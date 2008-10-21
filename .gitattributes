@@ -1,0 +1,2 @@
+cmds/incidentd/testdata/morethan96MB.txt filter=lfs diff=lfs merge=lfs -text
+packages/SettingsLib/Spa/gradle/wrapper/*.zip filter=lfs diff=lfs merge=lfs -text
