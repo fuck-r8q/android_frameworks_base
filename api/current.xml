@@ -125574,7 +125574,6 @@
  type="boolean"
  transient="false"
  volatile="false"
- value="false"
  static="true"
  final="true"
  deprecated="not deprecated"
@@ -125588,7 +125587,7 @@
  value="true"
  static="true"
  final="true"
- deprecated="not deprecated"
+ deprecated="deprecated"
  visibility="public"
 >
 </field>
@@ -125599,7 +125598,7 @@
  value="false"
  static="true"
  final="true"
- deprecated="not deprecated"
+ deprecated="deprecated"
  visibility="public"
 >
 </field>
@@ -125610,7 +125609,7 @@
  value="false"
  static="true"
  final="true"
- deprecated="not deprecated"
+ deprecated="deprecated"
  visibility="public"
 >
 </field>
@@ -125618,10 +125617,9 @@
  type="boolean"
  transient="false"
  volatile="false"
- value="true"
  static="true"
  final="true"
- deprecated="not deprecated"
+ deprecated="deprecated"
  visibility="public"
 >
 </field>
