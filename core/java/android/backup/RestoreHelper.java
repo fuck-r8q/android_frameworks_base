@@ -26,6 +26,6 @@ public interface RestoreHelper {
      * Do not close the <code>data</code> stream.  Do not read more than
      * <code>dataSize</code> bytes from <code>data</code>.
      */
-    public void performRestore(BackupDataInputStream data);
+    public void restoreEntity(BackupDataInputStream data);
 }
 
