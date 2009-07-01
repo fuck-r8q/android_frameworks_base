@@ -22,7 +22,7 @@ import android.security.Keystore;
 import java.io.IOException;
 
 /**
- * The service that manages the L2TP-over-IPSec VPN connection.
+ * The service that manages the certificate based L2TP-over-IPSec VPN connection.
  */
 class L2tpIpsecService extends VpnService<L2tpIpsecProfile> {
     private static final String IPSEC_DAEMON = "racoon";
@@ -34,11 +34,10 @@ class L2tpIpsecService extends VpnService<L2tpIpsecProfile> {
 
         // IPSEC
         AndroidServiceProxy ipsecService = startService(IPSEC_DAEMON);
-        ipsecService.sendCommand(
-                String.format("SETKEY %s %s", hostIp, serverIp));
-        ipsecService.sendCommand(String.format("SET_CERTS %s %s %s %s",
-                serverIp, getCaCertPath(), getUserCertPath(),
-                getUserkeyPath()));
+        ipsecService.sendCommand(hostIp, serverIp, L2tpService.L2TP_PORT,
+                getUserkeyPath(), getUserCertPath(), getCaCertPath());
+
+        sleep(2000); // 2 seconds
 
         // L2TP
         L2tpIpsecProfile p = getProfile();
