@@ -24,9 +24,10 @@ using namespace android::renderscript;
 
 Mesh::Mesh()
 {
-    mSources = NULL;
+    mVerticies = NULL;
+    mVerticiesCount = 0;
     mPrimitives = NULL;
-    mPrimitiveCount = 0;
+    mPrimitivesCount = 0;
 }
 
 Mesh::~Mesh()
