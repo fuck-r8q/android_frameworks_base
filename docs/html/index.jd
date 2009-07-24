@@ -33,7 +33,7 @@ home=true
                                       <!-- populated by buildCarousel() -->
                                     </div>
                                 </div><!-- end list-clip -->
-                                <a href="javascript:page_right()" id="arrow-right" onclick="" class="arrow-right-on"></a>
+                                <a href="javascript:page_right()" id="arrow-right" onclick="" class="arrow-right-off"></a>
                                 <div class="clearer"></div>
                             </div><!-- end app-list container -->
                         </div><!-- end carousel -->
@@ -135,15 +135,6 @@ home=true
       'img':"maps-large.png",
       'title':"Maps API Key",
       'desc':"<p>If you're writing an Android application that uses Google Maps (with MapView), you must register your application to obtain a Maps API Key. Without the key, your maps application will not work on Android devices. Obtaining a key requires just a couple of steps.</p><p><a href='http://code.google.com/android/add-ons/google-apis/maps-overview.html'>Learn more &raquo;</a></p>"
-    },
-
-    'market': {
-      'layout':"imgTop",
-      'icon':"market-small.png",
-      'name':"Android Market",
-      'img':"market-large.png",
-      'title':"",
-      'desc': "<p>Android Market helps you get your applications into the hands of users. The beta version of Market is now open and you can begin sharing your applications with users of the first Android-powered phone, the T-Mobile G1.</p><p><a href='http://market.android.com/publish/'>Publish your Android app on Market &raquo;</a></p>"
     },
 
     'devphone': {
