@@ -18,7 +18,6 @@ package com.android.grass.rs;
 
 import android.content.res.Resources;
 import android.renderscript.Sampler;
-import static android.renderscript.Sampler.Value.*;
 import static android.renderscript.ProgramFragment.EnvMode.*;
 import static android.renderscript.ProgramStore.DepthFunc.*;
 import static android.renderscript.ProgramStore.BlendSrcFunc;
@@ -33,6 +32,7 @@ import static android.util.MathUtils.*;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.renderscript.ScriptC;
+import static android.renderscript.Sampler.Value.*;
 
 import java.util.TimeZone;
 
@@ -43,8 +43,8 @@ class GrassRS {
     private static final int RSID_STATE_WIDTH = 2;
     private static final int RSID_STATE_HEIGHT = 3;
 
-    private static final int RSID_SKY_TEXTURES = 1;
-    private static final int SKY_TEXTURES_COUNT = 5;
+    private static final int RSID_TEXTURES = 1;
+    private static final int TEXTURES_COUNT = 5;
 
     private static final int RSID_BLADES = 2;
     private static final int BLADES_COUNT = 100;
@@ -69,32 +69,21 @@ class GrassRS {
     private final int mWidth;
     private final int mHeight;
 
-    @SuppressWarnings({"FieldCanBeLocal"})
     private ScriptC mScript;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private Sampler mSampler;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private ProgramFragment mPfBackground;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private ProgramStore mPfsBackground;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private RenderScript.ProgramVertex mPvBackground;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private ProgramVertexAlloc mPvOrthoAlloc;
 
-    @SuppressWarnings({"FieldCanBeLocal"})
     private Allocation mTexturesIDs;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private Allocation[] mTextures;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private int[] mTextureBufferIDs;
-    @SuppressWarnings({"FieldCanBeLocal"})
+
     private Allocation mState;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private Allocation mBlades;
-    @SuppressWarnings({"FieldCanBeLocal"})
+
     private ProgramFragment mPfGrass;
-    @SuppressWarnings({"FieldCanBeLocal"})
     private ProgramStore mPfsGrass;
 
     public GrassRS(int width, int height) {
@@ -108,6 +97,33 @@ class GrassRS {
         mRS = rs;
         mResources = res;
         initRS();
+    }
+    
+    public void destroy() {
+        mScript.destroy();
+        mSampler.destroy();
+        mPfBackground.destroy();
+        mPfsBackground.destroy();
+        mPvBackground.destroy();
+        mPvOrthoAlloc.mAlloc.destroy();
+        mTexturesIDs.destroy();
+        for (Allocation a : mTextures) {
+            a.destroy();
+        }
+        mState.destroy();
+        mBlades.destroy();
+        mPfGrass.destroy();
+        mPfsGrass.destroy();
+        mTextureBufferIDs = null;
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            destroy();
+        } finally {
+            super.finalize();
+        }
     }
 
     private void initRS() {
@@ -125,7 +141,7 @@ class GrassRS {
 
         loadSkyTextures();
         mScript.bindAllocation(mState, RSID_STATE);
-        mScript.bindAllocation(mTexturesIDs, RSID_SKY_TEXTURES);
+        mScript.bindAllocation(mTexturesIDs, RSID_TEXTURES);
         mScript.bindAllocation(mBlades, RSID_BLADES);
 
         mRS.contextBindRootScript(mScript);
@@ -165,9 +181,9 @@ class GrassRS {
     }
 
     private void loadSkyTextures() {
-        mTextureBufferIDs = new int[SKY_TEXTURES_COUNT];
-        mTextures = new Allocation[SKY_TEXTURES_COUNT];
-        mTexturesIDs = Allocation.createSized(mRS, USER_FLOAT, SKY_TEXTURES_COUNT);
+        mTextureBufferIDs = new int[TEXTURES_COUNT];
+        mTextures = new Allocation[TEXTURES_COUNT];
+        mTexturesIDs = Allocation.createSized(mRS, USER_FLOAT, TEXTURES_COUNT);
 
         final Allocation[] textures = mTextures;
         textures[0] = loadTexture(R.drawable.night, "night");

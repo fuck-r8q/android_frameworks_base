@@ -22,6 +22,8 @@ import android.renderscript.RenderScript;
 import android.view.SurfaceHolder;
 
 class GrassView extends RSSurfaceView {
+    private GrassRS mRender;
+
     public GrassView(Context context) {
         super(context);
     }
@@ -30,7 +32,12 @@ class GrassView extends RSSurfaceView {
         super.surfaceChanged(holder, format, w, h);
 
         RenderScript RS = createRenderScript();
-        GrassRS render = new GrassRS(w, h);
-        render.init(RS, getResources());
+        mRender = new GrassRS(w, h);
+        mRender.init(RS, getResources());
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        if (mRender != null) mRender.destroy();
     }
 }
