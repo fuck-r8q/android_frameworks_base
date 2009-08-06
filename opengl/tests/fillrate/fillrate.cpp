@@ -88,19 +88,25 @@ int main(int argc, char** argv)
      glBindTexture(GL_TEXTURE_2D, 0);
      glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
      glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+     glTexParameterx(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
      glTexEnvx(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
      glDisable(GL_DITHER);
-     glDisable(GL_BLEND);
+     glEnable(GL_BLEND);
      glEnable(GL_TEXTURE_2D);
      glColor4f(1,1,1,1);
 
      uint32_t* t32 = (uint32_t*)malloc(512*512*4); 
      for (int y=0 ; y<512 ; y++) {
          for (int x=0 ; x<512 ; x++) {
-             t32[x+y*512] = 0x10FFFFFF;
+             int u = x-256;
+             int v = y-256;
+             if (u*u+v*v < 256*256) {
+                 t32[x+y*512] = 0x10FFFFFF;
+             } else {
+                 t32[x+y*512] = 0x20FF0000;
+             }
          }
      }
 
@@ -127,14 +133,30 @@ int main(int argc, char** argv)
 
      glEnableClientState(GL_VERTEX_ARRAY);
      glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-     glVertexPointer(2, GL_FIXED, 0, vertices);
+     glVertexPointer(2, GL_FLOAT, 0, vertices);
      glTexCoordPointer(2, GL_FLOAT, 0, texCoords);
+
+     eglSwapInterval(dpy, 1);
 
      glClearColor(1,0,0,0);
      glClear(GL_COLOR_BUFFER_BIT);
      glDrawArrays(GL_TRIANGLE_FAN, 0, 4); 
      eglSwapBuffers(dpy, surface);
      
+
+     nsecs_t times[32];
+
+     for (int c=1 ; c<32 ; c++) {
+         glClear(GL_COLOR_BUFFER_BIT);
+         for (int i=0 ; i<c ; i++) {
+             glDrawArrays(GL_TRIANGLE_FAN, 0, 4); 
+         }
+         eglSwapBuffers(dpy, surface);
+     }
+
+
+     //     for (int c=31 ; c>=1 ; c--) {
+     int j=0;
      for (int c=1 ; c<32 ; c++) {
          glClear(GL_COLOR_BUFFER_BIT);
          nsecs_t now = systemTime();
@@ -143,7 +165,17 @@ int main(int argc, char** argv)
          }
          eglSwapBuffers(dpy, surface);
          nsecs_t t = systemTime() - now;
+         times[j++] = t;
+     }
+
+     for (int c=1, j=0 ; c<32 ; c++, j++) {
+         nsecs_t t = times[j];
          printf("%lld\t%d\t%f\n", t, c, (double(t)/c)/1000000.0);
      }
+
+
+       
+     eglTerminate(dpy);
+     
      return 0;
 }
