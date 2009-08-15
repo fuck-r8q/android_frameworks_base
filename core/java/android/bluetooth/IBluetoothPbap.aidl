@@ -16,6 +16,8 @@
 
 package android.bluetooth;
 
+import android.bluetooth.BluetoothDevice;
+
 /**
  * System private API for Bluetooth pbap service
  *
@@ -23,8 +25,8 @@ package android.bluetooth;
  */
 interface IBluetoothPbap {
     int getState();
-    String getPceAddress();
-    boolean connectPce(in String address);
-    void disconnectPce();
-    boolean isConnected(in String address);
+    BluetoothDevice getClient();
+    boolean connect(in BluetoothDevice device);
+    void disconnect();
+    boolean isConnected(in BluetoothDevice device);
 }
