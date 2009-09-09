@@ -30,9 +30,9 @@ public:
     // Extractor assumes ownership of "source".
     MP3Extractor(const sp<DataSource> &source);
 
-    size_t countTracks();
-    sp<MediaSource> getTrack(size_t index);
-    sp<MetaData> getTrackMetaData(size_t index);
+    virtual size_t countTracks();
+    virtual sp<MediaSource> getTrack(size_t index);
+    virtual sp<MetaData> getTrackMetaData(size_t index);
 
 protected:
     virtual ~MP3Extractor();
