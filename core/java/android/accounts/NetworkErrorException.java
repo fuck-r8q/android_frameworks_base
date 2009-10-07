@@ -15,7 +15,7 @@
  */
 package android.accounts;
 
-public class NetworkErrorException extends Exception {
+public class NetworkErrorException extends AccountsException {
     public NetworkErrorException() {
         super();
     }
