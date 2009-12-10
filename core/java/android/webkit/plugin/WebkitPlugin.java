@@ -30,7 +30,7 @@ package android.webkit.plugin;
  */
 public interface WebkitPlugin {
 
-    SurfaceDrawingModel getEmbeddedSurface();
-    SurfaceDrawingModel getFullScreenSurface();
+    SurfaceDrawingModel    getEmbeddedSurface();
+    FullScreenDrawingModel getFullScreenSurface();
 
 }
