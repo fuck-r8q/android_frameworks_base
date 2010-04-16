@@ -21,11 +21,11 @@ import android.util.Slog;
 import android.view.View;
 import java.util.ArrayList;
 
-class NotificationViewList {
+public class NotificationViewList {
     private ArrayList<StatusBarNotification> mOngoing = new ArrayList();
     private ArrayList<StatusBarNotification> mLatest = new ArrayList();
 
-    NotificationViewList() {
+    public NotificationViewList() {
     }
 
     private static final int indexInList(ArrayList<StatusBarNotification> list, NotificationData n){

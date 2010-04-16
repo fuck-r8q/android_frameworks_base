@@ -31,7 +31,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-class StatusBarIcon {
+public class StatusBarIcon {
     // TODO: get this from a resource
     private static final int ICON_GAP = 8;
     private static final int ICON_WIDTH = 25;
