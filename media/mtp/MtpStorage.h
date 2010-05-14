@@ -46,9 +46,6 @@ public:
     inline const char*      getPath() const { return mFilePath; }
 
     bool                    scanFiles();
-
-private:
-    int                     scanDirectory(const char* path, MtpObjectHandle parent);
 };
 
 }; // namespace android
