@@ -17,7 +17,7 @@
 #ifndef _MTP_DEBUG_H
 #define _MTP_DEBUG_H
 
-#include "mtp.h"
+#include "MtpTypes.h"
 
 namespace android {
 
