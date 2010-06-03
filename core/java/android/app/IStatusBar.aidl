@@ -16,6 +16,8 @@
  
 package android.app;
 
+import android.app.IPoo;
+
 /** @hide */
 interface IStatusBar
 {
@@ -26,4 +28,7 @@ interface IStatusBar
     IBinder addIcon(String slot, String iconPackage, int iconId, int iconLevel);
     void updateIcon(IBinder key, String slot, String iconPackage, int iconId, int iconLevel);
     void removeIcon(IBinder key);
+
+    // ---- Methods below are for use by the status bar policy services ----
+    void registerStatusBar(IPoo callbacks);
 }
