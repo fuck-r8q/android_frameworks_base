@@ -34,7 +34,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManagerImpl;
 
-public class StatusBarService extends Service {
+public abstract class StatusBarService extends Service {
     private static final String TAG = "StatusBarService";
 
     Bar mBar = new Bar();
@@ -71,26 +71,9 @@ public class StatusBarService extends Service {
     class Bar extends IStatusBar.Stub {
     }
 
-    // ================================================================================
-    // Constructing the view
-    // ================================================================================
-    private void addStatusBarView() {
-        final View view = new View(this);
-
-        // TODO final StatusBarView view = mStatusBarView;
-        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                view.getContext().getResources().getDimensionPixelSize(
-                        com.android.internal.R.dimen.status_bar_height),
-                WindowManager.LayoutParams.TYPE_STATUS_BAR,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
-                WindowManager.LayoutParams.FLAG_TOUCHABLE_WHEN_WAKING,
-                PixelFormat.RGB_888);
-        lp.gravity = Gravity.TOP | Gravity.FILL_HORIZONTAL;
-        lp.setTitle("StatusBar");
-        // TODO lp.windowAnimations = R.style.Animation_StatusBar;
-
-        WindowManagerImpl.getDefault().addView(view, lp);
-    }
+    /**
+     * Implement this to add the main status bar view.
+     */
+    protected abstract void addStatusBarView();
 }
 
