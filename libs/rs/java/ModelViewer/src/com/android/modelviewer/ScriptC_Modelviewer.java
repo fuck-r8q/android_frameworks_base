@@ -92,5 +92,27 @@ public class ScriptC_Modelviewer extends ScriptC {
         return mExportVar_gRotate;
     }
 
+    private final static int mExportVarIdx_gItalic = 6;
+    private Font mExportVar_gItalic;
+    public void set_gItalic(Font v) {
+        mExportVar_gItalic = v;
+        setVar(mExportVarIdx_gItalic, (v == null) ? 0 : v.getID());
+    }
+
+    public Font get_gItalic() {
+        return mExportVar_gItalic;
+    }
+
+    private final static int mExportVarIdx_gTextAlloc = 7;
+    private Allocation mExportVar_gTextAlloc;
+    public void set_gTextAlloc(Allocation v) {
+        mExportVar_gTextAlloc = v;
+        setVar(mExportVarIdx_gTextAlloc, (v == null) ? 0 : v.getID());
+    }
+
+    public Allocation get_gTextAlloc() {
+        return mExportVar_gTextAlloc;
+    }
+
 }
 
