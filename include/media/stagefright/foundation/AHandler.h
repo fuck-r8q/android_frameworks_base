@@ -34,6 +34,8 @@ struct AHandler : public RefBase {
         return mID;
     }
 
+    sp<ALooper> looper();
+
 protected:
     virtual void onMessageReceived(const sp<AMessage> &msg) = 0;
 
