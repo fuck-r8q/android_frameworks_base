@@ -97,6 +97,7 @@ Texture* TextureCache::get(SkBitmap* bitmap) {
     } else if (bitmap->getGenerationID() != texture->generation) {
         generateTexture(bitmap, texture, true);
     }
+    // TODO: Do something to destroy the texture object if it's too big for the cache
     return texture;
 }
 
