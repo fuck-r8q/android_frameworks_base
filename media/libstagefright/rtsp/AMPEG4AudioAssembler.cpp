@@ -168,4 +168,10 @@ void AMPEG4AudioAssembler::packetLost() {
     mAccessUnitDamaged = true;
 }
 
+void AMPEG4AudioAssembler::onByeReceived() {
+    sp<AMessage> msg = mNotifyMsg->dup();
+    msg->setInt32("eos", true);
+    msg->post();
+}
+
 }  // namespace android

@@ -35,6 +35,7 @@ protected:
     virtual ~AAVCAssembler();
 
     virtual AssemblyStatus assembleMore(const sp<ARTPSource> &source);
+    virtual void onByeReceived();
     virtual void packetLost();
 
 private:
