@@ -18,6 +18,9 @@ package android.graphics;
 
 import com.android.layoutlib.bridge.impl.DelegateManager;
 
+import java.awt.BasicStroke;
+import java.awt.Stroke;
+
 /**
  * Delegate implementing the native methods of android.graphics.DashPathEffect
  *
@@ -32,8 +35,10 @@ import com.android.layoutlib.bridge.impl.DelegateManager;
  * {@link DelegateManager}, as all the PathEffect classes will be added to the manager owned by
  * {@link PathEffect_Delegate}.
  *
+ * @see PathEffect_Delegate
+ *
  */
-public class DashPathEffect_Delegate extends PathEffect_Delegate {
+public final class DashPathEffect_Delegate extends PathEffect_Delegate {
 
     // ---- delegate data ----
 
@@ -42,12 +47,26 @@ public class DashPathEffect_Delegate extends PathEffect_Delegate {
 
     // ---- Public Helper methods ----
 
-    public float[] getIntervals() {
-        return mIntervals;
+    @Override
+    public Stroke getStroke(Paint_Delegate paint) {
+        return new BasicStroke(
+                paint.getStrokeWidth(),
+                paint.getJavaCap(),
+                paint.getJavaJoin(),
+                paint.getStrokeMiter(),
+                mIntervals,
+                mPhase);
     }
 
-    public float getPhase() {
-        return mPhase;
+    @Override
+    public boolean isSupported() {
+        return true;
+    }
+
+    @Override
+    public String getSupportMessage() {
+        // no message since isSupported returns true;
+        return null;
     }
 
     // ---- native methods ----
