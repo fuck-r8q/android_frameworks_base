@@ -21,10 +21,6 @@ import com.android.layoutlib.bridge.impl.DelegateManager;
 
 import android.graphics.Shader.TileMode;
 
-import java.awt.Paint;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.NoninvertibleTransformException;
-
 /**
  * Delegate implementing the native methods of android.graphics.LinearGradient
  *
@@ -41,7 +37,7 @@ import java.awt.geom.NoninvertibleTransformException;
  * @see Shader_Delegate
  *
  */
-public class LinearGradient_Delegate extends Gradient_Delegate {
+public final class LinearGradient_Delegate extends Gradient_Delegate {
 
     // ---- delegate data ----
     private java.awt.Paint mJavaPaint;
@@ -49,7 +45,7 @@ public class LinearGradient_Delegate extends Gradient_Delegate {
     // ---- Public Helper methods ----
 
     @Override
-    public Paint getJavaPaint() {
+    public java.awt.Paint getJavaPaint() {
         return mJavaPaint;
     }
 
@@ -58,17 +54,8 @@ public class LinearGradient_Delegate extends Gradient_Delegate {
     /*package*/ static int nativeCreate1(LinearGradient thisGradient,
             float x0, float y0, float x1, float y1,
             int colors[], float positions[], int tileMode) {
-        // figure out the tile
-        TileMode tile = null;
-        for (TileMode tm : TileMode.values()) {
-            if (tm.nativeInt == tileMode) {
-                tile = tm;
-                break;
-            }
-        }
-
         LinearGradient_Delegate newDelegate = new LinearGradient_Delegate(x0, y0, x1, y1,
-                colors, positions, tile);
+                colors, positions, Shader_Delegate.getTileMode(tileMode));
         return sManager.addDelegate(newDelegate);
     }
     /*package*/ static int nativeCreate2(LinearGradient thisGradient,
@@ -144,20 +131,20 @@ public class LinearGradient_Delegate extends Gradient_Delegate {
                 java.awt.RenderingHints        hints) {
             precomputeGradientColors();
 
-            AffineTransform canvasMatrix;
+            java.awt.geom.AffineTransform canvasMatrix;
             try {
                 canvasMatrix = xform.createInverse();
-            } catch (NoninvertibleTransformException e) {
+            } catch (java.awt.geom.NoninvertibleTransformException e) {
                 Bridge.getLog().error(null, "Unable to inverse matrix in LinearGradient", e);
-                canvasMatrix = new AffineTransform();
+                canvasMatrix = new java.awt.geom.AffineTransform();
             }
 
-            AffineTransform localMatrix = getLocalMatrix();
+            java.awt.geom.AffineTransform localMatrix = getLocalMatrix();
             try {
                 localMatrix = localMatrix.createInverse();
-            } catch (NoninvertibleTransformException e) {
+            } catch (java.awt.geom.NoninvertibleTransformException e) {
                 Bridge.getLog().error(null, "Unable to inverse matrix in LinearGradient", e);
-                localMatrix = new AffineTransform();
+                localMatrix = new java.awt.geom.AffineTransform();
             }
 
             return new LinearGradientPaintContext(canvasMatrix, localMatrix, colorModel);
@@ -165,12 +152,14 @@ public class LinearGradient_Delegate extends Gradient_Delegate {
 
         private class LinearGradientPaintContext implements java.awt.PaintContext {
 
-            private final AffineTransform mCanvasMatrix;
-            private final AffineTransform mLocalMatrix;
+            private final java.awt.geom.AffineTransform mCanvasMatrix;
+            private final java.awt.geom.AffineTransform mLocalMatrix;
             private final java.awt.image.ColorModel mColorModel;
 
-            public LinearGradientPaintContext(AffineTransform canvasMatrix,
-                    AffineTransform localMatrix, java.awt.image.ColorModel colorModel) {
+            private LinearGradientPaintContext(
+                    java.awt.geom.AffineTransform canvasMatrix,
+                    java.awt.geom.AffineTransform localMatrix,
+                    java.awt.image.ColorModel colorModel) {
                 mCanvasMatrix = canvasMatrix;
                 mLocalMatrix = localMatrix;
                 mColorModel = colorModel;
