@@ -18,16 +18,19 @@ package com.android.server;
 
 /**
  * Describes input-related application properties for use by the input dispatcher.
- * 
  * @hide
  */
 public final class InputApplication {
+    // Application handle.
+    public InputApplicationHandle inputApplicationHandle;
+
     // Application name.
     public String name;
-    
+
     // Dispatching timeout.
     public long dispatchingTimeoutNanos;
-    
-    // The application window token.
-    public Object token;
+
+    public void recycle() {
+        inputApplicationHandle = null;
+    }
 }
