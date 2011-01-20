@@ -20,7 +20,6 @@
     >
     <item
         android:drawable="@drawable/notification_item_background_color"
-        android:left="16dp"
         />
 </layer-list>
 
