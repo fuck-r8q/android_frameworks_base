@@ -31,7 +31,6 @@ public class BitmapMeshActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         final BitmapMeshView view = new BitmapMeshView(this);
-        view.setDrawingCacheEnabled(true);
         setContentView(view);
     }
 
