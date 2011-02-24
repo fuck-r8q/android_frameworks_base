@@ -33,3 +33,6 @@ LOCAL_MODULE := layoutlib
 
 include $(BUILD_HOST_JAVA_LIBRARY)
 
+# Build all sub-directories
+include $(call all-makefiles-under,$(LOCAL_PATH))
+
