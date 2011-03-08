@@ -18,28 +18,24 @@
 
 #define NU_HTTP_DATA_SOURCE_H_
 
-#include <media/stagefright/DataSource.h>
 #include <utils/List.h>
 #include <utils/String8.h>
 #include <utils/threads.h>
 
 #include "HTTPStream.h"
+#include "include/HTTPBase.h"
 
 namespace android {
 
-struct NuHTTPDataSource : public DataSource {
-    enum Flags {
-        // Don't log any URLs.
-        kFlagIncognito = 1
-    };
+struct NuHTTPDataSource : public HTTPBase {
     NuHTTPDataSource(uint32_t flags = 0);
 
-    status_t connect(
+    virtual status_t connect(
             const char *uri,
             const KeyedVector<String8, String8> *headers = NULL,
             off64_t offset = 0);
 
-    void disconnect();
+    virtual void disconnect();
 
     virtual status_t initCheck() const;
 
@@ -49,7 +45,7 @@ struct NuHTTPDataSource : public DataSource {
 
     // Returns true if bandwidth could successfully be estimated,
     // false otherwise.
-    bool estimateBandwidth(int32_t *bandwidth_bps);
+    virtual bool estimateBandwidth(int32_t *bandwidth_bps);
 
     virtual DecryptHandle* DrmInitialization();
     virtual void getDrmInfo(DecryptHandle **handle, DrmManagerClient **client);
