@@ -49,7 +49,7 @@ public class UsbPermissionActivity extends AlertActivity
 
     private static final String TAG = "UsbPermissionActivity";
 
-    private CheckBox mAlwaysCheck;
+    private CheckBox mAlwaysUse;
     private TextView mClearDefaultHint;
     private UsbDevice mDevice;
     private UsbAccessory mAccessory;
@@ -100,9 +100,9 @@ public class UsbPermissionActivity extends AlertActivity
         LayoutInflater inflater = (LayoutInflater)getSystemService(
                 Context.LAYOUT_INFLATER_SERVICE);
         ap.mView = inflater.inflate(com.android.internal.R.layout.always_use_checkbox, null);
-        mAlwaysCheck = (CheckBox)ap.mView.findViewById(com.android.internal.R.id.alwaysUse);
-        mAlwaysCheck.setText(com.android.internal.R.string.alwaysUse);
-        mAlwaysCheck.setOnCheckedChangeListener(this);
+        mAlwaysUse = (CheckBox)ap.mView.findViewById(com.android.internal.R.id.alwaysUse);
+        mAlwaysUse.setText(com.android.internal.R.string.alwaysUse);
+        mAlwaysUse.setOnCheckedChangeListener(this);
         mClearDefaultHint = (TextView)ap.mView.findViewById(
                                                     com.android.internal.R.id.clearDefaultHint);
         mClearDefaultHint.setVisibility(View.GONE);
@@ -123,7 +123,7 @@ public class UsbPermissionActivity extends AlertActivity
                 intent.putExtra(UsbManager.EXTRA_DEVICE, mDevice);
                 if (mPermissionGranted) {
                     service.grantDevicePermission(mDevice, mUid);
-                    if (mAlwaysCheck.isChecked()) {
+                    if (mAlwaysUse.isChecked()) {
                         service.setDevicePackage(mDevice, mPackageName);
                     }
                 }
@@ -132,7 +132,7 @@ public class UsbPermissionActivity extends AlertActivity
                 intent.putExtra(UsbManager.EXTRA_ACCESSORY, mAccessory);
                 if (mPermissionGranted) {
                     service.grantAccessoryPermission(mAccessory, mUid);
-                    if (mAlwaysCheck.isChecked()) {
+                    if (mAlwaysUse.isChecked()) {
                         service.setAccessoryPackage(mAccessory, mPackageName);
                     }
                 }
