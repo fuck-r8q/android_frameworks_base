@@ -16,7 +16,9 @@
 
 package android.nfc;
 
+import android.nfc.ApduList;
 import android.os.Bundle;
+
 
 /**
  * {@hide}
@@ -26,5 +28,7 @@ interface INfcAdapterExtras {
     Bundle close();
     Bundle transceive(in byte[] data_in);
     int getCardEmulationRoute();
-    void setCardEmulationRoute(int route);    
+    void setCardEmulationRoute(int route);
+    void registerTearDownApdus(String packageName, in ApduList apdu);
+    void unregisterTearDownApdus(String packageName);
 }
