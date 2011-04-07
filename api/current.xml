@@ -206095,68 +206095,6 @@
 </parameter>
 </constructor>
 </class>
-<class name="Config"
- extends="java.lang.Object"
- abstract="false"
- static="false"
- final="true"
- deprecated="not deprecated"
- visibility="public"
->
-<field name="DEBUG"
- type="boolean"
- transient="false"
- volatile="false"
- static="true"
- final="true"
- deprecated="not deprecated"
- visibility="public"
->
-</field>
-<field name="LOGD"
- type="boolean"
- transient="false"
- volatile="false"
- value="true"
- static="true"
- final="true"
- deprecated="deprecated"
- visibility="public"
->
-</field>
-<field name="LOGV"
- type="boolean"
- transient="false"
- volatile="false"
- value="false"
- static="true"
- final="true"
- deprecated="deprecated"
- visibility="public"
->
-</field>
-<field name="PROFILE"
- type="boolean"
- transient="false"
- volatile="false"
- value="false"
- static="true"
- final="true"
- deprecated="deprecated"
- visibility="public"
->
-</field>
-<field name="RELEASE"
- type="boolean"
- transient="false"
- volatile="false"
- static="true"
- final="true"
- deprecated="deprecated"
- visibility="public"
->
-</field>
-</class>
 <class name="DebugUtils"
  extends="java.lang.Object"
  abstract="false"
