@@ -13,20 +13,24 @@
  ** See the License for the specific language governing permissions and
  ** limitations under the License.
  */
- 
+
 #ifndef _GLESV2_DBG_H_
 #define _GLESV2_DBG_H_
 
+#include <pthread.h>
+
 namespace android
 {
-    struct DbgContext;
-    
-    DbgContext * CreateDbgContext(const unsigned version, const gl_hooks_t * const hooks);
-    void DestroyDbgContext(DbgContext * const dbg);
-    
-    void StartDebugServer(unsigned short port); // create and bind socket if haven't already
-    void StopDebugServer(); // close socket if open
-    
+struct DbgContext;
+
+DbgContext * CreateDbgContext(const pthread_key_t EGLThreadLocalStorageKey,
+                              const unsigned version, const gl_hooks_t * const hooks);
+
+void DestroyDbgContext(DbgContext * const dbg);
+
+void StartDebugServer(unsigned short port); // create and bind socket if haven't already
+void StopDebugServer(); // close socket if open
+
 }; // namespace android
 
 #endif // #ifndef _GLESV2_DBG_H_
