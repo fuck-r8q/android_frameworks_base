@@ -25,6 +25,9 @@
 
 #include "hooks.h"
 
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 4
+
 // ----------------------------------------------------------------------------
 namespace android {
 // ----------------------------------------------------------------------------
@@ -40,6 +43,8 @@ struct egl_connection_t
 };
 
 EGLAPI EGLImageKHR egl_get_image_for_current_context(EGLImageKHR image);
+
+extern egl_connection_t gEGLImpl[IMPL_NUM_IMPLEMENTATIONS];
 
 // ----------------------------------------------------------------------------
 }; // namespace android
