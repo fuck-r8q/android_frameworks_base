@@ -23,9 +23,6 @@ package android.net;
  */
 interface INetworkPolicyManager {
 
-    void onForegroundActivitiesChanged(int uid, int pid, boolean foregroundActivities);
-    void onProcessDied(int uid, int pid);
-
     void setUidPolicy(int uid, int policy);
     int getUidPolicy(int uid);
 
