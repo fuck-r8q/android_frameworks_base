@@ -15,8 +15,6 @@
  */
 package android.security;
 
-import android.os.Bundle;
-
 /**
  * Caller is required to ensure that {@link KeyStore#unlock
  * KeyStore.unlock} was successful.
