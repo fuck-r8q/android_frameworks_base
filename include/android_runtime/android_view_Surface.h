@@ -25,6 +25,7 @@ namespace android {
 
 extern sp<ANativeWindow> android_Surface_getNativeWindow(
         JNIEnv* env, jobject clazz);
+extern bool android_Surface_isInstanceOf(JNIEnv* env, jobject obj);
 
 } // namespace android
 
