@@ -14,28 +14,20 @@
      limitations under the License.
 -->
 
-<TabHost xmlns:android="http://schemas.android.com/apk/res/android"
-         android:id="@android:id/tabhost"
-         android:layout_width="fill_parent"
-         android:layout_height="fill_parent">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
 
-    <LinearLayout
-            android:orientation="vertical"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:padding="5dp">
+    <ListView android:id="@+id/testlist"
+        android:layout_width="0px" 
+        android:layout_height="fill_parent"
+        android:layout_weight="1"/>
 
-        <TabWidget
-                android:id="@android:id/tabs"
-                android:layout_width="fill_parent"
-                android:layout_height="wrap_content"/>
+    <FrameLayout android:id="@+id/testframe"
+        android:layout_width="0px" 
+        android:layout_height="fill_parent"
+        android:layout_weight="6">
+    </FrameLayout>
 
-        <FrameLayout
-                android:id="@android:id/tabcontent"
-                android:layout_width="fill_parent"
-                android:layout_height="fill_parent"
-                android:padding="5dp"/>
-
-    </LinearLayout>
-
-</TabHost>
+</LinearLayout>
