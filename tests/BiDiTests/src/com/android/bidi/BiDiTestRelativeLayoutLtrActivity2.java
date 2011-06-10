@@ -25,7 +25,7 @@ public class BiDiTestRelativeLayoutLtrActivity2 extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        setContentView(R.layout.relative_layout_ltr_2);
+        setContentView(R.layout.relative_layout_2_ltr);
     }
 }
 
