@@ -20,14 +20,14 @@
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
     <!-- Resources for MultiWaveView in LockScreen -->
-    <array name="ic_lockscreen_targets_when_silent">
+    <array name="lockscreen_targets_when_silent">
         <item>@null</item>"
         <item>@drawable/ic_lockscreen_unlock</item>
         <item>@null</item>
         <item>@drawable/ic_lockscreen_soundon</item>
     </array>
 
-    <array name="ic_lockscreen_targets_when_soundon">
+    <array name="lockscreen_targets_when_soundon">
         <item>@null</item>"
         <item>@drawable/ic_lockscreen_unlock</item>
         <item>@null</item>
