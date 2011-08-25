@@ -27,10 +27,28 @@ import java.util.List;
  */
 oneway interface IAccessibilityInteractionConnectionCallback {
 
+    /**
+     * Sets the result of an async request that returns an {@link AccessibilityNodeInfo}.
+     *
+     * @param infos The result {@link AccessibilityNodeInfo}.
+     * @param interactionId The interaction id to match the result with the request.
+     */
     void setFindAccessibilityNodeInfoResult(in AccessibilityNodeInfo info, int interactionId);
 
+    /**
+     * Sets the result of an async request that returns {@link AccessibilityNodeInfo}s.
+     *
+     * @param infos The result {@link AccessibilityNodeInfo}s.
+     * @param interactionId The interaction id to match the result with the request.
+     */
     void setFindAccessibilityNodeInfosResult(in List<AccessibilityNodeInfo> infos,
         int interactionId);
 
+    /**
+     * Sets the result of a request to perform an accessibility action.
+     *
+     * @param Whether the action was performed.
+     * @param interactionId The interaction id to match the result with the request.
+     */
     void setPerformAccessibilityActionResult(boolean succeeded, int interactionId);
 }
