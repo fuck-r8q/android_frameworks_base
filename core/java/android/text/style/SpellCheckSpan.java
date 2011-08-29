@@ -16,6 +16,10 @@
 
 package android.text.style;
 
+import android.os.Parcel;
+import android.text.ParcelableSpan;
+import android.text.TextUtils;
+
 /**
  * A SpellCheckSpan is an internal data structure created by the TextView's SpellChecker to
  * annotate portions of the text that are about to or currently being spell checked. They are
@@ -23,12 +27,16 @@ package android.text.style;
  *
  * @hide
  */
-public class SpellCheckSpan {
+public class SpellCheckSpan implements ParcelableSpan {
 
     private boolean mSpellCheckInProgress;
 
     public SpellCheckSpan() {
         mSpellCheckInProgress = false;
+    }
+
+    public SpellCheckSpan(Parcel src) {
+        mSpellCheckInProgress = (src.readInt() != 0);
     }
 
     public void setSpellCheckInProgress() {
@@ -37,5 +45,20 @@ public class SpellCheckSpan {
 
     public boolean isSpellCheckInProgress() {
         return mSpellCheckInProgress;
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(mSpellCheckInProgress ? 1 : 0);
+    }
+
+    @Override
+    public int getSpanTypeId() {
+        return TextUtils.SPELL_CHECK_SPAN;
     }
 }
