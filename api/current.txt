@@ -5087,7 +5087,7 @@ package android.content {
     field public static final java.lang.String ALARM_SERVICE = "alarm";
     field public static final java.lang.String AUDIO_SERVICE = "audio";
     field public static final int BIND_ABOVE_CLIENT = 8; // 0x8
-    field public static final int BIND_ADJUST_WITH_ACTIVITY = 64; // 0x40
+    field public static final int BIND_ADJUST_WITH_ACTIVITY = 128; // 0x80
     field public static final int BIND_ALLOW_OOM_MANAGEMENT = 16; // 0x10
     field public static final int BIND_AUTO_CREATE = 1; // 0x1
     field public static final int BIND_DEBUG_UNBIND = 2; // 0x2
