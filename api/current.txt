@@ -7319,22 +7319,11 @@ package android.database.sqlite {
     method public void bindString(int, java.lang.String);
     method public void clearBindings();
     method public void close();
-    method protected deprecated void compile(java.lang.String, boolean);
     method public final deprecated int getUniqueId();
-    method protected final void native_bind_blob(int, byte[]);
-    method protected final void native_bind_double(int, double);
-    method protected final void native_bind_long(int, long);
-    method protected final void native_bind_null(int);
-    method protected final void native_bind_string(int, java.lang.String);
-    method protected final deprecated void native_compile(java.lang.String);
-    method protected final deprecated void native_finalize();
     method protected void onAllReferencesReleased();
-    field protected deprecated android.database.sqlite.SQLiteDatabase mDatabase;
-    field protected deprecated int nHandle;
-    field protected deprecated int nStatement;
   }
 
-  public class SQLiteQuery extends android.database.sqlite.SQLiteProgram {
+  public final class SQLiteQuery extends android.database.sqlite.SQLiteProgram {
   }
 
   public class SQLiteQueryBuilder {
@@ -7363,7 +7352,7 @@ package android.database.sqlite {
     ctor public SQLiteReadOnlyDatabaseException(java.lang.String);
   }
 
-  public class SQLiteStatement extends android.database.sqlite.SQLiteProgram {
+  public final class SQLiteStatement extends android.database.sqlite.SQLiteProgram {
     method public void execute();
     method public long executeInsert();
     method public int executeUpdateDelete();
