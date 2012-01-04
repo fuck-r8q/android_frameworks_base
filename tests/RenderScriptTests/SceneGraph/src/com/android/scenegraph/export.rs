@@ -16,13 +16,14 @@
 
 #pragma rs java_package_name(com.android.scenegraph)
 
-// The sole purpose of this script is to have various structs exposed 
-// so that java reflected classes are generated 
+// The sole purpose of this script is to have various structs exposed
+// so that java reflected classes are generated
 #include "transform_def.rsh"
 SgTransform *exportPtr;
 SgRenderState *sExport;
 SgRenderable *drExport;
 SgRenderPass *pExport;
 SgCamera *exportPtrCam;
+SgLight *exportPtrLight;
 FBlurOffsets *blurExport;
 VertexShaderInputs *iExport;
