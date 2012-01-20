@@ -27,10 +27,9 @@ import android.util.Log;
 /**
  * @hide
  */
-public class Texture2D extends SceneGraphBase {
+public class Texture2D extends TextureBase {
     String mFileName;
     String mFileDir;
-    Allocation mRsTexture;
 
     public Texture2D() {
     }
