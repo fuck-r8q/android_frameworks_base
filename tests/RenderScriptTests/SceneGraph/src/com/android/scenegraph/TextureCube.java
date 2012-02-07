@@ -33,13 +33,16 @@ public class TextureCube extends TextureBase {
     String mFileDir;
 
     public TextureCube() {
+        super(ScriptC_export.const_TextureType_TEXTURE_CUBE);
     }
 
     public TextureCube(Allocation tex) {
+        super(ScriptC_export.const_TextureType_TEXTURE_CUBE);
         setTexture(tex);
     }
 
     public TextureCube(String dir, String file) {
+        super(ScriptC_export.const_TextureType_TEXTURE_CUBE);
         setFileDir(dir);
         setFileName(file);
     }
@@ -57,12 +60,22 @@ public class TextureCube extends TextureBase {
     }
 
     public void setTexture(Allocation tex) {
-        mRsTexture = tex;
+        mData.texture = tex;
+        if (mField != null) {
+            mField.set_texture(0, mData.texture, true);
+        }
     }
 
-    Allocation getRsData() {
-        if (mRsTexture != null) {
-            return mRsTexture;
+    void load() {
+        RenderScriptGL rs = SceneManager.getRS();
+        Resources res = SceneManager.getRes();
+        String shortName = mFileName.substring(mFileName.lastIndexOf('/') + 1);
+        setTexture(SceneManager.loadCubemap(mFileDir + shortName, rs, res));
+    }
+
+    ScriptField_Texture_s getRsData(boolean loadNow) {
+        if (mField != null) {
+            return mField;
         }
 
         RenderScriptGL rs = SceneManager.getRS();
@@ -71,10 +84,17 @@ public class TextureCube extends TextureBase {
             return null;
         }
 
-        String shortName = mFileName.substring(mFileName.lastIndexOf('/') + 1);
-        mRsTexture = SceneManager.loadCubemap(mFileDir + shortName, rs, res);
+        mField = new ScriptField_Texture_s(rs, 1);
 
-        return mRsTexture;
+        if (loadNow) {
+            load();
+        } else {
+            mData.texture = SceneManager.getDefaultTexCube();
+            new SingleImageLoaderTask().execute(this);
+        }
+
+        mField.set(mData, 0, true);
+        return mField;
     }
 }
 
