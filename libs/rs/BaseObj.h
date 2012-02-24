@@ -27,6 +27,9 @@ class BaseObj {
 protected:
     friend class Element;
     friend class Type;
+    friend class Allocation;
+    friend class Script;
+    friend class ScriptC;
 
     void *mID;
     RenderScript *mRS;
@@ -36,6 +39,8 @@ protected:
 
     BaseObj(void *id, RenderScript *rs);
     void checkValid();
+
+    static void * getObjID(const BaseObj *o);
 
 public:
 
