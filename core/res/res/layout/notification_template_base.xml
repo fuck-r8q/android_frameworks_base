@@ -15,9 +15,13 @@
 -->
 
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:internal="http://schemas.android.com/apk/prv/res/android"
+    android:background="@android:color/background_dark"
     android:id="@+id/status_bar_latest_event_content"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    internal:layout_minHeight="64dp"
+    internal:layout_maxHeight="64dp"
     >
     <ImageView android:id="@+id/icon"
         android:layout_width="@dimen/notification_large_icon_width"
