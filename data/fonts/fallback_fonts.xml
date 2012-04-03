@@ -88,4 +88,9 @@
             <file>DroidSansFallback.ttf</file>
         </fileset>
     </family>
+    <family>
+        <fileset>
+            <file>MTLmr3m.ttf</file>
+        </fileset>
+    </family>
 </familyset>
