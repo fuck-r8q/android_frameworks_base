@@ -16,6 +16,7 @@
 
 package android.accessibilityservice;
 
+import android.accessibilityservice.IAccessibilityServiceClientCallback;
 import android.accessibilityservice.IAccessibilityServiceConnection;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -32,5 +33,5 @@ import android.view.accessibility.AccessibilityEvent;
 
     void onInterrupt();
 
-    void onGesture(int gestureId);
+    void onGesture(int gesture, in IAccessibilityServiceClientCallback callback, int interactionId);
 }
