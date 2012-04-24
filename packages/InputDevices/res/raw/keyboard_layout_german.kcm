@@ -178,7 +178,7 @@ key P {
 key LEFT_BRACKET {
     label:                              '\u00dc'
     base:                               '\u00fc'
-    shift:                              '\u00dc'
+    shift, capslock:                    '\u00dc'
 }
 
 key RIGHT_BRACKET {
@@ -247,13 +247,13 @@ key L {
 key SEMICOLON {
     label:                              '\u00d6'
     base:                               '\u00f6'
-    shift:                              '\u00d6'
+    shift, capslock:                    '\u00d6'
 }
 
 key APOSTROPHE {
     label:                              '\u00c4'
     base:                               '\u00e4'
-    shift:                              '\u00c4'
+    shift, capslock:                    '\u00c4'
 }
 
 key BACKSLASH {
