@@ -15,7 +15,7 @@
 #
 # Russian keyboard layout.
 # This is a typical Russian PC keyboard layout.
-# English characters are accessible using ralt (Alt Gr).
+# As an added convenience, English characters are accessible using ralt (Alt Gr).
 #
 
 type OVERLAY
