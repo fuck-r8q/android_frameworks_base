@@ -17,7 +17,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
               android:layout_height="?android:attr/listPreferredItemHeight"
-              android:background="?android:attr/activatedBackgroundIndicator"
+              android:background="@drawable/item_background_activated_holo_dark"
               android:gravity="center_vertical">
 
     <ImageView android:layout_width="56dp"
@@ -37,20 +37,25 @@
         <TextView android:id="@android:id/text1"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
+                  android:singleLine="true"
+                  android:ellipsize="marquee"
                   android:textAppearance="?android:attr/textAppearanceMedium" />
 
         <TextView android:id="@android:id/text2"
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
+                  android:singleLine="true"
+                  android:ellipsize="marquee"
                   android:textAppearance="?android:attr/textAppearanceSmall" />
     </LinearLayout>
 
-    <!-- TODO Make this not glow when pressed from above, and give it a divider. -->
-    <ImageButton android:layout_width="56dp"
-                 android:layout_height="56dp"
-                 android:id="@+id/group_button"
-                 android:background="?android:attr/selectableItemBackground"
-                 android:scaleType="center"
-                 android:visibility="gone" />
+    <com.android.internal.view.ImageButtonNoParentPress
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:id="@+id/expand_button"
+        android:background="?android:attr/selectableItemBackground"
+        android:src="@drawable/ic_media_group_expand"
+        android:scaleType="center"
+        android:visibility="gone" />
 
 </LinearLayout>
