@@ -37,15 +37,15 @@ now available from the "SDK" tab, under "Downloadable SDK Components."</p>
 
 <ul>
 <li>Notes for the Android 2.0.1 platform are in the <a
-href="{@docRoot}sdk/android-2.0.1.html">Android 2.0.1, Release 1</a> document. </li>
+href="{@docRoot}about/versions/android-2.0.1.html">Android 2.0.1, Release 1</a> document. </li>
 <li>You can find information about tools changes in the <a
-href="{@docRoot}sdk/tools-notes.html#notes">SDK Tools</a> and <a
-href="{@docRoot}sdk/eclipse-adt.html#notes">ADT Plugin for Eclipse</a>.</li>
+href="{@docRoot}tools/sdk/tools-notes.html#notes">SDK Tools</a> and <a
+href="{@docRoot}tools/sdk/eclipse-adt.html#notes">ADT Plugin for Eclipse</a>.</li>
 </ul>
 
 <p>To get started with the SDK, review the Quick Start summary on the <a
 href="{@docRoot}sdk/index.html">Android SDK download page</a> or read <a
-href="{@docRoot}sdk/installing.html">Installing the SDK</a> for detailed
+href="{@docRoot}sdk/installing/index.html">Installing the SDK</a> for detailed
 installation instructions. </p>
 
 
@@ -64,7 +64,7 @@ changes include: </p>
 skins. </li>
     <li>Android SDK and AVD Manager, a graphical UI to let you manage your
 SDK and AVD environments more easily. The tool lets you create and manage 
-your <a href="{@docRoot}guide/developing/devices/managing-avds.html">Android Virtual
+your <a href="{@docRoot}tools/devices/managing-avds.html">Android Virtual
 Devices</a> and download new SDK packages (such as platform versions and 
 add-ons) into your environment.</li>
     <li>Improved support for test packages in New Project Wizard</li>
@@ -72,7 +72,7 @@ add-ons) into your environment.</li>
 capability that lets you display only the parts of the API that are actually 
 available to your application, based on the <code>android:minSdkVersion</code>
 value the application declares in its manifest. For more information, see
-<a href="{@docRoot}guide/appendix/api-levels.html">Android API Levels</a></li>
+<a href="{@docRoot}guide/topics/manifest/uses-sdk-element.html#ApiLevels">Android API Levels</a></li>
   </ul>
 
 <p>For details about the Android platforms included in the SDK &mdash; including
@@ -109,7 +109,7 @@ Plugin (0.9.3 or higher). </p>
 <p>The new version of ADT is downloadable from the usual remote update site or
 is separately downloadable as a .zip archive. For instructions on how to
 download the plugin, please see <a
-href="{@docRoot}sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>. </p>
+href="{@docRoot}tools/sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>. </p>
 
 <h3>Android SDK and AVD Manager</h3>
 
@@ -222,7 +222,7 @@ skins, including: </p>
 density for each skin, to create any combination of resolution/density (WVGA
 with medium density, for instance).  To do so, use the <code>android</code> tool
 command line to create a new AVD that uses a custom hardware configuration. See
-<a href="{@docRoot}guide/developing/devices/managing-avds.html#createavd">Creating an
+<a href="{@docRoot}tools/devices/managing-avds.html#createavd">Creating an
 AVD</a> for more information.</p>
 
 <h3>Other Notes and Resolved Issues</h3>
@@ -330,7 +330,7 @@ changes include: </p>
 Android 1.5). The tools are updated to let you deploy your application
 on any platform in the SDK, which helps you ensure forward-compatibility and, 
 if applicable, backward-compatibility.</li>
-    <li>Introduces <a href="{@docRoot}guide/developing/devices/managing-avds.html">Android
+    <li>Introduces <a href="{@docRoot}tools/devices/managing-avds.html">Android
 Virtual Devices</a> &mdash; (AVD) configurations of options that you
 run in the emulator to better model actual devices. Each AVD gets its
 own dedicated storage area, making it much easier to work with multiple emulators 
@@ -352,7 +352,7 @@ Android project.</li>
 
 <p>For details about the Android platforms included in the SDK &mdash; including
 bug fixes, features, and API changes &mdash; please read the <a
-href="{@docRoot}sdk/android-1.5.html">Android 1.5 version notes</a>.</p>
+href="{@docRoot}about/versions/android-1.5.html">Android 1.5 version notes</a>.</p>
 
 <h3>Installation and Upgrade Notes</h3>
 
@@ -407,7 +407,7 @@ that can run in the emulator.
 available to use.</p>
 
 <p>For more information about AVDs, see <a
-href="{@docRoot}guide/developing/devices/index.html">Creating and Managing Virtual Devices</a>
+href="{@docRoot}tools/devices/index.html">Creating and Managing Virtual Devices</a>
 
 <h3>Other Notes</h3>
 
@@ -491,7 +491,7 @@ as well as a few minor API changes from the 1.0 version. </p>
 
 <p>For details about the Android 1.1 system image included in the SDK &mdash;
 including bug fixes, features, and API changes &mdash; please read the <a
-href="{@docRoot}sdk/android-1.1.html">Android 1.1 version notes</a>.</p>
+href="{@docRoot}about/versions/android-1.1.html">Android 1.1 version notes</a>.</p>
 
 <h3>App Versioning for Android 1.1</h3>
 
@@ -545,7 +545,7 @@ testing.</p>
 Plugin for Eclipse is <strong>0.8.0</strong>. If you are using a
 previous version of ADT, you should update to the latest version for use
 with this SDK. For information about how to update your ADT plugin, see
-<a href="{@docRoot}sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>.</p>
+<a href="{@docRoot}tools/sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>.</p>
 
 <h3>Installation and Upgrade Notes</h3>
 
@@ -585,7 +585,7 @@ these USB drivers that you can install, to let you develop on the device:</p>
 <p>The USB driver files are located in the
 <code>&lt;SDK&gt;/usb_driver</code> directory. For details and
 installation instructions, see <a
-href="{@docRoot}guide/developing/device.html#setting-up">Connecting Hardware Devices</a>.</p>
+href="{@docRoot}tools/device.html#setting-up">Connecting Hardware Devices</a>.</p>
 </p>
 
 <h3>Resolved Issues, Changes</h3>
@@ -650,7 +650,7 @@ added.</p>
 Development Tools (ADT) Plugin for Eclipse is <strong>0.8.0</strong>. If you are
 using a previous version of ADT, you should update to the latest version for use
 with this SDK. For information about how to update your ADT plugin, see <a
-href="{@docRoot}sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>.</p>
+href="{@docRoot}tools/sdk/eclipse-adt.html">ADT Plugin for Eclipse</a>.</p>
 
 <h3>Other Notes</h3>
 
