@@ -22,15 +22,13 @@ import android.util.AttributeSet;
 public class NotificationPanelView extends PanelView {
     public NotificationPanelView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        android.util.Slog.v("NotificationPanelView", "ctor");
     }
-
 
     @Override
     public void fling(float vel, boolean always) {
         ((PhoneStatusBarView) mBar).mBar.getGestureRecorder().tag(
             "fling " + ((vel > 0) ? "open" : "closed"),
-            "v=" + vel);
+            "notifications,v=" + vel);
         super.fling(vel, always);
     }
 }
