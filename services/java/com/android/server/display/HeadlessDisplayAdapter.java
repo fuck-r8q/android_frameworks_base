@@ -17,6 +17,7 @@
 package com.android.server.display;
 
 import android.content.Context;
+import android.os.IBinder;
 import android.util.DisplayMetrics;
 
 /**
@@ -45,6 +46,11 @@ public final class HeadlessDisplayAdapter extends DisplayAdapter {
         @Override
         public DisplayAdapter getAdapter() {
             return HeadlessDisplayAdapter.this;
+        }
+
+        @Override
+        public IBinder getDisplayToken() {
+            return null;
         }
 
         @Override
