@@ -16,9 +16,13 @@
 
 package android.hardware.display;
 
+import android.hardware.display.IDisplayManagerCallback;
 import android.view.DisplayInfo;
 
 /** @hide */
 interface IDisplayManager {
-    boolean getDisplayInfo(int displayId, out DisplayInfo outInfo);
+    DisplayInfo getDisplayInfo(int displayId);
+    int[] getDisplayIds();
+
+    void registerCallback(in IDisplayManagerCallback callback);
 }
