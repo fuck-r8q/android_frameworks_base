@@ -16,7 +16,6 @@
 
 <!--
   Defines the layout of a single permission item.
-  Contains the group name and a list of permission labels under the group.
 -->
 
 <view class="android.widget.AppSecurityPermissions$PermissionItemView"
