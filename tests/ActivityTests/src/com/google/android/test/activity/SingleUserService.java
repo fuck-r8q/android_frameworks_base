@@ -20,9 +20,19 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.UserHandle;
+import android.widget.Toast;
 
 public class SingleUserService extends Service {
     Binder mBinder = new Binder();
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Toast.makeText(this,
+                "Service created as user " + UserHandle.myUserId(),
+                Toast.LENGTH_LONG).show();
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
