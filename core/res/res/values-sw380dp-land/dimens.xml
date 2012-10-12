@@ -19,5 +19,5 @@
 -->
 <resources>
     <!-- Top margin for the clock view --> 
-    <dimen name="kg_clock_top_margin">67dp</dimen>
+    <dimen name="kg_clock_top_margin">48dp</dimen>
 </resources>
