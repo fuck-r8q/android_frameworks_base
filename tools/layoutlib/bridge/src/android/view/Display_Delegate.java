@@ -16,11 +16,8 @@
 
 package android.view;
 
-import com.android.layoutlib.bridge.android.BridgeWindowManager;
-import com.android.layoutlib.bridge.impl.RenderAction;
 import com.android.tools.layoutlib.annotations.LayoutlibDelegate;
 
-import android.os.RemoteException;
 
 /**
  * Delegate used to provide new implementation of a select few methods of {@link Display}
@@ -30,5 +27,10 @@ import android.os.RemoteException;
  *
  */
 public class Display_Delegate {
+
+    @LayoutlibDelegate
+    static void updateDisplayInfoLocked(Display theDisplay) {
+        // do nothing
+    }
 
 }
