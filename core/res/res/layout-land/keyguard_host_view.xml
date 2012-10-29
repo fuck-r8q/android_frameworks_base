@@ -21,35 +21,32 @@
     and the security view. -->
 <com.android.internal.policy.impl.keyguard.KeyguardHostView
     xmlns:android="http://schemas.android.com/apk/res/android"
-
+    xmlns:androidprv="http://schemas.android.com/apk/res/android"
     android:id="@+id/keyguard_host_view"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center_horizontal"
     android:orientation="horizontal">
 
-    <com.android.internal.policy.impl.keyguard.SlidingChallengeLayout
-        android:id="@+id/sliding_layout"
+    <com.android.internal.policy.impl.keyguard.MultiPaneChallengeLayout
+        android:id="@+id/multi_pane_challenge"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:dragHandle="@drawable/security_handle">
+        android:clipChildren="false">
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-            <include layout="@layout/keyguard_widget_pager"
-                     android:layout_width="match_parent"
-                     android:layout_height="match_parent"
-                     android:layout_gravity="center"/>
-        </FrameLayout>
+        <include layout="@layout/keyguard_widget_pager"
+                 android:layout_width="match_parent"
+                 android:layout_height="match_parent"
+                 androidprv:layout_centerWithinArea="0.55"
+                 androidprv:layout_childType="widget"
+                 androidprv:layout_maxWidth="480dp"
+                 androidprv:layout_maxHeight="480dp" />
 
         <com.android.internal.policy.impl.keyguard.KeyguardSecurityContainer
             android:id="@+id/keyguard_security_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_isChallenge="true"
-            android:gravity="bottom|center_horizontal"
-            android:background="@drawable/security_frame">
+            androidprv:layout_childType="challenge"
+            androidprv:layout_centerWithinArea="0.55">
             <com.android.internal.policy.impl.keyguard.KeyguardSecurityViewFlipper
                 android:id="@+id/view_flipper"
                 android:layout_width="wrap_content"
@@ -63,6 +60,9 @@
                 android:gravity="center">
             </com.android.internal.policy.impl.keyguard.KeyguardSecurityViewFlipper>
         </com.android.internal.policy.impl.keyguard.KeyguardSecurityContainer>
-    </com.android.internal.policy.impl.keyguard.SlidingChallengeLayout>
+
+        <include layout="@layout/keyguard_multi_user_selector"/>
+
+    </com.android.internal.policy.impl.keyguard.MultiPaneChallengeLayout>
 </com.android.internal.policy.impl.keyguard.KeyguardHostView>
 
