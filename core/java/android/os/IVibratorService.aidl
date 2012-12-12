@@ -20,8 +20,8 @@ package android.os;
 interface IVibratorService
 {
     boolean hasVibrator();
-    void vibrate(long milliseconds, IBinder token);
-    void vibratePattern(in long[] pattern, int repeat, IBinder token);
+    void vibrate(String packageName, long milliseconds, IBinder token);
+    void vibratePattern(String packageName, in long[] pattern, int repeat, IBinder token);
     void cancelVibrate(IBinder token);
 }
 
