@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#pragma version(1)
-#pragma rs java_package_name(com.android.rs.image)
+#include "ip.rsh"
 //#pragma rs_fp_relaxed
 
 static int histR[256] = {0}, histG[256] = {0}, histB[256] = {0};

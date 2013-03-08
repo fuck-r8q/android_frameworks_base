@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#pragma version(1)
-#pragma rs java_package_name(com.android.rs.image)
+#include "ip.rsh"
 
 uchar4 __attribute__((kernel)) root(uchar4 v_in) {
     return v_in;
