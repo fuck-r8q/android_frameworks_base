@@ -44,9 +44,9 @@ void init_vignette(uint32_t dim_x, uint32_t dim_y, float center_x, float center_
     opp_shade = 1.f - desired_shade;
 }
 
-void root(const uchar4 *in, uchar4 *out, uint32_t x, uint32_t y) {
+uchar4 __attribute__((kernel)) root(uchar4 in, uint32_t x, uint32_t y) {
     // Convert x and y to floating point coordinates with center as origin
-    const float4 fin = convert_float4(*in);
+    const float4 fin = convert_float4(in);
     const float2 inCoord = {(float)x, (float)y};
     const float2 coord = mad(inCoord, inv_dimensions, neg_center);
     const float sloped_dist_ratio = length(axis_scale * coord)  * sloped_inv_max_dist;
@@ -54,6 +54,6 @@ void root(const uchar4 *in, uchar4 *out, uint32_t x, uint32_t y) {
     float4 fout;
     fout.rgb = fin.rgb * lumen;
     fout.w = fin.w;
-    *out = convert_uchar4(fout);
+    return convert_uchar4(fout);
 }
 
