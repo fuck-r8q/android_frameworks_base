@@ -24,7 +24,7 @@
 namespace android {
 namespace uirenderer {
 
-template<class T>
+template<typename T>
 class Future: public LightRefBase<Future<T> > {
 public:
     Future(Condition::WakeUpType type = Condition::WAKE_UP_ONE): mBarrier(type), mResult() { }
