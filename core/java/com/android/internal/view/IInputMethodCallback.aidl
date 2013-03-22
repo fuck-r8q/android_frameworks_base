@@ -16,13 +16,6 @@
 
 package com.android.internal.view;
 
-import android.graphics.Rect;
-import android.view.KeyEvent;
-import android.view.MotionEvent;
-import com.android.internal.view.IInputContext;
-import com.android.internal.view.IInputMethodSession;
-import android.os.IBinder;
-
 /**
  * Helper interface for IInputMethod to allow the input method to call back
  * to its client with results from incoming calls.
@@ -30,5 +23,4 @@ import android.os.IBinder;
  */
 oneway interface IInputMethodCallback {
     void finishedEvent(int seq, boolean handled);
-    void sessionCreated(IInputMethodSession session);
 }
