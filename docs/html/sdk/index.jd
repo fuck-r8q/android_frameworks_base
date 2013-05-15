@@ -271,7 +271,7 @@ To get the ADT Bundle or stand-alone SDK Tools, please visit the web site at <a
 href="http://developer.android.com/sdk/index.html">developer.android.com/sdk/</a>
 </p>
 
-</div>
+</div><!-- end col-6 (left column) -->
 
 
 
@@ -284,6 +284,9 @@ href="http://developer.android.com/sdk/index.html">developer.android.com/sdk/</a
 <a class="big button subtitle" id="download-bundle-button"
 href="" style="display:none;width:265px;margin:0 auto;display:block" ></a>
 
+
+
+
 <p id="not-supported">Choose the SDK package for your OS from the table below.</p>
 
 </div>
@@ -295,12 +298,25 @@ href="" style="display:none;width:265px;margin:0 auto;display:block" ></a>
 
 
 
+
 <!-- alternative SDK options -->
 <div class="col-13" style="margin:0;">
 
+
+<!-- this appears only when viewing the online docs -->
+<div class="online caution">
+<h3 style="margin:0 0 10px 0;font-size:14px">Android Studio Early Access Preview</h3>
+
+<p>A new Android development environment called Android Studio,
+based on IntelliJ IDEA, is now available as an <strong>early access preview</strong>.
+For more information, see
+<a href="{@docRoot}sdk/installing/studio.html">Getting Started with Android Studio</a>.</p>
+
+</div>
+
 <p>If you prefer to use an existing version of Eclipse or another IDE,
 you can instead take a more customized approach to installing
-the Android SDK. See the following instructions.</p>
+the Android SDK. See the following instructions:</p>
 
 
 <h4 id="ExistingIDE"><a href='' class="expandable"
