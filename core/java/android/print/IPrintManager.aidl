@@ -16,11 +16,8 @@
 
 package android.print;
 
-import android.os.ICancellationSignal;
-import android.print.IPrintAdapter;
+import android.print.IPrintDocumentAdapter;
 import android.print.IPrintClient;
-import android.print.IPrinterDiscoveryObserver;
-import android.print.PrinterId;
 import android.print.PrintJobInfo;
 import android.print.PrintAttributes;
 
@@ -30,12 +27,11 @@ import android.print.PrintAttributes;
  * @hide
  */
 interface IPrintManager {
-    List<PrintJobInfo> getPrintJobs(int appId, int userId);
-    PrintJobInfo getPrintJob(int printJobId, int appId, int userId);
-    PrintJobInfo print(String printJobName, in IPrintClient client, in IPrintAdapter printAdapter,
-            in PrintAttributes attributes, int appId, int userId);
+    List<PrintJobInfo> getPrintJobInfos(int appId, int userId);
+    PrintJobInfo getPrintJobInfo(int printJobId, int appId, int userId);
+    PrintJobInfo print(String printJobName, in IPrintClient client,
+            in IPrintDocumentAdapter printAdapter, in PrintAttributes attributes,
+            int appId, int userId);
     void cancelPrintJob(int printJobId, int appId, int userId);
-    void onPrintJobQueued(in PrinterId printerId, in PrintJobInfo printJob);
-    void startDiscoverPrinters(IPrinterDiscoveryObserver observer);
-    void stopDiscoverPrinters();
+
 }
