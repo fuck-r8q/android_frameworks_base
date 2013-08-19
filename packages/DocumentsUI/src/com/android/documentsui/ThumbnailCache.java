@@ -16,25 +16,11 @@
 
 package com.android.documentsui;
 
-import android.app.ActivityManager;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.util.LruCache;
 
 public class ThumbnailCache extends LruCache<Uri, Bitmap> {
-    private static ThumbnailCache sCache;
-
-    public static ThumbnailCache get(Context context) {
-        if (sCache == null) {
-            final ActivityManager am = (ActivityManager) context.getSystemService(
-                    Context.ACTIVITY_SERVICE);
-            final int memoryClassBytes = am.getMemoryClass() * 1024 * 1024;
-            sCache = new ThumbnailCache(memoryClassBytes / 4);
-        }
-        return sCache;
-    }
-
     public ThumbnailCache(int maxSizeBytes) {
         super(maxSizeBytes);
     }
