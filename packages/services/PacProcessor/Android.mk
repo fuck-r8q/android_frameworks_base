@@ -18,24 +18,15 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := \
-    main_pacserver.cpp \
-    ProxyService.cpp \
-    IProxyService.cpp
-
-LOCAL_C_INCLUDES += \
-    external/chromium-libpac/src
-
-LOCAL_SHARED_LIBRARIES := \
-    libutils \
-    liblog \
-    libpac \
-    libbinder \
-    libstlport
-
-LOCAL_MODULE := pacserver
 LOCAL_MODULE_TAGS := optional
 
-include external/stlport/libstlport.mk
+LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
-include $(BUILD_EXECUTABLE)
+LOCAL_PACKAGE_NAME := PacProcessor
+LOCAL_CERTIFICATE := platform
+
+LOCAL_REQUIRED_MODULES := libjni_pacprocessor
+
+include $(BUILD_PACKAGE)
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
