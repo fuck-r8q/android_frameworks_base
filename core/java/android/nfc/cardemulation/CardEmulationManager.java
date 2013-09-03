@@ -33,6 +33,10 @@ import android.util.Log;
 import java.util.HashMap;
 import java.util.List;
 
+/**
+ * TODO Remove when calling .apks are upgraded
+ * @hide
+ */
 public final class CardEmulationManager {
     static final String TAG = "CardEmulationManager";
 
