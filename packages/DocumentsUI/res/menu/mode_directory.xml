@@ -21,12 +21,12 @@
         android:showAsAction="always" />
     <item
         android:id="@+id/menu_share"
-        android:icon="@android:drawable/ic_menu_share"
+        android:icon="@drawable/ic_menu_share"
         android:title="@string/menu_share"
         android:showAsAction="always" />
     <item
         android:id="@+id/menu_delete"
-        android:icon="@android:drawable/ic_menu_delete"
+        android:icon="@drawable/ic_menu_delete"
         android:title="@string/menu_delete"
         android:showAsAction="always" />
 </menu>
