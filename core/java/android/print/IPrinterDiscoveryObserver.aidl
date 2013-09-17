@@ -18,6 +18,7 @@ package android.print;
 
 import android.print.PrinterId;
 import android.print.PrinterInfo;
+import android.content.pm.ParceledListSlice;
 
 /**
  * Interface for observing discovered printers by a discovery session.
@@ -25,6 +26,6 @@ import android.print.PrinterInfo;
  * @hide
  */
 oneway interface IPrinterDiscoveryObserver {
-    void onPrintersAdded(in List<PrinterInfo> printers);
-    void onPrintersRemoved(in List<PrinterId> printerIds);
+    void onPrintersAdded(in ParceledListSlice printers);
+    void onPrintersRemoved(in ParceledListSlice printerIds);
 }
