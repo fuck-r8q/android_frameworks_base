@@ -23,4 +23,8 @@
 
     <!-- FaceLock -->
     <color name="facelock_spotlight_mask">#CC000000</color>
+
+    <!-- Clock -->
+    <color name="clock_white">#ffffffff</color>
+    <color name="clock_gray">#80ffffff</color>
 </resources>
