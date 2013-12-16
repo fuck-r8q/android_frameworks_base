@@ -1124,66 +1124,6 @@ public class GLRenderer extends HardwareRenderer {
     }
 
     @Override
-    void drawDisplayList(DisplayList displayList, View.AttachInfo attachInfo,
-            HardwareDrawCallbacks callbacks, Rect dirty) {
-        if (canDraw()) {
-            if (!hasDirtyRegions()) {
-                dirty = null;
-            }
-
-            // We are already on the correct thread
-            final int surfaceState = checkRenderContextUnsafe();
-            if (surfaceState != SURFACE_STATE_ERROR) {
-                HardwareCanvas canvas = mCanvas;
-
-                if (mProfileEnabled) {
-                    mProfileLock.lock();
-                }
-
-                dirty = beginFrame(canvas, dirty, surfaceState);
-
-                int saveCount = 0;
-                int status = DisplayList.STATUS_DONE;
-
-                long start = getSystemTime();
-                try {
-                    status = prepareFrame(dirty);
-
-                    saveCount = canvas.save();
-                    callbacks.onHardwarePreDraw(canvas);
-
-                    status |= drawDisplayList(attachInfo, canvas, displayList, status);
-                } catch (Exception e) {
-                    Log.e(LOG_TAG, "An error has occurred while drawing:", e);
-                } finally {
-                    callbacks.onHardwarePostDraw(canvas);
-                    canvas.restoreToCount(saveCount);
-
-                    mDrawDelta = getSystemTime() - start;
-
-                    if (mDrawDelta > 0) {
-                        mFrameCount++;
-
-                        debugOverdraw(attachInfo, dirty, canvas, displayList);
-                        debugDirtyRegions(dirty, canvas);
-                        drawProfileData(attachInfo);
-                    }
-                }
-
-                onPostDraw();
-
-                swapBuffers(status);
-
-                if (mProfileEnabled) {
-                    mProfileLock.unlock();
-                }
-
-                attachInfo.mIgnoreDirtyState = false;
-            }
-        }
-    }
-
-    @Override
     void draw(View view, View.AttachInfo attachInfo, HardwareDrawCallbacks callbacks,
             Rect dirty) {
         if (canDraw()) {
@@ -1539,7 +1479,7 @@ public class GLRenderer extends HardwareRenderer {
         return (int) (dp * density + 0.5f);
     }
 
-    private static native boolean loadProperties();
+    static native boolean loadProperties();
 
     static native void setupShadersDiskCache(String cacheFile);
 
@@ -1547,14 +1487,14 @@ public class GLRenderer extends HardwareRenderer {
      * Notifies EGL that the frame is about to be rendered.
      * @param size
      */
-    private static native void beginFrame(int[] size);
+    static native void beginFrame(int[] size);
 
     /**
      * Returns the current system time according to the renderer.
      * This method is used for debugging only and should not be used
      * as a clock.
      */
-    private static native long getSystemTime();
+    static native long getSystemTime();
 
     /**
      * Preserves the back buffer of the current surface after a buffer swap.
@@ -1565,7 +1505,7 @@ public class GLRenderer extends HardwareRenderer {
      * @return True if the swap behavior was successfully changed,
      *         false otherwise.
      */
-    private static native boolean preserveBackBuffer();
+    static native boolean preserveBackBuffer();
 
     /**
      * Indicates whether the current surface preserves its back buffer
@@ -1574,7 +1514,7 @@ public class GLRenderer extends HardwareRenderer {
      * @return True, if the surface's EGL_SWAP_BEHAVIOR is EGL_BUFFER_PRESERVED,
      *         false otherwise
      */
-    private static native boolean isBackBufferPreserved();
+    static native boolean isBackBufferPreserved();
 
     class DrawPerformanceDataProvider extends GraphDataProvider {
         private final int mGraphType;
