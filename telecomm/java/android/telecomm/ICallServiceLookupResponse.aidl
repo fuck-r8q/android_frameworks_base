@@ -28,6 +28,7 @@ oneway interface ICallServiceLookupResponse {
      * Receives the list of {@link ICallService}s as a list of {@link IBinder}s.
      *
      * @param callServices List of call services from {@link ICallServiceProvider}.
+     * TODO(gilad): Rename to callServiceBinders.
      */
     void onResult(in List<IBinder> callServices);
 }
