@@ -25,7 +25,7 @@ public abstract class DreamManagerInternal {
     /**
      * Called by the power manager to start a dream.
      */
-    public abstract void startDream();
+    public abstract void startDream(boolean doze);
 
     /**
      * Called by the power manager to stop a dream.
