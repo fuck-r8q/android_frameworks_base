@@ -16,17 +16,18 @@
 
 package com.android.systemui.keyguard;
 
-import com.android.systemui.statusbar.CommandQueue;
+import com.android.systemui.statusbar.phone.PhoneStatusBar;
+import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
+import com.android.systemui.statusbar.phone.StatusBarWindowManager;
 
 import android.os.Binder;
-import android.os.IBinder;
+import android.view.ViewGroup;
 
 /**
  * Communication interface from status bar to {@link com.android.systemui.keyguard.KeyguardService}.
  */
 public abstract class KeyguardStatusBarBinder extends Binder {
 
-    public abstract void register(CommandQueue commandQueue);
-
-    public abstract void dismissKeyguard();
+    public abstract void registerStatusBar(PhoneStatusBar phoneStatusBar, ViewGroup container,
+            StatusBarWindowManager statusBarWindowManager);
 }
