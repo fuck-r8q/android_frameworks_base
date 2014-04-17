@@ -16,32 +16,55 @@
 
 package android.hardware.camera2;
 
+// TODO: Delete this class, since it was moved to android.util as public API
+
 /**
- * A simple immutable class for describing the dimensions of camera image
- * buffers.
+ * Immutable class for describing width and height dimensions in pixels.
+ *
+ * @hide
  */
 public final class Size {
     /**
-     * Create a new immutable Size instance
+     * Create a new immutable Size instance.
      *
-     * @param width The width to store in the Size instance
-     * @param height The height to store in the Size instance
+     * @param width The width of the size, in pixels
+     * @param height The height of the size, in pixels
      */
-    public Size(int width, int height) {
+    public Size(final int width, final int height) {
         mWidth = width;
         mHeight = height;
     }
 
+    /**
+     * Get the width of the size (in pixels).
+     * @return width
+     */
     public final int getWidth() {
         return mWidth;
     }
 
+    /**
+     * Get the height of the size (in pixels).
+     * @return height
+     */
     public final int getHeight() {
         return mHeight;
     }
 
+    /**
+     * Check if this size is equal to another size.
+     * <p>
+     * Two sizes are equal if and only if both their widths and heights are
+     * equal.
+     * </p>
+     * <p>
+     * A size object is never equal to any other type of object.
+     * </p>
+     *
+     * @return {@code true} if the objects were equal, {@code false} otherwise
+     */
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (obj == null) {
             return false;
         }
@@ -49,27 +72,29 @@ public final class Size {
             return true;
         }
         if (obj instanceof Size) {
-            Size other = (Size) obj;
+            final Size other = (Size) obj;
             return mWidth == other.mWidth && mHeight == other.mHeight;
         }
         return false;
     }
 
+    /**
+     * Return the size represented as a string with the format {@code "WxH"}
+     *
+     * @return string representation of the size
+     */
     @Override
     public String toString() {
         return mWidth + "x" + mHeight;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int hashCode() {
-        final long INT_MASK = 0xffffffffL;
-
-        long asLong = INT_MASK & mWidth;
-        asLong <<= 32;
-
-        asLong |= (INT_MASK & mHeight);
-
-        return ((Long)asLong).hashCode();
+        // assuming most sizes are <2^16, doing a rotate will give us perfect hashing
+        return mHeight ^ ((mWidth << (Integer.SIZE / 2)) | (mWidth >>> (Integer.SIZE / 2)));
     }
 
     private final int mWidth;
