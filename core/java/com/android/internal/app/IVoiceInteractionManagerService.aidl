@@ -17,12 +17,15 @@
 package com.android.internal.app;
 
 import android.content.Intent;
+import android.os.Bundle;
 
 import com.android.internal.app.IVoiceInteractor;
 import android.service.voice.IVoiceInteractionService;
 import android.service.voice.IVoiceInteractionSession;
 
 interface IVoiceInteractionManagerService {
-    int startVoiceActivity(in Intent intent, String resolvedType, IVoiceInteractionService service,
-            IVoiceInteractionSession session, IVoiceInteractor interactor);
+    void startVoiceActivity(in Intent intent, String resolvedType, IVoiceInteractionService service,
+            in Bundle sessionArgs);
+    int deliverNewSession(IBinder token, IVoiceInteractionSession session,
+            IVoiceInteractor interactor);
 }
