@@ -31,8 +31,7 @@ public class MainInteractionService extends VoiceInteractionService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startVoiceActivity(new Intent(this, TestInteractionActivity.class),
-                new MainInteractionSession(this));
+        startVoiceActivity(new Intent(this, TestInteractionActivity.class), null);
         stopSelf(startId);
         return START_NOT_STICKY;
     }
