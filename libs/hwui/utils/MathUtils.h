@@ -38,4 +38,4 @@ public:
 } /* namespace uirenderer */
 } /* namespace android */
 
-#endif /* RENDERNODE_H */
+#endif /* MATHUTILS_H */
