@@ -18,7 +18,7 @@
 #include "GraphicsJNI.h"
 #include <android_runtime/AndroidRuntime.h>
 
-#include <utils/VirtualLightRefBase.h>
+#include <utils/RefBase.h>
 #include <CanvasProperty.h>
 
 namespace android {
@@ -27,22 +27,13 @@ using namespace uirenderer;
 
 #ifdef USE_OPENGL_RENDERER
 
-static jlong incRef(VirtualLightRefBase* ptr) {
-    ptr->incStrong(0);
-    return reinterpret_cast<jlong>(ptr);
-}
-
 static jlong createFloat(JNIEnv* env, jobject clazz, jfloat initialValue) {
-    return incRef(new CanvasPropertyPrimitive(initialValue));
+    return reinterpret_cast<jlong>(new CanvasPropertyPrimitive(initialValue));
 }
 
 static jlong createPaint(JNIEnv* env, jobject clazz, jlong paintPtr) {
     const SkPaint* paint = reinterpret_cast<const SkPaint*>(paintPtr);
-    return incRef(new CanvasPropertyPaint(*paint));
-}
-
-static void unref(JNIEnv* env, jobject clazz, jlong containerPtr) {
-    reinterpret_cast<VirtualLightRefBase*>(containerPtr)->decStrong(0);
+    return reinterpret_cast<jlong>(new CanvasPropertyPaint(*paint));
 }
 
 #endif
@@ -57,7 +48,6 @@ static JNINativeMethod gMethods[] = {
 #ifdef USE_OPENGL_RENDERER
     { "nCreateFloat", "(F)J", (void*) createFloat },
     { "nCreatePaint", "(J)J", (void*) createPaint },
-    { "nUnref", "(J)V", (void*) unref },
 #endif
 };
 
