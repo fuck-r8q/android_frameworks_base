@@ -18,6 +18,7 @@ package android.hardware.hdmi;
 
 import android.hardware.hdmi.HdmiCecMessage;
 import android.hardware.hdmi.IHdmiControlCallback;
+import android.hardware.hdmi.IHdmiHotplugEventListener;
 
 /**
  * Binder interface that clients running in the application process
@@ -27,6 +28,9 @@ import android.hardware.hdmi.IHdmiControlCallback;
  * @hide
  */
 interface IHdmiControlService {
-    int oneTouchPlay(IHdmiControlCallback callback);
-    int queryDisplayStatus(IHdmiControlCallback callback);
+    int[] getSupportedTypes();
+    void oneTouchPlay(IHdmiControlCallback callback);
+    void queryDisplayStatus(IHdmiControlCallback callback);
+    void addHotplugEventListener(IHdmiHotplugEventListener listener);
+    void removeHotplugEventListener(IHdmiHotplugEventListener listener);
 }
