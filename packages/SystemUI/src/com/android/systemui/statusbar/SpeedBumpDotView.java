@@ -41,6 +41,11 @@ public class SpeedBumpDotView extends View {
         canvas.drawCircle(radius, radius, radius, mPaint);
     }
 
+    @Override
+    public boolean hasOverlappingRendering() {
+        return false;
+    }
+
     public void setColor(int color) {
         mPaint.setColor(color);
     }
