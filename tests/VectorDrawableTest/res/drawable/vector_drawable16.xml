@@ -25,7 +25,24 @@
 
     <group>
         <path
-            android:name="house"
+            android:name="background1"
+            android:pathData="M 0,0 l 100,0 l 0, 100 l -100, 0 z"
+            android:fill="#FF000000"/>
+        <path
+            android:name="background2"
+            android:pathData="M 100,100 l 100,0 l 0, 100 l -100, 0 z"
+            android:fill="#FF000000"/>
+    </group>
+    <group
+        android:pivotX="100"
+        android:pivotY="100"
+        android:rotation="90"
+        android:scaleX="0.75"
+        android:scaleY="0.5"
+        android:translateX="0.0"
+        android:translateY="100.0">
+        <path
+            android:name="twoLines"
             android:pathData="M 100,10 v 90 M 10,100 h 90"
             android:stroke="#FF00FF00"
             android:strokeWidth="10" />
