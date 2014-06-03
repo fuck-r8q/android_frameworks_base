@@ -14,6 +14,7 @@
 
 package com.android.test.dynamic;
 
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.graphics.drawable.AnimationDrawable;
 import android.os.Bundle;
@@ -27,7 +28,7 @@ public class VectorDrawableAnimation extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Button button = new Button(this);
+        final Button button = new Button(this);
         button.setBackgroundResource(R.drawable.animation_drawable_vector);
 
         button.setOnClickListener(new View.OnClickListener() {
