@@ -16,17 +16,12 @@
 
 package android.media;
 
-
 /**
- * AIDL for the AudioService to report interesting events to a remote volume control dialog.
+ * AIDL for the AudioService to report interesting events to a volume control
+ * dialog in another process.
  * @hide
  */
 oneway interface IVolumeController {
-    void hasNewRemotePlaybackInfo();
-
-    void remoteVolumeChanged(int streamType, int flags);
-
-    void remoteSliderVisibility(boolean visible);
 
     void displaySafeVolumeWarning(int flags);
 
