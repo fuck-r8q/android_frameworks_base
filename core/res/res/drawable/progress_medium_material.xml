@@ -13,10 +13,11 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/vector_drawable_progress_bar_medium" >
 
-<material-progress xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="?attr/colorControlActivated"
-    android:width="48dp"
-    android:height="48dp"
-    android:thickness="4dp"
-    android:innerRadius="19dp" />
+    <target
+        android:name="progressBar"
+        android:animation="@anim/progress_indeterminate_material" />
+
+</animated-vector>
