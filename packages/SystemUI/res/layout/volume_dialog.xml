@@ -15,11 +15,11 @@
      limitations under the License.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="@dimen/volume_panel_width"
     android:layout_height="wrap_content"
     android:background="@drawable/qs_panel_background"
     android:translationZ="@dimen/volume_panel_z"
-    android:layout_margin="@dimen/volume_panel_z">
+    android:layout_marginBottom="@dimen/volume_panel_z">
 
         <include layout="@layout/volume_panel" />
 
