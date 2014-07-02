@@ -18,6 +18,7 @@ package android.media.tv;
 
 import android.media.tv.ITvInputSession;
 import android.net.Uri;
+import android.media.tv.TvTrackInfo;
 import android.os.Bundle;
 
 /**
@@ -28,8 +29,6 @@ import android.os.Bundle;
 oneway interface ITvInputSessionCallback {
     void onSessionCreated(ITvInputSession session);
     void onSessionEvent(in String name, in Bundle args);
-    void onVideoStreamChanged(int width, int height, boolean interlaced);
-    void onAudioStreamChanged(int channelCount);
-    void onClosedCaptionStreamChanged(boolean hasClosedCaption);
     void onChannelRetuned(in Uri channelUri);
+    void onTrackInfoChanged(in List<TvTrackInfo> tracks);
 }
