@@ -28,7 +28,7 @@ public class PackageUninstallObserver {
     };
 
     /** {@hide} */
-    public IPackageDeleteObserver.Stub getBinder() {
+    public IPackageDeleteObserver getBinder() {
         return mBinder;
     }
 
