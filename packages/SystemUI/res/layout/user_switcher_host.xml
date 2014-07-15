@@ -21,17 +21,11 @@
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#dd000000"
-        android:elevation="12dp">
-    <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/volume_panel_top"
-            android:background="@*android:drawable/dialog_full_holo_dark">
+        android:layout_height="match_parent">
+
         <ListView android:id="@android:id/list"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 tools:listitem="@layout/user_switcher_item"/>
-    </FrameLayout>
+
 </com.android.systemui.settings.UserSwitcherHostView>
