@@ -24,5 +24,5 @@ import android.content.ComponentName;
  * @hide
  */
 oneway interface ITvInputServiceCallback {
-    void onAvailabilityChanged(in String inputId, boolean isAvailable);
+    void onInputStateChanged(int state);
 }
