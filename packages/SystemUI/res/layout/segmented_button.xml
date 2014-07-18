@@ -23,4 +23,4 @@
     android:background="@drawable/segmented_button"
     android:textAppearance="@style/TextAppearance.QS.SegmentedButton"
     android:minHeight="0dp"
-    android:padding="12dp" />
+    android:padding="10dp" />
