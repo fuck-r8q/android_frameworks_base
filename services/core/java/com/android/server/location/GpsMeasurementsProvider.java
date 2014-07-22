@@ -29,6 +29,9 @@ import android.os.RemoteException;
  */
 public abstract class GpsMeasurementsProvider
         extends RemoteListenerHelper<IGpsMeasurementsListener> {
+    public GpsMeasurementsProvider() {
+        super("GpsMeasurementsProvider");
+    }
 
     public void onMeasurementsAvailable(final GpsMeasurementsEvent event) {
         ListenerOperation<IGpsMeasurementsListener> operation =
