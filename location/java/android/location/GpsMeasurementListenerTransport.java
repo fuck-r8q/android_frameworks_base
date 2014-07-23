@@ -16,99 +16,51 @@
 
 package android.location;
 
-import com.android.internal.util.Preconditions;
-
-import android.annotation.NonNull;
 import android.content.Context;
 import android.os.RemoteException;
-import android.util.Log;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
 
 /**
- * A handler class to manage transport listeners for {@link GpsMeasurementsEvent.Listener},
- * and post the events in a handler.
+ * A handler class to manage transport listeners for {@link GpsMeasurementsEvent.Listener}.
  *
  * @hide
  */
-class GpsMeasurementListenerTransport {
-    private static final String TAG = "GpsMeasurementListenerTransport";
-
+class GpsMeasurementListenerTransport
+        extends LocalListenerHelper<GpsMeasurementsEvent.Listener> {
     private final Context mContext;
     private final ILocationManager mLocationManager;
 
     private final IGpsMeasurementsListener mListenerTransport = new ListenerTransport();
-    private final HashSet<GpsMeasurementsEvent.Listener> mListeners =
-            new HashSet<GpsMeasurementsEvent.Listener>();
 
     public GpsMeasurementListenerTransport(Context context, ILocationManager locationManager) {
+        super("GpsMeasurementListenerTransport");
         mContext = context;
         mLocationManager = locationManager;
     }
 
-    public boolean add(@NonNull GpsMeasurementsEvent.Listener listener) {
-        Preconditions.checkNotNull(listener);
-
-        synchronized (mListeners) {
-            // we need to register with the service first, because we need to find out if the
-            // service will actually support the request before we attempt anything
-            if (mListeners.isEmpty()) {
-                boolean registeredWithServer;
-                try {
-                    registeredWithServer = mLocationManager.addGpsMeasurementsListener(
-                            mListenerTransport,
-                            mContext.getPackageName());
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Error handling first listener.", e);
-                    return false;
-                }
-
-                if (!registeredWithServer) {
-                    Log.e(TAG, "Unable to register listener transport.");
-                    return false;
-                }
-            }
-
-            if (mListeners.contains(listener)) {
-                return true;
-            }
-
-            mListeners.add(listener);
-        }
-
-        return true;
+    @Override
+    protected boolean registerWithServer() throws RemoteException {
+        return mLocationManager.addGpsMeasurementsListener(
+                mListenerTransport,
+                mContext.getPackageName());
     }
 
-    public void remove(@NonNull GpsMeasurementsEvent.Listener listener) {
-        Preconditions.checkNotNull(listener);
-
-        synchronized (mListeners) {
-            boolean removed = mListeners.remove(listener);
-
-            boolean isLastListener = removed && mListeners.isEmpty();
-            if (isLastListener) {
-                try {
-                    mLocationManager.removeGpsMeasurementsListener(mListenerTransport);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Error handling last listener.", e);
-                }
-            }
-        }
+    @Override
+    protected void unregisterFromServer() throws RemoteException {
+        mLocationManager.removeGpsMeasurementsListener(mListenerTransport);
     }
 
     private class ListenerTransport extends IGpsMeasurementsListener.Stub {
         @Override
-        public void onGpsMeasurementsReceived(final GpsMeasurementsEvent eventArgs) {
-            Collection<GpsMeasurementsEvent.Listener> listeners;
-            synchronized (mListeners) {
-                listeners = new ArrayList<GpsMeasurementsEvent.Listener>(mListeners);
-            }
+        public void onGpsMeasurementsReceived(final GpsMeasurementsEvent event) {
+            ListenerOperation<GpsMeasurementsEvent.Listener> operation =
+                    new ListenerOperation<GpsMeasurementsEvent.Listener>() {
+                @Override
+                public void execute(GpsMeasurementsEvent.Listener listener) throws RemoteException {
+                    listener.onGpsMeasurementsReceived(event);
+                }
+            };
 
-            for (final GpsMeasurementsEvent.Listener listener : listeners) {
-                listener.onGpsMeasurementsReceived(eventArgs);
-            }
+            foreach(operation);
         }
     }
 }
