@@ -28,7 +28,6 @@ import android.graphics.Rect;
 import android.util.MathUtils;
 import android.view.HardwareCanvas;
 import android.view.RenderNodeAnimator;
-import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 
 import java.util.ArrayList;
@@ -44,16 +43,14 @@ class Ripple {
     private static final float WAVE_TOUCH_DOWN_ACCELERATION = 1024.0f * GLOBAL_SPEED;
     private static final float WAVE_TOUCH_UP_ACCELERATION = 3400.0f * GLOBAL_SPEED;
     private static final float WAVE_OPACITY_DECAY_VELOCITY = 3.0f / GLOBAL_SPEED;
-    private static final float WAVE_OUTER_OPACITY_VELOCITY_MAX = 4.5f * GLOBAL_SPEED;
-    private static final float WAVE_OUTER_OPACITY_VELOCITY_MIN = 1.5f * GLOBAL_SPEED;
-    private static final float WAVE_OUTER_SIZE_INFLUENCE_MAX = 200f;
-    private static final float WAVE_OUTER_SIZE_INFLUENCE_MIN = 40f;
 
     private static final long RIPPLE_ENTER_DELAY = 80;
 
     // Hardware animators.
-    private final ArrayList<RenderNodeAnimator> mRunningAnimations = new ArrayList<>();
-    private final ArrayList<RenderNodeAnimator> mPendingAnimations = new ArrayList<>();
+    private final ArrayList<RenderNodeAnimator> mRunningAnimations =
+            new ArrayList<RenderNodeAnimator>();
+    private final ArrayList<RenderNodeAnimator> mPendingAnimations =
+            new ArrayList<RenderNodeAnimator>();
 
     private final RippleDrawable mOwner;
 
@@ -79,20 +76,17 @@ class Ripple {
     private CanvasProperty<Float> mPropRadius;
     private CanvasProperty<Float> mPropX;
     private CanvasProperty<Float> mPropY;
-    private CanvasProperty<Paint> mPropOuterPaint;
-    private CanvasProperty<Float> mPropOuterRadius;
-    private CanvasProperty<Float> mPropOuterX;
-    private CanvasProperty<Float> mPropOuterY;
 
     // Software animators.
     private ObjectAnimator mAnimRadius;
     private ObjectAnimator mAnimOpacity;
-    private ObjectAnimator mAnimOuterOpacity;
     private ObjectAnimator mAnimX;
     private ObjectAnimator mAnimY;
 
+    // Temporary paint used for creating canvas properties.
+    private Paint mTempPaint;
+
     // Software rendering properties.
-    private float mOuterOpacity = 0;
     private float mOpacity = 1;
     private float mOuterX;
     private float mOuterY;
@@ -177,38 +171,35 @@ class Ripple {
         return mOpacity;
     }
 
-    public void setOuterOpacity(float a) {
-        mOuterOpacity = a;
-        invalidateSelf();
-    }
-
-    public float getOuterOpacity() {
-        return mOuterOpacity;
-    }
-
+    @SuppressWarnings("unused")
     public void setRadiusGravity(float r) {
         mTweenRadius = r;
         invalidateSelf();
     }
 
+    @SuppressWarnings("unused")
     public float getRadiusGravity() {
         return mTweenRadius;
     }
 
+    @SuppressWarnings("unused")
     public void setXGravity(float x) {
         mTweenX = x;
         invalidateSelf();
     }
 
+    @SuppressWarnings("unused")
     public float getXGravity() {
         return mTweenX;
     }
 
+    @SuppressWarnings("unused")
     public void setYGravity(float y) {
         mTweenY = y;
         invalidateSelf();
     }
 
+    @SuppressWarnings("unused")
     public float getYGravity() {
         return mTweenY;
     }
@@ -238,7 +229,7 @@ class Ripple {
         // If we have any pending hardware animations, cancel any running
         // animations and start those now.
         final ArrayList<RenderNodeAnimator> pendingAnimations = mPendingAnimations;
-        final int N = pendingAnimations == null ? 0 : pendingAnimations.size();
+        final int N = pendingAnimations.size();
         if (N > 0) {
             cancelHardwareAnimations();
 
@@ -251,7 +242,6 @@ class Ripple {
             pendingAnimations.clear();
         }
 
-        c.drawCircle(mPropOuterX, mPropOuterY, mPropOuterRadius, mPropOuterPaint);
         c.drawCircle(mPropX, mPropY, mPropRadius, mPropPaint);
 
         return true;
@@ -262,15 +252,6 @@ class Ripple {
 
         // Cache the paint alpha so we can restore it later.
         final int paintAlpha = p.getAlpha();
-
-        final int outerAlpha = (int) (paintAlpha * mOuterOpacity + 0.5f);
-        if (outerAlpha > 0 && mOuterRadius > 0) {
-            p.setAlpha(outerAlpha);
-            p.setStyle(Style.FILL);
-            c.drawCircle(mOuterX, mOuterY, mOuterRadius, p);
-            hasContent = true;
-        }
-
         final int alpha = (int) (paintAlpha * mOpacity + 0.5f);
         final float radius = MathUtils.lerp(0, mOuterRadius, mTweenRadius);
         if (alpha > 0 && radius > 0) {
@@ -316,7 +297,6 @@ class Ripple {
     public void enter() {
         final int radiusDuration = (int)
                 (1000 * Math.sqrt(mOuterRadius / WAVE_TOUCH_DOWN_ACCELERATION * mDensity) + 0.5);
-        final int outerDuration = (int) (1000 * 1.0f / WAVE_OUTER_OPACITY_VELOCITY_MIN);
 
         final ObjectAnimator radius = ObjectAnimator.ofFloat(this, "radiusGravity", 1);
         radius.setAutoCancel(true);
@@ -336,13 +316,7 @@ class Ripple {
         cY.setInterpolator(LINEAR_INTERPOLATOR);
         cY.setStartDelay(RIPPLE_ENTER_DELAY);
 
-        final ObjectAnimator outer = ObjectAnimator.ofFloat(this, "outerOpacity", 0, 1);
-        outer.setAutoCancel(true);
-        outer.setDuration(outerDuration);
-        outer.setInterpolator(LINEAR_INTERPOLATOR);
-
         mAnimRadius = radius;
-        mAnimOuterOpacity = outer;
         mAnimX = cX;
         mAnimY = cY;
 
@@ -350,7 +324,6 @@ class Ripple {
         // that anything interesting is happening until the user lifts their
         // finger.
         radius.start();
-        outer.start();
         cX.start();
         cY.start();
     }
@@ -372,51 +345,23 @@ class Ripple {
                 + WAVE_TOUCH_DOWN_ACCELERATION) * mDensity) + 0.5);
         final int opacityDuration = (int) (1000 * mOpacity / WAVE_OPACITY_DECAY_VELOCITY + 0.5f);
 
-        // Scale the outer max opacity and opacity velocity based
-        // on the size of the outer radius
-
-        float outerSizeInfluence = MathUtils.constrain(
-                (mOuterRadius - WAVE_OUTER_SIZE_INFLUENCE_MIN * mDensity)
-                / (WAVE_OUTER_SIZE_INFLUENCE_MAX * mDensity), 0, 1);
-        float outerOpacityVelocity = MathUtils.lerp(WAVE_OUTER_OPACITY_VELOCITY_MIN,
-                WAVE_OUTER_OPACITY_VELOCITY_MAX, outerSizeInfluence);
-
-        // Determine at what time the inner and outer opacity intersect.
-        // inner(t) = mOpacity - t * WAVE_OPACITY_DECAY_VELOCITY / 1000
-        // outer(t) = mOuterOpacity + t * WAVE_OUTER_OPACITY_VELOCITY / 1000
-
-        final int outerInflection = Math.max(0, (int) (1000 * (mOpacity - mOuterOpacity)
-                / (WAVE_OPACITY_DECAY_VELOCITY + outerOpacityVelocity) + 0.5f));
-        final int inflectionOpacity = (int) (255 * (mOuterOpacity + outerInflection
-                * outerOpacityVelocity * outerSizeInfluence / 1000) + 0.5f);
-
         if (mCanUseHardware) {
-            exitHardware(radiusDuration, opacityDuration, outerInflection, inflectionOpacity);
+            exitHardware(radiusDuration, opacityDuration);
         } else {
-            exitSoftware(radiusDuration, opacityDuration, outerInflection, inflectionOpacity);
+            exitSoftware(radiusDuration, opacityDuration);
         }
     }
 
-    private void exitHardware(int radiusDuration, int opacityDuration, int outerInflection,
-            int inflectionOpacity) {
+    private void exitHardware(int radiusDuration, int opacityDuration) {
         mPendingAnimations.clear();
 
         final float startX = MathUtils.lerp(
                 mClampedStartingX - mBounds.exactCenterX(), mOuterX, mTweenX);
         final float startY = MathUtils.lerp(
                 mClampedStartingY - mBounds.exactCenterY(), mOuterY, mTweenY);
-        final Paint outerPaint = new Paint();
-        outerPaint.setAntiAlias(true);
-        outerPaint.setColor(mColor);
-        outerPaint.setAlpha((int) (255 * mOuterOpacity + 0.5f));
-        outerPaint.setStyle(Style.FILL);
-        mPropOuterPaint = CanvasProperty.createPaint(outerPaint);
-        mPropOuterRadius = CanvasProperty.createFloat(mOuterRadius);
-        mPropOuterX = CanvasProperty.createFloat(mOuterX);
-        mPropOuterY = CanvasProperty.createFloat(mOuterY);
 
         final float startRadius = MathUtils.lerp(0, mOuterRadius, mTweenRadius);
-        final Paint paint = new Paint();
+        final Paint paint = getTempPaint();
         paint.setAntiAlias(true);
         paint.setColor(mColor);
         paint.setAlpha((int) (255 * mOpacity + 0.5f));
@@ -442,41 +387,10 @@ class Ripple {
                 RenderNodeAnimator.PAINT_ALPHA, 0);
         opacityAnim.setDuration(opacityDuration);
         opacityAnim.setInterpolator(LINEAR_INTERPOLATOR);
-
-        final RenderNodeAnimator outerOpacityAnim;
-        if (outerInflection > 0) {
-            // Outer opacity continues to increase for a bit.
-            outerOpacityAnim = new RenderNodeAnimator(
-                    mPropOuterPaint, RenderNodeAnimator.PAINT_ALPHA, inflectionOpacity);
-            outerOpacityAnim.setDuration(outerInflection);
-            outerOpacityAnim.setInterpolator(LINEAR_INTERPOLATOR);
-
-            // Chain the outer opacity exit animation.
-            final int outerDuration = opacityDuration - outerInflection;
-            if (outerDuration > 0) {
-                final RenderNodeAnimator outerFadeOutAnim = new RenderNodeAnimator(
-                        mPropOuterPaint, RenderNodeAnimator.PAINT_ALPHA, 0);
-                outerFadeOutAnim.setDuration(outerDuration);
-                outerFadeOutAnim.setInterpolator(LINEAR_INTERPOLATOR);
-                outerFadeOutAnim.setStartDelay(outerInflection);
-                outerFadeOutAnim.setStartValue(inflectionOpacity);
-                outerFadeOutAnim.addListener(mAnimationListener);
-
-                mPendingAnimations.add(outerFadeOutAnim);
-            } else {
-                outerOpacityAnim.addListener(mAnimationListener);
-            }
-        } else {
-            outerOpacityAnim = new RenderNodeAnimator(
-                    mPropOuterPaint, RenderNodeAnimator.PAINT_ALPHA, 0);
-            outerOpacityAnim.setInterpolator(LINEAR_INTERPOLATOR);
-            outerOpacityAnim.setDuration(opacityDuration);
-            outerOpacityAnim.addListener(mAnimationListener);
-        }
+        opacityAnim.addListener(mAnimationListener);
 
         mPendingAnimations.add(radiusAnim);
         mPendingAnimations.add(opacityAnim);
-        mPendingAnimations.add(outerOpacityAnim);
         mPendingAnimations.add(xAnim);
         mPendingAnimations.add(yAnim);
 
@@ -485,8 +399,14 @@ class Ripple {
         invalidateSelf();
     }
 
-    private void exitSoftware(int radiusDuration, int opacityDuration, int outerInflection,
-            int inflectionOpacity) {
+    private Paint getTempPaint() {
+        if (mTempPaint == null) {
+            mTempPaint = new Paint();
+        }
+        return mTempPaint;
+    }
+
+    private void exitSoftware(int radiusDuration, int opacityDuration) {
         final ObjectAnimator radiusAnim = ObjectAnimator.ofFloat(this, "radiusGravity", 1);
         radiusAnim.setAutoCancel(true);
         radiusAnim.setDuration(radiusDuration);
@@ -506,58 +426,15 @@ class Ripple {
         opacityAnim.setAutoCancel(true);
         opacityAnim.setDuration(opacityDuration);
         opacityAnim.setInterpolator(LINEAR_INTERPOLATOR);
-
-        final ObjectAnimator outerOpacityAnim;
-        if (outerInflection > 0) {
-            // Outer opacity continues to increase for a bit.
-            outerOpacityAnim = ObjectAnimator.ofFloat(this,
-                    "outerOpacity", inflectionOpacity / 255.0f);
-            outerOpacityAnim.setAutoCancel(true);
-            outerOpacityAnim.setDuration(outerInflection);
-            outerOpacityAnim.setInterpolator(LINEAR_INTERPOLATOR);
-
-            // Chain the outer opacity exit animation.
-            final int outerDuration = opacityDuration - outerInflection;
-            if (outerDuration > 0) {
-                outerOpacityAnim.addListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        final ObjectAnimator outerFadeOutAnim = ObjectAnimator.ofFloat(Ripple.this,
-                                "outerOpacity", 0);
-                        outerFadeOutAnim.setAutoCancel(true);
-                        outerFadeOutAnim.setDuration(outerDuration);
-                        outerFadeOutAnim.setInterpolator(LINEAR_INTERPOLATOR);
-                        outerFadeOutAnim.addListener(mAnimationListener);
-
-                        mAnimOuterOpacity = outerFadeOutAnim;
-
-                        outerFadeOutAnim.start();
-                    }
-
-                    @Override
-                    public void onAnimationCancel(Animator animation) {
-                        animation.removeListener(this);
-                    }
-                });
-            } else {
-                outerOpacityAnim.addListener(mAnimationListener);
-            }
-        } else {
-            outerOpacityAnim = ObjectAnimator.ofFloat(this, "outerOpacity", 0);
-            outerOpacityAnim.setAutoCancel(true);
-            outerOpacityAnim.setDuration(opacityDuration);
-            outerOpacityAnim.addListener(mAnimationListener);
-        }
+        opacityAnim.addListener(mAnimationListener);
 
         mAnimRadius = radiusAnim;
         mAnimOpacity = opacityAnim;
-        mAnimOuterOpacity = outerOpacityAnim;
-        mAnimX = opacityAnim;
-        mAnimY = opacityAnim;
+        mAnimX = xAnim;
+        mAnimY = yAnim;
 
         radiusAnim.start();
         opacityAnim.start();
-        outerOpacityAnim.start();
         xAnim.start();
         yAnim.start();
     }
@@ -579,10 +456,6 @@ class Ripple {
             mAnimOpacity.cancel();
         }
 
-        if (mAnimOuterOpacity != null) {
-            mAnimOuterOpacity.cancel();
-        }
-
         if (mAnimX != null) {
             mAnimX.cancel();
         }
@@ -597,7 +470,7 @@ class Ripple {
      */
     private void cancelHardwareAnimations() {
         final ArrayList<RenderNodeAnimator> runningAnimations = mRunningAnimations;
-        final int N = runningAnimations == null ? 0 : runningAnimations.size();
+        final int N = runningAnimations.size();
         for (int i = 0; i < N; i++) {
             runningAnimations.get(i).cancel();
         }
