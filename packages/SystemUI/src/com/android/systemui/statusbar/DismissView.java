@@ -19,133 +19,21 @@ package com.android.systemui.statusbar;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.animation.Interpolator;
 
 import com.android.systemui.R;
-import com.android.systemui.statusbar.phone.PhoneStatusBar;
 
-public class DismissView extends ExpandableView {
-
-    private View mClearAllIcon;
-    private boolean mIsVisible;
-    private boolean mAnimating;
-    private boolean mWillBeGone;
+public class DismissView extends StackScrollerDecorView {
 
     public DismissView(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
     @Override
-    protected void onFinishInflate() {
-        super.onFinishInflate();
-        mClearAllIcon = findViewById(R.id.dismiss_text);
-        setInvisible();
+    protected View findContentView() {
+        return findViewById(R.id.dismiss_text);
     }
 
-    @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
-        setOutlineProvider(null);
-    }
-
-    @Override
-    public boolean isTransparent() {
-        return true;
-    }
-
-    public void performVisibilityAnimation(boolean nowVisible) {
-        animateText(nowVisible, null /* onFinishedRunnable */);
-    }
-
-    public void performVisibilityAnimation(boolean nowVisible, Runnable onFinishedRunnable) {
-        animateText(nowVisible, onFinishedRunnable);
-    }
-
-    public boolean isVisible() {
-        return mIsVisible || mAnimating;
-    }
-
-    /**
-     * Animate the text to a new visibility.
-     *
-     * @param nowVisible should it now be visible
-     * @param onFinishedRunnable A runnable which should be run when the animation is
-     *        finished.
-     */
-    private void animateText(boolean nowVisible, final Runnable onFinishedRunnable) {
-        if (nowVisible != mIsVisible) {
-            // Animate text
-            float endValue = nowVisible ? 1.0f : 0.0f;
-            Interpolator interpolator;
-            if (nowVisible) {
-                interpolator = PhoneStatusBar.ALPHA_IN;
-            } else {
-                interpolator = PhoneStatusBar.ALPHA_OUT;
-            }
-            mAnimating = true;
-            mClearAllIcon.animate()
-                    .alpha(endValue)
-                    .setInterpolator(interpolator)
-                    .setDuration(260)
-                    .withLayer()
-                    .withEndAction(new Runnable() {
-                        @Override
-                        public void run() {
-                            mAnimating = false;
-                            if (onFinishedRunnable != null) {
-                                onFinishedRunnable.run();
-                            }
-                        }
-                    });
-            mIsVisible = nowVisible;
-        } else {
-            if (onFinishedRunnable != null) {
-                onFinishedRunnable.run();
-            }
-        }
-    }
-
-    public void setInvisible() {
-        mClearAllIcon.setAlpha(0.0f);
-        mIsVisible = false;
-    }
-
-    @Override
-    public void performRemoveAnimation(long duration, float translationDirection,
-            Runnable onFinishedRunnable) {
-        // TODO: Use duration
-        performVisibilityAnimation(false);
-    }
-
-    @Override
-    public void performAddAnimation(long delay, long duration) {
-        // TODO: use delay and duration
-        performVisibilityAnimation(true);
-    }
-
-    @Override
-    public void setScrimAmount(float scrimAmount) {
-        // We don't need to scrim the dismissView
-    }
-
-    public void setOnButtonClickListener(OnClickListener onClickListener) {
-        mClearAllIcon.setOnClickListener(onClickListener);
-    }
-
-    @Override
-    public boolean hasOverlappingRendering() {
-        return false;
-    }
-
-    public void cancelAnimation() {
-        mClearAllIcon.animate().cancel();
-    }
-
-    public boolean willBeGone() {
-        return mWillBeGone;
-    }
-
-    public void setWillBeGone(boolean willBeGone) {
-        mWillBeGone = willBeGone;
+    public void setOnButtonClickListener(OnClickListener listener) {
+        mContent.setOnClickListener(listener);
     }
 }
