@@ -19,5 +19,5 @@
          min value is used when no notifications are displaying, and the max value is when the
          highest possible number of notifications are showing. -->
     <fraction name="keyguard_clock_y_fraction_max">35%</fraction>
-    <fraction name="keyguard_clock_y_fraction_min">20%</fraction>
+    <fraction name="keyguard_clock_y_fraction_min">24%</fraction>
 </resources>
