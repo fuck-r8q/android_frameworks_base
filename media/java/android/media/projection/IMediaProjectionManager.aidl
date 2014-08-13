@@ -17,6 +17,9 @@
 package android.media.projection;
 
 import android.media.projection.IMediaProjection;
+import android.media.projection.IMediaProjectionCallback;
+import android.media.projection.IMediaProjectionWatcherCallback;
+import android.media.projection.MediaProjectionInfo;
 import android.os.IBinder;
 
 /** {@hide} */
@@ -25,4 +28,8 @@ interface IMediaProjectionManager {
     IMediaProjection createProjection(int uid, String packageName, int type,
             boolean permanentGrant);
     boolean isValidMediaProjection(IMediaProjection projection);
+    MediaProjectionInfo getActiveProjectionInfo();
+    void stopActiveProjection();
+    void addCallback(IMediaProjectionWatcherCallback callback);
+    void removeCallback(IMediaProjectionWatcherCallback callback);
 }
