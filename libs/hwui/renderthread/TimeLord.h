@@ -30,7 +30,7 @@ class TimeLord {
 public:
     void setFrameInterval(nsecs_t intervalNanos) { mFrameIntervalNanos = intervalNanos; }
     void vsyncReceived(nsecs_t vsync);
-    nsecs_t frameTimeMs();
+    nsecs_t computeFrameTimeMs();
 
 private:
     friend class RenderThread;
