@@ -22,15 +22,8 @@
         android:fillEnabled="true" android:fillBefore="true"
         android:interpolator="@interpolator/decelerate_quint"
         android:duration="400"/>
-    <scale
-        android:fromXScale="0.94" android:toXScale="1.0"
-        android:fromYScale="0.94" android:toYScale="1.0"
-        android:pivotX="50%" android:pivotY="100%"
-        android:fillEnabled="true" android:fillBefore="true"
-        android:interpolator="@interpolator/decelerate_quint"
-        android:duration="400" />
 
-    <translate android:fromYDelta="5%" android:toYDelta="0"
+    <translate android:fromYDelta="11%" android:toYDelta="0"
         android:fillEnabled="true" android:fillBefore="true" android:fillAfter="true"
         android:interpolator="@interpolator/decelerate_quint"
         android:duration="300" />
