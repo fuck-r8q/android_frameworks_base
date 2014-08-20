@@ -21,6 +21,7 @@ import android.os.IBinder;
 import android.os.PersistableBundle;
 
 /**
+ * @hide
  * Abstract implementation of a Restrictions Provider BroadcastReceiver. To implement a
  * Restrictions Provider, extend from this class and implement the abstract methods.
  * Export this receiver in the manifest. A profile owner device admin can then register this
@@ -33,6 +34,8 @@ import android.os.PersistableBundle;
  * {@link RestrictionsManager#notifyPermissionResponse(String, PersistableBundle)}.
  *
  * @see RestrictionsManager
+ * TODO: STOPSHIP: Remove before L ships, after clients have switched over
+ * to android.service.restrictions.RestrictionsReceiver. Bug: 17006805
  */
 public abstract class AbstractRestrictionsProvider extends BroadcastReceiver {
 
