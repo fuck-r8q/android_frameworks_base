@@ -31,7 +31,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_marginEnd="8dp"
         android:layout_marginStart="@dimen/notification_large_icon_width"
         android:minHeight="@dimen/notification_large_icon_height"
         android:orientation="vertical"
@@ -42,22 +41,26 @@
             android:textAppearance="@style/TextAppearance.StatusBar.Material.EventContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="@dimen/notification_large_icon_height"
-            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
             android:singleLine="false"
             android:visibility="gone"
             />
-        <include layout="@layout/notification_template_part_line3" />
+        <include
+            layout="@layout/notification_template_part_line3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            />
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="1dp"
+            android:layout_marginTop="10dp"
             android:id="@+id/action_divider"
             android:visibility="gone"
-            android:background="@drawable/list_divider_holo_light" />
+            android:background="@drawable/notification_template_divider" />
         <include
             layout="@layout/notification_material_action_list"
-            android:layout_marginLeft="-8dp"
-            android:layout_marginRight="-8dp"
+            android:layout_marginStart="-8dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             />
