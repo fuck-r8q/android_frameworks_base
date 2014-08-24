@@ -17,10 +17,15 @@
 package android.app;
 
 import android.app.ActivityManager;
+import android.content.Intent;
+import android.os.Bundle;
 
 /** @hide */
 interface IAppTask {
     void finishAndRemoveTask();
     ActivityManager.RecentTaskInfo getTaskInfo();
+    void moveToFront();
+    int startActivity(IBinder whoThread, String callingPackage,
+            in Intent intent, String resolvedType, in Bundle options);
     void setExcludeFromRecents(boolean exclude);
 }
