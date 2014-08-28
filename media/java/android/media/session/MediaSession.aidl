@@ -16,4 +16,4 @@
 package android.media.session;
 
 parcelable MediaSession.Token;
-parcelable MediaSession.Track;
+parcelable MediaSession.QueueItem;
