@@ -63,8 +63,14 @@ class CircularDisplayMask {
 
         SurfaceControl ctrl = null;
         try {
-            ctrl = new SurfaceControl(session, "CircularDisplayMask",
-                mScreenSize.x, mScreenSize.y, PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN);
+            if (WindowManagerService.DEBUG_SURFACE_TRACE) {
+                ctrl = new WindowStateAnimator.SurfaceTrace(session, "CircularDisplayMask",
+                        mScreenSize.x, mScreenSize.y, PixelFormat.TRANSLUCENT,
+                        SurfaceControl.HIDDEN);
+            } else {
+                ctrl = new SurfaceControl(session, "CircularDisplayMask", mScreenSize.x,
+                        mScreenSize.y, PixelFormat.TRANSLUCENT, SurfaceControl.HIDDEN);
+            }
             ctrl.setLayerStack(display.getLayerStack());
             ctrl.setLayer(zOrder);
             ctrl.setPosition(0, 0);
