@@ -16,8 +16,8 @@
 
 package com.android.ims.internal;
 
-import android.telecomm.CameraCapabilities;
-import android.telecomm.VideoProfile;
+import android.telecom.CameraCapabilities;
+import android.telecom.VideoProfile;
 
 /**
  * Internal remote interface for IMS's video call provider.
@@ -26,8 +26,8 @@ import android.telecomm.VideoProfile;
  * separate aidl interface for invoking callbacks in Telephony from the IMS Service to without
  * accessing internal interfaces. See {@link IImsVideoCallProvider} for additional detail.
  *
- * @see android.telecomm.internal.IVideoCallCallback
- * @see android.telecomm.VideoCallImpl
+ * @see android.telecom.internal.IVideoCallCallback
+ * @see android.telecom.VideoCallImpl
  *
  * {@hide}
  */
