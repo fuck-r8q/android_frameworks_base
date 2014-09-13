@@ -17,7 +17,7 @@
 package com.android.ims.internal;
 
 import android.view.Surface;
-import android.telecomm.VideoProfile;
+import android.telecom.VideoProfile;
 
 import com.android.ims.internal.IImsVideoCallCallback;
 
@@ -35,8 +35,8 @@ import com.android.ims.internal.IImsVideoCallCallback;
  * video call provider will not have the benefit of accessing the internal
  * {@link IVideoCallProvider} aidl for interprocess communication.
  *
- * @see android.telecomm.internal.IVideoCallProvider
- * @see android.telecomm.VideoCallProvider
+ * @see android.telecom.internal.IVideoCallProvider
+ * @see android.telecom.VideoCallProvider
  * @hide
  */
 oneway interface IImsVideoCallProvider {
