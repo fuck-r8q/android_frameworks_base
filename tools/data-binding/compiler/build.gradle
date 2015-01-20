@@ -32,10 +32,9 @@ buildscript {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+    compile project(":annotations")
     compile project(":grammerBuilder")
     compile project(":xmlGrammer")
-    compile "com.android.databinding:annotationprocessor:0.1-SNAPSHOT"
-    //compile project(":annotationprocessor")
 }
 uploadArchives {
     repositories {
