@@ -25,12 +25,12 @@ namespace uirenderer {
 class Scissor {
     friend class RenderState;
 public:
-    Scissor();
     bool setEnabled(bool enabled);
     bool set(GLint x, GLint y, GLint width, GLint height);
     void reset();
     bool isEnabled() { return mEnabled; }
 private:
+    Scissor();
     void invalidate();
     bool mEnabled;
     GLint mScissorX;
