@@ -21,4 +21,5 @@ import android.view.View;
 public interface IViewDataBinder {
     public View getRoot();
     public abstract void rebindDirty();
+    public abstract void invalidateAll();
 }
