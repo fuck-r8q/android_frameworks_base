@@ -17,7 +17,7 @@ object ParserHelper {
     public fun toClassName(name:String) : String  {
         val dot = name.indexOf(".")
         val stripped = if (dot == -1) name else name.substring(0, name.indexOf("."))
-        return stripped.split("_").map { "${it.substring(0,1).toUpperCase()}${it.substring(1)}" }.join("")
+        return stripped.split("[_-]").map { "${it.substring(0,1).toUpperCase()}${it.substring(1)}" }.join("")
     }
 
 }
