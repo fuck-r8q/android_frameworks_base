@@ -21,24 +21,21 @@ import com.android.databinding.ClassAnalyzer;
 import java.util.List;
 
 public class GroupExpr extends Expr {
-    Expr mWrapped;
-
     public GroupExpr(Expr wrapped) {
         super(wrapped);
-        mWrapped = wrapped;
     }
 
     @Override
     protected Class resolveType(ClassAnalyzer classAnalyzer) {
-        return mWrapped.resolveType(classAnalyzer);
+        return getWrapped().resolveType(classAnalyzer);
     }
 
     @Override
     protected List<Dependency> constructDependencies() {
-        return mWrapped.constructDependencies();
+        return getWrapped().constructDependencies();
     }
 
     public Expr getWrapped() {
-        return mWrapped;
+        return getChildren().get(0);
     }
 }
