@@ -15,6 +15,8 @@
  */
 package com.android.databinding.reflection;
 
+import java.util.List;
+
 public interface ReflectionMethod {
     ReflectionClass getDeclaringClass();
 
@@ -22,7 +24,7 @@ public interface ReflectionMethod {
 
     String getName();
 
-    ReflectionClass getReturnType();
+    ReflectionClass getReturnType(List<ReflectionClass> args);
 
     boolean isPublic();
 
