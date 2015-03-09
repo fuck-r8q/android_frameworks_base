@@ -17,10 +17,12 @@
 package android.media.midi;
 
 import android.media.midi.MidiDeviceInfo;
+import android.media.midi.MidiDeviceStatus;
 
 /** @hide */
 oneway interface IMidiDeviceListener
 {
     void onDeviceAdded(in MidiDeviceInfo device);
     void onDeviceRemoved(in MidiDeviceInfo device);
+    void onDeviceStatusChanged(in MidiDeviceStatus status);
 }
