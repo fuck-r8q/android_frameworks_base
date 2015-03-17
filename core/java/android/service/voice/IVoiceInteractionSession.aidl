@@ -17,6 +17,7 @@
 package android.service.voice;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 
 /**
@@ -26,6 +27,7 @@ oneway interface IVoiceInteractionSession {
     void show(in Bundle sessionArgs, int flags);
     void hide();
     void handleAssist(in Bundle assistData);
+    void handleScreenshot(in Bitmap screenshot);
     void taskStarted(in Intent intent, int taskId);
     void taskFinished(in Intent intent, int taskId);
     void closeSystemDialogs();
