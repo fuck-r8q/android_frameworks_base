@@ -23,9 +23,9 @@ import android.os.UserHandle;
  * @hide
  */
 oneway interface IFingerprintServiceReceiver {
-    void onEnrollResult(int fingerprintId,  int remaining);
-    void onAcquired(int acquiredInfo);
-    void onProcessed(int fingerprintId);
-    void onError(int error);
-    void onRemoved(int fingerprintId);
+    void onEnrollResult(long deviceId, int fingerId, int groupId, int remaining);
+    void onAcquired(long deviceId, int acquiredInfo);
+    void onProcessed(long deviceId, int fingerId, int groupId);
+    void onError(long deviceId, int error);
+    void onRemoved(long deviceId, int fingerId, int groupId);
 }
