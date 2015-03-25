@@ -26,9 +26,8 @@
         android:id="@+id/date_picker_day_picker"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingStart="@dimen/day_picker_padding_horizontal"
-        android:paddingEnd="@dimen/day_picker_padding_horizontal"
-        android:paddingTop="@dimen/day_picker_padding_top" />
+        android:inAnimation="@anim/fade_in"
+        android:outAnimation="@anim/fade_out" />
 
     <android.widget.YearPickerView
         android:id="@+id/date_picker_year_picker"
