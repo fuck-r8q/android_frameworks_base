@@ -14,6 +14,7 @@ FRAMEWORK := ../../../../../out/target/common/obj/APPS/framework-res_intermediat
 
 LOCAL_PACKAGE := com.android.app
 LOCAL_RESOURCE_DIR := res
+LOCAL_LIBS := lib/out/package.apk
 LOCAL_OUT := out
 LOCAL_GEN := out/gen
 
@@ -21,13 +22,12 @@ LOCAL_GEN := out/gen
 # AAPT2 custom rules.
 ##
 
-PRIVATE_ARSC := $(LOCAL_OUT)/resources.arsc
 PRIVATE_APK_UNALIGNED := $(LOCAL_OUT)/package-unaligned.apk
 PRIVATE_APK_ALIGNED := $(LOCAL_OUT)/package.apk
 
 # Eg: framework.apk, etc.
-PRIVATE_LIBS := $(FRAMEWORK)
-$(info PRIVATE_LIBS = $(PRIVATE_LIBS))
+PRIVATE_INCLUDES := $(FRAMEWORK)
+$(info PRIVATE_INCLUDES = $(PRIVATE_INCLUDES))
 
 # Eg: gen/com/android/app/R.java
 PRIVATE_R_JAVA := $(LOCAL_GEN)/$(subst .,/,$(LOCAL_PACKAGE))/R.java
@@ -42,56 +42,32 @@ PRIVATE_RESOURCE_TYPES := \
 	$(patsubst $(LOCAL_RESOURCE_DIR)/%/,%,$(sort $(dir $(PRIVATE_RESOURCES))))
 $(info PRIVATE_RESOURCE_TYPES = $(PRIVATE_RESOURCE_TYPES))
 
-# Eg: drawable, drawable-xhdpi, layout
-PRIVATE_NON_VALUE_RESOURCE_TYPES := $(filter-out values%,$(PRIVATE_RESOURCE_TYPES))
-$(info PRIVATE_NON_VALUE_RESOURCE_TYPES = $(PRIVATE_NON_VALUE_RESOURCE_TYPES))
-
-# Eg: out/values-v4.table, out/drawable-xhdpi.table
-PRIVATE_INTERMEDIATE_TABLES := $(patsubst %,$(LOCAL_OUT)/%.table,$(PRIVATE_RESOURCE_TYPES))
+# Eg: out/values-v4.apk, out/drawable-xhdpi.apk
+PRIVATE_INTERMEDIATE_TABLES := $(patsubst %,$(LOCAL_OUT)/%.apk,$(PRIVATE_RESOURCE_TYPES))
 $(info PRIVATE_INTERMEDIATE_TABLES = $(PRIVATE_INTERMEDIATE_TABLES))
-
-# Eg: out/res/layout/main.xml, out/res/drawable/icon.png
-PRIVATE_INTERMEDIATE_FILES := $(patsubst $(LOCAL_RESOURCE_DIR)/%,$(LOCAL_OUT)/res/%,$(filter-out $(LOCAL_RESOURCE_DIR)/values%,$(PRIVATE_RESOURCES)))
-$(info PRIVATE_INTERMEDIATE_FILES = $(PRIVATE_INTERMEDIATE_FILES))
 
 # Generates rules for collect phase.
 # $1: Resource type (values-v4)
-# returns: out/values-v4.table: res/values-v4/styles.xml res/values-v4/colors.xml
+# returns: out/values-v4.apk: res/values-v4/styles.xml res/values-v4/colors.xml
 define make-collect-rule
-$(LOCAL_OUT)/$1.table: $(filter $(LOCAL_RESOURCE_DIR)/$1/%,$(PRIVATE_RESOURCES))
-	$(AAPT) collect --package $(LOCAL_PACKAGE) -o $$@ $$^
+$(LOCAL_OUT)/$1.apk: $(filter $(LOCAL_RESOURCE_DIR)/$1/%,$(PRIVATE_RESOURCES))
+	$(AAPT) compile --package $(LOCAL_PACKAGE) --binding $(LOCAL_GEN) -o $$@ $$^
 endef
 
-# Collect: out/values-v4.table <- res/values-v4/styles.xml res/values-v4/colors.xml
+# Collect: out/values-v4.apk <- res/values-v4/styles.xml res/values-v4/colors.xml
 $(foreach d,$(PRIVATE_RESOURCE_TYPES),$(eval $(call make-collect-rule,$d)))
 
-# Link: out/resources.arsc <- out/values-v4.table out/drawable-v4.table
-$(PRIVATE_ARSC): $(PRIVATE_INTERMEDIATE_TABLES) $(PRIVATE_LIBS)
-	$(AAPT) link --package $(LOCAL_PACKAGE) $(addprefix -I ,$(PRIVATE_LIBS)) --java $(LOCAL_GEN) -o $@ $(PRIVATE_INTERMEDIATE_TABLES)
-
-# Compile Manifest: out/AndroidManifest.xml <- AndroidManifest.xml out/resources.arsc
-$(LOCAL_OUT)/AndroidManifest.xml: AndroidManifest.xml $(PRIVATE_ARSC) $(PRIVATE_LIBS)
-	$(AAPT) manifest -I $(PRIVATE_ARSC) $(addprefix -I ,$(PRIVATE_LIBS)) -o $(LOCAL_OUT) AndroidManifest.xml
-
-# Generates rules for compile phase.
-# $1: resource file (res/drawable/icon.png)
-# returns: out/res/drawable/icon.png: res/drawable/icon.png out/resources.arsc
-define make-compile-rule
-$1: $(patsubst $(LOCAL_OUT)/res/%,$(LOCAL_RESOURCE_DIR)/%,$1) $(PRIVATE_ARSC) $(PRIVATE_LIBS)
-	$(AAPT) compile --package $(LOCAL_PACKAGE) -I $(PRIVATE_ARSC) $(addprefix -I ,$(PRIVATE_LIBS)) -o $(LOCAL_OUT) $$<
-endef
-
-# Compile: out/res/drawable-xhdpi/icon.png <- res/drawable-xhdpi/icon.png
-$(foreach f,$(PRIVATE_INTERMEDIATE_FILES),$(eval $(call make-compile-rule,$f)))
+# Link: out/package-unaligned.apk <- out/values-v4.apk out/drawable-v4.apk
+$(PRIVATE_APK_UNALIGNED): $(PRIVATE_INTERMEDIATE_TABLES) $(PRIVATE_INCLUDES) $(LOCAL_LIBS) AndroidManifest.xml
+	$(AAPT) link --manifest AndroidManifest.xml $(addprefix -I ,$(PRIVATE_INCLUDES)) --java $(LOCAL_GEN) -o $@ $(PRIVATE_INTERMEDIATE_TABLES) $(LOCAL_LIBS)
 
 # R.java: gen/com/android/app/R.java <- out/resources.arsc
 # No action since R.java is generated when out/resources.arsc is.
-$(PRIVATE_R_JAVA): $(PRIVATE_ARSC)
+$(PRIVATE_R_JAVA): $(PRIVATE_APK_UNALIGNED)
 
 # Assemble: zip out/resources.arsc AndroidManifest.xml and res/**/*
-$(PRIVATE_APK_ALIGNED): $(PRIVATE_ARSC) $(PRIVATE_INTERMEDIATE_FILES) $(LOCAL_OUT)/AndroidManifest.xml
-	cd $(LOCAL_OUT); $(ZIP) $(patsubst $(LOCAL_OUT)/%,%,$(PRIVATE_APK_UNALIGNED)) $(patsubst $(LOCAL_OUT)/%,%,$^)
-	$(ZIPALIGN) $(PRIVATE_APK_UNALIGNED) $@
+$(PRIVATE_APK_ALIGNED): $(PRIVATE_APK_UNALIGNED)
+	$(ZIPALIGN) $< $@
 
 # Create the out directory if needed.
 dummy := $(shell test -d $(LOCAL_OUT) || mkdir -p $(LOCAL_OUT))
@@ -100,7 +76,7 @@ dummy := $(shell test -d $(LOCAL_OUT) || mkdir -p $(LOCAL_OUT))
 java: $(PRIVATE_R_JAVA)
 
 .PHONY: assemble
-assemble: $(LOCAL_OUT)/package.apk
+assemble: $(PRIVATE_APK_ALIGNED)
 
 .PHONY: all
 all: assemble java
