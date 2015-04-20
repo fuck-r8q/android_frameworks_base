@@ -19,8 +19,10 @@ package android.telecom;
 /**
  * Interface used to identify entities with which another entity can participate in a conference
  * call with.  The {@link ConnectionService} implementation will only recognize
- * {@link IConferenceable}s which are {@link Connection}s or {@link Conference}s.
+ * {@link Conferenceable}s which are {@link Connection}s or {@link Conference}s.
+ * <p>
+ * @deprecated use {@link Conferenceable} instead.
+ * @hide
  */
-public interface IConferenceable {
-
+public interface IConferenceable extends Conferenceable {
 }
