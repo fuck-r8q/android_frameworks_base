@@ -16,8 +16,15 @@
 
 package com.android.test.assist;
 
+import android.content.Intent;
 import android.service.voice.VoiceInteractionService;
 
 public class AssistInteractionService extends VoiceInteractionService {
-
+    @Override
+    public void onLaunchVoiceAssistFromKeyguard() {
+        super.onLaunchVoiceAssistFromKeyguard();
+        Intent intent = new Intent(this, AboveKeyguardActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
 }
