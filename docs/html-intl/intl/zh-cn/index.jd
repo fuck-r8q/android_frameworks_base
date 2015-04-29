@@ -1,14 +1,10 @@
 fullpage=true
 page.viewport_width=970
 excludeFromSuggestions=true
-page.metaDescription=The official site for Android developers. Provides the Android SDK and documentation for app developers and designers.
+page.metaDescription=Android 开发人员的官方网站。为应用开发人员以及设计师提供 Android SDK 和文档。
 page.customHeadTag=<meta name="google-site-verification" content="sa-bIAI6GKvct3f61-WpRguHq-aNjtF7xJjMTSi79as" />
 
 @jd:body
-
-
-
-
 
 <div class="home-new-carousel-1">
   <div class="fullscreen-carousel-content">
@@ -19,38 +15,31 @@ page.customHeadTag=<meta name="google-site-verification" content="sa-bIAI6GKvct3
           <div class="resource resource-card resource-card-18x6">
 
       <div class="landing-section-header">
-            <div class="col-10"><img src="{@docRoot}images/home/l-hero_2x.png"
-                 srcset="{@docRoot}images/home/l-hero.png 1x, {@docRoot}images/home/l-hero_2x.png 2x"
-                 width="510" style="margin:20px 30px 0 30px"></div>
+            <div class="col-10"><img src="{@docRoot}images/home/l-hero_2x.png" srcset="{@docRoot}images/home/l-hero.png 1x, {@docRoot}images/home/l-hero_2x.png 2x" width="510" style="margin:20px 30px 0 30px"></div>
             <div class="col-5" style=" margin-top:70px ">
             <h3 stye="font-weight:300;">Android 5.0 Lollipop</h3>
-            <p>在 Android 5.0 的版本更新中，我们添加了多种可用于你的应用程序的新功能，比如锁屏通知,一个全新的相机API，OpenGL ES 3.1，以及新的 Material Design 界面等等。</p>
+            <p>Android 5.0 更新将为您的应用增添各种新功能，例如锁定屏幕通知、全新的相机 API、OpenGL ES 3.1、全新的 Material Design 界面等等。</p>
             <a href="{@docRoot}about/versions/lollipop.html" class="landing-button landing-primary">了解详情</a>
             </div>
           </div>
           </div>
         </div>
        <h2>&nbsp;</h2>
-        
-        <div style="margin-top:20px" class="resource-widget resource-flow-layout wrap col-16
-        no-section" data-query="collection:index/primary/zhcn" data-resourcestyle="card"
-        data-sortorder="-timestamp" data-maxresults="3" data-cardsizes="6x2,6x2,6x2"></div> 
-
+        <div style="margin-top:20px;height:115px" class="resource-widget resource-flow-layout wrap col-16
+        no-section" data-query="collection:index/primary" data-resourcestyle="card"
+        data-sortorder="-timestamp" data-maxresults="3" data-cardsizes="6x2,6x2,6x2"></div> <!-- end .resource-widget -->
       </div> <!-- end .wrap -->
     </div> <!-- end .vcenter -->
   </div> <!-- end .fullscreen-carousel-content -->
 </div> <!-- end .fullscreen-carousel -->
 
-
-
-
 <div class="actions-bar" style="margin-top:20px">
   <div class="wrap">
     <div class="actions">
-      <div><a href="/sdk/index.html">下载 SDK</a></div>
-      <div><a href="/samples/index.html">浏览示例</a></div>
+      <div><a href="{@docRoot}sdk/index.html">获得 SDK</a></div>
+      <div><a href="{@docRoot}samples/index.html">浏览示例</a></div>
       <div><a href="//www.youtube.com/user/androiddevelopers">观看视频</a></div>
-      <div><a href="/distribute/googleplay/developer-console.html">管理应用</a></div>
+      <div><a href="{@docRoot}distribute/googleplay/developer-console.html">管理您的应用</a></div>
     </div><!-- end .actions -->
   </div><!-- end .wrap -->
 </div><!-- end .actions-bar -->
@@ -61,44 +50,41 @@ page.customHeadTag=<meta name="google-site-verification" content="sa-bIAI6GKvct3
   <div class="landing-section">
     <div class="wrap">
       <div class="landing-section-header">
-        
-            <div class="landing-h1" style="margin-top:0px">专为跨屏世界打造</div>
-        <div class="landing-subhead" style="margin-top:20px">
-          全球数亿手持设备安装的都是 Android 系统。<br />
-          现在 Android 系统还支持以下这些备受期待的新设备。
+
+            <div class="landing-h1" style="margin-top:0px">专为多屏幕时代而设</div>
+        <div class="landing-subhead" style="margin-top: 20px;">
+          Android 在全球各地的数亿台手持设备上运行， <br>
+          如今更支持下列激动人心的新设备和配置。
         </div>
       </div>
-      <div class="landing-body" style="margin-top:50px">
+      <div class="landing-body" style="margin-top: 50px;">
         <div class="landing-breakout cols">
           <div class="col-3-wide">
-              <img src="{@docRoot}images/home/wear-wordmark.png" />
-              <img src="{@docRoot}images/home/wear.png" />
+              <img src="{@docRoot}images/home/wear-wordmark.png"> <img src="{@docRoot}images/home/wear.png">
               <p class="landing-small">
-                让用户随时随地获得需要的信息。
+                让您的用户即便在途中亦能随时随地获得所需的信息。
             </p>
             <p class="landing-small">
-              <a href="/wear/index.html">了解 Android Wear</a>
+              <a href="{@docRoot}wear/index.html">了解关于 Android Wear 的信息</a>
             </p>
           </div>
           <div class="col-3-wide">
-              <img src="{@docRoot}images/home/tv-wordmark.png" />
-             <img src="{@docRoot}images/home/tv.png" />
+              <img src="{@docRoot}images/home/tv-wordmark.png"> <img src="{@docRoot}images/home/tv.png">
               <p class="landing-small">
-                针对大屏幕打造应用，使你的内容引人入胜。
+                将您的应用搬上大屏幕，使您的内容栩栩如生。
               </p>
             <p class="landing-small">
-              <a href="/tv/index.html">了解 Android TV</a>
+              <a href="{@docRoot}tv/index.html">了解关于 Android TV 的信息</a>
 
             </p>
           </div>
           <div class="col-3-wide">
-              <img src="{@docRoot}images/home/auto-wordmark.png" />
-              <img src="{@docRoot}images/home/auto.png" />
+              <img src="{@docRoot}images/home/auto-wordmark.png"> <img src="{@docRoot}images/home/auto.png">
               <p class="landing-small">
-                将你的音乐应用扩展到车载娱乐系统。
+                将您的音乐应用扩展至车载娱乐系统。
              </p>
             <p class="landing-small">
-              <a href="/auto/index.html">了解 Android Auto</a>
+              <a href="{@docRoot}auto/index.html">了解关于 Android Auto 的信息</a>
             </p>
           </div>
         </div>
