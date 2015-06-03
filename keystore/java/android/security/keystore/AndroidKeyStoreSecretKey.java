@@ -19,7 +19,7 @@ package android.security.keystore;
 import javax.crypto.SecretKey;
 
 /**
- * {@link SecretKey} backed by keystore.
+ * {@link SecretKey} backed by Android Keystore.
  *
  * @hide
  */
