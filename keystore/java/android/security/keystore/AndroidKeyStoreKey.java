@@ -19,7 +19,7 @@ package android.security.keystore;
 import java.security.Key;
 
 /**
- * {@link Key} backed by AndroidKeyStore.
+ * {@link Key} backed by Android Keystore.
  *
  * @hide
  */
