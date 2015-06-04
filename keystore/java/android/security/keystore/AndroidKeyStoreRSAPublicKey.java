@@ -30,7 +30,7 @@ public class AndroidKeyStoreRSAPublicKey extends AndroidKeyStorePublicKey implem
 
     public AndroidKeyStoreRSAPublicKey(String alias, byte[] x509EncodedForm, BigInteger modulus,
             BigInteger publicExponent) {
-        super(alias, "RSA", x509EncodedForm);
+        super(alias, KeyProperties.KEY_ALGORITHM_RSA, x509EncodedForm);
         mModulus = modulus;
         mPublicExponent = publicExponent;
     }
