@@ -20,6 +20,6 @@
     android:layout_height="match_parent"
     android:minWidth="@dimen/floating_toolbar_menu_button_minimum_width"
     android:minHeight="@dimen/floating_toolbar_height"
-    android:src="?android:attr/actionModeCloseDrawable"
+    android:src="?attr/floatingToolbarCloseDrawable"
     android:contentDescription="@string/floating_toolbar_close_overflow_description"
-    android:background="?attr/selectableItemBackgroundBorderless" />
+    android:background="?attr/floatingToolbarItemBackgroundBorderlessDrawable" />
