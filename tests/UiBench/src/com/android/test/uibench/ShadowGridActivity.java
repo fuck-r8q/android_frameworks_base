@@ -38,7 +38,7 @@ public class ShadowGridActivity extends AppCompatActivity {
             };
 
             listFragment.setListAdapter(new ArrayAdapter<>(this,
-                    R.layout.card_row, R.id.card_text, TrivialListActivity.buildStringList()));
+                    R.layout.card_row, R.id.card_text, TextUtils.buildSimpleStringList()));
             fm.beginTransaction().add(android.R.id.content, listFragment).commit();
         }
     }
