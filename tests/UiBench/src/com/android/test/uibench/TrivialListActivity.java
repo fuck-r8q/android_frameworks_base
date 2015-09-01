@@ -47,7 +47,7 @@ public class TrivialListActivity extends AppCompatActivity {
         FragmentManager fm = getSupportFragmentManager();
         if (fm.findFragmentById(android.R.id.content) == null) {
             ListFragment listFragment = new ListFragment();
-            listFragment.setListAdapter(new ArrayAdapter<>(TrivialListActivity.this,
+            listFragment.setListAdapter(new ArrayAdapter<>(this,
                     android.R.layout.simple_list_item_1, buildStringList()));
             fm.beginTransaction().add(android.R.id.content, listFragment).commit();
         }
