@@ -51,28 +51,11 @@
             android:layout_width="256dp"
             android:layout_height="match_parent" />
 
-        <LinearLayout
+        <include layout="@layout/directory_cluster"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:background="@color/material_grey_50"
-            android:elevation="8dp">
-
-            <com.android.documentsui.DirectoryContainerView
-                android:id="@+id/container_directory"
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <FrameLayout
-                android:id="@+id/container_save"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@color/material_grey_50"
-                android:elevation="8dp" />
-
-        </LinearLayout>
+            android:elevation="8dp"
+            android:background="@color/material_grey_50" />
 
     </LinearLayout>
 
