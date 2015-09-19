@@ -25,7 +25,7 @@ public abstract class GestureClassifier extends Classifier {
     /**
      * @param type the type of action for which this method is called
      * @return a non-negative value which is used to determine whether the most recent gesture is a
-     *         false interaction. The bigger the value the greater the chance that this a false
+     *         false interaction; the bigger the value the greater the chance that this a false
      *         interaction.
      */
     public abstract float getFalseTouchEvaluation(int type);
