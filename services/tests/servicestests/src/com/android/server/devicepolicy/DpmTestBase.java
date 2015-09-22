@@ -19,14 +19,25 @@ package com.android.server.devicepolicy;
 import android.content.Context;
 import android.test.AndroidTestCase;
 
+import java.io.File;
+
 public class DpmTestBase extends AndroidTestCase {
-    private DpmMockContext mMockContext;
+    public static final String TAG = "DpmTest";
+
+    protected Context mRealTestContext;
+    protected DpmMockContext mMockContext;
+
+    public File dataDir;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
 
+        mRealTestContext = super.getContext();
         mMockContext = new DpmMockContext(super.getContext());
+
+        dataDir = new File(mRealTestContext.getCacheDir(), "test-data");
+        DpmTestUtils.clearDir(dataDir);
     }
 
     @Override
