@@ -23,10 +23,11 @@ package com.android.systemui.classifier;
 public class LengthCountEvaluator {
     public static float evaluate(float value) {
         float evaluation = 0.0f;
-        if (value < 0.07) evaluation++;
+        if (value < 0.09) evaluation++;
         if (value < 0.05) evaluation++;
         if (value < 0.02) evaluation++;
         if (value > 0.6) evaluation++;
+        if (value > 0.9) evaluation++;
         if (value > 1.2) evaluation++;
         return evaluation;
     }
