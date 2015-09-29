@@ -45,7 +45,6 @@
     <string name="keyguard_sim_puk_locked_message" msgid="3747232467471801633">"O cartão SIM está bloqueado pelo PUK."</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="7975221805033614426">"Desbloqueando o cartão SIM…"</string>
     <string name="keyguard_accessibility_pattern_unlock" msgid="1490840706075246612">"Desbloqueio com padrão."</string>
-    <string name="keyguard_accessibility_face_unlock" msgid="4817282543351718535">"Desbloqueio facial."</string>
     <string name="keyguard_accessibility_pin_unlock" msgid="2469687111784035046">"Desbloqueio com PIN."</string>
     <string name="keyguard_accessibility_password_unlock" msgid="7675777623912155089">"Desbloqueio com senha."</string>
     <string name="keyguard_accessibility_pattern_area" msgid="7679891324509597904">"Área do padrão."</string>
@@ -94,20 +93,32 @@
     <string name="kg_failed_attempts_almost_at_login" product="tablet" msgid="3253575572118914370">"Você desenhou sua sequência de desbloqueio incorretamente <xliff:g id="NUMBER_0">%d</xliff:g> vezes. Se fizer mais <xliff:g id="NUMBER_1">%d</xliff:g> tentativas incorretas, será solicitado que você use o login do Google para desbloquear seu tablet.\n\n Tente novamente em <xliff:g id="NUMBER_2">%d</xliff:g> segundos."</string>
     <string name="kg_failed_attempts_almost_at_login" product="default" msgid="1437638152015574839">"Você desenhou sua sequência de desbloqueio incorretamente <xliff:g id="NUMBER_0">%d</xliff:g> vezes. Se fizer mais <xliff:g id="NUMBER_1">%d</xliff:g> tentativas incorretas, será solicitado que você use o login do Google para desbloquear.\n\n Tente novamente em <xliff:g id="NUMBER_2">%d</xliff:g> segundos."</string>
     <string name="kg_password_wrong_pin_code_pukked" msgid="30531039455764924">"Código PIN do SIM incorreto. Entre em contato com a operadora para desbloquear o dispositivo."</string>
-    <plurals name="kg_password_wrong_pin_code" formatted="false" msgid="6721575017538162249">
-      <item quantity="one">Código PIN do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER_1">%d</xliff:g>.</item>
-      <item quantity="other">Código PIN do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER_1">%d</xliff:g>.</item>
-    </plurals>
+  <plurals name="kg_password_wrong_pin_code">
+    <item quantity="one" msgid="8134313997799638254">"Código PIN do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER">%d</xliff:g>. Caso o código correto não seja digitado, será necessário entrar em contato com a operadora para desbloquear o dispositivo."</item>
+    <item quantity="other" msgid="2215723361575359486">"Código PIN do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER">%d</xliff:g>."</item>
+  </plurals>
     <string name="kg_password_wrong_puk_code_dead" msgid="7077536808291316208">"O SIM está inutilizável. Entre em contato com a operadora."</string>
-    <plurals name="kg_password_wrong_puk_code" formatted="false" msgid="7576227366999858780">
-      <item quantity="one">Código PUK do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER_1">%d</xliff:g>. Caso o código correto não seja digitado, o SIM não poderá mais ser usado.</item>
-      <item quantity="other">Código PUK do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER_1">%d</xliff:g>. Caso o código correto não seja digitado, o SIM não poderá mais ser usado.</item>
-    </plurals>
+  <plurals name="kg_password_wrong_puk_code">
+    <item quantity="one" msgid="3256893607561060649">"Código PUK do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER">%d</xliff:g> Caso o código correto não seja digitado, o SIM se tornará permanentemente inutilizável."</item>
+    <item quantity="other" msgid="5477305226026342036">"Código PUK do SIM incorreto. Tentativas restantes: <xliff:g id="NUMBER">%d</xliff:g>. Caso o código correto não seja digitado, o SIM se tornará permanentemente inutilizável."</item>
+  </plurals>
     <string name="kg_password_pin_failed" msgid="6268288093558031564">"Falha na operação de PIN do SIM."</string>
     <string name="kg_password_puk_failed" msgid="2838824369502455984">"Falha na operação de PUK do SIM."</string>
     <string name="kg_pin_accepted" msgid="1448241673570020097">"Código aceito."</string>
     <string name="keyguard_carrier_default" msgid="8700650403054042153">"Sem serviço."</string>
     <string name="accessibility_ime_switch_button" msgid="5032926134740456424">"Alterar botão do método de entrada."</string>
     <string name="airplane_mode" msgid="3122107900897202805">"Modo avião"</string>
+    <string name="kg_prompt_reason_restart_pattern" msgid="489430505491862444">"O padrão é exigido quando você reinicia o dispositivo."</string>
+    <string name="kg_prompt_reason_restart_pin" msgid="994878216570694974">"O PIN é exigido quando você reinicia o dispositivo."</string>
+    <string name="kg_prompt_reason_restart_password" msgid="2375742919528461664">"A senha é exigida quando você reinicia o dispositivo."</string>
+    <string name="kg_prompt_reason_switch_profiles_pattern" msgid="3802056699323773969">"O padrão é exigido quando você troca de perfil."</string>
+    <string name="kg_prompt_reason_switch_profiles_pin" msgid="8108020184731052246">"O PIN é exigido quando você troca de perfil."</string>
+    <string name="kg_prompt_reason_switch_profiles_password" msgid="6755997057852042672">"A senha é exigida quando você troca de perfil."</string>
+    <!-- no translation found for kg_prompt_reason_time_pattern:one (5598462918459516566) -->
+    <!-- no translation found for kg_prompt_reason_time_pattern:other (224518697489572649) -->
+    <!-- no translation found for kg_prompt_reason_time_pin:one (3073579168584205350) -->
+    <!-- no translation found for kg_prompt_reason_time_pin:other (3282423442327824649) -->
+    <!-- no translation found for kg_prompt_reason_time_password:one (9062782924671938516) -->
+    <!-- no translation found for kg_prompt_reason_time_password:other (1839722302513719629) -->
     <string name="fingerprint_not_recognized" msgid="2690661881608146617">"Não reconhecido"</string>
 </resources>
