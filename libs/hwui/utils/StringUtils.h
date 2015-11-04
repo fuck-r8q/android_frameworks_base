@@ -22,12 +22,16 @@
 namespace android {
 namespace uirenderer {
 
-class StringCollection {
+class unordered_string_set : public std::unordered_set<std::string> {
 public:
-    StringCollection(const char* spacedList);
-    bool has(const char* string);
-private:
-    std::unordered_set<std::string> mSet;
+    bool has(const char* str) {
+        return find(std::string(str)) != end();
+    }
+};
+
+class StringUtils {
+public:
+    static unordered_string_set&& split(const char* spacedList);
 };
 
 } /* namespace uirenderer */
