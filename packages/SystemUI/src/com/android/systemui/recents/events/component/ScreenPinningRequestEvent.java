@@ -26,10 +26,8 @@ import com.android.systemui.recents.misc.SystemServicesProxy;
 public class ScreenPinningRequestEvent extends EventBus.Event {
 
     public final Context applicationContext;
-    public final SystemServicesProxy systemServicesProxy;
 
-    public ScreenPinningRequestEvent(Context context, SystemServicesProxy systemServicesProxy) {
+    public ScreenPinningRequestEvent(Context context) {
         this.applicationContext = context.getApplicationContext();
-        this.systemServicesProxy = systemServicesProxy;
     }
 }
