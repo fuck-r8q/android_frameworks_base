@@ -15,6 +15,7 @@
  */
 
 #include "TestSceneBase.h"
+#include "utils/Color.h"
 
 class OvalAnimation;
 
@@ -28,12 +29,12 @@ class OvalAnimation : public TestScene {
 public:
     sp<RenderNode> card;
     void createContent(int width, int height, TestCanvas& canvas) override {
-        canvas.drawColor(0xFFFFFFFF, SkXfermode::kSrcOver_Mode);
+        canvas.drawColor(Color::White, SkXfermode::kSrcOver_Mode);
         card = TestUtils::createNode(0, 0, 200, 200,
                 [](RenderProperties& props, TestCanvas& canvas) {
             SkPaint paint;
             paint.setAntiAlias(true);
-            paint.setColor(0xFF000000);
+            paint.setColor(Color::Black);
             canvas.drawOval(0, 0, 200, 200, paint);
         });
         canvas.drawRenderNode(card.get());
