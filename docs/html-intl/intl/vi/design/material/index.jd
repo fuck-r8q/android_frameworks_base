@@ -1,5 +1,6 @@
 page.title=Material Design cho Android
 page.tags=Material,design
+page.type=thiết kế
 page.image=images/cards/design-material-for-android_2x.jpg
 
 @jd:body
@@ -38,8 +39,13 @@ page.image=images/cards/design-material-for-android_2x.jpg
 
 
 
+<<<<<<< HEAD
 <p itemprop="description">Material design là một hướng dẫn toàn diện về thiết kế
 trực quan, chuyển động và tương tác giữa nhiều nền tảng và thiết bị. Hiện nay Android có hỗ trợ
+=======
+<p itemprop="description">Material Design là một hướng dẫn toàn diện về thiết kế
+trực quan, chuyển động và tương tác giữa nhiều nền tảng và thiết bị. Hiện nay, Android có hỗ trợ
+>>>>>>> Docs: L10N update for design documentation
 những ứng dụng theo phong cách material design. Để sử dụng material design trong ứng dụng Androi của mình, hãy làm theo hướng dẫn nêu
 trong <a href="http://www.google.com/design/spec">đặc tả material design</a> và sử dụng
 những thành phần và tính năng mới sẵn có trong Android 5.0 (API mức 21) trở lên.</p>
@@ -58,7 +64,11 @@ những thành phần và tính năng mới sẵn có trong Android 5.0 (API m�
 
 <h3>Giao diện Material</h3>
 
+<<<<<<< HEAD
 <p>Giao diện material mang đến một phong cách mới cho ứng dụng của bạn và các widget hệ thống, cho phép bạn đặt
+=======
+<p>Giao diện material mang đến một phong cách mới cho ứng dụng của bạn và widget hệ thống, cho phép bạn đặt
+>>>>>>> Docs: L10N update for design documentation
 bảng màu của chúng và hoạt hình mặc định cho phản hồi chạm và chuyển tiếp hoạt động.</p>
 
 <!-- two columns -->
@@ -84,15 +94,25 @@ bảng màu của chúng và hoạt hình mặc định cho phản hồi chạm 
 
 <h3>Danh sách và Thẻ</h3>
 
+<<<<<<< HEAD
 <p>Android cung cấp hai loại widget mới để hiển thị thẻ và danh sách bằng phong cách
 và hoạt hình material design:</p>
+=======
+<p>Android cung cấp hai loại widget mới để hiển thị thẻ và danh sách bằng các kiểu dáng
+và hoạt hình theo phong cách material design:</p>
+>>>>>>> Docs: L10N update for design documentation
 
 <!-- two columns -->
 <div style="width:700px;margin-top:25px;margin-bottom:20px">
 <div style="float:left;width:250px;margin-left:40px;margin-right:60px;">
   <img src="{@docRoot}design/material/images/list_mail.png" width="500" height="426" />
+<<<<<<< HEAD
   <p>Widget <code>RecyclerView</code> mới là một phiên bản có thể ghép nối hơn của <code>ListView</code>
   có hỗ trợ nhiều kiểu bố trí khác nhau và cải thiện hiệu năng.</p>
+=======
+  <p>Widget <code>RecyclerView</code> mới là một phiên bản dễ ghép nối hơn của <code>ListView</code>
+  có hỗ trợ nhiều kiểu bố cục khác nhau và cải thiện hiệu năng.</p>
+>>>>>>> Docs: L10N update for design documentation
 </div>
 <div style="float:left;width:250px;margin-right:0px;">
   <img src="{@docRoot}design/material/images/card_travel.png" width="500" height="426" />
@@ -108,12 +128,21 @@ và Thẻ</a>.</p>
 
 <h3>Đổ bóng Dạng xem</h3>
 
+<<<<<<< HEAD
 <p>Bên cạnh các thuộc tính X và Y, dạng xem trong Android nay có
 thêm thuộc tính Z. Thuộc tính mới này biểu diễn độ cao của một dạng xem và sẽ quyết định:</p>
 
 <ul>
 <li>Kích cỡ của đổ bóng: dạng xem có giá trị Z cao hơn sẽ đặt đổ bóng lớn hơn.</li>
 <li>Thứ tự vẽ: dạng xem có giá trị Z cao hơn sẽ xuất hiện phía trên những dạng xem khác.</li>
+=======
+<p>Bên cạnh các thuộc tính X và Y, dạng xem trong Android nay có thêm thuộc tính Z
+. Thuộc tính mới này biểu diễn độ cao của một dạng xem và sẽ quyết định:</p>
+
+<ul>
+<li>Kích cỡ của đổ bóng: dạng xem với giá trị Z cao hơn sẽ có đổ bóng lớn hơn.</li>
+<li>Thứ tự vẽ: dạng xem với giá trị Z cao hơn sẽ xuất hiện ở trên những dạng xem khác.</li>
+>>>>>>> Docs: L10N update for design documentation
 </ul>
 
 <div style="width:290px;margin-left:35px;float:right">
@@ -125,7 +154,11 @@ thêm thuộc tính Z. Thuộc tính mới này biểu diễn độ cao của m�
   </video>
   </div>
   <div style="font-size:10pt;margin-left:20px;margin-bottom:30px">
+<<<<<<< HEAD
     <em>Để phát lại phim, nhấp vào màn hình thiết bị</em>
+=======
+    <em>Để phát lại phim, hãy nhấp vào màn hình thiết bị</em>
+>>>>>>> Docs: L10N update for design documentation
   </div>
 </div>
 
@@ -148,7 +181,11 @@ Phản hồi lại sự kiện chạm trong dạng xem của mình bằng hoạt
 Ẩn và hiện dạng xem bằng hoạt hình <strong>hiện hình tròn</strong>.
 </li>
 <li style="margin-bottom:15px">
+<<<<<<< HEAD
 Chuyển giữa các hoạt động bằng hoạt hình <strong>chuyển tiếp hoạt động</strong> tùy chỉnh.
+=======
+Chuyển giữa các hoạt động và hoạt hình <strong>chuyển tiếp hoạt động</strong> tùy chỉnh.
+>>>>>>> Docs: L10N update for design documentation
 </li>
 <li style="margin-bottom:15px">
 Tạo hoạt hình tự nhiên hơn bằng <strong>chuyển động cong</strong>.
