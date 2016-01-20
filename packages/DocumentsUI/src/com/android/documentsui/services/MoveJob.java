@@ -24,7 +24,6 @@ import android.content.Context;
 import android.os.RemoteException;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
-import android.util.Log;
 
 import com.android.documentsui.R;
 import com.android.documentsui.model.DocumentInfo;
@@ -76,17 +75,17 @@ final class MoveJob extends CopyJob {
     }
 
     @Override
-    boolean processDocument(DocumentInfo srcInfo, DocumentInfo dstDirInfo) throws RemoteException {
+    boolean processDocument(DocumentInfo src, DocumentInfo dest) throws RemoteException {
 
         // TODO: When optimized move kicks in, we're not making any progress updates. FIX IT!
 
         // When moving within the same provider, try to use optimized moving.
         // If not supported, then fallback to byte-by-byte copy/move.
-        if (srcInfo.authority.equals(dstDirInfo.authority)) {
-            if ((srcInfo.flags & Document.FLAG_SUPPORTS_MOVE) != 0) {
-                if (DocumentsContract.moveDocument(srcClient, srcInfo.derivedUri,
-                        dstDirInfo.derivedUri) == null) {
-                    onFileFailed(srcInfo);
+        if (src.authority.equals(dest.authority)) {
+            if ((src.flags & Document.FLAG_SUPPORTS_MOVE) != 0) {
+                if (DocumentsContract.moveDocument(getClient(src), src.derivedUri,
+                        dest.derivedUri) == null) {
+                    onFileFailed(src);
                     return false;
                 }
                 return true;
@@ -94,22 +93,20 @@ final class MoveJob extends CopyJob {
         }
 
         // If we couldn't do an optimized copy...we fall back to vanilla byte copy.
-        boolean copied = byteCopyDocument(srcInfo, dstDirInfo);
+        boolean copied = byteCopyDocument(src, dest);
 
-        return copied && !isCanceled() && deleteSrcDocument(srcInfo);
+        return copied && !isCanceled() && deleteDocument(src);
     }
 
-    private boolean deleteSrcDocument(DocumentInfo srcInfo) {
-        // This is racey. We should make sure that we never delete a directory after
-        // it changed, so we don't remove a file which had not been copied earlier
-        // to the target location.
-        try {
-            DocumentsContract.deleteDocument(srcClient, srcInfo.derivedUri);
-        } catch (RemoteException e) {
-            Log.w(TAG, "Failed to delete source after copy: " + srcInfo.derivedUri, e);
-            return false;
-        }
-
-        return true;  // victory dance!
+    @Override
+    public String toString() {
+        return new StringBuilder()
+                .append("MoveJob")
+                .append("{")
+                .append("id=" + id)
+                .append("srcs=" + mSrcs)
+                .append(", destination=" + stack)
+                .append("}")
+                .toString();
     }
 }
