@@ -63,7 +63,7 @@ public class CreateDirectoryFragment extends DialogFragment {
         final AlertDialog.Builder builder = new AlertDialog.Builder(context);
         final LayoutInflater dialogInflater = LayoutInflater.from(builder.getContext());
 
-        final View view = dialogInflater.inflate(R.layout.dialog_create_dir, null, false);
+        final View view = dialogInflater.inflate(R.layout.dialog_file_name, null, false);
         final EditText editText = (EditText) view.findViewById(android.R.id.text1);
 
         builder.setTitle(R.string.menu_create_dir);
