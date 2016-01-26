@@ -23,4 +23,9 @@ import com.android.systemui.recents.events.EventBus;
  */
 public class DockingTopTaskEvent extends EventBus.Event {
 
+    public int dragMode;
+
+    public DockingTopTaskEvent(int dragMode) {
+        this.dragMode = dragMode;
+    }
 }
