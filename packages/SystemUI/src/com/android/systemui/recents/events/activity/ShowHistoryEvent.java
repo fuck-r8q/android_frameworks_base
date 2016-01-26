@@ -21,7 +21,7 @@ import com.android.systemui.recents.events.EventBus;
 /**
  * This is sent when the history view button is clicked.
  */
-public class ShowHistoryEvent extends EventBus.AnimatedEvent {
+public class ShowHistoryEvent extends EventBus.Event {
 
     // Simple event
 
