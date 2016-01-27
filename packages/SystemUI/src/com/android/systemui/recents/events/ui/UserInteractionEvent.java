@@ -21,11 +21,6 @@ import com.android.systemui.recents.events.EventBus;
 /**
  * This is sent whenever the user interacts with the activity.
  */
-public class UserInteractionEvent extends EventBus.Event {
-
-    public final boolean showTimerIndicator;
-
-    public UserInteractionEvent(boolean showTimerIndicator) {
-        this.showTimerIndicator = showTimerIndicator;
-    }
+public class UserInteractionEvent extends EventBus.ReusableEvent {
+    // Simple Event
 }
