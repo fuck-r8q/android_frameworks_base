@@ -17,6 +17,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:paddingTop="8dp"
     android:orientation="vertical">
 
     <View
@@ -27,9 +28,9 @@
     <TextView
         android:id="@android:id/title"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
+        android:layout_height="48dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
         android:paddingStart="16dp"
         android:textAppearance="?android:attr/textAppearanceSmall" />
 
