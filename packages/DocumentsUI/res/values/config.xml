@@ -20,4 +20,6 @@
 
     <!-- Intentionally unset. Vendors should set this in an overlay. -->
     <string name="trusted_quick_viewer_package"></string>
+    <bool name="list_divider_inset_left">true</bool>
+    <bool name="always_show_summary">false</bool>
 </resources>
