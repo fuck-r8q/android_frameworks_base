@@ -19,21 +19,18 @@ package com.android.systemui.recents.events.component;
 import android.content.Context;
 
 import com.android.systemui.recents.events.EventBus;
-import com.android.systemui.recents.misc.SystemServicesProxy;
 
 /**
- * This is sent when the visibility of the RecentsActivity for the current user changes.
+ * This is sent when the visibility of the RecentsActivity for the current user changes.  Handlers
+ * of this event should not alter the UI, as the activity may still be visible.
  */
 public class RecentsVisibilityChangedEvent extends EventBus.Event {
 
     public final Context applicationContext;
-    public final SystemServicesProxy systemServicesProxy;
     public final boolean visible;
 
-    public RecentsVisibilityChangedEvent(Context context, SystemServicesProxy systemServicesProxy,
-            boolean visible) {
+    public RecentsVisibilityChangedEvent(Context context, boolean visible) {
         this.applicationContext = context.getApplicationContext();
-        this.systemServicesProxy = systemServicesProxy;
         this.visible = visible;
     }
 }
