@@ -15,5 +15,4 @@
 -->
 
 <resources>
-    <bool name="always_show_summary">true</bool>
 </resources>
