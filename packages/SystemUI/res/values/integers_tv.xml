@@ -17,4 +17,5 @@
     <integer name="item_scale_anim_duration">150</integer>
     <integer name="dismiss_short_duration">200</integer>
     <integer name="dismiss_long_duration">400</integer>
+    <integer name="recents_tv_pip_focus_anim_duration">200</integer>
 </resources>
