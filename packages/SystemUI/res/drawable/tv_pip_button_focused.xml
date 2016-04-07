@@ -14,11 +14,5 @@
      limitations under the License.
 -->
 
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <size
-        android:width="34dp"
-        android:height="34dp" />
-    <solid
-        android:color="#4DFFFFFF" />
-</shape>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#9AFFFFFF" android:radius="17dp" />
