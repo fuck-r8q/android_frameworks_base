@@ -20,77 +20,26 @@
 <!-- Layout for {@link com.android.systemui.tv.pip.PipControlsView}. -->
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <LinearLayout
+    <com.android.systemui.tv.pip.PipControlsButtonView
+        android:id="@+id/full_button"
         android:layout_width="100dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center">
+        android:src="@drawable/ic_fullscreen_white_24dp"
+        android:text="@string/pip_fullscreen" />
 
-        <ImageView android:id="@+id/full_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:src="@drawable/tv_pip_full_button" />
-
-        <TextView android:id="@+id/full_desc"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:gravity="center"
-            android:visibility="invisible"
-            android:text="@string/pip_fullscreen"
-            android:fontFamily="sans-serif"
-            android:textSize="12sp"
-            android:textColor="#EEEEEE" />
-    </LinearLayout>
-
-    <LinearLayout
+    <com.android.systemui.tv.pip.PipControlsButtonView
+        android:id="@+id/close_button"
         android:layout_width="100dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="-50dp"
-        android:orientation="vertical"
-        android:gravity="center">
+        android:src="@drawable/ic_close_white"
+        android:text="@string/pip_close" />
 
-        <ImageView android:id="@+id/close_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:src="@drawable/tv_pip_close_button" />
-
-        <TextView android:id="@+id/close_desc"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:gravity="center"
-            android:visibility="invisible"
-            android:text="@string/pip_close"
-            android:fontFamily="sans-serif"
-            android:textSize="12sp"
-            android:textColor="#EEEEEE" />
-    </LinearLayout>
-
-    <LinearLayout android:id="@+id/play_pause"
+    <com.android.systemui.tv.pip.PipControlsButtonView
+        android:id="@+id/play_pause_button"
         android:layout_width="100dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="-50dp"
-        android:orientation="vertical"
-        android:gravity="center" >
-
-        <ImageView android:id="@+id/play_pause_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:focusable="true"
-            android:src="@drawable/tv_pip_pause_button" />
-
-        <TextView android:id="@+id/play_pause_desc"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:gravity="center"
-            android:visibility="invisible"
-            android:text="@string/pip_pause"
-            android:fontFamily="sans-serif"
-            android:textSize="12sp"
-            android:textColor="#EEEEEE" />
-    </LinearLayout>
+        android:src="@drawable/ic_pause_white_24dp"
+        android:text="@string/pip_pause" />
 </merge>
