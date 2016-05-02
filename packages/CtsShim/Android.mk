@@ -20,23 +20,19 @@ LOCAL_PATH := $(call my-dir)
 # Variant: Privileged app
 
 include $(CLEAR_VARS)
+
+LOCAL_MODULE := CtsShimPrivPrebuilt
+LOCAL_MODULE_TAGS := optional
 # this needs to be a privileged application
 LOCAL_PRIVILEGED_MODULE := true
+LOCAL_MODULE_CLASS := APPS
+LOCAL_BUILT_MODULE_STEM := package.apk
+# Make sure the build system doesn't try to resign the APK
+LOCAL_CERTIFICATE := PRESIGNED
 
-LOCAL_MODULE_TAGS := optional
-LOCAL_SDK_VERSION := current
-LOCAL_PROGUARD_ENABLED := disabled
-LOCAL_DEX_PREOPT := false
+LOCAL_SRC_FILES := CtsShimPriv.apk
 
-LOCAL_PACKAGE_NAME := CtsShimPriv
-
-#TODO need to find the correct certificate
-#Change in conjunction with cts/hostsidetests/appsecurity/test-apps/IntentFilterApp
-LOCAL_CERTIFICATE := platform
-LOCAL_MANIFEST_FILE := priv_shim/AndroidManifest.xml
-
-include $(BUILD_PACKAGE)
-
+include $(BUILD_PREBUILT)
 
 
 ###########################################################
@@ -44,18 +40,14 @@ include $(BUILD_PACKAGE)
 
 include $(CLEAR_VARS)
 
+LOCAL_MODULE := CtsShimPrebuilt
 LOCAL_MODULE_TAGS := optional
-LOCAL_SDK_VERSION := current
-LOCAL_PROGUARD_ENABLED := disabled
-LOCAL_DEX_PREOPT := false
+LOCAL_MODULE_CLASS := APPS
+LOCAL_BUILT_MODULE_STEM := package.apk
+# Make sure the build system doesn't try to resign the APK
+LOCAL_CERTIFICATE := PRESIGNED
 
-LOCAL_PACKAGE_NAME := CtsShim
+LOCAL_SRC_FILES := CtsShim.apk
 
-#TODO need to find the correct certificate
-#Change in conjunction with cts/hostsidetests/appsecurity/test-apps/IntentFilterApp
-LOCAL_CERTIFICATE := platform
-LOCAL_MANIFEST_FILE := shim/AndroidManifest.xml
-
-include $(BUILD_PACKAGE)
-
+include $(BUILD_PREBUILT)
 
