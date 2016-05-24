@@ -21,9 +21,6 @@ import android.view.DragEvent;
 
 import org.mockito.Mockito;
 
-/**
- * Test support for working with {@link DragEvents} instances.
- */
 public final class DragEvents {
 
     private DragEvents() {}
@@ -41,4 +38,5 @@ public final class DragEvents {
 
         return dropEvent;
     }
+
 }
