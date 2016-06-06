@@ -16,6 +16,7 @@
 
 package com.android.documentsui.testing;
 
+import android.graphics.drawable.Drawable;
 import android.view.View;
 
 import org.mockito.Mockito;
@@ -30,5 +31,9 @@ public final class Views {
         Mockito.doCallRealMethod().when(view).getTag(Mockito.anyInt());
 
         return view;
+    }
+
+    public static void setBackground(View testView, Drawable background) {
+        Mockito.when(testView.getBackground()).thenReturn(background);
     }
 }
