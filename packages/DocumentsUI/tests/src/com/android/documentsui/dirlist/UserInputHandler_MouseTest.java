@@ -16,19 +16,17 @@
 
 package com.android.documentsui.dirlist;
 
-import static org.junit.Assert.*;
-
 import android.support.test.filters.SmallTest;
 import android.support.test.runner.AndroidJUnit4;
-import android.view.KeyEvent;
+import android.support.v7.widget.RecyclerView;
 import android.view.MotionEvent;
-import android.view.View;
 
 import com.android.documentsui.Events.InputEvent;
-import com.android.documentsui.TestInputEvent;
-import com.android.documentsui.dirlist.MultiSelectManager.Selection;
 import com.android.documentsui.dirlist.UserInputHandler.DocumentDetails;
+import com.android.documentsui.testing.TestEvent;
+import com.android.documentsui.testing.TestEvent.Builder;
 import com.android.documentsui.testing.TestPredicate;
+import com.android.documentsui.testing.dirlist.SelectionProbe;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -42,107 +40,71 @@ public final class UserInputHandler_MouseTest {
 
     private static final List<String> ITEMS = TestData.create(100);
 
+    private UserInputHandler<TestEvent> mInputHandler;
+
     private TestDocumentsAdapter mAdapter;
-    private MultiSelectManager mSelectionMgr;
+    private SelectionProbe mSelection;
     private TestPredicate<DocumentDetails> mCanSelect;
     private TestPredicate<InputEvent> mRightClickHandler;
     private TestPredicate<DocumentDetails> mActivateHandler;
     private TestPredicate<DocumentDetails> mDeleteHandler;
 
-    private TestInputEvent mTestEvent;
-    private TestDocDetails mTestDoc;
-
-    private UserInputHandler mInputHandler;
+    private Builder mEvent;
 
     @Before
     public void setUp() {
 
         mAdapter = new TestDocumentsAdapter(ITEMS);
-        mSelectionMgr = new MultiSelectManager(mAdapter, MultiSelectManager.MODE_MULTIPLE);
+        MultiSelectManager selectionMgr =
+                new MultiSelectManager(mAdapter, MultiSelectManager.MODE_MULTIPLE);
+
+        mSelection = new SelectionProbe(selectionMgr);
         mCanSelect = new TestPredicate<>();
         mRightClickHandler = new TestPredicate<>();
         mActivateHandler = new TestPredicate<>();
         mDeleteHandler = new TestPredicate<>();
 
-        mInputHandler = new UserInputHandler(
-                mSelectionMgr,
+        mInputHandler = new UserInputHandler<>(
+                selectionMgr,
                 new TestFocusHandler(),
                 (MotionEvent event) -> {
-                    return mTestEvent;
+                    throw new UnsupportedOperationException("Not exercised in tests.");
                 },
-                (InputEvent event) -> {
-                    return mTestDoc;
+                (TestEvent event) -> {
+                    return event.getDocument();
                 },
                 mCanSelect,
                 mRightClickHandler::test,
                 mActivateHandler::test,
                 mDeleteHandler::test);
 
-        mTestEvent = new TestInputEvent();
-        mTestEvent.mouseEvent = true;
-        mTestDoc = new TestDocDetails();
+        mEvent = TestEvent.builder().mouse();
     }
 
     @Test
     public void testConfirmedClick_StartsSelection() {
-        mTestDoc.modelId = "11";
-        mInputHandler.onSingleTapConfirmed(null);
-        assertSelected("11");
+        mInputHandler.onSingleTapConfirmed(mEvent.at(11).build());
+        mSelection.assertSelection(11);
+    }
+
+    @Test
+    public void testUnconfirmedClick_AddsToExistingSelection() {
+        mInputHandler.onSingleTapConfirmed(mEvent.at(7).build());
+
+        mInputHandler.onSingleTapUp(mEvent.at(11).build());
+        mSelection.assertSelection(7, 11);
     }
 
     @Test
     public void testDoubleClick_Activates() {
-        mTestDoc.modelId = "11";
-        mInputHandler.onDoubleTap(null);
-        mActivateHandler.assertLastArgument(mTestDoc);
+        mInputHandler.onDoubleTap(mEvent.at(11).build());
+        mActivateHandler.assertLastArgument(mEvent.build());
     }
 
-    void assertSelected(String id) {
-        Selection sel = mSelectionMgr.getSelection();
-        assertTrue(sel.contains(id));
-    }
-
-    private final class TestDocDetails implements DocumentDetails {
-
-        private String modelId;
-        private int position;
-        private boolean inHotspot;
-
-        @Override
-        public String getModelId() {
-            return modelId;
-        }
-
-        @Override
-        public int getAdapterPosition() {
-            return position;
-        }
-
-        @Override
-        public boolean isInSelectionHotspot(InputEvent event) {
-            return inHotspot;
-        }
-
-    }
-
-    private final class TestFocusHandler implements FocusHandler {
-
-        @Override
-        public boolean handleKey(DocumentHolder doc, int keyCode, KeyEvent event) {
-            return false;
-        }
-
-        @Override
-        public void onFocusChange(View v, boolean hasFocus) {
-        }
-
-        @Override
-        public void restoreLastFocus() {
-        }
-
-        @Override
-        public int getFocusPosition() {
-            return 0;
-        }
+    @Test
+    public void testClickOff_ClearsSelection() {
+        mInputHandler.onSingleTapConfirmed(mEvent.at(11).build());
+        mInputHandler.onSingleTapUp(mEvent.at(RecyclerView.NO_POSITION).build());
+        mSelection.assertNoSelection();
     }
 }
