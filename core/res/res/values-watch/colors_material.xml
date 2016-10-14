@@ -17,8 +17,10 @@
     <color name="background_material_dark">#ff232e33</color>
     <color name="background_floating_material_dark">#ff3e5059</color>
 
-    <color name="accent_material_dark">#ff5e97f6</color>
+    <color name="accent_material_700">#ff2e4978</color>
     <color name="accent_material_light">#ff4285f4</color>
+    <color name="accent_material_dark">#ff5e97f6</color>
+    <color name="accent_material_50">#ffd0def7</color>
 
     <color name="primary_material_dark">#4D4D4D</color>
 
