@@ -33,6 +33,7 @@ class LayerDrawable : public SkDrawable {
     explicit LayerDrawable(Layer* layer)
             : mLayer(layer) {}
 
+    static bool DrawLayer(GrContext* context, SkCanvas* canvas, Layer* layer);
  protected:
      virtual SkRect onGetBounds() override {
          return SkRect::MakeWH(mLayer->getWidth(), mLayer->getHeight());
