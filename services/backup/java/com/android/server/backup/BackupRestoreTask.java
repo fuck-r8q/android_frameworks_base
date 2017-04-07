@@ -19,7 +19,7 @@ package com.android.server.backup;
 /**
  * Interface and methods used by the asynchronous-with-timeout backup/restore operations.
  */
-interface BackupRestoreTask {
+public interface BackupRestoreTask {
 
     // Execute one tick of whatever state machine the task implements
     void execute();
