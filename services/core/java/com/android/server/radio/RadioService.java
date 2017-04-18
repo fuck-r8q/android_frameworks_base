@@ -28,29 +28,37 @@ public class RadioService extends SystemService {
     // TODO(b/36863239): rename to RadioService when native service goes away
     private static final String TAG = "RadioServiceJava";
 
+    private final RadioServiceImpl mServiceImpl = new RadioServiceImpl();
+
+    /**
+     * This field is used by native code, do not access or modify.
+     */
+    private final long mNativeContext = nativeInit();
+
     public RadioService(Context context) {
         super(context);
     }
 
     @Override
+    protected void finalize() throws Throwable {
+        nativeFinalize(mNativeContext);
+        super.finalize();
+    }
+
+    private native long nativeInit();
+    private native void nativeFinalize(long nativeContext);
+    private native Tuner openTunerNative(long nativeContext, boolean withAudio);
+
+    @Override
     public void onStart() {
-        publishBinderService(Context.RADIO_SERVICE, new RadioServiceImpl());
+        publishBinderService(Context.RADIO_SERVICE, mServiceImpl);
         Slog.v(TAG, "RadioService started");
     }
 
-    private static class RadioServiceImpl extends IRadioService.Stub {
+    private class RadioServiceImpl extends IRadioService.Stub {
         @Override
-        public ITuner openTuner() {
-            Slog.d(TAG, "openTuner()");
-            return new TunerImpl();
-        }
-    }
-
-    private static class TunerImpl extends ITuner.Stub {
-        @Override
-        public int getProgramInformation(RadioManager.ProgramInfo[] infoOut) {
-            Slog.d(TAG, "getProgramInformation()");
-            return RadioManager.STATUS_INVALID_OPERATION;
+        public ITuner openTuner(boolean withAudio) {
+            return openTunerNative(mNativeContext, withAudio);
         }
     }
 }
