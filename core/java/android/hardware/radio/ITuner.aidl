@@ -20,5 +20,7 @@ import android.hardware.radio.RadioManager;
 
 /** {@hide} */
 interface ITuner {
+    void close();
+
     int getProgramInformation(out RadioManager.ProgramInfo[] infoOut);
 }
