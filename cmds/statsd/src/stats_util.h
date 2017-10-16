@@ -16,8 +16,8 @@
 #ifndef PARSE_UTIL_H
 #define PARSE_UTIL_H
 
-#include "DropboxWriter.h"
-#include "LogReader.h"
+#include "logd/LogReader.h"
+#include "storage/DropboxWriter.h"
 
 #include <log/logprint.h>
 #include "frameworks/base/cmds/statsd/src/statsd_config.pb.h"
@@ -29,8 +29,6 @@ namespace statsd {
 EventMetricData parse(log_msg msg);
 
 int getTagId(log_msg msg);
-
-StatsdConfig buildFakeConfig();
 
 }  // namespace statsd
 }  // namespace os
