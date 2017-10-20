@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef PARSE_UTIL_H
-#define PARSE_UTIL_H
+#ifndef STATS_UTIL_H
+#define STATS_UTIL_H
 
 #include "logd/LogReader.h"
 #include "storage/DropboxWriter.h"
@@ -26,12 +26,19 @@ namespace android {
 namespace os {
 namespace statsd {
 
+#define DEFAULT_DIMENSION_KEY ""
+#define MATCHER_NOT_FOUND -2
+#define NANO_SECONDS_IN_A_SECOND (1000 * 1000 * 1000)
+
+typedef std::string HashableDimensionKey;
+
 EventMetricData parse(log_msg msg);
 
 int getTagId(log_msg msg);
 
+std::string getHashableKey(std::vector<KeyValuePair> key);
 }  // namespace statsd
 }  // namespace os
 }  // namespace android
 
-#endif  // PARSE_UTIL_H
+#endif  // STATS_UTIL_H
