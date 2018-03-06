@@ -4070,7 +4070,7 @@ package android.app {
     method public android.app.ActivityOptions setAppVerificationBundle(android.os.Bundle);
     method public android.app.ActivityOptions setLaunchBounds(android.graphics.Rect);
     method public android.app.ActivityOptions setLaunchDisplayId(int);
-    method public android.app.ActivityOptions setLockTaskMode(boolean);
+    method public android.app.ActivityOptions setLockTaskEnabled(boolean);
     method public android.os.Bundle toBundle();
     method public void update(android.app.ActivityOptions);
     field public static final java.lang.String EXTRA_USAGE_TIME_REPORT = "android.activity.usage_time";
@@ -5312,6 +5312,7 @@ package android.app {
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.app.Notification.Action> CREATOR;
     field public static final int SEMANTIC_ACTION_ARCHIVE = 5; // 0x5
+    field public static final int SEMANTIC_ACTION_CALL = 10; // 0xa
     field public static final int SEMANTIC_ACTION_DELETE = 4; // 0x4
     field public static final int SEMANTIC_ACTION_MARK_AS_READ = 2; // 0x2
     field public static final int SEMANTIC_ACTION_MARK_AS_UNREAD = 3; // 0x3
@@ -5348,18 +5349,18 @@ package android.app {
     ctor public Notification.Action.WearableExtender(android.app.Notification.Action);
     method public android.app.Notification.Action.WearableExtender clone();
     method public android.app.Notification.Action.Builder extend(android.app.Notification.Action.Builder);
-    method public java.lang.CharSequence getCancelLabel();
-    method public java.lang.CharSequence getConfirmLabel();
+    method public deprecated java.lang.CharSequence getCancelLabel();
+    method public deprecated java.lang.CharSequence getConfirmLabel();
     method public boolean getHintDisplayActionInline();
     method public boolean getHintLaunchesActivity();
-    method public java.lang.CharSequence getInProgressLabel();
+    method public deprecated java.lang.CharSequence getInProgressLabel();
     method public boolean isAvailableOffline();
     method public android.app.Notification.Action.WearableExtender setAvailableOffline(boolean);
-    method public android.app.Notification.Action.WearableExtender setCancelLabel(java.lang.CharSequence);
-    method public android.app.Notification.Action.WearableExtender setConfirmLabel(java.lang.CharSequence);
+    method public deprecated android.app.Notification.Action.WearableExtender setCancelLabel(java.lang.CharSequence);
+    method public deprecated android.app.Notification.Action.WearableExtender setConfirmLabel(java.lang.CharSequence);
     method public android.app.Notification.Action.WearableExtender setHintDisplayActionInline(boolean);
     method public android.app.Notification.Action.WearableExtender setHintLaunchesActivity(boolean);
-    method public android.app.Notification.Action.WearableExtender setInProgressLabel(java.lang.CharSequence);
+    method public deprecated android.app.Notification.Action.WearableExtender setInProgressLabel(java.lang.CharSequence);
   }
 
   public static class Notification.BigPictureStyle extends android.app.Notification.Style {
@@ -5582,39 +5583,39 @@ package android.app {
     method public android.graphics.Bitmap getBackground();
     method public java.lang.String getBridgeTag();
     method public int getContentAction();
-    method public int getContentIcon();
-    method public int getContentIconGravity();
+    method public deprecated int getContentIcon();
+    method public deprecated int getContentIconGravity();
     method public boolean getContentIntentAvailableOffline();
-    method public int getCustomContentHeight();
-    method public int getCustomSizePreset();
+    method public deprecated int getCustomContentHeight();
+    method public deprecated int getCustomSizePreset();
     method public java.lang.String getDismissalId();
     method public android.app.PendingIntent getDisplayIntent();
-    method public int getGravity();
+    method public deprecated int getGravity();
     method public boolean getHintAmbientBigPicture();
-    method public boolean getHintAvoidBackgroundClipping();
+    method public deprecated boolean getHintAvoidBackgroundClipping();
     method public boolean getHintContentIntentLaunchesActivity();
-    method public boolean getHintHideIcon();
-    method public int getHintScreenTimeout();
-    method public boolean getHintShowBackgroundOnly();
+    method public deprecated boolean getHintHideIcon();
+    method public deprecated int getHintScreenTimeout();
+    method public deprecated boolean getHintShowBackgroundOnly();
     method public java.util.List<android.app.Notification> getPages();
     method public boolean getStartScrollBottom();
     method public android.app.Notification.WearableExtender setBackground(android.graphics.Bitmap);
     method public android.app.Notification.WearableExtender setBridgeTag(java.lang.String);
     method public android.app.Notification.WearableExtender setContentAction(int);
-    method public android.app.Notification.WearableExtender setContentIcon(int);
-    method public android.app.Notification.WearableExtender setContentIconGravity(int);
+    method public deprecated android.app.Notification.WearableExtender setContentIcon(int);
+    method public deprecated android.app.Notification.WearableExtender setContentIconGravity(int);
     method public android.app.Notification.WearableExtender setContentIntentAvailableOffline(boolean);
-    method public android.app.Notification.WearableExtender setCustomContentHeight(int);
-    method public android.app.Notification.WearableExtender setCustomSizePreset(int);
+    method public deprecated android.app.Notification.WearableExtender setCustomContentHeight(int);
+    method public deprecated android.app.Notification.WearableExtender setCustomSizePreset(int);
     method public android.app.Notification.WearableExtender setDismissalId(java.lang.String);
     method public android.app.Notification.WearableExtender setDisplayIntent(android.app.PendingIntent);
-    method public android.app.Notification.WearableExtender setGravity(int);
+    method public deprecated android.app.Notification.WearableExtender setGravity(int);
     method public android.app.Notification.WearableExtender setHintAmbientBigPicture(boolean);
-    method public android.app.Notification.WearableExtender setHintAvoidBackgroundClipping(boolean);
+    method public deprecated android.app.Notification.WearableExtender setHintAvoidBackgroundClipping(boolean);
     method public android.app.Notification.WearableExtender setHintContentIntentLaunchesActivity(boolean);
-    method public android.app.Notification.WearableExtender setHintHideIcon(boolean);
-    method public android.app.Notification.WearableExtender setHintScreenTimeout(int);
-    method public android.app.Notification.WearableExtender setHintShowBackgroundOnly(boolean);
+    method public deprecated android.app.Notification.WearableExtender setHintHideIcon(boolean);
+    method public deprecated android.app.Notification.WearableExtender setHintScreenTimeout(int);
+    method public deprecated android.app.Notification.WearableExtender setHintShowBackgroundOnly(boolean);
     method public android.app.Notification.WearableExtender setStartScrollBottom(boolean);
     field public static final int SCREEN_TIMEOUT_LONG = -1; // 0xffffffff
     field public static final int SCREEN_TIMEOUT_SHORT = 0; // 0x0
@@ -6594,7 +6595,7 @@ package android.app.admin {
     method public void uninstallCaCert(android.content.ComponentName, byte[]);
     method public boolean updateOverrideApn(android.content.ComponentName, int, android.telephony.data.ApnSetting);
     method public void wipeData(int);
-    method public void wipeDataWithReason(int, java.lang.CharSequence);
+    method public void wipeData(int, java.lang.CharSequence);
     field public static final java.lang.String ACTION_ADD_DEVICE_ADMIN = "android.app.action.ADD_DEVICE_ADMIN";
     field public static final java.lang.String ACTION_APPLICATION_DELEGATION_SCOPES_CHANGED = "android.app.action.APPLICATION_DELEGATION_SCOPES_CHANGED";
     field public static final java.lang.String ACTION_DEVICE_ADMIN_SERVICE = "android.app.action.DEVICE_ADMIN_SERVICE";
@@ -6677,7 +6678,7 @@ package android.app.admin {
     field public static final int LOCK_TASK_FEATURE_KEYGUARD = 32; // 0x20
     field public static final int LOCK_TASK_FEATURE_NONE = 0; // 0x0
     field public static final int LOCK_TASK_FEATURE_NOTIFICATIONS = 2; // 0x2
-    field public static final int LOCK_TASK_FEATURE_RECENTS = 8; // 0x8
+    field public static final int LOCK_TASK_FEATURE_OVERVIEW = 8; // 0x8
     field public static final int LOCK_TASK_FEATURE_SYSTEM_INFO = 1; // 0x1
     field public static final int MAKE_USER_EPHEMERAL = 2; // 0x2
     field public static final java.lang.String MIME_TYPE_PROVISIONING_NFC = "application/com.android.managedprovisioning";
@@ -7266,6 +7267,7 @@ package android.app.slice {
     method public void registerSliceCallback(android.net.Uri, java.util.List<android.app.slice.SliceSpec>, java.util.concurrent.Executor, android.app.slice.SliceManager.SliceCallback);
     method public void unpinSlice(android.net.Uri);
     method public void unregisterSliceCallback(android.net.Uri, android.app.slice.SliceManager.SliceCallback);
+    field public static final java.lang.String SLICE_METADATA_KEY = "android.metadata.SLICE_URI";
   }
 
   public static abstract interface SliceManager.SliceCallback {
@@ -11388,6 +11390,8 @@ package android.content.pm {
     ctor public PermissionInfo();
     ctor public PermissionInfo(android.content.pm.PermissionInfo);
     method public int describeContents();
+    method public int getProtection();
+    method public int getProtectionFlags();
     method public java.lang.CharSequence loadDescription(android.content.pm.PackageManager);
     field public static final android.os.Parcelable.Creator<android.content.pm.PermissionInfo> CREATOR;
     field public static final int FLAG_COSTS_MONEY = 1; // 0x1
@@ -11404,8 +11408,8 @@ package android.content.pm {
     field public static final int PROTECTION_FLAG_SETUP = 2048; // 0x800
     field public static final deprecated int PROTECTION_FLAG_SYSTEM = 16; // 0x10
     field public static final int PROTECTION_FLAG_VERIFIER = 512; // 0x200
-    field public static final int PROTECTION_MASK_BASE = 15; // 0xf
-    field public static final int PROTECTION_MASK_FLAGS = 65520; // 0xfff0
+    field public static final deprecated int PROTECTION_MASK_BASE = 15; // 0xf
+    field public static final deprecated int PROTECTION_MASK_FLAGS = 65520; // 0xfff0
     field public static final int PROTECTION_NORMAL = 0; // 0x0
     field public static final int PROTECTION_SIGNATURE = 2; // 0x2
     field public static final deprecated int PROTECTION_SIGNATURE_OR_SYSTEM = 3; // 0x3
@@ -11413,7 +11417,7 @@ package android.content.pm {
     field public int flags;
     field public java.lang.String group;
     field public java.lang.CharSequence nonLocalizedDescription;
-    field public int protectionLevel;
+    field public deprecated int protectionLevel;
   }
 
   public final class ProviderInfo extends android.content.pm.ComponentInfo implements android.os.Parcelable {
@@ -13777,7 +13781,7 @@ package android.graphics {
     enum_constant public static final android.graphics.Matrix.ScaleToFit START;
   }
 
-  public class Movie {
+  public deprecated class Movie {
     method public static android.graphics.Movie decodeByteArray(byte[], int, int);
     method public static android.graphics.Movie decodeFile(java.lang.String);
     method public static android.graphics.Movie decodeStream(java.io.InputStream);
@@ -13839,6 +13843,7 @@ package android.graphics {
     method public int breakText(java.lang.String, boolean, float, float[]);
     method public void clearShadowLayer();
     method public float descent();
+    method public boolean equalsForTextMeasurement(android.graphics.Paint);
     method public int getAlpha();
     method public int getColor();
     method public android.graphics.ColorFilter getColorFilter();
@@ -14505,7 +14510,9 @@ package android.graphics.drawable {
     ctor public AnimatedImageDrawable();
     method public void clearAnimationCallbacks();
     method public void draw(android.graphics.Canvas);
+    method public int getLoopCount();
     method public int getOpacity();
+    method public final boolean isAutoMirrored();
     method public boolean isRunning();
     method public void registerAnimationCallback(android.graphics.drawable.Animatable2.AnimationCallback);
     method public void setAlpha(int);
@@ -16271,9 +16278,7 @@ package android.hardware.camera2 {
     field public static final android.hardware.camera2.CaptureResult.Key<android.hardware.camera2.params.LensShadingMap> STATISTICS_LENS_SHADING_CORRECTION_MAP;
     field public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> STATISTICS_LENS_SHADING_MAP_MODE;
     field public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> STATISTICS_OIS_DATA_MODE;
-    field public static final android.hardware.camera2.CaptureResult.Key<long[]> STATISTICS_OIS_TIMESTAMPS;
-    field public static final android.hardware.camera2.CaptureResult.Key<float[]> STATISTICS_OIS_X_SHIFTS;
-    field public static final android.hardware.camera2.CaptureResult.Key<float[]> STATISTICS_OIS_Y_SHIFTS;
+    field public static final android.hardware.camera2.CaptureResult.Key<android.hardware.camera2.params.OisSample[]> STATISTICS_OIS_SAMPLES;
     field public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> STATISTICS_SCENE_FLICKER;
     field public static final android.hardware.camera2.CaptureResult.Key<android.hardware.camera2.params.TonemapCurve> TONEMAP_CURVE;
     field public static final android.hardware.camera2.CaptureResult.Key<java.lang.Float> TONEMAP_GAMMA;
@@ -16367,6 +16372,13 @@ package android.hardware.camera2.params {
     field public static final int METERING_WEIGHT_DONT_CARE = 0; // 0x0
     field public static final int METERING_WEIGHT_MAX = 1000; // 0x3e8
     field public static final int METERING_WEIGHT_MIN = 0; // 0x0
+  }
+
+  public final class OisSample {
+    ctor public OisSample(long, float, float);
+    method public long getTimestamp();
+    method public float getXshift();
+    method public float getYshift();
   }
 
   public final class OutputConfiguration implements android.os.Parcelable {
@@ -16570,7 +16582,7 @@ package android.hardware.fingerprint {
     field public static final int FINGERPRINT_ERROR_VENDOR = 8; // 0x8
   }
 
-  public static abstract class FingerprintManager.AuthenticationCallback {
+  public static abstract deprecated class FingerprintManager.AuthenticationCallback {
     ctor public FingerprintManager.AuthenticationCallback();
     method public void onAuthenticationError(int, java.lang.CharSequence);
     method public void onAuthenticationFailed();
@@ -16578,11 +16590,11 @@ package android.hardware.fingerprint {
     method public void onAuthenticationSucceeded(android.hardware.fingerprint.FingerprintManager.AuthenticationResult);
   }
 
-  public static class FingerprintManager.AuthenticationResult {
+  public static deprecated class FingerprintManager.AuthenticationResult {
     method public android.hardware.fingerprint.FingerprintManager.CryptoObject getCryptoObject();
   }
 
-  public static final class FingerprintManager.CryptoObject {
+  public static final deprecated class FingerprintManager.CryptoObject {
     ctor public FingerprintManager.CryptoObject(java.security.Signature);
     ctor public FingerprintManager.CryptoObject(javax.crypto.Cipher);
     ctor public FingerprintManager.CryptoObject(javax.crypto.Mac);
@@ -21901,6 +21913,7 @@ package android.media {
     field public static final int TYPE_FM_TUNER = 16; // 0x10
     field public static final int TYPE_HDMI = 9; // 0x9
     field public static final int TYPE_HDMI_ARC = 10; // 0xa
+    field public static final int TYPE_HEARING_AID = 23; // 0x17
     field public static final int TYPE_IP = 20; // 0x14
     field public static final int TYPE_LINE_ANALOG = 5; // 0x5
     field public static final int TYPE_LINE_DIGITAL = 6; // 0x6
@@ -22829,6 +22842,27 @@ package android.media {
     field public static final int STOP_VIDEO_RECORDING = 3; // 0x3
   }
 
+  public class MediaBrowser2 extends android.media.MediaController2 {
+    ctor public MediaBrowser2(android.content.Context, android.media.SessionToken2, java.util.concurrent.Executor, android.media.MediaBrowser2.BrowserCallback);
+    method public void getChildren(java.lang.String, int, int, android.os.Bundle);
+    method public void getItem(java.lang.String);
+    method public void getLibraryRoot(android.os.Bundle);
+    method public void getSearchResult(java.lang.String, int, int, android.os.Bundle);
+    method public void search(java.lang.String, android.os.Bundle);
+    method public void subscribe(java.lang.String, android.os.Bundle);
+    method public void unsubscribe(java.lang.String);
+  }
+
+  public static class MediaBrowser2.BrowserCallback extends android.media.MediaController2.ControllerCallback {
+    ctor public MediaBrowser2.BrowserCallback();
+    method public void onChildrenChanged(java.lang.String, int, android.os.Bundle);
+    method public void onGetChildrenDone(java.lang.String, int, int, java.util.List<android.media.MediaItem2>, android.os.Bundle);
+    method public void onGetItemDone(java.lang.String, android.media.MediaItem2);
+    method public void onGetLibraryRootDone(android.os.Bundle, java.lang.String, android.os.Bundle);
+    method public void onGetSearchResultDone(java.lang.String, int, int, java.util.List<android.media.MediaItem2>, android.os.Bundle);
+    method public void onSearchResultChanged(java.lang.String, int, android.os.Bundle);
+  }
+
   public final class MediaCas implements java.lang.AutoCloseable {
     ctor public MediaCas(int) throws android.media.MediaCasException.UnsupportedCasException;
     method public void close();
@@ -23305,6 +23339,73 @@ package android.media {
     field public static final int REGULAR_CODECS = 0; // 0x0
   }
 
+  public class MediaController2 implements java.lang.AutoCloseable {
+    ctor public MediaController2(android.content.Context, android.media.SessionToken2, java.util.concurrent.Executor, android.media.MediaController2.ControllerCallback);
+    method public void addPlaylistItem(int, android.media.MediaItem2);
+    method public void adjustVolume(int, int);
+    method public void close();
+    method public void fastForward();
+    method public long getBufferedPosition();
+    method public android.media.MediaItem2 getCurrentPlaylistItem();
+    method public android.media.MediaController2.PlaybackInfo getPlaybackInfo();
+    method public float getPlaybackSpeed();
+    method public int getPlayerState();
+    method public java.util.List<android.media.MediaItem2> getPlaylist();
+    method public android.media.MediaSession2.PlaylistParams getPlaylistParams();
+    method public long getPosition();
+    method public android.app.PendingIntent getSessionActivity();
+    method public android.media.SessionToken2 getSessionToken();
+    method public boolean isConnected();
+    method public void pause();
+    method public void play();
+    method public void playFromMediaId(java.lang.String, android.os.Bundle);
+    method public void playFromSearch(java.lang.String, android.os.Bundle);
+    method public void playFromUri(android.net.Uri, android.os.Bundle);
+    method public void prepare();
+    method public void prepareFromMediaId(java.lang.String, android.os.Bundle);
+    method public void prepareFromSearch(java.lang.String, android.os.Bundle);
+    method public void prepareFromUri(android.net.Uri, android.os.Bundle);
+    method public void removePlaylistItem(android.media.MediaItem2);
+    method public void rewind();
+    method public void seekTo(long);
+    method public void sendCustomCommand(android.media.MediaSession2.Command, android.os.Bundle, android.os.ResultReceiver);
+    method public void setPlaylistParams(android.media.MediaSession2.PlaylistParams);
+    method public void setRating(java.lang.String, android.media.Rating2);
+    method public void setVolumeTo(int, int);
+    method public void skipToNext();
+    method public void skipToPlaylistItem(android.media.MediaItem2);
+    method public void skipToPrevious();
+    method public void stop();
+  }
+
+  public static abstract class MediaController2.ControllerCallback {
+    ctor public MediaController2.ControllerCallback();
+    method public void onAllowedCommandsChanged(android.media.MediaSession2.CommandGroup);
+    method public void onBufferedPositionChanged(long);
+    method public void onConnected(android.media.MediaSession2.CommandGroup);
+    method public void onCurrentPlaylistItemChanged(android.media.MediaItem2);
+    method public void onCustomCommand(android.media.MediaSession2.Command, android.os.Bundle, android.os.ResultReceiver);
+    method public void onCustomLayoutChanged(java.util.List<android.media.MediaSession2.CommandButton>);
+    method public void onDisconnected();
+    method public void onError(int, int);
+    method public void onPlaybackInfoChanged(android.media.MediaController2.PlaybackInfo);
+    method public void onPlaybackSpeedChanged(float);
+    method public void onPlayerStateChanged(int);
+    method public void onPlaylistChanged(java.util.List<android.media.MediaItem2>);
+    method public void onPlaylistParamsChanged(android.media.MediaSession2.PlaylistParams);
+    method public void onPositionUpdated(long, long);
+  }
+
+  public static final class MediaController2.PlaybackInfo {
+    method public android.media.AudioAttributes getAudioAttributes();
+    method public int getControlType();
+    method public int getCurrentVolume();
+    method public int getMaxVolume();
+    method public int getPlaybackType();
+    field public static final int PLAYBACK_TYPE_LOCAL = 1; // 0x1
+    field public static final int PLAYBACK_TYPE_REMOTE = 2; // 0x2
+  }
+
   public final class MediaCrypto {
     ctor public MediaCrypto(java.util.UUID, byte[]) throws android.media.MediaCryptoException;
     method protected void finalize();
@@ -23615,6 +23716,7 @@ package android.media {
     field public static final int COLOR_TRANSFER_ST2084 = 6; // 0x6
     field public static final java.lang.String KEY_AAC_DRC_ATTENUATION_FACTOR = "aac-drc-cut-level";
     field public static final java.lang.String KEY_AAC_DRC_BOOST_FACTOR = "aac-drc-boost-level";
+    field public static final java.lang.String KEY_AAC_DRC_EFFECT_TYPE = "aac-drc-effect-type";
     field public static final java.lang.String KEY_AAC_DRC_HEAVY_COMPRESSION = "aac-drc-heavy-compression";
     field public static final java.lang.String KEY_AAC_DRC_TARGET_REFERENCE_LEVEL = "aac-target-ref-level";
     field public static final java.lang.String KEY_AAC_ENCODED_TARGET_LEVEL = "aac-encoded-target-level";
@@ -23699,6 +23801,69 @@ package android.media {
     field public static final java.lang.String MIMETYPE_VIDEO_VP9 = "video/x-vnd.on2.vp9";
   }
 
+  public class MediaItem2 {
+    method public static android.media.MediaItem2 fromBundle(android.content.Context, android.os.Bundle);
+    method public android.media.DataSourceDesc getDataSourceDesc();
+    method public int getFlags();
+    method public java.lang.String getMediaId();
+    method public android.media.MediaMetadata2 getMetadata();
+    method public boolean isBrowsable();
+    method public boolean isPlayable();
+    method public void setMetadata(android.media.MediaMetadata2);
+    method public android.os.Bundle toBundle();
+    field public static final int FLAG_BROWSABLE = 1; // 0x1
+    field public static final int FLAG_PLAYABLE = 2; // 0x2
+  }
+
+  public static final class MediaItem2.Builder {
+    ctor public MediaItem2.Builder(android.content.Context, int);
+    method public android.media.MediaItem2 build();
+    method public android.media.MediaItem2.Builder setDataSourceDesc(android.media.DataSourceDesc);
+    method public android.media.MediaItem2.Builder setMediaId(java.lang.String);
+    method public android.media.MediaItem2.Builder setMetadata(android.media.MediaMetadata2);
+  }
+
+  public abstract class MediaLibraryService2 extends android.media.MediaSessionService2 {
+    ctor public MediaLibraryService2();
+    method public abstract android.media.MediaLibraryService2.MediaLibrarySession onCreateSession(java.lang.String);
+    field public static final java.lang.String SERVICE_INTERFACE = "android.media.MediaLibraryService2";
+  }
+
+  public static final class MediaLibraryService2.LibraryRoot {
+    ctor public MediaLibraryService2.LibraryRoot(android.content.Context, java.lang.String, android.os.Bundle);
+    method public android.os.Bundle getExtras();
+    method public java.lang.String getRootId();
+    field public static final java.lang.String EXTRA_OFFLINE = "android.media.extra.OFFLINE";
+    field public static final java.lang.String EXTRA_RECENT = "android.media.extra.RECENT";
+    field public static final java.lang.String EXTRA_SUGGESTED = "android.media.extra.SUGGESTED";
+  }
+
+  public static final class MediaLibraryService2.MediaLibrarySession extends android.media.MediaSession2 {
+    method public void notifyChildrenChanged(android.media.MediaSession2.ControllerInfo, java.lang.String, int, android.os.Bundle);
+    method public void notifyChildrenChanged(java.lang.String, int, android.os.Bundle);
+    method public void notifySearchResultChanged(android.media.MediaSession2.ControllerInfo, java.lang.String, int, android.os.Bundle);
+  }
+
+  public static final class MediaLibraryService2.MediaLibrarySession.Builder {
+    ctor public MediaLibraryService2.MediaLibrarySession.Builder(android.media.MediaLibraryService2, android.media.MediaPlayerBase, java.util.concurrent.Executor, android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback);
+    method public android.media.MediaLibraryService2.MediaLibrarySession build();
+    method public android.media.MediaLibraryService2.MediaLibrarySession.Builder setId(java.lang.String);
+    method public android.media.MediaLibraryService2.MediaLibrarySession.Builder setSessionActivity(android.app.PendingIntent);
+    method public android.media.MediaLibraryService2.MediaLibrarySession.Builder setSessionCallback(java.util.concurrent.Executor, android.media.MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback);
+    method public android.media.MediaLibraryService2.MediaLibrarySession.Builder setVolumeProvider(android.media.VolumeProvider2);
+  }
+
+  public static class MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback extends android.media.MediaSession2.SessionCallback {
+    ctor public MediaLibraryService2.MediaLibrarySession.MediaLibrarySessionCallback(android.content.Context);
+    method public java.util.List<android.media.MediaItem2> onGetChildren(android.media.MediaSession2.ControllerInfo, java.lang.String, int, int, android.os.Bundle);
+    method public android.media.MediaItem2 onGetItem(android.media.MediaSession2.ControllerInfo, java.lang.String);
+    method public android.media.MediaLibraryService2.LibraryRoot onGetLibraryRoot(android.media.MediaSession2.ControllerInfo, android.os.Bundle);
+    method public java.util.List<android.media.MediaItem2> onGetSearchResult(android.media.MediaSession2.ControllerInfo, java.lang.String, int, int, android.os.Bundle);
+    method public void onSearch(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onSubscribe(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onUnsubscribe(android.media.MediaSession2.ControllerInfo, java.lang.String);
+  }
+
   public final class MediaMetadata implements android.os.Parcelable {
     method public boolean containsKey(java.lang.String);
     method public int describeContents();
@@ -23752,6 +23917,79 @@ package android.media {
     method public android.media.MediaMetadata.Builder putRating(java.lang.String, android.media.Rating);
     method public android.media.MediaMetadata.Builder putString(java.lang.String, java.lang.String);
     method public android.media.MediaMetadata.Builder putText(java.lang.String, java.lang.CharSequence);
+  }
+
+  public final class MediaMetadata2 {
+    method public boolean containsKey(java.lang.String);
+    method public static android.media.MediaMetadata2 fromBundle(android.content.Context, android.os.Bundle);
+    method public android.graphics.Bitmap getBitmap(java.lang.String);
+    method public android.os.Bundle getExtras();
+    method public float getFloat(java.lang.String);
+    method public long getLong(java.lang.String);
+    method public java.lang.String getMediaId();
+    method public android.media.Rating2 getRating(java.lang.String);
+    method public java.lang.String getString(java.lang.String);
+    method public java.lang.CharSequence getText(java.lang.String);
+    method public java.util.Set<java.lang.String> keySet();
+    method public int size();
+    method public android.os.Bundle toBundle();
+    field public static final long BT_FOLDER_TYPE_ALBUMS = 2L; // 0x2L
+    field public static final long BT_FOLDER_TYPE_ARTISTS = 3L; // 0x3L
+    field public static final long BT_FOLDER_TYPE_GENRES = 4L; // 0x4L
+    field public static final long BT_FOLDER_TYPE_MIXED = 0L; // 0x0L
+    field public static final long BT_FOLDER_TYPE_PLAYLISTS = 5L; // 0x5L
+    field public static final long BT_FOLDER_TYPE_TITLES = 1L; // 0x1L
+    field public static final long BT_FOLDER_TYPE_YEARS = 6L; // 0x6L
+    field public static final java.lang.String METADATA_KEY_ADVERTISEMENT = "android.media.metadata.ADVERTISEMENT";
+    field public static final java.lang.String METADATA_KEY_ALBUM = "android.media.metadata.ALBUM";
+    field public static final java.lang.String METADATA_KEY_ALBUM_ART = "android.media.metadata.ALBUM_ART";
+    field public static final java.lang.String METADATA_KEY_ALBUM_ARTIST = "android.media.metadata.ALBUM_ARTIST";
+    field public static final java.lang.String METADATA_KEY_ALBUM_ART_URI = "android.media.metadata.ALBUM_ART_URI";
+    field public static final java.lang.String METADATA_KEY_ART = "android.media.metadata.ART";
+    field public static final java.lang.String METADATA_KEY_ARTIST = "android.media.metadata.ARTIST";
+    field public static final java.lang.String METADATA_KEY_ART_URI = "android.media.metadata.ART_URI";
+    field public static final java.lang.String METADATA_KEY_AUTHOR = "android.media.metadata.AUTHOR";
+    field public static final java.lang.String METADATA_KEY_BT_FOLDER_TYPE = "android.media.metadata.BT_FOLDER_TYPE";
+    field public static final java.lang.String METADATA_KEY_COMPILATION = "android.media.metadata.COMPILATION";
+    field public static final java.lang.String METADATA_KEY_COMPOSER = "android.media.metadata.COMPOSER";
+    field public static final java.lang.String METADATA_KEY_DATE = "android.media.metadata.DATE";
+    field public static final java.lang.String METADATA_KEY_DISC_NUMBER = "android.media.metadata.DISC_NUMBER";
+    field public static final java.lang.String METADATA_KEY_DISPLAY_DESCRIPTION = "android.media.metadata.DISPLAY_DESCRIPTION";
+    field public static final java.lang.String METADATA_KEY_DISPLAY_ICON = "android.media.metadata.DISPLAY_ICON";
+    field public static final java.lang.String METADATA_KEY_DISPLAY_ICON_URI = "android.media.metadata.DISPLAY_ICON_URI";
+    field public static final java.lang.String METADATA_KEY_DISPLAY_SUBTITLE = "android.media.metadata.DISPLAY_SUBTITLE";
+    field public static final java.lang.String METADATA_KEY_DISPLAY_TITLE = "android.media.metadata.DISPLAY_TITLE";
+    field public static final java.lang.String METADATA_KEY_DOWNLOAD_STATUS = "android.media.metadata.DOWNLOAD_STATUS";
+    field public static final java.lang.String METADATA_KEY_DURATION = "android.media.metadata.DURATION";
+    field public static final java.lang.String METADATA_KEY_EXTRAS = "android.media.metadata.EXTRAS";
+    field public static final java.lang.String METADATA_KEY_GENRE = "android.media.metadata.GENRE";
+    field public static final java.lang.String METADATA_KEY_MEDIA_ID = "android.media.metadata.MEDIA_ID";
+    field public static final java.lang.String METADATA_KEY_MEDIA_URI = "android.media.metadata.MEDIA_URI";
+    field public static final java.lang.String METADATA_KEY_NUM_TRACKS = "android.media.metadata.NUM_TRACKS";
+    field public static final java.lang.String METADATA_KEY_RADIO_CALLSIGN = "android.media.metadata.RADIO_CALLSIGN";
+    field public static final java.lang.String METADATA_KEY_RADIO_FREQUENCY = "android.media.metadata.RADIO_FREQUENCY";
+    field public static final java.lang.String METADATA_KEY_RATING = "android.media.metadata.RATING";
+    field public static final java.lang.String METADATA_KEY_TITLE = "android.media.metadata.TITLE";
+    field public static final java.lang.String METADATA_KEY_TRACK_NUMBER = "android.media.metadata.TRACK_NUMBER";
+    field public static final java.lang.String METADATA_KEY_USER_RATING = "android.media.metadata.USER_RATING";
+    field public static final java.lang.String METADATA_KEY_WRITER = "android.media.metadata.WRITER";
+    field public static final java.lang.String METADATA_KEY_YEAR = "android.media.metadata.YEAR";
+    field public static final long STATUS_DOWNLOADED = 2L; // 0x2L
+    field public static final long STATUS_DOWNLOADING = 1L; // 0x1L
+    field public static final long STATUS_NOT_DOWNLOADED = 0L; // 0x0L
+  }
+
+  public static final class MediaMetadata2.Builder {
+    ctor public MediaMetadata2.Builder(android.content.Context);
+    ctor public MediaMetadata2.Builder(android.content.Context, android.media.MediaMetadata2);
+    method public android.media.MediaMetadata2 build();
+    method public android.media.MediaMetadata2.Builder putBitmap(java.lang.String, android.graphics.Bitmap);
+    method public android.media.MediaMetadata2.Builder putFloat(java.lang.String, float);
+    method public android.media.MediaMetadata2.Builder putLong(java.lang.String, long);
+    method public android.media.MediaMetadata2.Builder putRating(java.lang.String, android.media.Rating2);
+    method public android.media.MediaMetadata2.Builder putString(java.lang.String, java.lang.String);
+    method public android.media.MediaMetadata2.Builder putText(java.lang.String, java.lang.CharSequence);
+    method public android.media.MediaMetadata2.Builder setExtras(android.os.Bundle);
   }
 
   public abstract deprecated class MediaMetadataEditor {
@@ -24069,13 +24307,14 @@ package android.media {
     method public static final android.media.MediaPlayer2 create();
     method public abstract void deselectTrack(int);
     method public abstract android.media.DataSourceDesc editPlaylistItem(int, android.media.DataSourceDesc);
+    method public abstract android.media.AudioAttributes getAudioAttributes();
     method public abstract int getAudioSessionId();
     method public abstract android.media.DataSourceDesc getCurrentDataSource();
     method public abstract int getCurrentPlaylistItemIndex();
-    method public abstract int getCurrentPosition();
+    method public abstract long getCurrentPosition();
     method public abstract android.media.MediaPlayer2.DrmInfo getDrmInfo();
     method public abstract java.lang.String getDrmPropertyString(java.lang.String) throws android.media.MediaPlayer2.NoDrmSchemeException;
-    method public abstract int getDuration();
+    method public abstract long getDuration();
     method public abstract android.media.MediaDrm.KeyRequest getKeyRequest(byte[], byte[], java.lang.String, int, java.util.Map<java.lang.String, java.lang.String>) throws android.media.MediaPlayer2.NoDrmSchemeException;
     method public abstract int getLoopingMode();
     method public abstract android.os.PersistableBundle getMetrics();
@@ -24161,8 +24400,8 @@ package android.media {
 
   public static abstract class MediaPlayer2.DrmEventCallback {
     ctor public MediaPlayer2.DrmEventCallback();
-    method public void onDrmInfo(android.media.MediaPlayer2, android.media.MediaPlayer2.DrmInfo);
-    method public void onDrmPrepared(android.media.MediaPlayer2, int);
+    method public void onDrmInfo(android.media.MediaPlayer2, long, android.media.MediaPlayer2.DrmInfo);
+    method public void onDrmPrepared(android.media.MediaPlayer2, long, int);
   }
 
   public static abstract class MediaPlayer2.DrmInfo {
@@ -24200,7 +24439,7 @@ package android.media {
   }
 
   public static abstract interface MediaPlayer2.OnDrmConfigHelper {
-    method public abstract void onDrmConfig(android.media.MediaPlayer2);
+    method public abstract void onDrmConfig(android.media.MediaPlayer2, long);
   }
 
   public static abstract class MediaPlayer2.ProvisioningNetworkErrorException extends android.media.MediaDrmException {
@@ -24222,6 +24461,19 @@ package android.media {
     field public static final int MEDIA_TRACK_TYPE_SUBTITLE = 4; // 0x4
     field public static final int MEDIA_TRACK_TYPE_UNKNOWN = 0; // 0x0
     field public static final int MEDIA_TRACK_TYPE_VIDEO = 1; // 0x1
+  }
+
+  public abstract class MediaPlayerBase implements java.lang.AutoCloseable {
+    ctor public MediaPlayerBase();
+    method public abstract android.media.AudioAttributes getAudioAttributes();
+    method public abstract int getPlayerState();
+    method public abstract void pause();
+    method public abstract void play();
+    method public abstract void setAudioAttributes(android.media.AudioAttributes);
+    field public static final int STATE_ERROR = 0; // 0x0
+    field public static final int STATE_IDLE = 0; // 0x0
+    field public static final int STATE_PAUSED = 0; // 0x0
+    field public static final int STATE_PLAYING = 0; // 0x0
   }
 
   public class MediaRecorder implements android.media.AudioRouting {
@@ -24500,6 +24752,172 @@ package android.media {
     method public abstract void onScanCompleted(java.lang.String, android.net.Uri);
   }
 
+  public class MediaSession2 implements java.lang.AutoCloseable {
+    method public void addPlaylistItem(int, android.media.MediaItem2);
+    method public void close();
+    method public void editPlaylistItem(android.media.MediaItem2);
+    method public void fastForward();
+    method public java.util.List<android.media.MediaSession2.ControllerInfo> getConnectedControllers();
+    method public android.media.MediaItem2 getCurrentPlaylistItem();
+    method public android.media.MediaPlayerBase getPlayer();
+    method public java.util.List<android.media.MediaItem2> getPlaylist();
+    method public android.media.MediaSession2.PlaylistParams getPlaylistParams();
+    method public android.media.SessionToken2 getToken();
+    method public void notifyError(int, int);
+    method public void pause();
+    method public void play();
+    method public void prepare();
+    method public void removePlaylistItem(android.media.MediaItem2);
+    method public void rewind();
+    method public void seekTo(long);
+    method public void sendCustomCommand(android.media.MediaSession2.Command, android.os.Bundle);
+    method public void sendCustomCommand(android.media.MediaSession2.ControllerInfo, android.media.MediaSession2.Command, android.os.Bundle, android.os.ResultReceiver);
+    method public void setAllowedCommands(android.media.MediaSession2.ControllerInfo, android.media.MediaSession2.CommandGroup);
+    method public void setCustomLayout(android.media.MediaSession2.ControllerInfo, java.util.List<android.media.MediaSession2.CommandButton>);
+    method public void setPlayer(android.media.MediaPlayerBase);
+    method public void setPlayer(android.media.MediaPlayerBase, android.media.VolumeProvider2);
+    method public void setPlaylist(java.util.List<android.media.MediaItem2>);
+    method public void setPlaylistParams(android.media.MediaSession2.PlaylistParams);
+    method public void skipToNext();
+    method public void skipToPlaylistItem(android.media.MediaItem2);
+    method public void skipToPrevious();
+    method public void stop();
+    field public static final int COMMAND_CODE_BROWSER = 22; // 0x16
+    field public static final int COMMAND_CODE_CUSTOM = 0; // 0x0
+    field public static final int COMMAND_CODE_PLAYBACK_FAST_FORWARD = 7; // 0x7
+    field public static final int COMMAND_CODE_PLAYBACK_PAUSE = 2; // 0x2
+    field public static final int COMMAND_CODE_PLAYBACK_PLAY = 1; // 0x1
+    field public static final int COMMAND_CODE_PLAYBACK_PREPARE = 6; // 0x6
+    field public static final int COMMAND_CODE_PLAYBACK_REWIND = 8; // 0x8
+    field public static final int COMMAND_CODE_PLAYBACK_SEEK_TO = 9; // 0x9
+    field public static final int COMMAND_CODE_PLAYBACK_SET_CURRENT_PLAYLIST_ITEM = 10; // 0xa
+    field public static final int COMMAND_CODE_PLAYBACK_SET_PLAYLIST_PARAMS = 11; // 0xb
+    field public static final int COMMAND_CODE_PLAYBACK_SKIP_NEXT_ITEM = 4; // 0x4
+    field public static final int COMMAND_CODE_PLAYBACK_SKIP_PREV_ITEM = 5; // 0x5
+    field public static final int COMMAND_CODE_PLAYBACK_STOP = 3; // 0x3
+    field public static final int COMMAND_CODE_PLAYLIST_ADD = 12; // 0xc
+    field public static final int COMMAND_CODE_PLAYLIST_GET = 14; // 0xe
+    field public static final int COMMAND_CODE_PLAYLIST_REMOVE = 13; // 0xd
+    field public static final int COMMAND_CODE_PLAY_FROM_MEDIA_ID = 16; // 0x10
+    field public static final int COMMAND_CODE_PLAY_FROM_SEARCH = 18; // 0x12
+    field public static final int COMMAND_CODE_PLAY_FROM_URI = 17; // 0x11
+    field public static final int COMMAND_CODE_PREPARE_FROM_MEDIA_ID = 19; // 0x13
+    field public static final int COMMAND_CODE_PREPARE_FROM_SEARCH = 21; // 0x15
+    field public static final int COMMAND_CODE_PREPARE_FROM_URI = 20; // 0x14
+    field public static final int COMMAND_CODE_SET_VOLUME = 15; // 0xf
+    field public static final int ERROR_CODE_ACTION_ABORTED = 10; // 0xa
+    field public static final int ERROR_CODE_APP_ERROR = 1; // 0x1
+    field public static final int ERROR_CODE_AUTHENTICATION_EXPIRED = 3; // 0x3
+    field public static final int ERROR_CODE_CONCURRENT_STREAM_LIMIT = 5; // 0x5
+    field public static final int ERROR_CODE_CONTENT_ALREADY_PLAYING = 8; // 0x8
+    field public static final int ERROR_CODE_END_OF_QUEUE = 11; // 0xb
+    field public static final int ERROR_CODE_NOT_AVAILABLE_IN_REGION = 7; // 0x7
+    field public static final int ERROR_CODE_NOT_SUPPORTED = 2; // 0x2
+    field public static final int ERROR_CODE_PARENTAL_CONTROL_RESTRICTED = 6; // 0x6
+    field public static final int ERROR_CODE_PREMIUM_ACCOUNT_REQUIRED = 4; // 0x4
+    field public static final int ERROR_CODE_SETUP_REQUIRED = 12; // 0xc
+    field public static final int ERROR_CODE_SKIP_LIMIT_REACHED = 9; // 0x9
+    field public static final int ERROR_CODE_UNKNOWN_ERROR = 0; // 0x0
+  }
+
+  public static final class MediaSession2.Builder {
+    ctor public MediaSession2.Builder(android.content.Context, android.media.MediaPlayerBase);
+    method public android.media.MediaSession2 build();
+    method public android.media.MediaSession2.Builder setId(java.lang.String);
+    method public android.media.MediaSession2.Builder setSessionActivity(android.app.PendingIntent);
+    method public android.media.MediaSession2.Builder setSessionCallback(java.util.concurrent.Executor, android.media.MediaSession2.SessionCallback);
+    method public android.media.MediaSession2.Builder setVolumeProvider(android.media.VolumeProvider2);
+  }
+
+  public static final class MediaSession2.Command {
+    ctor public MediaSession2.Command(android.content.Context, int);
+    ctor public MediaSession2.Command(android.content.Context, java.lang.String, android.os.Bundle);
+    method public int getCommandCode();
+    method public java.lang.String getCustomCommand();
+    method public android.os.Bundle getExtra();
+  }
+
+  public static final class MediaSession2.CommandButton {
+    method public android.media.MediaSession2.Command getCommand();
+    method public java.lang.String getDisplayName();
+    method public android.os.Bundle getExtra();
+    method public int getIconResId();
+    method public boolean isEnabled();
+  }
+
+  public static final class MediaSession2.CommandButton.Builder {
+    ctor public MediaSession2.CommandButton.Builder(android.content.Context);
+    method public android.media.MediaSession2.CommandButton build();
+    method public android.media.MediaSession2.CommandButton.Builder setCommand(android.media.MediaSession2.Command);
+    method public android.media.MediaSession2.CommandButton.Builder setDisplayName(java.lang.String);
+    method public android.media.MediaSession2.CommandButton.Builder setEnabled(boolean);
+    method public android.media.MediaSession2.CommandButton.Builder setExtra(android.os.Bundle);
+    method public android.media.MediaSession2.CommandButton.Builder setIconResId(int);
+  }
+
+  public static final class MediaSession2.CommandGroup {
+    ctor public MediaSession2.CommandGroup(android.content.Context);
+    ctor public MediaSession2.CommandGroup(android.content.Context, android.media.MediaSession2.CommandGroup);
+    method public void addAllPredefinedCommands();
+    method public void addCommand(android.media.MediaSession2.Command);
+    method public boolean hasCommand(android.media.MediaSession2.Command);
+    method public boolean hasCommand(int);
+    method public void removeCommand(android.media.MediaSession2.Command);
+  }
+
+  public static final class MediaSession2.ControllerInfo {
+    method public java.lang.String getPackageName();
+    method public int getUid();
+    method public boolean isTrusted();
+  }
+
+  public static final class MediaSession2.PlaylistParams {
+    ctor public MediaSession2.PlaylistParams(android.content.Context, int, int, android.media.MediaMetadata2);
+    method public static android.media.MediaSession2.PlaylistParams fromBundle(android.content.Context, android.os.Bundle);
+    method public android.media.MediaMetadata2 getPlaylistMetadata();
+    method public int getRepeatMode();
+    method public int getShuffleMode();
+    method public android.os.Bundle toBundle();
+    field public static final int REPEAT_MODE_ALL = 2; // 0x2
+    field public static final int REPEAT_MODE_GROUP = 3; // 0x3
+    field public static final int REPEAT_MODE_NONE = 0; // 0x0
+    field public static final int REPEAT_MODE_ONE = 1; // 0x1
+    field public static final int SHUFFLE_MODE_ALL = 1; // 0x1
+    field public static final int SHUFFLE_MODE_GROUP = 2; // 0x2
+    field public static final int SHUFFLE_MODE_NONE = 0; // 0x0
+  }
+
+  public static abstract class MediaSession2.SessionCallback {
+    ctor public MediaSession2.SessionCallback(android.content.Context);
+    method public boolean onCommandRequest(android.media.MediaSession2.ControllerInfo, android.media.MediaSession2.Command);
+    method public android.media.MediaSession2.CommandGroup onConnect(android.media.MediaSession2.ControllerInfo);
+    method public void onCustomCommand(android.media.MediaSession2.ControllerInfo, android.media.MediaSession2.Command, android.os.Bundle, android.os.ResultReceiver);
+    method public void onDisconnected(android.media.MediaSession2.ControllerInfo);
+    method public void onPlayFromMediaId(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onPlayFromSearch(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onPlayFromUri(android.media.MediaSession2.ControllerInfo, android.net.Uri, android.os.Bundle);
+    method public void onPrepareFromMediaId(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onPrepareFromSearch(android.media.MediaSession2.ControllerInfo, java.lang.String, android.os.Bundle);
+    method public void onPrepareFromUri(android.media.MediaSession2.ControllerInfo, android.net.Uri, android.os.Bundle);
+    method public void onSetRating(android.media.MediaSession2.ControllerInfo, java.lang.String, android.media.Rating2);
+  }
+
+  public abstract class MediaSessionService2 extends android.app.Service {
+    ctor public MediaSessionService2();
+    method public final android.media.MediaSession2 getSession();
+    method public android.os.IBinder onBind(android.content.Intent);
+    method public abstract android.media.MediaSession2 onCreateSession(java.lang.String);
+    method public android.media.MediaSessionService2.MediaNotification onUpdateNotification();
+    field public static final java.lang.String SERVICE_INTERFACE = "android.media.MediaSessionService2";
+    field public static final java.lang.String SERVICE_META_DATA = "android.media.session";
+  }
+
+  public static class MediaSessionService2.MediaNotification {
+    ctor public MediaSessionService2.MediaNotification(android.content.Context, int, android.app.Notification);
+    method public android.app.Notification getNotification();
+    method public int getNotificationId();
+  }
+
   public final class MediaSync {
     ctor public MediaSync();
     method public android.view.Surface createInputSurface();
@@ -24567,13 +24985,19 @@ package android.media {
     field public static final int DIRECTIONALITY_OMNI = 1; // 0x1
     field public static final int DIRECTIONALITY_SUPER_CARDIOID = 5; // 0x5
     field public static final int DIRECTIONALITY_UNKNOWN = 0; // 0x0
+    field public static final int GROUP_UNKNOWN = -1; // 0xffffffff
+    field public static final int INDEX_IN_THE_GROUP_UNKNOWN = -1; // 0xffffffff
     field public static final int LOCATION_MAINBODY = 1; // 0x1
     field public static final int LOCATION_MAINBODY_MOVABLE = 2; // 0x2
     field public static final int LOCATION_PERIPHERAL = 3; // 0x3
     field public static final int LOCATION_UNKNOWN = 0; // 0x0
+    field public static final android.media.MicrophoneInfo.Coordinate3F ORIENTATION_UNKNOWN;
+    field public static final android.media.MicrophoneInfo.Coordinate3F POSITION_UNKNOWN;
+    field public static final float SENSITIVITY_UNKNOWN = -3.4028235E38f;
+    field public static final float SPL_UNKNOWN = -3.4028235E38f;
   }
 
-  public class MicrophoneInfo.Coordinate3F {
+  public static final class MicrophoneInfo.Coordinate3F {
     field public final float x;
     field public final float y;
     field public final float z;
@@ -24615,6 +25039,29 @@ package android.media {
     method public static android.media.Rating newUnratedRating(int);
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.media.Rating> CREATOR;
+    field public static final int RATING_3_STARS = 3; // 0x3
+    field public static final int RATING_4_STARS = 4; // 0x4
+    field public static final int RATING_5_STARS = 5; // 0x5
+    field public static final int RATING_HEART = 1; // 0x1
+    field public static final int RATING_NONE = 0; // 0x0
+    field public static final int RATING_PERCENTAGE = 6; // 0x6
+    field public static final int RATING_THUMB_UP_DOWN = 2; // 0x2
+  }
+
+  public final class Rating2 {
+    method public static android.media.Rating2 fromBundle(android.content.Context, android.os.Bundle);
+    method public float getPercentRating();
+    method public int getRatingStyle();
+    method public float getStarRating();
+    method public boolean hasHeart();
+    method public boolean isRated();
+    method public boolean isThumbUp();
+    method public static android.media.Rating2 newHeartRating(android.content.Context, boolean);
+    method public static android.media.Rating2 newPercentageRating(android.content.Context, float);
+    method public static android.media.Rating2 newStarRating(android.content.Context, int, float);
+    method public static android.media.Rating2 newThumbRating(android.content.Context, boolean);
+    method public static android.media.Rating2 newUnratedRating(android.content.Context, int);
+    method public android.os.Bundle toBundle();
     field public static final int RATING_3_STARS = 3; // 0x3
     field public static final int RATING_4_STARS = 4; // 0x4
     field public static final int RATING_5_STARS = 5; // 0x5
@@ -24757,6 +25204,22 @@ package android.media {
     field public static final int TYPE_NOTIFICATION = 2; // 0x2
     field public static final int TYPE_RINGTONE = 1; // 0x1
     field public static final int URI_COLUMN_INDEX = 2; // 0x2
+  }
+
+  public final class SessionToken2 {
+    ctor public SessionToken2(android.content.Context, java.lang.String, java.lang.String);
+    method public static android.media.SessionToken2 fromBundle(android.content.Context, android.os.Bundle);
+    method public java.lang.String getId();
+    method public java.lang.String getPackageName();
+    method public int getType();
+    method public int getUid();
+    method public android.os.Bundle toBundle();
+    field public static final int TYPE_LIBRARY_SERVICE = 2; // 0x2
+    field public static final int TYPE_SESSION = 0; // 0x0
+    field public static final int TYPE_SESSION_SERVICE = 1; // 0x1
+  }
+
+  public static abstract class SessionToken2.TokenType implements java.lang.annotation.Annotation {
   }
 
   public class SoundPool {
@@ -24954,6 +25417,19 @@ package android.media {
     method public final int getCurrentVolume();
     method public final int getMaxVolume();
     method public final int getVolumeControl();
+    method public void onAdjustVolume(int);
+    method public void onSetVolumeTo(int);
+    method public final void setCurrentVolume(int);
+    field public static final int VOLUME_CONTROL_ABSOLUTE = 2; // 0x2
+    field public static final int VOLUME_CONTROL_FIXED = 0; // 0x0
+    field public static final int VOLUME_CONTROL_RELATIVE = 1; // 0x1
+  }
+
+  public abstract class VolumeProvider2 {
+    ctor public VolumeProvider2(android.content.Context, int, int, int);
+    method public final int getControlType();
+    method public final int getCurrentVolume();
+    method public final int getMaxVolume();
     method public void onAdjustVolume(int);
     method public void onSetVolumeTo(int);
     method public final void setCurrentVolume(int);
@@ -25708,12 +26184,21 @@ package android.media.session {
   public final class MediaSessionManager {
     method public void addOnActiveSessionsChangedListener(android.media.session.MediaSessionManager.OnActiveSessionsChangedListener, android.content.ComponentName);
     method public void addOnActiveSessionsChangedListener(android.media.session.MediaSessionManager.OnActiveSessionsChangedListener, android.content.ComponentName, android.os.Handler);
+    method public void addOnSessionTokensChangedListener(java.util.concurrent.Executor, android.media.session.MediaSessionManager.OnSessionTokensChangedListener);
+    method public java.util.List<android.media.SessionToken2> getActiveSessionTokens();
     method public java.util.List<android.media.session.MediaController> getActiveSessions(android.content.ComponentName);
+    method public java.util.List<android.media.SessionToken2> getAllSessionTokens();
+    method public java.util.List<android.media.SessionToken2> getSessionServiceTokens();
     method public void removeOnActiveSessionsChangedListener(android.media.session.MediaSessionManager.OnActiveSessionsChangedListener);
+    method public void removeOnSessionTokensChangedListener(android.media.session.MediaSessionManager.OnSessionTokensChangedListener);
   }
 
   public static abstract interface MediaSessionManager.OnActiveSessionsChangedListener {
     method public abstract void onActiveSessionsChanged(java.util.List<android.media.session.MediaController>);
+  }
+
+  public static abstract interface MediaSessionManager.OnSessionTokensChangedListener {
+    method public abstract void onSessionTokensChanged(java.util.List<android.media.SessionToken2>);
   }
 
   public final class PlaybackState implements android.os.Parcelable {
@@ -32974,7 +33459,7 @@ package android.os {
     method public android.os.StrictMode.ThreadPolicy.Builder penaltyDialog();
     method public android.os.StrictMode.ThreadPolicy.Builder penaltyDropBox();
     method public android.os.StrictMode.ThreadPolicy.Builder penaltyFlashScreen();
-    method public android.os.StrictMode.ThreadPolicy.Builder penaltyListener(android.os.StrictMode.OnThreadViolationListener, java.util.concurrent.Executor);
+    method public android.os.StrictMode.ThreadPolicy.Builder penaltyListener(java.util.concurrent.Executor, android.os.StrictMode.OnThreadViolationListener);
     method public android.os.StrictMode.ThreadPolicy.Builder penaltyLog();
     method public android.os.StrictMode.ThreadPolicy.Builder permitAll();
     method public android.os.StrictMode.ThreadPolicy.Builder permitCustomSlowCalls();
@@ -33006,7 +33491,7 @@ package android.os {
     method public android.os.StrictMode.VmPolicy.Builder penaltyDeathOnCleartextNetwork();
     method public android.os.StrictMode.VmPolicy.Builder penaltyDeathOnFileUriExposure();
     method public android.os.StrictMode.VmPolicy.Builder penaltyDropBox();
-    method public android.os.StrictMode.VmPolicy.Builder penaltyListener(android.os.StrictMode.OnVmViolationListener, java.util.concurrent.Executor);
+    method public android.os.StrictMode.VmPolicy.Builder penaltyListener(java.util.concurrent.Executor, android.os.StrictMode.OnVmViolationListener);
     method public android.os.StrictMode.VmPolicy.Builder penaltyLog();
     method public android.os.StrictMode.VmPolicy.Builder setClassInstanceLimit(java.lang.Class, int);
   }
@@ -34616,10 +35101,9 @@ package android.provider {
     field public static final java.lang.String DURATION = "duration";
     field public static final java.lang.String EXTRA_CALL_TYPE_FILTER = "android.provider.extra.CALL_TYPE_FILTER";
     field public static final java.lang.String FEATURES = "features";
-    field public static final int FEATURES_ASSISTED_DIALING_USED = 16; // 0x10
     field public static final int FEATURES_HD_CALL = 4; // 0x4
     field public static final int FEATURES_PULLED_EXTERNALLY = 2; // 0x2
-    field public static final int FEATURES_RTT = 32; // 0x20
+    field public static final int FEATURES_RTT = 16; // 0x10
     field public static final int FEATURES_VIDEO = 1; // 0x1
     field public static final int FEATURES_WIFI = 8; // 0x8
     field public static final java.lang.String GEOCODED_LOCATION = "geocoded_location";
@@ -38240,17 +38724,6 @@ package android.se.omapi {
     method public byte[] transmit(byte[]) throws java.io.IOException;
   }
 
-  public abstract interface ISecureElementListener implements android.os.IInterface {
-    method public abstract void serviceConnected() throws android.os.RemoteException;
-  }
-
-  public static abstract class ISecureElementListener.Stub extends android.os.Binder implements android.se.omapi.ISecureElementListener {
-    ctor public ISecureElementListener.Stub();
-    method public android.os.IBinder asBinder();
-    method public static android.se.omapi.ISecureElementListener asInterface(android.os.IBinder);
-    method public boolean onTransact(int, android.os.Parcel, android.os.Parcel, int) throws android.os.RemoteException;
-  }
-
   public class Reader {
     method public void closeSessions();
     method public java.lang.String getName();
@@ -38260,11 +38733,17 @@ package android.se.omapi {
   }
 
   public class SEService {
-    ctor public SEService(android.content.Context, android.se.omapi.ISecureElementListener);
+    ctor public SEService(android.content.Context, android.se.omapi.SEService.SecureElementListener);
     method public android.se.omapi.Reader[] getReaders();
     method public java.lang.String getVersion();
     method public boolean isConnected();
     method public void shutdown();
+  }
+
+  public static abstract class SEService.SecureElementListener extends android.os.Binder {
+    ctor public SEService.SecureElementListener();
+    method public android.os.IBinder asBinder();
+    method public void serviceConnected();
   }
 
   public class Session {
@@ -38426,7 +38905,6 @@ package android.security.keystore {
     method public boolean isRandomizedEncryptionRequired();
     method public boolean isStrongBoxBacked();
     method public boolean isTrustedUserPresenceRequired();
-    method public boolean isUnlockedDeviceRequired();
     method public boolean isUserAuthenticationRequired();
     method public boolean isUserAuthenticationValidWhileOnBody();
     method public boolean isUserConfirmationRequired();
@@ -38454,7 +38932,6 @@ package android.security.keystore {
     method public android.security.keystore.KeyGenParameterSpec.Builder setRandomizedEncryptionRequired(boolean);
     method public android.security.keystore.KeyGenParameterSpec.Builder setSignaturePaddings(java.lang.String...);
     method public android.security.keystore.KeyGenParameterSpec.Builder setTrustedUserPresenceRequired(boolean);
-    method public android.security.keystore.KeyGenParameterSpec.Builder setUnlockedDeviceRequired(boolean);
     method public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationRequired(boolean);
     method public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationValidWhileOnBody(boolean);
     method public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationValidityDurationSeconds(int);
@@ -38546,8 +39023,6 @@ package android.security.keystore {
     method public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
     method public boolean isRandomizedEncryptionRequired();
-    method public boolean isTrustedUserPresenceRequired();
-    method public boolean isUnlockedDeviceRequired();
     method public boolean isUserAuthenticationRequired();
     method public boolean isUserAuthenticationValidWhileOnBody();
     method public boolean isUserConfirmationRequired();
@@ -38566,8 +39041,6 @@ package android.security.keystore {
     method public android.security.keystore.KeyProtection.Builder setKeyValidityStart(java.util.Date);
     method public android.security.keystore.KeyProtection.Builder setRandomizedEncryptionRequired(boolean);
     method public android.security.keystore.KeyProtection.Builder setSignaturePaddings(java.lang.String...);
-    method public android.security.keystore.KeyProtection.Builder setTrustedUserPresenceRequired(boolean);
-    method public android.security.keystore.KeyProtection.Builder setUnlockedDeviceRequired(boolean);
     method public android.security.keystore.KeyProtection.Builder setUserAuthenticationRequired(boolean);
     method public android.security.keystore.KeyProtection.Builder setUserAuthenticationValidWhileOnBody(boolean);
     method public android.security.keystore.KeyProtection.Builder setUserAuthenticationValidityDurationSeconds(int);
@@ -40620,7 +41093,6 @@ package android.telecom {
     field public static final int CAPABILITY_SUPPORT_DEFLECT = 16777216; // 0x1000000
     field public static final int CAPABILITY_SUPPORT_HOLD = 2; // 0x2
     field public static final int CAPABILITY_SWAP_CONFERENCE = 8; // 0x8
-    field public static final int PROPERTY_ASSISTED_DIALING_USED = 512; // 0x200
     field public static final int PROPERTY_CONFERENCE = 1; // 0x1
     field public static final int PROPERTY_EMERGENCY_CALLBACK_MODE = 4; // 0x4
     field public static final int PROPERTY_ENTERPRISE_CALL = 32; // 0x20
@@ -40845,7 +41317,6 @@ package android.telecom {
     field public static final java.lang.String EXTRA_CALL_SUBJECT = "android.telecom.extra.CALL_SUBJECT";
     field public static final java.lang.String EXTRA_CHILD_ADDRESS = "android.telecom.extra.CHILD_ADDRESS";
     field public static final java.lang.String EXTRA_LAST_FORWARDED_NUMBER = "android.telecom.extra.LAST_FORWARDED_NUMBER";
-    field public static final int PROPERTY_ASSISTED_DIALING_USED = 512; // 0x200
     field public static final int PROPERTY_HAS_CDMA_VOICE_PRIVACY = 32; // 0x20
     field public static final int PROPERTY_IS_EXTERNAL_CALL = 16; // 0x10
     field public static final int PROPERTY_IS_RTT = 256; // 0x100
@@ -41262,14 +41733,12 @@ package android.telecom {
     field public static final deprecated java.lang.String ACTION_INCOMING_CALL = "android.telecom.action.INCOMING_CALL";
     field public static final java.lang.String ACTION_PHONE_ACCOUNT_REGISTERED = "android.telecom.action.PHONE_ACCOUNT_REGISTERED";
     field public static final java.lang.String ACTION_PHONE_ACCOUNT_UNREGISTERED = "android.telecom.action.PHONE_ACCOUNT_UNREGISTERED";
-    field public static final java.lang.String ACTION_SHOW_ASSISTED_DIALING_SETTINGS = "android.telecom.action.SHOW_ASSISTED_DIALING_SETTINGS";
     field public static final java.lang.String ACTION_SHOW_CALL_ACCESSIBILITY_SETTINGS = "android.telecom.action.SHOW_CALL_ACCESSIBILITY_SETTINGS";
     field public static final java.lang.String ACTION_SHOW_CALL_SETTINGS = "android.telecom.action.SHOW_CALL_SETTINGS";
     field public static final java.lang.String ACTION_SHOW_MISSED_CALLS_NOTIFICATION = "android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION";
     field public static final java.lang.String ACTION_SHOW_RESPOND_VIA_SMS_SETTINGS = "android.telecom.action.SHOW_RESPOND_VIA_SMS_SETTINGS";
     field public static final char DTMF_CHARACTER_PAUSE = 44; // 0x002c ','
     field public static final char DTMF_CHARACTER_WAIT = 59; // 0x003b ';'
-    field public static final java.lang.String EXTRA_ASSISTED_DIALING_TRANSFORMATION_INFO = "android.telecom.extra.ASSISTED_DIALING_TRANSFORMATION_INFO";
     field public static final java.lang.String EXTRA_CALL_BACK_NUMBER = "android.telecom.extra.CALL_BACK_NUMBER";
     field public static final java.lang.String EXTRA_CALL_DISCONNECT_CAUSE = "android.telecom.extra.CALL_DISCONNECT_CAUSE";
     field public static final java.lang.String EXTRA_CALL_DISCONNECT_MESSAGE = "android.telecom.extra.CALL_DISCONNECT_MESSAGE";
@@ -41285,7 +41754,6 @@ package android.telecom {
     field public static final java.lang.String EXTRA_START_CALL_WITH_RTT = "android.telecom.extra.START_CALL_WITH_RTT";
     field public static final java.lang.String EXTRA_START_CALL_WITH_SPEAKERPHONE = "android.telecom.extra.START_CALL_WITH_SPEAKERPHONE";
     field public static final java.lang.String EXTRA_START_CALL_WITH_VIDEO_STATE = "android.telecom.extra.START_CALL_WITH_VIDEO_STATE";
-    field public static final java.lang.String EXTRA_USE_ASSISTED_DIALING = "android.telecom.extra.USE_ASSISTED_DIALING";
     field public static final java.lang.String GATEWAY_ORIGINAL_ADDRESS = "android.telecom.extra.GATEWAY_ORIGINAL_ADDRESS";
     field public static final java.lang.String GATEWAY_PROVIDER_PACKAGE = "android.telecom.extra.GATEWAY_PROVIDER_PACKAGE";
     field public static final java.lang.String METADATA_INCLUDE_EXTERNAL_CALLS = "android.telecom.INCLUDE_EXTERNAL_CALLS";
@@ -41296,18 +41764,6 @@ package android.telecom {
     field public static final int PRESENTATION_PAYPHONE = 4; // 0x4
     field public static final int PRESENTATION_RESTRICTED = 2; // 0x2
     field public static final int PRESENTATION_UNKNOWN = 3; // 0x3
-  }
-
-  public final class TransformationInfo implements android.os.Parcelable {
-    ctor public TransformationInfo(java.lang.String, java.lang.String, java.lang.String, java.lang.String, int);
-    method public int describeContents();
-    method public java.lang.String getOriginalNumber();
-    method public java.lang.String getTransformedNumber();
-    method public int getTransformedNumberCountryCallingCode();
-    method public java.lang.String getUserHomeCountryCode();
-    method public java.lang.String getUserRoamingCountryCode();
-    method public void writeToParcel(android.os.Parcel, int);
-    field public static final android.os.Parcelable.Creator<android.telecom.TransformationInfo> CREATOR;
   }
 
   public class VideoProfile implements android.os.Parcelable {
@@ -41476,7 +41932,6 @@ package android.telephony {
     field public static final java.lang.String KEY_ALLOW_NON_EMERGENCY_CALLS_IN_ECM_BOOL = "allow_non_emergency_calls_in_ecm_bool";
     field public static final java.lang.String KEY_ALWAYS_SHOW_EMERGENCY_ALERT_ONOFF_BOOL = "always_show_emergency_alert_onoff_bool";
     field public static final java.lang.String KEY_APN_EXPAND_BOOL = "apn_expand_bool";
-    field public static final java.lang.String KEY_ASSISTED_DIALING_ENABLED_BOOL = "assisted_dialing_enabled_bool";
     field public static final java.lang.String KEY_AUTO_RETRY_ENABLED_BOOL = "auto_retry_enabled_bool";
     field public static final java.lang.String KEY_CALL_FORWARDING_BLOCKS_WHILE_ROAMING_STRING_ARRAY = "call_forwarding_blocks_while_roaming_string_array";
     field public static final java.lang.String KEY_CARRIER_ALLOW_TURNOFF_IMS_BOOL = "carrier_allow_turnoff_ims_bool";
@@ -41815,12 +42270,12 @@ package android.telephony {
   public class MbmsDownloadSession implements java.lang.AutoCloseable {
     method public int cancelDownload(android.telephony.mbms.DownloadRequest);
     method public void close();
-    method public static android.telephony.MbmsDownloadSession create(android.content.Context, android.telephony.mbms.MbmsDownloadSessionCallback, android.os.Handler);
-    method public static android.telephony.MbmsDownloadSession create(android.content.Context, android.telephony.mbms.MbmsDownloadSessionCallback, int, android.os.Handler);
+    method public static android.telephony.MbmsDownloadSession create(android.content.Context, java.util.concurrent.Executor, android.telephony.mbms.MbmsDownloadSessionCallback);
+    method public static android.telephony.MbmsDownloadSession create(android.content.Context, java.util.concurrent.Executor, int, android.telephony.mbms.MbmsDownloadSessionCallback);
     method public int download(android.telephony.mbms.DownloadRequest);
     method public java.io.File getTempFileRootDirectory();
     method public java.util.List<android.telephony.mbms.DownloadRequest> listPendingDownloads();
-    method public int registerStateCallback(android.telephony.mbms.DownloadRequest, android.telephony.mbms.DownloadStateCallback, android.os.Handler);
+    method public int registerStateCallback(android.telephony.mbms.DownloadRequest, java.util.concurrent.Executor, android.telephony.mbms.DownloadStateCallback);
     method public void requestDownloadState(android.telephony.mbms.DownloadRequest, android.telephony.mbms.FileInfo);
     method public void requestUpdateFileServices(java.util.List<java.lang.String>);
     method public void resetDownloadKnowledge(android.telephony.mbms.DownloadRequest);
@@ -41848,10 +42303,10 @@ package android.telephony {
 
   public class MbmsStreamingSession implements java.lang.AutoCloseable {
     method public void close();
-    method public static android.telephony.MbmsStreamingSession create(android.content.Context, android.telephony.mbms.MbmsStreamingSessionCallback, int, android.os.Handler);
-    method public static android.telephony.MbmsStreamingSession create(android.content.Context, android.telephony.mbms.MbmsStreamingSessionCallback, android.os.Handler);
+    method public static android.telephony.MbmsStreamingSession create(android.content.Context, java.util.concurrent.Executor, int, android.telephony.mbms.MbmsStreamingSessionCallback);
+    method public static android.telephony.MbmsStreamingSession create(android.content.Context, java.util.concurrent.Executor, android.telephony.mbms.MbmsStreamingSessionCallback);
     method public void requestUpdateStreamingServices(java.util.List<java.lang.String>);
-    method public android.telephony.mbms.StreamingService startStreaming(android.telephony.mbms.StreamingServiceInfo, android.telephony.mbms.StreamingServiceCallback, android.os.Handler);
+    method public android.telephony.mbms.StreamingService startStreaming(android.telephony.mbms.StreamingServiceInfo, java.util.concurrent.Executor, android.telephony.mbms.StreamingServiceCallback);
   }
 
   public class NeighboringCellInfo implements android.os.Parcelable {
@@ -42724,20 +43179,23 @@ package android.telephony.gsm {
 package android.telephony.mbms {
 
   public final class DownloadRequest implements android.os.Parcelable {
-    method public static android.telephony.mbms.DownloadRequest copy(android.telephony.mbms.DownloadRequest);
     method public int describeContents();
+    method public android.net.Uri getDestinationUri();
     method public java.lang.String getFileServiceId();
     method public static int getMaxAppIntentSize();
     method public static int getMaxDestinationUriSize();
     method public android.net.Uri getSourceUri();
     method public int getSubscriptionId();
+    method public byte[] toByteArray();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.telephony.mbms.DownloadRequest> CREATOR;
   }
 
   public static class DownloadRequest.Builder {
-    ctor public DownloadRequest.Builder(android.net.Uri);
+    ctor public DownloadRequest.Builder(android.net.Uri, android.net.Uri);
     method public android.telephony.mbms.DownloadRequest build();
+    method public static android.telephony.mbms.DownloadRequest.Builder fromDownloadRequest(android.telephony.mbms.DownloadRequest);
+    method public static android.telephony.mbms.DownloadRequest.Builder fromSerializedRequest(byte[]);
     method public android.telephony.mbms.DownloadRequest.Builder setAppIntent(android.content.Intent);
     method public android.telephony.mbms.DownloadRequest.Builder setServiceInfo(android.telephony.mbms.FileServiceInfo);
     method public android.telephony.mbms.DownloadRequest.Builder setSubscriptionId(int);
@@ -42833,10 +43291,10 @@ package android.telephony.mbms {
     method public java.util.Date getSessionStartTime();
   }
 
-  public class StreamingService {
+  public class StreamingService implements java.lang.AutoCloseable {
+    method public void close();
     method public android.telephony.mbms.StreamingServiceInfo getInfo();
     method public android.net.Uri getPlaybackUri();
-    method public void stopStreaming();
     field public static final int BROADCAST_METHOD = 1; // 0x1
     field public static final int REASON_BY_USER_REQUEST = 1; // 0x1
     field public static final int REASON_END_OF_SESSION = 2; // 0x2
@@ -43216,36 +43674,6 @@ package android.text {
     method public boolean isAllowed(char);
   }
 
-  public class MeasuredText implements android.text.Spanned {
-    method public char charAt(int);
-    method public int getBreakStrategy();
-    method public int getEnd();
-    method public int getHyphenationFrequency();
-    method public android.text.TextPaint getPaint();
-    method public int getParagraphCount();
-    method public int getParagraphEnd(int);
-    method public int getParagraphStart(int);
-    method public int getSpanEnd(java.lang.Object);
-    method public int getSpanFlags(java.lang.Object);
-    method public int getSpanStart(java.lang.Object);
-    method public <T> T[] getSpans(int, int, java.lang.Class<T>);
-    method public int getStart();
-    method public java.lang.CharSequence getText();
-    method public android.text.TextDirectionHeuristic getTextDir();
-    method public int length();
-    method public int nextSpanTransition(int, int, java.lang.Class);
-    method public java.lang.CharSequence subSequence(int, int);
-  }
-
-  public static final class MeasuredText.Builder {
-    ctor public MeasuredText.Builder(java.lang.CharSequence, android.text.TextPaint);
-    method public android.text.MeasuredText build();
-    method public android.text.MeasuredText.Builder setBreakStrategy(int);
-    method public android.text.MeasuredText.Builder setHyphenationFrequency(int);
-    method public android.text.MeasuredText.Builder setRange(int, int);
-    method public android.text.MeasuredText.Builder setTextDirection(android.text.TextDirectionHeuristic);
-  }
-
   public abstract interface NoCopySpan {
   }
 
@@ -43255,6 +43683,38 @@ package android.text {
 
   public abstract interface ParcelableSpan implements android.os.Parcelable {
     method public abstract int getSpanTypeId();
+  }
+
+  public class PrecomputedText implements android.text.Spanned {
+    method public char charAt(int);
+    method public static android.text.PrecomputedText create(java.lang.CharSequence, android.text.PrecomputedText.Params);
+    method public int getParagraphCount();
+    method public int getParagraphEnd(int);
+    method public int getParagraphStart(int);
+    method public android.text.PrecomputedText.Params getParams();
+    method public int getSpanEnd(java.lang.Object);
+    method public int getSpanFlags(java.lang.Object);
+    method public int getSpanStart(java.lang.Object);
+    method public <T> T[] getSpans(int, int, java.lang.Class<T>);
+    method public java.lang.CharSequence getText();
+    method public int length();
+    method public int nextSpanTransition(int, int, java.lang.Class);
+    method public java.lang.CharSequence subSequence(int, int);
+  }
+
+  public static final class PrecomputedText.Params {
+    method public int getBreakStrategy();
+    method public int getHyphenationFrequency();
+    method public android.text.TextDirectionHeuristic getTextDirection();
+    method public android.text.TextPaint getTextPaint();
+  }
+
+  public static class PrecomputedText.Params.Builder {
+    ctor public PrecomputedText.Params.Builder(android.text.TextPaint);
+    method public android.text.PrecomputedText.Params build();
+    method public android.text.PrecomputedText.Params.Builder setBreakStrategy(int);
+    method public android.text.PrecomputedText.Params.Builder setHyphenationFrequency(int);
+    method public android.text.PrecomputedText.Params.Builder setTextDirection(android.text.TextDirectionHeuristic);
   }
 
   public class Selection {
@@ -47610,6 +48070,7 @@ package android.view {
     method public void setAlpha(float);
     method public void setAnimation(android.view.animation.Animation);
     method public void setAutofillHints(java.lang.String...);
+    method public void setAutofillId(android.view.autofill.AutofillId);
     method public void setBackground(android.graphics.drawable.Drawable);
     method public void setBackgroundColor(int);
     method public deprecated void setBackgroundDrawable(android.graphics.drawable.Drawable);
@@ -49773,6 +50234,7 @@ package android.view.autofill {
     method public android.content.ComponentName getAutofillServiceComponentName();
     method public java.util.List<java.lang.String> getAvailableFieldClassificationAlgorithms();
     method public java.lang.String getDefaultFieldClassificationAlgorithm();
+    method public android.view.autofill.AutofillId getNextAutofillId();
     method public android.service.autofill.UserData getUserData();
     method public java.lang.String getUserDataId();
     method public boolean hasEnabledAutofillServices();
@@ -50288,15 +50750,13 @@ package android.view.textclassifier {
     method public default android.view.textclassifier.TextClassification classifyText(java.lang.CharSequence, int, int, android.os.LocaleList);
     method public default android.view.textclassifier.TextLinks generateLinks(java.lang.CharSequence, android.view.textclassifier.TextLinks.Options);
     method public default android.view.textclassifier.TextLinks generateLinks(java.lang.CharSequence);
-    method public default java.util.Collection<java.lang.String> getEntitiesForPreset(int);
     method public default android.view.textclassifier.logging.Logger getLogger(android.view.textclassifier.logging.Logger.Config);
     method public default int getMaxGenerateLinksTextLength();
     method public default android.view.textclassifier.TextSelection suggestSelection(java.lang.CharSequence, int, int, android.view.textclassifier.TextSelection.Options);
     method public default android.view.textclassifier.TextSelection suggestSelection(java.lang.CharSequence, int, int);
     method public default android.view.textclassifier.TextSelection suggestSelection(java.lang.CharSequence, int, int, android.os.LocaleList);
-    field public static final int ENTITY_PRESET_ALL = 0; // 0x0
-    field public static final int ENTITY_PRESET_BASE = 2; // 0x2
-    field public static final int ENTITY_PRESET_NONE = 1; // 0x1
+    field public static final java.lang.String HINT_TEXT_IS_EDITABLE = "android.text_is_editable";
+    field public static final java.lang.String HINT_TEXT_IS_NOT_EDITABLE = "android.text_is_not_editable";
     field public static final android.view.textclassifier.TextClassifier NO_OP;
     field public static final java.lang.String TYPE_ADDRESS = "address";
     field public static final java.lang.String TYPE_DATE = "date";
@@ -50310,11 +50770,12 @@ package android.view.textclassifier {
   }
 
   public static final class TextClassifier.EntityConfig implements android.os.Parcelable {
-    ctor public TextClassifier.EntityConfig(int);
+    method public static android.view.textclassifier.TextClassifier.EntityConfig create(java.util.Collection<java.lang.String>);
+    method public static android.view.textclassifier.TextClassifier.EntityConfig create(java.util.Collection<java.lang.String>, java.util.Collection<java.lang.String>, java.util.Collection<java.lang.String>);
+    method public static android.view.textclassifier.TextClassifier.EntityConfig createWithEntityList(java.util.Collection<java.lang.String>);
     method public int describeContents();
-    method public android.view.textclassifier.TextClassifier.EntityConfig excludeEntities(java.lang.String...);
-    method public java.util.List<java.lang.String> getEntities(android.view.textclassifier.TextClassifier);
-    method public android.view.textclassifier.TextClassifier.EntityConfig includeEntities(java.lang.String...);
+    method public java.util.Collection<java.lang.String> getHints();
+    method public java.util.List<java.lang.String> resolveEntityListModifications(java.util.Collection<java.lang.String>);
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.view.textclassifier.TextClassifier.EntityConfig> CREATOR;
   }
@@ -53640,6 +54101,7 @@ package android.widget {
     method public final android.content.res.ColorStateList getTextColors();
     method public java.util.Locale getTextLocale();
     method public android.os.LocaleList getTextLocales();
+    method public android.text.PrecomputedText.Params getTextMetricsParams();
     method public float getTextScaleX();
     method public float getTextSize();
     method public int getTotalPaddingBottom();
@@ -53769,6 +54231,7 @@ package android.widget {
     method public final void setTextKeepState(java.lang.CharSequence, android.widget.TextView.BufferType);
     method public void setTextLocale(java.util.Locale);
     method public void setTextLocales(android.os.LocaleList);
+    method public void setTextMetricsParams(android.text.PrecomputedText.Params);
     method public void setTextScaleX(float);
     method public void setTextSize(float);
     method public void setTextSize(int, float);
