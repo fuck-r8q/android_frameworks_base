@@ -20,17 +20,12 @@ import android.app.Activity;
 import android.os.Looper;
 import android.os.Bundle;
 import android.perftests.utils.PerfStatusReporter;
-import android.perftests.utils.SettingsHelper;
-import android.perftests.utils.SettingsStateKeeperRule;
-import android.perftests.utils.ShellHelper;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.perftests.utils.BenchmarkState;
 import android.perftests.utils.StubActivity;
 import android.provider.Settings;
-import android.support.test.filters.LargeTest;
-import android.support.test.runner.AndroidJUnit4;
 import android.support.test.rule.ActivityTestRule;
 import android.support.test.InstrumentationRegistry;
 
@@ -51,9 +46,9 @@ import org.junit.runner.RunWith;
 
 import static org.junit.Assert.assertTrue;
 
-@LargeTest
+// TODO(b/38345816): remove this test once we have enough runs from LoginTest
 @RunWith(Parameterized.class)
-public class AutofillPerfTest {
+public class AutofillPerfTest extends AbstractAutofillPerfTestCase {
     @Parameters(name = "{0}")
     @SuppressWarnings("rawtypes")
     public static Collection layouts() {
@@ -62,46 +57,18 @@ public class AutofillPerfTest {
         });
     }
 
-    private final int mLayoutId;
     private EditText mUsername;
     private EditText mPassword;
 
-    public AutofillPerfTest(String key, int layoutId) {
-        mLayoutId = layoutId;
+    public AutofillPerfTest(@SuppressWarnings("unused") String key, int layoutId) {
+        super(layoutId);
     }
 
-    @ClassRule
-    public static final SettingsStateKeeperRule mServiceSettingsKeeper = new SettingsStateKeeperRule(
-            InstrumentationRegistry.getTargetContext(), Settings.Secure.AUTOFILL_SERVICE);
-
-    @Rule
-    public ActivityTestRule<StubActivity> mActivityRule =
-            new ActivityTestRule<StubActivity>(StubActivity.class);
-
-    @Rule
-    public PerfStatusReporter mPerfStatusReporter = new PerfStatusReporter();
-
-    /**
-     * Prepares the activity so that by the time the test is run it has reference to its fields.
-     */
-    @Before
-    public void prepareActivity() throws Throwable {
-        mActivityRule.runOnUiThread(() -> {
-            assertTrue("We should be running on the main thread",
-                    Looper.getMainLooper().getThread() == Thread.currentThread());
-            assertTrue("We should be running on the main thread",
-                    Looper.myLooper() == Looper.getMainLooper());
-            Activity activity = mActivityRule.getActivity();
-            activity.setContentView(mLayoutId);
-            View root = activity.getWindow().getDecorView();
-            mUsername = root.findViewById(R.id.username);
-            mPassword = root.findViewById(R.id.password);
-        });
-    }
-
-    @Before
-    public void resetStaticState() {
-        MyAutofillService.resetStaticState();
+    @Override
+    protected void onCreate(StubActivity activity) {
+        View root = activity.getWindow().getDecorView();
+        mUsername = root.findViewById(R.id.username);
+        mPassword = root.findViewById(R.id.password);
     }
 
     /**
@@ -259,22 +226,30 @@ public class AutofillPerfTest {
         });
     }
 
-    /**
-     * Uses the {@code settings} binary to set the autofill service.
-     */
-    private void setService() {
-        SettingsHelper.syncSet(InstrumentationRegistry.getTargetContext(),
-                SettingsHelper.NAMESPACE_SECURE,
-                Settings.Secure.AUTOFILL_SERVICE,
-                MyAutofillService.COMPONENT_NAME);
+    // TODO(b/38345816): remove this test, it's used just to test the dashboard
+    @Test
+    public void stupidTestThatAlwaysPass() throws Throwable {
+        mActivityRule.runOnUiThread(() -> {
+            BenchmarkState state = mPerfStatusReporter.getBenchmarkState();
+            while (state.keepRunning()) {
+            }
+        });
     }
 
-    /**
-     * Uses the {@code settings} binary to reset the autofill service.
-     */
-    private void resetService() {
-        SettingsHelper.syncDelete(InstrumentationRegistry.getTargetContext(),
-                SettingsHelper.NAMESPACE_SECURE,
-                Settings.Secure.AUTOFILL_SERVICE);
+    // TODO(b/38345816): remove this test, it's used just to test the dashboard
+    @Test
+    public void stupidTestThatAlwaysFail() throws Throwable {
+        mActivityRule.runOnUiThread(() -> {
+            BenchmarkState state = mPerfStatusReporter.getBenchmarkState();
+            while (state.keepRunning()) {
+                throw new RuntimeException("TEST, Y U NO PASS?");
+            }
+        });
+    }
+
+    // TODO(b/38345816): remove this test, it's used just to test the dashboard
+    @Test
+    public void stupidTestThatAlwaysHang() throws Throwable {
+        android.os.SystemClock.sleep(60_000); // 1m
     }
 }
