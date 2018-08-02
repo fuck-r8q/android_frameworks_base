@@ -966,6 +966,10 @@ package android {
     field public static final int onClick = 16843375; // 0x101026f
     field public static final int oneshot = 16843159; // 0x1010197
     field public static final int opacity = 16843550; // 0x101031e
+    field public static final int opticalInsetBottom = 16844170; // 0x101058a
+    field public static final int opticalInsetLeft = 16844167; // 0x1010587
+    field public static final int opticalInsetRight = 16844169; // 0x1010589
+    field public static final int opticalInsetTop = 16844168; // 0x1010588
     field public static final int order = 16843242; // 0x10101ea
     field public static final int orderInCategory = 16843231; // 0x10101df
     field public static final int ordering = 16843490; // 0x10102e2
@@ -4207,8 +4211,8 @@ package android.app {
   }
 
   public class AppOpsManager {
-    method public int checkOp(java.lang.String, int, java.lang.String);
-    method public int checkOpNoThrow(java.lang.String, int, java.lang.String);
+    method public deprecated int checkOp(java.lang.String, int, java.lang.String);
+    method public deprecated int checkOpNoThrow(java.lang.String, int, java.lang.String);
     method public void checkPackage(int, java.lang.String);
     method public void finishOp(java.lang.String, int, java.lang.String);
     method public int noteOp(java.lang.String, int, java.lang.String);
@@ -4219,10 +4223,15 @@ package android.app {
     method public int startOp(java.lang.String, int, java.lang.String);
     method public int startOpNoThrow(java.lang.String, int, java.lang.String);
     method public void startWatchingMode(java.lang.String, java.lang.String, android.app.AppOpsManager.OnOpChangedListener);
+    method public void startWatchingMode(java.lang.String, java.lang.String, int, android.app.AppOpsManager.OnOpChangedListener);
     method public void stopWatchingMode(android.app.AppOpsManager.OnOpChangedListener);
+    method public int unsafeCheckOp(java.lang.String, int, java.lang.String);
+    method public int unsafeCheckOpNoThrow(java.lang.String, int, java.lang.String);
+    method public int unsafeCheckOpRaw(java.lang.String, int, java.lang.String);
     field public static final int MODE_ALLOWED = 0; // 0x0
     field public static final int MODE_DEFAULT = 3; // 0x3
     field public static final int MODE_ERRORED = 2; // 0x2
+    field public static final int MODE_FOREGROUND = 4; // 0x4
     field public static final int MODE_IGNORED = 1; // 0x1
     field public static final java.lang.String OPSTR_ADD_VOICEMAIL = "android:add_voicemail";
     field public static final java.lang.String OPSTR_ANSWER_PHONE_CALLS = "android:answer_phone_calls";
@@ -4258,6 +4267,7 @@ package android.app {
     field public static final java.lang.String OPSTR_WRITE_CONTACTS = "android:write_contacts";
     field public static final java.lang.String OPSTR_WRITE_EXTERNAL_STORAGE = "android:write_external_storage";
     field public static final java.lang.String OPSTR_WRITE_SETTINGS = "android:write_settings";
+    field public static final int WATCH_FOREGROUND_CHANGES = 1; // 0x1
   }
 
   public static abstract interface AppOpsManager.OnOpChangedListener {
@@ -6110,8 +6120,10 @@ package android.app {
   }
 
   public final class UiAutomation {
+    method public void adoptShellPermissionIdentity();
     method public void clearWindowAnimationFrameStats();
     method public boolean clearWindowContentFrameStats(int);
+    method public void dropShellPermissionIdentity();
     method public android.view.accessibility.AccessibilityEvent executeAndWaitForEvent(java.lang.Runnable, android.app.UiAutomation.AccessibilityEventFilter, long) throws java.util.concurrent.TimeoutException;
     method public android.os.ParcelFileDescriptor executeShellCommand(java.lang.String);
     method public android.view.accessibility.AccessibilityNodeInfo findFocus(int);
@@ -9125,6 +9137,7 @@ package android.content {
     method public android.os.Bundle call(java.lang.String, java.lang.String, android.os.Bundle) throws android.os.RemoteException;
     method public final android.net.Uri canonicalize(android.net.Uri) throws android.os.RemoteException;
     method public void close();
+    method public static void closeQuietly(android.content.ContentProviderClient);
     method public int delete(android.net.Uri, java.lang.String, java.lang.String[]) throws android.os.RemoteException;
     method public android.content.ContentProvider getLocalContentProvider();
     method public java.lang.String[] getStreamTypes(android.net.Uri, java.lang.String) throws android.os.RemoteException;
@@ -10127,6 +10140,7 @@ package android.content {
     field public static final int FLAG_ACTIVITY_SINGLE_TOP = 536870912; // 0x20000000
     field public static final int FLAG_ACTIVITY_TASK_ON_HOME = 16384; // 0x4000
     field public static final int FLAG_DEBUG_LOG_RESOLUTION = 8; // 0x8
+    field public static final int FLAG_DIRECT_BOOT_AUTO = 256; // 0x100
     field public static final int FLAG_EXCLUDE_STOPPED_PACKAGES = 16; // 0x10
     field public static final int FLAG_FROM_BACKGROUND = 4; // 0x4
     field public static final int FLAG_GRANT_PERSISTABLE_URI_PERMISSION = 64; // 0x40
@@ -11378,6 +11392,7 @@ package android.content.pm {
     field public static final int INSTALL_REASON_USER = 4; // 0x4
     field public static final int MATCH_ALL = 131072; // 0x20000
     field public static final int MATCH_DEFAULT_ONLY = 65536; // 0x10000
+    field public static final int MATCH_DIRECT_BOOT_AUTO = 268435456; // 0x10000000
     field public static final int MATCH_DIRECT_BOOT_AWARE = 524288; // 0x80000
     field public static final int MATCH_DIRECT_BOOT_UNAWARE = 262144; // 0x40000
     field public static final int MATCH_DISABLED_COMPONENTS = 512; // 0x200
@@ -12655,22 +12670,30 @@ package android.database.sqlite {
     ctor public SQLiteQueryBuilder();
     method public static void appendColumns(java.lang.StringBuilder, java.lang.String[]);
     method public void appendWhere(java.lang.CharSequence);
+    method public void appendWhere(java.lang.CharSequence, java.lang.String...);
     method public void appendWhereEscapeString(java.lang.String);
+    method public void appendWhereEscapeString(java.lang.String, java.lang.String...);
+    method public void appendWhereExpression(java.lang.CharSequence);
+    method public void appendWhereExpression(java.lang.CharSequence, java.lang.String...);
     method public java.lang.String buildQuery(java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public deprecated java.lang.String buildQuery(java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public static java.lang.String buildQueryString(boolean, java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public java.lang.String buildUnionQuery(java.lang.String[], java.lang.String, java.lang.String);
     method public java.lang.String buildUnionSubQuery(java.lang.String, java.lang.String[], java.util.Set<java.lang.String>, int, java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public deprecated java.lang.String buildUnionSubQuery(java.lang.String, java.lang.String[], java.util.Set<java.lang.String>, int, java.lang.String, java.lang.String, java.lang.String[], java.lang.String, java.lang.String);
+    method public int delete(android.database.sqlite.SQLiteDatabase, java.lang.String, java.lang.String[]);
     method public java.lang.String getTables();
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String);
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String);
+    method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, android.os.CancellationSignal);
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, android.os.CancellationSignal);
+    method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], android.os.Bundle, android.os.CancellationSignal);
     method public void setCursorFactory(android.database.sqlite.SQLiteDatabase.CursorFactory);
     method public void setDistinct(boolean);
     method public void setProjectionMap(java.util.Map<java.lang.String, java.lang.String>);
     method public void setStrict(boolean);
     method public void setTables(java.lang.String);
+    method public int update(android.database.sqlite.SQLiteDatabase, android.content.ContentValues, java.lang.String, java.lang.String[]);
   }
 
   public class SQLiteReadOnlyDatabaseException extends android.database.sqlite.SQLiteException {
@@ -13748,6 +13771,16 @@ package android.graphics {
     field public static final int YV12 = 842094169; // 0x32315659
   }
 
+  public class Insets {
+    method public static android.graphics.Insets of(int, int, int, int);
+    method public static android.graphics.Insets of(android.graphics.Rect);
+    field public static final android.graphics.Insets NONE;
+    field public final int bottom;
+    field public final int left;
+    field public final int right;
+    field public final int top;
+  }
+
   public class Interpolator {
     ctor public Interpolator(int);
     ctor public Interpolator(int, int);
@@ -14189,13 +14222,11 @@ package android.graphics {
     ctor public Picture();
     ctor public Picture(android.graphics.Picture);
     method public android.graphics.Canvas beginRecording(int, int);
-    method public static deprecated android.graphics.Picture createFromStream(java.io.InputStream);
     method public void draw(android.graphics.Canvas);
     method public void endRecording();
     method public int getHeight();
     method public int getWidth();
     method public boolean requiresHardwareAcceleration();
-    method public deprecated void writeToStream(java.io.OutputStream);
   }
 
   public class PixelFormat {
@@ -14716,6 +14747,7 @@ package android.graphics.drawable {
     method public int getMinimumHeight();
     method public int getMinimumWidth();
     method public abstract int getOpacity();
+    method public android.graphics.Insets getOpticalInsets();
     method public void getOutline(android.graphics.Outline);
     method public boolean getPadding(android.graphics.Rect);
     method public int[] getState();
@@ -15074,6 +15106,10 @@ package android.graphics.drawable {
   public class StateListDrawable extends android.graphics.drawable.DrawableContainer {
     ctor public StateListDrawable();
     method public void addState(int[], android.graphics.drawable.Drawable);
+    method public int getStateCount();
+    method public android.graphics.drawable.Drawable getStateDrawable(int);
+    method public int getStateDrawableIndex(int[]);
+    method public int[] getStateSet(int);
   }
 
   public class TransitionDrawable extends android.graphics.drawable.LayerDrawable implements android.graphics.drawable.Drawable.Callback {
@@ -20852,6 +20888,7 @@ package android.icu.util {
     field public static final android.icu.util.MeasureUnit PICOMETER;
     field public static final android.icu.util.MeasureUnit PINT;
     field public static final android.icu.util.MeasureUnit PINT_METRIC;
+    field public static final android.icu.util.MeasureUnit POINT;
     field public static final android.icu.util.MeasureUnit POUND;
     field public static final android.icu.util.MeasureUnit POUND_PER_SQUARE_INCH;
     field public static final android.icu.util.MeasureUnit QUART;
@@ -24482,7 +24519,8 @@ package android.media {
 
   public final class MediaTimestamp {
     method public long getAnchorMediaTimeUs();
-    method public long getAnchorSytemNanoTime();
+    method public long getAnchorSystemNanoTime();
+    method public deprecated long getAnchorSytemNanoTime();
     method public float getMediaClockRate();
     field public static final android.media.MediaTimestamp TIMESTAMP_UNKNOWN;
   }
@@ -26140,6 +26178,7 @@ package android.media.tv {
     field public static final java.lang.String COLUMN_SEARCHABLE = "searchable";
     field public static final java.lang.String COLUMN_SEASON_DISPLAY_NUMBER = "season_display_number";
     field public static final java.lang.String COLUMN_SEASON_TITLE = "season_title";
+    field public static final java.lang.String COLUMN_SERIES_ID = "series_id";
     field public static final java.lang.String COLUMN_SHORT_DESCRIPTION = "short_description";
     field public static final java.lang.String COLUMN_STARTING_PRICE = "starting_price";
     field public static final java.lang.String COLUMN_THUMBNAIL_ASPECT_RATIO = "poster_thumbnail_aspect_ratio";
@@ -26202,6 +26241,7 @@ package android.media.tv {
     field public static final java.lang.String COLUMN_SEASON_DISPLAY_NUMBER = "season_display_number";
     field public static final deprecated java.lang.String COLUMN_SEASON_NUMBER = "season_number";
     field public static final java.lang.String COLUMN_SEASON_TITLE = "season_title";
+    field public static final java.lang.String COLUMN_SERIES_ID = "series_id";
     field public static final java.lang.String COLUMN_SHORT_DESCRIPTION = "short_description";
     field public static final java.lang.String COLUMN_START_TIME_UTC_MILLIS = "start_time_utc_millis";
     field public static final java.lang.String COLUMN_THUMBNAIL_URI = "thumbnail_uri";
@@ -26266,6 +26306,7 @@ package android.media.tv {
     field public static final java.lang.String COLUMN_SEARCHABLE = "searchable";
     field public static final java.lang.String COLUMN_SEASON_DISPLAY_NUMBER = "season_display_number";
     field public static final java.lang.String COLUMN_SEASON_TITLE = "season_title";
+    field public static final java.lang.String COLUMN_SERIES_ID = "series_id";
     field public static final java.lang.String COLUMN_SHORT_DESCRIPTION = "short_description";
     field public static final java.lang.String COLUMN_START_TIME_UTC_MILLIS = "start_time_utc_millis";
     field public static final java.lang.String COLUMN_THUMBNAIL_URI = "thumbnail_uri";
@@ -26325,6 +26366,7 @@ package android.media.tv {
     field public static final java.lang.String COLUMN_SEARCHABLE = "searchable";
     field public static final java.lang.String COLUMN_SEASON_DISPLAY_NUMBER = "season_display_number";
     field public static final java.lang.String COLUMN_SEASON_TITLE = "season_title";
+    field public static final java.lang.String COLUMN_SERIES_ID = "series_id";
     field public static final java.lang.String COLUMN_SHORT_DESCRIPTION = "short_description";
     field public static final java.lang.String COLUMN_STARTING_PRICE = "starting_price";
     field public static final java.lang.String COLUMN_THUMBNAIL_ASPECT_RATIO = "poster_thumbnail_aspect_ratio";
@@ -32193,6 +32235,7 @@ package android.os {
     field public static final int O = 26; // 0x1a
     field public static final int O_MR1 = 27; // 0x1b
     field public static final int P = 28; // 0x1c
+    field public static final int Q = 10000; // 0x2710
   }
 
   public final class Bundle extends android.os.BaseBundle implements java.lang.Cloneable android.os.Parcelable {
@@ -32513,6 +32556,21 @@ package android.os {
     ctor public FileUriExposedException(java.lang.String);
   }
 
+  public class FileUtils {
+    method public static void closeQuietly(java.lang.AutoCloseable);
+    method public static void closeQuietly(java.io.FileDescriptor);
+    method public static long copy(java.io.File, java.io.File) throws java.io.IOException;
+    method public static long copy(java.io.File, java.io.File, android.os.CancellationSignal, java.util.concurrent.Executor, android.os.FileUtils.ProgressListener) throws java.io.IOException;
+    method public static long copy(java.io.InputStream, java.io.OutputStream) throws java.io.IOException;
+    method public static long copy(java.io.InputStream, java.io.OutputStream, android.os.CancellationSignal, java.util.concurrent.Executor, android.os.FileUtils.ProgressListener) throws java.io.IOException;
+    method public static long copy(java.io.FileDescriptor, java.io.FileDescriptor) throws java.io.IOException;
+    method public static long copy(java.io.FileDescriptor, java.io.FileDescriptor, android.os.CancellationSignal, java.util.concurrent.Executor, android.os.FileUtils.ProgressListener) throws java.io.IOException;
+  }
+
+  public static abstract interface FileUtils.ProgressListener {
+    method public abstract void onProgress(long);
+  }
+
   public class Handler {
     ctor public Handler();
     ctor public Handler(android.os.Handler.Callback);
@@ -32525,6 +32583,7 @@ package android.os {
     method public final android.os.Looper getLooper();
     method public java.lang.String getMessageName(android.os.Message);
     method public void handleMessage(android.os.Message);
+    method public final boolean hasCallbacks(java.lang.Runnable);
     method public final boolean hasMessages(int);
     method public final boolean hasMessages(int, java.lang.Object);
     method public final android.os.Message obtainMessage();
@@ -32755,6 +32814,7 @@ package android.os {
     method public java.util.ArrayList readArrayList(java.lang.ClassLoader);
     method public void readBinderArray(android.os.IBinder[]);
     method public void readBinderList(java.util.List<android.os.IBinder>);
+    method public boolean readBoolean();
     method public void readBooleanArray(boolean[]);
     method public android.os.Bundle readBundle();
     method public android.os.Bundle readBundle(java.lang.ClassLoader);
@@ -32777,6 +32837,7 @@ package android.os {
     method public void readMap(java.util.Map, java.lang.ClassLoader);
     method public <T extends android.os.Parcelable> T readParcelable(java.lang.ClassLoader);
     method public android.os.Parcelable[] readParcelableArray(java.lang.ClassLoader);
+    method public <T extends android.os.Parcelable> java.util.List<T> readParcelableList(java.util.List<T>, java.lang.ClassLoader);
     method public android.os.PersistableBundle readPersistableBundle();
     method public android.os.PersistableBundle readPersistableBundle(java.lang.ClassLoader);
     method public java.io.Serializable readSerializable();
@@ -32800,6 +32861,7 @@ package android.os {
     method public void writeArray(java.lang.Object[]);
     method public void writeBinderArray(android.os.IBinder[]);
     method public void writeBinderList(java.util.List<android.os.IBinder>);
+    method public void writeBoolean(boolean);
     method public void writeBooleanArray(boolean[]);
     method public void writeBundle(android.os.Bundle);
     method public void writeByte(byte);
@@ -32822,6 +32884,7 @@ package android.os {
     method public void writeNoException();
     method public void writeParcelable(android.os.Parcelable, int);
     method public <T extends android.os.Parcelable> void writeParcelableArray(T[], int);
+    method public <T extends android.os.Parcelable> void writeParcelableList(java.util.List<T>, int);
     method public void writePersistableBundle(android.os.PersistableBundle);
     method public void writeSerializable(java.io.Serializable);
     method public void writeSize(android.util.Size);
@@ -33173,7 +33236,9 @@ package android.os {
     method public android.os.StrictMode.VmPolicy.Builder detectAll();
     method public android.os.StrictMode.VmPolicy.Builder detectCleartextNetwork();
     method public android.os.StrictMode.VmPolicy.Builder detectContentUriWithoutPermission();
+    method public android.os.StrictMode.VmPolicy.Builder detectCredentialProtectedWhileLocked();
     method public android.os.StrictMode.VmPolicy.Builder detectFileUriExposure();
+    method public android.os.StrictMode.VmPolicy.Builder detectImplicitDirectBoot();
     method public android.os.StrictMode.VmPolicy.Builder detectLeakedClosableObjects();
     method public android.os.StrictMode.VmPolicy.Builder detectLeakedRegistrationObjects();
     method public android.os.StrictMode.VmPolicy.Builder detectLeakedSqlLiteObjects();
@@ -33221,8 +33286,12 @@ package android.os {
   }
 
   public final class Trace {
+    method public static void beginAsyncSection(java.lang.String, int);
     method public static void beginSection(java.lang.String);
+    method public static void endAsyncSection(java.lang.String, int);
     method public static void endSection();
+    method public static boolean isEnabled();
+    method public static void setCounter(java.lang.String, int);
   }
 
   public class TransactionTooLargeException extends android.os.RemoteException {
@@ -33575,6 +33644,9 @@ package android.os.strictmode {
   public final class ContentUriWithoutPermissionViolation extends android.os.strictmode.Violation {
   }
 
+  public final class CredentialProtectedWhileLockedViolation extends android.os.strictmode.Violation {
+  }
+
   public final class CustomViolation extends android.os.strictmode.Violation {
   }
 
@@ -33585,6 +33657,9 @@ package android.os.strictmode {
   }
 
   public final class FileUriExposedViolation extends android.os.strictmode.Violation {
+  }
+
+  public final class ImplicitDirectBootViolation extends android.os.strictmode.Violation {
   }
 
   public class InstanceCountViolation extends android.os.strictmode.Violation {
@@ -39621,6 +39696,7 @@ package android.service.voice {
     field public static final int SHOW_SOURCE_ACTIVITY = 16; // 0x10
     field public static final int SHOW_SOURCE_APPLICATION = 8; // 0x8
     field public static final int SHOW_SOURCE_ASSIST_GESTURE = 4; // 0x4
+    field public static final int SHOW_SOURCE_PUSH_TO_TALK = 32; // 0x20
     field public static final int SHOW_WITH_ASSIST = 1; // 0x1
     field public static final int SHOW_WITH_SCREENSHOT = 2; // 0x2
   }
@@ -40973,6 +41049,7 @@ package android.telecom {
     method public void onReject(java.lang.String);
     method public void onSeparate();
     method public void onShowIncomingCallUi();
+    method public void onSilence();
     method public void onStartRtt(android.telecom.Connection.RttTextStream);
     method public void onStateChanged(int);
     method public void onStopDtmfTone();
@@ -41766,6 +41843,7 @@ package android.telephony {
     field public static final java.lang.String KEY_SMS_REQUIRES_DESTINATION_NUMBER_CONVERSION_BOOL = "sms_requires_destination_number_conversion_bool";
     field public static final java.lang.String KEY_SUPPORT_3GPP_CALL_FORWARDING_WHILE_ROAMING_BOOL = "support_3gpp_call_forwarding_while_roaming_bool";
     field public static final java.lang.String KEY_SUPPORT_CONFERENCE_CALL_BOOL = "support_conference_call_bool";
+    field public static final java.lang.String KEY_SUPPORT_EMERGENCY_SMS_OVER_IMS_BOOL = "support_emergency_sms_over_ims_bool";
     field public static final java.lang.String KEY_SUPPORT_PAUSE_IMS_VIDEO_CALLS_BOOL = "support_pause_ims_video_calls_bool";
     field public static final java.lang.String KEY_SUPPORT_SWAP_AFTER_MERGE_BOOL = "support_swap_after_merge_bool";
     field public static final java.lang.String KEY_TREAT_DOWNGRADED_VIDEO_CALLS_AS_VIDEO_CALLS_BOOL = "treat_downgraded_video_calls_as_video_calls_bool";
@@ -42365,8 +42443,10 @@ package android.telephony {
     method public java.lang.CharSequence getDisplayName();
     method public java.lang.String getIccId();
     method public int getIconTint();
-    method public int getMcc();
-    method public int getMnc();
+    method public deprecated int getMcc();
+    method public java.lang.String getMccString();
+    method public deprecated int getMnc();
+    method public java.lang.String getMncString();
     method public java.lang.String getNumber();
     method public int getSimSlotIndex();
     method public int getSubscriptionId();
@@ -42460,6 +42540,8 @@ package android.telephony {
     method public java.lang.String getImei();
     method public java.lang.String getImei(int);
     method public java.lang.String getLine1Number();
+    method public java.lang.String getManufacturerCode();
+    method public java.lang.String getManufacturerCode(int);
     method public java.lang.String getMeid();
     method public java.lang.String getMeid(int);
     method public java.lang.String getMmsUAProfUrl();
@@ -42484,6 +42566,8 @@ package android.telephony {
     method public int getSimState();
     method public int getSimState(int);
     method public java.lang.String getSubscriberId();
+    method public java.lang.String getTypeAllocationCode();
+    method public java.lang.String getTypeAllocationCode(int);
     method public java.lang.String getVisualVoicemailPackageName();
     method public java.lang.String getVoiceMailAlphaTag();
     method public java.lang.String getVoiceMailNumber();
@@ -42696,7 +42780,8 @@ package android.telephony.data {
     method public int getAuthType();
     method public java.lang.String getEntryName();
     method public int getId();
-    method public java.net.InetAddress getMmsProxyAddress();
+    method public deprecated java.net.InetAddress getMmsProxyAddress();
+    method public java.lang.String getMmsProxyAddressAsString();
     method public int getMmsProxyPort();
     method public android.net.Uri getMmsc();
     method public int getMvnoType();
@@ -42704,7 +42789,8 @@ package android.telephony.data {
     method public java.lang.String getOperatorNumeric();
     method public java.lang.String getPassword();
     method public int getProtocol();
-    method public java.net.InetAddress getProxyAddress();
+    method public deprecated java.net.InetAddress getProxyAddress();
+    method public java.lang.String getProxyAddressAsString();
     method public int getProxyPort();
     method public int getRoamingProtocol();
     method public java.lang.String getUser();
@@ -42724,7 +42810,7 @@ package android.telephony.data {
     field public static final int PROTOCOL_IPV6 = 1; // 0x1
     field public static final int PROTOCOL_PPP = 3; // 0x3
     field public static final int TYPE_CBS = 128; // 0x80
-    field public static final int TYPE_DEFAULT = 17; // 0x11
+    field public static final int TYPE_DEFAULT = 1; // 0x1
     field public static final int TYPE_DUN = 8; // 0x8
     field public static final int TYPE_EMERGENCY = 512; // 0x200
     field public static final int TYPE_FOTA = 32; // 0x20
@@ -42743,7 +42829,8 @@ package android.telephony.data {
     method public android.telephony.data.ApnSetting.Builder setAuthType(int);
     method public android.telephony.data.ApnSetting.Builder setCarrierEnabled(boolean);
     method public android.telephony.data.ApnSetting.Builder setEntryName(java.lang.String);
-    method public android.telephony.data.ApnSetting.Builder setMmsProxyAddress(java.net.InetAddress);
+    method public deprecated android.telephony.data.ApnSetting.Builder setMmsProxyAddress(java.net.InetAddress);
+    method public android.telephony.data.ApnSetting.Builder setMmsProxyAddress(java.lang.String);
     method public android.telephony.data.ApnSetting.Builder setMmsProxyPort(int);
     method public android.telephony.data.ApnSetting.Builder setMmsc(android.net.Uri);
     method public android.telephony.data.ApnSetting.Builder setMvnoType(int);
@@ -42751,7 +42838,8 @@ package android.telephony.data {
     method public android.telephony.data.ApnSetting.Builder setOperatorNumeric(java.lang.String);
     method public android.telephony.data.ApnSetting.Builder setPassword(java.lang.String);
     method public android.telephony.data.ApnSetting.Builder setProtocol(int);
-    method public android.telephony.data.ApnSetting.Builder setProxyAddress(java.net.InetAddress);
+    method public deprecated android.telephony.data.ApnSetting.Builder setProxyAddress(java.net.InetAddress);
+    method public android.telephony.data.ApnSetting.Builder setProxyAddress(java.lang.String);
     method public android.telephony.data.ApnSetting.Builder setProxyPort(int);
     method public android.telephony.data.ApnSetting.Builder setRoamingProtocol(int);
     method public android.telephony.data.ApnSetting.Builder setUser(java.lang.String);
@@ -44692,6 +44780,7 @@ package android.text.util {
   public class Linkify {
     ctor public Linkify();
     method public static final boolean addLinks(android.text.Spannable, int);
+    method public static final boolean addLinks(android.text.Spannable, int, android.text.util.Linkify.UrlSpanFactory);
     method public static final boolean addLinks(android.widget.TextView, int);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String);
     method public static final void addLinks(android.widget.TextView, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
@@ -44699,6 +44788,7 @@ package android.text.util {
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String, android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
     method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String, java.lang.String[], android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter);
+    method public static final boolean addLinks(android.text.Spannable, java.util.regex.Pattern, java.lang.String, java.lang.String[], android.text.util.Linkify.MatchFilter, android.text.util.Linkify.TransformFilter, android.text.util.Linkify.UrlSpanFactory);
     field public static final int ALL = 15; // 0xf
     field public static final int EMAIL_ADDRESSES = 2; // 0x2
     field public static final deprecated int MAP_ADDRESSES = 8; // 0x8
@@ -44715,6 +44805,11 @@ package android.text.util {
 
   public static abstract interface Linkify.TransformFilter {
     method public abstract java.lang.String transformUrl(java.util.regex.Matcher, java.lang.String);
+  }
+
+  public static class Linkify.UrlSpanFactory {
+    ctor public Linkify.UrlSpanFactory();
+    method public android.text.style.URLSpan create(java.lang.String);
   }
 
   public class Rfc822Token {
@@ -45916,6 +46011,7 @@ package android.view {
   public final class Display {
     method public long getAppVsyncOffsetNanos();
     method public void getCurrentSizeRange(android.graphics.Point, android.graphics.Point);
+    method public android.view.DisplayCutout getCutout();
     method public int getDisplayId();
     method public int getFlags();
     method public android.view.Display.HdrCapabilities getHdrCapabilities();
@@ -49337,18 +49433,18 @@ package android.view.accessibility {
     method public void setCheckable(boolean);
     method public void setChecked(boolean);
     method public void setClassName(java.lang.CharSequence);
-    method public void setClickable(boolean);
+    method public deprecated void setClickable(boolean);
     method public void setCollectionInfo(android.view.accessibility.AccessibilityNodeInfo.CollectionInfo);
     method public void setCollectionItemInfo(android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo);
     method public void setContentDescription(java.lang.CharSequence);
     method public void setContentInvalid(boolean);
-    method public void setContextClickable(boolean);
-    method public void setDismissable(boolean);
+    method public deprecated void setContextClickable(boolean);
+    method public deprecated void setDismissable(boolean);
     method public void setDrawingOrder(int);
     method public void setEditable(boolean);
     method public void setEnabled(boolean);
     method public void setError(java.lang.CharSequence);
-    method public void setFocusable(boolean);
+    method public deprecated void setFocusable(boolean);
     method public void setFocused(boolean);
     method public void setHeading(boolean);
     method public void setHintText(java.lang.CharSequence);
@@ -49359,7 +49455,7 @@ package android.view.accessibility {
     method public void setLabeledBy(android.view.View);
     method public void setLabeledBy(android.view.View, int);
     method public void setLiveRegion(int);
-    method public void setLongClickable(boolean);
+    method public deprecated void setLongClickable(boolean);
     method public void setMaxTextLength(int);
     method public void setMovementGranularities(int);
     method public void setMultiLine(boolean);
@@ -49370,7 +49466,7 @@ package android.view.accessibility {
     method public void setPassword(boolean);
     method public void setRangeInfo(android.view.accessibility.AccessibilityNodeInfo.RangeInfo);
     method public void setScreenReaderFocusable(boolean);
-    method public void setScrollable(boolean);
+    method public deprecated void setScrollable(boolean);
     method public void setSelected(boolean);
     method public void setShowingHintText(boolean);
     method public void setSource(android.view.View);
@@ -54055,6 +54151,8 @@ package android.widget {
     method protected android.widget.Toolbar.LayoutParams generateDefaultLayoutParams();
     method public android.widget.Toolbar.LayoutParams generateLayoutParams(android.util.AttributeSet);
     method protected android.widget.Toolbar.LayoutParams generateLayoutParams(android.view.ViewGroup.LayoutParams);
+    method public java.lang.CharSequence getCollapseContentDescription();
+    method public android.graphics.drawable.Drawable getCollapseIcon();
     method public int getContentInsetEnd();
     method public int getContentInsetEndWithActions();
     method public int getContentInsetLeft();
@@ -54082,6 +54180,10 @@ package android.widget {
     method public boolean hideOverflowMenu();
     method public void inflateMenu(int);
     method public boolean isOverflowMenuShowing();
+    method public void setCollapseContentDescription(int);
+    method public void setCollapseContentDescription(java.lang.CharSequence);
+    method public void setCollapseIcon(int);
+    method public void setCollapseIcon(android.graphics.drawable.Drawable);
     method public void setContentInsetEndWithActions(int);
     method public void setContentInsetStartWithNavigation(int);
     method public void setContentInsetsAbsolute(int, int);
@@ -70111,7 +70213,7 @@ package java.util.regex {
     method public java.util.regex.Matcher reset();
     method public java.util.regex.Matcher reset(java.lang.CharSequence);
     method public int start();
-    method public int start(int) throws java.lang.IllegalStateException;
+    method public int start(int);
     method public int start(java.lang.String);
     method public java.util.regex.MatchResult toMatchResult();
     method public java.util.regex.Matcher useAnchoringBounds(boolean);
@@ -70122,7 +70224,7 @@ package java.util.regex {
   public final class Pattern implements java.io.Serializable {
     method public java.util.function.Predicate<java.lang.String> asPredicate();
     method public static java.util.regex.Pattern compile(java.lang.String);
-    method public static java.util.regex.Pattern compile(java.lang.String, int) throws java.util.regex.PatternSyntaxException;
+    method public static java.util.regex.Pattern compile(java.lang.String, int);
     method public int flags();
     method public java.util.regex.Matcher matcher(java.lang.CharSequence);
     method public static boolean matches(java.lang.String, java.lang.CharSequence);
