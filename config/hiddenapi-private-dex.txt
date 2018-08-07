@@ -141734,3 +141734,9 @@ Lsun/util/logging/PlatformLogger;->OFF:I
 Lsun/util/logging/PlatformLogger;->redirectToJavaLoggerProxy()V
 Lsun/util/logging/PlatformLogger;->SEVERE:I
 Lsun/util/logging/PlatformLogger;->WARNING:I
+Landroid/graphics/Bitmap;-><init>(JIIIZ[BLandroid/graphics/NinePatch$InsetStruct;)V
+Landroid/os/ServiceManager;->sCache:Ljava/util/Map;
+Landroid/view/InputEventReceiver;->dispatchInputEvent(ILandroid/view/InputEvent;)V
+Landroid/view/InputEventReceiver;->onInputEvent(Landroid/view/InputEvent;)V
+Lcom/android/internal/os/IDropBoxManagerService;->getNextEntry(Ljava/lang/String;JLjava/lang/String;)Landroid/os/DropBoxManager$Entry;
+Lcom/android/internal/telephony/ICarrierConfigLoader;->getConfigForSubId(ILjava/lang/String;)Landroid/os/PersistableBundle;
