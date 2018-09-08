@@ -11,6 +11,7 @@ package android {
     field public static final java.lang.String ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION";
     field public static final java.lang.String ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION";
     field public static final java.lang.String ACCESS_LOCATION_EXTRA_COMMANDS = "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS";
+    field public static final java.lang.String ACCESS_MEDIA_LOCATION = "android.permission.ACCESS_MEDIA_LOCATION";
     field public static final java.lang.String ACCESS_NETWORK_STATE = "android.permission.ACCESS_NETWORK_STATE";
     field public static final java.lang.String ACCESS_NOTIFICATION_POLICY = "android.permission.ACCESS_NOTIFICATION_POLICY";
     field public static final java.lang.String ACCESS_WIFI_STATE = "android.permission.ACCESS_WIFI_STATE";
@@ -101,10 +102,13 @@ package android {
     field public static final java.lang.String READ_CALENDAR = "android.permission.READ_CALENDAR";
     field public static final java.lang.String READ_CALL_LOG = "android.permission.READ_CALL_LOG";
     field public static final java.lang.String READ_CONTACTS = "android.permission.READ_CONTACTS";
-    field public static final java.lang.String READ_EXTERNAL_STORAGE = "android.permission.READ_EXTERNAL_STORAGE";
+    field public static final deprecated java.lang.String READ_EXTERNAL_STORAGE = "android.permission.READ_EXTERNAL_STORAGE";
     field public static final java.lang.String READ_FRAME_BUFFER = "android.permission.READ_FRAME_BUFFER";
     field public static final deprecated java.lang.String READ_INPUT_STATE = "android.permission.READ_INPUT_STATE";
     field public static final java.lang.String READ_LOGS = "android.permission.READ_LOGS";
+    field public static final java.lang.String READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO";
+    field public static final java.lang.String READ_MEDIA_IMAGES = "android.permission.READ_MEDIA_IMAGES";
+    field public static final java.lang.String READ_MEDIA_VIDEO = "android.permission.READ_MEDIA_VIDEO";
     field public static final java.lang.String READ_PHONE_NUMBERS = "android.permission.READ_PHONE_NUMBERS";
     field public static final java.lang.String READ_PHONE_STATE = "android.permission.READ_PHONE_STATE";
     field public static final java.lang.String READ_SMS = "android.permission.READ_SMS";
@@ -151,8 +155,11 @@ package android {
     field public static final java.lang.String WRITE_CALENDAR = "android.permission.WRITE_CALENDAR";
     field public static final java.lang.String WRITE_CALL_LOG = "android.permission.WRITE_CALL_LOG";
     field public static final java.lang.String WRITE_CONTACTS = "android.permission.WRITE_CONTACTS";
-    field public static final java.lang.String WRITE_EXTERNAL_STORAGE = "android.permission.WRITE_EXTERNAL_STORAGE";
+    field public static final deprecated java.lang.String WRITE_EXTERNAL_STORAGE = "android.permission.WRITE_EXTERNAL_STORAGE";
     field public static final java.lang.String WRITE_GSERVICES = "android.permission.WRITE_GSERVICES";
+    field public static final java.lang.String WRITE_MEDIA_AUDIO = "android.permission.WRITE_MEDIA_AUDIO";
+    field public static final java.lang.String WRITE_MEDIA_IMAGES = "android.permission.WRITE_MEDIA_IMAGES";
+    field public static final java.lang.String WRITE_MEDIA_VIDEO = "android.permission.WRITE_MEDIA_VIDEO";
     field public static final java.lang.String WRITE_SECURE_SETTINGS = "android.permission.WRITE_SECURE_SETTINGS";
     field public static final java.lang.String WRITE_SETTINGS = "android.permission.WRITE_SETTINGS";
     field public static final java.lang.String WRITE_SYNC_SETTINGS = "android.permission.WRITE_SYNC_SETTINGS";
@@ -166,11 +173,13 @@ package android {
     field public static final java.lang.String CAMERA = "android.permission-group.CAMERA";
     field public static final java.lang.String CONTACTS = "android.permission-group.CONTACTS";
     field public static final java.lang.String LOCATION = "android.permission-group.LOCATION";
+    field public static final java.lang.String MEDIA_AURAL = "android.permission-group.MEDIA_AURAL";
+    field public static final java.lang.String MEDIA_VISUAL = "android.permission-group.MEDIA_VISUAL";
     field public static final java.lang.String MICROPHONE = "android.permission-group.MICROPHONE";
     field public static final java.lang.String PHONE = "android.permission-group.PHONE";
     field public static final java.lang.String SENSORS = "android.permission-group.SENSORS";
     field public static final java.lang.String SMS = "android.permission-group.SMS";
-    field public static final java.lang.String STORAGE = "android.permission-group.STORAGE";
+    field public static final deprecated java.lang.String STORAGE = "android.permission-group.STORAGE";
   }
 
   public final class R {
@@ -272,6 +281,7 @@ package android {
     field public static final int allowBackup = 16843392; // 0x1010280
     field public static final int allowClearUserData = 16842757; // 0x1010005
     field public static final int allowEmbedded = 16843765; // 0x10103f5
+    field public static final int allowForceDark = 16844171; // 0x101058b
     field public static final int allowParallelSyncs = 16843570; // 0x1010332
     field public static final int allowSingleTap = 16843353; // 0x1010259
     field public static final int allowTaskReparenting = 16843268; // 0x1010204
@@ -1294,6 +1304,7 @@ package android {
     field public static final int summaryColumn = 16843426; // 0x10102a2
     field public static final int summaryOff = 16843248; // 0x10101f0
     field public static final int summaryOn = 16843247; // 0x10101ef
+    field public static final int supportsAmbientMode = 16844172; // 0x101058c
     field public static final int supportsAssist = 16844016; // 0x10104f0
     field public static final int supportsLaunchVoiceAssistFromKeyguard = 16844017; // 0x10104f1
     field public static final int supportsLocalInteraction = 16844047; // 0x101050f
@@ -1321,7 +1332,7 @@ package android {
     field public static final int targetName = 16843853; // 0x101044d
     field public static final int targetPackage = 16842785; // 0x1010021
     field public static final int targetProcesses = 16844097; // 0x1010541
-    field public static final int targetSandboxVersion = 16844108; // 0x101054c
+    field public static final deprecated int targetSandboxVersion = 16844108; // 0x101054c
     field public static final int targetSdkVersion = 16843376; // 0x1010270
     field public static final int taskAffinity = 16842770; // 0x1010012
     field public static final int taskCloseEnterAnimation = 16842942; // 0x10100be
@@ -2818,6 +2829,7 @@ package android.accessibilityservice {
     field public static final java.lang.String SERVICE_META_DATA = "android.accessibilityservice";
     field public static final int SHOW_MODE_AUTO = 0; // 0x0
     field public static final int SHOW_MODE_HIDDEN = 1; // 0x1
+    field public static final int SHOW_MODE_WITH_HARD_KEYBOARD = 2; // 0x2
   }
 
   public static abstract class AccessibilityService.GestureResultCallback {
@@ -3951,22 +3963,16 @@ package android.app {
     field public int uid;
   }
 
-  public static class ActivityManager.RecentTaskInfo implements android.os.Parcelable {
+  public static class ActivityManager.RecentTaskInfo extends android.app.TaskInfo implements android.os.Parcelable {
     ctor public ActivityManager.RecentTaskInfo();
     method public int describeContents();
     method public void readFromParcel(android.os.Parcel);
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.app.ActivityManager.RecentTaskInfo> CREATOR;
-    field public int affiliatedTaskId;
-    field public android.content.ComponentName baseActivity;
-    field public android.content.Intent baseIntent;
-    field public java.lang.CharSequence description;
-    field public int id;
-    field public int numActivities;
-    field public android.content.ComponentName origActivity;
-    field public int persistentId;
-    field public android.app.ActivityManager.TaskDescription taskDescription;
-    field public android.content.ComponentName topActivity;
+    field public deprecated int affiliatedTaskId;
+    field public deprecated java.lang.CharSequence description;
+    field public deprecated int id;
+    field public deprecated int persistentId;
   }
 
   public static class ActivityManager.RunningAppProcessInfo implements android.os.Parcelable {
@@ -4030,19 +4036,16 @@ package android.app {
     field public int uid;
   }
 
-  public static class ActivityManager.RunningTaskInfo implements android.os.Parcelable {
+  public static class ActivityManager.RunningTaskInfo extends android.app.TaskInfo implements android.os.Parcelable {
     ctor public ActivityManager.RunningTaskInfo();
     method public int describeContents();
     method public void readFromParcel(android.os.Parcel);
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.app.ActivityManager.RunningTaskInfo> CREATOR;
-    field public android.content.ComponentName baseActivity;
-    field public java.lang.CharSequence description;
-    field public int id;
-    field public int numActivities;
-    field public int numRunning;
-    field public android.graphics.Bitmap thumbnail;
-    field public android.content.ComponentName topActivity;
+    field public deprecated java.lang.CharSequence description;
+    field public deprecated int id;
+    field public deprecated int numRunning;
+    field public deprecated android.graphics.Bitmap thumbnail;
   }
 
   public static class ActivityManager.TaskDescription implements android.os.Parcelable {
@@ -6091,6 +6094,17 @@ package android.app {
     method public void setDefaultTab(int);
   }
 
+  public class TaskInfo {
+    field public android.content.ComponentName baseActivity;
+    field public android.content.Intent baseIntent;
+    field public boolean isRunning;
+    field public int numActivities;
+    field public android.content.ComponentName origActivity;
+    field public android.app.ActivityManager.TaskDescription taskDescription;
+    field public int taskId;
+    field public android.content.ComponentName topActivity;
+  }
+
   public class TaskStackBuilder {
     method public android.app.TaskStackBuilder addNextIntent(android.content.Intent);
     method public android.app.TaskStackBuilder addNextIntentWithParentStack(android.content.Intent);
@@ -6277,6 +6291,7 @@ package android.app {
     method public android.graphics.drawable.Drawable loadIcon(android.content.pm.PackageManager);
     method public java.lang.CharSequence loadLabel(android.content.pm.PackageManager);
     method public android.graphics.drawable.Drawable loadThumbnail(android.content.pm.PackageManager);
+    method public boolean supportsAmbientMode();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.app.WallpaperInfo> CREATOR;
   }
@@ -11235,6 +11250,7 @@ package android.content.pm {
     method public abstract boolean hasSystemFeature(java.lang.String, int);
     method public abstract boolean isInstantApp();
     method public abstract boolean isInstantApp(java.lang.String);
+    method public boolean isPackageSuspended(java.lang.String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPackageSuspended();
     method public abstract boolean isPermissionRevokedByPolicy(java.lang.String, java.lang.String);
     method public abstract boolean isSafeMode();
@@ -12670,11 +12686,8 @@ package android.database.sqlite {
     ctor public SQLiteQueryBuilder();
     method public static void appendColumns(java.lang.StringBuilder, java.lang.String[]);
     method public void appendWhere(java.lang.CharSequence);
-    method public void appendWhere(java.lang.CharSequence, java.lang.String...);
     method public void appendWhereEscapeString(java.lang.String);
-    method public void appendWhereEscapeString(java.lang.String, java.lang.String...);
-    method public void appendWhereExpression(java.lang.CharSequence);
-    method public void appendWhereExpression(java.lang.CharSequence, java.lang.String...);
+    method public void appendWhereStandalone(java.lang.CharSequence);
     method public java.lang.String buildQuery(java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public deprecated java.lang.String buildQuery(java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String);
     method public static java.lang.String buildQueryString(boolean, java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, java.lang.String);
@@ -12685,9 +12698,7 @@ package android.database.sqlite {
     method public java.lang.String getTables();
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String);
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String);
-    method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, android.os.CancellationSignal);
     method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], java.lang.String, java.lang.String[], java.lang.String, java.lang.String, java.lang.String, java.lang.String, android.os.CancellationSignal);
-    method public android.database.Cursor query(android.database.sqlite.SQLiteDatabase, java.lang.String[], android.os.Bundle, android.os.CancellationSignal);
     method public void setCursorFactory(android.database.sqlite.SQLiteDatabase.CursorFactory);
     method public void setDistinct(boolean);
     method public void setProjectionMap(java.util.Map<java.lang.String, java.lang.String>);
@@ -14715,6 +14726,22 @@ package android.graphics.drawable {
     method public void setColorFilter(android.graphics.ColorFilter);
   }
 
+  public class ColorStateListDrawable extends android.graphics.drawable.Drawable implements android.graphics.drawable.Drawable.Callback {
+    ctor public ColorStateListDrawable();
+    ctor public ColorStateListDrawable(android.content.res.ColorStateList);
+    method public void clearAlpha();
+    method public void draw(android.graphics.Canvas);
+    method public android.content.res.ColorStateList getColorStateList();
+    method public int getOpacity();
+    method public boolean hasFocusStateSpecified();
+    method public void invalidateDrawable(android.graphics.drawable.Drawable);
+    method public void scheduleDrawable(android.graphics.drawable.Drawable, java.lang.Runnable, long);
+    method public void setAlpha(int);
+    method public void setColorFilter(android.graphics.ColorFilter);
+    method public void setColorStateList(android.content.res.ColorStateList);
+    method public void unscheduleDrawable(android.graphics.drawable.Drawable, java.lang.Runnable);
+  }
+
   public abstract class Drawable {
     ctor public Drawable();
     method public void applyTheme(android.content.res.Resources.Theme);
@@ -15178,6 +15205,48 @@ package android.graphics.drawable.shapes {
 }
 
 package android.graphics.fonts {
+
+  public final class Font {
+    method public android.graphics.fonts.FontVariationAxis[] getAxes();
+    method public int getTtcIndex();
+    method public int getWeight();
+    method public boolean isItalic();
+    field public static final int FONT_WEIGHT_BLACK = 900; // 0x384
+    field public static final int FONT_WEIGHT_BOLD = 700; // 0x2bc
+    field public static final int FONT_WEIGHT_EXTRA_BOLD = 800; // 0x320
+    field public static final int FONT_WEIGHT_EXTRA_LIGHT = 200; // 0xc8
+    field public static final int FONT_WEIGHT_LIGHT = 300; // 0x12c
+    field public static final int FONT_WEIGHT_MEDIUM = 500; // 0x1f4
+    field public static final int FONT_WEIGHT_NORMAL = 400; // 0x190
+    field public static final int FONT_WEIGHT_SEMI_BOLD = 600; // 0x258
+    field public static final int FONT_WEIGHT_THIN = 100; // 0x64
+  }
+
+  public static class Font.Builder {
+    ctor public Font.Builder(java.nio.ByteBuffer);
+    ctor public Font.Builder(java.io.File);
+    ctor public Font.Builder(java.io.FileDescriptor);
+    ctor public Font.Builder(java.io.FileDescriptor, long, long);
+    ctor public Font.Builder(android.content.res.AssetManager, java.lang.String);
+    ctor public Font.Builder(android.content.res.Resources, int);
+    method public android.graphics.fonts.Font build() throws java.io.IOException;
+    method public android.graphics.fonts.Font.Builder setFontVariationSettings(java.lang.String);
+    method public android.graphics.fonts.Font.Builder setFontVariationSettings(android.graphics.fonts.FontVariationAxis[]);
+    method public android.graphics.fonts.Font.Builder setItalic(boolean);
+    method public android.graphics.fonts.Font.Builder setTtcIndex(int);
+    method public android.graphics.fonts.Font.Builder setWeight(int);
+  }
+
+  public final class FontFamily {
+    method public android.graphics.fonts.Font getFont(int);
+    method public int getSize();
+  }
+
+  public static class FontFamily.Builder {
+    ctor public FontFamily.Builder(android.graphics.fonts.Font);
+    method public android.graphics.fonts.FontFamily.Builder addFont(android.graphics.fonts.Font);
+    method public android.graphics.fonts.FontFamily build();
+  }
 
   public final class FontVariationAxis {
     ctor public FontVariationAxis(java.lang.String, float);
@@ -17136,6 +17205,8 @@ package android.icu.lang {
     field public static final int GAMAL = 12; // 0xc
     field public static final int HAH = 13; // 0xd
     field public static final int HAMZA_ON_HEH_GOAL = 14; // 0xe
+    field public static final int HANIFI_ROHINGYA_KINNA_YA = 100; // 0x64
+    field public static final int HANIFI_ROHINGYA_PA = 101; // 0x65
     field public static final int HE = 15; // 0xf
     field public static final int HEH = 16; // 0x10
     field public static final int HEH_GOAL = 17; // 0x11
@@ -17387,6 +17458,8 @@ package android.icu.lang {
     field public static final int CHEROKEE_ID = 32; // 0x20
     field public static final android.icu.lang.UCharacter.UnicodeBlock CHEROKEE_SUPPLEMENT;
     field public static final int CHEROKEE_SUPPLEMENT_ID = 255; // 0xff
+    field public static final android.icu.lang.UCharacter.UnicodeBlock CHESS_SYMBOLS;
+    field public static final int CHESS_SYMBOLS_ID = 281; // 0x119
     field public static final android.icu.lang.UCharacter.UnicodeBlock CJK_COMPATIBILITY;
     field public static final android.icu.lang.UCharacter.UnicodeBlock CJK_COMPATIBILITY_FORMS;
     field public static final int CJK_COMPATIBILITY_FORMS_ID = 83; // 0x53
@@ -17463,6 +17536,8 @@ package android.icu.lang {
     field public static final int DEVANAGARI_ID = 15; // 0xf
     field public static final android.icu.lang.UCharacter.UnicodeBlock DINGBATS;
     field public static final int DINGBATS_ID = 56; // 0x38
+    field public static final android.icu.lang.UCharacter.UnicodeBlock DOGRA;
+    field public static final int DOGRA_ID = 282; // 0x11a
     field public static final android.icu.lang.UCharacter.UnicodeBlock DOMINO_TILES;
     field public static final int DOMINO_TILES_ID = 171; // 0xab
     field public static final android.icu.lang.UCharacter.UnicodeBlock DUPLOYAN;
@@ -17498,6 +17573,8 @@ package android.icu.lang {
     field public static final int GEOMETRIC_SHAPES_EXTENDED_ID = 227; // 0xe3
     field public static final int GEOMETRIC_SHAPES_ID = 54; // 0x36
     field public static final android.icu.lang.UCharacter.UnicodeBlock GEORGIAN;
+    field public static final android.icu.lang.UCharacter.UnicodeBlock GEORGIAN_EXTENDED;
+    field public static final int GEORGIAN_EXTENDED_ID = 283; // 0x11b
     field public static final int GEORGIAN_ID = 29; // 0x1d
     field public static final android.icu.lang.UCharacter.UnicodeBlock GEORGIAN_SUPPLEMENT;
     field public static final int GEORGIAN_SUPPLEMENT_ID = 135; // 0x87
@@ -17515,6 +17592,8 @@ package android.icu.lang {
     field public static final int GREEK_ID = 8; // 0x8
     field public static final android.icu.lang.UCharacter.UnicodeBlock GUJARATI;
     field public static final int GUJARATI_ID = 18; // 0x12
+    field public static final android.icu.lang.UCharacter.UnicodeBlock GUNJALA_GONDI;
+    field public static final int GUNJALA_GONDI_ID = 284; // 0x11c
     field public static final android.icu.lang.UCharacter.UnicodeBlock GURMUKHI;
     field public static final int GURMUKHI_ID = 17; // 0x11
     field public static final android.icu.lang.UCharacter.UnicodeBlock HALFWIDTH_AND_FULLWIDTH_FORMS;
@@ -17529,6 +17608,8 @@ package android.icu.lang {
     field public static final int HANGUL_JAMO_ID = 30; // 0x1e
     field public static final android.icu.lang.UCharacter.UnicodeBlock HANGUL_SYLLABLES;
     field public static final int HANGUL_SYLLABLES_ID = 74; // 0x4a
+    field public static final android.icu.lang.UCharacter.UnicodeBlock HANIFI_ROHINGYA;
+    field public static final int HANIFI_ROHINGYA_ID = 285; // 0x11d
     field public static final android.icu.lang.UCharacter.UnicodeBlock HANUNOO;
     field public static final int HANUNOO_ID = 99; // 0x63
     field public static final android.icu.lang.UCharacter.UnicodeBlock HATRAN;
@@ -17547,6 +17628,8 @@ package android.icu.lang {
     field public static final int IDEOGRAPHIC_SYMBOLS_AND_PUNCTUATION_ID = 267; // 0x10b
     field public static final android.icu.lang.UCharacter.UnicodeBlock IMPERIAL_ARAMAIC;
     field public static final int IMPERIAL_ARAMAIC_ID = 186; // 0xba
+    field public static final android.icu.lang.UCharacter.UnicodeBlock INDIC_SIYAQ_NUMBERS;
+    field public static final int INDIC_SIYAQ_NUMBERS_ID = 286; // 0x11e
     field public static final android.icu.lang.UCharacter.UnicodeBlock INSCRIPTIONAL_PAHLAVI;
     field public static final int INSCRIPTIONAL_PAHLAVI_ID = 190; // 0xbe
     field public static final android.icu.lang.UCharacter.UnicodeBlock INSCRIPTIONAL_PARTHIAN;
@@ -17625,6 +17708,8 @@ package android.icu.lang {
     field public static final int MAHAJANI_ID = 233; // 0xe9
     field public static final android.icu.lang.UCharacter.UnicodeBlock MAHJONG_TILES;
     field public static final int MAHJONG_TILES_ID = 170; // 0xaa
+    field public static final android.icu.lang.UCharacter.UnicodeBlock MAKASAR;
+    field public static final int MAKASAR_ID = 287; // 0x11f
     field public static final android.icu.lang.UCharacter.UnicodeBlock MALAYALAM;
     field public static final int MALAYALAM_ID = 23; // 0x17
     field public static final android.icu.lang.UCharacter.UnicodeBlock MANDAIC;
@@ -17639,6 +17724,10 @@ package android.icu.lang {
     field public static final int MATHEMATICAL_ALPHANUMERIC_SYMBOLS_ID = 93; // 0x5d
     field public static final android.icu.lang.UCharacter.UnicodeBlock MATHEMATICAL_OPERATORS;
     field public static final int MATHEMATICAL_OPERATORS_ID = 47; // 0x2f
+    field public static final android.icu.lang.UCharacter.UnicodeBlock MAYAN_NUMERALS;
+    field public static final int MAYAN_NUMERALS_ID = 288; // 0x120
+    field public static final android.icu.lang.UCharacter.UnicodeBlock MEDEFAIDRIN;
+    field public static final int MEDEFAIDRIN_ID = 289; // 0x121
     field public static final android.icu.lang.UCharacter.UnicodeBlock MEETEI_MAYEK;
     field public static final android.icu.lang.UCharacter.UnicodeBlock MEETEI_MAYEK_EXTENSIONS;
     field public static final int MEETEI_MAYEK_EXTENSIONS_ID = 213; // 0xd5
@@ -17708,6 +17797,8 @@ package android.icu.lang {
     field public static final int OLD_PERMIC_ID = 241; // 0xf1
     field public static final android.icu.lang.UCharacter.UnicodeBlock OLD_PERSIAN;
     field public static final int OLD_PERSIAN_ID = 140; // 0x8c
+    field public static final android.icu.lang.UCharacter.UnicodeBlock OLD_SOGDIAN;
+    field public static final int OLD_SOGDIAN_ID = 290; // 0x122
     field public static final android.icu.lang.UCharacter.UnicodeBlock OLD_SOUTH_ARABIAN;
     field public static final int OLD_SOUTH_ARABIAN_ID = 187; // 0xbb
     field public static final android.icu.lang.UCharacter.UnicodeBlock OLD_TURKIC;
@@ -17772,6 +17863,8 @@ package android.icu.lang {
     field public static final int SINHALA_ID = 24; // 0x18
     field public static final android.icu.lang.UCharacter.UnicodeBlock SMALL_FORM_VARIANTS;
     field public static final int SMALL_FORM_VARIANTS_ID = 84; // 0x54
+    field public static final android.icu.lang.UCharacter.UnicodeBlock SOGDIAN;
+    field public static final int SOGDIAN_ID = 291; // 0x123
     field public static final android.icu.lang.UCharacter.UnicodeBlock SORA_SOMPENG;
     field public static final int SORA_SOMPENG_ID = 218; // 0xda
     field public static final android.icu.lang.UCharacter.UnicodeBlock SOYOMBO;
@@ -17896,6 +17989,7 @@ package android.icu.lang {
     field public static final int OTHER = 0; // 0x0
     field public static final int REGIONAL_INDICATOR = 13; // 0xd
     field public static final int SINGLE_QUOTE = 15; // 0xf
+    field public static final int WSEGSPACE = 22; // 0x16
     field public static final int ZWJ = 21; // 0x15
   }
 
@@ -18027,6 +18121,7 @@ package android.icu.lang {
     field public static final int EMOJI_MODIFIER = 59; // 0x3b
     field public static final int EMOJI_MODIFIER_BASE = 60; // 0x3c
     field public static final int EMOJI_PRESENTATION = 58; // 0x3a
+    field public static final int EXTENDED_PICTOGRAPHIC = 64; // 0x40
     field public static final int EXTENDER = 8; // 0x8
     field public static final int FULL_COMPOSITION_EXCLUSION = 9; // 0x9
     field public static final int GENERAL_CATEGORY = 4101; // 0x1005
@@ -18157,6 +18252,7 @@ package android.icu.lang {
     field public static final int DEMOTIC_EGYPTIAN = 69; // 0x45
     field public static final int DESERET = 9; // 0x9
     field public static final int DEVANAGARI = 10; // 0xa
+    field public static final int DOGRA = 178; // 0xb2
     field public static final int DUPLOYAN = 135; // 0x87
     field public static final int EASTERN_SYRIAC = 97; // 0x61
     field public static final int EGYPTIAN_HIEROGLYPHS = 71; // 0x47
@@ -18169,9 +18265,11 @@ package android.icu.lang {
     field public static final int GRANTHA = 137; // 0x89
     field public static final int GREEK = 14; // 0xe
     field public static final int GUJARATI = 15; // 0xf
+    field public static final int GUNJALA_GONDI = 179; // 0xb3
     field public static final int GURMUKHI = 16; // 0x10
     field public static final int HAN = 17; // 0x11
     field public static final int HANGUL = 18; // 0x12
+    field public static final int HANIFI_ROHINGYA = 182; // 0xb6
     field public static final int HANUNOO = 43; // 0x2b
     field public static final int HAN_WITH_BOPOMOFO = 172; // 0xac
     field public static final int HARAPPAN_INDUS = 77; // 0x4d
@@ -18214,6 +18312,7 @@ package android.icu.lang {
     field public static final int LYCIAN = 107; // 0x6b
     field public static final int LYDIAN = 108; // 0x6c
     field public static final int MAHAJANI = 160; // 0xa0
+    field public static final int MAKASAR = 180; // 0xb4
     field public static final int MALAYALAM = 26; // 0x1a
     field public static final int MANDAEAN = 84; // 0x54
     field public static final int MANDAIC = 84; // 0x54
@@ -18222,6 +18321,7 @@ package android.icu.lang {
     field public static final int MASARAM_GONDI = 175; // 0xaf
     field public static final int MATHEMATICAL_NOTATION = 128; // 0x80
     field public static final int MAYAN_HIEROGLYPHS = 85; // 0x55
+    field public static final int MEDEFAIDRIN = 181; // 0xb5
     field public static final int MEITEI_MAYEK = 115; // 0x73
     field public static final int MENDE = 140; // 0x8c
     field public static final int MEROITIC = 86; // 0x56
@@ -18247,6 +18347,7 @@ package android.icu.lang {
     field public static final int OLD_NORTH_ARABIAN = 142; // 0x8e
     field public static final int OLD_PERMIC = 89; // 0x59
     field public static final int OLD_PERSIAN = 61; // 0x3d
+    field public static final int OLD_SOGDIAN = 184; // 0xb8
     field public static final int OLD_SOUTH_ARABIAN = 133; // 0x85
     field public static final int OL_CHIKI = 109; // 0x6d
     field public static final int ORIYA = 31; // 0x1f
@@ -18273,6 +18374,7 @@ package android.icu.lang {
     field public static final int SIMPLIFIED_HAN = 73; // 0x49
     field public static final int SINDHI = 145; // 0x91
     field public static final int SINHALA = 33; // 0x21
+    field public static final int SOGDIAN = 183; // 0xb7
     field public static final int SORA_SOMPENG = 152; // 0x98
     field public static final int SOYOMBO = 176; // 0xb0
     field public static final int SUNDANESE = 113; // 0x71
@@ -21214,6 +21316,7 @@ package android.icu.util {
     field public static final android.icu.util.VersionInfo UCOL_BUILDER_VERSION;
     field public static final android.icu.util.VersionInfo UCOL_RUNTIME_VERSION;
     field public static final android.icu.util.VersionInfo UNICODE_10_0;
+    field public static final android.icu.util.VersionInfo UNICODE_11_0;
     field public static final android.icu.util.VersionInfo UNICODE_1_0;
     field public static final android.icu.util.VersionInfo UNICODE_1_0_1;
     field public static final android.icu.util.VersionInfo UNICODE_1_1_0;
@@ -27639,6 +27742,7 @@ package android.net.http {
     method public java.util.Date getValidNotAfterDate();
     method public deprecated java.lang.String getValidNotBefore();
     method public java.util.Date getValidNotBeforeDate();
+    method public java.security.cert.X509Certificate getX509Certificate();
     method public static android.net.http.SslCertificate restoreState(android.os.Bundle);
     method public static android.os.Bundle saveState(android.net.http.SslCertificate);
   }
@@ -32141,6 +32245,7 @@ package android.os {
 
   public class Binder implements android.os.IBinder {
     ctor public Binder();
+    ctor public Binder(java.lang.String);
     method public void attachInterface(android.os.IInterface, java.lang.String);
     method public static final long clearCallingIdentity();
     method public void dump(java.io.FileDescriptor, java.lang.String[]);
@@ -35543,11 +35648,11 @@ package android.provider {
 
   protected static abstract interface ContactsContract.ContactOptionsColumns {
     field public static final java.lang.String CUSTOM_RINGTONE = "custom_ringtone";
-    field public static final java.lang.String LAST_TIME_CONTACTED = "last_time_contacted";
+    field public static final deprecated java.lang.String LAST_TIME_CONTACTED = "last_time_contacted";
     field public static final java.lang.String PINNED = "pinned";
     field public static final java.lang.String SEND_TO_VOICEMAIL = "send_to_voicemail";
     field public static final java.lang.String STARRED = "starred";
-    field public static final java.lang.String TIMES_CONTACTED = "times_contacted";
+    field public static final deprecated java.lang.String TIMES_CONTACTED = "times_contacted";
   }
 
   protected static abstract interface ContactsContract.ContactStatusColumns {
@@ -35569,7 +35674,7 @@ package android.provider {
     method public static java.io.InputStream openContactPhotoInputStream(android.content.ContentResolver, android.net.Uri, boolean);
     method public static java.io.InputStream openContactPhotoInputStream(android.content.ContentResolver, android.net.Uri);
     field public static final android.net.Uri CONTENT_FILTER_URI;
-    field public static final android.net.Uri CONTENT_FREQUENT_URI;
+    field public static final deprecated android.net.Uri CONTENT_FREQUENT_URI;
     field public static final android.net.Uri CONTENT_GROUP_URI;
     field public static final java.lang.String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/contact";
     field public static final android.net.Uri CONTENT_LOOKUP_URI;
@@ -35677,7 +35782,7 @@ package android.provider {
   protected static abstract interface ContactsContract.DataColumnsWithJoins implements android.provider.BaseColumns android.provider.ContactsContract.ContactNameColumns android.provider.ContactsContract.ContactOptionsColumns android.provider.ContactsContract.ContactStatusColumns android.provider.ContactsContract.ContactsColumns android.provider.ContactsContract.DataColumns android.provider.ContactsContract.DataUsageStatColumns android.provider.ContactsContract.RawContactsColumns android.provider.ContactsContract.StatusColumns {
   }
 
-  public static final class ContactsContract.DataUsageFeedback {
+  public static final deprecated class ContactsContract.DataUsageFeedback {
     ctor public ContactsContract.DataUsageFeedback();
     field public static final android.net.Uri DELETE_USAGE_URI;
     field public static final android.net.Uri FEEDBACK_URI;
@@ -35688,8 +35793,8 @@ package android.provider {
   }
 
   protected static abstract interface ContactsContract.DataUsageStatColumns {
-    field public static final java.lang.String LAST_TIME_USED = "last_time_used";
-    field public static final java.lang.String TIMES_USED = "times_used";
+    field public static final deprecated java.lang.String LAST_TIME_USED = "last_time_used";
+    field public static final deprecated java.lang.String TIMES_USED = "times_used";
   }
 
   public static final class ContactsContract.DeletedContacts implements android.provider.ContactsContract.DeletedContactsColumns {
@@ -38916,6 +39021,7 @@ package android.service.autofill {
   public static class CustomDescription.Builder {
     ctor public CustomDescription.Builder(android.widget.RemoteViews);
     method public android.service.autofill.CustomDescription.Builder addChild(int, android.service.autofill.Transformation);
+    method public android.service.autofill.CustomDescription.Builder addOnClickAction(int, android.service.autofill.OnClickAction);
     method public android.service.autofill.CustomDescription.Builder batchUpdate(android.service.autofill.Validator, android.service.autofill.BatchUpdates);
     method public android.service.autofill.CustomDescription build();
   }
@@ -39006,6 +39112,7 @@ package android.service.autofill {
     method public int getId();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.service.autofill.FillRequest> CREATOR;
+    field public static final int FLAG_COMPATIBILITY_MODE_REQUEST = 2; // 0x2
     field public static final int FLAG_MANUAL_REQUEST = 1; // 0x1
   }
 
@@ -39053,6 +39160,9 @@ package android.service.autofill {
     field public static final android.os.Parcelable.Creator<android.service.autofill.LuhnChecksumValidator> CREATOR;
   }
 
+  public abstract interface OnClickAction {
+  }
+
   public final class RegexValidator implements android.os.Parcelable android.service.autofill.Validator {
     ctor public RegexValidator(android.view.autofill.AutofillId, java.util.regex.Pattern);
     method public int describeContents();
@@ -39073,6 +39183,7 @@ package android.service.autofill {
     method public int describeContents();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.service.autofill.SaveInfo> CREATOR;
+    field public static final int FLAG_DELAY_SAVE = 4; // 0x4
     field public static final int FLAG_DONT_SAVE_ON_FINISH = 2; // 0x2
     field public static final int FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE = 1; // 0x1
     field public static final int NEGATIVE_BUTTON_STYLE_CANCEL = 0; // 0x0
@@ -39145,6 +39256,18 @@ package android.service.autofill {
     method public static android.service.autofill.Validator and(android.service.autofill.Validator...);
     method public static android.service.autofill.Validator not(android.service.autofill.Validator);
     method public static android.service.autofill.Validator or(android.service.autofill.Validator...);
+  }
+
+  public final class VisibilitySetterAction implements android.service.autofill.OnClickAction android.os.Parcelable {
+    method public int describeContents();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.service.autofill.VisibilitySetterAction> CREATOR;
+  }
+
+  public static class VisibilitySetterAction.Builder {
+    ctor public VisibilitySetterAction.Builder(int, int);
+    method public android.service.autofill.VisibilitySetterAction build();
+    method public android.service.autofill.VisibilitySetterAction.Builder setVisibility(int, int);
   }
 
 }
@@ -39787,9 +39910,11 @@ package android.service.wallpaper {
     method public int getDesiredMinimumHeight();
     method public int getDesiredMinimumWidth();
     method public android.view.SurfaceHolder getSurfaceHolder();
+    method public boolean isInAmbientMode();
     method public boolean isPreview();
     method public boolean isVisible();
     method public void notifyColorsChanged();
+    method public void onAmbientModeChanged(boolean, boolean);
     method public void onApplyWindowInsets(android.view.WindowInsets);
     method public android.os.Bundle onCommand(java.lang.String, int, int, int, android.os.Bundle, boolean);
     method public android.app.WallpaperColors onComputeColors();
@@ -40931,6 +41056,16 @@ package android.telecom {
     field public static final int ROUTE_SPEAKER = 8; // 0x8
     field public static final int ROUTE_WIRED_HEADSET = 4; // 0x4
     field public static final int ROUTE_WIRED_OR_EARPIECE = 5; // 0x5
+  }
+
+  public abstract class CallRedirectionService extends android.app.Service {
+    ctor public CallRedirectionService();
+    method public final void cancelCall();
+    method public android.os.IBinder onBind(android.content.Intent);
+    method public abstract void onPlaceCall(android.net.Uri, android.telecom.PhoneAccountHandle);
+    method public final void placeCallUnmodified();
+    method public final void redirectCall(android.net.Uri, android.telecom.PhoneAccountHandle);
+    field public static final java.lang.String SERVICE_INTERFACE = "android.telecom.CallRedirectionService";
   }
 
   public abstract class CallScreeningService extends android.app.Service {
@@ -42448,9 +42583,11 @@ package android.telephony {
     method public deprecated int getMnc();
     method public java.lang.String getMncString();
     method public java.lang.String getNumber();
+    method public int getParentSubId();
     method public int getSimSlotIndex();
     method public int getSubscriptionId();
     method public boolean isEmbedded();
+    method public boolean isOpportunistic();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.telephony.SubscriptionInfo> CREATOR;
   }
@@ -42475,6 +42612,7 @@ package android.telephony {
     method public void setSubscriptionOverrideCongested(int, boolean, long);
     method public void setSubscriptionOverrideUnmetered(int, boolean, long);
     method public void setSubscriptionPlans(int, java.util.List<android.telephony.SubscriptionPlan>);
+    method public void switchToSubscription(int, android.app.PendingIntent);
     field public static final java.lang.String ACTION_DEFAULT_SMS_SUBSCRIPTION_CHANGED = "android.telephony.action.DEFAULT_SMS_SUBSCRIPTION_CHANGED";
     field public static final java.lang.String ACTION_DEFAULT_SUBSCRIPTION_CHANGED = "android.telephony.action.DEFAULT_SUBSCRIPTION_CHANGED";
     field public static final java.lang.String ACTION_MANAGE_SUBSCRIPTION_PLANS = "android.telephony.action.MANAGE_SUBSCRIPTION_PLANS";
@@ -46406,7 +46544,7 @@ package android.view {
     method public final deprecated boolean dispatch(android.view.KeyEvent.Callback);
     method public final boolean dispatch(android.view.KeyEvent.Callback, android.view.KeyEvent.DispatcherState, java.lang.Object);
     method public final int getAction();
-    method public final java.lang.String getCharacters();
+    method public final deprecated java.lang.String getCharacters();
     method public static int getDeadChar(int, int);
     method public final int getDeviceId();
     method public char getDisplayLabel();
@@ -46455,7 +46593,7 @@ package android.view {
     method public final void startTracking();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final int ACTION_DOWN = 0; // 0x0
-    field public static final int ACTION_MULTIPLE = 2; // 0x2
+    field public static final deprecated int ACTION_MULTIPLE = 2; // 0x2
     field public static final int ACTION_UP = 1; // 0x1
     field public static final android.os.Parcelable.Creator<android.view.KeyEvent> CREATOR;
     field public static final int FLAG_CANCELED = 32; // 0x20
@@ -47528,6 +47666,7 @@ package android.view {
     method public void forceLayout();
     method public static int generateViewId();
     method public java.lang.CharSequence getAccessibilityClassName();
+    method public android.view.View.AccessibilityDelegate getAccessibilityDelegate();
     method public int getAccessibilityLiveRegion();
     method public android.view.accessibility.AccessibilityNodeProvider getAccessibilityNodeProvider();
     method public java.lang.CharSequence getAccessibilityPaneTitle();
@@ -48781,6 +48920,7 @@ package android.view {
     method public void dispatchOnGlobalLayout();
     method public boolean dispatchOnPreDraw();
     method public boolean isAlive();
+    method public void registerFrameCommitCallback(java.lang.Runnable);
     method public deprecated void removeGlobalOnLayoutListener(android.view.ViewTreeObserver.OnGlobalLayoutListener);
     method public void removeOnDrawListener(android.view.ViewTreeObserver.OnDrawListener);
     method public void removeOnGlobalFocusChangeListener(android.view.ViewTreeObserver.OnGlobalFocusChangeListener);
@@ -48790,6 +48930,7 @@ package android.view {
     method public void removeOnTouchModeChangeListener(android.view.ViewTreeObserver.OnTouchModeChangeListener);
     method public void removeOnWindowAttachListener(android.view.ViewTreeObserver.OnWindowAttachListener);
     method public void removeOnWindowFocusChangeListener(android.view.ViewTreeObserver.OnWindowFocusChangeListener);
+    method public boolean unregisterFrameCommitCallback(java.lang.Runnable);
   }
 
   public static abstract interface ViewTreeObserver.OnDrawListener {
@@ -57644,14 +57785,14 @@ package java.lang {
     method public void setContextClassLoader(java.lang.ClassLoader);
     method public final void setDaemon(boolean);
     method public static void setDefaultUncaughtExceptionHandler(java.lang.Thread.UncaughtExceptionHandler);
-    method public final void setName(java.lang.String);
+    method public final synchronized void setName(java.lang.String);
     method public final void setPriority(int);
     method public void setUncaughtExceptionHandler(java.lang.Thread.UncaughtExceptionHandler);
     method public static void sleep(long) throws java.lang.InterruptedException;
     method public static void sleep(long, int) throws java.lang.InterruptedException;
     method public synchronized void start();
     method public final deprecated void stop();
-    method public final deprecated void stop(java.lang.Throwable);
+    method public final deprecated synchronized void stop(java.lang.Throwable);
     method public final deprecated void suspend();
     method public static void yield();
     field public static final int MAX_PRIORITY = 10; // 0xa
@@ -70685,7 +70826,7 @@ package java.util.zip {
     ctor public InflaterInputStream(java.io.InputStream);
     method protected void fill() throws java.io.IOException;
     field protected byte[] buf;
-    field protected boolean closed;
+    field protected deprecated boolean closed;
     field protected java.util.zip.Inflater inf;
     field protected int len;
   }
