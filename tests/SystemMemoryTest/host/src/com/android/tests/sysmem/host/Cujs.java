@@ -16,24 +16,21 @@
 
 package com.android.tests.sysmem.host;
 
-import com.android.tradefed.device.DeviceNotAvailableException;
-import com.android.tradefed.device.ITestDevice;
-
 /**
  * Critical user journeys with which to exercise the system, driven from the
  * host.
  */
 public class Cujs {
-    private ITestDevice mDevice;
+    private Device mDevice;
 
-    public Cujs(ITestDevice device) {
+    public Cujs(Device device) {
         this.mDevice = device;
     }
 
     /**
      * Runs the critical user journeys.
      */
-    public void run() throws DeviceNotAvailableException {
+    public void run() throws TestException {
         // Invoke the Device Cujs instrumentation to run the cujs.
         // TODO: Consider exercising the system in other interesting ways as
         // well.
