@@ -26,6 +26,7 @@ package android {
     field public static final String BIND_APPWIDGET = "android.permission.BIND_APPWIDGET";
     field public static final String BIND_AUTOFILL_SERVICE = "android.permission.BIND_AUTOFILL_SERVICE";
     field public static final String BIND_CALL_REDIRECTION_SERVICE = "android.permission.BIND_CALL_REDIRECTION_SERVICE";
+    field public static final String BIND_CARRIER_MESSAGING_CLIENT_SERVICE = "android.permission.BIND_CARRIER_MESSAGING_CLIENT_SERVICE";
     field @Deprecated public static final String BIND_CARRIER_MESSAGING_SERVICE = "android.permission.BIND_CARRIER_MESSAGING_SERVICE";
     field public static final String BIND_CARRIER_SERVICES = "android.permission.BIND_CARRIER_SERVICES";
     field public static final String BIND_CHOOSER_TARGET_SERVICE = "android.permission.BIND_CHOOSER_TARGET_SERVICE";
@@ -41,7 +42,6 @@ package android {
     field public static final String BIND_QUICK_SETTINGS_TILE = "android.permission.BIND_QUICK_SETTINGS_TILE";
     field public static final String BIND_REMOTEVIEWS = "android.permission.BIND_REMOTEVIEWS";
     field public static final String BIND_SCREENING_SERVICE = "android.permission.BIND_SCREENING_SERVICE";
-    field public static final String BIND_SMS_APP_SERVICE = "android.permission.BIND_SMS_APP_SERVICE";
     field public static final String BIND_TELECOM_CONNECTION_SERVICE = "android.permission.BIND_TELECOM_CONNECTION_SERVICE";
     field public static final String BIND_TEXT_SERVICE = "android.permission.BIND_TEXT_SERVICE";
     field public static final String BIND_TV_INPUT = "android.permission.BIND_TV_INPUT";
@@ -224,6 +224,11 @@ package android {
 
   public static final class R.attr {
     ctor public R.attr();
+    field public static final int __removed1 = 16844185; // 0x1010599
+    field public static final int __removed2 = 16844186; // 0x101059a
+    field public static final int __removed3 = 16844187; // 0x101059b
+    field public static final int __removed4 = 16844188; // 0x101059c
+    field public static final int __removed5 = 16844189; // 0x101059d
     field public static final int absListViewStyle = 16842858; // 0x101006a
     field public static final int accessibilityEventTypes = 16843648; // 0x1010380
     field public static final int accessibilityFeedbackType = 16843650; // 0x1010382
@@ -484,10 +489,6 @@ package android {
     field public static final int dashGap = 16843175; // 0x10101a7
     field public static final int dashWidth = 16843174; // 0x10101a6
     field public static final int data = 16842798; // 0x101002e
-    field public static final int dataRetentionTime = 16844189; // 0x101059d
-    field public static final int dataSentOffDevice = 16844186; // 0x101059a
-    field public static final int dataSharedWithThirdParty = 16844187; // 0x101059b
-    field public static final int dataUsedForMonetization = 16844188; // 0x101059c
     field public static final int datePickerDialogTheme = 16843948; // 0x10104ac
     field public static final int datePickerMode = 16843955; // 0x10104b3
     field public static final int datePickerStyle = 16843612; // 0x101035c
@@ -645,6 +646,7 @@ package android {
     field public static final int footerDividersEnabled = 16843311; // 0x101022f
     field public static final int forceDarkAllowed = 16844172; // 0x101058c
     field public static final int forceHasOverlappingRendering = 16844065; // 0x1010521
+    field public static final int forceUriPermissions = 16844197; // 0x10105a5
     field public static final int foreground = 16843017; // 0x1010109
     field public static final int foregroundGravity = 16843264; // 0x1010200
     field public static final int foregroundServiceType = 16844191; // 0x101059f
@@ -1507,7 +1509,6 @@ package android {
     field @Deprecated public static final int unfocusedMonthDateColor = 16843588; // 0x1010344
     field public static final int unselectedAlpha = 16843278; // 0x101020e
     field public static final int updatePeriodMillis = 16843344; // 0x1010250
-    field public static final int usageInfoRequired = 16844185; // 0x1010599
     field public static final int use32bitAbi = 16844053; // 0x1010515
     field public static final int useAppZygote = 16844184; // 0x1010598
     field public static final int useDefaultMargins = 16843641; // 0x1010379
@@ -6210,11 +6211,6 @@ package android.app {
     method public void onSharedElementsReady();
   }
 
-  public class SmsAppService extends android.app.Service {
-    ctor public SmsAppService();
-    method public final android.os.IBinder onBind(android.content.Intent);
-  }
-
   public class StatusBarManager {
   }
 
@@ -6742,6 +6738,7 @@ package android.app.admin {
     method public void setCrossProfileCalendarPackages(@NonNull android.content.ComponentName, @Nullable java.util.Set<java.lang.String>);
     method public void setCrossProfileCallerIdDisabled(@NonNull android.content.ComponentName, boolean);
     method public void setCrossProfileContactsSearchDisabled(@NonNull android.content.ComponentName, boolean);
+    method public void setDefaultSmsApplication(@NonNull android.content.ComponentName, @NonNull String);
     method public void setDelegatedScopes(@NonNull android.content.ComponentName, @NonNull String, @NonNull java.util.List<java.lang.String>);
     method public void setDeviceOwnerLockScreenInfo(@NonNull android.content.ComponentName, CharSequence);
     method public void setEndUserSessionMessage(@NonNull android.content.ComponentName, @Nullable CharSequence);
@@ -7252,6 +7249,7 @@ package android.app.backup {
     ctor public BackupManager(android.content.Context);
     method public void dataChanged();
     method public static void dataChanged(String);
+    method @Nullable public android.os.UserHandle getUserForAncestralSerialNumber(long);
     method @Deprecated public int requestRestore(android.app.backup.RestoreObserver);
   }
 
@@ -10267,7 +10265,6 @@ package android.content {
     field public static final String ACTION_PACKAGE_RESTARTED = "android.intent.action.PACKAGE_RESTARTED";
     field public static final String ACTION_PACKAGE_VERIFIED = "android.intent.action.PACKAGE_VERIFIED";
     field public static final String ACTION_PASTE = "android.intent.action.PASTE";
-    field public static final String ACTION_PERMISSION_USAGE_DETAILS = "android.intent.action.PERMISSION_USAGE_DETAILS";
     field public static final String ACTION_PICK = "android.intent.action.PICK";
     field public static final String ACTION_PICK_ACTIVITY = "android.intent.action.PICK_ACTIVITY";
     field public static final String ACTION_POWER_CONNECTED = "android.intent.action.ACTION_POWER_CONNECTED";
@@ -10393,7 +10390,6 @@ package android.content {
     field public static final String EXTRA_NOT_UNKNOWN_SOURCE = "android.intent.extra.NOT_UNKNOWN_SOURCE";
     field public static final String EXTRA_ORIGINATING_URI = "android.intent.extra.ORIGINATING_URI";
     field public static final String EXTRA_PACKAGE_NAME = "android.intent.extra.PACKAGE_NAME";
-    field public static final String EXTRA_PERMISSION_USAGE_PERMISSIONS = "android.intent.extra.PERMISSION_USAGE_PERMISSIONS";
     field public static final String EXTRA_PHONE_NUMBER = "android.intent.extra.PHONE_NUMBER";
     field public static final String EXTRA_PROCESS_TEXT = "android.intent.extra.PROCESS_TEXT";
     field public static final String EXTRA_PROCESS_TEXT_READONLY = "android.intent.extra.PROCESS_TEXT_READONLY";
@@ -11358,8 +11354,8 @@ package android.content.pm {
     field public android.content.pm.ProviderInfo[] providers;
     field public android.content.pm.ActivityInfo[] receivers;
     field public android.content.pm.FeatureInfo[] reqFeatures;
-    field @Deprecated public String[] requestedPermissions;
-    field @Deprecated public int[] requestedPermissionsFlags;
+    field public String[] requestedPermissions;
+    field public int[] requestedPermissionsFlags;
     field public android.content.pm.ServiceInfo[] services;
     field public String sharedUserId;
     field public int sharedUserLabel;
@@ -11367,7 +11363,6 @@ package android.content.pm {
     field public android.content.pm.SigningInfo signingInfo;
     field public String[] splitNames;
     field public int[] splitRevisionCodes;
-    field public android.content.pm.UsesPermissionInfo[] usesPermissions;
     field @Deprecated public int versionCode;
     field public String versionName;
   }
@@ -11867,7 +11862,6 @@ package android.content.pm {
     field public String group;
     field public CharSequence nonLocalizedDescription;
     field @Deprecated public int protectionLevel;
-    field public boolean usageInfoRequired;
   }
 
   public final class ProviderInfo extends android.content.pm.ComponentInfo implements android.os.Parcelable {
@@ -11879,6 +11873,7 @@ package android.content.pm {
     field public static final int FLAG_SINGLE_USER = 1073741824; // 0x40000000
     field public String authority;
     field public int flags;
+    field public boolean forceUriPermissions;
     field public boolean grantUriPermissions;
     field public int initOrder;
     field @Deprecated public boolean isSyncable;
@@ -12056,28 +12051,6 @@ package android.content.pm {
     method public boolean hasPastSigningCertificates();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.content.pm.SigningInfo> CREATOR;
-  }
-
-  public final class UsesPermissionInfo extends android.content.pm.PackageItemInfo implements android.os.Parcelable {
-    method public int describeContents();
-    method public int getDataRetention();
-    method public int getDataRetentionWeeks();
-    method public int getDataSentOffDevice();
-    method public int getDataSharedWithThirdParty();
-    method public int getDataUsedForMonetization();
-    method public int getFlags();
-    method public String getPermission();
-    field public static final android.os.Parcelable.Creator<android.content.pm.UsesPermissionInfo> CREATOR;
-    field public static final int FLAG_REQUESTED_PERMISSION_GRANTED = 2; // 0x2
-    field public static final int RETENTION_NOT_RETAINED = 1; // 0x1
-    field public static final int RETENTION_SPECIFIED = 4; // 0x4
-    field public static final int RETENTION_UNDEFINED = 0; // 0x0
-    field public static final int RETENTION_UNLIMITED = 3; // 0x3
-    field public static final int RETENTION_USER_SELECTED = 2; // 0x2
-    field public static final int USAGE_NO = 3; // 0x3
-    field public static final int USAGE_UNDEFINED = 0; // 0x0
-    field public static final int USAGE_USER_TRIGGERED = 2; // 0x2
-    field public static final int USAGE_YES = 1; // 0x1
   }
 
   public final class VersionedPackage implements android.os.Parcelable {
@@ -12357,8 +12330,10 @@ package android.content.res {
   public final class Resources.Theme {
     method public void applyStyle(int, boolean);
     method public void dump(int, String, String);
+    method public int[] getAttributeResolutionStack(@AttrRes int, @StyleRes int, @StyleRes int);
     method public int getChangingConfigurations();
     method public android.graphics.drawable.Drawable getDrawable(@DrawableRes int) throws android.content.res.Resources.NotFoundException;
+    method @StyleRes public int getExplicitStyle(@Nullable android.util.AttributeSet);
     method public android.content.res.Resources getResources();
     method @NonNull public android.content.res.TypedArray obtainStyledAttributes(@NonNull @StyleableRes int[]);
     method @NonNull public android.content.res.TypedArray obtainStyledAttributes(@StyleRes int, @NonNull @StyleableRes int[]) throws android.content.res.Resources.NotFoundException;
@@ -14197,6 +14172,7 @@ package android.graphics {
     field public static final int DEPTH_POINT_CLOUD = 257; // 0x101
     field public static final int FLEX_RGBA_8888 = 42; // 0x2a
     field public static final int FLEX_RGB_888 = 41; // 0x29
+    field public static final int HEIC = 1212500294; // 0x48454946
     field public static final int JPEG = 256; // 0x100
     field public static final int NV16 = 16; // 0x10
     field public static final int NV21 = 17; // 0x11
@@ -14215,13 +14191,16 @@ package android.graphics {
     field public static final int YV12 = 842094169; // 0x32315659
   }
 
-  public final class Insets {
+  public final class Insets implements android.os.Parcelable {
     method @NonNull public static android.graphics.Insets add(@NonNull android.graphics.Insets, @NonNull android.graphics.Insets);
+    method public int describeContents();
     method @NonNull public static android.graphics.Insets max(@NonNull android.graphics.Insets, @NonNull android.graphics.Insets);
     method @NonNull public static android.graphics.Insets min(@NonNull android.graphics.Insets, @NonNull android.graphics.Insets);
     method @NonNull public static android.graphics.Insets of(int, int, int, int);
     method @NonNull public static android.graphics.Insets of(@Nullable android.graphics.Rect);
     method @NonNull public static android.graphics.Insets subtract(@NonNull android.graphics.Insets, @NonNull android.graphics.Insets);
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.graphics.Insets> CREATOR;
     field public static final android.graphics.Insets NONE;
     field public final int bottom;
     field public final int left;
@@ -16513,6 +16492,7 @@ package android.hardware.biometrics {
     field public static final int BIOMETRIC_ERROR_LOCKOUT = 7; // 0x7
     field public static final int BIOMETRIC_ERROR_LOCKOUT_PERMANENT = 9; // 0x9
     field public static final int BIOMETRIC_ERROR_NO_BIOMETRICS = 11; // 0xb
+    field public static final int BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL = 14; // 0xe
     field public static final int BIOMETRIC_ERROR_NO_SPACE = 4; // 0x4
     field public static final int BIOMETRIC_ERROR_TIMEOUT = 3; // 0x3
     field public static final int BIOMETRIC_ERROR_UNABLE_TO_PROCESS = 2; // 0x2
@@ -16535,8 +16515,8 @@ package android.hardware.biometrics {
   public static class BiometricPrompt.Builder {
     ctor public BiometricPrompt.Builder(android.content.Context);
     method public android.hardware.biometrics.BiometricPrompt build();
+    method public android.hardware.biometrics.BiometricPrompt.Builder setAllowDeviceCredential(boolean);
     method public android.hardware.biometrics.BiometricPrompt.Builder setDescription(@NonNull CharSequence);
-    method public android.hardware.biometrics.BiometricPrompt.Builder setEnableFallback(boolean);
     method public android.hardware.biometrics.BiometricPrompt.Builder setNegativeButton(@NonNull CharSequence, @NonNull java.util.concurrent.Executor, @NonNull android.content.DialogInterface.OnClickListener);
     method public android.hardware.biometrics.BiometricPrompt.Builder setRequireConfirmation(boolean);
     method public android.hardware.biometrics.BiometricPrompt.Builder setSubtitle(@NonNull CharSequence);
@@ -16935,6 +16915,7 @@ package android.hardware.camera2 {
     field public static final int REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING = 4; // 0x4
     field public static final int REQUEST_AVAILABLE_CAPABILITIES_RAW = 3; // 0x3
     field public static final int REQUEST_AVAILABLE_CAPABILITIES_READ_SENSOR_SETTINGS = 5; // 0x5
+    field public static final int REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA = 13; // 0xd
     field public static final int REQUEST_AVAILABLE_CAPABILITIES_YUV_REPROCESSING = 7; // 0x7
     field public static final int SCALER_CROPPING_TYPE_CENTER_ONLY = 0; // 0x0
     field public static final int SCALER_CROPPING_TYPE_FREEFORM = 1; // 0x1
@@ -19446,9 +19427,9 @@ package android.icu.text {
     method public static android.icu.text.BreakIterator getSentenceInstance(java.util.Locale);
     method public static android.icu.text.BreakIterator getSentenceInstance(android.icu.util.ULocale);
     method public abstract java.text.CharacterIterator getText();
-    method public static android.icu.text.BreakIterator getTitleInstance();
-    method public static android.icu.text.BreakIterator getTitleInstance(java.util.Locale);
-    method public static android.icu.text.BreakIterator getTitleInstance(android.icu.util.ULocale);
+    method @Deprecated public static android.icu.text.BreakIterator getTitleInstance();
+    method @Deprecated public static android.icu.text.BreakIterator getTitleInstance(java.util.Locale);
+    method @Deprecated public static android.icu.text.BreakIterator getTitleInstance(android.icu.util.ULocale);
     method public static android.icu.text.BreakIterator getWordInstance();
     method public static android.icu.text.BreakIterator getWordInstance(java.util.Locale);
     method public static android.icu.text.BreakIterator getWordInstance(android.icu.util.ULocale);
@@ -19465,7 +19446,7 @@ package android.icu.text {
     field public static final int KIND_CHARACTER = 0; // 0x0
     field public static final int KIND_LINE = 2; // 0x2
     field public static final int KIND_SENTENCE = 3; // 0x3
-    field public static final int KIND_TITLE = 4; // 0x4
+    field @Deprecated public static final int KIND_TITLE = 4; // 0x4
     field public static final int KIND_WORD = 1; // 0x1
     field public static final int WORD_IDEO = 400; // 0x190
     field public static final int WORD_IDEO_LIMIT = 500; // 0x1f4
@@ -22643,6 +22624,7 @@ package android.location {
     method public int getCodeType();
     method public int getConstellationType();
     method public int getMultipathIndicator();
+    method @NonNull public String getOtherCodeTypeName();
     method public double getPseudorangeRateMetersPerSecond();
     method public double getPseudorangeRateUncertaintyMetersPerSecond();
     method public long getReceivedSvTimeNanos();
@@ -22668,10 +22650,11 @@ package android.location {
     field public static final int CODE_TYPE_A = 0; // 0x0
     field public static final int CODE_TYPE_B = 1; // 0x1
     field public static final int CODE_TYPE_C = 2; // 0x2
-    field public static final int CODE_TYPE_CODELESS = 13; // 0xd
     field public static final int CODE_TYPE_I = 3; // 0x3
     field public static final int CODE_TYPE_L = 4; // 0x4
     field public static final int CODE_TYPE_M = 5; // 0x5
+    field public static final int CODE_TYPE_N = 13; // 0xd
+    field public static final int CODE_TYPE_OTHER = 255; // 0xff
     field public static final int CODE_TYPE_P = 6; // 0x6
     field public static final int CODE_TYPE_Q = 7; // 0x7
     field public static final int CODE_TYPE_S = 8; // 0x8
@@ -23746,6 +23729,7 @@ package android.media {
     ctor public ExifInterface(@NonNull java.io.InputStream) throws java.io.IOException;
     method public double getAltitude(double);
     method @Nullable public String getAttribute(@NonNull String);
+    method @Nullable public byte[] getAttributeBytes(@NonNull String);
     method public double getAttributeDouble(@NonNull String, double);
     method public int getAttributeInt(@NonNull String, int);
     method @Nullable public long[] getAttributeRange(@NonNull String);
@@ -23901,6 +23885,7 @@ package android.media {
     field public static final String TAG_USER_COMMENT = "UserComment";
     field public static final String TAG_WHITE_BALANCE = "WhiteBalance";
     field public static final String TAG_WHITE_POINT = "WhitePoint";
+    field public static final String TAG_XMP = "Xmp";
     field public static final String TAG_X_RESOLUTION = "XResolution";
     field public static final String TAG_Y_CB_CR_COEFFICIENTS = "YCbCrCoefficients";
     field public static final String TAG_Y_CB_CR_POSITIONING = "YCbCrPositioning";
@@ -24554,7 +24539,9 @@ package android.media {
   }
 
   public static final class MediaCodecInfo.VideoCapabilities.PerformancePoint {
+    ctor public MediaCodecInfo.VideoCapabilities.PerformancePoint(int, int, int);
     method public boolean covers(@NonNull android.media.MediaFormat);
+    method public boolean covers(@NonNull android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint);
     field public static final android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint FHD_100;
     field public static final android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint FHD_120;
     field public static final android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint FHD_200;
@@ -24589,8 +24576,8 @@ package android.media {
     field public static final android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint UHD_50;
     field public static final android.media.MediaCodecInfo.VideoCapabilities.PerformancePoint UHD_60;
     field public final int frameRate;
-    field public final int height;
-    field public final int width;
+    field public final long macroBlockRate;
+    field public final int macroBlocks;
   }
 
   public final class MediaCodecList {
@@ -25008,8 +24995,10 @@ package android.media {
     field public static final String KEY_LANGUAGE = "language";
     field public static final String KEY_LATENCY = "latency";
     field public static final String KEY_LEVEL = "level";
+    field public static final String KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
     field public static final String KEY_MAX_HEIGHT = "max-height";
     field public static final String KEY_MAX_INPUT_SIZE = "max-input-size";
+    field public static final String KEY_MAX_PTS_GAP_TO_ENCODER = "max-pts-gap-to-encoder";
     field public static final String KEY_MAX_WIDTH = "max-width";
     field public static final String KEY_MIME = "mime";
     field public static final String KEY_OPERATING_RATE = "operating-rate";
@@ -28605,7 +28594,7 @@ package android.net {
     field public static final String EXTRA_NETWORK = "android.net.extra.NETWORK";
     field @Deprecated public static final String EXTRA_NETWORK_INFO = "networkInfo";
     field public static final String EXTRA_NETWORK_REQUEST = "android.net.extra.NETWORK_REQUEST";
-    field public static final String EXTRA_NETWORK_TYPE = "networkType";
+    field @Deprecated public static final String EXTRA_NETWORK_TYPE = "networkType";
     field public static final String EXTRA_NO_CONNECTIVITY = "noConnectivity";
     field @Deprecated public static final String EXTRA_OTHER_NETWORK_INFO = "otherNetwork";
     field public static final String EXTRA_REASON = "reason";
@@ -30122,10 +30111,14 @@ package android.net.wifi.aware {
     method public void onIdentityChanged(byte[]);
   }
 
-  public final class PeerHandle implements android.os.Parcelable {
+  public final class ParcelablePeerHandle extends android.net.wifi.aware.PeerHandle implements android.os.Parcelable {
+    ctor public ParcelablePeerHandle(android.net.wifi.aware.PeerHandle);
     method public int describeContents();
     method public void writeToParcel(android.os.Parcel, int);
-    field public static final android.os.Parcelable.Creator<android.net.wifi.aware.PeerHandle> CREATOR;
+    field public static final android.os.Parcelable.Creator<android.net.wifi.aware.ParcelablePeerHandle> CREATOR;
+  }
+
+  public class PeerHandle {
   }
 
   public final class PublishConfig implements android.os.Parcelable {
@@ -34199,7 +34192,6 @@ package android.os {
   }
 
   public static class Build.Partition {
-    ctor public Build.Partition();
     method public long getBuildTimeMillis();
     method @NonNull public String getFingerprint();
     method @NonNull public String getName();
@@ -38358,11 +38350,7 @@ package android.provider {
     method @NonNull public static String getVolumeName(@NonNull android.net.Uri);
     method @NonNull public static android.provider.MediaStore.PendingSession openPending(@NonNull android.content.Context, @NonNull android.net.Uri);
     method @NonNull public static android.net.Uri setIncludePending(@NonNull android.net.Uri);
-    method @NonNull public static android.net.Uri setIncludeTrashed(@NonNull android.net.Uri);
     method @NonNull public static android.net.Uri setRequireOriginal(@NonNull android.net.Uri);
-    method public static void trash(@NonNull android.content.Context, @NonNull android.net.Uri);
-    method public static void trash(@NonNull android.content.Context, @NonNull android.net.Uri, long);
-    method public static void untrash(@NonNull android.content.Context, @NonNull android.net.Uri);
     field public static final String ACTION_IMAGE_CAPTURE = "android.media.action.IMAGE_CAPTURE";
     field public static final String ACTION_IMAGE_CAPTURE_SECURE = "android.media.action.IMAGE_CAPTURE_SECURE";
     field public static final String ACTION_REVIEW = "android.provider.action.REVIEW";
@@ -38633,14 +38621,14 @@ package android.provider {
   public static interface MediaStore.MediaColumns extends android.provider.BaseColumns {
     field @Deprecated public static final String DATA = "_data";
     field public static final String DATE_ADDED = "date_added";
-    field public static final String DATE_EXPIRES = "date_expires";
     field public static final String DATE_MODIFIED = "date_modified";
     field public static final String DISPLAY_NAME = "_display_name";
-    field public static final String HASH = "_hash";
+    field public static final String DOCUMENT_ID = "document_id";
     field public static final String HEIGHT = "height";
+    field public static final String INSTANCE_ID = "instance_id";
     field public static final String IS_PENDING = "is_pending";
-    field public static final String IS_TRASHED = "is_trashed";
     field public static final String MIME_TYPE = "mime_type";
+    field public static final String ORIGINAL_DOCUMENT_ID = "original_document_id";
     field public static final String OWNER_PACKAGE_NAME = "owner_package_name";
     field public static final String PRIMARY_DIRECTORY = "primary_directory";
     field public static final String SECONDARY_DIRECTORY = "secondary_directory";
@@ -41357,6 +41345,11 @@ package android.service.carrier {
     field public static final android.os.Parcelable.Creator<android.service.carrier.CarrierIdentifier> CREATOR;
   }
 
+  public class CarrierMessagingClientService extends android.app.Service {
+    ctor public CarrierMessagingClientService();
+    method public final android.os.IBinder onBind(android.content.Intent);
+  }
+
   public abstract class CarrierMessagingService extends android.app.Service {
     ctor public CarrierMessagingService();
     method @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
@@ -41698,6 +41691,7 @@ package android.service.notification {
 
   public static class NotificationListenerService.Ranking {
     ctor public NotificationListenerService.Ranking();
+    method public boolean canBubble();
     method public boolean canShowBadge();
     method public android.app.NotificationChannel getChannel();
     method public int getImportance();
@@ -42451,6 +42445,7 @@ package android.system {
     method public static java.io.FileDescriptor accept(java.io.FileDescriptor, java.net.InetSocketAddress) throws android.system.ErrnoException, java.net.SocketException;
     method public static boolean access(String, int) throws android.system.ErrnoException;
     method public static void bind(java.io.FileDescriptor, java.net.InetAddress, int) throws android.system.ErrnoException, java.net.SocketException;
+    method public static void bind(java.io.FileDescriptor, java.net.SocketAddress) throws android.system.ErrnoException, java.net.SocketException;
     method public static void chmod(String, int) throws android.system.ErrnoException;
     method public static void chown(String, int, int) throws android.system.ErrnoException;
     method public static void close(java.io.FileDescriptor) throws android.system.ErrnoException;
@@ -42519,6 +42514,7 @@ package android.system {
     method public static long sendfile(java.io.FileDescriptor, java.io.FileDescriptor, android.system.Int64Ref, long) throws android.system.ErrnoException;
     method public static int sendto(java.io.FileDescriptor, java.nio.ByteBuffer, int, java.net.InetAddress, int) throws android.system.ErrnoException, java.net.SocketException;
     method public static int sendto(java.io.FileDescriptor, byte[], int, int, int, java.net.InetAddress, int) throws android.system.ErrnoException, java.net.SocketException;
+    method public static int sendto(java.io.FileDescriptor, byte[], int, int, int, java.net.SocketAddress) throws android.system.ErrnoException, java.net.SocketException;
     method @Deprecated public static void setegid(int) throws android.system.ErrnoException;
     method public static void setenv(String, String, boolean) throws android.system.ErrnoException;
     method @Deprecated public static void seteuid(int) throws android.system.ErrnoException;
@@ -44136,7 +44132,7 @@ package android.telephony {
   }
 
   public final class AvailableNetworkInfo implements android.os.Parcelable {
-    ctor public AvailableNetworkInfo(int, int, java.util.ArrayList<java.lang.String>);
+    ctor public AvailableNetworkInfo(int, int, java.util.List<java.lang.String>);
     method public int describeContents();
     method public java.util.List<java.lang.String> getMccMncs();
     method public int getPriority();
@@ -45098,7 +45094,7 @@ package android.telephony {
     method public int getNetworkType();
     method public int getPhoneCount();
     method public int getPhoneType();
-    method public int getPreferredOpportunisticDataSubscription();
+    method @RequiresPermission(anyOf={"android.permission.READ_PRIVILEGED_PHONE_STATE", android.Manifest.permission.READ_PHONE_STATE}) public int getPreferredOpportunisticDataSubscription();
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public android.telephony.ServiceState getServiceState();
     method @Nullable public android.telephony.SignalStrength getSignalStrength();
     method public int getSimCarrierId();
@@ -45134,6 +45130,7 @@ package android.telephony {
     method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_NETWORK_STATE, android.Manifest.permission.READ_PHONE_STATE}) public boolean isDataRoamingEnabled();
     method public boolean isHearingAidCompatibilitySupported();
     method public boolean isNetworkRoaming();
+    method public boolean isRttSupported();
     method public boolean isSmsCapable();
     method @Deprecated public boolean isTtyModeSupported();
     method public boolean isVoiceCapable();
@@ -45159,13 +45156,13 @@ package android.telephony {
     method @Deprecated public void setVoicemailVibrationEnabled(android.telecom.PhoneAccountHandle, boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void switchMultiSimConfig(int);
     method public boolean updateAvailableNetworks(java.util.List<android.telephony.AvailableNetworkInfo>);
+    field public static final String ACTION_CARRIER_MESSAGING_CLIENT_SERVICE = "android.telephony.action.CARRIER_MESSAGING_CLIENT_SERVICE";
     field public static final String ACTION_CONFIGURE_VOICEMAIL = "android.telephony.action.CONFIGURE_VOICEMAIL";
     field public static final String ACTION_NETWORK_COUNTRY_CHANGED = "android.telephony.action.NETWORK_COUNTRY_CHANGED";
     field @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public static final String ACTION_PHONE_STATE_CHANGED = "android.intent.action.PHONE_STATE";
     field public static final String ACTION_RESPOND_VIA_MESSAGE = "android.intent.action.RESPOND_VIA_MESSAGE";
     field public static final String ACTION_SECRET_CODE = "android.telephony.action.SECRET_CODE";
     field public static final String ACTION_SHOW_VOICEMAIL_NOTIFICATION = "android.telephony.action.SHOW_VOICEMAIL_NOTIFICATION";
-    field public static final String ACTION_SMS_APP_SERVICE = "android.telephony.action.SMS_APP_SERVICE";
     field public static final String ACTION_SUBSCRIPTION_CARRIER_IDENTITY_CHANGED = "android.telephony.action.SUBSCRIPTION_CARRIER_IDENTITY_CHANGED";
     field public static final String ACTION_SUBSCRIPTION_PRECISE_CARRIER_IDENTITY_CHANGED = "android.telephony.action.SUBSCRIPTION_PRECISE_CARRIER_IDENTITY_CHANGED";
     field public static final int APPTYPE_CSIM = 4; // 0x4
@@ -45600,6 +45597,483 @@ package android.telephony.gsm {
 
 }
 
+package android.telephony.ims {
+
+  public class Rcs1To1Thread extends android.telephony.ims.RcsThread {
+    method @WorkerThread public long getFallbackThreadId() throws android.telephony.ims.RcsMessageStoreException;
+    method @NonNull @WorkerThread public android.telephony.ims.RcsParticipant getRecipient() throws android.telephony.ims.RcsMessageStoreException;
+    method public boolean isGroup();
+    method @WorkerThread public void setFallbackThreadId(long) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public abstract class RcsEvent {
+    ctor protected RcsEvent(long);
+    method public long getTimestamp();
+  }
+
+  public final class RcsEventQueryParams implements android.os.Parcelable {
+    method public int describeContents();
+    method @android.telephony.ims.RcsEventQueryParams.EventType public int getEventType();
+    method public int getLimit();
+    method public boolean getSortDirection();
+    method public int getSortingProperty();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final int ALL_EVENTS = -1; // 0xffffffff
+    field public static final int ALL_GROUP_THREAD_EVENTS = 0; // 0x0
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsEventQueryParams> CREATOR;
+    field public static final int GROUP_THREAD_ICON_CHANGED_EVENT = 8; // 0x8
+    field public static final int GROUP_THREAD_NAME_CHANGED_EVENT = 16; // 0x10
+    field public static final int GROUP_THREAD_PARTICIPANT_JOINED_EVENT = 2; // 0x2
+    field public static final int GROUP_THREAD_PARTICIPANT_LEFT_EVENT = 4; // 0x4
+    field public static final int PARTICIPANT_ALIAS_CHANGED_EVENT = 1; // 0x1
+    field public static final int SORT_BY_CREATION_ORDER = 0; // 0x0
+    field public static final int SORT_BY_TIMESTAMP = 1; // 0x1
+  }
+
+  public static class RcsEventQueryParams.Builder {
+    ctor public RcsEventQueryParams.Builder();
+    method public android.telephony.ims.RcsEventQueryParams build();
+    method @CheckResult public android.telephony.ims.RcsEventQueryParams.Builder setEventType(@android.telephony.ims.RcsEventQueryParams.EventType int);
+    method @CheckResult public android.telephony.ims.RcsEventQueryParams.Builder setGroupThread(@NonNull android.telephony.ims.RcsGroupThread);
+    method @CheckResult public android.telephony.ims.RcsEventQueryParams.Builder setResultLimit(@IntRange(from=0) int) throws java.security.InvalidParameterException;
+    method @CheckResult public android.telephony.ims.RcsEventQueryParams.Builder setSortDirection(boolean);
+    method @CheckResult public android.telephony.ims.RcsEventQueryParams.Builder setSortProperty(@android.telephony.ims.RcsEventQueryParams.SortingProperty int);
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsEventQueryParams.ALL_EVENTS, android.telephony.ims.RcsEventQueryParams.ALL_GROUP_THREAD_EVENTS, android.telephony.ims.RcsEventQueryParams.PARTICIPANT_ALIAS_CHANGED_EVENT, android.telephony.ims.RcsEventQueryParams.GROUP_THREAD_PARTICIPANT_JOINED_EVENT, android.telephony.ims.RcsEventQueryParams.GROUP_THREAD_PARTICIPANT_LEFT_EVENT, android.telephony.ims.RcsEventQueryParams.GROUP_THREAD_NAME_CHANGED_EVENT, android.telephony.ims.RcsEventQueryParams.GROUP_THREAD_ICON_CHANGED_EVENT}) public static @interface RcsEventQueryParams.EventType {
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsEventQueryParams.SORT_BY_CREATION_ORDER, android.telephony.ims.RcsEventQueryParams.SORT_BY_TIMESTAMP}) public static @interface RcsEventQueryParams.SortingProperty {
+  }
+
+  public final class RcsEventQueryResult implements android.os.Parcelable {
+    method public int describeContents();
+    method public android.telephony.ims.RcsQueryContinuationToken getContinuationToken();
+    method public java.util.List<android.telephony.ims.RcsEvent> getEvents();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsEventQueryResult> CREATOR;
+  }
+
+  public final class RcsFileTransferCreationParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public String getContentMimeType();
+    method public android.net.Uri getContentUri();
+    method public long getFileSize();
+    method @android.telephony.ims.RcsFileTransferPart.RcsFileTransferStatus public int getFileTransferStatus();
+    method public int getHeight();
+    method public long getMediaDuration();
+    method public String getPreviewMimeType();
+    method public android.net.Uri getPreviewUri();
+    method public String getRcsFileTransferSessionId();
+    method public long getTransferOffset();
+    method public int getWidth();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsFileTransferCreationParams> CREATOR;
+  }
+
+  public class RcsFileTransferCreationParams.Builder {
+    ctor public RcsFileTransferCreationParams.Builder();
+    method public android.telephony.ims.RcsFileTransferCreationParams build();
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setContentMimeType(String);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setContentUri(android.net.Uri);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setFileSize(long);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setFileTransferSessionId(String);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setFileTransferStatus(@android.telephony.ims.RcsFileTransferPart.RcsFileTransferStatus int);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setHeight(int);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setMediaDuration(long);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setPreviewMimeType(String);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setPreviewUri(android.net.Uri);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setTransferOffset(long);
+    method @CheckResult public android.telephony.ims.RcsFileTransferCreationParams.Builder setWidth(int);
+  }
+
+  public class RcsFileTransferPart {
+    method @WorkerThread @Nullable public String getContentMimeType() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public android.net.Uri getContentUri() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public long getFileSize() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public String getFileTransferSessionId() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @android.telephony.ims.RcsFileTransferPart.RcsFileTransferStatus public int getFileTransferStatus() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public int getHeight() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public long getLength() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public String getPreviewMimeType() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public android.net.Uri getPreviewUri() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public long getTransferOffset() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public int getWidth() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setContentMimeType(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setContentUri(android.net.Uri) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setFileSize(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setFileTransferSessionId(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setFileTransferStatus(@android.telephony.ims.RcsFileTransferPart.RcsFileTransferStatus int) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setHeight(int) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setLength(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setPreviewMimeType(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setPreviewUri(android.net.Uri) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setTransferOffset(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setWidth(int) throws android.telephony.ims.RcsMessageStoreException;
+    field public static final int DOWNLOADING = 6; // 0x6
+    field public static final int DOWNLOADING_CANCELLED = 9; // 0x9
+    field public static final int DOWNLOADING_FAILED = 8; // 0x8
+    field public static final int DOWNLOADING_PAUSED = 7; // 0x7
+    field public static final int DRAFT = 1; // 0x1
+    field public static final int NOT_SET = 0; // 0x0
+    field public static final int SENDING = 2; // 0x2
+    field public static final int SENDING_CANCELLED = 5; // 0x5
+    field public static final int SENDING_FAILED = 4; // 0x4
+    field public static final int SENDING_PAUSED = 3; // 0x3
+    field public static final int SUCCEEDED = 10; // 0xa
+  }
+
+  @IntDef({android.telephony.ims.RcsFileTransferPart.DRAFT, android.telephony.ims.RcsFileTransferPart.SENDING, android.telephony.ims.RcsFileTransferPart.SENDING_PAUSED, android.telephony.ims.RcsFileTransferPart.SENDING_FAILED, android.telephony.ims.RcsFileTransferPart.SENDING_CANCELLED, android.telephony.ims.RcsFileTransferPart.DOWNLOADING, android.telephony.ims.RcsFileTransferPart.DOWNLOADING_PAUSED, android.telephony.ims.RcsFileTransferPart.DOWNLOADING_FAILED, android.telephony.ims.RcsFileTransferPart.DOWNLOADING_CANCELLED, android.telephony.ims.RcsFileTransferPart.SUCCEEDED}) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface RcsFileTransferPart.RcsFileTransferStatus {
+  }
+
+  public class RcsGroupThread extends android.telephony.ims.RcsThread {
+    method @WorkerThread public void addParticipant(@NonNull android.telephony.ims.RcsParticipant) throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public android.net.Uri getConferenceUri() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable public android.net.Uri getGroupIcon() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public String getGroupName() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public android.telephony.ims.RcsParticipant getOwner() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public java.util.Set<android.telephony.ims.RcsParticipant> getParticipants() throws android.telephony.ims.RcsMessageStoreException;
+    method public boolean isGroup();
+    method @WorkerThread public void removeParticipant(@NonNull android.telephony.ims.RcsParticipant) throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public void setConferenceUri(android.net.Uri) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setGroupIcon(@Nullable android.net.Uri) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setGroupName(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setOwner(@Nullable android.telephony.ims.RcsParticipant) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public abstract class RcsGroupThreadEvent extends android.telephony.ims.RcsEvent {
+    method @NonNull public android.telephony.ims.RcsParticipant getOriginatingParticipant();
+    method @NonNull public android.telephony.ims.RcsGroupThread getRcsGroupThread();
+  }
+
+  public final class RcsGroupThreadIconChangedEvent extends android.telephony.ims.RcsGroupThreadEvent implements android.os.Parcelable {
+    ctor public RcsGroupThreadIconChangedEvent(long, @NonNull android.telephony.ims.RcsGroupThread, @NonNull android.telephony.ims.RcsParticipant, @Nullable android.net.Uri);
+    method public int describeContents();
+    method @Nullable public android.net.Uri getNewIcon();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsGroupThreadIconChangedEvent> CREATOR;
+  }
+
+  public final class RcsGroupThreadNameChangedEvent extends android.telephony.ims.RcsGroupThreadEvent implements android.os.Parcelable {
+    ctor public RcsGroupThreadNameChangedEvent(long, @NonNull android.telephony.ims.RcsGroupThread, @NonNull android.telephony.ims.RcsParticipant, @Nullable String);
+    method public int describeContents();
+    method @Nullable public String getNewName();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsGroupThreadNameChangedEvent> CREATOR;
+  }
+
+  public final class RcsGroupThreadParticipantJoinedEvent extends android.telephony.ims.RcsGroupThreadEvent implements android.os.Parcelable {
+    ctor public RcsGroupThreadParticipantJoinedEvent(long, @NonNull android.telephony.ims.RcsGroupThread, @NonNull android.telephony.ims.RcsParticipant, @NonNull android.telephony.ims.RcsParticipant);
+    method public int describeContents();
+    method public android.telephony.ims.RcsParticipant getJoinedParticipant();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsGroupThreadParticipantJoinedEvent> CREATOR;
+  }
+
+  public final class RcsGroupThreadParticipantLeftEvent extends android.telephony.ims.RcsGroupThreadEvent implements android.os.Parcelable {
+    ctor public RcsGroupThreadParticipantLeftEvent(long, @NonNull android.telephony.ims.RcsGroupThread, @NonNull android.telephony.ims.RcsParticipant, @NonNull android.telephony.ims.RcsParticipant);
+    method public int describeContents();
+    method @NonNull public android.telephony.ims.RcsParticipant getLeavingParticipantId();
+    method public void persist() throws android.telephony.ims.RcsMessageStoreException;
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsGroupThreadParticipantLeftEvent> CREATOR;
+  }
+
+  public class RcsIncomingMessage extends android.telephony.ims.RcsMessage {
+    method @WorkerThread public long getArrivalTimestamp() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public long getSeenTimestamp() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public android.telephony.ims.RcsParticipant getSenderParticipant() throws android.telephony.ims.RcsMessageStoreException;
+    method public boolean isIncoming();
+    method @WorkerThread public void setArrivalTimestamp(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setSeenTimestamp(long) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public final class RcsIncomingMessageCreationParams extends android.telephony.ims.RcsMessageCreationParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public long getArrivalTimestamp();
+    method public long getSeenTimestamp();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsIncomingMessageCreationParams> CREATOR;
+  }
+
+  public static class RcsIncomingMessageCreationParams.Builder extends android.telephony.ims.RcsMessageCreationParams.Builder {
+    ctor public RcsIncomingMessageCreationParams.Builder(long, long, int);
+    method public android.telephony.ims.RcsIncomingMessageCreationParams build();
+    method @CheckResult public android.telephony.ims.RcsIncomingMessageCreationParams.Builder setArrivalTimestamp(long);
+    method @CheckResult public android.telephony.ims.RcsIncomingMessageCreationParams.Builder setSeenTimestamp(long);
+    method @CheckResult public android.telephony.ims.RcsIncomingMessageCreationParams.Builder setSenderParticipant(android.telephony.ims.RcsParticipant);
+  }
+
+  public class RcsManager {
+    method public android.telephony.ims.RcsMessageStore getRcsMessageStore();
+  }
+
+  public abstract class RcsMessage {
+    method @NonNull @WorkerThread public java.util.Set<android.telephony.ims.RcsFileTransferPart> getFileTransferParts() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public double getLatitude() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public double getLongitude() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public long getOriginationTimestamp() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public String getRcsMessageId() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @android.telephony.ims.RcsMessage.RcsMessageStatus public int getStatus() throws android.telephony.ims.RcsMessageStoreException;
+    method public int getSubscriptionId() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public String getText() throws android.telephony.ims.RcsMessageStoreException;
+    method @NonNull @WorkerThread public android.telephony.ims.RcsFileTransferPart insertFileTransfer(android.telephony.ims.RcsFileTransferCreationParams) throws android.telephony.ims.RcsMessageStoreException;
+    method public abstract boolean isIncoming();
+    method @WorkerThread public void removeFileTransferPart(@NonNull android.telephony.ims.RcsFileTransferPart) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setLatitude(double) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setLongitude(double) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setOriginationTimestamp(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setRcsMessageId(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setStatus(@android.telephony.ims.RcsMessage.RcsMessageStatus int) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setSubscriptionId(int) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setText(String) throws android.telephony.ims.RcsMessageStoreException;
+    field public static final int DRAFT = 1; // 0x1
+    field public static final int FAILED = 6; // 0x6
+    field public static final double LOCATION_NOT_SET = 4.9E-324;
+    field public static final int NOT_SET = 0; // 0x0
+    field public static final int QUEUED = 2; // 0x2
+    field public static final int RECEIVED = 7; // 0x7
+    field public static final int RETRYING = 5; // 0x5
+    field public static final int SEEN = 9; // 0x9
+    field public static final int SENDING = 3; // 0x3
+    field public static final int SENT = 4; // 0x4
+  }
+
+  @IntDef({android.telephony.ims.RcsMessage.DRAFT, android.telephony.ims.RcsMessage.QUEUED, android.telephony.ims.RcsMessage.SENDING, android.telephony.ims.RcsMessage.SENT, android.telephony.ims.RcsMessage.RETRYING, android.telephony.ims.RcsMessage.FAILED, android.telephony.ims.RcsMessage.RECEIVED, android.telephony.ims.RcsMessage.SEEN}) @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) public static @interface RcsMessage.RcsMessageStatus {
+  }
+
+  public class RcsMessageCreationParams {
+    ctor protected RcsMessageCreationParams(android.telephony.ims.RcsMessageCreationParams.Builder);
+    method public double getLatitude();
+    method public double getLongitude();
+    method public int getMessageStatus();
+    method public long getOriginationTimestamp();
+    method @Nullable public String getRcsMessageGlobalId();
+    method public int getSubId();
+    method @Nullable public String getText();
+  }
+
+  public static class RcsMessageCreationParams.Builder {
+    method public android.telephony.ims.RcsMessageCreationParams build();
+    method @CheckResult public android.telephony.ims.RcsMessageCreationParams.Builder setLatitude(double);
+    method @CheckResult public android.telephony.ims.RcsMessageCreationParams.Builder setLongitude(double);
+    method @CheckResult public android.telephony.ims.RcsMessageCreationParams.Builder setRcsMessageId(String);
+    method @CheckResult public android.telephony.ims.RcsMessageCreationParams.Builder setStatus(@android.telephony.ims.RcsMessage.RcsMessageStatus int);
+    method @CheckResult public android.telephony.ims.RcsMessageCreationParams.Builder setText(String);
+  }
+
+  public final class RcsMessageQueryParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getFileTransferPresence();
+    method public int getLimit();
+    method public String getMessageLike();
+    method public int getMessageType();
+    method public boolean getSortDirection();
+    method @android.telephony.ims.RcsMessageQueryParams.SortingProperty public int getSortingProperty();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsMessageQueryParams> CREATOR;
+    field public static final int MESSAGES_WITHOUT_FILE_TRANSFERS = 8; // 0x8
+    field public static final int MESSAGES_WITH_FILE_TRANSFERS = 4; // 0x4
+    field public static final int MESSAGE_TYPE_INCOMING = 1; // 0x1
+    field public static final int MESSAGE_TYPE_OUTGOING = 2; // 0x2
+    field public static final int SORT_BY_CREATION_ORDER = 0; // 0x0
+    field public static final int SORT_BY_TIMESTAMP = 1; // 0x1
+  }
+
+  public static class RcsMessageQueryParams.Builder {
+    ctor public RcsMessageQueryParams.Builder();
+    method public android.telephony.ims.RcsMessageQueryParams build();
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setFileTransferPresence(int);
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setMessageLike(String);
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setMessageType(int);
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setResultLimit(@IntRange(from=0) int) throws java.security.InvalidParameterException;
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setSortDirection(boolean);
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setSortProperty(@android.telephony.ims.RcsMessageQueryParams.SortingProperty int);
+    method @CheckResult public android.telephony.ims.RcsMessageQueryParams.Builder setThread(@Nullable android.telephony.ims.RcsThread);
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsMessageQueryParams.SORT_BY_CREATION_ORDER, android.telephony.ims.RcsMessageQueryParams.SORT_BY_TIMESTAMP}) public static @interface RcsMessageQueryParams.SortingProperty {
+  }
+
+  public final class RcsMessageQueryResult implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public android.telephony.ims.RcsQueryContinuationToken getContinuationToken();
+    method @NonNull public java.util.List<android.telephony.ims.RcsMessage> getMessages();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsMessageQueryResult> CREATOR;
+  }
+
+  public final class RcsMessageSnippet implements android.os.Parcelable {
+    method public int describeContents();
+    method @android.telephony.ims.RcsMessage.RcsMessageStatus public int getSnippetStatus();
+    method @Nullable public String getSnippetText();
+    method public long getSnippetTimestamp();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsMessageSnippet> CREATOR;
+  }
+
+  public class RcsMessageStore {
+    ctor public RcsMessageStore();
+    method @WorkerThread @NonNull public android.telephony.ims.RcsGroupThread createGroupThread(@Nullable java.util.List<android.telephony.ims.RcsParticipant>, @Nullable String, @Nullable android.net.Uri) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.Rcs1To1Thread createRcs1To1Thread(@NonNull android.telephony.ims.RcsParticipant) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsParticipant createRcsParticipant(String, @Nullable String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void deleteThread(@NonNull android.telephony.ims.RcsThread) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsEventQueryResult getRcsEvents(@Nullable android.telephony.ims.RcsEventQueryParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsEventQueryResult getRcsEvents(@NonNull android.telephony.ims.RcsQueryContinuationToken) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsMessageQueryResult getRcsMessages(@Nullable android.telephony.ims.RcsMessageQueryParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsMessageQueryResult getRcsMessages(@NonNull android.telephony.ims.RcsQueryContinuationToken) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsParticipantQueryResult getRcsParticipants(@Nullable android.telephony.ims.RcsParticipantQueryParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsParticipantQueryResult getRcsParticipants(@NonNull android.telephony.ims.RcsQueryContinuationToken) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsThreadQueryResult getRcsThreads(@Nullable android.telephony.ims.RcsThreadQueryParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsThreadQueryResult getRcsThreads(@NonNull android.telephony.ims.RcsQueryContinuationToken) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public void persistRcsEvent(android.telephony.ims.RcsEvent) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public class RcsMessageStoreException extends java.lang.Exception {
+    ctor public RcsMessageStoreException(String);
+  }
+
+  public class RcsOutgoingMessage extends android.telephony.ims.RcsMessage {
+    method @NonNull @WorkerThread public java.util.List<android.telephony.ims.RcsOutgoingMessageDelivery> getOutgoingDeliveries() throws android.telephony.ims.RcsMessageStoreException;
+    method public boolean isIncoming();
+  }
+
+  public final class RcsOutgoingMessageCreationParams extends android.telephony.ims.RcsMessageCreationParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsOutgoingMessageCreationParams> CREATOR;
+  }
+
+  public static class RcsOutgoingMessageCreationParams.Builder extends android.telephony.ims.RcsMessageCreationParams.Builder {
+    ctor public RcsOutgoingMessageCreationParams.Builder(long, int);
+    method public android.telephony.ims.RcsOutgoingMessageCreationParams build();
+  }
+
+  public class RcsOutgoingMessageDelivery {
+    method @WorkerThread public long getDeliveredTimestamp() throws android.telephony.ims.RcsMessageStoreException;
+    method @NonNull public android.telephony.ims.RcsOutgoingMessage getMessage();
+    method @NonNull public android.telephony.ims.RcsParticipant getRecipient();
+    method @WorkerThread public long getSeenTimestamp() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @android.telephony.ims.RcsMessage.RcsMessageStatus public int getStatus() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setDeliveredTimestamp(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setSeenTimestamp(long) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setStatus(@android.telephony.ims.RcsMessage.RcsMessageStatus int) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public class RcsParticipant {
+    method @Nullable @WorkerThread public String getAlias() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public String getCanonicalAddress() throws android.telephony.ims.RcsMessageStoreException;
+    method @Nullable @WorkerThread public String getContactId() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setAlias(String) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void setContactId(String) throws android.telephony.ims.RcsMessageStoreException;
+  }
+
+  public final class RcsParticipantAliasChangedEvent extends android.telephony.ims.RcsEvent implements android.os.Parcelable {
+    ctor public RcsParticipantAliasChangedEvent(long, @NonNull android.telephony.ims.RcsParticipant, @Nullable String);
+    method public int describeContents();
+    method @Nullable public String getNewAlias();
+    method @NonNull public android.telephony.ims.RcsParticipant getParticipantId();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsParticipantAliasChangedEvent> CREATOR;
+  }
+
+  public final class RcsParticipantQueryParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public String getAliasLike();
+    method public String getCanonicalAddressLike();
+    method public int getLimit();
+    method public boolean getSortDirection();
+    method public int getSortingProperty();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsParticipantQueryParams> CREATOR;
+    field public static final int SORT_BY_ALIAS = 1; // 0x1
+    field public static final int SORT_BY_CANONICAL_ADDRESS = 2; // 0x2
+    field public static final int SORT_BY_CREATION_ORDER = 0; // 0x0
+  }
+
+  public static class RcsParticipantQueryParams.Builder {
+    ctor public RcsParticipantQueryParams.Builder();
+    method public android.telephony.ims.RcsParticipantQueryParams build();
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setAliasLike(String);
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setCanonicalAddressLike(String);
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setResultLimit(@IntRange(from=0) int) throws java.security.InvalidParameterException;
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setSortDirection(boolean);
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setSortProperty(@android.telephony.ims.RcsParticipantQueryParams.SortingProperty int);
+    method @CheckResult public android.telephony.ims.RcsParticipantQueryParams.Builder setThread(android.telephony.ims.RcsThread);
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsParticipantQueryParams.SORT_BY_CREATION_ORDER, android.telephony.ims.RcsParticipantQueryParams.SORT_BY_ALIAS, android.telephony.ims.RcsParticipantQueryParams.SORT_BY_CANONICAL_ADDRESS}) public static @interface RcsParticipantQueryParams.SortingProperty {
+  }
+
+  public final class RcsParticipantQueryResult implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public android.telephony.ims.RcsQueryContinuationToken getContinuationToken();
+    method @NonNull public java.util.List<android.telephony.ims.RcsParticipant> getParticipants();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsParticipantQueryResult> CREATOR;
+  }
+
+  public final class RcsQueryContinuationToken implements android.os.Parcelable {
+    method public int describeContents();
+    method @android.telephony.ims.RcsQueryContinuationToken.ContinuationTokenType public int getQueryType();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsQueryContinuationToken> CREATOR;
+    field public static final int EVENT_QUERY_CONTINUATION_TOKEN_TYPE = 0; // 0x0
+    field public static final int MESSAGE_QUERY_CONTINUATION_TOKEN_TYPE = 1; // 0x1
+    field public static final int PARTICIPANT_QUERY_CONTINUATION_TOKEN_TYPE = 2; // 0x2
+    field public static final int THREAD_QUERY_CONTINUATION_TOKEN_TYPE = 3; // 0x3
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsQueryContinuationToken.EVENT_QUERY_CONTINUATION_TOKEN_TYPE, android.telephony.ims.RcsQueryContinuationToken.MESSAGE_QUERY_CONTINUATION_TOKEN_TYPE, android.telephony.ims.RcsQueryContinuationToken.PARTICIPANT_QUERY_CONTINUATION_TOKEN_TYPE, android.telephony.ims.RcsQueryContinuationToken.THREAD_QUERY_CONTINUATION_TOKEN_TYPE}) public static @interface RcsQueryContinuationToken.ContinuationTokenType {
+  }
+
+  public abstract class RcsThread {
+    method @WorkerThread @NonNull public android.telephony.ims.RcsIncomingMessage addIncomingMessage(@NonNull android.telephony.ims.RcsIncomingMessageCreationParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsOutgoingMessage addOutgoingMessage(@NonNull android.telephony.ims.RcsOutgoingMessageCreationParams) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread public void deleteMessage(@NonNull android.telephony.ims.RcsMessage) throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsMessageQueryResult getMessages() throws android.telephony.ims.RcsMessageStoreException;
+    method @WorkerThread @NonNull public android.telephony.ims.RcsMessageSnippet getSnippet() throws android.telephony.ims.RcsMessageStoreException;
+    method public abstract boolean isGroup();
+  }
+
+  public final class RcsThreadQueryParams implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getLimit();
+    method public boolean getSortDirection();
+    method @android.telephony.ims.RcsThreadQueryParams.SortingProperty public int getSortingProperty();
+    method public int getThreadType();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsThreadQueryParams> CREATOR;
+    field public static final int SORT_BY_CREATION_ORDER = 0; // 0x0
+    field public static final int SORT_BY_TIMESTAMP = 1; // 0x1
+    field public static final int THREAD_TYPE_1_TO_1 = 2; // 0x2
+    field public static final int THREAD_TYPE_GROUP = 1; // 0x1
+  }
+
+  public static class RcsThreadQueryParams.Builder {
+    ctor public RcsThreadQueryParams.Builder();
+    method public android.telephony.ims.RcsThreadQueryParams build();
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setParticipant(@NonNull android.telephony.ims.RcsParticipant);
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setParticipants(@NonNull java.util.List<android.telephony.ims.RcsParticipant>);
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setResultLimit(@IntRange(from=0) int) throws java.security.InvalidParameterException;
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setSortDirection(boolean);
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setSortProperty(@android.telephony.ims.RcsThreadQueryParams.SortingProperty int);
+    method @CheckResult public android.telephony.ims.RcsThreadQueryParams.Builder setThreadType(int);
+  }
+
+  @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE) @IntDef({android.telephony.ims.RcsThreadQueryParams.SORT_BY_CREATION_ORDER, android.telephony.ims.RcsThreadQueryParams.SORT_BY_TIMESTAMP}) public static @interface RcsThreadQueryParams.SortingProperty {
+  }
+
+  public final class RcsThreadQueryResult implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public android.telephony.ims.RcsQueryContinuationToken getContinuationToken();
+    method @NonNull public java.util.List<android.telephony.ims.RcsThread> getThreads();
+    method public void writeToParcel(android.os.Parcel, int);
+    field public static final android.os.Parcelable.Creator<android.telephony.ims.RcsThreadQueryResult> CREATOR;
+  }
+
+}
+
 package android.telephony.mbms {
 
   public class DownloadProgressListener {
@@ -45666,9 +46140,9 @@ package android.telephony.mbms {
   }
 
   public interface GroupCallCallback {
-    method public void onBroadcastSignalStrengthUpdated(@IntRange(from=0xffffffff, to=4) int);
-    method public void onError(int, @Nullable String);
-    method public void onGroupCallStateChanged(int, int);
+    method public default void onBroadcastSignalStrengthUpdated(@IntRange(from=0xffffffff, to=4) int);
+    method public default void onError(int, @Nullable String);
+    method public default void onGroupCallStateChanged(int, int);
     field public static final int SIGNAL_STRENGTH_UNAVAILABLE = -1; // 0xffffffff
   }
 
@@ -45726,10 +46200,10 @@ package android.telephony.mbms {
   }
 
   public interface MbmsGroupCallSessionCallback {
-    method public void onAvailableSaisUpdated(@NonNull java.util.List<java.lang.Integer>, @NonNull java.util.List<java.util.List<java.lang.Integer>>);
-    method public void onError(int, @Nullable String);
-    method public void onMiddlewareReady();
-    method public void onServiceInterfaceAvailable(@NonNull String, int);
+    method public default void onAvailableSaisUpdated(@NonNull java.util.List<java.lang.Integer>, @NonNull java.util.List<java.util.List<java.lang.Integer>>);
+    method public default void onError(int, @Nullable String);
+    method public default void onMiddlewareReady();
+    method public default void onServiceInterfaceAvailable(@NonNull String, int);
   }
 
   public class MbmsStreamingSessionCallback {
@@ -49004,6 +49478,7 @@ package android.view {
     method public boolean[] hasKeys(int...);
     method public boolean hasMicrophone();
     method public boolean isEnabled();
+    method public boolean isExternal();
     method public boolean isVirtual();
     method public boolean supportsSource(int);
     method public void writeToParcel(android.os.Parcel, int);
@@ -49559,6 +50034,7 @@ package android.view {
     ctor protected LayoutInflater(android.view.LayoutInflater, android.content.Context);
     method public abstract android.view.LayoutInflater cloneInContext(android.content.Context);
     method public final android.view.View createView(String, String, android.util.AttributeSet) throws java.lang.ClassNotFoundException, android.view.InflateException;
+    method @Nullable public final android.view.View createView(@NonNull android.content.Context, @NonNull String, @Nullable String, @Nullable android.util.AttributeSet) throws java.lang.ClassNotFoundException, android.view.InflateException;
     method public static android.view.LayoutInflater from(android.content.Context);
     method public android.content.Context getContext();
     method public final android.view.LayoutInflater.Factory getFactory();
@@ -49570,6 +50046,7 @@ package android.view {
     method public android.view.View inflate(org.xmlpull.v1.XmlPullParser, @Nullable android.view.ViewGroup, boolean);
     method protected android.view.View onCreateView(String, android.util.AttributeSet) throws java.lang.ClassNotFoundException;
     method protected android.view.View onCreateView(android.view.View, String, android.util.AttributeSet) throws java.lang.ClassNotFoundException;
+    method @Nullable public android.view.View onCreateView(@NonNull android.content.Context, @Nullable android.view.View, @NonNull String, @Nullable android.util.AttributeSet) throws java.lang.ClassNotFoundException;
     method public void setFactory(android.view.LayoutInflater.Factory);
     method public void setFactory2(android.view.LayoutInflater.Factory2);
     method public void setFilter(android.view.LayoutInflater.Filter);
@@ -50315,6 +50792,8 @@ package android.view {
     method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getAlpha();
     method public android.view.animation.Animation getAnimation();
     method public android.os.IBinder getApplicationWindowToken();
+    method @NonNull public java.util.List<java.lang.Integer> getAttributeResolutionStack();
+    method @NonNull public java.util.Map<java.lang.Integer,java.lang.Integer> getAttributeSourceResourceMap();
     method @android.view.ViewDebug.ExportedProperty @Nullable public String[] getAutofillHints();
     method public final android.view.autofill.AutofillId getAutofillId();
     method public int getAutofillType();
@@ -50345,6 +50824,7 @@ package android.view {
     method public void getDrawingRect(android.graphics.Rect);
     method public long getDrawingTime();
     method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getElevation();
+    method @StyleRes public int getExplicitStyle();
     method @android.view.ViewDebug.ExportedProperty public boolean getFilterTouchesWhenObscured();
     method @android.view.ViewDebug.ExportedProperty public boolean getFitsSystemWindows();
     method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.NOT_FOCUSABLE, to="NOT_FOCUSABLE"), @android.view.ViewDebug.IntToString(from=android.view.View.FOCUSABLE, to="FOCUSABLE"), @android.view.ViewDebug.IntToString(from=android.view.View.FOCUSABLE_AUTO, to="FOCUSABLE_AUTO")}, category="focus") public int getFocusable();
@@ -50639,6 +51119,7 @@ package android.view {
     method public static int resolveSizeAndState(int, int, int);
     method public boolean restoreDefaultFocus();
     method public void restoreHierarchyState(android.util.SparseArray<android.os.Parcelable>);
+    method public final void saveAttributeDataForStyleable(@NonNull android.content.Context, @NonNull int[], @Nullable android.util.AttributeSet, @NonNull android.content.res.TypedArray, int, int);
     method public void saveHierarchyState(android.util.SparseArray<android.os.Parcelable>);
     method public void scheduleDrawable(@NonNull android.graphics.drawable.Drawable, @NonNull Runnable, long);
     method public void scrollBy(int, int);
@@ -50668,7 +51149,7 @@ package android.view {
     method public void setClickable(boolean);
     method public void setClipBounds(android.graphics.Rect);
     method public void setClipToOutline(boolean);
-    method public void setContentCaptureSession(@NonNull android.view.contentcapture.ContentCaptureSession);
+    method public void setContentCaptureSession(@Nullable android.view.contentcapture.ContentCaptureSession);
     method public void setContentDescription(CharSequence);
     method public void setContextClickable(boolean);
     method public void setDefaultFocusHighlightEnabled(boolean);
@@ -50776,6 +51257,7 @@ package android.view {
     method public void setTouchDelegate(android.view.TouchDelegate);
     method public void setTransitionAlpha(float);
     method public final void setTransitionName(String);
+    method public void setTransitionVisibility(int);
     method public void setTranslationX(float);
     method public void setTranslationY(float);
     method public void setTranslationZ(float);
@@ -51115,6 +51597,7 @@ package android.view {
     method public int getScaledHoverSlop();
     method public int getScaledMaximumDrawingCacheSize();
     method public int getScaledMaximumFlingVelocity();
+    method public int getScaledMinScalingSpan();
     method public int getScaledMinimumFlingVelocity();
     method public int getScaledOverflingDistance();
     method public int getScaledOverscrollDistance();
@@ -52611,7 +53094,6 @@ package android.view.animation {
   public abstract class Animation implements java.lang.Cloneable {
     ctor public Animation();
     ctor public Animation(android.content.Context, android.util.AttributeSet);
-    method public void addAnimationListener(android.view.animation.Animation.AnimationListener);
     method protected void applyTransformation(float, android.view.animation.Transformation);
     method public void cancel();
     method protected android.view.animation.Animation clone() throws java.lang.CloneNotSupportedException;
@@ -52636,7 +53118,6 @@ package android.view.animation {
     method public void initialize(int, int, int, int);
     method public boolean isFillEnabled();
     method public boolean isInitialized();
-    method public void removeAnimationListener(android.view.animation.Animation.AnimationListener);
     method public void reset();
     method protected float resolveSize(int, float, int, int);
     method public void restrictDuration(long);
@@ -53562,7 +54043,7 @@ package android.view.textclassifier {
     method @NonNull public java.util.List<android.view.textclassifier.ConversationActions.Message> getConversation();
     method @Nullable public String getConversationId();
     method @Nullable public java.util.List<java.lang.String> getHints();
-    method @IntRange(from=0) public int getMaxSuggestions();
+    method @IntRange(from=0xffffffff) public int getMaxSuggestions();
     method @NonNull public android.view.textclassifier.TextClassifier.EntityConfig getTypeConfig();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.view.textclassifier.ConversationActions.Request> CREATOR;
@@ -53575,7 +54056,7 @@ package android.view.textclassifier {
     method @NonNull public android.view.textclassifier.ConversationActions.Request build();
     method @NonNull public android.view.textclassifier.ConversationActions.Request.Builder setConversationId(@Nullable String);
     method public android.view.textclassifier.ConversationActions.Request.Builder setHints(@Nullable java.util.List<java.lang.String>);
-    method @NonNull public android.view.textclassifier.ConversationActions.Request.Builder setMaxSuggestions(@IntRange(from=0) int);
+    method @NonNull public android.view.textclassifier.ConversationActions.Request.Builder setMaxSuggestions(@IntRange(from=0xffffffff) int);
     method @NonNull public android.view.textclassifier.ConversationActions.Request.Builder setTypeConfig(@Nullable android.view.textclassifier.TextClassifier.EntityConfig);
   }
 
@@ -54853,12 +55334,14 @@ package android.widget {
     method public void deferNotifyDataSetChanged();
     method public void fling(int);
     method public android.widget.AbsListView.LayoutParams generateLayoutParams(android.util.AttributeSet);
+    method @ColorInt public int getBottomEdgeEffectColor();
     method @android.view.ViewDebug.ExportedProperty(category="drawing") @ColorInt public int getCacheColorHint();
     method public int getCheckedItemCount();
     method public long[] getCheckedItemIds();
     method public int getCheckedItemPosition();
     method public android.util.SparseBooleanArray getCheckedItemPositions();
     method public int getChoiceMode();
+    method public boolean getDrawSelectorOnTop();
     method public int getListPaddingBottom();
     method public int getListPaddingLeft();
     method public int getListPaddingRight();
@@ -54866,6 +55349,7 @@ package android.widget {
     method @android.view.ViewDebug.ExportedProperty public android.view.View getSelectedView();
     method public android.graphics.drawable.Drawable getSelector();
     method public CharSequence getTextFilter();
+    method @ColorInt public int getTopEdgeEffectColor();
     method public int getTranscriptMode();
     method protected void handleDataChanged();
     method public boolean hasTextFilter();
@@ -54893,9 +55377,11 @@ package android.widget {
     method public void reclaimViews(java.util.List<android.view.View>);
     method public void scrollListBy(int);
     method public void setAdapter(android.widget.ListAdapter);
+    method public void setBottomEdgeEffectColor(@ColorInt int);
     method public void setCacheColorHint(@ColorInt int);
     method public void setChoiceMode(int);
     method public void setDrawSelectorOnTop(boolean);
+    method public void setEdgeEffectColor(@ColorInt int);
     method public void setFastScrollAlwaysVisible(boolean);
     method public void setFastScrollEnabled(boolean);
     method public void setFastScrollStyle(int);
@@ -54914,6 +55400,7 @@ package android.widget {
     method public void setSmoothScrollbarEnabled(boolean);
     method public void setStackFromBottom(boolean);
     method public void setTextFilterEnabled(boolean);
+    method public void setTopEdgeEffectColor(@ColorInt int);
     method public void setTranscriptMode(int);
     method public void setVelocityScale(float);
     method public void smoothScrollBy(int, int);
@@ -55243,6 +55730,7 @@ package android.widget {
     method public void performCompletion();
     method protected void performFiltering(CharSequence, int);
     method public void performValidation();
+    method public final void refreshAutoCompleteResults();
     method protected void replaceText(CharSequence);
     method public <T extends android.widget.ListAdapter & android.widget.Filterable> void setAdapter(T);
     method public void setCompletionHint(CharSequence);
@@ -55546,6 +56034,7 @@ package android.widget {
     ctor public EdgeEffect(android.content.Context);
     method public boolean draw(android.graphics.Canvas);
     method public void finish();
+    method @Nullable public android.graphics.BlendMode getBlendMode();
     method @ColorInt public int getColor();
     method public int getMaxHeight();
     method public boolean isFinished();
@@ -55553,8 +56042,10 @@ package android.widget {
     method public void onPull(float);
     method public void onPull(float, float);
     method public void onRelease();
+    method public void setBlendMode(@Nullable android.graphics.BlendMode);
     method public void setColor(@ColorInt int);
     method public void setSize(int, int);
+    field public static final android.graphics.BlendMode DEFAULT_BLEND_MODE;
   }
 
   public class EditText extends android.widget.TextView {
@@ -55859,11 +56350,16 @@ package android.widget {
     method public boolean executeKeyEvent(android.view.KeyEvent);
     method public void fling(int);
     method public boolean fullScroll(int);
+    method @ColorInt public int getLeftEdgeEffectColor();
     method public int getMaxScrollAmount();
+    method @ColorInt public int getRightEdgeEffectColor();
     method public boolean isFillViewport();
     method public boolean isSmoothScrollingEnabled();
     method public boolean pageScroll(int);
+    method public void setEdgeEffectColor(@ColorInt int);
     method public void setFillViewport(boolean);
+    method public void setLeftEdgeEffectColor(@ColorInt int);
+    method public void setRightEdgeEffectColor(@ColorInt int);
     method public void setSmoothScrollingEnabled(boolean);
     method public final void smoothScrollBy(int, int);
     method public final void smoothScrollTo(int, int);
@@ -56004,6 +56500,7 @@ package android.widget {
     method @Nullable public android.view.View getAnchorView();
     method @StyleRes public int getAnimationStyle();
     method @Nullable public android.graphics.drawable.Drawable getBackground();
+    method @Nullable public android.graphics.Rect getEpicenterBounds();
     method public int getHeight();
     method public int getHorizontalOffset();
     method public int getInputMethodMode();
@@ -56030,6 +56527,7 @@ package android.widget {
     method public void setBackgroundDrawable(@Nullable android.graphics.drawable.Drawable);
     method public void setContentWidth(int);
     method public void setDropDownGravity(int);
+    method public void setEpicenterBounds(@Nullable android.graphics.Rect);
     method public void setHeight(int);
     method public void setHorizontalOffset(int);
     method public void setInputMethodMode(int);
@@ -56259,6 +56757,7 @@ package android.widget {
     method public android.view.Menu getMenu();
     method public android.view.MenuInflater getMenuInflater();
     method public void inflate(@MenuRes int);
+    method public void setForceShowIcon(boolean);
     method public void setGravity(int);
     method public void setOnDismissListener(android.widget.PopupMenu.OnDismissListener);
     method public void setOnMenuItemClickListener(android.widget.PopupMenu.OnMenuItemClickListener);
@@ -56289,6 +56788,7 @@ package android.widget {
     method public android.view.View getContentView();
     method public float getElevation();
     method @Nullable public android.transition.Transition getEnterTransition();
+    method @Nullable public android.graphics.Rect getEpicenterBounds();
     method @Nullable public android.transition.Transition getExitTransition();
     method public int getHeight();
     method public int getInputMethodMode();
@@ -56301,30 +56801,37 @@ package android.widget {
     method public int getWindowLayoutType();
     method public boolean isAboveAnchor();
     method public boolean isAttachedInDecor();
+    method public boolean isClipToScreenEnabled();
     method public boolean isClippingEnabled();
     method public boolean isFocusable();
+    method public boolean isLayoutInScreenEnabled();
     method public boolean isOutsideTouchable();
     method public boolean isShowing();
     method public boolean isSplitTouchEnabled();
+    method public boolean isTouchModal();
     method public boolean isTouchable();
     method public void setAnimationStyle(int);
     method public void setAttachedInDecor(boolean);
     method public void setBackgroundDrawable(android.graphics.drawable.Drawable);
+    method public void setClipToScreenEnabled(boolean);
     method public void setClippingEnabled(boolean);
     method public void setContentView(android.view.View);
     method public void setElevation(float);
     method public void setEnterTransition(@Nullable android.transition.Transition);
+    method public void setEpicenterBounds(@Nullable android.graphics.Rect);
     method public void setExitTransition(@Nullable android.transition.Transition);
     method public void setFocusable(boolean);
     method public void setHeight(int);
     method public void setIgnoreCheekPress();
     method public void setInputMethodMode(int);
+    method public void setLayoutInScreenEnabled(boolean);
     method public void setOnDismissListener(android.widget.PopupWindow.OnDismissListener);
     method public void setOutsideTouchable(boolean);
     method public void setOverlapAnchor(boolean);
     method public void setSoftInputMode(int);
     method public void setSplitTouchEnabled(boolean);
     method public void setTouchInterceptor(android.view.View.OnTouchListener);
+    method public void setTouchModal(boolean);
     method public void setTouchable(boolean);
     method public void setWidth(int);
     method @Deprecated public void setWindowLayoutMode(int, int);
@@ -56353,12 +56860,17 @@ package android.widget {
     ctor public ProgressBar(android.content.Context, android.util.AttributeSet);
     ctor public ProgressBar(android.content.Context, android.util.AttributeSet, int);
     ctor public ProgressBar(android.content.Context, android.util.AttributeSet, int, int);
+    method @Nullable public android.graphics.drawable.Drawable getCurrentDrawable();
     method public android.graphics.drawable.Drawable getIndeterminateDrawable();
     method @Nullable public android.content.res.ColorStateList getIndeterminateTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getIndeterminateTintMode();
     method public android.view.animation.Interpolator getInterpolator();
     method @android.view.ViewDebug.ExportedProperty(category="progress") public int getMax();
+    method @Px public int getMaxHeight();
+    method @Px public int getMaxWidth();
     method @android.view.ViewDebug.ExportedProperty(category="progress") public int getMin();
+    method @Px public int getMinHeight();
+    method @Px public int getMinWidth();
     method @android.view.ViewDebug.ExportedProperty(category="progress") public int getProgress();
     method @Nullable public android.content.res.ColorStateList getProgressBackgroundTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getProgressBackgroundTintMode();
@@ -56382,7 +56894,11 @@ package android.widget {
     method public void setInterpolator(android.content.Context, @InterpolatorRes int);
     method public void setInterpolator(android.view.animation.Interpolator);
     method public void setMax(int);
+    method public void setMaxHeight(@Px int);
+    method public void setMaxWidth(@Px int);
     method public void setMin(int);
+    method public void setMinHeight(@Px int);
+    method public void setMinWidth(@Px int);
     method public void setProgress(int);
     method public void setProgress(int, boolean);
     method public void setProgressBackgroundTintList(@Nullable android.content.res.ColorStateList);
@@ -56472,6 +56988,7 @@ package android.widget {
     ctor public RelativeLayout(android.content.Context, android.util.AttributeSet, int, int);
     method public android.widget.RelativeLayout.LayoutParams generateLayoutParams(android.util.AttributeSet);
     method public int getGravity();
+    method public int getIgnoreGravity();
     method public void setGravity(int);
     method public void setHorizontalGravity(int);
     method public void setIgnoreGravity(int);
@@ -56641,12 +57158,18 @@ package android.widget {
     method public boolean executeKeyEvent(android.view.KeyEvent);
     method public void fling(int);
     method public boolean fullScroll(int);
+    method @ColorInt public int getBottomEdgeEffectColor();
     method public int getMaxScrollAmount();
+    method @ColorInt public int getTopEdgeEffectColor();
     method public boolean isFillViewport();
     method public boolean isSmoothScrollingEnabled();
     method public boolean pageScroll(int);
+    method public void scrollToDescendant(android.view.View);
+    method public void setBottomEdgeEffectColor(@ColorInt int);
+    method public void setEdgeEffectColor(@ColorInt int);
     method public void setFillViewport(boolean);
     method public void setSmoothScrollingEnabled(boolean);
+    method public void setTopEdgeEffectColor(@ColorInt int);
     method public final void smoothScrollBy(int, int);
     method public final void smoothScrollTo(int, int);
   }
@@ -56688,8 +57211,9 @@ package android.widget {
     method public CharSequence getQuery();
     method @Nullable public CharSequence getQueryHint();
     method public android.widget.CursorAdapter getSuggestionsAdapter();
-    method public boolean isIconfiedByDefault();
+    method @Deprecated public boolean isIconfiedByDefault();
     method public boolean isIconified();
+    method public boolean isIconifiedByDefault();
     method public boolean isQueryRefinementEnabled();
     method public boolean isSubmitButtonEnabled();
     method public void onActionViewCollapsed();
@@ -57412,6 +57936,7 @@ package android.widget {
     ctor public ToggleButton(android.content.Context, android.util.AttributeSet, int);
     ctor public ToggleButton(android.content.Context, android.util.AttributeSet);
     ctor public ToggleButton(android.content.Context);
+    method public float getDisabledAlpha();
     method public CharSequence getTextOff();
     method public CharSequence getTextOn();
     method public void setBackgroundDrawable(android.graphics.drawable.Drawable);
@@ -57572,6 +58097,7 @@ package android.widget {
   @android.widget.RemoteViews.RemoteView public class ViewFlipper extends android.widget.ViewAnimator {
     ctor public ViewFlipper(android.content.Context);
     ctor public ViewFlipper(android.content.Context, android.util.AttributeSet);
+    method public int getFlipInterval();
     method public boolean isAutoStart();
     method public boolean isFlipping();
     method public void setAutoStart(boolean);
@@ -61164,9 +61690,9 @@ package java.lang.invoke {
     method public String getName();
     method public int getReferenceKind();
     method public default boolean isVarArgs();
-    method public static boolean refKindIsField(int);
-    method public static boolean refKindIsValid(int);
-    method public static String refKindName(int);
+    method @Deprecated public static boolean refKindIsField(int);
+    method @Deprecated public static boolean refKindIsValid(int);
+    method @Deprecated public static String refKindName(int);
     method public static String referenceKindToString(int);
     method public <T extends java.lang.reflect.Member> T reflectAs(Class<T>, java.lang.invoke.MethodHandles.Lookup);
     method public static String toString(int, Class<?>, String, java.lang.invoke.MethodType);
