@@ -745,6 +745,7 @@ package android {
     field public static final int immersive = 16843456; // 0x10102c0
     field public static final int importantForAccessibility = 16843690; // 0x10103aa
     field public static final int importantForAutofill = 16844120; // 0x1010558
+    field public static final int importantForContentCapture = 16844295; // 0x1010607
     field public static final int inAnimation = 16843127; // 0x1010177
     field public static final int includeFontPadding = 16843103; // 0x101015f
     field public static final int includeInGlobalSearch = 16843374; // 0x101026e
@@ -21804,7 +21805,6 @@ package android.icu.util {
     ctor public JapaneseCalendar(int, int, int, int);
     ctor public JapaneseCalendar(int, int, int);
     ctor public JapaneseCalendar(int, int, int, int, int, int);
-    field @Deprecated public static final int CURRENT_ERA;
     field public static final int HEISEI;
     field public static final int MEIJI;
     field public static final int SHOWA;
@@ -28090,6 +28090,7 @@ package android.media.tv {
     method public int getVideoHeight();
     method public float getVideoPixelAspectRatio();
     method public int getVideoWidth();
+    method public boolean isEncrypted();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.media.tv.TvTrackInfo> CREATOR;
     field public static final int TYPE_AUDIO = 0; // 0x0
@@ -28103,6 +28104,7 @@ package android.media.tv {
     method public android.media.tv.TvTrackInfo.Builder setAudioChannelCount(int);
     method public android.media.tv.TvTrackInfo.Builder setAudioSampleRate(int);
     method public android.media.tv.TvTrackInfo.Builder setDescription(CharSequence);
+    method public android.media.tv.TvTrackInfo.Builder setEncrypted(boolean);
     method public android.media.tv.TvTrackInfo.Builder setExtra(android.os.Bundle);
     method public android.media.tv.TvTrackInfo.Builder setLanguage(String);
     method public android.media.tv.TvTrackInfo.Builder setVideoActiveFormatDescription(byte);
@@ -29811,7 +29813,7 @@ package android.net.wifi {
     method @Deprecated public boolean reconnect();
     method @Deprecated public boolean removeNetwork(int);
     method @RequiresPermission(android.Manifest.permission.CHANGE_WIFI_STATE) public int removeNetworkSuggestions(@NonNull java.util.List<android.net.wifi.WifiNetworkSuggestion>);
-    method @Deprecated @RequiresPermission("android.permission.NETWORK_SETTINGS") public void removePasspointConfiguration(String);
+    method @Deprecated @RequiresPermission(anyOf={"android.permission.NETWORK_SETTINGS", "android.permission.NETWORK_CARRIER_PROVISIONING"}) public void removePasspointConfiguration(String);
     method @Deprecated public boolean saveConfiguration();
     method public void setTdlsEnabled(java.net.InetAddress, boolean);
     method public void setTdlsEnabledWithMacAddress(String, boolean);
@@ -42272,6 +42274,8 @@ package android.system {
   public final class ErrnoException extends java.lang.Exception {
     ctor public ErrnoException(String, int);
     ctor public ErrnoException(String, int, Throwable);
+    method @NonNull public java.io.IOException rethrowAsIOException() throws java.io.IOException;
+    method @NonNull public java.net.SocketException rethrowAsSocketException() throws java.net.SocketException;
     field public final int errno;
   }
 
@@ -44934,7 +44938,7 @@ package android.telephony {
     method public String getNetworkOperator();
     method public String getNetworkOperatorName();
     method public String getNetworkSpecifier();
-    method public int getNetworkType();
+    method @Deprecated @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public int getNetworkType();
     method public int getPhoneCount();
     method public int getPhoneType();
     method @RequiresPermission(anyOf={"android.permission.READ_PRIVILEGED_PHONE_STATE", android.Manifest.permission.READ_PHONE_STATE}) public int getPreferredOpportunisticDataSubscription();
@@ -50221,6 +50225,7 @@ package android.view {
     method @android.view.ViewDebug.CapturedViewProperty @IdRes public int getId();
     method @android.view.ViewDebug.ExportedProperty(category="accessibility", mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, to="noHideDescendants")}) public int getImportantForAccessibility();
     method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS, to="yesExcludeDescendants"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS, to="noExcludeDescendants")}) public int getImportantForAutofill();
+    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS, to="yesExcludeDescendants"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS, to="noExcludeDescendants")}) public int getImportantForContentCapture();
     method public boolean getKeepScreenOn();
     method public android.view.KeyEvent.DispatcherState getKeyDispatcherState();
     method @android.view.ViewDebug.ExportedProperty(category="accessibility") @IdRes public int getLabelFor();
@@ -50361,6 +50366,7 @@ package android.view {
     method @android.view.ViewDebug.ExportedProperty public boolean isHovered();
     method public boolean isImportantForAccessibility();
     method public final boolean isImportantForAutofill();
+    method public final boolean isImportantForContentCapture();
     method public boolean isInEditMode();
     method public boolean isInLayout();
     method @android.view.ViewDebug.ExportedProperty public boolean isInTouchMode();
@@ -50435,6 +50441,7 @@ package android.view {
     method @CallSuper public void onPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent);
     method public void onProvideAutofillStructure(android.view.ViewStructure, int);
     method public void onProvideAutofillVirtualStructure(android.view.ViewStructure, int);
+    method public void onProvideContentCaptureStructure(@NonNull android.view.ViewStructure, int);
     method public void onProvideStructure(android.view.ViewStructure);
     method public void onProvideVirtualStructure(android.view.ViewStructure);
     method public android.view.PointerIcon onResolvePointerIcon(android.view.MotionEvent, int);
@@ -50560,6 +50567,7 @@ package android.view {
     method public void setId(@IdRes int);
     method public void setImportantForAccessibility(int);
     method public void setImportantForAutofill(int);
+    method public void setImportantForContentCapture(int);
     method public void setKeepScreenOn(boolean);
     method public void setKeyboardNavigationCluster(boolean);
     method public void setLabelFor(@IdRes int);
@@ -50738,6 +50746,11 @@ package android.view {
     field public static final int IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS = 8; // 0x8
     field public static final int IMPORTANT_FOR_AUTOFILL_YES = 1; // 0x1
     field public static final int IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS = 4; // 0x4
+    field public static final int IMPORTANT_FOR_CONTENT_CAPTURE_AUTO = 0; // 0x0
+    field public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO = 2; // 0x2
+    field public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS = 8; // 0x8
+    field public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES = 1; // 0x1
+    field public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS = 4; // 0x4
     field public static final int INVISIBLE = 4; // 0x4
     field public static final int KEEP_SCREEN_ON = 67108864; // 0x4000000
     field public static final int LAYER_TYPE_HARDWARE = 2; // 0x2
