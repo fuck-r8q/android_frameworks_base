@@ -16,6 +16,7 @@
 
 package com.android.systemui;
 
+import static com.android.systemui.Dependency.ALLOW_NOTIFICATION_LONG_PRESS_NAME;
 import static com.android.systemui.Dependency.LEAK_REPORT_EMAIL_NAME;
 
 import android.content.Context;
@@ -73,5 +74,12 @@ abstract class SystemUIDefaultModule {
     @Provides
     static ShadeController provideShadeController(Context context) {
         return SysUiServiceProvider.getComponent(context, StatusBar.class);
+    }
+
+    @Singleton
+    @Provides
+    @Named(ALLOW_NOTIFICATION_LONG_PRESS_NAME)
+    static boolean provideAllowNotificationLongPress() {
+        return true;
     }
 }
