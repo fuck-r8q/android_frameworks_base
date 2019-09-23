@@ -21,6 +21,8 @@ import static com.android.server.wm.flicker.CommonTransitions.editTextLoseFocusT
 import androidx.test.InstrumentationRegistry;
 import androidx.test.filters.LargeTest;
 
+import com.android.server.wm.flicker.helpers.ImeAppHelper;
+
 import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
@@ -42,14 +44,12 @@ public class CloseImeWindowToAppTest extends NonRotationTestBase {
     public CloseImeWindowToAppTest(String beginRotationName, int beginRotation) {
         super(beginRotationName, beginRotation);
 
-        mTestApp = new StandardAppHelper(
-                InstrumentationRegistry.getInstrumentation(),
-                "com.android.server.wm.flicker.testapp", "ImeApp");
+        mTestApp = new ImeAppHelper(InstrumentationRegistry.getInstrumentation());
     }
 
     @Before
     public void runTransition() {
-        run(editTextLoseFocusToApp(mTestApp, mUiDevice, mBeginRotation, /* clickOnEditField */true)
+        run(editTextLoseFocusToApp((ImeAppHelper) mTestApp, mUiDevice, mBeginRotation)
                 .includeJankyRuns().build());
     }
 
