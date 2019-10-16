@@ -2812,12 +2812,12 @@ package android.accessibilityservice {
     method public void onClicked(android.accessibilityservice.AccessibilityButtonController);
   }
 
-  public final class AccessibilityGestureInfo implements android.os.Parcelable {
+  public final class AccessibilityGestureEvent implements android.os.Parcelable {
     method public int describeContents();
     method public int getDisplayId();
     method public int getGestureId();
-    method public void writeToParcel(android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.accessibilityservice.AccessibilityGestureInfo> CREATOR;
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.accessibilityservice.AccessibilityGestureEvent> CREATOR;
   }
 
   public abstract class AccessibilityService extends android.app.Service {
@@ -2836,7 +2836,7 @@ package android.accessibilityservice {
     method public abstract void onAccessibilityEvent(android.view.accessibility.AccessibilityEvent);
     method public final android.os.IBinder onBind(android.content.Intent);
     method @Deprecated protected boolean onGesture(int);
-    method public boolean onGesture(@NonNull android.accessibilityservice.AccessibilityGestureInfo);
+    method public boolean onGesture(@NonNull android.accessibilityservice.AccessibilityGestureEvent);
     method public abstract void onInterrupt();
     method protected boolean onKeyEvent(android.view.KeyEvent);
     method protected void onServiceConnected();
@@ -3690,11 +3690,11 @@ package android.app {
     method public <T extends android.view.View> T findViewById(@IdRes int);
     method public void finish();
     method public void finishActivity(int);
-    method public void finishActivityFromChild(@NonNull android.app.Activity, int);
+    method @Deprecated public void finishActivityFromChild(@NonNull android.app.Activity, int);
     method public void finishAffinity();
     method public void finishAfterTransition();
     method public void finishAndRemoveTask();
-    method public void finishFromChild(android.app.Activity);
+    method @Deprecated public void finishFromChild(android.app.Activity);
     method @Nullable public android.app.ActionBar getActionBar();
     method public final android.app.Application getApplication();
     method @Nullable public android.content.ComponentName getCallingActivity();
@@ -3743,7 +3743,7 @@ package android.app {
     method @Deprecated public final android.database.Cursor managedQuery(android.net.Uri, String[], String, String[], String);
     method public boolean moveTaskToBack(boolean);
     method public boolean navigateUpTo(android.content.Intent);
-    method public boolean navigateUpToFromChild(android.app.Activity, android.content.Intent);
+    method @Deprecated public boolean navigateUpToFromChild(android.app.Activity, android.content.Intent);
     method @CallSuper public void onActionModeFinished(android.view.ActionMode);
     method @CallSuper public void onActionModeStarted(android.view.ActionMode);
     method public void onActivityReenter(int, android.content.Intent);
@@ -3787,7 +3787,7 @@ package android.app {
     method public void onMultiWindowModeChanged(boolean, android.content.res.Configuration);
     method @Deprecated public void onMultiWindowModeChanged(boolean);
     method public boolean onNavigateUp();
-    method public boolean onNavigateUpFromChild(android.app.Activity);
+    method @Deprecated public boolean onNavigateUpFromChild(android.app.Activity);
     method protected void onNewIntent(android.content.Intent);
     method public boolean onOptionsItemSelected(@NonNull android.view.MenuItem);
     method public void onOptionsMenuClosed(android.view.Menu);
@@ -3894,16 +3894,16 @@ package android.app {
     method @Nullable public android.view.ActionMode startActionMode(android.view.ActionMode.Callback, int);
     method public void startActivityForResult(@RequiresPermission android.content.Intent, int);
     method public void startActivityForResult(@RequiresPermission android.content.Intent, int, @Nullable android.os.Bundle);
-    method public void startActivityFromChild(@NonNull android.app.Activity, @RequiresPermission android.content.Intent, int);
-    method public void startActivityFromChild(@NonNull android.app.Activity, @RequiresPermission android.content.Intent, int, @Nullable android.os.Bundle);
+    method @Deprecated public void startActivityFromChild(@NonNull android.app.Activity, @RequiresPermission android.content.Intent, int);
+    method @Deprecated public void startActivityFromChild(@NonNull android.app.Activity, @RequiresPermission android.content.Intent, int, @Nullable android.os.Bundle);
     method @Deprecated public void startActivityFromFragment(@NonNull android.app.Fragment, @RequiresPermission android.content.Intent, int);
     method @Deprecated public void startActivityFromFragment(@NonNull android.app.Fragment, @RequiresPermission android.content.Intent, int, @Nullable android.os.Bundle);
     method public boolean startActivityIfNeeded(@RequiresPermission @NonNull android.content.Intent, int);
     method public boolean startActivityIfNeeded(@RequiresPermission @NonNull android.content.Intent, int, @Nullable android.os.Bundle);
     method public void startIntentSenderForResult(android.content.IntentSender, int, @Nullable android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
     method public void startIntentSenderForResult(android.content.IntentSender, int, @Nullable android.content.Intent, int, int, int, android.os.Bundle) throws android.content.IntentSender.SendIntentException;
-    method public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
-    method public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int, @Nullable android.os.Bundle) throws android.content.IntentSender.SendIntentException;
+    method @Deprecated public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
+    method @Deprecated public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int, @Nullable android.os.Bundle) throws android.content.IntentSender.SendIntentException;
     method public void startLocalVoiceInteraction(android.os.Bundle);
     method public void startLockTask();
     method @Deprecated public void startManagingCursor(android.database.Cursor);
@@ -4278,16 +4278,26 @@ package android.app {
     method @Deprecated public int checkOpNoThrow(@NonNull String, int, @NonNull String);
     method public void checkPackage(int, @NonNull String);
     method public void finishOp(@NonNull String, int, @NonNull String);
-    method public int noteOp(@NonNull String, int, @NonNull String);
-    method public int noteOpNoThrow(@NonNull String, int, @NonNull String);
-    method public int noteProxyOp(@NonNull String, @NonNull String);
-    method public int noteProxyOpNoThrow(@NonNull String, @NonNull String);
-    method public int noteProxyOpNoThrow(@NonNull String, @Nullable String, int);
+    method public boolean isOpActive(@NonNull String, int, @NonNull String);
+    method @Deprecated public int noteOp(@NonNull String, int, @NonNull String);
+    method public int noteOp(@NonNull String, int, @Nullable String, @Nullable String);
+    method @Deprecated public int noteOpNoThrow(@NonNull String, int, @NonNull String);
+    method public int noteOpNoThrow(@NonNull String, int, @NonNull String, @Nullable String);
+    method @Deprecated public int noteProxyOp(@NonNull String, @NonNull String);
+    method public int noteProxyOp(@NonNull String, @Nullable String, int, @Nullable String);
+    method @Deprecated public int noteProxyOpNoThrow(@NonNull String, @NonNull String);
+    method @Deprecated public int noteProxyOpNoThrow(@NonNull String, @Nullable String, int);
+    method public int noteProxyOpNoThrow(@NonNull String, @Nullable String, int, @Nullable String);
     method public static String permissionToOp(String);
-    method public int startOp(@NonNull String, int, @NonNull String);
-    method public int startOpNoThrow(@NonNull String, int, @NonNull String);
+    method public void setNotedAppOpsCollector(@Nullable android.app.AppOpsManager.AppOpsCollector);
+    method @Deprecated public int startOp(@NonNull String, int, @NonNull String);
+    method public int startOp(@NonNull String, int, @Nullable String, @Nullable String);
+    method @Deprecated public int startOpNoThrow(@NonNull String, int, @NonNull String);
+    method public int startOpNoThrow(@NonNull String, int, @NonNull String, @Nullable String);
+    method public void startWatchingActive(@NonNull String[], @NonNull java.util.concurrent.Executor, @NonNull android.app.AppOpsManager.OnOpActiveChangedListener);
     method public void startWatchingMode(@NonNull String, @Nullable String, @NonNull android.app.AppOpsManager.OnOpChangedListener);
     method public void startWatchingMode(@NonNull String, @Nullable String, int, @NonNull android.app.AppOpsManager.OnOpChangedListener);
+    method public void stopWatchingActive(@NonNull android.app.AppOpsManager.OnOpActiveChangedListener);
     method public void stopWatchingMode(@NonNull android.app.AppOpsManager.OnOpChangedListener);
     method public int unsafeCheckOp(@NonNull String, int, @NonNull String);
     method public int unsafeCheckOpNoThrow(@NonNull String, int, @NonNull String);
@@ -4333,6 +4343,18 @@ package android.app {
     field public static final String OPSTR_WRITE_EXTERNAL_STORAGE = "android:write_external_storage";
     field public static final String OPSTR_WRITE_SETTINGS = "android:write_settings";
     field public static final int WATCH_FOREGROUND_CHANGES = 1; // 0x1
+  }
+
+  public abstract static class AppOpsManager.AppOpsCollector {
+    ctor public AppOpsManager.AppOpsCollector();
+    method @NonNull public java.util.concurrent.Executor getAsyncNotedExecutor();
+    method public abstract void onAsyncNoted(@NonNull android.app.AsyncNotedAppOp);
+    method public abstract void onNoted(@NonNull android.app.SyncNotedAppOp);
+    method public abstract void onSelfNoted(@NonNull android.app.SyncNotedAppOp);
+  }
+
+  public static interface AppOpsManager.OnOpActiveChangedListener {
+    method public void onOpActiveChanged(@NonNull String, int, @NonNull String, boolean);
   }
 
   public static interface AppOpsManager.OnOpChangedListener {
@@ -4449,6 +4471,17 @@ package android.app {
     method public void writeToParcel(android.os.Parcel, int);
     field public long durationMillis;
     field public String serviceDetails;
+  }
+
+  public final class AsyncNotedAppOp implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public String getMessage();
+    method @Nullable public String getNotingPackageName();
+    method @IntRange(from=0) public int getNotingUid();
+    method @NonNull public String getOp();
+    method @IntRange(from=0) public long getTime();
+    method public void writeToParcel(android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.AsyncNotedAppOp> CREATOR;
   }
 
   public final class AuthenticationRequiredException extends java.lang.SecurityException implements android.os.Parcelable {
@@ -5287,10 +5320,12 @@ package android.app {
     ctor public Notification(android.os.Parcel);
     method public android.app.Notification clone();
     method public int describeContents();
+    method @Nullable public android.util.Pair<android.app.RemoteInput,android.app.Notification.Action> findRemoteInputActionPair(boolean);
     method public boolean getAllowSystemGeneratedContextualActions();
     method public int getBadgeIconType();
     method @Nullable public android.app.Notification.BubbleMetadata getBubbleMetadata();
     method public String getChannelId();
+    method @NonNull public java.util.List<android.app.Notification.Action> getContextualActions();
     method public String getGroup();
     method public int getGroupAlertBehavior();
     method public android.graphics.drawable.Icon getLargeIcon();
@@ -5686,6 +5721,7 @@ package android.app {
     method public String getDataMimeType();
     method public android.net.Uri getDataUri();
     method public android.os.Bundle getExtras();
+    method @NonNull public static java.util.List<android.app.Notification.MessagingStyle.Message> getMessagesFromBundleArray(@Nullable android.os.Parcelable[]);
     method @Deprecated public CharSequence getSender();
     method @Nullable public android.app.Person getSenderPerson();
     method public CharSequence getText();
@@ -5783,6 +5819,7 @@ package android.app {
     method public android.net.Uri getSound();
     method public long[] getVibrationPattern();
     method public boolean hasUserSetImportance();
+    method public boolean hasUserSetSound();
     method public void setAllowBubbles(boolean);
     method public void setBypassDnd(boolean);
     method public void setDescription(String);
@@ -6258,6 +6295,10 @@ package android.app {
   }
 
   public class StatusBarManager {
+  }
+
+  public final class SyncNotedAppOp {
+    method @NonNull public String getOp();
   }
 
   @Deprecated public class TabActivity extends android.app.ActivityGroup {
@@ -7175,18 +7216,18 @@ package android.app.assist {
     method @Nullable public android.view.autofill.AutofillValue getAutofillValue();
     method public android.app.assist.AssistStructure.ViewNode getChildAt(int);
     method public int getChildCount();
-    method public String getClassName();
-    method public CharSequence getContentDescription();
+    method @Nullable public String getClassName();
+    method @Nullable public CharSequence getContentDescription();
     method public float getElevation();
-    method public android.os.Bundle getExtras();
+    method @Nullable public android.os.Bundle getExtras();
     method public int getHeight();
-    method public String getHint();
+    method @Nullable public String getHint();
     method @Nullable public String getHintIdEntry();
     method @Nullable public android.view.ViewStructure.HtmlInfo getHtmlInfo();
     method public int getId();
-    method public String getIdEntry();
-    method public String getIdPackage();
-    method public String getIdType();
+    method @Nullable public String getIdEntry();
+    method @Nullable public String getIdPackage();
+    method @Nullable public String getIdType();
     method public int getImportantForAutofill();
     method public int getInputType();
     method public int getLeft();
@@ -7196,12 +7237,12 @@ package android.app.assist {
     method public int getMinTextEms();
     method public int getScrollX();
     method public int getScrollY();
-    method public CharSequence getText();
+    method @Nullable public CharSequence getText();
     method public int getTextBackgroundColor();
     method public int getTextColor();
     method @Nullable public String getTextIdEntry();
-    method public int[] getTextLineBaselines();
-    method public int[] getTextLineCharOffsets();
+    method @Nullable public int[] getTextLineBaselines();
+    method @Nullable public int[] getTextLineCharOffsets();
     method public int getTextSelectionEnd();
     method public int getTextSelectionStart();
     method public float getTextSize();
@@ -7837,6 +7878,7 @@ package android.appwidget {
     method public void deleteAppWidgetId(int);
     method public void deleteHost();
     method public int[] getAppWidgetIds();
+    method public void onAppWidgetRemoved(int);
     method protected android.appwidget.AppWidgetHostView onCreateView(android.content.Context, int, android.appwidget.AppWidgetProviderInfo);
     method protected void onProviderChanged(int, android.appwidget.AppWidgetProviderInfo);
     method protected void onProvidersChanged();
@@ -9341,6 +9383,7 @@ package android.content {
     field public static final String MIMETYPE_TEXT_INTENT = "text/vnd.android.intent";
     field public static final String MIMETYPE_TEXT_PLAIN = "text/plain";
     field public static final String MIMETYPE_TEXT_URILIST = "text/uri-list";
+    field public static final String MIMETYPE_UNKNOWN = "application/octet-stream";
   }
 
   public class ClipboardManager extends android.text.ClipboardManager {
@@ -9688,6 +9731,7 @@ package android.content {
     method public Long getAsLong(String);
     method public Short getAsShort(String);
     method public String getAsString(String);
+    method public boolean isEmpty();
     method public java.util.Set<java.lang.String> keySet();
     method public void put(String, String);
     method public void put(String, Byte);
@@ -10866,9 +10910,7 @@ package android.content {
     method @Nullable public String getString(String, @Nullable String);
     method @Nullable public java.util.Set<java.lang.String> getStringSet(String, @Nullable java.util.Set<java.lang.String>);
     method public void registerOnSharedPreferenceChangeListener(android.content.SharedPreferences.OnSharedPreferenceChangeListener);
-    method public default void registerOnSharedPreferencesClearListener(@NonNull android.content.SharedPreferences.OnSharedPreferencesClearListener);
     method public void unregisterOnSharedPreferenceChangeListener(android.content.SharedPreferences.OnSharedPreferenceChangeListener);
-    method public default void unregisterOnSharedPreferencesClearListener(@NonNull android.content.SharedPreferences.OnSharedPreferencesClearListener);
   }
 
   public static interface SharedPreferences.Editor {
@@ -10886,10 +10928,6 @@ package android.content {
 
   public static interface SharedPreferences.OnSharedPreferenceChangeListener {
     method public void onSharedPreferenceChanged(android.content.SharedPreferences, String);
-  }
-
-  public static interface SharedPreferences.OnSharedPreferencesClearListener {
-    method public void onSharedPreferencesClear(@NonNull android.content.SharedPreferences, @NonNull java.util.Set<java.lang.String>);
   }
 
   public class SyncAdapterType implements android.os.Parcelable {
@@ -16869,8 +16907,13 @@ package android.hardware.camera2 {
     method @NonNull public abstract android.hardware.camera2.CaptureRequest.Builder createReprocessCaptureRequest(@NonNull android.hardware.camera2.TotalCaptureResult) throws android.hardware.camera2.CameraAccessException;
     method public abstract void createReprocessableCaptureSession(@NonNull android.hardware.camera2.params.InputConfiguration, @NonNull java.util.List<android.view.Surface>, @NonNull android.hardware.camera2.CameraCaptureSession.StateCallback, @Nullable android.os.Handler) throws android.hardware.camera2.CameraAccessException;
     method public abstract void createReprocessableCaptureSessionByConfigurations(@NonNull android.hardware.camera2.params.InputConfiguration, @NonNull java.util.List<android.hardware.camera2.params.OutputConfiguration>, @NonNull android.hardware.camera2.CameraCaptureSession.StateCallback, @Nullable android.os.Handler) throws android.hardware.camera2.CameraAccessException;
+    method public int getCameraAudioRestriction() throws android.hardware.camera2.CameraAccessException;
     method @NonNull public abstract String getId();
     method public boolean isSessionConfigurationSupported(@NonNull android.hardware.camera2.params.SessionConfiguration) throws android.hardware.camera2.CameraAccessException;
+    method public void setCameraAudioRestriction(int) throws android.hardware.camera2.CameraAccessException;
+    field public static final int AUDIO_RESTRICTION_NONE = 0; // 0x0
+    field public static final int AUDIO_RESTRICTION_VIBRATION = 1; // 0x1
+    field public static final int AUDIO_RESTRICTION_VIBRATION_SOUND = 3; // 0x3
     field public static final int TEMPLATE_MANUAL = 6; // 0x6
     field public static final int TEMPLATE_PREVIEW = 1; // 0x1
     field public static final int TEMPLATE_RECORD = 3; // 0x3
@@ -23925,6 +23968,7 @@ package android.media {
     method @Nullable public long[] getThumbnailRange();
     method public boolean hasAttribute(@NonNull String);
     method public boolean hasThumbnail();
+    method public static boolean isSupportedMimeType(@NonNull String);
     method public boolean isThumbnailCompressed();
     method public void saveAttributes() throws java.io.IOException;
     method public void setAttribute(@NonNull String, @Nullable String);
@@ -28195,7 +28239,7 @@ package android.media.tv {
     method public android.media.tv.TvTrackInfo.Builder setAudioChannelCount(int);
     method public android.media.tv.TvTrackInfo.Builder setAudioSampleRate(int);
     method public android.media.tv.TvTrackInfo.Builder setDescription(CharSequence);
-    method public android.media.tv.TvTrackInfo.Builder setEncrypted(boolean);
+    method @NonNull public android.media.tv.TvTrackInfo.Builder setEncrypted(boolean);
     method public android.media.tv.TvTrackInfo.Builder setExtra(android.os.Bundle);
     method public android.media.tv.TvTrackInfo.Builder setLanguage(String);
     method public android.media.tv.TvTrackInfo.Builder setVideoActiveFormatDescription(byte);
@@ -34523,6 +34567,7 @@ package android.os {
     method public static String getExternalStorageState();
     method public static String getExternalStorageState(java.io.File);
     method @NonNull public static java.io.File getRootDirectory();
+    method @NonNull public static java.io.File getStorageDirectory();
     method @Deprecated public static String getStorageState(java.io.File);
     method public static boolean isExternalStorageEmulated();
     method public static boolean isExternalStorageEmulated(@NonNull java.io.File);
@@ -38346,8 +38391,10 @@ package android.provider {
     ctor public MediaStore();
     method @Nullable public static android.net.Uri getDocumentUri(@NonNull android.content.Context, @NonNull android.net.Uri);
     method @NonNull public static java.util.Set<java.lang.String> getExternalVolumeNames(@NonNull android.content.Context);
+    method public static boolean getIncludePending(@NonNull android.net.Uri);
     method public static android.net.Uri getMediaScannerUri();
     method @Nullable public static android.net.Uri getMediaUri(@NonNull android.content.Context, @NonNull android.net.Uri);
+    method public static boolean getRequireOriginal(@NonNull android.net.Uri);
     method @NonNull public static String getVersion(@NonNull android.content.Context);
     method @NonNull public static String getVersion(@NonNull android.content.Context, @NonNull String);
     method @NonNull public static String getVolumeName(@NonNull android.net.Uri);
@@ -38490,6 +38537,7 @@ package android.provider {
   public static final class MediaStore.Audio.Media implements android.provider.MediaStore.Audio.AudioColumns {
     ctor public MediaStore.Audio.Media();
     method public static android.net.Uri getContentUri(String);
+    method @NonNull public static android.net.Uri getContentUri(@NonNull String, long);
     method @Deprecated @Nullable public static android.net.Uri getContentUriForPath(@NonNull String);
     field public static final String CONTENT_TYPE = "vnd.android.cursor.dir/audio";
     field public static final String DEFAULT_SORT_ORDER = "title_key";
@@ -38540,6 +38588,7 @@ package android.provider {
 
   public static final class MediaStore.Downloads implements android.provider.MediaStore.DownloadColumns {
     method @NonNull public static android.net.Uri getContentUri(@NonNull String);
+    method @NonNull public static android.net.Uri getContentUri(@NonNull String, long);
     field public static final String CONTENT_TYPE = "vnd.android.cursor.dir/download";
     field @NonNull public static final android.net.Uri EXTERNAL_CONTENT_URI;
     field @NonNull public static final android.net.Uri INTERNAL_CONTENT_URI;
@@ -38580,6 +38629,7 @@ package android.provider {
     ctor public MediaStore.Images.Media();
     method @Deprecated public static android.graphics.Bitmap getBitmap(android.content.ContentResolver, android.net.Uri) throws java.io.FileNotFoundException, java.io.IOException;
     method public static android.net.Uri getContentUri(String);
+    method @NonNull public static android.net.Uri getContentUri(@NonNull String, long);
     method @Deprecated public static String insertImage(android.content.ContentResolver, String, String, String) throws java.io.FileNotFoundException;
     method @Deprecated public static String insertImage(android.content.ContentResolver, android.graphics.Bitmap, String, String);
     method @Deprecated public static android.database.Cursor query(android.content.ContentResolver, android.net.Uri, String[]);
@@ -38649,6 +38699,7 @@ package android.provider {
   public static final class MediaStore.Video.Media implements android.provider.MediaStore.Video.VideoColumns {
     ctor public MediaStore.Video.Media();
     method public static android.net.Uri getContentUri(String);
+    method @NonNull public static android.net.Uri getContentUri(@NonNull String, long);
     field public static final String CONTENT_TYPE = "vnd.android.cursor.dir/video";
     field public static final String DEFAULT_SORT_ORDER = "title";
     field public static final android.net.Uri EXTERNAL_CONTENT_URI;
@@ -39222,6 +39273,7 @@ package android.provider {
   }
 
   public static final class Telephony.Mms.Addr implements android.provider.BaseColumns {
+    method @NonNull public static android.net.Uri getAddrUriForMessage(@NonNull String);
     field public static final String ADDRESS = "address";
     field public static final String CHARSET = "charset";
     field public static final String CONTACT_ID = "contact_id";
@@ -39250,6 +39302,7 @@ package android.provider {
   }
 
   public static final class Telephony.Mms.Part implements android.provider.BaseColumns {
+    method @NonNull public static android.net.Uri getPartUriForMessage(@NonNull String);
     field public static final String CHARSET = "chset";
     field public static final String CONTENT_DISPOSITION = "cd";
     field public static final String CONTENT_ID = "cid";
@@ -40682,7 +40735,7 @@ package android.se.omapi {
 package android.security {
 
   public final class AttestedKeyPair {
-    ctor public AttestedKeyPair(@Nullable java.security.KeyPair, @Nullable java.security.cert.Certificate[]);
+    ctor public AttestedKeyPair(@Nullable java.security.KeyPair, @NonNull java.util.List<java.security.cert.Certificate>);
     method @NonNull public java.util.List<java.security.cert.Certificate> getAttestationRecord();
     method @Nullable public java.security.KeyPair getKeyPair();
   }
@@ -41690,6 +41743,7 @@ package android.service.notification {
     method public int getUid();
     method public android.os.UserHandle getUser();
     method @Deprecated public int getUserId();
+    method public boolean isAppGroup();
     method public boolean isClearable();
     method public boolean isGroup();
     method public boolean isOngoing();
@@ -44064,7 +44118,7 @@ package android.telephony {
 
   public class CarrierConfigManager {
     method @Nullable public android.os.PersistableBundle getConfig();
-    method @Nullable public android.os.PersistableBundle getConfigByComponentForSubId(String, int);
+    method @Nullable public android.os.PersistableBundle getConfigByComponentForSubId(@NonNull String, int);
     method @Nullable public android.os.PersistableBundle getConfigForSubId(int);
     method public static boolean isConfigForIdentifiedCarrier(android.os.PersistableBundle);
     method public void notifyConfigChangedForSubId(int);
@@ -50397,6 +50451,7 @@ package android.view {
     method public final int getScrollY();
     method @android.view.ViewDebug.ExportedProperty(category="drawing") @ColorInt public int getSolidColor();
     method @LayoutRes public int getSourceLayoutResId();
+    method @android.view.ViewDebug.ExportedProperty(category="accessibility") @Nullable public final CharSequence getStateDescription();
     method public android.animation.StateListAnimator getStateListAnimator();
     method protected int getSuggestedMinimumHeight();
     method protected int getSuggestedMinimumWidth();
@@ -50741,6 +50796,7 @@ package android.view {
     method public void setScrollbarFadingEnabled(boolean);
     method public void setSelected(boolean);
     method public void setSoundEffectsEnabled(boolean);
+    method public void setStateDescription(@Nullable CharSequence);
     method public void setStateListAnimator(android.animation.StateListAnimator);
     method public void setSystemGestureExclusionRects(@NonNull java.util.List<android.graphics.Rect>);
     method public void setSystemUiVisibility(int);
@@ -52095,6 +52151,7 @@ package android.view.accessibility {
     field public static final int CONTENT_CHANGE_TYPE_PANE_APPEARED = 16; // 0x10
     field public static final int CONTENT_CHANGE_TYPE_PANE_DISAPPEARED = 32; // 0x20
     field public static final int CONTENT_CHANGE_TYPE_PANE_TITLE = 8; // 0x8
+    field public static final int CONTENT_CHANGE_TYPE_STATE_DESCRIPTION = 64; // 0x40
     field public static final int CONTENT_CHANGE_TYPE_SUBTREE = 1; // 0x1
     field public static final int CONTENT_CHANGE_TYPE_TEXT = 2; // 0x2
     field public static final int CONTENT_CHANGE_TYPE_UNDEFINED = 0; // 0x0
@@ -52212,6 +52269,7 @@ package android.view.accessibility {
     method @Nullable public CharSequence getPaneTitle();
     method public android.view.accessibility.AccessibilityNodeInfo getParent();
     method public android.view.accessibility.AccessibilityNodeInfo.RangeInfo getRangeInfo();
+    method @Nullable public CharSequence getStateDescription();
     method public CharSequence getText();
     method public int getTextSelectionEnd();
     method public int getTextSelectionStart();
@@ -52303,6 +52361,7 @@ package android.view.accessibility {
     method public void setShowingHintText(boolean);
     method public void setSource(android.view.View);
     method public void setSource(android.view.View, int);
+    method public void setStateDescription(@Nullable CharSequence);
     method public void setText(CharSequence);
     method public void setTextEntryKey(boolean);
     method public void setTextSelection(int, int);
@@ -52615,7 +52674,7 @@ package android.view.animation {
     method protected android.view.animation.Animation clone() throws java.lang.CloneNotSupportedException;
     method public long computeDurationHint();
     method protected void ensureInterpolator();
-    method @ColorInt public int getBackgroundColor();
+    method @Deprecated @ColorInt public int getBackgroundColor();
     method @Deprecated public boolean getDetachWallpaper();
     method public long getDuration();
     method public boolean getFillAfter();
@@ -52639,7 +52698,7 @@ package android.view.animation {
     method public void restrictDuration(long);
     method public void scaleCurrentDuration(float);
     method public void setAnimationListener(android.view.animation.Animation.AnimationListener);
-    method public void setBackgroundColor(@ColorInt int);
+    method @Deprecated public void setBackgroundColor(@ColorInt int);
     method @Deprecated public void setDetachWallpaper(boolean);
     method public void setDuration(long);
     method public void setFillAfter(boolean);
@@ -52983,6 +53042,7 @@ package android.view.contentcapture {
     method @NonNull public android.view.autofill.AutofillId newAutofillId(@NonNull android.view.autofill.AutofillId, long);
     method @NonNull public final android.view.ViewStructure newViewStructure(@NonNull android.view.View);
     method @NonNull public final android.view.ViewStructure newVirtualViewStructure(@NonNull android.view.autofill.AutofillId, long);
+    method public final void notifySessionLifecycle(boolean);
     method public final void notifyViewAppeared(@NonNull android.view.ViewStructure);
     method public final void notifyViewDisappeared(@NonNull android.view.autofill.AutofillId);
     method public final void notifyViewTextChanged(@NonNull android.view.autofill.AutofillId, @Nullable CharSequence);
@@ -53710,6 +53770,7 @@ package android.view.textclassifier {
 
   public final class TextClassificationSessionId implements android.os.Parcelable {
     method public int describeContents();
+    method @NonNull public String flattenToString();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.view.textclassifier.TextClassificationSessionId> CREATOR;
   }
@@ -53797,6 +53858,7 @@ package android.view.textclassifier {
     field public static final int TYPE_AUTO_SELECTION = 5; // 0x5
     field public static final int TYPE_COPY_ACTION = 9; // 0x9
     field public static final int TYPE_CUT_ACTION = 11; // 0xb
+    field public static final int TYPE_LINKS_GENERATED = 21; // 0x15
     field public static final int TYPE_LINK_CLICKED = 7; // 0x7
     field public static final int TYPE_MANUAL_REPLY = 19; // 0x13
     field public static final int TYPE_OTHER_ACTION = 16; // 0x10
@@ -57180,6 +57242,7 @@ package android.widget {
     method @android.view.ViewDebug.ExportedProperty public CharSequence getFormat24Hour();
     method public String getTimeZone();
     method public boolean is24HourModeEnabled();
+    method public void refresh();
     method public void setFormat12Hour(CharSequence);
     method public void setFormat24Hour(CharSequence);
     method public void setTimeZone(String);
