@@ -9231,14 +9231,16 @@ package android.companion {
 
   public final class WifiDeviceFilter implements android.companion.DeviceFilter<android.net.wifi.ScanResult> {
     method public int describeContents();
-    method public void writeToParcel(android.os.Parcel, int);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.WifiDeviceFilter> CREATOR;
   }
 
   public static final class WifiDeviceFilter.Builder {
     ctor public WifiDeviceFilter.Builder();
     method @NonNull public android.companion.WifiDeviceFilter build();
-    method public android.companion.WifiDeviceFilter.Builder setNamePattern(@Nullable java.util.regex.Pattern);
+    method @NonNull public android.companion.WifiDeviceFilter.Builder setBssid(@Nullable android.net.MacAddress);
+    method @NonNull public android.companion.WifiDeviceFilter.Builder setBssidMask(@NonNull android.net.MacAddress);
+    method @NonNull public android.companion.WifiDeviceFilter.Builder setNamePattern(@Nullable java.util.regex.Pattern);
   }
 
 }
@@ -9465,6 +9467,7 @@ package android.content {
     method @NonNull public final android.content.ContentProvider.CallingIdentity clearCallingIdentity();
     method public abstract int delete(@NonNull android.net.Uri, @Nullable String, @Nullable String[]);
     method public void dump(java.io.FileDescriptor, java.io.PrintWriter, String[]);
+    method @Nullable public final String getCallingFeatureId();
     method @Nullable public final String getCallingPackage();
     method @Nullable public final android.content.Context getContext();
     method @Nullable public final android.content.pm.PathPermission[] getPathPermissions();
@@ -30034,7 +30037,7 @@ package android.net.wifi {
     method public void setTdlsEnabled(java.net.InetAddress, boolean);
     method public void setTdlsEnabledWithMacAddress(String, boolean);
     method @Deprecated public boolean setWifiEnabled(boolean);
-    method public void startLocalOnlyHotspot(android.net.wifi.WifiManager.LocalOnlyHotspotCallback, @Nullable android.os.Handler);
+    method @RequiresPermission(allOf={android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void startLocalOnlyHotspot(android.net.wifi.WifiManager.LocalOnlyHotspotCallback, @Nullable android.os.Handler);
     method @Deprecated public boolean startScan();
     method @Deprecated public void startWps(android.net.wifi.WpsInfo, android.net.wifi.WifiManager.WpsCallback);
     method @Deprecated public int updateNetwork(android.net.wifi.WifiConfiguration);
@@ -38488,7 +38491,11 @@ package android.provider {
     method @NonNull public static String getVersion(@NonNull android.content.Context, @NonNull String);
     method @NonNull public static String getVolumeName(@NonNull android.net.Uri);
     method @NonNull public static android.net.Uri setIncludePending(@NonNull android.net.Uri);
+    method @NonNull public static android.net.Uri setIncludeTrashed(@NonNull android.net.Uri);
     method @NonNull public static android.net.Uri setRequireOriginal(@NonNull android.net.Uri);
+    method public static void trash(@NonNull android.content.Context, @NonNull android.net.Uri);
+    method public static void trash(@NonNull android.content.Context, @NonNull android.net.Uri, long);
+    method public static void untrash(@NonNull android.content.Context, @NonNull android.net.Uri);
     field public static final String ACTION_IMAGE_CAPTURE = "android.media.action.IMAGE_CAPTURE";
     field public static final String ACTION_IMAGE_CAPTURE_SECURE = "android.media.action.IMAGE_CAPTURE_SECURE";
     field public static final String ACTION_REVIEW = "android.provider.action.REVIEW";
@@ -38581,14 +38588,11 @@ package android.provider {
   }
 
   public static interface MediaStore.Audio.AudioColumns extends android.provider.MediaStore.MediaColumns {
-    field public static final String ALBUM = "album";
     field public static final String ALBUM_ID = "album_id";
     field @Deprecated public static final String ALBUM_KEY = "album_key";
-    field public static final String ARTIST = "artist";
     field public static final String ARTIST_ID = "artist_id";
     field @Deprecated public static final String ARTIST_KEY = "artist_key";
     field public static final String BOOKMARK = "bookmark";
-    field public static final String COMPOSER = "composer";
     field public static final String GENRE = "genre";
     field public static final String GENRE_ID = "genre_id";
     field @Deprecated public static final String GENRE_KEY = "genre_key";
@@ -38703,7 +38707,6 @@ package android.provider {
     field public static final int MEDIA_TYPE_VIDEO = 3; // 0x3
     field public static final String MIME_TYPE = "mime_type";
     field public static final String PARENT = "parent";
-    field public static final String TITLE = "title";
   }
 
   public static final class MediaStore.Images {
@@ -38712,6 +38715,9 @@ package android.provider {
 
   public static interface MediaStore.Images.ImageColumns extends android.provider.MediaStore.MediaColumns {
     field public static final String DESCRIPTION = "description";
+    field public static final String EXPOSURE_TIME = "exposure_time";
+    field public static final String F_NUMBER = "f_number";
+    field public static final String ISO = "iso";
     field public static final String IS_PRIVATE = "isprivate";
     field @Deprecated public static final String LATITUDE = "latitude";
     field @Deprecated public static final String LONGITUDE = "longitude";
@@ -38760,28 +38766,45 @@ package android.provider {
   }
 
   public static interface MediaStore.MediaColumns extends android.provider.BaseColumns {
+    field public static final String ALBUM = "album";
+    field public static final String ALBUM_ARTIST = "album_artist";
+    field public static final String ARTIST = "artist";
+    field public static final String AUTHOR = "author";
+    field public static final String BITRATE = "bitrate";
     field public static final String BUCKET_DISPLAY_NAME = "bucket_display_name";
     field public static final String BUCKET_ID = "bucket_id";
+    field public static final String CAPTURE_FRAMERATE = "capture_framerate";
+    field public static final String CD_TRACK_NUMBER = "cd_track_number";
+    field public static final String COMPILATION = "compilation";
+    field public static final String COMPOSER = "composer";
     field @Deprecated public static final String DATA = "_data";
     field public static final String DATE_ADDED = "date_added";
     field public static final String DATE_EXPIRES = "date_expires";
     field public static final String DATE_MODIFIED = "date_modified";
     field public static final String DATE_TAKEN = "datetaken";
+    field public static final String DISC_NUMBER = "disc_number";
     field public static final String DISPLAY_NAME = "_display_name";
     field public static final String DOCUMENT_ID = "document_id";
     field public static final String DURATION = "duration";
+    field public static final String GENRE = "genre";
     field public static final String HEIGHT = "height";
     field public static final String INSTANCE_ID = "instance_id";
+    field public static final String IS_FAVORITE = "is_favorite";
     field public static final String IS_PENDING = "is_pending";
+    field public static final String IS_TRASHED = "is_trashed";
     field public static final String MIME_TYPE = "mime_type";
+    field public static final String NUM_TRACKS = "num_tracks";
     field public static final String ORIENTATION = "orientation";
     field public static final String ORIGINAL_DOCUMENT_ID = "original_document_id";
     field public static final String OWNER_PACKAGE_NAME = "owner_package_name";
     field public static final String RELATIVE_PATH = "relative_path";
+    field public static final String RESOLUTION = "resolution";
     field public static final String SIZE = "_size";
     field public static final String TITLE = "title";
     field public static final String VOLUME_NAME = "volume_name";
     field public static final String WIDTH = "width";
+    field public static final String WRITER = "writer";
+    field public static final String YEAR = "year";
   }
 
   public static final class MediaStore.Video {
@@ -38821,8 +38844,6 @@ package android.provider {
   }
 
   public static interface MediaStore.Video.VideoColumns extends android.provider.MediaStore.MediaColumns {
-    field public static final String ALBUM = "album";
-    field public static final String ARTIST = "artist";
     field public static final String BOOKMARK = "bookmark";
     field public static final String CATEGORY = "category";
     field public static final String COLOR_RANGE = "color_range";
@@ -38834,7 +38855,6 @@ package android.provider {
     field @Deprecated public static final String LATITUDE = "latitude";
     field @Deprecated public static final String LONGITUDE = "longitude";
     field @Deprecated public static final String MINI_THUMB_MAGIC = "mini_thumb_magic";
-    field public static final String RESOLUTION = "resolution";
     field public static final String TAGS = "tags";
   }
 
@@ -38917,6 +38937,7 @@ package android.provider {
     field public static final String ACTION_SECURITY_SETTINGS = "android.settings.SECURITY_SETTINGS";
     field public static final String ACTION_SETTINGS = "android.settings.SETTINGS";
     field public static final String ACTION_SHOW_REGULATORY_INFO = "android.settings.SHOW_REGULATORY_INFO";
+    field public static final String ACTION_SHOW_WORK_POLICY_INFO = "android.settings.SHOW_WORK_POLICY_INFO";
     field public static final String ACTION_SOUND_SETTINGS = "android.settings.SOUND_SETTINGS";
     field @Deprecated public static final String ACTION_STORAGE_VOLUME_ACCESS_SETTINGS = "android.settings.STORAGE_VOLUME_ACCESS_SETTINGS";
     field public static final String ACTION_SYNC_SETTINGS = "android.settings.SYNC_SETTINGS";
@@ -44377,6 +44398,7 @@ package android.telephony {
     field public static final String KEY_OPPORTUNISTIC_NETWORK_EXIT_THRESHOLD_RSRP_INT = "opportunistic_network_exit_threshold_rsrp_int";
     field public static final String KEY_OPPORTUNISTIC_NETWORK_EXIT_THRESHOLD_RSSNR_INT = "opportunistic_network_exit_threshold_rssnr_int";
     field public static final String KEY_PREFER_2G_BOOL = "prefer_2g_bool";
+    field public static final String KEY_PREVENT_CLIR_ACTIVATION_AND_DEACTIVATION_CODE_BOOL = "prevent_clir_activation_and_deactivation_code_bool";
     field public static final String KEY_RADIO_RESTART_FAILURE_CAUSES_INT_ARRAY = "radio_restart_failure_causes_int_array";
     field public static final String KEY_RCS_CONFIG_SERVER_URL_STRING = "rcs_config_server_url_string";
     field public static final String KEY_REQUIRE_ENTITLEMENT_CHECKS_BOOL = "require_entitlement_checks_bool";
@@ -44992,13 +45014,60 @@ package android.telephony {
     field public static final int MMS_ERROR_RETRY = 6; // 0x6
     field public static final int MMS_ERROR_UNABLE_CONNECT_MMS = 3; // 0x3
     field public static final int MMS_ERROR_UNSPECIFIED = 1; // 0x1
+    field public static final int RESULT_BLUETOOTH_DISCONNECTED = 27; // 0x1b
+    field public static final int RESULT_CANCELLED = 23; // 0x17
+    field public static final int RESULT_ENCODING_ERROR = 18; // 0x12
+    field public static final int RESULT_ERROR_FDN_CHECK_FAILURE = 6; // 0x6
     field public static final int RESULT_ERROR_GENERIC_FAILURE = 1; // 0x1
     field public static final int RESULT_ERROR_LIMIT_EXCEEDED = 5; // 0x5
+    field public static final int RESULT_ERROR_NONE = 0; // 0x0
     field public static final int RESULT_ERROR_NO_SERVICE = 4; // 0x4
     field public static final int RESULT_ERROR_NULL_PDU = 3; // 0x3
     field public static final int RESULT_ERROR_RADIO_OFF = 2; // 0x2
     field public static final int RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED = 8; // 0x8
     field public static final int RESULT_ERROR_SHORT_CODE_NOT_ALLOWED = 7; // 0x7
+    field public static final int RESULT_INTERNAL_ERROR = 21; // 0x15
+    field public static final int RESULT_INVALID_ARGUMENTS = 11; // 0xb
+    field public static final int RESULT_INVALID_BLUETOOTH_ADDRESS = 26; // 0x1a
+    field public static final int RESULT_INVALID_SMSC_ADDRESS = 19; // 0x13
+    field public static final int RESULT_INVALID_SMS_FORMAT = 14; // 0xe
+    field public static final int RESULT_INVALID_STATE = 12; // 0xc
+    field public static final int RESULT_MODEM_ERROR = 16; // 0x10
+    field public static final int RESULT_NETWORK_ERROR = 17; // 0x11
+    field public static final int RESULT_NETWORK_REJECT = 10; // 0xa
+    field public static final int RESULT_NO_BLUETOOTH_SERVICE = 25; // 0x19
+    field public static final int RESULT_NO_DEFAULT_SMS_APP = 32; // 0x20
+    field public static final int RESULT_NO_MEMORY = 13; // 0xd
+    field public static final int RESULT_NO_RESOURCES = 22; // 0x16
+    field public static final int RESULT_OPERATION_NOT_ALLOWED = 20; // 0x14
+    field public static final int RESULT_RADIO_NOT_AVAILABLE = 9; // 0x9
+    field public static final int RESULT_REMOTE_EXCEPTION = 31; // 0x1f
+    field public static final int RESULT_REQUEST_NOT_SUPPORTED = 24; // 0x18
+    field public static final int RESULT_RIL_CANCELLED = 119; // 0x77
+    field public static final int RESULT_RIL_ENCODING_ERR = 109; // 0x6d
+    field public static final int RESULT_RIL_INTERNAL_ERR = 113; // 0x71
+    field public static final int RESULT_RIL_INVALID_ARGUMENTS = 104; // 0x68
+    field public static final int RESULT_RIL_INVALID_MODEM_STATE = 115; // 0x73
+    field public static final int RESULT_RIL_INVALID_SMSC_ADDRESS = 110; // 0x6e
+    field public static final int RESULT_RIL_INVALID_SMS_FORMAT = 107; // 0x6b
+    field public static final int RESULT_RIL_INVALID_STATE = 103; // 0x67
+    field public static final int RESULT_RIL_MODEM_ERR = 111; // 0x6f
+    field public static final int RESULT_RIL_NETWORK_ERR = 112; // 0x70
+    field public static final int RESULT_RIL_NETWORK_NOT_READY = 116; // 0x74
+    field public static final int RESULT_RIL_NETWORK_REJECT = 102; // 0x66
+    field public static final int RESULT_RIL_NO_MEMORY = 105; // 0x69
+    field public static final int RESULT_RIL_NO_RESOURCES = 118; // 0x76
+    field public static final int RESULT_RIL_OPERATION_NOT_ALLOWED = 117; // 0x75
+    field public static final int RESULT_RIL_RADIO_NOT_AVAILABLE = 100; // 0x64
+    field public static final int RESULT_RIL_REQUEST_NOT_SUPPORTED = 114; // 0x72
+    field public static final int RESULT_RIL_REQUEST_RATE_LIMITED = 106; // 0x6a
+    field public static final int RESULT_RIL_SIM_ABSENT = 120; // 0x78
+    field public static final int RESULT_RIL_SMS_SEND_FAIL_RETRY = 101; // 0x65
+    field public static final int RESULT_RIL_SYSTEM_ERR = 108; // 0x6c
+    field public static final int RESULT_SMS_BLOCKED_DURING_EMERGENCY = 29; // 0x1d
+    field public static final int RESULT_SMS_SEND_RETRY_FAILED = 30; // 0x1e
+    field public static final int RESULT_SYSTEM_ERROR = 15; // 0xf
+    field public static final int RESULT_UNEXPECTED_EVENT_STOP_SENDING = 28; // 0x1c
     field public static final int STATUS_ON_ICC_FREE = 0; // 0x0
     field public static final int STATUS_ON_ICC_READ = 1; // 0x1
     field public static final int STATUS_ON_ICC_SENT = 5; // 0x5
