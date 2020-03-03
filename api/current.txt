@@ -2992,9 +2992,7 @@ package android.accessibilityservice {
     method public int getNonInteractiveUiTimeoutMillis();
     method public android.content.pm.ResolveInfo getResolveInfo();
     method public String getSettingsActivityName();
-    method @Nullable public android.graphics.drawable.Drawable loadAnimatedImage(@NonNull android.content.Context);
     method public String loadDescription(android.content.pm.PackageManager);
-    method @Nullable public String loadHtmlDescription(@NonNull android.content.pm.PackageManager);
     method public CharSequence loadSummary(android.content.pm.PackageManager);
     method public void setInteractiveUiTimeoutMillis(@IntRange(from=0) int);
     method public void setNonInteractiveUiTimeoutMillis(@IntRange(from=0) int);
@@ -4188,15 +4186,15 @@ package android.app {
   }
 
   public static class ActivityManager.TaskDescription implements android.os.Parcelable {
-    ctor @Deprecated public ActivityManager.TaskDescription(String, android.graphics.Bitmap, int);
     ctor public ActivityManager.TaskDescription(String, @DrawableRes int, int);
-    ctor @Deprecated public ActivityManager.TaskDescription(String, android.graphics.Bitmap);
     ctor public ActivityManager.TaskDescription(String, @DrawableRes int);
     ctor public ActivityManager.TaskDescription(String);
     ctor public ActivityManager.TaskDescription();
+    ctor @Deprecated public ActivityManager.TaskDescription(String, android.graphics.Bitmap, int);
+    ctor @Deprecated public ActivityManager.TaskDescription(String, android.graphics.Bitmap);
     ctor public ActivityManager.TaskDescription(android.app.ActivityManager.TaskDescription);
     method public int describeContents();
-    method public android.graphics.Bitmap getIcon();
+    method @Deprecated public android.graphics.Bitmap getIcon();
     method public String getLabel();
     method public int getPrimaryColor();
     method public void readFromParcel(android.os.Parcel);
@@ -5943,7 +5941,7 @@ package android.app {
     method public boolean isImportantConversation();
     method public void setAllowBubbles(boolean);
     method public void setBypassDnd(boolean);
-    method public void setConversationId(@Nullable String, @Nullable String);
+    method public void setConversationId(@NonNull String, @NonNull String);
     method public void setDescription(String);
     method public void setGroup(String);
     method public void setImportance(int);
@@ -5956,7 +5954,6 @@ package android.app {
     method public boolean shouldShowLights();
     method public boolean shouldVibrate();
     method public void writeToParcel(android.os.Parcel, int);
-    field public static final String CONVERSATION_CHANNEL_ID_FORMAT = "%1$s : %2$s";
     field @NonNull public static final android.os.Parcelable.Creator<android.app.NotificationChannel> CREATOR;
     field public static final String DEFAULT_CHANNEL_ID = "miscellaneous";
   }
@@ -8190,6 +8187,7 @@ package android.appwidget {
     field public static final String OPTION_APPWIDGET_MAX_WIDTH = "appWidgetMaxWidth";
     field public static final String OPTION_APPWIDGET_MIN_HEIGHT = "appWidgetMinHeight";
     field public static final String OPTION_APPWIDGET_MIN_WIDTH = "appWidgetMinWidth";
+    field public static final String OPTION_APPWIDGET_RESTORE_COMPLETED = "appWidgetRestoreCompleted";
   }
 
   public class AppWidgetProvider extends android.content.BroadcastReceiver {
@@ -10121,7 +10119,6 @@ package android.content {
     method public abstract void sendOrderedBroadcast(@RequiresPermission android.content.Intent, @Nullable String);
     method public abstract void sendOrderedBroadcast(@NonNull @RequiresPermission android.content.Intent, @Nullable String, @Nullable android.content.BroadcastReceiver, @Nullable android.os.Handler, int, @Nullable String, @Nullable android.os.Bundle);
     method public void sendOrderedBroadcast(@NonNull android.content.Intent, @Nullable String, @Nullable String, @Nullable android.content.BroadcastReceiver, @Nullable android.os.Handler, int, @Nullable String, @Nullable android.os.Bundle);
-    method public void sendOrderedBroadcast(@NonNull @RequiresPermission android.content.Intent, @Nullable String, @Nullable String, @Nullable android.os.Bundle, @Nullable android.content.BroadcastReceiver, @Nullable android.os.Handler, int, @Nullable String, @Nullable android.os.Bundle);
     method @RequiresPermission("android.permission.INTERACT_ACROSS_USERS") public abstract void sendOrderedBroadcastAsUser(@RequiresPermission android.content.Intent, android.os.UserHandle, @Nullable String, android.content.BroadcastReceiver, @Nullable android.os.Handler, int, @Nullable String, @Nullable android.os.Bundle);
     method @Deprecated @RequiresPermission(android.Manifest.permission.BROADCAST_STICKY) public abstract void sendStickyBroadcast(@RequiresPermission android.content.Intent);
     method @Deprecated @RequiresPermission(allOf={"android.permission.INTERACT_ACROSS_USERS", android.Manifest.permission.BROADCAST_STICKY}) public abstract void sendStickyBroadcastAsUser(@RequiresPermission android.content.Intent, android.os.UserHandle);
@@ -10329,6 +10326,7 @@ package android.content {
     method public void sendBroadcastAsUser(android.content.Intent, android.os.UserHandle, String);
     method public void sendOrderedBroadcast(android.content.Intent, String);
     method public void sendOrderedBroadcast(android.content.Intent, String, android.content.BroadcastReceiver, android.os.Handler, int, String, android.os.Bundle);
+    method public void sendOrderedBroadcast(@NonNull @RequiresPermission android.content.Intent, int, @Nullable String, @Nullable String, @Nullable android.content.BroadcastReceiver, @Nullable android.os.Handler, @Nullable String, @Nullable android.os.Bundle, @Nullable android.os.Bundle);
     method public void sendOrderedBroadcastAsUser(android.content.Intent, android.os.UserHandle, String, android.content.BroadcastReceiver, android.os.Handler, int, String, android.os.Bundle);
     method @Deprecated public void sendStickyBroadcast(android.content.Intent);
     method @Deprecated public void sendStickyBroadcastAsUser(android.content.Intent, android.os.UserHandle);
@@ -26899,21 +26897,27 @@ package android.media {
     ctor public MediaRoute2ProviderService();
     method @NonNull public final java.util.List<android.media.RoutingSessionInfo> getAllSessionInfo();
     method @Nullable public final android.media.RoutingSessionInfo getSessionInfo(@NonNull String);
+    method public final void notifyRequestFailed(long, int);
     method public final void notifyRoutes(@NonNull java.util.Collection<android.media.MediaRoute2Info>);
     method public final void notifySessionCreated(@NonNull android.media.RoutingSessionInfo, long);
     method public final void notifySessionCreationFailed(long);
     method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
-    method public abstract void onCreateSession(@NonNull String, @NonNull String, long, @Nullable android.os.Bundle);
-    method public abstract void onDeselectRoute(@NonNull String, @NonNull String);
+    method public abstract void onCreateSession(long, @NonNull String, @NonNull String, @Nullable android.os.Bundle);
+    method public abstract void onDeselectRoute(long, @NonNull String, @NonNull String);
     method public void onDiscoveryPreferenceChanged(@NonNull android.media.RouteDiscoveryPreference);
-    method public abstract void onReleaseSession(@NonNull String);
-    method public abstract void onSelectRoute(@NonNull String, @NonNull String);
-    method public abstract void onSetRouteVolume(@NonNull String, int);
-    method public abstract void onSetSessionVolume(@NonNull String, int);
-    method public abstract void onTransferToRoute(@NonNull String, @NonNull String);
-    field public static final long REQUEST_ID_UNKNOWN = 0L; // 0x0L
+    method public abstract void onReleaseSession(long, @NonNull String);
+    method public abstract void onSelectRoute(long, @NonNull String, @NonNull String);
+    method public abstract void onSetRouteVolume(long, @NonNull String, int);
+    method public abstract void onSetSessionVolume(long, @NonNull String, int);
+    method public abstract void onTransferToRoute(long, @NonNull String, @NonNull String);
+    field public static final int REASON_INVALID_COMMAND = 4; // 0x4
+    field public static final int REASON_NETWORK_ERROR = 2; // 0x2
+    field public static final int REASON_REJECTED = 1; // 0x1
+    field public static final int REASON_ROUTE_NOT_AVAILABLE = 3; // 0x3
+    field public static final int REASON_UNKNOWN_ERROR = 0; // 0x0
+    field public static final long REQUEST_ID_NONE = 0L; // 0x0L
     field public static final String SERVICE_INTERFACE = "android.media.MediaRoute2ProviderService";
   }
 
@@ -27055,7 +27059,7 @@ package android.media {
     method public void unregisterTransferCallback(@NonNull android.media.MediaRouter2.TransferCallback);
   }
 
-  public static class MediaRouter2.ControllerCallback {
+  public abstract static class MediaRouter2.ControllerCallback {
     ctor public MediaRouter2.ControllerCallback();
     method public void onControllerUpdated(@NonNull android.media.MediaRouter2.RoutingController);
   }
@@ -27064,7 +27068,7 @@ package android.media {
     method @Nullable public android.os.Bundle onGetControllerHints(@NonNull android.media.MediaRoute2Info);
   }
 
-  public static class MediaRouter2.RouteCallback {
+  public abstract static class MediaRouter2.RouteCallback {
     ctor public MediaRouter2.RouteCallback();
     method public void onRoutesAdded(@NonNull java.util.List<android.media.MediaRoute2Info>);
     method public void onRoutesChanged(@NonNull java.util.List<android.media.MediaRoute2Info>);
@@ -27087,7 +27091,7 @@ package android.media {
     method public void setVolume(int);
   }
 
-  public static class MediaRouter2.TransferCallback {
+  public abstract static class MediaRouter2.TransferCallback {
     ctor public MediaRouter2.TransferCallback();
     method public void onTransferFailed(@NonNull android.media.MediaRoute2Info);
     method public void onTransferred(@NonNull android.media.MediaRouter2.RoutingController, @Nullable android.media.MediaRouter2.RoutingController);
@@ -27473,6 +27477,7 @@ package android.media {
     method @Nullable public android.os.Bundle getControlHints();
     method @NonNull public java.util.List<java.lang.String> getDeselectableRoutes();
     method @NonNull public String getId();
+    method @Nullable public CharSequence getName();
     method @NonNull public java.util.List<java.lang.String> getSelectableRoutes();
     method @NonNull public java.util.List<java.lang.String> getSelectedRoutes();
     method @NonNull public java.util.List<java.lang.String> getTransferableRoutes();
@@ -27500,6 +27505,7 @@ package android.media {
     method @NonNull public android.media.RoutingSessionInfo.Builder removeSelectedRoute(@NonNull String);
     method @NonNull public android.media.RoutingSessionInfo.Builder removeTransferableRoute(@NonNull String);
     method @NonNull public android.media.RoutingSessionInfo.Builder setControlHints(@Nullable android.os.Bundle);
+    method @NonNull public android.media.RoutingSessionInfo.Builder setName(@Nullable CharSequence);
     method @NonNull public android.media.RoutingSessionInfo.Builder setVolume(int);
     method @NonNull public android.media.RoutingSessionInfo.Builder setVolumeHandling(int);
     method @NonNull public android.media.RoutingSessionInfo.Builder setVolumeMax(int);
@@ -29351,9 +29357,9 @@ package android.media.tv {
   public abstract class TvInputService extends android.app.Service {
     ctor public TvInputService();
     method public final android.os.IBinder onBind(android.content.Intent);
-    method @Nullable public android.media.tv.TvInputService.RecordingSession onCreateRecordingSession(String);
+    method @Nullable public android.media.tv.TvInputService.RecordingSession onCreateRecordingSession(@NonNull String);
     method @Nullable public android.media.tv.TvInputService.RecordingSession onCreateRecordingSession(@NonNull String, @NonNull String);
-    method @Nullable public abstract android.media.tv.TvInputService.Session onCreateSession(String);
+    method @Nullable public abstract android.media.tv.TvInputService.Session onCreateSession(@NonNull String);
     method @Nullable public android.media.tv.TvInputService.Session onCreateSession(@NonNull String, @NonNull String);
     field public static final int PRIORITY_HINT_USE_CASE_TYPE_BACKGROUND = 100; // 0x64
     field public static final int PRIORITY_HINT_USE_CASE_TYPE_LIVE = 400; // 0x190
@@ -31100,6 +31106,7 @@ package android.net.wifi {
 
   public class ScanResult implements android.os.Parcelable {
     ctor public ScanResult(@NonNull android.net.wifi.ScanResult);
+    ctor public ScanResult();
     method public int describeContents();
     method @NonNull public java.util.List<android.net.wifi.ScanResult.InformationElement> getInformationElements();
     method public int getWifiStandard();
@@ -31371,6 +31378,15 @@ package android.net.wifi {
     field public static final int LINK_SPEED_UNKNOWN = -1; // 0xffffffff
   }
 
+  public static final class WifiInfo.Builder {
+    ctor public WifiInfo.Builder();
+    method @NonNull public android.net.wifi.WifiInfo build();
+    method @NonNull public android.net.wifi.WifiInfo.Builder setBssid(@NonNull String);
+    method @NonNull public android.net.wifi.WifiInfo.Builder setNetworkId(int);
+    method @NonNull public android.net.wifi.WifiInfo.Builder setRssi(int);
+    method @NonNull public android.net.wifi.WifiInfo.Builder setSsid(@NonNull byte[]);
+  }
+
   public class WifiManager {
     method @Deprecated public int addNetwork(android.net.wifi.WifiConfiguration);
     method @RequiresPermission(android.Manifest.permission.CHANGE_WIFI_STATE) public int addNetworkSuggestions(@NonNull java.util.List<android.net.wifi.WifiNetworkSuggestion>);
@@ -31554,6 +31570,20 @@ package android.net.wifi {
 
   public final class WifiNetworkSuggestion implements android.os.Parcelable {
     method public int describeContents();
+    method @Nullable public android.net.MacAddress getBssid();
+    method @Nullable public android.net.wifi.WifiEnterpriseConfig getEnterpriseConfig();
+    method @Nullable public String getPassphrase();
+    method @Nullable public android.net.wifi.hotspot2.PasspointConfiguration getPasspointConfig();
+    method @IntRange(from=0) public int getPriority();
+    method @Nullable public String getSsid();
+    method public boolean isAppInteractionRequired();
+    method public boolean isCredentialSharedWithUser();
+    method public boolean isEnhancedOpen();
+    method public boolean isHiddenSsid();
+    method public boolean isInitialAutojoinEnabled();
+    method public boolean isMetered();
+    method public boolean isUntrusted();
+    method public boolean isUserInteractionRequired();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.WifiNetworkSuggestion> CREATOR;
   }
@@ -43420,12 +43450,12 @@ package android.service.controls {
 
   public abstract class ControlsProviderService extends android.app.Service {
     ctor public ControlsProviderService();
-    method @Deprecated public void loadAvailableControls(@NonNull java.util.function.Consumer<java.util.List<android.service.controls.Control>>);
+    method @NonNull public abstract java.util.concurrent.Flow.Publisher<android.service.controls.Control> createPublisherFor(@NonNull java.util.List<java.lang.String>);
+    method @NonNull public abstract java.util.concurrent.Flow.Publisher<android.service.controls.Control> createPublisherForAllAvailable();
+    method @Nullable public java.util.concurrent.Flow.Publisher<android.service.controls.Control> createPublisherForSuggested();
     method @NonNull public final android.os.IBinder onBind(@NonNull android.content.Intent);
+    method public final boolean onUnbind(@NonNull android.content.Intent);
     method public abstract void performControlAction(@NonNull String, @NonNull android.service.controls.actions.ControlAction, @NonNull java.util.function.Consumer<java.lang.Integer>);
-    method @NonNull public abstract java.util.concurrent.Flow.Publisher<android.service.controls.Control> publisherFor(@NonNull java.util.List<java.lang.String>);
-    method @Nullable public java.util.concurrent.Flow.Publisher<android.service.controls.Control> publisherForAllAvailable();
-    method @Nullable public java.util.concurrent.Flow.Publisher<android.service.controls.Control> publisherForSuggested();
     method public static void requestAddControl(@NonNull android.content.Context, @NonNull android.content.ComponentName, @NonNull android.service.controls.Control);
     field public static final String SERVICE_CONTROLS = "android.service.controls.ControlsProviderService";
     field @NonNull public static final String TAG = "ControlsProviderService";
@@ -47748,7 +47778,9 @@ package android.telephony {
     method public boolean getIsManualSelection();
     method @NonNull public java.util.List<android.telephony.NetworkRegistrationInfo> getNetworkRegistrationInfoList();
     method public String getOperatorAlphaLong();
+    method @Nullable public String getOperatorAlphaLongRaw();
     method public String getOperatorAlphaShort();
+    method @Nullable public String getOperatorAlphaShortRaw();
     method public String getOperatorNumeric();
     method public boolean getRoaming();
     method public int getState();
@@ -48141,6 +48173,7 @@ package android.telephony {
     method public String getMmsUserAgent();
     method @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public String getNai();
     method public String getNetworkCountryIso();
+    method @NonNull public String getNetworkCountryIso(int);
     method public String getNetworkOperator();
     method public String getNetworkOperatorName();
     method @RequiresPermission(anyOf={"android.permission.READ_PRIVILEGED_PHONE_STATE", android.Manifest.permission.READ_PRECISE_PHONE_STATE}) public int getNetworkSelectionMode();
@@ -48208,6 +48241,7 @@ package android.telephony {
     method public boolean setLine1NumberForDisplay(String, String);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setNetworkSelectionModeAutomatic();
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public boolean setNetworkSelectionModeManual(String, boolean);
+    method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public boolean setNetworkSelectionModeManual(@NonNull String, boolean, int);
     method public boolean setOperatorBrandOverride(String);
     method public boolean setPreferredNetworkTypeToGlobal();
     method public void setPreferredOpportunisticDataSubscription(int, boolean, @Nullable java.util.concurrent.Executor, @Nullable java.util.function.Consumer<java.lang.Integer>);
@@ -48252,6 +48286,7 @@ package android.telephony {
     field public static final int DATA_DISCONNECTING = 4; // 0x4
     field public static final int DATA_SUSPENDED = 3; // 0x3
     field public static final int DATA_UNKNOWN = -1; // 0xffffffff
+    field public static final String EXTRA_ACTIVE_SIM_SUPPORTED_COUNT = "android.telephony.extra.ACTIVE_SIM_SUPPORTED_COUNT";
     field public static final String EXTRA_CALL_VOICEMAIL_INTENT = "android.telephony.extra.CALL_VOICEMAIL_INTENT";
     field public static final String EXTRA_CARRIER_ID = "android.telephony.extra.CARRIER_ID";
     field public static final String EXTRA_CARRIER_NAME = "android.telephony.extra.CARRIER_NAME";
@@ -48261,7 +48296,6 @@ package android.telephony {
     field public static final String EXTRA_LAUNCH_VOICEMAIL_SETTINGS_INTENT = "android.telephony.extra.LAUNCH_VOICEMAIL_SETTINGS_INTENT";
     field public static final String EXTRA_NETWORK_COUNTRY = "android.telephony.extra.NETWORK_COUNTRY";
     field public static final String EXTRA_NOTIFICATION_COUNT = "android.telephony.extra.NOTIFICATION_COUNT";
-    field public static final String EXTRA_NUM_OF_ACTIVE_SIM_SUPPORTED = "android.telephony.extra.NUM_OF_ACTIVE_SIM_SUPPORTED";
     field public static final String EXTRA_PHONE_ACCOUNT_HANDLE = "android.telephony.extra.PHONE_ACCOUNT_HANDLE";
     field public static final String EXTRA_SPECIFIC_CARRIER_ID = "android.telephony.extra.SPECIFIC_CARRIER_ID";
     field public static final String EXTRA_SPECIFIC_CARRIER_NAME = "android.telephony.extra.SPECIFIC_CARRIER_NAME";
@@ -55454,6 +55488,7 @@ package android.view {
     method public boolean hasInsets();
     method @Deprecated public boolean hasStableInsets();
     method @Deprecated public boolean hasSystemWindowInsets();
+    method @NonNull public android.view.WindowInsets inset(@NonNull android.graphics.Insets);
     method @NonNull public android.view.WindowInsets inset(@IntRange(from=0) int, @IntRange(from=0) int, @IntRange(from=0) int, @IntRange(from=0) int);
     method public boolean isConsumed();
     method public boolean isRound();
@@ -55488,6 +55523,7 @@ package android.view {
 
   public static final class WindowInsets.Type {
     method public static int captionBar();
+    method public static int displayCutout();
     method public static int ime();
     method public static int mandatorySystemGestures();
     method public static int navigationBars();
@@ -56949,6 +56985,7 @@ package android.view.inputmethod {
     method @NonNull public android.view.inline.InlinePresentationSpec getPresentationSpec();
     method @NonNull public String getSource();
     method @NonNull public String getType();
+    method public boolean isPinned();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.view.inputmethod.InlineSuggestionInfo> CREATOR;
     field public static final String SOURCE_AUTOFILL = "android:autofill";
