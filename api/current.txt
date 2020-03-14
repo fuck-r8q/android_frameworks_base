@@ -315,7 +315,7 @@ package android {
     field public static final int animationOrder = 16843214; // 0x10101ce
     field @Deprecated public static final int animationResolution = 16843546; // 0x101031a
     field public static final int antialias = 16843034; // 0x101011a
-    field public static final int anyDensity = 16843372; // 0x101026c
+    field @Deprecated public static final int anyDensity = 16843372; // 0x101026c
     field public static final int apduServiceBanner = 16843757; // 0x10103ed
     field public static final int apiKey = 16843281; // 0x1010211
     field public static final int appCategory = 16844101; // 0x1010545
@@ -4572,14 +4572,17 @@ package android.app {
     field public static final int REASON_ANR = 6; // 0x6
     field public static final int REASON_CRASH = 4; // 0x4
     field public static final int REASON_CRASH_NATIVE = 5; // 0x5
+    field public static final int REASON_DEPENDENCY_DIED = 12; // 0xc
     field public static final int REASON_EXCESSIVE_RESOURCE_USAGE = 9; // 0x9
     field public static final int REASON_EXIT_SELF = 1; // 0x1
     field public static final int REASON_INITIALIZATION_FAILURE = 7; // 0x7
     field public static final int REASON_LOW_MEMORY = 3; // 0x3
-    field public static final int REASON_OTHER = 10; // 0xa
+    field public static final int REASON_OTHER = 13; // 0xd
     field public static final int REASON_PERMISSION_CHANGE = 8; // 0x8
     field public static final int REASON_SIGNALED = 2; // 0x2
     field public static final int REASON_UNKNOWN = 0; // 0x0
+    field public static final int REASON_USER_REQUESTED = 10; // 0xa
+    field public static final int REASON_USER_STOPPED = 11; // 0xb
   }
 
   public final class AsyncNotedAppOp implements android.os.Parcelable {
@@ -9921,8 +9924,11 @@ package android.content {
     field public static final String EXTRA_REFRESH_SUPPORTED = "android.content.extra.REFRESH_SUPPORTED";
     field public static final String EXTRA_SIZE = "android.content.extra.SIZE";
     field public static final String EXTRA_TOTAL_COUNT = "android.content.extra.TOTAL_COUNT";
+    field public static final int NOTIFY_DELETE = 16; // 0x10
+    field public static final int NOTIFY_INSERT = 4; // 0x4
     field public static final int NOTIFY_SKIP_NOTIFY_FOR_DESCENDANTS = 2; // 0x2
     field public static final int NOTIFY_SYNC_TO_NETWORK = 1; // 0x1
+    field public static final int NOTIFY_UPDATE = 8; // 0x8
     field public static final String QUERY_ARG_GROUP_COLUMNS = "android:query-arg-group-columns";
     field public static final String QUERY_ARG_LIMIT = "android:query-arg-limit";
     field public static final String QUERY_ARG_OFFSET = "android:query-arg-offset";
@@ -11368,6 +11374,7 @@ package android.content.pm {
     field public static final int FLAG_IMMERSIVE = 2048; // 0x800
     field public static final int FLAG_MULTIPROCESS = 1; // 0x1
     field public static final int FLAG_NO_HISTORY = 128; // 0x80
+    field public static final int FLAG_PREFER_MINIMAL_POST_PROCESSING = 33554432; // 0x2000000
     field public static final int FLAG_RELINQUISH_TASK_IDENTITY = 4096; // 0x1000
     field public static final int FLAG_RESUME_WHILE_PAUSING = 16384; // 0x4000
     field public static final int FLAG_SINGLE_USER = 1073741824; // 0x40000000
@@ -11405,7 +11412,6 @@ package android.content.pm {
     field public String parentActivityName;
     field public String permission;
     field public int persistableMode;
-    field public boolean preferMinimalPostProcessing;
     field public int screenOrientation;
     field public int softInputMode;
     field public String targetActivity;
@@ -11469,7 +11475,7 @@ package android.content.pm {
     field public static final int FLAG_SUPPORTS_LARGE_SCREENS = 2048; // 0x800
     field public static final int FLAG_SUPPORTS_NORMAL_SCREENS = 1024; // 0x400
     field public static final int FLAG_SUPPORTS_RTL = 4194304; // 0x400000
-    field public static final int FLAG_SUPPORTS_SCREEN_DENSITIES = 8192; // 0x2000
+    field @Deprecated public static final int FLAG_SUPPORTS_SCREEN_DENSITIES = 8192; // 0x2000
     field public static final int FLAG_SUPPORTS_SMALL_SCREENS = 512; // 0x200
     field public static final int FLAG_SUPPORTS_XLARGE_SCREENS = 524288; // 0x80000
     field public static final int FLAG_SUSPENDED = 1073741824; // 0x40000000
@@ -12964,9 +12970,13 @@ package android.database {
     ctor public ContentObserver(android.os.Handler);
     method public boolean deliverSelfNotifications();
     method @Deprecated public final void dispatchChange(boolean);
-    method public final void dispatchChange(boolean, android.net.Uri);
+    method public final void dispatchChange(boolean, @Nullable android.net.Uri);
+    method public final void dispatchChange(boolean, @Nullable android.net.Uri, int);
+    method public final void dispatchChange(boolean, @NonNull Iterable<android.net.Uri>, int);
     method public void onChange(boolean);
-    method public void onChange(boolean, android.net.Uri);
+    method public void onChange(boolean, @Nullable android.net.Uri);
+    method public void onChange(boolean, @Nullable android.net.Uri, int);
+    method public void onChange(boolean, @NonNull Iterable<android.net.Uri>, int);
   }
 
   public interface CrossProcessCursor extends android.database.Cursor {
@@ -26403,7 +26413,7 @@ package android.media {
   }
 
   public final class MediaParser {
-    method public boolean advance(@NonNull android.media.MediaParser.SeekableInputReader) throws java.io.IOException, java.lang.InterruptedException;
+    method public boolean advance(@NonNull android.media.MediaParser.SeekableInputReader) throws java.io.IOException;
     method @NonNull public static android.media.MediaParser create(@NonNull android.media.MediaParser.OutputConsumer, @NonNull java.lang.String...);
     method @NonNull public static android.media.MediaParser createByName(@NonNull String, @NonNull android.media.MediaParser.OutputConsumer);
     method @Nullable public String getParserName();
@@ -26435,12 +26445,12 @@ package android.media {
   public static interface MediaParser.InputReader {
     method public long getLength();
     method public long getPosition();
-    method public int read(@NonNull byte[], int, int) throws java.io.IOException, java.lang.InterruptedException;
+    method public int read(@NonNull byte[], int, int) throws java.io.IOException;
   }
 
   public static interface MediaParser.OutputConsumer {
     method public void onSampleCompleted(int, long, int, int, int, @Nullable android.media.MediaCodec.CryptoInfo);
-    method public void onSampleData(int, @NonNull android.media.MediaParser.InputReader) throws java.io.IOException, java.lang.InterruptedException;
+    method public void onSampleData(int, @NonNull android.media.MediaParser.InputReader) throws java.io.IOException;
     method public void onSeekMap(@NonNull android.media.MediaParser.SeekMap);
     method public void onTrackData(int, @NonNull android.media.MediaParser.TrackData);
     method public void onTracksFound(int);
@@ -26899,7 +26909,6 @@ package android.media {
     method public final void notifyRequestFailed(long, int);
     method public final void notifyRoutes(@NonNull java.util.Collection<android.media.MediaRoute2Info>);
     method public final void notifySessionCreated(@NonNull android.media.RoutingSessionInfo, long);
-    method public final void notifySessionCreationFailed(long);
     method public final void notifySessionReleased(@NonNull String);
     method public final void notifySessionUpdated(@NonNull android.media.RoutingSessionInfo);
     method @CallSuper @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
@@ -36585,6 +36594,7 @@ package android.os {
     method public static android.os.ParcelFileDescriptor open(java.io.File, int) throws java.io.FileNotFoundException;
     method public static android.os.ParcelFileDescriptor open(java.io.File, int, android.os.Handler, android.os.ParcelFileDescriptor.OnCloseListener) throws java.io.IOException;
     method public static int parseMode(String);
+    method @NonNull public static android.os.ParcelFileDescriptor wrap(@NonNull android.os.ParcelFileDescriptor, @NonNull android.os.Handler, @NonNull android.os.ParcelFileDescriptor.OnCloseListener) throws java.io.IOException;
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.os.ParcelFileDescriptor> CREATOR;
     field public static final int MODE_APPEND = 33554432; // 0x2000000
@@ -40254,7 +40264,7 @@ package android.provider {
     field public static final String _ID = "_id";
   }
 
-  public static interface MediaStore.Audio.PlaylistsColumns {
+  public static interface MediaStore.Audio.PlaylistsColumns extends android.provider.MediaStore.MediaColumns {
     field @Deprecated public static final String DATA = "_data";
     field public static final String DATE_ADDED = "date_added";
     field public static final String DATE_MODIFIED = "date_modified";
@@ -40565,7 +40575,7 @@ package android.provider {
     field public static final String EXTRA_APP_PACKAGE = "android.provider.extra.APP_PACKAGE";
     field public static final String EXTRA_AUTHORITIES = "authorities";
     field public static final String EXTRA_BATTERY_SAVER_MODE_ENABLED = "android.settings.extra.battery_saver_mode_enabled";
-    field public static final String EXTRA_BIOMETRIC_MINIMUM_STRENGTH_REQUIRED = "android.provider.extra.BIOMETRIC_MINIMUM_STRENGTH_REQUIRED";
+    field public static final String EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED = "android.provider.extra.BIOMETRIC_AUTHENTICATORS_ALLOWED";
     field public static final String EXTRA_CHANNEL_ID = "android.provider.extra.CHANNEL_ID";
     field public static final String EXTRA_CONVERSATION_ID = "android.provider.extra.CONVERSATION_ID";
     field public static final String EXTRA_DO_NOT_DISTURB_MODE_ENABLED = "android.settings.extra.do_not_disturb_mode_enabled";
@@ -42784,7 +42794,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUnlockedDeviceRequired(boolean);
-    method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationParameters(@IntRange(from=0xffffffff) int, int);
+    method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationParameters(@IntRange(from=0) int, int);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationRequired(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationValidWhileOnBody(boolean);
     method @Deprecated @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUserAuthenticationValidityDurationSeconds(@IntRange(from=0xffffffff) int);
@@ -42902,7 +42912,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyProtection.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUnlockedDeviceRequired(boolean);
-    method @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationParameters(@IntRange(from=0xffffffff) int, int);
+    method @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationParameters(@IntRange(from=0) int, int);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationRequired(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationValidWhileOnBody(boolean);
     method @Deprecated @NonNull public android.security.keystore.KeyProtection.Builder setUserAuthenticationValidityDurationSeconds(@IntRange(from=0xffffffff) int);
@@ -43504,6 +43514,7 @@ package android.service.controls {
     field public static final int TYPE_RADIATOR = 16; // 0x10
     field public static final int TYPE_REFRIGERATOR = 48; // 0x30
     field public static final int TYPE_REMOTE_CONTROL = 17; // 0x11
+    field public static final int TYPE_ROUTINE = 52; // 0x34
     field public static final int TYPE_SECURITY_SYSTEM = 46; // 0x2e
     field public static final int TYPE_SET_TOP = 18; // 0x12
     field public static final int TYPE_SHOWER = 29; // 0x1d
@@ -43542,9 +43553,9 @@ package android.service.controls.actions {
   public abstract class ControlAction {
     method public abstract int getActionType();
     method @Nullable public String getChallengeValue();
+    method @NonNull public static android.service.controls.actions.ControlAction getErrorAction();
     method @NonNull public String getTemplateId();
     method public static final boolean isValidResponse(int);
-    field @NonNull public static final android.service.controls.actions.ControlAction ERROR_ACTION;
     field public static final int RESPONSE_CHALLENGE_ACK = 3; // 0x3
     field public static final int RESPONSE_CHALLENGE_PASSPHRASE = 5; // 0x5
     field public static final int RESPONSE_CHALLENGE_PIN = 4; // 0x4
@@ -43556,7 +43567,6 @@ package android.service.controls.actions {
     field public static final int TYPE_ERROR = -1; // 0xffffffff
     field public static final int TYPE_FLOAT = 2; // 0x2
     field public static final int TYPE_MODE = 4; // 0x4
-    field public static final int TYPE_MULTI_FLOAT = 3; // 0x3
   }
 
   public final class FloatAction extends android.service.controls.actions.ControlAction {
@@ -43573,13 +43583,6 @@ package android.service.controls.actions {
     method public int getNewMode();
   }
 
-  public final class MultiFloatAction extends android.service.controls.actions.ControlAction {
-    ctor public MultiFloatAction(@NonNull String, @NonNull float[], @Nullable String);
-    ctor public MultiFloatAction(@NonNull String, @NonNull float[]);
-    method public int getActionType();
-    method @NonNull public float[] getNewValues();
-  }
-
 }
 
 package android.service.controls.templates {
@@ -43594,16 +43597,15 @@ package android.service.controls.templates {
   }
 
   public abstract class ControlTemplate {
+    method @NonNull public static android.service.controls.templates.ControlTemplate getErrorTemplate();
+    method @NonNull public static android.service.controls.templates.ControlTemplate getNoTemplateObject();
     method @NonNull public String getTemplateId();
     method public abstract int getTemplateType();
-    field @NonNull public static final android.service.controls.templates.ControlTemplate ERROR_TEMPLATE;
-    field @NonNull public static final android.service.controls.templates.ControlTemplate NO_TEMPLATE;
     field public static final int TYPE_ERROR = -1; // 0xffffffff
-    field public static final int TYPE_NONE = 0; // 0x0
+    field public static final int TYPE_NO_TEMPLATE = 0; // 0x0
     field public static final int TYPE_RANGE = 2; // 0x2
     field public static final int TYPE_STATELESS = 8; // 0x8
     field public static final int TYPE_TEMPERATURE = 7; // 0x7
-    field public static final int TYPE_THUMBNAIL = 3; // 0x3
     field public static final int TYPE_TOGGLE = 1; // 0x1
     field public static final int TYPE_TOGGLE_RANGE = 6; // 0x6
   }
@@ -43641,13 +43643,6 @@ package android.service.controls.templates {
     field public static final int MODE_HEAT_COOL = 4; // 0x4
     field public static final int MODE_OFF = 1; // 0x1
     field public static final int MODE_UNKNOWN = 0; // 0x0
-  }
-
-  public final class ThumbnailTemplate extends android.service.controls.templates.ControlTemplate {
-    ctor public ThumbnailTemplate(@NonNull String, @NonNull android.graphics.drawable.Icon, @NonNull CharSequence);
-    method @NonNull public CharSequence getContentDescription();
-    method public int getTemplateType();
-    method @NonNull public android.graphics.drawable.Icon getThumbnail();
   }
 
   public final class ToggleRangeTemplate extends android.service.controls.templates.ControlTemplate {
@@ -46897,7 +46892,7 @@ package android.telephony {
 
   public final class CellIdentityLte extends android.telephony.CellIdentity {
     method @NonNull public java.util.Set<java.lang.String> getAdditionalPlmns();
-    method @NonNull public java.util.List<java.lang.Integer> getBands();
+    method @NonNull public int[] getBands();
     method public int getBandwidth();
     method public int getCi();
     method @Nullable public android.telephony.ClosedSubscriberGroupInfo getClosedSubscriberGroupInfo();
@@ -46915,7 +46910,7 @@ package android.telephony {
 
   public final class CellIdentityNr extends android.telephony.CellIdentity {
     method @NonNull public java.util.Set<java.lang.String> getAdditionalPlmns();
-    method @NonNull public java.util.List<java.lang.Integer> getBands();
+    method @NonNull public int[] getBands();
     method @Nullable public String getMccString();
     method @Nullable public String getMncString();
     method public long getNci();
@@ -48305,10 +48300,6 @@ package android.telephony {
     field public static final String EXTRA_SUBSCRIPTION_ID = "android.telephony.extra.SUBSCRIPTION_ID";
     field public static final String EXTRA_VOICEMAIL_NUMBER = "android.telephony.extra.VOICEMAIL_NUMBER";
     field public static final String METADATA_HIDE_VOICEMAIL_SETTINGS_MENU = "android.telephony.HIDE_VOICEMAIL_SETTINGS_MENU";
-    field public static final int MODEM_COUNT_DUAL_MODEM = 2; // 0x2
-    field public static final int MODEM_COUNT_NO_MODEM = 0; // 0x0
-    field public static final int MODEM_COUNT_SINGLE_MODEM = 1; // 0x1
-    field public static final int MODEM_COUNT_TRI_MODEM = 3; // 0x3
     field public static final int MULTISIM_ALLOWED = 0; // 0x0
     field public static final int MULTISIM_NOT_SUPPORTED_BY_CARRIER = 2; // 0x2
     field public static final int MULTISIM_NOT_SUPPORTED_BY_HARDWARE = 1; // 0x1
@@ -48768,6 +48759,7 @@ package android.telephony.ims {
 
   public class ImsManager {
     method @NonNull public android.telephony.ims.ImsMmTelManager getImsMmTelManager(int);
+    method @NonNull public android.telephony.ims.ImsRcsManager getImsRcsManager(int);
     field public static final String ACTION_WFC_IMS_REGISTRATION_ERROR = "android.telephony.ims.action.WFC_IMS_REGISTRATION_ERROR";
     field public static final String EXTRA_WFC_REGISTRATION_FAILURE_MESSAGE = "android.telephony.ims.extra.WFC_REGISTRATION_FAILURE_MESSAGE";
     field public static final String EXTRA_WFC_REGISTRATION_FAILURE_TITLE = "android.telephony.ims.extra.WFC_REGISTRATION_FAILURE_TITLE";
@@ -48794,6 +48786,15 @@ package android.telephony.ims {
   public static class ImsMmTelManager.CapabilityCallback {
     ctor public ImsMmTelManager.CapabilityCallback();
     method public void onCapabilitiesStatusChanged(@NonNull android.telephony.ims.feature.MmTelFeature.MmTelCapabilities);
+  }
+
+  public class ImsRcsManager implements android.telephony.ims.RegistrationManager {
+    method @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public void getRegistrationState(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
+    method @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public void getRegistrationTransportType(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
+    method @NonNull public android.telephony.ims.RcsUceAdapter getUceAdapter();
+    method @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public void registerImsRegistrationCallback(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.ims.RegistrationManager.RegistrationCallback) throws android.telephony.ims.ImsException;
+    method @RequiresPermission("android.permission.READ_PRIVILEGED_PHONE_STATE") public void unregisterImsRegistrationCallback(@NonNull android.telephony.ims.RegistrationManager.RegistrationCallback);
+    field public static final String ACTION_SHOW_CAPABILITY_DISCOVERY_OPT_IN = "android.telephony.ims.action.SHOW_CAPABILITY_DISCOVERY_OPT_IN";
   }
 
   public final class ImsReasonInfo implements android.os.Parcelable {
@@ -48977,6 +48978,10 @@ package android.telephony.ims {
     field public static final int EXTRA_CODE_CALL_RETRY_BY_SETTINGS = 3; // 0x3
     field public static final int EXTRA_CODE_CALL_RETRY_NORMAL = 1; // 0x1
     field public static final int EXTRA_CODE_CALL_RETRY_SILENT_REDIAL = 2; // 0x2
+  }
+
+  public class RcsUceAdapter {
+    method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public boolean isUceSettingEnabled() throws android.telephony.ims.ImsException;
   }
 
   public interface RegistrationManager {
@@ -55730,7 +55735,7 @@ package android.view {
     field public static final int TYPE_PRIVATE_PRESENTATION = 2030; // 0x7ee
     field public static final int TYPE_SEARCH_BAR = 2001; // 0x7d1
     field public static final int TYPE_STATUS_BAR = 2000; // 0x7d0
-    field public static final int TYPE_STATUS_BAR_PANEL = 2014; // 0x7de
+    field @Deprecated public static final int TYPE_STATUS_BAR_PANEL = 2014; // 0x7de
     field @Deprecated public static final int TYPE_SYSTEM_ALERT = 2003; // 0x7d3
     field public static final int TYPE_SYSTEM_DIALOG = 2008; // 0x7d8
     field @Deprecated public static final int TYPE_SYSTEM_ERROR = 2010; // 0x7da
@@ -56041,7 +56046,7 @@ package android.view.accessibility {
     field public static final String ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT = "ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT";
     field public static final String ACTION_ARGUMENT_MOVE_WINDOW_X = "ACTION_ARGUMENT_MOVE_WINDOW_X";
     field public static final String ACTION_ARGUMENT_MOVE_WINDOW_Y = "ACTION_ARGUMENT_MOVE_WINDOW_Y";
-    field public static final String ACTION_ARGUMENT_PRESS_HOLD_DURATION_MILLIS_INT = "android.view.accessibility.action.ARGUMENT_PRESS_HOLD_DURATION_MILLIS_INT";
+    field public static final String ACTION_ARGUMENT_PRESS_AND_HOLD_DURATION_MILLIS_INT = "android.view.accessibility.action.ARGUMENT_PRESS_AND_HOLD_DURATION_MILLIS_INT";
     field public static final String ACTION_ARGUMENT_PROGRESS_VALUE = "android.view.accessibility.action.ARGUMENT_PROGRESS_VALUE";
     field public static final String ACTION_ARGUMENT_ROW_INT = "android.view.accessibility.action.ARGUMENT_ROW_INT";
     field public static final String ACTION_ARGUMENT_SELECTION_END_INT = "ACTION_ARGUMENT_SELECTION_END_INT";
@@ -57548,7 +57553,7 @@ package android.view.textclassifier {
 
   public final class TextClassificationSessionId implements android.os.Parcelable {
     method public int describeContents();
-    method @NonNull public String flattenToString();
+    method @NonNull public String getValue();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.view.textclassifier.TextClassificationSessionId> CREATOR;
   }
