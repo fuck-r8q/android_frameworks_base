@@ -6891,7 +6891,7 @@ package android.app.admin {
     method public int getMaximumFailedPasswordsForWipe(@Nullable android.content.ComponentName);
     method public long getMaximumTimeToLock(@Nullable android.content.ComponentName);
     method @NonNull public java.util.List<java.lang.String> getMeteredDataDisabledPackages(@NonNull android.content.ComponentName);
-    method @ColorInt public int getOrganizationColor(@NonNull android.content.ComponentName);
+    method @Deprecated @ColorInt public int getOrganizationColor(@NonNull android.content.ComponentName);
     method @Nullable public CharSequence getOrganizationName(@NonNull android.content.ComponentName);
     method public java.util.List<android.telephony.data.ApnSetting> getOverrideApns(@NonNull android.content.ComponentName);
     method @NonNull public android.app.admin.DevicePolicyManager getParentProfileInstance(@NonNull android.content.ComponentName);
@@ -7023,7 +7023,7 @@ package android.app.admin {
     method public void setMaximumTimeToLock(@NonNull android.content.ComponentName, long);
     method @NonNull public java.util.List<java.lang.String> setMeteredDataDisabledPackages(@NonNull android.content.ComponentName, @NonNull java.util.List<java.lang.String>);
     method public void setNetworkLoggingEnabled(@Nullable android.content.ComponentName, boolean);
-    method public void setOrganizationColor(@NonNull android.content.ComponentName, int);
+    method @Deprecated public void setOrganizationColor(@NonNull android.content.ComponentName, int);
     method public void setOrganizationName(@NonNull android.content.ComponentName, @Nullable CharSequence);
     method public void setOverrideApnsEnabled(@NonNull android.content.ComponentName, boolean);
     method @NonNull public String[] setPackagesSuspended(@NonNull android.content.ComponentName, @NonNull String[], boolean);
@@ -14300,6 +14300,8 @@ package android.graphics {
     method public void drawOval(@NonNull android.graphics.RectF, @NonNull android.graphics.Paint);
     method public void drawOval(float, float, float, float, @NonNull android.graphics.Paint);
     method public void drawPaint(@NonNull android.graphics.Paint);
+    method public void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.Rect, @Nullable android.graphics.Paint);
+    method public void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.RectF, @Nullable android.graphics.Paint);
     method public void drawPath(@NonNull android.graphics.Path, @NonNull android.graphics.Paint);
     method public void drawPicture(@NonNull android.graphics.Picture);
     method public void drawPicture(@NonNull android.graphics.Picture, @NonNull android.graphics.RectF);
@@ -15354,8 +15356,6 @@ package android.graphics {
   }
 
   public final class RecordingCanvas extends android.graphics.Canvas {
-    method public final void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.Rect, @Nullable android.graphics.Paint);
-    method public final void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.RectF, @Nullable android.graphics.Paint);
   }
 
   public final class Rect implements android.os.Parcelable {
@@ -15786,6 +15786,7 @@ package android.graphics.drawable {
     method public final boolean isAutoMirrored();
     method public void setAlpha(int);
     method public void setAntiAlias(boolean);
+    method public void setBitmap(@Nullable android.graphics.Bitmap);
     method public void setColorFilter(android.graphics.ColorFilter);
     method public void setDither(boolean);
     method public void setGravity(int);
