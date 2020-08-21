@@ -16,7 +16,13 @@
 
 package com.android.systemui.car.hvac;
 
+import static android.car.VehicleAreaType.VEHICLE_AREA_TYPE_GLOBAL;
+import static android.car.VehiclePropertyIds.HVAC_TEMPERATURE_DISPLAY_UNITS;
+import static android.car.VehiclePropertyIds.HVAC_TEMPERATURE_SET;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyFloat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -24,7 +30,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.car.Car;
-import android.car.hardware.hvac.CarHvacManager;
+import android.car.VehicleUnit;
+import android.car.hardware.property.CarPropertyManager;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 
@@ -46,92 +53,91 @@ import org.mockito.MockitoAnnotations;
 @SmallTest
 public class HvacControllerTest extends SysuiTestCase {
 
-    private static final int PROPERTY_ID = 1;
     private static final int AREA_ID = 1;
-    private static final float VALUE = 72.0f;
+    private static final float TEMP = 72.0f;
 
     private HvacController mHvacController;
-    private CarServiceProvider mCarServiceProvider;
 
     @Mock
     private Car mCar;
     @Mock
-    private CarHvacManager mCarHvacManager;
+    private CarPropertyManager mCarPropertyManager;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
         when(mCar.isConnected()).thenReturn(true);
-        when(mCar.getCarManager(Car.HVAC_SERVICE)).thenReturn(mCarHvacManager);
+        when(mCar.getCarManager(Car.PROPERTY_SERVICE)).thenReturn(mCarPropertyManager);
 
-        mCarServiceProvider = new CarServiceProvider(mContext, mCar);
-        mHvacController = new HvacController(mCarServiceProvider);
+        CarServiceProvider carServiceProvider = new CarServiceProvider(mContext, mCar);
+        mHvacController = new HvacController(carServiceProvider);
         mHvacController.connectToCarService();
     }
 
     @Test
     public void connectToCarService_registersCallback() {
-        verify(mCarHvacManager).registerCallback(any());
+        verify(mCarPropertyManager).registerCallback(any(), eq(HVAC_TEMPERATURE_SET), anyFloat());
+        verify(mCarPropertyManager).registerCallback(any(), eq(HVAC_TEMPERATURE_DISPLAY_UNITS),
+                anyFloat());
     }
 
     @Test
     public void addTemperatureViewToController_usingTemperatureView_registersView() {
-        TemperatureTextView v = setupMockTemperatureTextView(PROPERTY_ID, AREA_ID, VALUE);
+        TemperatureTextView v = setupMockTemperatureTextView(AREA_ID, TEMP);
         mHvacController.addTemperatureViewToController(v);
 
-        verify(v).setTemp(VALUE);
+        verify(v).setTemperatureView(TEMP);
     }
 
     @Test
     public void addTemperatureViewToController_usingSameTemperatureView_registersFirstView() {
-        TemperatureTextView v = setupMockTemperatureTextView(PROPERTY_ID, AREA_ID, VALUE);
+        TemperatureTextView v = setupMockTemperatureTextView(AREA_ID, TEMP);
         mHvacController.addTemperatureViewToController(v);
-        verify(v).setTemp(VALUE);
-        resetTemperatureView(v, PROPERTY_ID, AREA_ID);
+        verify(v).setTemperatureView(TEMP);
+        resetTemperatureView(v, AREA_ID);
 
         mHvacController.addTemperatureViewToController(v);
-        verify(v, never()).setTemp(VALUE);
+        verify(v, never()).setTemperatureView(TEMP);
     }
 
     @Test
     public void addTemperatureViewToController_usingDifferentTemperatureView_registersBothViews() {
-        TemperatureTextView v1 = setupMockTemperatureTextView(PROPERTY_ID, AREA_ID, VALUE);
+        TemperatureTextView v1 = setupMockTemperatureTextView(AREA_ID, TEMP);
         mHvacController.addTemperatureViewToController(v1);
-        verify(v1).setTemp(VALUE);
+        verify(v1).setTemperatureView(TEMP);
 
         TemperatureTextView v2 = setupMockTemperatureTextView(
-                PROPERTY_ID + 1,
                 AREA_ID + 1,
-                VALUE + 1);
+                TEMP + 1);
         mHvacController.addTemperatureViewToController(v2);
-        verify(v2).setTemp(VALUE + 1);
+        verify(v2).setTemperatureView(TEMP + 1);
     }
 
     @Test
-    public void removeAllComponents_ableToRegisterSameView() {
-        TemperatureTextView v = setupMockTemperatureTextView(PROPERTY_ID, AREA_ID, VALUE);
-        mHvacController.addTemperatureViewToController(v);
-        verify(v).setTemp(VALUE);
+    public void setTemperatureToFahrenheit_callsViewSetDisplayInFahrenheit() {
+        when(mCarPropertyManager.isPropertyAvailable(HVAC_TEMPERATURE_DISPLAY_UNITS,
+                VEHICLE_AREA_TYPE_GLOBAL)).thenReturn(true);
+        when(mCarPropertyManager.getIntProperty(HVAC_TEMPERATURE_DISPLAY_UNITS,
+                VEHICLE_AREA_TYPE_GLOBAL)).thenReturn(VehicleUnit.FAHRENHEIT);
+        TemperatureTextView v = setupMockTemperatureTextView(AREA_ID, TEMP);
 
-        mHvacController.removeAllComponents();
-        resetTemperatureView(v, PROPERTY_ID, AREA_ID);
-
         mHvacController.addTemperatureViewToController(v);
-        verify(v).setTemp(VALUE);
+
+        verify(v).setDisplayInFahrenheit(true);
+        verify(v).setTemperatureView(TEMP);
     }
 
-    private TemperatureTextView setupMockTemperatureTextView(int propertyId, int areaId,
-            float value) {
+    private TemperatureTextView setupMockTemperatureTextView(int areaId, float value) {
         TemperatureTextView v = mock(TemperatureTextView.class);
-        resetTemperatureView(v, propertyId, areaId);
-        when(mCarHvacManager.isPropertyAvailable(propertyId, areaId)).thenReturn(true);
-        when(mCarHvacManager.getFloatProperty(propertyId, areaId)).thenReturn(value);
+        resetTemperatureView(v, areaId);
+        when(mCarPropertyManager.isPropertyAvailable(HVAC_TEMPERATURE_SET, areaId)).thenReturn(
+                true);
+        when(mCarPropertyManager.getFloatProperty(HVAC_TEMPERATURE_SET, areaId)).thenReturn(value);
         return v;
     }
 
-    private void resetTemperatureView(TemperatureTextView view, int propertyId, int areaId) {
+    private void resetTemperatureView(TemperatureTextView view, int areaId) {
         reset(view);
-        when(view.getPropertyId()).thenReturn(propertyId);
         when(view.getAreaId()).thenReturn(areaId);
     }
 }
