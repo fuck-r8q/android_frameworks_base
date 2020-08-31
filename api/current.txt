@@ -289,6 +289,7 @@ package android {
     field public static final int allowAudioPlaybackCapture = 16844289; // 0x1010601
     field public static final int allowBackup = 16843392; // 0x1010280
     field public static final int allowClearUserData = 16842757; // 0x1010005
+    field public static final int allowClickWhenDisabled = 16844312; // 0x1010618
     field public static final int allowEmbedded = 16843765; // 0x10103f5
     field public static final int allowNativeHeapPointerTagging = 16844306; // 0x1010612
     field public static final int allowParallelSyncs = 16843570; // 0x1010332
@@ -1164,6 +1165,7 @@ package android {
     field public static final int right = 16843183; // 0x10101af
     field public static final int ringtonePreferenceStyle = 16842899; // 0x1010093
     field public static final int ringtoneType = 16843257; // 0x10101f9
+    field public static final int rollbackDataPolicy = 16844311; // 0x1010617
     field public static final int rotation = 16843558; // 0x1010326
     field public static final int rotationAnimation = 16844090; // 0x101053a
     field public static final int rotationX = 16843559; // 0x1010327
@@ -2924,8 +2926,13 @@ package android.accessibilityservice {
     field public static final int GESTURE_SWIPE_UP_AND_DOWN = 7; // 0x7
     field public static final int GESTURE_SWIPE_UP_AND_LEFT = 13; // 0xd
     field public static final int GESTURE_SWIPE_UP_AND_RIGHT = 14; // 0xe
+    field public static final int GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS = 14; // 0xe
+    field public static final int GLOBAL_ACTION_ACCESSIBILITY_BUTTON = 11; // 0xb
+    field public static final int GLOBAL_ACTION_ACCESSIBILITY_BUTTON_CHOOSER = 12; // 0xc
+    field public static final int GLOBAL_ACTION_ACCESSIBILITY_SHORTCUT = 13; // 0xd
     field public static final int GLOBAL_ACTION_BACK = 1; // 0x1
     field public static final int GLOBAL_ACTION_HOME = 2; // 0x2
+    field public static final int GLOBAL_ACTION_KEYCODE_HEADSETHOOK = 10; // 0xa
     field public static final int GLOBAL_ACTION_LOCK_SCREEN = 8; // 0x8
     field public static final int GLOBAL_ACTION_NOTIFICATIONS = 4; // 0x4
     field public static final int GLOBAL_ACTION_POWER_DIALOG = 6; // 0x6
@@ -3712,7 +3719,7 @@ package android.app {
     ctor public ActionBar.LayoutParams(int);
     ctor public ActionBar.LayoutParams(android.app.ActionBar.LayoutParams);
     ctor public ActionBar.LayoutParams(android.view.ViewGroup.LayoutParams);
-    field @android.view.ViewDebug.ExportedProperty(category="layout", mapping={@android.view.ViewDebug.IntToString(from=0xffffffff, to="NONE"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.NO_GRAVITY, to="NONE"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.TOP, to="TOP"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.BOTTOM, to="BOTTOM"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.LEFT, to="LEFT"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.RIGHT, to="RIGHT"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.START, to="START"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.END, to="END"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER_VERTICAL, to="CENTER_VERTICAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL_VERTICAL, to="FILL_VERTICAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER_HORIZONTAL, to="CENTER_HORIZONTAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL_HORIZONTAL, to="FILL_HORIZONTAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER, to="CENTER"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL, to="FILL")}) public int gravity;
+    field public int gravity;
   }
 
   public static interface ActionBar.OnMenuVisibilityListener {
@@ -3985,7 +3992,7 @@ package android.app {
     method public boolean startActivityIfNeeded(@NonNull @RequiresPermission android.content.Intent, int);
     method public boolean startActivityIfNeeded(@NonNull @RequiresPermission android.content.Intent, int, @Nullable android.os.Bundle);
     method public void startIntentSenderForResult(android.content.IntentSender, int, @Nullable android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
-    method public void startIntentSenderForResult(android.content.IntentSender, int, @Nullable android.content.Intent, int, int, int, android.os.Bundle) throws android.content.IntentSender.SendIntentException;
+    method public void startIntentSenderForResult(android.content.IntentSender, int, @Nullable android.content.Intent, int, int, int, @Nullable android.os.Bundle) throws android.content.IntentSender.SendIntentException;
     method @Deprecated public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
     method @Deprecated public void startIntentSenderFromChild(android.app.Activity, android.content.IntentSender, int, android.content.Intent, int, int, int, @Nullable android.os.Bundle) throws android.content.IntentSender.SendIntentException;
     method public void startLocalVoiceInteraction(android.os.Bundle);
@@ -6889,7 +6896,7 @@ package android.app.admin {
     method public int getMaximumFailedPasswordsForWipe(@Nullable android.content.ComponentName);
     method public long getMaximumTimeToLock(@Nullable android.content.ComponentName);
     method @NonNull public java.util.List<java.lang.String> getMeteredDataDisabledPackages(@NonNull android.content.ComponentName);
-    method @ColorInt public int getOrganizationColor(@NonNull android.content.ComponentName);
+    method @Deprecated @ColorInt public int getOrganizationColor(@NonNull android.content.ComponentName);
     method @Nullable public CharSequence getOrganizationName(@NonNull android.content.ComponentName);
     method public java.util.List<android.telephony.data.ApnSetting> getOverrideApns(@NonNull android.content.ComponentName);
     method @NonNull public android.app.admin.DevicePolicyManager getParentProfileInstance(@NonNull android.content.ComponentName);
@@ -7021,7 +7028,7 @@ package android.app.admin {
     method public void setMaximumTimeToLock(@NonNull android.content.ComponentName, long);
     method @NonNull public java.util.List<java.lang.String> setMeteredDataDisabledPackages(@NonNull android.content.ComponentName, @NonNull java.util.List<java.lang.String>);
     method public void setNetworkLoggingEnabled(@Nullable android.content.ComponentName, boolean);
-    method public void setOrganizationColor(@NonNull android.content.ComponentName, int);
+    method @Deprecated public void setOrganizationColor(@NonNull android.content.ComponentName, int);
     method public void setOrganizationName(@NonNull android.content.ComponentName, @Nullable CharSequence);
     method public void setOverrideApnsEnabled(@NonNull android.content.ComponentName, boolean);
     method @NonNull public String[] setPackagesSuspended(@NonNull android.content.ComponentName, @NonNull String[], boolean);
@@ -10092,7 +10099,7 @@ package android.content {
     method public final <T> T getSystemService(@NonNull Class<T>);
     method @Nullable public abstract String getSystemServiceName(@NonNull Class<?>);
     method @NonNull public final CharSequence getText(@StringRes int);
-    method @android.view.ViewDebug.ExportedProperty(deepExport=true) public abstract android.content.res.Resources.Theme getTheme();
+    method public abstract android.content.res.Resources.Theme getTheme();
     method @Deprecated public abstract android.graphics.drawable.Drawable getWallpaper();
     method @Deprecated public abstract int getWallpaperDesiredMinimumHeight();
     method @Deprecated public abstract int getWallpaperDesiredMinimumWidth();
@@ -10348,8 +10355,8 @@ package android.content {
     method public void startActivity(android.content.Intent, android.os.Bundle);
     method public android.content.ComponentName startForegroundService(android.content.Intent);
     method public boolean startInstrumentation(android.content.ComponentName, String, android.os.Bundle);
-    method public void startIntentSender(android.content.IntentSender, android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
-    method public void startIntentSender(android.content.IntentSender, android.content.Intent, int, int, int, android.os.Bundle) throws android.content.IntentSender.SendIntentException;
+    method public void startIntentSender(android.content.IntentSender, @Nullable android.content.Intent, int, int, int) throws android.content.IntentSender.SendIntentException;
+    method public void startIntentSender(android.content.IntentSender, @Nullable android.content.Intent, int, int, int, @Nullable android.os.Bundle) throws android.content.IntentSender.SendIntentException;
     method public android.content.ComponentName startService(android.content.Intent);
     method public boolean stopService(android.content.Intent);
     method public void unbindService(android.content.ServiceConnection);
@@ -11800,6 +11807,7 @@ package android.content.pm {
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback, @NonNull android.os.Handler);
     method @RequiresPermission(anyOf={android.Manifest.permission.DELETE_PACKAGES, android.Manifest.permission.REQUEST_DELETE_PACKAGES}) public void uninstall(@NonNull String, @NonNull android.content.IntentSender);
     method @RequiresPermission(anyOf={android.Manifest.permission.DELETE_PACKAGES, android.Manifest.permission.REQUEST_DELETE_PACKAGES}) public void uninstall(@NonNull android.content.pm.VersionedPackage, @NonNull android.content.IntentSender);
+    method @RequiresPermission(android.Manifest.permission.DELETE_PACKAGES) public void uninstallExistingPackage(@NonNull String, @Nullable android.content.IntentSender);
     method public void unregisterSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public void updateSessionAppIcon(int, @Nullable android.graphics.Bitmap);
     method public void updateSessionAppLabel(int, @Nullable CharSequence);
@@ -11862,6 +11870,7 @@ package android.content.pm {
     method public long getCreatedMillis();
     method public int getInstallLocation();
     method public int getInstallReason();
+    method @Nullable public String getInstallerAttributionTag();
     method @Nullable public String getInstallerPackageName();
     method public int getMode();
     method public int getOriginatingUid();
@@ -11945,7 +11954,7 @@ package android.content.pm {
   }
 
   public abstract class PackageManager {
-    ctor public PackageManager();
+    ctor @Deprecated public PackageManager();
     method @Deprecated public abstract void addPackageToPreferred(@NonNull String);
     method public abstract boolean addPermission(@NonNull android.content.pm.PermissionInfo);
     method public abstract boolean addPermissionAsync(@NonNull android.content.pm.PermissionInfo);
@@ -14038,6 +14047,7 @@ package android.gesture {
 package android.graphics {
 
   public final class Bitmap implements android.os.Parcelable {
+    method @NonNull public android.graphics.Bitmap asShared();
     method @WorkerThread public boolean compress(android.graphics.Bitmap.CompressFormat, int, java.io.OutputStream);
     method public android.graphics.Bitmap copy(android.graphics.Bitmap.Config, boolean);
     method public void copyPixelsFromBuffer(java.nio.Buffer);
@@ -14070,6 +14080,7 @@ package android.graphics {
     method public android.graphics.Bitmap.Config getConfig();
     method public int getDensity();
     method public int getGenerationId();
+    method @NonNull public android.hardware.HardwareBuffer getHardwareBuffer();
     method public int getHeight();
     method public byte[] getNinePatchChunk();
     method @ColorInt public int getPixel(int, int);
@@ -14171,10 +14182,14 @@ package android.graphics {
     method public int getHeight();
     method public int getWidth();
     method public boolean isRecycled();
-    method public static android.graphics.BitmapRegionDecoder newInstance(byte[], int, int, boolean) throws java.io.IOException;
-    method public static android.graphics.BitmapRegionDecoder newInstance(java.io.FileDescriptor, boolean) throws java.io.IOException;
-    method public static android.graphics.BitmapRegionDecoder newInstance(java.io.InputStream, boolean) throws java.io.IOException;
-    method public static android.graphics.BitmapRegionDecoder newInstance(String, boolean) throws java.io.IOException;
+    method @Deprecated @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull byte[], int, int, boolean) throws java.io.IOException;
+    method @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull byte[], int, int) throws java.io.IOException;
+    method @Deprecated @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull java.io.FileDescriptor, boolean) throws java.io.IOException;
+    method @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull android.os.ParcelFileDescriptor) throws java.io.IOException;
+    method @Deprecated @Nullable public static android.graphics.BitmapRegionDecoder newInstance(@NonNull java.io.InputStream, boolean) throws java.io.IOException;
+    method @Nullable public static android.graphics.BitmapRegionDecoder newInstance(@NonNull java.io.InputStream) throws java.io.IOException;
+    method @Deprecated @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull String, boolean) throws java.io.IOException;
+    method @NonNull public static android.graphics.BitmapRegionDecoder newInstance(@NonNull String) throws java.io.IOException;
     method public void recycle();
   }
 
@@ -14292,6 +14307,8 @@ package android.graphics {
     method public void drawOval(@NonNull android.graphics.RectF, @NonNull android.graphics.Paint);
     method public void drawOval(float, float, float, float, @NonNull android.graphics.Paint);
     method public void drawPaint(@NonNull android.graphics.Paint);
+    method public void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.Rect, @Nullable android.graphics.Paint);
+    method public void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.RectF, @Nullable android.graphics.Paint);
     method public void drawPath(@NonNull android.graphics.Path, @NonNull android.graphics.Paint);
     method public void drawPicture(@NonNull android.graphics.Picture);
     method public void drawPicture(@NonNull android.graphics.Picture, @NonNull android.graphics.RectF);
@@ -14475,6 +14492,8 @@ package android.graphics {
   @AnyThread public abstract class ColorSpace {
     method @NonNull public static android.graphics.ColorSpace adapt(@NonNull android.graphics.ColorSpace, @NonNull @Size(min=2, max=3) float[]);
     method @NonNull public static android.graphics.ColorSpace adapt(@NonNull android.graphics.ColorSpace, @NonNull @Size(min=2, max=3) float[], @NonNull android.graphics.ColorSpace.Adaptation);
+    method @NonNull @Size(3) public static float[] cctToXyz(@IntRange(from=1) int);
+    method @NonNull @Size(9) public static float[] chromaticAdaptation(@NonNull android.graphics.ColorSpace.Adaptation, @NonNull @Size(min=2, max=3) float[], @NonNull @Size(min=2, max=3) float[]);
     method @NonNull public static android.graphics.ColorSpace.Connector connect(@NonNull android.graphics.ColorSpace, @NonNull android.graphics.ColorSpace);
     method @NonNull public static android.graphics.ColorSpace.Connector connect(@NonNull android.graphics.ColorSpace, @NonNull android.graphics.ColorSpace, @NonNull android.graphics.ColorSpace.RenderIntent);
     method @NonNull public static android.graphics.ColorSpace.Connector connect(@NonNull android.graphics.ColorSpace);
@@ -14659,6 +14678,8 @@ package android.graphics {
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull android.content.res.Resources, int);
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull android.content.ContentResolver, @NonNull android.net.Uri);
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull android.content.res.AssetManager, @NonNull String);
+    method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull byte[], int, int) throws java.lang.ArrayIndexOutOfBoundsException;
+    method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull byte[]);
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull java.nio.ByteBuffer);
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull java.io.File);
     method @AnyThread @NonNull public static android.graphics.ImageDecoder.Source createSource(@NonNull java.util.concurrent.Callable<android.content.res.AssetFileDescriptor>);
@@ -14804,6 +14825,7 @@ package android.graphics {
   public class Matrix {
     ctor public Matrix();
     ctor public Matrix(android.graphics.Matrix);
+    method public final void dump(@NonNull java.io.PrintWriter);
     method public void getValues(float[]);
     method public boolean invert(android.graphics.Matrix);
     method public boolean isAffine();
@@ -14850,6 +14872,7 @@ package android.graphics {
     method public void setTranslate(float, float);
     method public void setValues(float[]);
     method public String toShortString();
+    field @NonNull public static final android.graphics.Matrix IDENTITY_MATRIX;
     field public static final int MPERSP_0 = 6; // 0x6
     field public static final int MPERSP_1 = 7; // 0x7
     field public static final int MPERSP_2 = 8; // 0x8
@@ -15267,6 +15290,7 @@ package android.graphics {
     ctor public Point(int, int);
     ctor public Point(@NonNull android.graphics.Point);
     method public int describeContents();
+    method public final void dump(@NonNull java.io.PrintWriter);
     method public final boolean equals(int, int);
     method public final void negate();
     method public final void offset(int, int);
@@ -15343,8 +15367,6 @@ package android.graphics {
   }
 
   public final class RecordingCanvas extends android.graphics.Canvas {
-    method public final void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.Rect, @Nullable android.graphics.Paint);
-    method public final void drawPatch(@NonNull android.graphics.NinePatch, @NonNull android.graphics.RectF, @Nullable android.graphics.Paint);
   }
 
   public final class Rect implements android.os.Parcelable {
@@ -15775,6 +15797,7 @@ package android.graphics.drawable {
     method public final boolean isAutoMirrored();
     method public void setAlpha(int);
     method public void setAntiAlias(boolean);
+    method public void setBitmap(@Nullable android.graphics.Bitmap);
     method public void setColorFilter(android.graphics.ColorFilter);
     method public void setDither(boolean);
     method public void setGravity(int);
@@ -15811,7 +15834,6 @@ package android.graphics.drawable {
     method public void draw(@NonNull android.graphics.Canvas);
     method @NonNull public android.content.res.ColorStateList getColorStateList();
     method public int getOpacity();
-    method public boolean hasFocusStateSpecified();
     method public void invalidateDrawable(@NonNull android.graphics.drawable.Drawable);
     method public void scheduleDrawable(@NonNull android.graphics.drawable.Drawable, @NonNull Runnable, long);
     method public void setAlpha(@IntRange(from=0, to=255) int);
@@ -15857,6 +15879,7 @@ package android.graphics.drawable {
     method public boolean getPadding(@NonNull android.graphics.Rect);
     method @NonNull public int[] getState();
     method @Nullable public android.graphics.Region getTransparentRegion();
+    method public boolean hasFocusStateSpecified();
     method public void inflate(@NonNull android.content.res.Resources, @NonNull org.xmlpull.v1.XmlPullParser, @NonNull android.util.AttributeSet) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
     method public void inflate(@NonNull android.content.res.Resources, @NonNull org.xmlpull.v1.XmlPullParser, @NonNull android.util.AttributeSet, @Nullable android.content.res.Resources.Theme) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
     method public void invalidateSelf();
@@ -17263,6 +17286,7 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> REQUEST_PARTIAL_RESULT_COUNT;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Byte> REQUEST_PIPELINE_MAX_DEPTH;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Float> SCALER_AVAILABLE_MAX_DIGITAL_ZOOM;
+    field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<int[]> SCALER_AVAILABLE_ROTATE_AND_CROP_MODES;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> SCALER_CROPPING_TYPE;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<android.hardware.camera2.params.MandatoryStreamCombination[]> SCALER_MANDATORY_CONCURRENT_STREAM_COMBINATIONS;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<android.hardware.camera2.params.MandatoryStreamCombination[]> SCALER_MANDATORY_STREAM_COMBINATIONS;
@@ -17547,6 +17571,11 @@ package android.hardware.camera2 {
     field public static final int REQUEST_AVAILABLE_CAPABILITIES_YUV_REPROCESSING = 7; // 0x7
     field public static final int SCALER_CROPPING_TYPE_CENTER_ONLY = 0; // 0x0
     field public static final int SCALER_CROPPING_TYPE_FREEFORM = 1; // 0x1
+    field public static final int SCALER_ROTATE_AND_CROP_180 = 2; // 0x2
+    field public static final int SCALER_ROTATE_AND_CROP_270 = 3; // 0x3
+    field public static final int SCALER_ROTATE_AND_CROP_90 = 1; // 0x1
+    field public static final int SCALER_ROTATE_AND_CROP_AUTO = 4; // 0x4
+    field public static final int SCALER_ROTATE_AND_CROP_NONE = 0; // 0x0
     field public static final int SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_BGGR = 3; // 0x3
     field public static final int SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_GBRG = 2; // 0x2
     field public static final int SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_GRBG = 1; // 0x1
@@ -17682,6 +17711,7 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> NOISE_REDUCTION_MODE;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Float> REPROCESS_EFFECTIVE_EXPOSURE_FACTOR;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<android.graphics.Rect> SCALER_CROP_REGION;
+    field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> SCALER_ROTATE_AND_CROP;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Long> SENSOR_EXPOSURE_TIME;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Long> SENSOR_FRAME_DURATION;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> SENSOR_SENSITIVITY;
@@ -17778,6 +17808,7 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Float> REPROCESS_EFFECTIVE_EXPOSURE_FACTOR;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Byte> REQUEST_PIPELINE_DEPTH;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<android.graphics.Rect> SCALER_CROP_REGION;
+    field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> SCALER_ROTATE_AND_CROP;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<float[]> SENSOR_DYNAMIC_BLACK_LEVEL;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> SENSOR_DYNAMIC_WHITE_LEVEL;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Long> SENSOR_EXPOSURE_TIME;
@@ -23666,10 +23697,10 @@ package android.location {
   public final class GnssNavigationMessage implements android.os.Parcelable {
     method public int describeContents();
     method @NonNull public byte[] getData();
-    method public int getMessageId();
+    method @IntRange(from=0xffffffff, to=120) public int getMessageId();
     method public int getStatus();
-    method public int getSubmessageId();
-    method public int getSvid();
+    method @IntRange(from=1) public int getSubmessageId();
+    method @IntRange(from=1, to=200) public int getSvid();
     method public int getType();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssNavigationMessage> CREATOR;
@@ -23702,7 +23733,8 @@ package android.location {
     field public static final int STATUS_READY = 1; // 0x1
   }
 
-  public final class GnssStatus {
+  public final class GnssStatus implements android.os.Parcelable {
+    method public int describeContents();
     method @FloatRange(from=0, to=360) public float getAzimuthDegrees(@IntRange(from=0) int);
     method @FloatRange(from=0, to=63) public float getBasebandCn0DbHz(@IntRange(from=0) int);
     method @FloatRange(from=0) public float getCarrierFrequencyHz(@IntRange(from=0) int);
@@ -23716,6 +23748,7 @@ package android.location {
     method public boolean hasCarrierFrequencyHz(@IntRange(from=0) int);
     method public boolean hasEphemerisData(@IntRange(from=0) int);
     method public boolean usedInFix(@IntRange(from=0) int);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final int CONSTELLATION_BEIDOU = 5; // 0x5
     field public static final int CONSTELLATION_GALILEO = 6; // 0x6
     field public static final int CONSTELLATION_GLONASS = 3; // 0x3
@@ -23724,6 +23757,7 @@ package android.location {
     field public static final int CONSTELLATION_QZSS = 4; // 0x4
     field public static final int CONSTELLATION_SBAS = 2; // 0x2
     field public static final int CONSTELLATION_UNKNOWN = 0; // 0x0
+    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssStatus> CREATOR;
   }
 
   public static final class GnssStatus.Builder {
@@ -24045,6 +24079,7 @@ package android.media {
     field public static final int TYPE_IP = 20; // 0x14
     field public static final int TYPE_LINE_ANALOG = 5; // 0x5
     field public static final int TYPE_LINE_DIGITAL = 6; // 0x6
+    field public static final int TYPE_REMOTE_SUBMIX = 25; // 0x19
     field public static final int TYPE_TELEPHONY = 18; // 0x12
     field public static final int TYPE_TV_TUNER = 17; // 0x11
     field public static final int TYPE_UNKNOWN = 0; // 0x0
@@ -26111,6 +26146,7 @@ package android.media {
     field public static final String KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT = "aac-max-output-channel_count";
     field public static final String KEY_AAC_PROFILE = "aac-profile";
     field public static final String KEY_AAC_SBR_MODE = "aac-sbr-mode";
+    field public static final String KEY_ALLOW_FRAME_DROP = "allow-frame-drop";
     field public static final String KEY_AUDIO_SESSION_ID = "audio-session-id";
     field public static final String KEY_BITRATE_MODE = "bitrate-mode";
     field public static final String KEY_BIT_RATE = "bitrate";
@@ -26320,6 +26356,7 @@ package android.media {
     field public static final int METADATA_KEY_ARTIST = 2; // 0x2
     field public static final int METADATA_KEY_AUTHOR = 3; // 0x3
     field public static final int METADATA_KEY_BITRATE = 20; // 0x14
+    field public static final int METADATA_KEY_BITS_PER_SAMPLE = 39; // 0x27
     field public static final int METADATA_KEY_CAPTURE_FRAMERATE = 25; // 0x19
     field public static final int METADATA_KEY_CD_TRACK_NUMBER = 0; // 0x0
     field public static final int METADATA_KEY_COLOR_RANGE = 37; // 0x25
@@ -26344,6 +26381,7 @@ package android.media {
     field public static final int METADATA_KEY_LOCATION = 23; // 0x17
     field public static final int METADATA_KEY_MIMETYPE = 12; // 0xc
     field public static final int METADATA_KEY_NUM_TRACKS = 10; // 0xa
+    field public static final int METADATA_KEY_SAMPLERATE = 38; // 0x26
     field public static final int METADATA_KEY_TITLE = 7; // 0x7
     field public static final int METADATA_KEY_VIDEO_FRAME_COUNT = 32; // 0x20
     field public static final int METADATA_KEY_VIDEO_HEIGHT = 19; // 0x13
@@ -27868,6 +27906,7 @@ package android.media.audiofx {
     field public static final java.util.UUID EFFECT_TYPE_DYNAMICS_PROCESSING;
     field public static final java.util.UUID EFFECT_TYPE_ENV_REVERB;
     field public static final java.util.UUID EFFECT_TYPE_EQUALIZER;
+    field @NonNull public static final java.util.UUID EFFECT_TYPE_HAPTIC_GENERATOR;
     field public static final java.util.UUID EFFECT_TYPE_LOUDNESS_ENHANCER;
     field public static final java.util.UUID EFFECT_TYPE_NS;
     field public static final java.util.UUID EFFECT_TYPE_PRESET_REVERB;
@@ -28218,6 +28257,13 @@ package android.media.audiofx {
     field public short[] bandLevels;
     field public short curPreset;
     field public short numBands;
+  }
+
+  public class HapticGenerator extends android.media.audiofx.AudioEffect implements java.lang.AutoCloseable {
+    method public void close();
+    method @NonNull public static android.media.audiofx.HapticGenerator create(int);
+    method public static boolean isAvailable();
+    method public int setEnabled(boolean);
   }
 
   public class LoudnessEnhancer extends android.media.audiofx.AudioEffect {
@@ -35809,6 +35855,7 @@ package android.os {
     field public static final String PRODUCT;
     field @Deprecated public static final String RADIO;
     field @Deprecated public static final String SERIAL;
+    field @NonNull public static final String SKU;
     field public static final String[] SUPPORTED_32_BIT_ABIS;
     field public static final String[] SUPPORTED_64_BIT_ABIS;
     field public static final String[] SUPPORTED_ABIS;
@@ -35872,6 +35919,7 @@ package android.os {
     field public static final int P = 28; // 0x1c
     field public static final int Q = 29; // 0x1d
     field public static final int R = 30; // 0x1e
+    field public static final int S = 10000; // 0x2710
   }
 
   public final class Bundle extends android.os.BaseBundle implements java.lang.Cloneable android.os.Parcelable {
@@ -42744,6 +42792,7 @@ package android.security.keystore {
     method @NonNull public String[] getSignaturePaddings();
     method public int getUserAuthenticationType();
     method public int getUserAuthenticationValidityDurationSeconds();
+    method public boolean isDevicePropertiesAttestationIncluded();
     method @NonNull public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
     method public boolean isRandomizedEncryptionRequired();
@@ -42765,6 +42814,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setCertificateNotBefore(@NonNull java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setCertificateSerialNumber(@NonNull java.math.BigInteger);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setCertificateSubject(@NonNull javax.security.auth.x500.X500Principal);
+    method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setDevicePropertiesAttestationIncluded(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setDigests(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setEncryptionPaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setInvalidatedByBiometricEnrollment(boolean);
@@ -42888,6 +42938,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyProtection.Builder setDigests(java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setEncryptionPaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setInvalidatedByBiometricEnrollment(boolean);
+    method @NonNull public android.security.keystore.KeyProtection.Builder setIsStrongBoxBacked(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityForConsumptionEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityForOriginationEnd(java.util.Date);
@@ -44539,10 +44590,12 @@ package android.speech.tts {
     method public int addEarcon(String, String, @RawRes int);
     method @Deprecated public int addEarcon(String, String);
     method public int addEarcon(String, java.io.File);
+    method public int addEarcon(@NonNull String, @NonNull android.net.Uri);
     method public int addSpeech(String, String, @RawRes int);
     method public int addSpeech(CharSequence, String, @RawRes int);
     method public int addSpeech(String, String);
     method public int addSpeech(CharSequence, java.io.File);
+    method public int addSpeech(@NonNull CharSequence, @NonNull android.net.Uri);
     method @Deprecated public boolean areDefaultsEnforced();
     method public java.util.Set<java.util.Locale> getAvailableLanguages();
     method public String getDefaultEngine();
@@ -46826,7 +46879,6 @@ package android.telephony {
   }
 
   public static final class CarrierConfigManager.Apn {
-    field public static final String KEY_PREFIX = "apn.";
     field public static final String KEY_SETTINGS_DEFAULT_PROTOCOL_STRING = "apn.settings_default_protocol_string";
     field public static final String KEY_SETTINGS_DEFAULT_ROAMING_PROTOCOL_STRING = "apn.settings_default_roaming_protocol_string";
     field public static final String PROTOCOL_IPV4 = "IP";
@@ -47001,7 +47053,7 @@ package android.telephony {
   public abstract class CellLocation {
     ctor public CellLocation();
     method public static android.telephony.CellLocation getEmpty();
-    method public static void requestLocationUpdate();
+    method @Deprecated public static void requestLocationUpdate();
   }
 
   public abstract class CellSignalStrength {
@@ -47448,6 +47500,88 @@ package android.telephony {
     field public static final int VSNCP_TIMEOUT = 2236; // 0x8bc
   }
 
+  public final class DisconnectCause {
+    field public static final int ALREADY_DIALING = 72; // 0x48
+    field public static final int ANSWERED_ELSEWHERE = 52; // 0x34
+    field public static final int BUSY = 4; // 0x4
+    field public static final int CALLING_DISABLED = 74; // 0x4a
+    field public static final int CALL_BARRED = 20; // 0x14
+    field public static final int CALL_PULLED = 51; // 0x33
+    field public static final int CANT_CALL_WHILE_RINGING = 73; // 0x49
+    field public static final int CDMA_ACCESS_BLOCKED = 35; // 0x23
+    field public static final int CDMA_ACCESS_FAILURE = 32; // 0x20
+    field public static final int CDMA_ALREADY_ACTIVATED = 49; // 0x31
+    field public static final int CDMA_DROP = 27; // 0x1b
+    field public static final int CDMA_INTERCEPT = 28; // 0x1c
+    field public static final int CDMA_LOCKED_UNTIL_POWER_CYCLE = 26; // 0x1a
+    field public static final int CDMA_NOT_EMERGENCY = 34; // 0x22
+    field public static final int CDMA_PREEMPTED = 33; // 0x21
+    field public static final int CDMA_REORDER = 29; // 0x1d
+    field public static final int CDMA_RETRY_ORDER = 31; // 0x1f
+    field public static final int CDMA_SO_REJECT = 30; // 0x1e
+    field public static final int CONGESTION = 5; // 0x5
+    field public static final int CS_RESTRICTED = 22; // 0x16
+    field public static final int CS_RESTRICTED_EMERGENCY = 24; // 0x18
+    field public static final int CS_RESTRICTED_NORMAL = 23; // 0x17
+    field public static final int DATA_DISABLED = 54; // 0x36
+    field public static final int DATA_LIMIT_REACHED = 55; // 0x37
+    field public static final int DIALED_CALL_FORWARDING_WHILE_ROAMING = 57; // 0x39
+    field public static final int DIALED_MMI = 39; // 0x27
+    field public static final int DIAL_LOW_BATTERY = 62; // 0x3e
+    field public static final int DIAL_MODIFIED_TO_DIAL = 48; // 0x30
+    field public static final int DIAL_MODIFIED_TO_DIAL_VIDEO = 66; // 0x42
+    field public static final int DIAL_MODIFIED_TO_SS = 47; // 0x2f
+    field public static final int DIAL_MODIFIED_TO_USSD = 46; // 0x2e
+    field public static final int DIAL_VIDEO_MODIFIED_TO_DIAL = 69; // 0x45
+    field public static final int DIAL_VIDEO_MODIFIED_TO_DIAL_VIDEO = 70; // 0x46
+    field public static final int DIAL_VIDEO_MODIFIED_TO_SS = 67; // 0x43
+    field public static final int DIAL_VIDEO_MODIFIED_TO_USSD = 68; // 0x44
+    field public static final int EMERGENCY_CALL_OVER_WFC_NOT_AVAILABLE = 78; // 0x4e
+    field public static final int EMERGENCY_PERM_FAILURE = 64; // 0x40
+    field public static final int EMERGENCY_TEMP_FAILURE = 63; // 0x3f
+    field public static final int ERROR_UNSPECIFIED = 36; // 0x24
+    field public static final int FDN_BLOCKED = 21; // 0x15
+    field public static final int ICC_ERROR = 19; // 0x13
+    field public static final int IMEI_NOT_ACCEPTED = 58; // 0x3a
+    field public static final int IMS_ACCESS_BLOCKED = 60; // 0x3c
+    field public static final int IMS_MERGED_SUCCESSFULLY = 45; // 0x2d
+    field public static final int IMS_SIP_ALTERNATE_EMERGENCY_CALL = 71; // 0x47
+    field public static final int INCOMING_AUTO_REJECTED = 81; // 0x51
+    field public static final int INCOMING_MISSED = 1; // 0x1
+    field public static final int INCOMING_REJECTED = 16; // 0x10
+    field public static final int INVALID_CREDENTIALS = 10; // 0xa
+    field public static final int INVALID_NUMBER = 7; // 0x7
+    field public static final int LIMIT_EXCEEDED = 15; // 0xf
+    field public static final int LOCAL = 3; // 0x3
+    field public static final int LOST_SIGNAL = 14; // 0xe
+    field public static final int LOW_BATTERY = 61; // 0x3d
+    field public static final int MAXIMUM_NUMBER_OF_CALLS_REACHED = 53; // 0x35
+    field public static final int MEDIA_TIMEOUT = 77; // 0x4d
+    field public static final int MMI = 6; // 0x6
+    field public static final int NORMAL = 2; // 0x2
+    field public static final int NORMAL_UNSPECIFIED = 65; // 0x41
+    field public static final int NOT_DISCONNECTED = 0; // 0x0
+    field public static final int NOT_VALID = -1; // 0xffffffff
+    field public static final int NO_PHONE_NUMBER_SUPPLIED = 38; // 0x26
+    field public static final int NUMBER_UNREACHABLE = 8; // 0x8
+    field public static final int OTASP_PROVISIONING_IN_PROCESS = 76; // 0x4c
+    field public static final int OUTGOING_CANCELED = 44; // 0x2c
+    field public static final int OUTGOING_EMERGENCY_CALL_PLACED = 80; // 0x50
+    field public static final int OUTGOING_FAILURE = 43; // 0x2b
+    field public static final int OUT_OF_NETWORK = 11; // 0xb
+    field public static final int OUT_OF_SERVICE = 18; // 0x12
+    field public static final int POWER_OFF = 17; // 0x11
+    field public static final int SERVER_ERROR = 12; // 0xc
+    field public static final int SERVER_UNREACHABLE = 9; // 0x9
+    field public static final int TIMED_OUT = 13; // 0xd
+    field public static final int TOO_MANY_ONGOING_CALLS = 75; // 0x4b
+    field public static final int UNOBTAINABLE_NUMBER = 25; // 0x19
+    field public static final int VIDEO_CALL_NOT_ALLOWED_WHILE_TTY_ENABLED = 50; // 0x32
+    field public static final int VOICEMAIL_NUMBER_MISSING = 40; // 0x28
+    field public static final int WFC_SERVICE_NOT_AVAILABLE_IN_THIS_LOCATION = 79; // 0x4f
+    field public static final int WIFI_LOST = 59; // 0x3b
+  }
+
   public class IccOpenLogicalChannelResponse implements android.os.Parcelable {
     method public int describeContents();
     method public int getChannel();
@@ -47464,12 +47598,14 @@ package android.telephony {
 
   public class MbmsDownloadSession implements java.lang.AutoCloseable {
     method public void addProgressListener(@NonNull android.telephony.mbms.DownloadRequest, @NonNull java.util.concurrent.Executor, @NonNull android.telephony.mbms.DownloadProgressListener);
+    method public void addServiceAnnouncement(@NonNull byte[]);
     method public void addStatusListener(@NonNull android.telephony.mbms.DownloadRequest, @NonNull java.util.concurrent.Executor, @NonNull android.telephony.mbms.DownloadStatusListener);
     method public void cancelDownload(@NonNull android.telephony.mbms.DownloadRequest);
     method public void close();
     method public static android.telephony.MbmsDownloadSession create(@NonNull android.content.Context, @NonNull java.util.concurrent.Executor, @NonNull android.telephony.mbms.MbmsDownloadSessionCallback);
     method @Nullable public static android.telephony.MbmsDownloadSession create(@NonNull android.content.Context, @NonNull java.util.concurrent.Executor, int, @NonNull android.telephony.mbms.MbmsDownloadSessionCallback);
     method public void download(@NonNull android.telephony.mbms.DownloadRequest);
+    method public static int getMaximumServiceAnnouncementSize();
     method @Nullable public java.io.File getTempFileRootDirectory();
     method @NonNull public java.util.List<android.telephony.mbms.DownloadRequest> listPendingDownloads();
     method public void removeProgressListener(@NonNull android.telephony.mbms.DownloadRequest, @NonNull android.telephony.mbms.DownloadProgressListener);
@@ -47917,6 +48053,7 @@ package android.telephony {
     method public static int[] calculateLength(String, boolean);
     method @Deprecated public static android.telephony.SmsMessage createFromPdu(byte[]);
     method public static android.telephony.SmsMessage createFromPdu(byte[], String);
+    method @Nullable public static android.telephony.SmsMessage createSmsSubmitPdu(@NonNull byte[], boolean);
     method public String getDisplayMessageBody();
     method public String getDisplayOriginatingAddress();
     method public String getEmailBody();
@@ -47999,7 +48136,7 @@ package android.telephony {
 
   public class SubscriptionManager {
     method public void addOnOpportunisticSubscriptionsChangedListener(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.SubscriptionManager.OnOpportunisticSubscriptionsChangedListener);
-    method public void addOnSubscriptionsChangedListener(android.telephony.SubscriptionManager.OnSubscriptionsChangedListener);
+    method @Deprecated public void addOnSubscriptionsChangedListener(android.telephony.SubscriptionManager.OnSubscriptionsChangedListener);
     method public void addOnSubscriptionsChangedListener(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.SubscriptionManager.OnSubscriptionsChangedListener);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void addSubscriptionsIntoGroup(@NonNull java.util.List<java.lang.Integer>, @NonNull android.os.ParcelUuid);
     method public boolean canManageSubscription(android.telephony.SubscriptionInfo);
@@ -48203,7 +48340,7 @@ package android.telephony {
     method @Deprecated public String sendEnvelopeWithStatus(String);
     method @RequiresPermission(android.Manifest.permission.CALL_PHONE) public void sendUssdRequest(String, android.telephony.TelephonyManager.UssdResponseCallback, android.os.Handler);
     method public void sendVisualVoicemailSms(String, int, String, android.app.PendingIntent);
-    method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setDataEnabled(boolean);
+    method @Deprecated @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setDataEnabled(boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public int setForbiddenPlmns(@NonNull java.util.List<java.lang.String>);
     method public boolean setLine1NumberForDisplay(String, String);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void setNetworkSelectionModeAutomatic();
@@ -48978,6 +49115,7 @@ package android.telephony.ims.feature {
   }
 
   public static class MmTelFeature.MmTelCapabilities {
+    method public final boolean isCapable(int);
     field public static final int CAPABILITY_TYPE_SMS = 8; // 0x8
     field public static final int CAPABILITY_TYPE_UT = 4; // 0x4
     field public static final int CAPABILITY_TYPE_VIDEO = 2; // 0x2
@@ -49080,6 +49218,7 @@ package android.telephony.mbms {
 
   public static class MbmsErrors.DownloadErrors {
     field public static final int ERROR_CANNOT_CHANGE_TEMP_FILE_ROOT = 401; // 0x191
+    field public static final int ERROR_MALFORMED_SERVICE_ANNOUNCEMENT = 404; // 0x194
     field public static final int ERROR_UNKNOWN_DOWNLOAD_REQUEST = 402; // 0x192
     field public static final int ERROR_UNKNOWN_FILE_INFO = 403; // 0x193
   }
@@ -51291,6 +51430,7 @@ package android.util {
     method public void failWrite(java.io.FileOutputStream);
     method public void finishWrite(java.io.FileOutputStream);
     method public java.io.File getBaseFile();
+    method public long getLastModifiedTime();
     method public java.io.FileInputStream openRead() throws java.io.FileNotFoundException;
     method public byte[] readFully() throws java.io.IOException;
     method public java.io.FileOutputStream startWrite() throws java.io.IOException;
@@ -53838,13 +53978,13 @@ package android.view {
     method @Nullable public CharSequence getAccessibilityPaneTitle();
     method @IdRes public int getAccessibilityTraversalAfter();
     method @IdRes public int getAccessibilityTraversalBefore();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getAlpha();
+    method public float getAlpha();
     method public android.view.animation.Animation getAnimation();
     method @Nullable public android.graphics.Matrix getAnimationMatrix();
     method public android.os.IBinder getApplicationWindowToken();
     method @NonNull public int[] getAttributeResolutionStack(@AttrRes int);
     method @NonNull public java.util.Map<java.lang.Integer,java.lang.Integer> getAttributeSourceResourceMap();
-    method @android.view.ViewDebug.ExportedProperty @Nullable public String[] getAutofillHints();
+    method @Nullable public String[] getAutofillHints();
     method public final android.view.autofill.AutofillId getAutofillId();
     method public int getAutofillType();
     method @Nullable public android.view.autofill.AutofillValue getAutofillValue();
@@ -53852,8 +53992,8 @@ package android.view {
     method @Nullable public android.graphics.BlendMode getBackgroundTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getBackgroundTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getBackgroundTintMode();
-    method @android.view.ViewDebug.ExportedProperty(category="layout") public int getBaseline();
-    method @android.view.ViewDebug.CapturedViewProperty public final int getBottom();
+    method public int getBaseline();
+    method public final int getBottom();
     method protected float getBottomFadingEdgeStrength();
     method protected int getBottomPaddingOffset();
     method public float getCameraDistance();
@@ -53861,10 +54001,10 @@ package android.view {
     method public boolean getClipBounds(android.graphics.Rect);
     method public final boolean getClipToOutline();
     method @Nullable public final android.view.contentcapture.ContentCaptureSession getContentCaptureSession();
-    method @android.view.ViewDebug.ExportedProperty(category="accessibility") public CharSequence getContentDescription();
-    method @android.view.ViewDebug.CapturedViewProperty public final android.content.Context getContext();
+    method public CharSequence getContentDescription();
+    method public final android.content.Context getContext();
     method protected android.view.ContextMenu.ContextMenuInfo getContextMenuInfo();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public final boolean getDefaultFocusHighlightEnabled();
+    method public final boolean getDefaultFocusHighlightEnabled();
     method public static int getDefaultSize(int, int);
     method public android.view.Display getDisplay();
     method public final int[] getDrawableState();
@@ -53874,11 +54014,11 @@ package android.view {
     method @Deprecated public int getDrawingCacheQuality();
     method public void getDrawingRect(android.graphics.Rect);
     method public long getDrawingTime();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getElevation();
+    method public float getElevation();
     method @StyleRes public int getExplicitStyle();
-    method @android.view.ViewDebug.ExportedProperty public boolean getFilterTouchesWhenObscured();
-    method @android.view.ViewDebug.ExportedProperty public boolean getFitsSystemWindows();
-    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.NOT_FOCUSABLE, to="NOT_FOCUSABLE"), @android.view.ViewDebug.IntToString(from=android.view.View.FOCUSABLE, to="FOCUSABLE"), @android.view.ViewDebug.IntToString(from=android.view.View.FOCUSABLE_AUTO, to="FOCUSABLE_AUTO")}, category="focus") public int getFocusable();
+    method public boolean getFilterTouchesWhenObscured();
+    method public boolean getFitsSystemWindows();
+    method public int getFocusable();
     method public java.util.ArrayList<android.view.View> getFocusables(int);
     method public void getFocusedRect(android.graphics.Rect);
     method public android.graphics.drawable.Drawable getForeground();
@@ -53890,23 +54030,23 @@ package android.view {
     method public final boolean getGlobalVisibleRect(android.graphics.Rect);
     method public android.os.Handler getHandler();
     method public final boolean getHasOverlappingRendering();
-    method @android.view.ViewDebug.ExportedProperty(category="layout") public final int getHeight();
+    method public final int getHeight();
     method public void getHitRect(android.graphics.Rect);
     method public int getHorizontalFadingEdgeLength();
     method protected int getHorizontalScrollbarHeight();
     method @Nullable public android.graphics.drawable.Drawable getHorizontalScrollbarThumbDrawable();
     method @Nullable public android.graphics.drawable.Drawable getHorizontalScrollbarTrackDrawable();
-    method @android.view.ViewDebug.CapturedViewProperty @IdRes public int getId();
-    method @android.view.ViewDebug.ExportedProperty(category="accessibility", mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS, to="noHideDescendants")}) public int getImportantForAccessibility();
-    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS, to="yesExcludeDescendants"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS, to="noExcludeDescendants")}) public int getImportantForAutofill();
-    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_AUTO, to="auto"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_YES, to="yes"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO, to="no"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS, to="yesExcludeDescendants"), @android.view.ViewDebug.IntToString(from=android.view.View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS, to="noExcludeDescendants")}) public int getImportantForContentCapture();
+    method @IdRes public int getId();
+    method public int getImportantForAccessibility();
+    method public int getImportantForAutofill();
+    method public int getImportantForContentCapture();
     method public boolean getKeepScreenOn();
     method public android.view.KeyEvent.DispatcherState getKeyDispatcherState();
-    method @android.view.ViewDebug.ExportedProperty(category="accessibility") @IdRes public int getLabelFor();
+    method @IdRes public int getLabelFor();
     method public int getLayerType();
-    method @android.view.ViewDebug.ExportedProperty(category="layout", mapping={@android.view.ViewDebug.IntToString(from=android.view.View.LAYOUT_DIRECTION_LTR, to="RESOLVED_DIRECTION_LTR"), @android.view.ViewDebug.IntToString(from=android.view.View.LAYOUT_DIRECTION_RTL, to="RESOLVED_DIRECTION_RTL")}) public int getLayoutDirection();
-    method @android.view.ViewDebug.ExportedProperty(deepExport=true, prefix="layout_") public android.view.ViewGroup.LayoutParams getLayoutParams();
-    method @android.view.ViewDebug.CapturedViewProperty public final int getLeft();
+    method public int getLayoutDirection();
+    method public android.view.ViewGroup.LayoutParams getLayoutParams();
+    method public final int getLeft();
     method protected float getLeftFadingEdgeStrength();
     method protected int getLeftPaddingOffset();
     method public final boolean getLocalVisibleRect(android.graphics.Rect);
@@ -53915,10 +54055,10 @@ package android.view {
     method public void getLocationOnScreen(@Size(2) int[]);
     method public android.graphics.Matrix getMatrix();
     method public final int getMeasuredHeight();
-    method @android.view.ViewDebug.ExportedProperty(category="measurement", flagMapping={@android.view.ViewDebug.FlagToString(mask=android.view.View.MEASURED_STATE_MASK, equals=android.view.View.MEASURED_STATE_TOO_SMALL, name="MEASURED_STATE_TOO_SMALL")}) public final int getMeasuredHeightAndState();
+    method public final int getMeasuredHeightAndState();
     method public final int getMeasuredState();
     method public final int getMeasuredWidth();
-    method @android.view.ViewDebug.ExportedProperty(category="measurement", flagMapping={@android.view.ViewDebug.FlagToString(mask=android.view.View.MEASURED_STATE_MASK, equals=android.view.View.MEASURED_STATE_TOO_SMALL, name="MEASURED_STATE_TOO_SMALL")}) public final int getMeasuredWidthAndState();
+    method public final int getMeasuredWidthAndState();
     method public int getMinimumHeight();
     method public int getMinimumWidth();
     method @IdRes public int getNextClusterForwardId();
@@ -53941,51 +54081,51 @@ package android.view {
     method public int getPaddingTop();
     method public final android.view.ViewParent getParent();
     method public android.view.ViewParent getParentForAccessibility();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getPivotX();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getPivotY();
+    method public float getPivotX();
+    method public float getPivotY();
     method public android.view.PointerIcon getPointerIcon();
     method public android.content.res.Resources getResources();
     method public final boolean getRevealOnFocusHint();
-    method @android.view.ViewDebug.CapturedViewProperty public final int getRight();
+    method public final int getRight();
     method protected float getRightFadingEdgeStrength();
     method protected int getRightPaddingOffset();
     method public android.view.View getRootView();
     method public android.view.WindowInsets getRootWindowInsets();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getRotation();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getRotationX();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getRotationY();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getScaleX();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getScaleY();
+    method public float getRotation();
+    method public float getRotationX();
+    method public float getRotationY();
+    method public float getScaleX();
+    method public float getScaleY();
     method public int getScrollBarDefaultDelayBeforeFade();
     method public int getScrollBarFadeDuration();
     method public int getScrollBarSize();
-    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.SCROLLBARS_INSIDE_OVERLAY, to="INSIDE_OVERLAY"), @android.view.ViewDebug.IntToString(from=android.view.View.SCROLLBARS_INSIDE_INSET, to="INSIDE_INSET"), @android.view.ViewDebug.IntToString(from=android.view.View.SCROLLBARS_OUTSIDE_OVERLAY, to="OUTSIDE_OVERLAY"), @android.view.ViewDebug.IntToString(from=android.view.View.SCROLLBARS_OUTSIDE_INSET, to="OUTSIDE_INSET")}) public int getScrollBarStyle();
+    method public int getScrollBarStyle();
     method public int getScrollIndicators();
     method public final int getScrollX();
     method public final int getScrollY();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") @ColorInt public int getSolidColor();
+    method @ColorInt public int getSolidColor();
     method @LayoutRes public int getSourceLayoutResId();
-    method @android.view.ViewDebug.ExportedProperty(category="accessibility") @Nullable public final CharSequence getStateDescription();
+    method @Nullable public final CharSequence getStateDescription();
     method public android.animation.StateListAnimator getStateListAnimator();
     method protected int getSuggestedMinimumHeight();
     method protected int getSuggestedMinimumWidth();
     method @NonNull public java.util.List<android.graphics.Rect> getSystemGestureExclusionRects();
     method @Deprecated public int getSystemUiVisibility();
-    method @android.view.ViewDebug.ExportedProperty public Object getTag();
+    method public Object getTag();
     method public Object getTag(int);
-    method @android.view.ViewDebug.ExportedProperty(category="text", mapping={@android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_INHERIT, to="INHERIT"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_GRAVITY, to="GRAVITY"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_TEXT_START, to="TEXT_START"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_TEXT_END, to="TEXT_END"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_CENTER, to="CENTER"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_VIEW_START, to="VIEW_START"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_ALIGNMENT_VIEW_END, to="VIEW_END")}) public int getTextAlignment();
-    method @android.view.ViewDebug.ExportedProperty(category="text", mapping={@android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_INHERIT, to="INHERIT"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_FIRST_STRONG, to="FIRST_STRONG"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_ANY_RTL, to="ANY_RTL"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_LTR, to="LTR"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_RTL, to="RTL"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_LOCALE, to="LOCALE"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_FIRST_STRONG_LTR, to="FIRST_STRONG_LTR"), @android.view.ViewDebug.IntToString(from=android.view.View.TEXT_DIRECTION_FIRST_STRONG_RTL, to="FIRST_STRONG_RTL")}) public int getTextDirection();
+    method public int getTextAlignment();
+    method public int getTextDirection();
     method @Nullable public CharSequence getTooltipText();
-    method @android.view.ViewDebug.CapturedViewProperty public final int getTop();
+    method public final int getTop();
     method protected float getTopFadingEdgeStrength();
     method protected int getTopPaddingOffset();
     method public android.view.TouchDelegate getTouchDelegate();
     method public java.util.ArrayList<android.view.View> getTouchables();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getTransitionAlpha();
-    method @android.view.ViewDebug.ExportedProperty public String getTransitionName();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getTranslationX();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getTranslationY();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getTranslationZ();
+    method public float getTransitionAlpha();
+    method public String getTransitionName();
+    method public float getTranslationX();
+    method public float getTranslationY();
+    method public float getTranslationZ();
     method public long getUniqueDrawingId();
     method public int getVerticalFadingEdgeLength();
     method public int getVerticalScrollbarPosition();
@@ -53993,8 +54133,8 @@ package android.view {
     method @Nullable public android.graphics.drawable.Drawable getVerticalScrollbarTrackDrawable();
     method public int getVerticalScrollbarWidth();
     method public android.view.ViewTreeObserver getViewTreeObserver();
-    method @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.View.VISIBLE, to="VISIBLE"), @android.view.ViewDebug.IntToString(from=android.view.View.INVISIBLE, to="INVISIBLE"), @android.view.ViewDebug.IntToString(from=android.view.View.GONE, to="GONE")}) public int getVisibility();
-    method @android.view.ViewDebug.ExportedProperty(category="layout") public final int getWidth();
+    method public int getVisibility();
+    method public final int getWidth();
     method protected int getWindowAttachCount();
     method public android.view.WindowId getWindowId();
     method @Nullable public android.view.WindowInsetsController getWindowInsetsController();
@@ -54002,18 +54142,18 @@ package android.view {
     method public android.os.IBinder getWindowToken();
     method public int getWindowVisibility();
     method public void getWindowVisibleDisplayFrame(android.graphics.Rect);
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getX();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getY();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public float getZ();
+    method public float getX();
+    method public float getY();
+    method public float getZ();
     method public boolean hasExplicitFocusable();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public boolean hasFocus();
+    method public boolean hasFocus();
     method public boolean hasFocusable();
     method public boolean hasNestedScrollingParent();
     method public boolean hasOnClickListeners();
     method public boolean hasOnLongClickListeners();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean hasOverlappingRendering();
+    method public boolean hasOverlappingRendering();
     method public boolean hasPointerCapture();
-    method @android.view.ViewDebug.ExportedProperty(category="layout") public boolean hasTransientState();
+    method public boolean hasTransientState();
     method public boolean hasWindowFocus();
     method public static android.view.View inflate(android.content.Context, @LayoutRes int, android.view.ViewGroup);
     method @Deprecated public void invalidate(android.graphics.Rect);
@@ -54023,50 +54163,50 @@ package android.view {
     method public void invalidateOutline();
     method public boolean isAccessibilityFocused();
     method public boolean isAccessibilityHeading();
-    method @android.view.ViewDebug.ExportedProperty public boolean isActivated();
+    method public boolean isActivated();
     method public boolean isAttachedToWindow();
-    method @android.view.ViewDebug.ExportedProperty public boolean isClickable();
+    method public boolean isClickable();
     method public boolean isContextClickable();
     method public boolean isDirty();
-    method @Deprecated @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean isDrawingCacheEnabled();
+    method @Deprecated public boolean isDrawingCacheEnabled();
     method public boolean isDuplicateParentStateEnabled();
-    method @android.view.ViewDebug.ExportedProperty public boolean isEnabled();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public final boolean isFocusable();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public final boolean isFocusableInTouchMode();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public boolean isFocused();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public final boolean isFocusedByDefault();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean isForceDarkAllowed();
-    method @android.view.ViewDebug.ExportedProperty public boolean isHapticFeedbackEnabled();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean isHardwareAccelerated();
+    method public boolean isEnabled();
+    method public final boolean isFocusable();
+    method public final boolean isFocusableInTouchMode();
+    method public boolean isFocused();
+    method public final boolean isFocusedByDefault();
+    method public boolean isForceDarkAllowed();
+    method public boolean isHapticFeedbackEnabled();
+    method public boolean isHardwareAccelerated();
     method public boolean isHorizontalFadingEdgeEnabled();
     method public boolean isHorizontalScrollBarEnabled();
-    method @android.view.ViewDebug.ExportedProperty public boolean isHovered();
+    method public boolean isHovered();
     method public boolean isImportantForAccessibility();
     method public final boolean isImportantForAutofill();
     method public final boolean isImportantForContentCapture();
     method public boolean isInEditMode();
     method public boolean isInLayout();
-    method @android.view.ViewDebug.ExportedProperty public boolean isInTouchMode();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public final boolean isKeyboardNavigationCluster();
+    method public boolean isInTouchMode();
+    method public final boolean isKeyboardNavigationCluster();
     method public boolean isLaidOut();
     method public boolean isLayoutDirectionResolved();
     method public boolean isLayoutRequested();
     method public boolean isLongClickable();
     method public boolean isNestedScrollingEnabled();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean isOpaque();
+    method public boolean isOpaque();
     method protected boolean isPaddingOffsetRequired();
     method public boolean isPaddingRelative();
     method public boolean isPivotSet();
-    method @android.view.ViewDebug.ExportedProperty public boolean isPressed();
+    method public boolean isPressed();
     method public boolean isSaveEnabled();
     method public boolean isSaveFromParentEnabled();
     method public boolean isScreenReaderFocusable();
     method public boolean isScrollContainer();
     method public boolean isScrollbarFadingEnabled();
-    method @android.view.ViewDebug.ExportedProperty public boolean isSelected();
+    method public boolean isSelected();
     method public final boolean isShowingLayoutBounds();
     method public boolean isShown();
-    method @android.view.ViewDebug.ExportedProperty public boolean isSoundEffectsEnabled();
+    method public boolean isSoundEffectsEnabled();
     method public final boolean isTemporarilyDetached();
     method public boolean isTextAlignmentResolved();
     method public boolean isTextDirectionResolved();
@@ -54196,6 +54336,7 @@ package android.view {
     method public void setAccessibilityTraversalAfter(@IdRes int);
     method public void setAccessibilityTraversalBefore(@IdRes int);
     method public void setActivated(boolean);
+    method public void setAllowClickWhenDisabled(boolean);
     method public void setAlpha(@FloatRange(from=0.0, to=1.0) float);
     method public void setAnimation(android.view.animation.Animation);
     method public void setAnimationMatrix(@Nullable android.graphics.Matrix);
@@ -54357,8 +54498,8 @@ package android.view {
     method public void unscheduleDrawable(android.graphics.drawable.Drawable);
     method public final void updateDragShadow(android.view.View.DragShadowBuilder);
     method @CallSuper protected boolean verifyDrawable(@NonNull android.graphics.drawable.Drawable);
-    method @Deprecated @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean willNotCacheDrawing();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean willNotDraw();
+    method @Deprecated public boolean willNotCacheDrawing();
+    method public boolean willNotDraw();
     field public static final int ACCESSIBILITY_LIVE_REGION_ASSERTIVE = 2; // 0x2
     field public static final int ACCESSIBILITY_LIVE_REGION_NONE = 0; // 0x0
     field public static final int ACCESSIBILITY_LIVE_REGION_POLITE = 1; // 0x1
@@ -54380,6 +54521,7 @@ package android.view {
     field public static final int AUTOFILL_TYPE_DATE = 4; // 0x4
     field public static final int AUTOFILL_TYPE_LIST = 3; // 0x3
     field public static final int AUTOFILL_TYPE_NONE = 0; // 0x0
+    field public static final int AUTOFILL_TYPE_RICH_CONTENT = 5; // 0x5
     field public static final int AUTOFILL_TYPE_TEXT = 1; // 0x1
     field public static final int AUTOFILL_TYPE_TOGGLE = 2; // 0x2
     field public static final int DRAG_FLAG_GLOBAL = 256; // 0x100
@@ -54799,9 +54941,9 @@ package android.view {
     method public static int getChildMeasureSpec(int, int, int);
     method protected boolean getChildStaticTransformation(android.view.View, android.view.animation.Transformation);
     method public boolean getChildVisibleRect(android.view.View, android.graphics.Rect, android.graphics.Point);
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean getClipChildren();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") public boolean getClipToPadding();
-    method @android.view.ViewDebug.ExportedProperty(category="focus", mapping={@android.view.ViewDebug.IntToString(from=android.view.ViewGroup.FOCUS_BEFORE_DESCENDANTS, to="FOCUS_BEFORE_DESCENDANTS"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS, to="FOCUS_AFTER_DESCENDANTS"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS, to="FOCUS_BLOCK_DESCENDANTS")}) public int getDescendantFocusability();
+    method public boolean getClipChildren();
+    method public boolean getClipToPadding();
+    method public int getDescendantFocusability();
     method public android.view.View getFocusedChild();
     method public android.view.animation.LayoutAnimationController getLayoutAnimation();
     method public android.view.animation.Animation.AnimationListener getLayoutAnimationListener();
@@ -54809,14 +54951,14 @@ package android.view {
     method public android.animation.LayoutTransition getLayoutTransition();
     method public int getNestedScrollAxes();
     method public android.view.ViewGroupOverlay getOverlay();
-    method @Deprecated @android.view.ViewDebug.ExportedProperty(category="drawing", mapping={@android.view.ViewDebug.IntToString(from=android.view.ViewGroup.PERSISTENT_NO_CACHE, to="NONE"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.PERSISTENT_ANIMATION_CACHE, to="ANIMATION"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.PERSISTENT_SCROLLING_CACHE, to="SCROLLING"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.PERSISTENT_ALL_CACHES, to="ALL")}) public int getPersistentDrawingCache();
-    method @android.view.ViewDebug.ExportedProperty(category="focus") public boolean getTouchscreenBlocksFocus();
+    method @Deprecated public int getPersistentDrawingCache();
+    method public boolean getTouchscreenBlocksFocus();
     method public int indexOfChild(android.view.View);
     method @Deprecated public final void invalidateChild(android.view.View, android.graphics.Rect);
     method @Deprecated public android.view.ViewParent invalidateChildInParent(int[], android.graphics.Rect);
     method @Deprecated public boolean isAlwaysDrawnWithCacheEnabled();
     method @Deprecated public boolean isAnimationCacheEnabled();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") protected boolean isChildrenDrawingOrderEnabled();
+    method protected boolean isChildrenDrawingOrderEnabled();
     method @Deprecated protected boolean isChildrenDrawnWithCacheEnabled();
     method public boolean isLayoutSuppressed();
     method public boolean isMotionEventSplittingEnabled();
@@ -54907,9 +55049,9 @@ package android.view {
     field @Deprecated public static final int FILL_PARENT = -1; // 0xffffffff
     field public static final int MATCH_PARENT = -1; // 0xffffffff
     field public static final int WRAP_CONTENT = -2; // 0xfffffffe
-    field @android.view.ViewDebug.ExportedProperty(category="layout", mapping={@android.view.ViewDebug.IntToString(from=android.view.ViewGroup.LayoutParams.MATCH_PARENT, to="MATCH_PARENT"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.LayoutParams.WRAP_CONTENT, to="WRAP_CONTENT")}) public int height;
+    field public int height;
     field public android.view.animation.LayoutAnimationController.AnimationParameters layoutAnimationParameters;
-    field @android.view.ViewDebug.ExportedProperty(category="layout", mapping={@android.view.ViewDebug.IntToString(from=android.view.ViewGroup.LayoutParams.MATCH_PARENT, to="MATCH_PARENT"), @android.view.ViewDebug.IntToString(from=android.view.ViewGroup.LayoutParams.WRAP_CONTENT, to="WRAP_CONTENT")}) public int width;
+    field public int width;
   }
 
   public static class ViewGroup.MarginLayoutParams extends android.view.ViewGroup.LayoutParams {
@@ -54925,10 +55067,10 @@ package android.view {
     method public void setMarginEnd(int);
     method public void setMarginStart(int);
     method public void setMargins(int, int, int, int);
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int bottomMargin;
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int leftMargin;
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int rightMargin;
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int topMargin;
+    field public int bottomMargin;
+    field public int leftMargin;
+    field public int rightMargin;
+    field public int topMargin;
   }
 
   public static interface ViewGroup.OnHierarchyChangeListener {
@@ -55715,7 +55857,6 @@ package android.view {
     field public static final int TYPE_PRIVATE_PRESENTATION = 2030; // 0x7ee
     field public static final int TYPE_SEARCH_BAR = 2001; // 0x7d1
     field public static final int TYPE_STATUS_BAR = 2000; // 0x7d0
-    field @Deprecated public static final int TYPE_STATUS_BAR_PANEL = 2014; // 0x7de
     field @Deprecated public static final int TYPE_SYSTEM_ALERT = 2003; // 0x7d3
     field public static final int TYPE_SYSTEM_DIALOG = 2008; // 0x7d8
     field @Deprecated public static final int TYPE_SYSTEM_ERROR = 2010; // 0x7da
@@ -55725,11 +55866,11 @@ package android.view {
     field public float alpha;
     field public float buttonBrightness;
     field public float dimAmount;
-    field @android.view.ViewDebug.ExportedProperty(flagMapping={@android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON, equals=android.view.WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON, name="ALLOW_LOCK_WHILE_SCREEN_ON"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND, equals=android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND, name="DIM_BEHIND"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND, equals=android.view.WindowManager.LayoutParams.FLAG_BLUR_BEHIND, name="BLUR_BEHIND"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, equals=android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, name="NOT_FOCUSABLE"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, equals=android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, name="NOT_TOUCHABLE"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, equals=android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, name="NOT_TOUCH_MODAL"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_TOUCHABLE_WHEN_WAKING, equals=android.view.WindowManager.LayoutParams.FLAG_TOUCHABLE_WHEN_WAKING, name="TOUCHABLE_WHEN_WAKING"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, equals=android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON, name="KEEP_SCREEN_ON"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, equals=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, name="LAYOUT_IN_SCREEN"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, equals=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, name="LAYOUT_NO_LIMITS"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN, equals=android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN, name="FULLSCREEN"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN, equals=android.view.WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN, name="FORCE_NOT_FULLSCREEN"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_DITHER, equals=android.view.WindowManager.LayoutParams.FLAG_DITHER, name="DITHER"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_SECURE, equals=android.view.WindowManager.LayoutParams.FLAG_SECURE, name="SECURE"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_SCALED, equals=android.view.WindowManager.LayoutParams.FLAG_SCALED, name="SCALED"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_IGNORE_CHEEK_PRESSES, equals=android.view.WindowManager.LayoutParams.FLAG_IGNORE_CHEEK_PRESSES, name="IGNORE_CHEEK_PRESSES"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR, equals=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR, name="LAYOUT_INSET_DECOR"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM, equals=android.view.WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM, name="ALT_FOCUSABLE_IM"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH, equals=android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH, name="WATCH_OUTSIDE_TOUCH"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED, equals=android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED, name="SHOW_WHEN_LOCKED"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER, equals=android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER, name="SHOW_WALLPAPER"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON, equals=android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON, name="TURN_SCREEN_ON"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD, equals=android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD, name="DISMISS_KEYGUARD"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_SPLIT_TOUCH, equals=android.view.WindowManager.LayoutParams.FLAG_SPLIT_TOUCH, name="SPLIT_TOUCH"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, equals=android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED, name="HARDWARE_ACCELERATED"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_OVERSCAN, equals=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_OVERSCAN, name="LOCAL_FOCUS_MODE"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS, equals=android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS, name="TRANSLUCENT_STATUS"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION, equals=android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION, name="TRANSLUCENT_NAVIGATION"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LOCAL_FOCUS_MODE, equals=android.view.WindowManager.LayoutParams.FLAG_LOCAL_FOCUS_MODE, name="LOCAL_FOCUS_MODE"), @android.view.ViewDebug.FlagToString(mask=0x20000000, equals=0x20000000, name="FLAG_SLIPPERY"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_ATTACHED_IN_DECOR, equals=android.view.WindowManager.LayoutParams.FLAG_LAYOUT_ATTACHED_IN_DECOR, name="FLAG_LAYOUT_ATTACHED_IN_DECOR"), @android.view.ViewDebug.FlagToString(mask=android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS, equals=android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS, name="DRAWS_SYSTEM_BAR_BACKGROUNDS")}, formatToHexString=true) public int flags;
+    field public int flags;
     field public int format;
     field public int gravity;
     field public float horizontalMargin;
-    field @android.view.ViewDebug.ExportedProperty public float horizontalWeight;
+    field public float horizontalWeight;
     field public int layoutInDisplayCutoutMode;
     field @Deprecated public int memoryType;
     field public String packageName;
@@ -55742,12 +55883,12 @@ package android.view {
     field public int softInputMode;
     field @Deprecated public int systemUiVisibility;
     field public android.os.IBinder token;
-    field @android.view.ViewDebug.ExportedProperty(mapping={@android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION, to="BASE_APPLICATION"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION, to="APPLICATION"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING, to="APPLICATION_STARTING"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_DRAWN_APPLICATION, to="DRAWN_APPLICATION"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_PANEL, to="APPLICATION_PANEL"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA, to="APPLICATION_MEDIA"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_SUB_PANEL, to="APPLICATION_SUB_PANEL"), @android.view.ViewDebug.IntToString(from=0x3ed, to="APPLICATION_ABOVE_SUB_PANEL"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG, to="APPLICATION_ATTACHED_DIALOG"), @android.view.ViewDebug.IntToString(from=0x3ec, to="APPLICATION_MEDIA_OVERLAY"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR, to="STATUS_BAR"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_SEARCH_BAR, to="SEARCH_BAR"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_PHONE, to="PHONE"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT, to="SYSTEM_ALERT"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_TOAST, to="TOAST"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY, to="SYSTEM_OVERLAY"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_PRIORITY_PHONE, to="PRIORITY_PHONE"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG, to="SYSTEM_DIALOG"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG, to="KEYGUARD_DIALOG"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ERROR, to="SYSTEM_ERROR"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD, to="INPUT_METHOD"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD_DIALOG, to="INPUT_METHOD_DIALOG"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_WALLPAPER, to="WALLPAPER"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_PANEL, to="STATUS_BAR_PANEL"), @android.view.ViewDebug.IntToString(from=0x7df, to="SECURE_SYSTEM_OVERLAY"), @android.view.ViewDebug.IntToString(from=0x7e0, to="DRAG"), @android.view.ViewDebug.IntToString(from=0x7e1, to="STATUS_BAR_SUB_PANEL"), @android.view.ViewDebug.IntToString(from=0x7e2, to="POINTER"), @android.view.ViewDebug.IntToString(from=0x7e3, to="NAVIGATION_BAR"), @android.view.ViewDebug.IntToString(from=0x7e4, to="VOLUME_OVERLAY"), @android.view.ViewDebug.IntToString(from=0x7e5, to="BOOT_PROGRESS"), @android.view.ViewDebug.IntToString(from=0x7e6, to="INPUT_CONSUMER"), @android.view.ViewDebug.IntToString(from=0x7e8, to="NAVIGATION_BAR_PANEL"), @android.view.ViewDebug.IntToString(from=0x7ea, to="DISPLAY_OVERLAY"), @android.view.ViewDebug.IntToString(from=0x7eb, to="MAGNIFICATION_OVERLAY"), @android.view.ViewDebug.IntToString(from=0x7f5, to="PRESENTATION"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION, to="PRIVATE_PRESENTATION"), @android.view.ViewDebug.IntToString(from=0x7ef, to="VOICE_INTERACTION"), @android.view.ViewDebug.IntToString(from=0x7f1, to="VOICE_INTERACTION_STARTING"), @android.view.ViewDebug.IntToString(from=0x7f2, to="DOCK_DIVIDER"), @android.view.ViewDebug.IntToString(from=0x7f3, to="QS_DIALOG"), @android.view.ViewDebug.IntToString(from=0x7f4, to="SCREENSHOT"), @android.view.ViewDebug.IntToString(from=android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, to="APPLICATION_OVERLAY")}) public int type;
+    field public int type;
     field public float verticalMargin;
-    field @android.view.ViewDebug.ExportedProperty public float verticalWeight;
+    field public float verticalWeight;
     field public int windowAnimations;
-    field @android.view.ViewDebug.ExportedProperty public int x;
-    field @android.view.ViewDebug.ExportedProperty public int y;
+    field public int x;
+    field public int y;
   }
 
   public final class WindowMetrics {
@@ -56649,14 +56790,17 @@ package android.view.autofill {
     method public int describeContents();
     method public static android.view.autofill.AutofillValue forDate(long);
     method public static android.view.autofill.AutofillValue forList(int);
+    method @NonNull public static android.view.autofill.AutofillValue forRichContent(@NonNull android.content.ClipData);
     method public static android.view.autofill.AutofillValue forText(@Nullable CharSequence);
     method public static android.view.autofill.AutofillValue forToggle(boolean);
     method public long getDateValue();
     method public int getListValue();
+    method @NonNull public android.content.ClipData getRichContentValue();
     method @NonNull public CharSequence getTextValue();
     method public boolean getToggleValue();
     method public boolean isDate();
     method public boolean isList();
+    method public boolean isRichContent();
     method public boolean isText();
     method public boolean isToggle();
     method public void writeToParcel(android.os.Parcel, int);
@@ -58484,21 +58628,21 @@ package android.webkit {
     method public void flingScroll(int, int);
     method @Deprecated public void freeMemory();
     method @Nullable public android.net.http.SslCertificate getCertificate();
-    method @android.view.ViewDebug.ExportedProperty(category="webview") public int getContentHeight();
+    method public int getContentHeight();
     method @Nullable public static android.content.pm.PackageInfo getCurrentWebViewPackage();
     method @Nullable public android.graphics.Bitmap getFavicon();
     method @NonNull public android.webkit.WebView.HitTestResult getHitTestResult();
     method @Deprecated @Nullable public String[] getHttpAuthUsernamePassword(String, String);
-    method @android.view.ViewDebug.ExportedProperty(category="webview") @Nullable public String getOriginalUrl();
+    method @Nullable public String getOriginalUrl();
     method public int getProgress();
     method public boolean getRendererPriorityWaivedWhenNotVisible();
     method public int getRendererRequestedPriority();
     method @NonNull public static android.net.Uri getSafeBrowsingPrivacyPolicyUrl();
-    method @Deprecated @android.view.ViewDebug.ExportedProperty(category="webview") public float getScale();
+    method @Deprecated public float getScale();
     method @NonNull public android.webkit.WebSettings getSettings();
     method @NonNull public android.view.textclassifier.TextClassifier getTextClassifier();
-    method @android.view.ViewDebug.ExportedProperty(category="webview") @Nullable public String getTitle();
-    method @android.view.ViewDebug.ExportedProperty(category="webview") @Nullable public String getUrl();
+    method @Nullable public String getTitle();
+    method @Nullable public String getUrl();
     method @Nullable public android.webkit.WebChromeClient getWebChromeClient();
     method @NonNull public static ClassLoader getWebViewClassLoader();
     method @NonNull public android.webkit.WebViewClient getWebViewClient();
@@ -58700,7 +58844,7 @@ package android.widget {
     method public void fling(int);
     method public android.widget.AbsListView.LayoutParams generateLayoutParams(android.util.AttributeSet);
     method @ColorInt public int getBottomEdgeEffectColor();
-    method @android.view.ViewDebug.ExportedProperty(category="drawing") @ColorInt public int getCacheColorHint();
+    method @ColorInt public int getCacheColorHint();
     method public int getCheckedItemCount();
     method public long[] getCheckedItemIds();
     method public int getCheckedItemPosition();
@@ -58710,7 +58854,7 @@ package android.widget {
     method public int getListPaddingLeft();
     method public int getListPaddingRight();
     method public int getListPaddingTop();
-    method @android.view.ViewDebug.ExportedProperty public android.view.View getSelectedView();
+    method public android.view.View getSelectedView();
     method public android.graphics.drawable.Drawable getSelector();
     method public CharSequence getTextFilter();
     method @ColorInt public int getTopEdgeEffectColor();
@@ -58720,13 +58864,13 @@ package android.widget {
     method public void invalidateViews();
     method public boolean isDrawSelectorOnTop();
     method public boolean isFastScrollAlwaysVisible();
-    method @android.view.ViewDebug.ExportedProperty public boolean isFastScrollEnabled();
+    method public boolean isFastScrollEnabled();
     method protected boolean isInFilterMode();
     method public boolean isItemChecked(int);
-    method @android.view.ViewDebug.ExportedProperty public boolean isScrollingCacheEnabled();
-    method @android.view.ViewDebug.ExportedProperty public boolean isSmoothScrollbarEnabled();
-    method @android.view.ViewDebug.ExportedProperty public boolean isStackFromBottom();
-    method @android.view.ViewDebug.ExportedProperty public boolean isTextFilterEnabled();
+    method public boolean isScrollingCacheEnabled();
+    method public boolean isSmoothScrollbarEnabled();
+    method public boolean isStackFromBottom();
+    method public boolean isTextFilterEnabled();
     method protected void layoutChildren();
     method public void onFilterComplete(int);
     method public void onGlobalLayout();
@@ -58923,7 +59067,7 @@ package android.widget {
     ctor public AdapterView(android.content.Context, android.util.AttributeSet, int);
     ctor public AdapterView(android.content.Context, android.util.AttributeSet, int, int);
     method public abstract T getAdapter();
-    method @android.view.ViewDebug.CapturedViewProperty public int getCount();
+    method public int getCount();
     method public android.view.View getEmptyView();
     method public int getFirstVisiblePosition();
     method public Object getItemAtPosition(int);
@@ -58934,8 +59078,8 @@ package android.widget {
     method @Nullable public final android.widget.AdapterView.OnItemSelectedListener getOnItemSelectedListener();
     method public int getPositionForView(android.view.View);
     method public Object getSelectedItem();
-    method @android.view.ViewDebug.CapturedViewProperty public long getSelectedItemId();
-    method @android.view.ViewDebug.CapturedViewProperty public int getSelectedItemPosition();
+    method public long getSelectedItemId();
+    method public int getSelectedItemPosition();
     method public abstract android.view.View getSelectedView();
     method public boolean performItemClick(android.view.View, int, long);
     method public abstract void setAdapter(T);
@@ -59236,7 +59380,7 @@ package android.widget {
     method @Nullable public android.graphics.BlendMode getCheckMarkTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getCheckMarkTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getCheckMarkTintMode();
-    method @android.view.ViewDebug.ExportedProperty public boolean isChecked();
+    method public boolean isChecked();
     method public void setCheckMarkDrawable(@DrawableRes int);
     method public void setCheckMarkDrawable(@Nullable android.graphics.drawable.Drawable);
     method public void setCheckMarkTintBlendMode(@Nullable android.graphics.BlendMode);
@@ -59277,7 +59421,7 @@ package android.widget {
     method @Nullable public android.graphics.BlendMode getButtonTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getButtonTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getButtonTintMode();
-    method @android.view.ViewDebug.ExportedProperty public boolean isChecked();
+    method public boolean isChecked();
     method public void setButtonDrawable(@DrawableRes int);
     method public void setButtonDrawable(@Nullable android.graphics.drawable.Drawable);
     method public void setButtonTintBlendMode(@Nullable android.graphics.BlendMode);
@@ -59666,7 +59810,7 @@ package android.widget {
     method public int getColumnWidth();
     method public int getGravity();
     method public int getHorizontalSpacing();
-    method @android.view.ViewDebug.ExportedProperty public int getNumColumns();
+    method public int getNumColumns();
     method public int getRequestedColumnWidth();
     method public int getRequestedHorizontalSpacing();
     method public int getStretchMode();
@@ -59857,8 +60001,8 @@ package android.widget {
     ctor public LinearLayout.LayoutParams(android.view.ViewGroup.MarginLayoutParams);
     ctor public LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams);
     method public String debug(String);
-    field @android.view.ViewDebug.ExportedProperty(category="layout", mapping={@android.view.ViewDebug.IntToString(from=0xffffffff, to="NONE"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.NO_GRAVITY, to="NONE"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.TOP, to="TOP"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.BOTTOM, to="BOTTOM"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.LEFT, to="LEFT"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.RIGHT, to="RIGHT"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.START, to="START"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.END, to="END"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER_VERTICAL, to="CENTER_VERTICAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL_VERTICAL, to="FILL_VERTICAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER_HORIZONTAL, to="CENTER_HORIZONTAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL_HORIZONTAL, to="FILL_HORIZONTAL"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.CENTER, to="CENTER"), @android.view.ViewDebug.IntToString(from=android.view.Gravity.FILL, to="FILL")}) public int gravity;
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public float weight;
+    field public int gravity;
+    field public float weight;
   }
 
   public interface ListAdapter extends android.widget.Adapter {
@@ -60247,13 +60391,13 @@ package android.widget {
     method @Nullable public android.content.res.ColorStateList getIndeterminateTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getIndeterminateTintMode();
     method public android.view.animation.Interpolator getInterpolator();
-    method @android.view.ViewDebug.ExportedProperty(category="progress") public int getMax();
+    method public int getMax();
     method @Px public int getMaxHeight();
     method @Px public int getMaxWidth();
-    method @android.view.ViewDebug.ExportedProperty(category="progress") public int getMin();
+    method public int getMin();
     method @Px public int getMinHeight();
     method @Px public int getMinWidth();
-    method @android.view.ViewDebug.ExportedProperty(category="progress") public int getProgress();
+    method public int getProgress();
     method @Nullable public android.graphics.BlendMode getProgressBackgroundTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getProgressBackgroundTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getProgressBackgroundTintMode();
@@ -60261,14 +60405,14 @@ package android.widget {
     method @Nullable public android.graphics.BlendMode getProgressTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getProgressTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getProgressTintMode();
-    method @android.view.ViewDebug.ExportedProperty(category="progress") public int getSecondaryProgress();
+    method public int getSecondaryProgress();
     method @Nullable public android.graphics.BlendMode getSecondaryProgressTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getSecondaryProgressTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getSecondaryProgressTintMode();
     method public final void incrementProgressBy(int);
     method public final void incrementSecondaryProgressBy(int);
     method public boolean isAnimating();
-    method @android.view.ViewDebug.ExportedProperty(category="progress") public boolean isIndeterminate();
+    method public boolean isIndeterminate();
     method public void onRestoreInstanceState(android.os.Parcelable);
     method public android.os.Parcelable onSaveInstanceState();
     method public void setIndeterminate(boolean);
@@ -60419,7 +60563,7 @@ package android.widget {
     method public int getRule(int);
     method public int[] getRules();
     method public void removeRule(int);
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public boolean alignWithParent;
+    field public boolean alignWithParent;
   }
 
   public class RemoteViews implements android.view.LayoutInflater.Filter android.os.Parcelable {
@@ -60535,6 +60679,17 @@ package android.widget {
     ctor public ResourceCursorTreeAdapter(android.content.Context, android.database.Cursor, int, int);
     method public android.view.View newChildView(android.content.Context, android.database.Cursor, boolean, android.view.ViewGroup);
     method public android.view.View newGroupView(android.content.Context, android.database.Cursor, boolean, android.view.ViewGroup);
+  }
+
+  public interface RichContentReceiver<T extends android.view.View> {
+    method @NonNull public java.util.Set<java.lang.String> getSupportedMimeTypes();
+    method public boolean onReceive(@NonNull T, @NonNull android.content.ClipData, int, int);
+    field public static final int FLAG_CONVERT_TO_PLAIN_TEXT = 1; // 0x1
+    field public static final int SOURCE_AUTOFILL = 3; // 0x3
+    field public static final int SOURCE_CLIPBOARD = 0; // 0x0
+    field public static final int SOURCE_DRAG_AND_DROP = 2; // 0x2
+    field public static final int SOURCE_INPUT_METHOD = 1; // 0x1
+    field public static final int SOURCE_PROCESS_TEXT = 4; // 0x4
   }
 
   public class ScrollView extends android.widget.FrameLayout {
@@ -60978,8 +61133,8 @@ package android.widget {
     ctor public TableRow.LayoutParams(int);
     ctor public TableRow.LayoutParams(android.view.ViewGroup.LayoutParams);
     ctor public TableRow.LayoutParams(android.view.ViewGroup.MarginLayoutParams);
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int column;
-    field @android.view.ViewDebug.ExportedProperty(category="layout") public int span;
+    field public int column;
+    field public int span;
   }
 
   @android.widget.RemoteViews.RemoteView public class TextClock extends android.widget.TextView {
@@ -60987,8 +61142,8 @@ package android.widget {
     ctor public TextClock(android.content.Context, android.util.AttributeSet);
     ctor public TextClock(android.content.Context, android.util.AttributeSet, int);
     ctor public TextClock(android.content.Context, android.util.AttributeSet, int, int);
-    method @android.view.ViewDebug.ExportedProperty public CharSequence getFormat12Hour();
-    method @android.view.ViewDebug.ExportedProperty public CharSequence getFormat24Hour();
+    method public CharSequence getFormat12Hour();
+    method public CharSequence getFormat24Hour();
     method public String getTimeZone();
     method public boolean is24HourModeEnabled();
     method public void refreshTime();
@@ -61047,7 +61202,7 @@ package android.widget {
     method protected boolean getDefaultEditable();
     method protected android.text.method.MovementMethod getDefaultMovementMethod();
     method public android.text.Editable getEditableText();
-    method @android.view.ViewDebug.ExportedProperty public android.text.TextUtils.TruncateAt getEllipsize();
+    method public android.text.TextUtils.TruncateAt getEllipsize();
     method public CharSequence getError();
     method public int getExtendedPaddingBottom();
     method public int getExtendedPaddingTop();
@@ -61058,7 +61213,7 @@ package android.widget {
     method public boolean getFreezesText();
     method public int getGravity();
     method @ColorInt public int getHighlightColor();
-    method @android.view.ViewDebug.CapturedViewProperty public CharSequence getHint();
+    method public CharSequence getHint();
     method public final android.content.res.ColorStateList getHintTextColors();
     method public int getHyphenationFrequency();
     method public int getImeActionId();
@@ -61094,14 +61249,15 @@ package android.widget {
     method public android.text.TextPaint getPaint();
     method public int getPaintFlags();
     method public String getPrivateImeOptions();
-    method @android.view.ViewDebug.ExportedProperty(category="text") public int getSelectionEnd();
-    method @android.view.ViewDebug.ExportedProperty(category="text") public int getSelectionStart();
+    method @NonNull public android.widget.RichContentReceiver<android.widget.TextView> getRichContentReceiver();
+    method public int getSelectionEnd();
+    method public int getSelectionStart();
     method @ColorInt public int getShadowColor();
     method public float getShadowDx();
     method public float getShadowDy();
     method public float getShadowRadius();
     method public final boolean getShowSoftInputOnFocus();
-    method @android.view.ViewDebug.CapturedViewProperty public CharSequence getText();
+    method public CharSequence getText();
     method @NonNull public android.view.textclassifier.TextClassifier getTextClassifier();
     method public final android.content.res.ColorStateList getTextColors();
     method @Nullable public android.graphics.drawable.Drawable getTextCursorDrawable();
@@ -61113,7 +61269,7 @@ package android.widget {
     method @Nullable public android.graphics.drawable.Drawable getTextSelectHandle();
     method @Nullable public android.graphics.drawable.Drawable getTextSelectHandleLeft();
     method @Nullable public android.graphics.drawable.Drawable getTextSelectHandleRight();
-    method @android.view.ViewDebug.ExportedProperty(category="text") public float getTextSize();
+    method public float getTextSize();
     method public int getTextSizeUnit();
     method public int getTotalPaddingBottom();
     method public int getTotalPaddingEnd();
@@ -61221,6 +61377,7 @@ package android.widget {
     method public void setPaintFlags(int);
     method public void setPrivateImeOptions(String);
     method public void setRawInputType(int);
+    method public void setRichContentReceiver(@NonNull android.widget.RichContentReceiver<android.widget.TextView>);
     method public void setScroller(android.widget.Scroller);
     method public void setSelectAllOnFocus(boolean);
     method public void setShadowLayer(float, float, float, int);
@@ -61261,6 +61418,7 @@ package android.widget {
     method public void setWidth(int);
     field public static final int AUTO_SIZE_TEXT_TYPE_NONE = 0; // 0x0
     field public static final int AUTO_SIZE_TEXT_TYPE_UNIFORM = 1; // 0x1
+    field @NonNull public static final android.widget.RichContentReceiver<android.widget.TextView> DEFAULT_RICH_CONTENT_RECEIVER;
   }
 
   public enum TextView.BufferType {
