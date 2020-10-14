@@ -17,6 +17,7 @@
 package com.android.server.biometrics.sensors.fingerprint.aidl;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.content.Context;
 import android.hardware.biometrics.BiometricsProtoEnums;
 import android.hardware.biometrics.fingerprint.ISession;
@@ -35,12 +36,12 @@ import java.util.Map;
  * Fingerprint-specific removal client supporting the
  * {@link android.hardware.biometrics.fingerprint.IFingerprint} interface.
  */
-public class FingerprintRemovalClient extends RemovalClient<Fingerprint, ISession> {
+class FingerprintRemovalClient extends RemovalClient<Fingerprint, ISession> {
     private static final String TAG = "FingerprintRemovalClient";
 
-    public FingerprintRemovalClient(@NonNull Context context,
+    FingerprintRemovalClient(@NonNull Context context,
             @NonNull LazyDaemon<ISession> lazyDaemon, @NonNull IBinder token,
-            @NonNull ClientMonitorCallbackConverter listener, int biometricId, int userId,
+            @Nullable ClientMonitorCallbackConverter listener, int biometricId, int userId,
             @NonNull String owner, @NonNull BiometricUtils<Fingerprint> utils, int sensorId,
             @NonNull Map<Integer, Long> authenticatorIds) {
         super(context, lazyDaemon, token, listener, biometricId, userId, owner, utils, sensorId,
