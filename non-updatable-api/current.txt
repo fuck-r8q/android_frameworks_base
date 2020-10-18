@@ -1613,6 +1613,7 @@ package android {
     field public static final int windowHideAnimation = 16842935; // 0x10100b7
     field public static final int windowIsFloating = 16842839; // 0x1010057
     field public static final int windowIsTranslucent = 16842840; // 0x1010058
+    field public static final int windowLayoutAffinity = 16844313; // 0x1010619
     field public static final int windowLayoutInDisplayCutoutMode = 16844166; // 0x1010586
     field public static final int windowLightNavigationBar = 16844140; // 0x101056c
     field public static final int windowLightStatusBar = 16844000; // 0x10104e0
@@ -4901,7 +4902,7 @@ package android.app {
   @Deprecated public class Fragment implements android.content.ComponentCallbacks2 android.view.View.OnCreateContextMenuListener {
     ctor @Deprecated public Fragment();
     method @Deprecated public void dump(String, java.io.FileDescriptor, java.io.PrintWriter, String[]);
-    method @Deprecated public final boolean equals(Object);
+    method @Deprecated public final boolean equals(@Nullable Object);
     method @Deprecated public final android.app.Activity getActivity();
     method @Deprecated public boolean getAllowEnterTransitionOverlap();
     method @Deprecated public boolean getAllowReturnTransitionOverlap();
@@ -10667,15 +10668,12 @@ package android.content {
     field public static final String ACTION_PACKAGE_CHANGED = "android.intent.action.PACKAGE_CHANGED";
     field public static final String ACTION_PACKAGE_DATA_CLEARED = "android.intent.action.PACKAGE_DATA_CLEARED";
     field public static final String ACTION_PACKAGE_FIRST_LAUNCH = "android.intent.action.PACKAGE_FIRST_LAUNCH";
-    field public static final String ACTION_PACKAGE_FULLY_LOADED = "android.intent.action.PACKAGE_FULLY_LOADED";
     field public static final String ACTION_PACKAGE_FULLY_REMOVED = "android.intent.action.PACKAGE_FULLY_REMOVED";
     field @Deprecated public static final String ACTION_PACKAGE_INSTALL = "android.intent.action.PACKAGE_INSTALL";
     field public static final String ACTION_PACKAGE_NEEDS_VERIFICATION = "android.intent.action.PACKAGE_NEEDS_VERIFICATION";
     field public static final String ACTION_PACKAGE_REMOVED = "android.intent.action.PACKAGE_REMOVED";
     field public static final String ACTION_PACKAGE_REPLACED = "android.intent.action.PACKAGE_REPLACED";
     field public static final String ACTION_PACKAGE_RESTARTED = "android.intent.action.PACKAGE_RESTARTED";
-    field public static final String ACTION_PACKAGE_STARTABLE = "android.intent.action.PACKAGE_STARTABLE";
-    field public static final String ACTION_PACKAGE_UNSTARTABLE = "android.intent.action.PACKAGE_UNSTARTABLE";
     field public static final String ACTION_PACKAGE_VERIFIED = "android.intent.action.PACKAGE_VERIFIED";
     field public static final String ACTION_PASTE = "android.intent.action.PASTE";
     field public static final String ACTION_PICK = "android.intent.action.PICK";
@@ -10840,7 +10838,6 @@ package android.content {
     field public static final String EXTRA_TIMEZONE = "time-zone";
     field public static final String EXTRA_TITLE = "android.intent.extra.TITLE";
     field public static final String EXTRA_UID = "android.intent.extra.UID";
-    field public static final String EXTRA_UNSTARTABLE_REASON = "android.intent.extra.UNSTARTABLE_REASON";
     field public static final String EXTRA_USER = "android.intent.extra.USER";
     field public static final int FILL_IN_ACTION = 1; // 0x1
     field public static final int FILL_IN_CATEGORIES = 4; // 0x4
@@ -11714,10 +11711,7 @@ package android.content.pm {
     method public android.graphics.drawable.Drawable getIcon(int);
     method public CharSequence getLabel();
     method public String getName();
-    method public float getProgress();
     method public android.os.UserHandle getUser();
-    method public boolean isLoading();
-    method public boolean isStartable();
   }
 
   public class LauncherApps {
@@ -11757,7 +11751,6 @@ package android.content.pm {
     ctor public LauncherApps.Callback();
     method public abstract void onPackageAdded(String, android.os.UserHandle);
     method public abstract void onPackageChanged(String, android.os.UserHandle);
-    method public void onPackageProgressChanged(@NonNull String, @NonNull android.os.UserHandle, float);
     method public abstract void onPackageRemoved(String, android.os.UserHandle);
     method public abstract void onPackagesAvailable(String[], android.os.UserHandle, boolean);
     method public void onPackagesSuspended(String[], android.os.UserHandle);
@@ -12304,9 +12297,6 @@ package android.content.pm {
     field public static final int SYNCHRONOUS = 2; // 0x2
     field @Nullable public static final java.util.List<java.security.cert.Certificate> TRUST_ALL;
     field @NonNull public static final java.util.List<java.security.cert.Certificate> TRUST_NONE;
-    field public static final int UNSTARTABLE_REASON_CONNECTION_ERROR = 1; // 0x1
-    field public static final int UNSTARTABLE_REASON_INSUFFICIENT_STORAGE = 2; // 0x2
-    field public static final int UNSTARTABLE_REASON_UNKNOWN = 0; // 0x0
     field public static final int VERIFICATION_ALLOW = 1; // 0x1
     field public static final int VERIFICATION_REJECT = -1; // 0xffffffff
     field public static final int VERSION_CODE_HIGHEST = -1; // 0xffffffff
@@ -30016,9 +30006,12 @@ package android.net {
     method public int describeContents();
     method @NonNull public byte[] getKey();
     method @NonNull public String getName();
+    method @NonNull public static java.util.Set<java.lang.String> getSupportedAlgorithms();
     method public int getTruncationLengthBits();
     method public void writeToParcel(android.os.Parcel, int);
+    field public static final String AUTH_AES_XCBC = "xcbc(aes)";
     field public static final String AUTH_CRYPT_AES_GCM = "rfc4106(gcm(aes))";
+    field public static final String AUTH_CRYPT_CHACHA20_POLY1305 = "rfc7539esp(chacha20,poly1305)";
     field public static final String AUTH_HMAC_MD5 = "hmac(md5)";
     field public static final String AUTH_HMAC_SHA1 = "hmac(sha1)";
     field public static final String AUTH_HMAC_SHA256 = "hmac(sha256)";
@@ -30026,6 +30019,7 @@ package android.net {
     field public static final String AUTH_HMAC_SHA512 = "hmac(sha512)";
     field @NonNull public static final android.os.Parcelable.Creator<android.net.IpSecAlgorithm> CREATOR;
     field public static final String CRYPT_AES_CBC = "cbc(aes)";
+    field public static final String CRYPT_AES_CTR = "rfc3686(ctr(aes))";
   }
 
   public final class IpSecManager {
@@ -41431,8 +41425,16 @@ package android.service.autofill {
     method @NonNull public java.util.Map<android.view.autofill.AutofillId,android.service.autofill.FieldClassification> getFieldsClassification();
     method @NonNull public java.util.Set<java.lang.String> getIgnoredDatasetIds();
     method @NonNull public java.util.Map<android.view.autofill.AutofillId,java.util.Set<java.lang.String>> getManuallyEnteredField();
+    method public int getNoSaveReason();
     method @NonNull public java.util.Set<java.lang.String> getSelectedDatasetIds();
     method public int getType();
+    field public static final int NO_SAVE_REASON_DATASET_MATCH = 6; // 0x6
+    field public static final int NO_SAVE_REASON_FIELD_VALIDATION_FAILED = 5; // 0x5
+    field public static final int NO_SAVE_REASON_HAS_EMPTY_REQUIRED = 3; // 0x3
+    field public static final int NO_SAVE_REASON_NONE = 0; // 0x0
+    field public static final int NO_SAVE_REASON_NO_SAVE_INFO = 1; // 0x1
+    field public static final int NO_SAVE_REASON_NO_VALUE_CHANGED = 4; // 0x4
+    field public static final int NO_SAVE_REASON_WITH_DELAY_SAVE_FLAG = 2; // 0x2
     field public static final int TYPE_AUTHENTICATION_SELECTED = 2; // 0x2
     field public static final int TYPE_CONTEXT_COMMITTED = 4; // 0x4
     field public static final int TYPE_DATASETS_SHOWN = 5; // 0x5
