@@ -43,16 +43,11 @@ import java.util.ArrayList;
 public class NotificationHeaderView extends ViewGroup {
     private final int mChildMinWidth;
     private final int mContentEndMargin;
-    private View mAppName;
-    private View mHeaderText;
-    private View mSecondaryHeaderText;
     private OnClickListener mExpandClickListener;
-    private OnClickListener mFeedbackListener;
     private HeaderTouchListener mTouchListener = new HeaderTouchListener();
+    private NotificationTopLineView mTopLineView;
     private NotificationExpandButton mExpandButton;
     private CachingIconView mIcon;
-    private View mProfileBadge;
-    private View mFeedbackIcon;
     private int mHeaderTextMarginEnd;
     private Drawable mBackground;
     private boolean mEntireHeaderClickable;
@@ -94,13 +89,9 @@ public class NotificationHeaderView extends ViewGroup {
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mAppName = findViewById(R.id.app_name_text);
-        mHeaderText = findViewById(R.id.header_text);
-        mSecondaryHeaderText = findViewById(R.id.header_text_secondary);
-        mExpandButton = findViewById(R.id.expand_button);
         mIcon = findViewById(R.id.icon);
-        mProfileBadge = findViewById(R.id.profile_badge);
-        mFeedbackIcon = findViewById(R.id.feedback);
+        mTopLineView = findViewById(R.id.notification_top_line);
+        mExpandButton = findViewById(R.id.expand_button);
         setClipToPadding(false);
     }
 
@@ -127,7 +118,7 @@ public class NotificationHeaderView extends ViewGroup {
                     lp.topMargin + lp.bottomMargin, lp.height);
             child.measure(childWidthSpec, childHeightSpec);
             // Icons that should go at the end
-            if (child == mExpandButton || child == mProfileBadge || child == mFeedbackIcon) {
+            if (child == mExpandButton) {
                 iconWidth += lp.leftMargin + lp.rightMargin + child.getMeasuredWidth();
             } else {
                 totalWidth += lp.leftMargin + lp.rightMargin + child.getMeasuredWidth();
@@ -138,16 +129,9 @@ public class NotificationHeaderView extends ViewGroup {
         int endMargin = Math.max(mHeaderTextMarginEnd, iconWidth);
         if (totalWidth > givenWidth - endMargin) {
             int overFlow = totalWidth - givenWidth + endMargin;
-            // We are overflowing, lets shrink the app name first
-            overFlow = shrinkViewForOverflow(wrapContentHeightSpec, overFlow, mAppName,
+            // We are overflowing; shrink the top line
+            shrinkViewForOverflow(wrapContentHeightSpec, overFlow, mTopLineView,
                     mChildMinWidth);
-
-            // still overflowing, we shrink the header text
-            overFlow = shrinkViewForOverflow(wrapContentHeightSpec, overFlow, mHeaderText, 0);
-
-            // still overflowing, finally we shrink the secondary header text
-            shrinkViewForOverflow(wrapContentHeightSpec, overFlow, mSecondaryHeaderText,
-                    0);
         }
         setMeasuredDimension(givenWidth, givenHeight);
     }
@@ -183,7 +167,7 @@ public class NotificationHeaderView extends ViewGroup {
             int top = (int) (getPaddingTop() + (ownHeight - childHeight) / 2.0f);
             int bottom = top + childHeight;
             // Icons that should go at the end
-            if (child == mExpandButton || child == mProfileBadge || child == mFeedbackIcon) {
+            if (child == mExpandButton) {
                 if (end == getMeasuredWidth()) {
                     layoutRight = end - mContentEndMargin;
                 } else {
@@ -251,21 +235,12 @@ public class NotificationHeaderView extends ViewGroup {
     }
 
     private void updateTouchListener() {
-        if (mExpandClickListener == null && mFeedbackListener == null) {
+        if (mExpandClickListener == null) {
             setOnTouchListener(null);
             return;
         }
         setOnTouchListener(mTouchListener);
         mTouchListener.bindTouchRects();
-    }
-
-    /**
-     * Sets onclick listener for feedback icon.
-     */
-    public void setFeedbackOnClickListener(OnClickListener l) {
-        mFeedbackListener = l;
-        mFeedbackIcon.setOnClickListener(mFeedbackListener);
-        updateTouchListener();
     }
 
     @Override
@@ -302,7 +277,6 @@ public class NotificationHeaderView extends ViewGroup {
 
         private final ArrayList<Rect> mTouchRects = new ArrayList<>();
         private Rect mExpandButtonRect;
-        private Rect mFeedbackRect;
         private int mTouchSlop;
         private boolean mTrackGesture;
         private float mDownX;
@@ -315,7 +289,6 @@ public class NotificationHeaderView extends ViewGroup {
             mTouchRects.clear();
             addRectAroundView(mIcon);
             mExpandButtonRect = addRectAroundView(mExpandButton);
-            mFeedbackRect = addRectAroundView(mFeedbackIcon);
             addWidthRect();
             mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         }
@@ -376,11 +349,11 @@ public class NotificationHeaderView extends ViewGroup {
                     break;
                 case MotionEvent.ACTION_UP:
                     if (mTrackGesture) {
-                        if (mFeedbackIcon.isVisibleToUser()
-                                && (mFeedbackRect.contains((int) x, (int) y)
-                                || mFeedbackRect.contains((int) mDownX, (int) mDownY))) {
-                            mFeedbackIcon.performClick();
-                            return true;
+                        float topLineX = mTopLineView.getX();
+                        float topLineY = mTopLineView.getY();
+                        if (mTopLineView.onTouchUp(x - topLineX, y - topLineY,
+                                mDownX - topLineX, mDownY - topLineY)) {
+                            break;
                         }
                         mExpandButton.performClick();
                     }
@@ -402,7 +375,9 @@ public class NotificationHeaderView extends ViewGroup {
                     return true;
                 }
             }
-            return false;
+            float topLineX = x - mTopLineView.getX();
+            float topLineY = y - mTopLineView.getY();
+            return mTopLineView.isInTouchRect(topLineX, topLineY);
         }
     }
 
