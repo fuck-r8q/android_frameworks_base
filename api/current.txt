@@ -31416,6 +31416,7 @@ package android.net.wifi {
     field @Deprecated public static final int SECURITY_TYPE_EAP = 3; // 0x3
     field @Deprecated public static final int SECURITY_TYPE_EAP_SUITE_B = 5; // 0x5
     field @Deprecated public static final int SECURITY_TYPE_EAP_WPA3_ENTERPRISE = 9; // 0x9
+    field @Deprecated public static final int SECURITY_TYPE_EAP_WPA3_ENTERPRISE_192_BIT = 5; // 0x5
     field @Deprecated public static final int SECURITY_TYPE_OPEN = 0; // 0x0
     field @Deprecated public static final int SECURITY_TYPE_OWE = 6; // 0x6
     field @Deprecated public static final int SECURITY_TYPE_PSK = 2; // 0x2
@@ -43145,6 +43146,11 @@ package android.security.keystore {
     field public static final int PURPOSE_SIGN = 4; // 0x4
     field public static final int PURPOSE_VERIFY = 8; // 0x8
     field public static final int PURPOSE_WRAP_KEY = 32; // 0x20
+    field public static final int SECURITY_LEVEL_SOFTWARE = 0; // 0x0
+    field public static final int SECURITY_LEVEL_STRONGBOX = 2; // 0x2
+    field public static final int SECURITY_LEVEL_TRUSTED_ENVIRONMENT = 1; // 0x1
+    field public static final int SECURITY_LEVEL_UNKNOWN = -2; // 0xfffffffe
+    field public static final int SECURITY_LEVEL_UNKNOWN_SECURE = -1; // 0xffffffff
     field public static final String SIGNATURE_PADDING_RSA_PKCS1 = "PKCS1";
     field public static final String SIGNATURE_PADDING_RSA_PSS = "PSS";
   }
