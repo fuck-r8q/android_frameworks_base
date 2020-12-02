@@ -6968,6 +6968,7 @@ package android.app.admin {
     method public boolean grantKeyPairToApp(@Nullable android.content.ComponentName, @NonNull String, @NonNull String);
     method public boolean hasCaCertInstalled(@Nullable android.content.ComponentName, byte[]);
     method public boolean hasGrantedPolicy(@NonNull android.content.ComponentName, int);
+    method public boolean hasKeyPair(@NonNull String);
     method public boolean hasLockdownAdminConfiguredNetworks(@NonNull android.content.ComponentName);
     method public boolean installCaCert(@Nullable android.content.ComponentName, byte[]);
     method public boolean installExistingPackage(@NonNull android.content.ComponentName, String);
@@ -7343,6 +7344,7 @@ package android.app.admin {
     field public static final int TAG_MEDIA_UNMOUNT = 210014; // 0x3345e
     field public static final int TAG_OS_SHUTDOWN = 210010; // 0x3345a
     field public static final int TAG_OS_STARTUP = 210009; // 0x33459
+    field public static final int TAG_PASSWORD_COMPLEXITY_REQUIRED = 210035; // 0x33473
     field public static final int TAG_PASSWORD_COMPLEXITY_SET = 210017; // 0x33461
     field public static final int TAG_PASSWORD_EXPIRATION_SET = 210016; // 0x33460
     field public static final int TAG_PASSWORD_HISTORY_LENGTH_SET = 210018; // 0x33462
@@ -45126,6 +45128,7 @@ package android.telephony {
     field public static final int DATA_CYCLE_THRESHOLD_DISABLED = -2; // 0xfffffffe
     field public static final int DATA_CYCLE_USE_PLATFORM_DEFAULT = -1; // 0xffffffff
     field public static final String ENABLE_EAP_METHOD_PREFIX_BOOL = "enable_eap_method_prefix_bool";
+    field public static final String EXTRA_REBROADCAST_ON_UNLOCK = "android.telephony.extra.REBROADCAST_ON_UNLOCK";
     field public static final String EXTRA_SLOT_INDEX = "android.telephony.extra.SLOT_INDEX";
     field public static final String EXTRA_SUBSCRIPTION_INDEX = "android.telephony.extra.SUBSCRIPTION_INDEX";
     field public static final String IMSI_KEY_AVAILABILITY_INT = "imsi_key_availability_int";
@@ -45400,6 +45403,7 @@ package android.telephony {
   }
 
   public static final class CarrierConfigManager.Ims {
+    field public static final String KEY_ENABLE_PRESENCE_PUBLISH_BOOL = "ims.enable_presence_publish_bool";
     field public static final String KEY_IMS_SINGLE_REGISTRATION_REQUIRED_BOOL = "ims.ims_single_registration_required_bool";
     field public static final String KEY_PREFIX = "ims.";
     field public static final String KEY_WIFI_OFF_DEFERRING_TIME_MILLIS_INT = "ims.wifi_off_deferring_time_millis_int";
