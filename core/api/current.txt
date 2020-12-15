@@ -6023,7 +6023,7 @@ package android.app {
 
   public class NotificationManager {
     method public String addAutomaticZenRule(android.app.AutomaticZenRule);
-    method public boolean areBubblesAllowed();
+    method @Deprecated public boolean areBubblesAllowed();
     method public boolean areNotificationsEnabled();
     method public boolean areNotificationsPaused();
     method public boolean canNotifyAsPackage(@NonNull String);
@@ -6040,6 +6040,7 @@ package android.app {
     method public android.service.notification.StatusBarNotification[] getActiveNotifications();
     method public android.app.AutomaticZenRule getAutomaticZenRule(String);
     method public java.util.Map<java.lang.String,android.app.AutomaticZenRule> getAutomaticZenRules();
+    method public int getBubblePreference();
     method @NonNull public android.app.NotificationManager.Policy getConsolidatedNotificationPolicy();
     method public final int getCurrentInterruptionFilter();
     method public int getImportance();
@@ -6074,6 +6075,9 @@ package android.app {
     field public static final int AUTOMATIC_RULE_STATUS_ENABLED = 1; // 0x1
     field public static final int AUTOMATIC_RULE_STATUS_REMOVED = 3; // 0x3
     field public static final int AUTOMATIC_RULE_STATUS_UNKNOWN = -1; // 0xffffffff
+    field public static final int BUBBLE_PREFERENCE_ALL = 1; // 0x1
+    field public static final int BUBBLE_PREFERENCE_NONE = 0; // 0x0
+    field public static final int BUBBLE_PREFERENCE_SELECTED = 2; // 0x2
     field public static final String EXTRA_AUTOMATIC_RULE_ID = "android.app.extra.AUTOMATIC_RULE_ID";
     field public static final String EXTRA_AUTOMATIC_ZEN_RULE_ID = "android.app.extra.AUTOMATIC_ZEN_RULE_ID";
     field public static final String EXTRA_AUTOMATIC_ZEN_RULE_STATUS = "android.app.extra.AUTOMATIC_ZEN_RULE_STATUS";
@@ -12263,6 +12267,7 @@ package android.content.pm {
     field public static final String FEATURE_NFC_HOST_CARD_EMULATION_NFCF = "android.hardware.nfc.hcef";
     field public static final String FEATURE_NFC_OFF_HOST_CARD_EMULATION_ESE = "android.hardware.nfc.ese";
     field public static final String FEATURE_NFC_OFF_HOST_CARD_EMULATION_UICC = "android.hardware.nfc.uicc";
+    field public static final String FEATURE_OPENGLES_DEQP_LEVEL = "android.software.opengles.deqp.level";
     field public static final String FEATURE_OPENGLES_EXTENSION_PACK = "android.hardware.opengles.aep";
     field public static final String FEATURE_PC = "android.hardware.type.pc";
     field public static final String FEATURE_PICTURE_IN_PICTURE = "android.software.picture_in_picture";
@@ -29926,6 +29931,7 @@ package android.os {
     field public static final String ID;
     field public static final String MANUFACTURER;
     field public static final String MODEL;
+    field @NonNull public static final String ODM_SKU;
     field public static final String PRODUCT;
     field @Deprecated public static final String RADIO;
     field @Deprecated public static final String SERIAL;
