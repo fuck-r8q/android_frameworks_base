@@ -16,33 +16,31 @@
 
 package com.android.systemui.qs.tiles;
 
+import static android.service.SensorPrivacyIndividualEnabledSensorProto.CAMERA;
+
 import static com.android.systemui.DejankUtils.whitelistIpcs;
 
-import android.content.Intent;
+import android.annotation.StringRes;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.DeviceConfig;
-import android.service.quicksettings.Tile;
-import android.widget.Switch;
+
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.systemui.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
-import com.android.systemui.plugins.qs.QSTile;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.logging.QSLogger;
-import com.android.systemui.qs.tileimpl.QSTileImpl;
-import com.android.systemui.statusbar.policy.CameraToggleController;
+import com.android.systemui.statusbar.policy.IndividualSensorPrivacyController;
 
 import javax.inject.Inject;
 
-public class CameraToggleTile extends QSTileImpl<QSTile.BooleanState> implements
-        CameraToggleController.Callback {
-
-    private CameraToggleController mCameraToggleController;
+public class CameraToggleTile extends SensorPrivacyToggleTile {
 
     @Inject
     protected CameraToggleTile(QSHost host,
@@ -52,11 +50,9 @@ public class CameraToggleTile extends QSTileImpl<QSTile.BooleanState> implements
             StatusBarStateController statusBarStateController,
             ActivityStarter activityStarter,
             QSLogger qsLogger,
-            CameraToggleController cameraToggleController) {
+            IndividualSensorPrivacyController sensorPrivacyController) {
         super(host, backgroundLooper, mainHandler, metricsLogger, statusBarStateController,
-                activityStarter, qsLogger);
-        mCameraToggleController = cameraToggleController;
-        mCameraToggleController.observe(getLifecycle(), this);
+                activityStarter, qsLogger, sensorPrivacyController);
     }
 
     @Override
@@ -68,46 +64,17 @@ public class CameraToggleTile extends QSTileImpl<QSTile.BooleanState> implements
     }
 
     @Override
-    public BooleanState newTileState() {
-        return new BooleanState();
+    public @DrawableRes int getIconRes() {
+        return R.drawable.ic_camera_blocked;
     }
 
     @Override
-    protected void handleClick() {
-        mCameraToggleController.setCameraBlocked(!mCameraToggleController.isCameraBlocked());
-    }
-
-    @Override
-    protected void handleUpdateState(BooleanState state, Object arg) {
-        boolean isBlocked = arg == null ? mCameraToggleController.setCameraBlocked()
-                : (boolean) arg;
-
-        state.icon = ResourceIcon.get(R.drawable.ic_camera_blocked);
-        state.state = isBlocked ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
-        state.value = isBlocked;
-        state.label = getTileLabel();
-        state.handlesLongClick = false;
-        state.contentDescription = state.label;
-        state.expandedAccessibilityClassName = Switch.class.getName();
-    }
-
-    @Override
-    public int getMetricsCategory() {
-        return 0;
-    }
-
-    @Override
-    public Intent getLongClickIntent() {
-        return null;
-    }
-
-    @Override
-    public CharSequence getTileLabel() {
+    public @NonNull CharSequence getTileLabel() {
         return mContext.getString(R.string.quick_settings_camera_label);
     }
 
     @Override
-    public void onCameraBlockedChanged(boolean enable) {
-        refreshState(enable);
+    public int getSensorId() {
+        return CAMERA;
     }
 }
