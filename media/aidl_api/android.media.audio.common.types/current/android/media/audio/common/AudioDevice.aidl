@@ -36,5 +36,5 @@ package android.media.audio.common;
 @JavaDerive(equals=true, toString=true) @VintfStability
 parcelable AudioDevice {
   android.media.audio.common.AudioDeviceDescription type;
-  @utf8InCpp String address;
+  android.media.audio.common.AudioDeviceAddress address;
 }
