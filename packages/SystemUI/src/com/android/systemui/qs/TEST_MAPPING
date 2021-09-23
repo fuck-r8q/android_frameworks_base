@@ -1,14 +1,8 @@
 {
   "presubmit": [
     {
-      "name": "CtsAppTestCases",
+      "name": "CtsTileServiceTestCases",
       "options": [
-        {
-          "include-filter": "android.app.cts.TileServiceTest"
-        },
-        {
-          "include-filter": "android.app.cts.BooleanTileServiceTest"
-        },
         {
           "exclude-annotation": "org.junit.Ignore"
         },
