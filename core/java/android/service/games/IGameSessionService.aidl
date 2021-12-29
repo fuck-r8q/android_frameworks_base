@@ -16,6 +16,7 @@
 
 package android.service.games;
 
+import android.service.games.IGameSessionController;
 import android.service.games.IGameSession;
 import android.service.games.CreateGameSessionRequest;
 import android.service.games.GameSessionViewHostConfiguration;
@@ -28,6 +29,7 @@ import com.android.internal.infra.AndroidFuture;
  */
 oneway interface IGameSessionService {
     void create(
+            in IGameSessionController gameSessionController,
             in CreateGameSessionRequest createGameSessionRequest,
             in GameSessionViewHostConfiguration gameSessionViewHostConfiguration,
             in AndroidFuture /* T=CreateGameSessionResult */ createGameSessionResultFuture);
