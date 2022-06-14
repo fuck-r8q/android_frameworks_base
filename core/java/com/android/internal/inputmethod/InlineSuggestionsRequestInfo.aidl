@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,6 @@
  * limitations under the License.
  */
 
-package com.android.internal.view;
+package com.android.internal.inputmethod;
 
-import android.view.autofill.AutofillId;
-import android.view.inputmethod.InlineSuggestionsResponse;
-
-/**
- * Binder interface for the IME service to receive an inline suggestion response from the system.
- * {@hide}
- */
-oneway interface IInlineSuggestionsResponseCallback {
-    void onInlineSuggestionsResponse(in AutofillId fieldId, in InlineSuggestionsResponse response);
-}
+parcelable InlineSuggestionsRequestInfo;
