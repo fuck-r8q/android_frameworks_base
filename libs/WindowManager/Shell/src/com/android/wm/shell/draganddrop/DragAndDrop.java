@@ -16,8 +16,6 @@
 
 package com.android.wm.shell.draganddrop;
 
-import android.content.res.Configuration;
-
 import com.android.wm.shell.common.annotations.ExternalThread;
 
 /**
@@ -25,10 +23,4 @@ import com.android.wm.shell.common.annotations.ExternalThread;
  */
 @ExternalThread
 public interface DragAndDrop {
-
-    /** Called when the theme changes. */
-    void onThemeChanged();
-
-    /** Called when the configuration changes. */
-    void onConfigChanged(Configuration newConfig);
 }
