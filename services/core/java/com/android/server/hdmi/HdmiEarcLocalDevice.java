@@ -22,8 +22,11 @@ import android.util.IndentingPrintWriter;
  * Class that models a local eARC device hosted in this system.
  * The class contains methods that are common between eARC TX and eARC RX devices.
  */
-public class HdmiEarcLocalDevice {
+public class HdmiEarcLocalDevice extends HdmiLocalDevice {
     private static final String TAG = "HdmiEarcLocalDevice";
+
+    protected void disableDevice() {
+    }
 
     /** Dump internal status of HdmiEarcLocalDevice object */
     protected void dump(final IndentingPrintWriter pw) {
