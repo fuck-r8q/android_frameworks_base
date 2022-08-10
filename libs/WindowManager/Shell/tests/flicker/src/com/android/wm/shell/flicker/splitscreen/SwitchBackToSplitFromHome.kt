@@ -26,10 +26,8 @@ import com.android.server.wm.flicker.FlickerTestParameterFactory
 import com.android.server.wm.flicker.annotation.Group1
 import com.android.server.wm.flicker.dsl.FlickerBuilder
 import com.android.wm.shell.flicker.appWindowBecomesVisible
-import com.android.wm.shell.flicker.appWindowIsVisibleAtEnd
 import com.android.wm.shell.flicker.helpers.SplitScreenHelper
 import com.android.wm.shell.flicker.layerBecomesVisible
-import com.android.wm.shell.flicker.layerIsVisibleAtEnd
 import com.android.wm.shell.flicker.splitAppLayerBoundsIsVisibleAtEnd
 import com.android.wm.shell.flicker.splitScreenDividerBecomesVisible
 import org.junit.Assume
@@ -41,7 +39,7 @@ import org.junit.runners.MethodSorters
 import org.junit.runners.Parameterized
 
 /**
- * Test switch back to split pair after go home
+ * Test quick switch to split pair from home.
  *
  * To run this test: `atest WMShellFlickerTests:SwitchBackToSplitFromHome`
  */
@@ -59,30 +57,30 @@ class SwitchBackToSplitFromHome(testSpec: FlickerTestParameter) : SplitScreenBas
     }
 
     override val transition: FlickerBuilder.() -> Unit
-    get() = {
-        super.transition(this)
-        setup {
-            eachRun {
-                primaryApp.launchViaIntent(wmHelper)
-                // TODO(b/231399940): Use recent shortcut to enter split.
-                tapl.launchedAppState.taskbar
-                    .openAllApps()
-                    .getAppIcon(secondaryApp.appName)
-                    .dragToSplitscreen(secondaryApp.`package`, primaryApp.`package`)
-                SplitScreenHelper.waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
+        get() = {
+            super.transition(this)
+            setup {
+                eachRun {
+                    primaryApp.launchViaIntent(wmHelper)
+                    // TODO(b/231399940): Use recent shortcut to enter split.
+                    tapl.launchedAppState.taskbar
+                        .openAllApps()
+                        .getAppIcon(secondaryApp.appName)
+                        .dragToSplitscreen(secondaryApp.`package`, primaryApp.`package`)
+                    SplitScreenHelper.waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
 
-                tapl.goHome()
-                wmHelper.StateSyncBuilder()
-                    .withAppTransitionIdle()
-                    .withHomeActivityVisible()
-                    .waitForAndVerify()
+                    tapl.goHome()
+                    wmHelper.StateSyncBuilder()
+                        .withAppTransitionIdle()
+                        .withHomeActivityVisible()
+                        .waitForAndVerify()
+                }
+            }
+            transitions {
+                tapl.workspace.quickSwitchToPreviousApp()
+                SplitScreenHelper.waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
             }
         }
-        transitions {
-            tapl.workspace.quickSwitchToPreviousApp()
-            SplitScreenHelper.waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
-        }
-    }
 
     @Presubmit
     @Test
@@ -90,7 +88,7 @@ class SwitchBackToSplitFromHome(testSpec: FlickerTestParameter) : SplitScreenBas
 
     @Presubmit
     @Test
-    fun primaryAppLayerIsVisibleAtEnd() = testSpec.layerIsVisibleAtEnd(primaryApp)
+    fun primaryAppLayerBecomesVisible() = testSpec.layerBecomesVisible(primaryApp)
 
     @Presubmit
     @Test
@@ -108,7 +106,7 @@ class SwitchBackToSplitFromHome(testSpec: FlickerTestParameter) : SplitScreenBas
 
     @Presubmit
     @Test
-    fun primaryAppWindowIsVisibleAtEnd() = testSpec.appWindowIsVisibleAtEnd(primaryApp)
+    fun primaryAppWindowBecomesVisible() = testSpec.appWindowBecomesVisible(primaryApp)
 
     @Presubmit
     @Test
