@@ -61,19 +61,6 @@ class MediaTttLoggerTest : SysuiTestCase() {
     }
 
     @Test
-    fun logChipRemoval_bufferHasDeviceTypeAndReason() {
-        val reason = "test reason"
-        logger.logChipRemoval(reason)
-
-        val stringWriter = StringWriter()
-        buffer.dump(PrintWriter(stringWriter), tailLength = 0)
-        val actualString = stringWriter.toString()
-
-        assertThat(actualString).contains(DEVICE_TYPE_TAG)
-        assertThat(actualString).contains(reason)
-    }
-
-    @Test
     fun logPackageNotFound_bufferHasPackageName() {
         val packageName = "this.is.a.package"
 
