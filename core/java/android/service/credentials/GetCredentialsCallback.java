@@ -41,7 +41,7 @@ public final class GetCredentialsCallback {
      * Invoked on a successful response for {@link GetCredentialsRequest}
      * @param response The response from the credential provider.
      */
-    public void onSuccess(@Nullable GetCredentialsResponse response) {
+    public void onSuccess(@NonNull GetCredentialsResponse response) {
         try {
             mCallback.onSuccess(response);
         } catch (RemoteException e) {
