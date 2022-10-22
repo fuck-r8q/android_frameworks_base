@@ -26,6 +26,7 @@ import static com.google.common.truth.Truth.assertThat;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.view.View;
+import android.view.WindowManager;
 
 import androidx.test.filters.SmallTest;
 
@@ -44,7 +45,8 @@ public class MenuViewLayerTest extends SysuiTestCase {
 
     @Before
     public void setUp() throws Exception {
-        mMenuViewLayer = new MenuViewLayer(mContext);
+        final WindowManager stubWindowManager = mContext.getSystemService(WindowManager.class);
+        mMenuViewLayer = new MenuViewLayer(mContext, stubWindowManager);
     }
 
     @Test
