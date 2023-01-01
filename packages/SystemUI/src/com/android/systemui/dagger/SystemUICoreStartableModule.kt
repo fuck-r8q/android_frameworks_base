@@ -22,7 +22,7 @@ import com.android.systemui.LatencyTester
 import com.android.systemui.ScreenDecorations
 import com.android.systemui.SliceBroadcastRelayHandler
 import com.android.systemui.accessibility.SystemActions
-import com.android.systemui.accessibility.WindowMagnification
+import com.android.systemui.accessibility.Magnification
 import com.android.systemui.back.domain.interactor.BackActionInteractor
 import com.android.systemui.biometrics.AuthController
 import com.android.systemui.biometrics.BiometricNotificationService
@@ -37,7 +37,6 @@ import com.android.systemui.keyboard.PhysicalKeyboardCoreStartable
 import com.android.systemui.keyguard.KeyguardViewConfigurator
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.data.quickaffordance.MuteQuickAffordanceCoreStartable
-import com.android.systemui.keyguard.ui.binder.AlternateBouncerBinder
 import com.android.systemui.keyguard.ui.binder.KeyguardDismissActionBinder
 import com.android.systemui.keyguard.ui.binder.KeyguardDismissBinder
 import com.android.systemui.log.SessionTracker
@@ -91,11 +90,6 @@ abstract class SystemUICoreStartableModule {
     @IntoMap
     @ClassKey(AuthController::class)
     abstract fun bindAuthController(service: AuthController): CoreStartable
-
-    @Binds
-    @IntoMap
-    @ClassKey(AlternateBouncerBinder::class)
-    abstract fun bindAlternateBouncerBinder(impl: AlternateBouncerBinder): CoreStartable
 
     /** Inject into BiometricNotificationService */
     @Binds
@@ -254,11 +248,11 @@ abstract class SystemUICoreStartableModule {
     @ClassKey(VolumeUI::class)
     abstract fun bindVolumeUI(sysui: VolumeUI): CoreStartable
 
-    /** Inject into WindowMagnification.  */
+    /** Inject into Magnification.  */
     @Binds
     @IntoMap
-    @ClassKey(WindowMagnification::class)
-    abstract fun bindWindowMagnification(sysui: WindowMagnification): CoreStartable
+    @ClassKey(Magnification::class)
+    abstract fun bindMagnification(sysui: Magnification): CoreStartable
 
     /** Inject into WMShell.  */
     @Binds

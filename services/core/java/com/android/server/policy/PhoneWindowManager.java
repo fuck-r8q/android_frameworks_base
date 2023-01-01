@@ -32,7 +32,6 @@ import static android.os.Build.VERSION_CODES.M;
 import static android.os.Build.VERSION_CODES.O;
 import static android.os.IInputConstants.INVALID_INPUT_DEVICE_ID;
 import static android.provider.Settings.Secure.VOLUME_HUSH_OFF;
-import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.Display.STATE_OFF;
@@ -71,6 +70,7 @@ import static android.view.WindowManager.ScreenshotSource.SCREENSHOT_KEY_OTHER;
 import static android.view.WindowManager.TAKE_SCREENSHOT_FULLSCREEN;
 import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
+import static android.view.contentprotection.flags.Flags.createAccessibilityOverlayAppOpEnabled;
 
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
 import static com.android.internal.util.FrameworkStatsLog.ACCESSIBILITY_SHORTCUT_REPORTED__SHORTCUT_TYPE__A11Y_WEAR_TRIPLE_PRESS_GESTURE;
@@ -104,6 +104,7 @@ import android.app.ActivityManagerInternal;
 import android.app.ActivityTaskManager;
 import android.app.AppOpsManager;
 import android.app.CrossDeviceManager;
+import android.app.IActivityManager;
 import android.app.IUiModeManager;
 import android.app.NotificationManager;
 import android.app.ProgressDialog;
@@ -432,6 +433,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     WindowManagerInternal mWindowManagerInternal;
     PowerManager mPowerManager;
     ActivityManagerInternal mActivityManagerInternal;
+    IActivityManager mActivityManagerService;
     ActivityTaskManagerInternal mActivityTaskManagerInternal;
     AutofillManagerInternal mAutofillManagerInternal;
     InputManager mInputManager;
@@ -554,7 +556,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mLidNavigationAccessibility;
     int mShortPressOnPowerBehavior;
     private boolean mShouldEarlyShortPressOnPower;
-    private boolean mShouldEarlyShortPressOnStemPrimary;
+    boolean mShouldEarlyShortPressOnStemPrimary;
     int mLongPressOnPowerBehavior;
     long mLongPressOnPowerAssistantTimeoutMs;
     int mVeryLongPressOnPowerBehavior;
@@ -583,6 +585,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private int mDoublePressOnStemPrimaryBehavior;
     private int mTriplePressOnStemPrimaryBehavior;
     private int mLongPressOnStemPrimaryBehavior;
+    private RecentTaskInfo mBackgroundRecentTaskInfoOnStemPrimarySingleKeyUp;
 
     private boolean mHandleVolumeKeysInWM;
 
@@ -1091,7 +1094,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void powerPress(long eventTime, int count) {
+    private void powerPress(long eventTime, int count, int displayId) {
         // SideFPS still needs to know about suppressed power buttons, in case it needs to block
         // an auth attempt.
         if (count == 1) {
@@ -1144,8 +1147,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     break;
                 case SHORT_PRESS_POWER_CLOSE_IME_OR_GO_HOME: {
                     if (mDismissImeOnBackKeyPressed) {
-                        InputMethodManagerInternal.get().hideCurrentInputMethod(
-                                    SoftInputShowHideReason.HIDE_POWER_BUTTON_GO_HOME);
+                        // TODO(b/308479256): Check if hiding "all" IMEs is OK or not.
+                        InputMethodManagerInternal.get().hideAllInputMethods(
+                                SoftInputShowHideReason.HIDE_POWER_BUTTON_GO_HOME, displayId);
                     } else {
                         shortPressPowerGoHome();
                     }
@@ -1589,7 +1593,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         ? false
                         : mKeyguardDelegate.isShowing();
                 if (!keyguardActive) {
-                    switchRecentTask();
+                    performStemPrimaryDoublePressSwitchToRecentTask();
                 }
                 break;
         }
@@ -1698,11 +1702,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /**
      * Load most recent task (expect current task) and bring it to the front.
      */
-    private void switchRecentTask() {
-        RecentTaskInfo targetTask = mActivityTaskManagerInternal.getMostRecentTaskFromBackground();
+    void performStemPrimaryDoublePressSwitchToRecentTask() {
+        RecentTaskInfo targetTask = mBackgroundRecentTaskInfoOnStemPrimarySingleKeyUp;
         if (targetTask == null) {
             if (DEBUG_INPUT) {
-                Slog.w(TAG, "No recent task available! Show watch face.");
+                Slog.w(TAG, "No recent task available! Show wallpaper.");
             }
             goHome();
             return;
@@ -1721,7 +1725,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             + targetTask.baseIntent);
         }
         try {
-            ActivityManager.getService().startActivityFromRecents(targetTask.persistentId, null);
+            mActivityManagerService.startActivityFromRecents(targetTask.persistentId, null);
         } catch (RemoteException | IllegalArgumentException e) {
             Slog.e(TAG, "Failed to start task " + targetTask.persistentId + " from recents", e);
         }
@@ -2245,6 +2249,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         }
                     });
         }
+
+        IActivityManager getActivityManagerService() {
+            return ActivityManager.getService();
+        }
     }
 
     /** {@inheritDoc} */
@@ -2259,6 +2267,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mWindowManagerFuncs = injector.getWindowManagerFuncs();
         mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
         mActivityManagerInternal = LocalServices.getService(ActivityManagerInternal.class);
+        mActivityManagerService = injector.getActivityManagerService();
         mActivityTaskManagerInternal = LocalServices.getService(ActivityTaskManagerInternal.class);
         mInputManager = mContext.getSystemService(InputManager.class);
         mInputManagerInternal = LocalServices.getService(InputManagerInternal.class);
@@ -2688,11 +2697,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         @Override
-        void onPress(long downTime) {
+        void onPress(long downTime, int displayId) {
             if (mShouldEarlyShortPressOnPower) {
                 return;
             }
-            powerPress(downTime, 1 /*count*/);
+            powerPress(downTime, 1 /*count*/, displayId);
         }
 
         @Override
@@ -2722,14 +2731,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         @Override
-        void onMultiPress(long downTime, int count) {
-            powerPress(downTime, count);
+        void onMultiPress(long downTime, int count, int displayId) {
+            powerPress(downTime, count, displayId);
         }
 
         @Override
-        void onKeyUp(long eventTime, int count) {
+        void onKeyUp(long eventTime, int count, int displayId) {
             if (mShouldEarlyShortPressOnPower && count == 1) {
-                powerPress(eventTime, 1 /*pressCount*/);
+                powerPress(eventTime, 1 /*pressCount*/, displayId);
             }
         }
     }
@@ -2753,7 +2762,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         @Override
-        void onPress(long downTime) {
+        void onPress(long downTime, int unusedDisplayId) {
             mBackKeyHandled |= backKeyPress();
         }
 
@@ -2782,7 +2791,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         @Override
-        void onPress(long downTime) {
+        void onPress(long downTime, int unusedDisplayId) {
             if (mShouldEarlyShortPressOnStemPrimary) {
                 return;
             }
@@ -2795,14 +2804,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         @Override
-        void onMultiPress(long downTime, int count) {
+        void onMultiPress(long downTime, int count, int unusedDisplayId) {
             stemPrimaryPress(count);
         }
 
         @Override
-        void onKeyUp(long eventTime, int count) {
-            if (mShouldEarlyShortPressOnStemPrimary && count == 1) {
-                stemPrimaryPress(1 /*pressCount*/);
+        void onKeyUp(long eventTime, int count, int unusedDisplayId) {
+            if (count == 1) {
+                // Save info about the most recent task on the first press of the stem key. This
+                // may be used later to switch to the most recent app using double press gesture.
+                // It is possible that we may navigate away from this task before the double
+                // press is detected, as a result of the first press, so we save the  current
+                // most recent task before that happens.
+                mBackgroundRecentTaskInfoOnStemPrimarySingleKeyUp =
+                        mActivityTaskManagerInternal.getMostRecentTaskFromBackground();
+                if (mShouldEarlyShortPressOnStemPrimary) {
+                    stemPrimaryPress(1 /*pressCount*/);
+                }
             }
         }
     }

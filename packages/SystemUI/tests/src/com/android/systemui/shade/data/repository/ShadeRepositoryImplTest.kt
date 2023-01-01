@@ -158,6 +158,15 @@ class ShadeRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
+    fun updateLegacyLockscreenShadeTracking() =
+        testScope.runTest {
+            assertThat(underTest.legacyLockscreenShadeTracking.value).isEqualTo(false)
+
+            underTest.setLegacyLockscreenShadeTracking(true)
+            assertThat(underTest.legacyLockscreenShadeTracking.value).isEqualTo(true)
+        }
+
+    @Test
     fun updateLegacyQsTracking() =
         testScope.runTest {
             assertThat(underTest.legacyQsTracking.value).isEqualTo(false)
@@ -197,5 +206,23 @@ class ShadeRepositoryImplTest : SysuiTestCase() {
 
             underTest.setLegacyIsQsExpanded(true)
             assertThat(underTest.legacyIsQsExpanded.value).isEqualTo(true)
+        }
+
+    @Test
+    fun updateLegacyExpandImmediate() =
+        testScope.runTest {
+            assertThat(underTest.legacyExpandImmediate.value).isEqualTo(false)
+
+            underTest.setLegacyExpandImmediate(true)
+            assertThat(underTest.legacyExpandImmediate.value).isEqualTo(true)
+        }
+
+    @Test
+    fun updateLegacyQsFullscreen() =
+        testScope.runTest {
+            assertThat(underTest.legacyQsFullscreen.value).isEqualTo(false)
+
+            underTest.setLegacyQsFullscreen(true)
+            assertThat(underTest.legacyQsFullscreen.value).isEqualTo(true)
         }
 }

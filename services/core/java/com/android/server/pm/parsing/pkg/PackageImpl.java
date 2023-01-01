@@ -50,6 +50,19 @@ import android.util.SparseIntArray;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.pm.pkg.component.ParsedActivity;
+import com.android.internal.pm.pkg.component.ParsedApexSystemService;
+import com.android.internal.pm.pkg.component.ParsedAttribution;
+import com.android.internal.pm.pkg.component.ParsedComponent;
+import com.android.internal.pm.pkg.component.ParsedInstrumentation;
+import com.android.internal.pm.pkg.component.ParsedIntentInfo;
+import com.android.internal.pm.pkg.component.ParsedMainComponent;
+import com.android.internal.pm.pkg.component.ParsedPermission;
+import com.android.internal.pm.pkg.component.ParsedPermissionGroup;
+import com.android.internal.pm.pkg.component.ParsedProcess;
+import com.android.internal.pm.pkg.component.ParsedProvider;
+import com.android.internal.pm.pkg.component.ParsedService;
+import com.android.internal.pm.pkg.component.ParsedUsesPermission;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.internal.util.DataClass;
@@ -61,27 +74,15 @@ import com.android.server.pm.pkg.AndroidPackageSplit;
 import com.android.server.pm.pkg.AndroidPackageSplitImpl;
 import com.android.server.pm.pkg.SELinuxUtil;
 import com.android.server.pm.pkg.component.ComponentMutateUtils;
-import com.android.server.pm.pkg.component.ParsedActivity;
 import com.android.server.pm.pkg.component.ParsedActivityImpl;
-import com.android.server.pm.pkg.component.ParsedApexSystemService;
 import com.android.server.pm.pkg.component.ParsedApexSystemServiceImpl;
-import com.android.server.pm.pkg.component.ParsedAttribution;
 import com.android.server.pm.pkg.component.ParsedAttributionImpl;
-import com.android.server.pm.pkg.component.ParsedComponent;
-import com.android.server.pm.pkg.component.ParsedInstrumentation;
 import com.android.server.pm.pkg.component.ParsedInstrumentationImpl;
-import com.android.server.pm.pkg.component.ParsedIntentInfo;
-import com.android.server.pm.pkg.component.ParsedMainComponent;
-import com.android.server.pm.pkg.component.ParsedPermission;
-import com.android.server.pm.pkg.component.ParsedPermissionGroup;
 import com.android.server.pm.pkg.component.ParsedPermissionGroupImpl;
 import com.android.server.pm.pkg.component.ParsedPermissionImpl;
-import com.android.server.pm.pkg.component.ParsedProcess;
-import com.android.server.pm.pkg.component.ParsedProvider;
+import com.android.server.pm.pkg.component.ParsedProcessImpl;
 import com.android.server.pm.pkg.component.ParsedProviderImpl;
-import com.android.server.pm.pkg.component.ParsedService;
 import com.android.server.pm.pkg.component.ParsedServiceImpl;
-import com.android.server.pm.pkg.component.ParsedUsesPermission;
 import com.android.server.pm.pkg.component.ParsedUsesPermissionImpl;
 import com.android.server.pm.pkg.parsing.ParsingPackage;
 import com.android.server.pm.pkg.parsing.ParsingPackageHidden;
@@ -396,7 +397,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     // an APK targeting <R that doesn't contain an <application> tag. That code would be skipped
     // and never assign this, so initialize this to true for those cases.
     private long mBooleans = Booleans.ENABLED;
-    private long mBooleans2;
+    private long mBooleans2 = Booleans2.UPDATABLE_SYSTEM;
     @NonNull
     private Set<String> mKnownActivityEmbeddingCerts = emptySet();
     // Derived fields
@@ -3305,7 +3306,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         this.instrumentations = ParsingUtils.createTypedInterfaceList(in,
                 ParsedInstrumentationImpl.CREATOR);
         this.preferredActivityFilters = sForIntentInfoPairs.unparcel(in);
-        this.processes = in.readHashMap(ParsedProcess.class.getClassLoader());
+        this.processes = in.readHashMap(ParsedProcessImpl.class.getClassLoader());
         this.metaData = in.readBundle(boot);
         this.volumeUuid = sForInternedString.unparcel(in);
         this.signingDetails = in.readParcelable(boot, android.content.pm.SigningDetails.class);
@@ -3450,6 +3451,11 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     }
 
     @Override
+    public boolean isUpdatableSystem() {
+        return getBoolean2(Booleans2.UPDATABLE_SYSTEM);
+    }
+
+    @Override
     public boolean isFactoryTest() {
         return getBoolean(Booleans.FACTORY_TEST);
     }
@@ -3518,6 +3524,11 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     public PackageImpl setSystem(boolean value) {
         setBoolean(Booleans.SYSTEM, value);
         return this;
+    }
+
+    @Override
+    public PackageImpl setUpdatableSystem(boolean value) {
+        return setBoolean2(Booleans2.UPDATABLE_SYSTEM, value);
     }
 
     @Override
@@ -3731,10 +3742,12 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         @LongDef({
                 STUB,
                 APEX,
+                UPDATABLE_SYSTEM,
         })
         public @interface Flags {}
 
         private static final long STUB = 1L;
         private static final long APEX = 1L << 1;
+        private static final long UPDATABLE_SYSTEM = 1L << 2;
     }
 }

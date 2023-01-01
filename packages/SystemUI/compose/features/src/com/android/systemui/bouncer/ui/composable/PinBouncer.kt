@@ -24,17 +24,14 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -69,38 +66,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun PinBouncer(
-    viewModel: PinBouncerViewModel,
-    modifier: Modifier = Modifier,
-) {
-    // Report that the UI is shown to let the view-model run some logic.
-    LaunchedEffect(Unit) { viewModel.onShown() }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier =
-            modifier.pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown()
-                    viewModel.onDown()
-                }
-            }
-    ) {
-        PinInputDisplay(viewModel)
-        Spacer(Modifier.heightIn(min = 34.dp, max = 48.dp))
-        PinPad(viewModel)
-    }
-}
-
-@Composable
 fun PinPad(
     viewModel: PinBouncerViewModel,
     modifier: Modifier = Modifier,
 ) {
+    DisposableEffect(Unit) {
+        viewModel.onShown()
+        onDispose { viewModel.onHidden() }
+    }
+
     val isInputEnabled: Boolean by viewModel.isInputEnabled.collectAsState()
     val backspaceButtonAppearance by viewModel.backspaceButtonAppearance.collectAsState()
     val confirmButtonAppearance by viewModel.confirmButtonAppearance.collectAsState()
     val animateFailure: Boolean by viewModel.animateFailure.collectAsState()
+    val isDigitButtonAnimationEnabled: Boolean by
+        viewModel.isDigitButtonAnimationEnabled.collectAsState()
 
     val buttonScaleAnimatables = remember { List(12) { Animatable(1f) } }
     LaunchedEffect(animateFailure) {
@@ -119,10 +99,11 @@ fun PinPad(
     ) {
         repeat(9) { index ->
             DigitButton(
-                index + 1,
-                isInputEnabled,
-                viewModel::onPinButtonClicked,
-                buttonScaleAnimatables[index]::value,
+                digit = index + 1,
+                isInputEnabled = isInputEnabled,
+                onClicked = viewModel::onPinButtonClicked,
+                scaling = buttonScaleAnimatables[index]::value,
+                isAnimationEnabled = isDigitButtonAnimationEnabled,
             )
         }
 
@@ -141,10 +122,11 @@ fun PinPad(
         )
 
         DigitButton(
-            0,
-            isInputEnabled,
-            viewModel::onPinButtonClicked,
-            buttonScaleAnimatables[10]::value,
+            digit = 0,
+            isInputEnabled = isInputEnabled,
+            onClicked = viewModel::onPinButtonClicked,
+            scaling = buttonScaleAnimatables[10]::value,
+            isAnimationEnabled = isDigitButtonAnimationEnabled,
         )
 
         ActionButton(
@@ -168,15 +150,17 @@ private fun DigitButton(
     isInputEnabled: Boolean,
     onClicked: (Int) -> Unit,
     scaling: () -> Float,
+    isAnimationEnabled: Boolean,
 ) {
     PinPadButton(
         onClicked = { onClicked(digit) },
         isEnabled = isInputEnabled,
         backgroundColor = MaterialTheme.colorScheme.surfaceVariant,
         foregroundColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        isAnimationEnabled = isAnimationEnabled,
         modifier =
             Modifier.graphicsLayer {
-                val scale = scaling()
+                val scale = if (isAnimationEnabled) scaling() else 1f
                 scaleX = scale
                 scaleY = scale
             }
@@ -220,6 +204,7 @@ private fun ActionButton(
         isEnabled = isInputEnabled && !isHidden,
         backgroundColor = backgroundColor,
         foregroundColor = foregroundColor,
+        isAnimationEnabled = true,
         modifier =
             Modifier.graphicsLayer {
                 alpha = hiddenAlpha
@@ -241,6 +226,7 @@ private fun PinPadButton(
     isEnabled: Boolean,
     backgroundColor: Color,
     foregroundColor: Color,
+    isAnimationEnabled: Boolean,
     modifier: Modifier = Modifier,
     onLongPressed: (() -> Unit)? = null,
     content: @Composable (contentColor: () -> Color) -> Unit,
@@ -268,7 +254,7 @@ private fun PinPadButton(
 
     val cornerRadius: Dp by
         animateDpAsState(
-            if (isPressed) 24.dp else pinButtonSize / 2,
+            if (isAnimationEnabled && isPressed) 24.dp else pinButtonSize / 2,
             label = "PinButton round corners",
             animationSpec = tween(animDurationMillis, easing = animEasing)
         )
@@ -276,7 +262,7 @@ private fun PinPadButton(
     val containerColor: Color by
         animateColorAsState(
             when {
-                isPressed -> MaterialTheme.colorScheme.primary
+                isAnimationEnabled && isPressed -> MaterialTheme.colorScheme.primary
                 else -> backgroundColor
             },
             label = "Pin button container color",
@@ -285,7 +271,7 @@ private fun PinPadButton(
     val contentColor =
         animateColorAsState(
             when {
-                isPressed -> MaterialTheme.colorScheme.onPrimary
+                isAnimationEnabled && isPressed -> MaterialTheme.colorScheme.onPrimary
                 else -> foregroundColor
             },
             label = "Pin button container color",
@@ -298,7 +284,8 @@ private fun PinPadButton(
         contentAlignment = Alignment.Center,
         modifier =
             modifier
-                .size(pinButtonSize)
+                .sizeIn(maxWidth = pinButtonSize, maxHeight = pinButtonSize)
+                .aspectRatio(1f)
                 .drawBehind {
                     drawRoundRect(
                         color = containerColor,

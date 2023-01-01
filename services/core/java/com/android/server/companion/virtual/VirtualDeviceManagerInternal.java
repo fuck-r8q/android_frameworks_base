@@ -25,6 +25,7 @@ import android.os.LocaleList;
 import android.util.ArraySet;
 
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Virtual device manager local service interface.
@@ -32,28 +33,11 @@ import java.util.Set;
  */
 public abstract class VirtualDeviceManagerInternal {
 
-    /** Interface to listen to the creation and destruction of virtual displays. */
-    public interface VirtualDisplayListener {
-        /** Notifies that a virtual display was created. */
-        void onVirtualDisplayCreated(int displayId);
-
-        /** Notifies that a virtual display was removed. */
-        void onVirtualDisplayRemoved(int displayId);
-    }
-
     /** Interface to listen to the changes on the list of app UIDs running on any virtual device. */
     public interface AppsOnVirtualDeviceListener {
         /** Notifies that running apps on any virtual device has changed */
         void onAppsOnAnyVirtualDeviceChanged(Set<Integer> allRunningUids);
     }
-
-    /** Register a listener for the creation and destruction of virtual displays. */
-    public abstract void registerVirtualDisplayListener(
-            @NonNull VirtualDisplayListener listener);
-
-    /** Unregister a listener for the creation and destruction of virtual displays. */
-    public abstract void unregisterVirtualDisplayListener(
-            @NonNull VirtualDisplayListener listener);
 
     /** Register a listener for changes of running app UIDs on any virtual device. */
     public abstract void registerAppsOnVirtualDeviceListener(
@@ -62,6 +46,14 @@ public abstract class VirtualDeviceManagerInternal {
     /** Unregister a listener for changes of running app UIDs on any virtual device. */
     public abstract void unregisterAppsOnVirtualDeviceListener(
             @NonNull AppsOnVirtualDeviceListener listener);
+
+    /** Register a listener for removal of persistent device IDs. */
+    public abstract void registerPersistentDeviceIdRemovedListener(
+            @NonNull Consumer<String> persistentDeviceIdRemovedListener);
+
+    /** Unregister a listener for the removal of persistent device IDs. */
+    public abstract void unregisterPersistentDeviceIdRemovedListener(
+            @NonNull Consumer<String> persistentDeviceIdRemovedListener);
 
     /**
      * Notifies that the set of apps running on virtual devices has changed.
@@ -74,6 +66,11 @@ public abstract class VirtualDeviceManagerInternal {
      * Notifies that an authentication prompt is about to be shown for an app with the given uid.
      */
     public abstract void onAuthenticationPrompt(int uid);
+
+    /**
+     * Notifies the given persistent device IDs have been removed.
+     */
+    public abstract void onPersistentDeviceIdsRemoved(Set<String> removedPersistentDeviceIds);
 
     /**
      * Gets the owner uid for a deviceId.
@@ -102,13 +99,6 @@ public abstract class VirtualDeviceManagerInternal {
      * the app is running on the default device or not.
      */
     public abstract @NonNull ArraySet<Integer> getDeviceIdsForUid(int uid);
-
-    /**
-     * Notifies that a virtual display is created.
-     *
-     * @param displayId The display id of the created virtual display.
-     */
-    public abstract void onVirtualDisplayCreated(int displayId);
 
     /**
      * Notifies that a virtual display is removed.

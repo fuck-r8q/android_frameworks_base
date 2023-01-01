@@ -28,6 +28,7 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.display.DisplayManagerInternal;
+import android.hardware.display.VirtualDisplayConfig;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Message;
@@ -45,6 +46,7 @@ import android.view.SurfaceControlViewHost;
 import android.view.WindowInfo;
 import android.view.WindowManager.DisplayImePolicy;
 import android.view.inputmethod.ImeTracker;
+import android.window.ScreenCapture;
 
 import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.server.input.InputManagerService;
@@ -752,9 +754,31 @@ public abstract class WindowManagerInternal {
     public abstract Context getTopFocusedDisplayUiContext();
 
     /**
-     * Checks if this display is configured and allowed to show system decorations.
+     * Sets whether the relevant display content can host the relevant home activity and wallpaper.
+     *
+     * @param displayUniqueId The unique ID of the display. Note that the display may not yet be
+     *   created, but whenever it is, this property will be applied.
+     * @param displayType The type of the display, e.g. {@link Display#TYPE_VIRTUAL}.
+     * @param supported Whether home and wallpaper are supported on this display.
      */
-    public abstract boolean shouldShowSystemDecorOnDisplay(int displayId);
+    public abstract void setHomeSupportedOnDisplay(
+            @NonNull String displayUniqueId, int displayType, boolean supported);
+
+    /**
+     * Checks if this display is configured and allowed to show home activity and wallpaper.
+     *
+     * <p>This is implied for displays that have {@link Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS}
+     * and can also be set via {@link VirtualDisplayConfig.Builder#setHomeSupported}.</p>
+     */
+    public abstract boolean isHomeSupportedOnDisplay(int displayId);
+
+    /**
+     * Removes any settings relevant to the given display.
+     *
+     * <p>This may be used when a property is set for a display unique ID before the display
+     * creation but the actual display creation failed for some reason.</p>
+     */
+    public abstract void clearDisplaySettings(@NonNull String displayUniqueId, int displayType);
 
     /**
      * Indicates the policy for how the display should show IME.
@@ -954,6 +978,14 @@ public abstract class WindowManagerInternal {
 
     /** Returns the SurfaceControl accessibility services should use for accessibility overlays. */
     public abstract SurfaceControl getA11yOverlayLayer(int displayId);
+
+    /**
+     * Captures the entire display specified by the displayId using the args provided. If the args
+     * are null or if the sourceCrop is invalid or null, the entire display bounds will be captured.
+     */
+    public abstract void captureDisplay(int displayId,
+                                        @Nullable ScreenCapture.CaptureArgs captureArgs,
+                                        ScreenCapture.ScreenCaptureListener listener);
 
     /**
      * Device has a software navigation bar (separate from the status bar) on specific display.

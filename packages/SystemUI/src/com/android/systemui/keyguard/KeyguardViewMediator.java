@@ -2724,9 +2724,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     private void updateActivityLockScreenState(boolean showing, boolean aodShowing) {
         mUiBgExecutor.execute(() -> {
-            if (DEBUG) {
-                Log.d(TAG, "updateActivityLockScreenState(" + showing + ", " + aodShowing + ")");
-            }
+            Log.d(TAG, "updateActivityLockScreenState(" + showing + ", " + aodShowing + ")");
 
             if (mFeatureFlags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR)) {
                 // Handled in WmLockscreenVisibilityManager if flag is enabled.
@@ -3255,10 +3253,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         DejankUtils.postAfterTraversal(() -> {
             if (!mPM.isInteractive() && !mPendingLock) {
                 Log.e(TAG, "exitKeyguardAndFinishSurfaceBehindRemoteAnimation#postAfterTraversal:"
-                        + "mPM.isInteractive()=" + mPM.isInteractive()
-                        + "mPendingLock=" + mPendingLock + "."
-                        + "One of these being false means we re-locked the device during unlock. "
-                        + "Do not proceed to finish keyguard exit and unlock.");
+                        + " mPM.isInteractive()=" + mPM.isInteractive()
+                        + " mPendingLock=" + mPendingLock + "."
+                        + " One of these being false means we re-locked the device during unlock."
+                        + " Do not proceed to finish keyguard exit and unlock.");
                 doKeyguardLocked(null);
                 finishSurfaceBehindRemoteAnimation(true /* showKeyguard */);
                 // Ensure WM is notified that we made a decision to show

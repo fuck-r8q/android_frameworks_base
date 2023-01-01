@@ -541,7 +541,6 @@ package android.app.admin {
     field public static final String PERMITTED_INPUT_METHODS_POLICY = "permittedInputMethods";
     field public static final String PERSONAL_APPS_SUSPENDED_POLICY = "personalAppsSuspended";
     field public static final String SCREEN_CAPTURE_DISABLED_POLICY = "screenCaptureDisabled";
-    field @FlaggedApi("android.app.admin.flags.policy_engine_migration_v2_enabled") public static final String USB_DATA_SIGNALING_POLICY = "usbDataSignaling";
   }
 
   public class DevicePolicyManager {
@@ -3604,6 +3603,8 @@ package android.view.accessibility {
   public final class AccessibilityManager {
     method @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_ACCESSIBILITY) public java.util.List<java.lang.String> getAccessibilityShortcutTargets(int);
     method public boolean hasAnyDirectConnection();
+    method @FlaggedApi("android.view.accessibility.flash_notification_system_api") public boolean startFlashNotificationSequence(@NonNull android.content.Context, int);
+    method @FlaggedApi("android.view.accessibility.flash_notification_system_api") public boolean stopFlashNotificationSequence(@NonNull android.content.Context);
   }
 
   public class AccessibilityNodeInfo implements android.os.Parcelable {

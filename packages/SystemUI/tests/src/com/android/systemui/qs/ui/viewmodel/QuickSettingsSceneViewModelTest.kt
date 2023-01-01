@@ -19,13 +19,16 @@ package com.android.systemui.qs.ui.viewmodel
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.authentication.data.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags
+import com.android.systemui.qs.ui.adapter.FakeQSSceneAdapter
 import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.shared.model.Direction
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.scene.shared.model.UserAction
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
@@ -53,6 +56,7 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
     private val sceneInteractor = utils.sceneInteractor()
     private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
     private val flags = FakeFeatureFlagsClassic().also { it.set(Flags.NEW_NETWORK_SLICE_UI, false) }
+    private val qsFlexiglassAdapter = FakeQSSceneAdapter { _, _ -> mock() }
 
     private var mobileIconsViewModel: MobileIconsViewModel =
         MobileIconsViewModel(
@@ -90,17 +94,14 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
 
         underTest =
             QuickSettingsSceneViewModel(
-                bouncerInteractor =
-                    utils.bouncerInteractor(
-                        deviceEntryInteractor =
-                            utils.deviceEntryInteractor(
-                                authenticationInteractor = authenticationInteractor,
-                                sceneInteractor = sceneInteractor,
-                            ),
+                deviceEntryInteractor =
+                    utils.deviceEntryInteractor(
                         authenticationInteractor = authenticationInteractor,
                         sceneInteractor = sceneInteractor,
                     ),
                 shadeHeaderViewModel = shadeHeaderViewModel,
+                qsSceneAdapter = qsFlexiglassAdapter,
+                notifications = utils.notificationsPlaceholderViewModel(),
             )
     }
 
@@ -128,5 +129,34 @@ class QuickSettingsSceneViewModelTest : SysuiTestCase() {
             underTest.onContentClicked()
 
             assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+        }
+
+    @Test
+    fun destinationsNotCustomizing() =
+        testScope.runTest {
+            val destinations by collectLastValue(underTest.destinationScenes)
+            qsFlexiglassAdapter.setCustomizing(false)
+
+            assertThat(destinations)
+                .isEqualTo(
+                    mapOf(
+                        UserAction.Back to SceneModel(SceneKey.Shade),
+                        UserAction.Swipe(Direction.UP) to SceneModel(SceneKey.Shade),
+                    )
+                )
+        }
+
+    @Test
+    fun destinationsCustomizing() =
+        testScope.runTest {
+            val destinations by collectLastValue(underTest.destinationScenes)
+            qsFlexiglassAdapter.setCustomizing(true)
+
+            assertThat(destinations)
+                .isEqualTo(
+                    mapOf(
+                        UserAction.Back to SceneModel(SceneKey.QuickSettings),
+                    )
+                )
         }
 }

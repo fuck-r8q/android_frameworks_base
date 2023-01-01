@@ -55,6 +55,7 @@ import android.media.IStrategyNonDefaultDevicesDispatcher;
 import android.media.IStrategyPreferredDevicesDispatcher;
 import android.media.MediaMetrics;
 import android.media.MediaRecorder.AudioSource;
+import android.media.Utils;
 import android.media.audiopolicy.AudioProductStrategy;
 import android.media.permission.ClearCallingIdentityContext;
 import android.media.permission.SafeCloseable;
@@ -484,7 +485,7 @@ public class AudioDeviceInventory {
             return "[DeviceInfo: type:0x" + Integer.toHexString(mDeviceType)
                     + " (" + AudioSystem.getDeviceName(mDeviceType)
                     + ") name:" + mDeviceName
-                    + " addr:" + mDeviceAddress
+                    + " addr:" + Utils.anonymizeBluetoothAddress(mDeviceType, mDeviceAddress)
                     + " codec: " + Integer.toHexString(mDeviceCodecFormat)
                     + " peer addr:" + mPeerDeviceAddress
                     + " group:" + mGroupId
@@ -539,7 +540,7 @@ public class AudioDeviceInventory {
         mApmConnectedDevices.forEach((keyType, valueAddress) -> {
             pw.println("  " + prefix + " type:0x" + Integer.toHexString(keyType)
                     + " (" + AudioSystem.getDeviceName(keyType)
-                    + ") addr:" + valueAddress); });
+                    + ") addr:" + Utils.anonymizeBluetoothAddress(keyType, valueAddress)); });
         pw.println("\n" + prefix + "Preferred devices for capture preset:");
         mPreferredDevicesForCapturePreset.forEach((capturePreset, devices) -> {
             pw.println("  " + prefix + "capturePreset:" + capturePreset
@@ -1892,7 +1893,8 @@ public class AudioDeviceInventory {
 
         } else {
             AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                    "A2DP device addr=" + address + " now available").printLog(TAG));
+                    "A2DP device addr=" + Utils.anonymizeBluetoothAddress(address)
+                            + " now available").printLog(TAG));
         }
 
         // Reset A2DP suspend state each time a new sink is connected
@@ -2130,7 +2132,8 @@ public class AudioDeviceInventory {
                 .equals(mApmConnectedDevices.get(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP))) {
             // removing A2DP device not currently used by AudioPolicy, log but don't act on it
             AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
-                    "A2DP device " + address + " made unavailable, was not used")).printLog(TAG));
+                    "A2DP device " + Utils.anonymizeBluetoothAddress(address)
+                            + " made unavailable, was not used")).printLog(TAG));
             mmi.set(MediaMetrics.Property.EARLY_RETURN,
                     "A2DP device made unavailable, was not used")
                     .record();
@@ -2146,13 +2149,15 @@ public class AudioDeviceInventory {
 
         if (res != AudioSystem.AUDIO_STATUS_OK) {
             AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                    "APM failed to make unavailable A2DP device addr=" + address
+                    "APM failed to make unavailable A2DP device addr="
+                            + Utils.anonymizeBluetoothAddress(address)
                             + " error=" + res).printLog(TAG));
             // TODO:  failed to disconnect, stop here
             // TODO: return;
         } else {
             AudioService.sDeviceLogger.enqueue((new EventLogger.StringEvent(
-                    "A2DP device addr=" + address + " made unavailable")).printLog(TAG));
+                    "A2DP device addr=" + Utils.anonymizeBluetoothAddress(address)
+                            + " made unavailable")).printLog(TAG));
         }
         mApmConnectedDevices.remove(AudioSystem.DEVICE_OUT_BLUETOOTH_A2DP);
 
@@ -2355,7 +2360,8 @@ public class AudioDeviceInventory {
                 // TODO: return;
             } else {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                        "LE Audio device addr=" + address + " now available").printLog(TAG));
+                        "LE Audio device addr=" + Utils.anonymizeBluetoothAddress(address)
+                                + " now available").printLog(TAG));
             }
             // Reset LEA suspend state each time a new sink is connected
             mDeviceBroker.clearLeAudioSuspended(true /* internalOnly */);
@@ -2399,7 +2405,8 @@ public class AudioDeviceInventory {
                 // TODO: return;
             } else {
                 AudioService.sDeviceLogger.enqueue(new EventLogger.StringEvent(
-                        "LE Audio device addr=" + address + " made unavailable").printLog(TAG));
+                        "LE Audio device addr=" + Utils.anonymizeBluetoothAddress(address)
+                                + " made unavailable").printLog(TAG));
             }
             mConnectedDevices.remove(DeviceInfo.makeDeviceListKey(device, address));
         }

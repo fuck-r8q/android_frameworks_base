@@ -18,7 +18,6 @@
 package com.android.systemui.communal.domain.interactor
 
 import android.app.smartspace.SmartspaceTarget
-import android.provider.Settings
 import android.provider.Settings.Secure.HUB_MODE_TUTORIAL_COMPLETED
 import android.widget.RemoteViews
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,9 +28,9 @@ import com.android.systemui.communal.data.repository.FakeCommunalRepository
 import com.android.systemui.communal.data.repository.FakeCommunalTutorialRepository
 import com.android.systemui.communal.data.repository.FakeCommunalWidgetRepository
 import com.android.systemui.communal.domain.model.CommunalContentModel
-import com.android.systemui.communal.shared.model.CommunalAppWidgetInfo
 import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.communal.shared.model.CommunalWidgetContentModel
+import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.smartspace.data.repository.FakeSmartspaceRepository
@@ -45,16 +44,14 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
 @SmallTest
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CommunalInteractorTest : SysuiTestCase() {
-    @Mock private lateinit var stopwatchAppWidgetInfo: CommunalAppWidgetInfo
-
     private lateinit var testScope: TestScope
 
     private lateinit var tutorialRepository: FakeCommunalTutorialRepository
@@ -63,6 +60,7 @@ class CommunalInteractorTest : SysuiTestCase() {
     private lateinit var widgetRepository: FakeCommunalWidgetRepository
     private lateinit var smartspaceRepository: FakeSmartspaceRepository
     private lateinit var keyguardRepository: FakeKeyguardRepository
+    private lateinit var editWidgetsActivityStarter: EditWidgetsActivityStarter
 
     private lateinit var underTest: CommunalInteractor
 
@@ -80,21 +78,10 @@ class CommunalInteractorTest : SysuiTestCase() {
         widgetRepository = withDeps.widgetRepository
         smartspaceRepository = withDeps.smartspaceRepository
         keyguardRepository = withDeps.keyguardRepository
+        editWidgetsActivityStarter = withDeps.editWidgetsActivityStarter
 
         underTest = withDeps.communalInteractor
     }
-
-    @Test
-    fun appWidgetInfoFlow() =
-        testScope.runTest {
-            val lastAppWidgetInfo = collectLastValue(underTest.appWidgetInfo)
-            runCurrent()
-            assertThat(lastAppWidgetInfo()).isNull()
-
-            widgetRepository.setStopwatchAppWidgetInfo(stopwatchAppWidgetInfo)
-            runCurrent()
-            assertThat(lastAppWidgetInfo()).isEqualTo(stopwatchAppWidgetInfo)
-        }
 
     @Test
     fun communalEnabled() =
@@ -108,24 +95,6 @@ class CommunalInteractorTest : SysuiTestCase() {
         testScope.runTest {
             communalRepository.setIsCommunalEnabled(false)
             assertThat(underTest.isCommunalEnabled).isFalse()
-        }
-
-    @Test
-    fun tutorial_tutorialNotCompletedAndKeyguardVisible_showTutorialContent() =
-        testScope.runTest {
-            // Keyguard showing, and tutorial not started.
-            keyguardRepository.setKeyguardShowing(true)
-            keyguardRepository.setKeyguardOccluded(false)
-            tutorialRepository.setTutorialSettingState(
-                Settings.Secure.HUB_MODE_TUTORIAL_NOT_STARTED
-            )
-
-            val communalContent by collectLastValue(underTest.communalContent)
-
-            assertThat(communalContent!!).isNotEmpty()
-            communalContent!!.forEach { model ->
-                assertThat(model is CommunalContentModel.Tutorial).isTrue()
-            }
         }
 
     @Test
@@ -157,12 +126,11 @@ class CommunalInteractorTest : SysuiTestCase() {
                 )
             widgetRepository.setCommunalWidgets(widgets)
 
-            val communalContent by collectLastValue(underTest.communalContent)
+            val widgetContent by collectLastValue(underTest.widgetContent)
 
-            assertThat(communalContent!!).isNotEmpty()
-            communalContent!!.forEachIndexed { index, model ->
-                assertThat((model as CommunalContentModel.Widget).appWidgetId)
-                    .isEqualTo(widgets[index].appWidgetId)
+            assertThat(widgetContent!!).isNotEmpty()
+            widgetContent!!.forEachIndexed { index, model ->
+                assertThat(model.appWidgetId).isEqualTo(widgets[index].appWidgetId)
             }
         }
 
@@ -195,48 +163,9 @@ class CommunalInteractorTest : SysuiTestCase() {
             val targets = listOf(target1, target2, target3)
             smartspaceRepository.setLockscreenSmartspaceTargets(targets)
 
-            val communalContent by collectLastValue(underTest.communalContent)
-            assertThat(communalContent?.size).isEqualTo(1)
-            assertThat(communalContent?.get(0)?.key).isEqualTo("smartspace_target3")
-        }
-
-    @Test
-    fun smartspace_smartspaceAndWidgetsAvailable_showSmartspaceAndWidgetContent() =
-        testScope.runTest {
-            // Keyguard showing, and tutorial completed.
-            keyguardRepository.setKeyguardShowing(true)
-            keyguardRepository.setKeyguardOccluded(false)
-            tutorialRepository.setTutorialSettingState(HUB_MODE_TUTORIAL_COMPLETED)
-
-            // Widgets available.
-            val widgets =
-                listOf(
-                    CommunalWidgetContentModel(
-                        appWidgetId = 0,
-                        priority = 30,
-                        providerInfo = mock(),
-                    ),
-                    CommunalWidgetContentModel(
-                        appWidgetId = 1,
-                        priority = 20,
-                        providerInfo = mock(),
-                    ),
-                )
-            widgetRepository.setCommunalWidgets(widgets)
-
-            // Smartspace available.
-            val target = mock(SmartspaceTarget::class.java)
-            whenever(target.smartspaceTargetId).thenReturn("target")
-            whenever(target.featureType).thenReturn(SmartspaceTarget.FEATURE_TIMER)
-            whenever(target.remoteViews).thenReturn(mock(RemoteViews::class.java))
-            smartspaceRepository.setLockscreenSmartspaceTargets(listOf(target))
-
-            val communalContent by collectLastValue(underTest.communalContent)
-
-            assertThat(communalContent?.size).isEqualTo(3)
-            assertThat(communalContent?.get(0)?.key).isEqualTo("smartspace_target")
-            assertThat(communalContent?.get(1)?.key).isEqualTo("widget_0")
-            assertThat(communalContent?.get(2)?.key).isEqualTo("widget_1")
+            val smartspaceContent by collectLastValue(underTest.smartspaceContent)
+            assertThat(smartspaceContent?.size).isEqualTo(1)
+            assertThat(smartspaceContent?.get(0)?.key).isEqualTo("smartspace_target3")
         }
 
     @Test
@@ -248,55 +177,11 @@ class CommunalInteractorTest : SysuiTestCase() {
             // Media is playing.
             mediaRepository.mediaPlaying.value = true
 
-            val communalContent by collectLastValue(underTest.communalContent)
+            val umoContent by collectLastValue(underTest.umoContent)
 
-            assertThat(communalContent?.size).isEqualTo(1)
-            assertThat(communalContent?.get(0)).isInstanceOf(CommunalContentModel.Umo::class.java)
-            assertThat(communalContent?.get(0)?.key).isEqualTo(CommunalContentModel.UMO_KEY)
-        }
-
-    @Test
-    fun contentOrdering() =
-        testScope.runTest {
-            tutorialRepository.setTutorialSettingState(HUB_MODE_TUTORIAL_COMPLETED)
-
-            // Widgets available.
-            val widgets =
-                listOf(
-                    CommunalWidgetContentModel(
-                        appWidgetId = 0,
-                        priority = 30,
-                        providerInfo = mock(),
-                    ),
-                    CommunalWidgetContentModel(
-                        appWidgetId = 1,
-                        priority = 20,
-                        providerInfo = mock(),
-                    ),
-                )
-            widgetRepository.setCommunalWidgets(widgets)
-
-            // Smartspace available.
-            val target = mock(SmartspaceTarget::class.java)
-            whenever(target.smartspaceTargetId).thenReturn("target")
-            whenever(target.featureType).thenReturn(SmartspaceTarget.FEATURE_TIMER)
-            whenever(target.remoteViews).thenReturn(mock(RemoteViews::class.java))
-            smartspaceRepository.setLockscreenSmartspaceTargets(listOf(target))
-
-            // Media playing.
-            mediaRepository.mediaPlaying.value = true
-
-            val communalContent by collectLastValue(underTest.communalContent)
-
-            // Order is smart space, then UMO, then widget content.
-            assertThat(communalContent?.size).isEqualTo(4)
-            assertThat(communalContent?.get(0))
-                .isInstanceOf(CommunalContentModel.Smartspace::class.java)
-            assertThat(communalContent?.get(1)).isInstanceOf(CommunalContentModel.Umo::class.java)
-            assertThat(communalContent?.get(2))
-                .isInstanceOf(CommunalContentModel.Widget::class.java)
-            assertThat(communalContent?.get(3))
-                .isInstanceOf(CommunalContentModel.Widget::class.java)
+            assertThat(umoContent?.size).isEqualTo(1)
+            assertThat(umoContent?.get(0)).isInstanceOf(CommunalContentModel.Umo::class.java)
+            assertThat(umoContent?.get(0)?.key).isEqualTo(CommunalContentModel.UMO_KEY)
         }
 
     @Test
@@ -337,5 +222,12 @@ class CommunalInteractorTest : SysuiTestCase() {
             isCommunalShowing = collectLastValue(underTest.isCommunalShowing)
             runCurrent()
             assertThat(isCommunalShowing()).isEqualTo(true)
+        }
+
+    @Test
+    fun testShowWidgetEditorStartsActivity() =
+        testScope.runTest {
+            underTest.showWidgetEditor()
+            verify(editWidgetsActivityStarter).startActivity()
         }
 }

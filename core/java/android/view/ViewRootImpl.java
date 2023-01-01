@@ -81,6 +81,8 @@ import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_DRAWN_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
+import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
+import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_ADDITIONAL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
@@ -443,9 +445,6 @@ public final class ViewRootImpl implements ViewParent,
      * @see #performConfigurationChange(MergedConfiguration, boolean, int)
      */
     private boolean mForceNextConfigUpdate;
-
-    private boolean mUseBLASTAdapter;
-    private boolean mForceDisableBLAST;
 
     /** lazily-initialized in getAudioManager() */
     private boolean mFastScrollSoundEffectsEnabled = false;
@@ -1302,8 +1301,6 @@ public final class ViewRootImpl implements ViewParent,
                 if (mWindowAttributes.packageName == null) {
                     mWindowAttributes.packageName = mBasePackageName;
                 }
-                mWindowAttributes.privateFlags |=
-                        WindowManager.LayoutParams.PRIVATE_FLAG_USE_BLAST;
 
                 attrs = mWindowAttributes;
                 setTag();
@@ -1513,9 +1510,6 @@ public final class ViewRootImpl implements ViewParent,
                 if (mExtraDisplayListenerLogging) {
                     Slog.i(mTag, "(" + mBasePackageName + ") Initial DisplayState: "
                             + mAttachInfo.mDisplayState, new Throwable());
-                }
-                if ((res & WindowManagerGlobal.ADD_FLAG_USE_BLAST) != 0) {
-                    mUseBLASTAdapter = true;
                 }
 
                 if (view instanceof RootViewSurfaceTaker) {
@@ -1913,8 +1907,7 @@ public final class ViewRootImpl implements ViewParent,
             mWindowAttributes.insetsFlags.appearance = appearance;
             mWindowAttributes.insetsFlags.behavior = behavior;
             mWindowAttributes.privateFlags |= compatibleWindowFlag
-                    | appearanceAndBehaviorPrivateFlags
-                    | WindowManager.LayoutParams.PRIVATE_FLAG_USE_BLAST;
+                    | appearanceAndBehaviorPrivateFlags;
 
             if (mWindowAttributes.preservePreviousSurfaceInsets) {
                 // Restore old surface insets.
@@ -4016,9 +4009,7 @@ public final class ViewRootImpl implements ViewParent,
         // when the values are applicable.
         setPreferredFrameRate(mPreferredFrameRate);
         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
-        mLastPreferredFrameRateCategory = mPreferredFrameRateCategory;
         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
-        mLastPreferredFrameRate = mPreferredFrameRate;
         mPreferredFrameRate = 0;
     }
 
@@ -5906,7 +5897,7 @@ public final class ViewRootImpl implements ViewParent,
             mInputQueue = null;
         }
         try {
-            mWindowSession.remove(mWindow);
+            mWindowSession.remove(mWindow.asBinder());
         } catch (RemoteException e) {
         }
         // Dispose receiver would dispose client InputChannel, too. That could send out a socket
@@ -8713,11 +8704,7 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         if (mSurfaceControl.isValid()) {
-            if (!useBLAST()) {
-                mSurface.copyFrom(mSurfaceControl);
-            } else {
-                updateBlastSurfaceIfNeeded();
-            }
+            updateBlastSurfaceIfNeeded();
             if (mAttachInfo.mThreadedRenderer != null) {
                 mAttachInfo.mThreadedRenderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
             }
@@ -11570,7 +11557,7 @@ public final class ViewRootImpl implements ViewParent,
         SurfaceControl.Transaction transaction = new SurfaceControl.Transaction();
         transaction.setBlurRegions(surfaceControl, regionCopy);
 
-        if (useBLAST() && mBlastBufferQueue != null) {
+        if (mBlastBufferQueue != null) {
             mBlastBufferQueue.mergeWithNextTransaction(transaction, frameNumber);
         }
     }
@@ -11585,18 +11572,6 @@ public final class ViewRootImpl implements ViewParent,
     @Override
     public void onDescendantUnbufferedRequested() {
         mUnbufferedInputSource = mView.mUnbufferedInputSource;
-    }
-
-    /**
-     * Force disabling use of the BLAST adapter regardless of the system
-     * flag. Needs to be called before addView.
-     */
-    void forceDisableBLAST() {
-        mForceDisableBLAST = true;
-    }
-
-    boolean useBLAST() {
-        return mUseBLASTAdapter && !mForceDisableBLAST;
     }
 
     int getSurfaceSequenceId() {
@@ -12042,8 +12017,11 @@ public final class ViewRootImpl implements ViewParent,
                 ? FRAME_RATE_CATEGORY_HIGH : preferredFrameRateCategory;
 
         try {
-            mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
-                    frameRateCategory, false).apply();
+            if (mLastPreferredFrameRateCategory != frameRateCategory) {
+                mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
+                    frameRateCategory, false).applyAsyncUnsafe();
+                mLastPreferredFrameRateCategory = frameRateCategory;
+            }
         } catch (Exception e) {
             Log.e(mTag, "Unable to set frame rate category", e);
         }
@@ -12063,8 +12041,11 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         try {
-            mFrameRateTransaction.setFrameRate(mSurfaceControl,
-                    preferredFrameRate, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT).apply();
+            if (mLastPreferredFrameRate != preferredFrameRate) {
+                mFrameRateTransaction.setFrameRate(mSurfaceControl, preferredFrameRate,
+                    Surface.FRAME_RATE_COMPATIBILITY_DEFAULT).applyAsyncUnsafe();
+                mLastPreferredFrameRate = preferredFrameRate;
+            }
         } catch (Exception e) {
             Log.e(mTag, "Unable to set frame rate", e);
         }
@@ -12091,7 +12072,8 @@ public final class ViewRootImpl implements ViewParent,
                 || motionEventAction == MotionEvent.ACTION_MOVE
                 || motionEventAction == MotionEvent.ACTION_UP;
         boolean desiredType = windowType == TYPE_BASE_APPLICATION || windowType == TYPE_APPLICATION
-                || windowType == TYPE_APPLICATION_STARTING || windowType == TYPE_DRAWN_APPLICATION;
+                || windowType == TYPE_APPLICATION_STARTING || windowType == TYPE_DRAWN_APPLICATION
+                || windowType == TYPE_NOTIFICATION_SHADE || windowType == TYPE_STATUS_BAR;
         // use toolkitSetFrameRate flag to gate the change
         return desiredAction && desiredType && sToolkitSetFrameRateReadOnlyFlagValue;
     }

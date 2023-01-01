@@ -1088,6 +1088,16 @@ final class ActivityManagerConstants extends ContentObserver {
 
     public boolean APP_PROFILER_PSS_PROFILING_DISABLED;
 
+    /**
+     * The modifier used to adjust PSS thresholds in OomAdjuster when RSS is collected instead.
+     */
+    static final String KEY_PSS_TO_RSS_THRESHOLD_MODIFIER =
+            "pss_to_rss_threshold_modifier";
+
+    private final float mDefaultPssToRssThresholdModifier;
+
+    public float PSS_TO_RSS_THRESHOLD_MODIFIER;
+
     private final OnPropertiesChangedListener mOnDeviceConfigChangedListener =
             new OnPropertiesChangedListener() {
                 @Override
@@ -1266,6 +1276,9 @@ final class ActivityManagerConstants extends ContentObserver {
                             case KEY_DISABLE_APP_PROFILER_PSS_PROFILING:
                                 updateDisableAppProfilerPssProfiling();
                                 break;
+                            case KEY_PSS_TO_RSS_THRESHOLD_MODIFIER:
+                                updatePssToRssThresholdModifier();
+                                break;
                             default:
                                 updateFGSPermissionEnforcementFlagsIfNecessary(name);
                                 break;
@@ -1351,6 +1364,10 @@ final class ActivityManagerConstants extends ContentObserver {
         mDefaultDisableAppProfilerPssProfiling = context.getResources().getBoolean(
                 R.bool.config_am_disablePssProfiling);
         APP_PROFILER_PSS_PROFILING_DISABLED = mDefaultDisableAppProfilerPssProfiling;
+
+        mDefaultPssToRssThresholdModifier = context.getResources().getFloat(
+                com.android.internal.R.dimen.config_am_pssToRssThresholdModifier);
+        PSS_TO_RSS_THRESHOLD_MODIFIER = mDefaultPssToRssThresholdModifier;
     }
 
     private void updatePerfConfigConstants() {
@@ -2110,6 +2127,12 @@ final class ActivityManagerConstants extends ContentObserver {
                 mDefaultDisableAppProfilerPssProfiling);
     }
 
+    private void updatePssToRssThresholdModifier() {
+        PSS_TO_RSS_THRESHOLD_MODIFIER = DeviceConfig.getFloat(
+                DeviceConfig.NAMESPACE_ACTIVITY_MANAGER, KEY_PSS_TO_RSS_THRESHOLD_MODIFIER,
+                mDefaultPssToRssThresholdModifier);
+    }
+
     @NeverCompile // Avoid size overhead of debugging code.
     void dump(PrintWriter pw) {
         pw.println("ACTIVITY MANAGER SETTINGS (dumpsys activity settings) "
@@ -2300,6 +2323,9 @@ final class ActivityManagerConstants extends ContentObserver {
 
         pw.print("  "); pw.print(KEY_DISABLE_APP_PROFILER_PSS_PROFILING);
         pw.print("="); pw.println(APP_PROFILER_PSS_PROFILING_DISABLED);
+
+        pw.print("  "); pw.print(KEY_PSS_TO_RSS_THRESHOLD_MODIFIER);
+        pw.print("="); pw.println(PSS_TO_RSS_THRESHOLD_MODIFIER);
 
         pw.println();
         if (mOverrideMaxCachedProcesses >= 0) {

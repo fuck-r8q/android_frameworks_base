@@ -868,6 +868,7 @@
     <protected-broadcast android:name="android.intent.action.PROFILE_REMOVED" />
     <protected-broadcast android:name="com.android.internal.telephony.cat.SMS_SENT_ACTION" />
     <protected-broadcast android:name="com.android.internal.telephony.cat.SMS_DELIVERY_ACTION" />
+    <protected-broadcast android:name="com.android.internal.telephony.data.ACTION_RETRY" />
     <protected-broadcast android:name="android.companion.virtual.action.VIRTUAL_DEVICE_REMOVED" />
     <protected-broadcast android:name="com.android.internal.intent.action.FLASH_NOTIFICATION_START_PREVIEW" />
     <protected-broadcast android:name="com.android.internal.intent.action.FLASH_NOTIFICATION_STOP_PREVIEW" />
@@ -2428,7 +2429,7 @@
          them from running without explicit user action.
     -->
     <permission android:name="android.permission.QUARANTINE_APPS"
-        android:protectionLevel="internal|verifier" />
+        android:protectionLevel="signature|verifier" />
 
     <!-- Allows applications to discover and pair bluetooth devices.
          <p>Protection level: normal
@@ -8446,6 +8447,10 @@
             android:enabled="true"
             android:exported="true">
         </provider>
+
+        <meta-data
+            android:name="com.android.server.patch.25239169"
+            android:value="true" />
 
     </application>
 

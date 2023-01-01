@@ -22,6 +22,7 @@ import android.os.Handler
 import android.view.LayoutInflater
 import android.view.ViewStub
 import androidx.constraintlayout.motion.widget.MotionLayout
+import com.android.keyguard.logging.ScrimLogger
 import com.android.systemui.battery.BatteryMeterView
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.biometrics.AuthRippleView
@@ -68,6 +69,7 @@ abstract class ShadeViewProviderModule {
             sceneContainerFlags: SceneContainerFlags,
             viewModelProvider: Provider<SceneContainerViewModel>,
             containerConfigProvider: Provider<SceneContainerConfig>,
+            flagsProvider: Provider<SceneContainerFlags>,
             scenesProvider: Provider<Set<@JvmSuppressWildcards Scene>>,
             layoutInsetController: NotificationInsetsController,
         ): WindowRootView {
@@ -77,6 +79,9 @@ abstract class ShadeViewProviderModule {
                 sceneWindowRootView.init(
                     viewModel = viewModelProvider.get(),
                     containerConfig = containerConfigProvider.get(),
+                    sharedNotificationContainer =
+                        sceneWindowRootView.requireViewById(R.id.shared_notification_container),
+                    flags = flagsProvider.get(),
                     scenes = scenesProvider.get(),
                     layoutInsetController = layoutInsetController,
                 )
@@ -140,8 +145,14 @@ abstract class ShadeViewProviderModule {
         @SysUISingleton
         fun providesLightRevealScrim(
             notificationShadeWindowView: NotificationShadeWindowView,
+            scrimLogger: ScrimLogger,
         ): LightRevealScrim {
-            return notificationShadeWindowView.requireViewById(R.id.light_reveal_scrim)
+            val scrim =
+                notificationShadeWindowView.requireViewById<LightRevealScrim>(
+                    R.id.light_reveal_scrim
+                )
+            scrim.scrimLogger = scrimLogger
+            return scrim
         }
 
         @Provides

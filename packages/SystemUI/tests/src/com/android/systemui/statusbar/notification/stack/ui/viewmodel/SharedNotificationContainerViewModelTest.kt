@@ -19,13 +19,11 @@ package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.SysUITestComponent
-import com.android.SysUITestModule
-import com.android.TestMocksModule
-import com.android.collectLastValue
-import com.android.runCurrent
-import com.android.runTest
+import com.android.systemui.SysUITestComponent
+import com.android.systemui.SysUITestModule
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.TestMocksModule
+import com.android.systemui.collectLastValue
 import com.android.systemui.common.shared.model.SharedNotificationContainerPosition
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.dagger.SysUISingleton
@@ -39,14 +37,11 @@ import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.res.R
+import com.android.systemui.runCurrent
+import com.android.systemui.runTest
 import com.android.systemui.shade.data.repository.FakeShadeRepository
-import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
-import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
 import com.android.systemui.user.domain.UserDomainLayerModule
-import com.android.systemui.util.mockito.any
-import com.android.systemui.util.mockito.mock
-import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import dagger.BindsInstance
 import dagger.Component
@@ -84,25 +79,13 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
         }
     }
 
-    private val notificationStackSizeCalculator: NotificationStackSizeCalculator = mock()
-    private val notificationStackScrollLayoutController: NotificationStackScrollLayoutController =
-        mock {
-            whenever(view).thenReturn(mock())
-            whenever(shelfHeight).thenReturn(0)
-        }
-
     private val testComponent: TestComponent =
         DaggerSharedNotificationContainerViewModelTest_TestComponent.factory()
             .create(
                 test = this,
                 featureFlags =
                     FakeFeatureFlagsClassicModule { set(Flags.FULL_SCREEN_USER_SWITCHER, true) },
-                mocks =
-                    TestMocksModule(
-                        notificationStackSizeCalculator = notificationStackSizeCalculator,
-                        notificationStackScrollLayoutController =
-                            notificationStackScrollLayoutController,
-                    )
+                mocks = TestMocksModule(),
             )
 
     @Test
@@ -270,8 +253,9 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             // Start on lockscreen
             showLockscreen()
 
-            keyguardInteractor.sharedNotificationContainerPosition.value =
+            keyguardInteractor.setSharedNotificationContainerPosition(
                 SharedNotificationContainerPosition(top = 1f, bottom = 2f)
+            )
 
             assertThat(position)
                 .isEqualTo(SharedNotificationContainerPosition(top = 1f, bottom = 2f))
@@ -290,8 +274,9 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             // Start on lockscreen
             showLockscreen()
 
-            keyguardInteractor.sharedNotificationContainerPosition.value =
+            keyguardInteractor.setSharedNotificationContainerPosition(
                 SharedNotificationContainerPosition(top = 1f, bottom = 2f)
+            )
             runCurrent()
 
             // Top should be overridden to 0f
@@ -336,49 +321,75 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
     @Test
     fun maxNotificationsOnLockscreen() =
         testComponent.runTest {
-            whenever(
-                    notificationStackSizeCalculator.computeMaxKeyguardNotifications(
-                        any(),
-                        any(),
-                        any(),
-                        any()
-                    )
-                )
-                .thenReturn(10)
-
-            val maxNotifications by collectLastValue(underTest.maxNotifications)
+            var notificationCount = 10
+            val maxNotifications by
+                collectLastValue(underTest.getMaxNotifications { notificationCount })
 
             showLockscreen()
 
             overrideResource(R.bool.config_use_split_notification_shade, false)
             configurationRepository.onAnyConfigurationChange()
-            keyguardInteractor.sharedNotificationContainerPosition.value =
+            keyguardInteractor.setSharedNotificationContainerPosition(
                 SharedNotificationContainerPosition(top = 1f, bottom = 2f)
+            )
 
             assertThat(maxNotifications).isEqualTo(10)
+
+            // Also updates when directly requested (as it would from NotificationStackScrollLayout)
+            notificationCount = 25
+            sharedNotificationContainerInteractor.notificationStackChanged()
+            assertThat(maxNotifications).isEqualTo(25)
+        }
+
+    @Test
+    fun maxNotificationsOnLockscreen_DoesNotUpdateWhenUserInteracting() =
+        testComponent.runTest {
+            var notificationCount = 10
+            val maxNotifications by
+                collectLastValue(underTest.getMaxNotifications { notificationCount })
+
+            showLockscreen()
+
+            overrideResource(R.bool.config_use_split_notification_shade, false)
+            configurationRepository.onAnyConfigurationChange()
+            keyguardInteractor.setSharedNotificationContainerPosition(
+                SharedNotificationContainerPosition(top = 1f, bottom = 2f)
+            )
+
+            assertThat(maxNotifications).isEqualTo(10)
+
+            // Shade expanding... still 10
+            shadeRepository.setLockscreenShadeExpansion(0.5f)
+            assertThat(maxNotifications).isEqualTo(10)
+
+            notificationCount = 25
+
+            // When shade is expanding by user interaction
+            shadeRepository.setLegacyLockscreenShadeTracking(true)
+
+            // Should still be 10, since the user is interacting
+            assertThat(maxNotifications).isEqualTo(10)
+
+            shadeRepository.setLegacyLockscreenShadeTracking(false)
+            shadeRepository.setLockscreenShadeExpansion(0f)
+
+            // Stopped tracking, show 25
+            assertThat(maxNotifications).isEqualTo(25)
         }
 
     @Test
     fun maxNotificationsOnShade() =
         testComponent.runTest {
-            whenever(
-                    notificationStackSizeCalculator.computeMaxKeyguardNotifications(
-                        any(),
-                        any(),
-                        any(),
-                        any()
-                    )
-                )
-                .thenReturn(10)
-            val maxNotifications by collectLastValue(underTest.maxNotifications)
+            val maxNotifications by collectLastValue(underTest.getMaxNotifications { 10 })
 
             // Show lockscreen with shade expanded
             showLockscreenWithShadeExpanded()
 
             overrideResource(R.bool.config_use_split_notification_shade, false)
             configurationRepository.onAnyConfigurationChange()
-            keyguardInteractor.sharedNotificationContainerPosition.value =
+            keyguardInteractor.setSharedNotificationContainerPosition(
                 SharedNotificationContainerPosition(top = 1f, bottom = 2f)
+            )
 
             // -1 means No Limit
             assertThat(maxNotifications).isEqualTo(-1)

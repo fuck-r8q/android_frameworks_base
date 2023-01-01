@@ -57,6 +57,7 @@ import static org.mockito.Mockito.withSettings;
 
 import android.app.ActivityManagerInternal;
 import android.app.AppOpsManager;
+import android.app.IActivityManager;
 import android.app.NotificationManager;
 import android.app.SearchManager;
 import android.content.ComponentName;
@@ -98,6 +99,7 @@ import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.server.testutils.OffsettableClock;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.DisplayPolicy;
@@ -126,7 +128,8 @@ class TestPhoneWindowManager {
 
     @Mock private WindowManagerInternal mWindowManagerInternal;
     @Mock private ActivityManagerInternal mActivityManagerInternal;
-    @Mock private ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    @Mock ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    @Mock IActivityManager mActivityManagerService;
     @Mock private InputManagerInternal mInputManagerInternal;
     @Mock private InputManager mInputManager;
     @Mock private SensorPrivacyManager mSensorPrivacyManager;
@@ -160,7 +163,8 @@ class TestPhoneWindowManager {
     @Mock private KeyguardServiceDelegate mKeyguardServiceDelegate;
 
     private StaticMockitoSession mMockitoSession;
-    private TestLooper mTestLooper = new TestLooper();
+    private OffsettableClock mClock = new OffsettableClock();
+    private TestLooper mTestLooper = new TestLooper(() -> mClock.now());
     private HandlerThread mHandlerThread;
     private Handler mHandler;
 
@@ -180,6 +184,10 @@ class TestPhoneWindowManager {
 
         KeyguardServiceDelegate getKeyguardServiceDelegate() {
             return mKeyguardServiceDelegate;
+        }
+
+        IActivityManager getActivityManagerService() {
+            return mActivityManagerService;
         }
     }
 
@@ -329,6 +337,15 @@ class TestPhoneWindowManager {
         mPhoneWindowManager.dispatchUnhandledKey(null /*focusedToken*/, event, FLAG_INTERACTIVE);
     }
 
+    long getCurrentTime() {
+        return mClock.now();
+    }
+
+    void moveTimeForward(long timeMs) {
+        mClock.fastForward(timeMs);
+        mTestLooper.dispatchAll();
+    }
+
     /**
      * Below functions will override the setting or the policy behavior.
      */
@@ -345,6 +362,10 @@ class TestPhoneWindowManager {
 
     void overrideShortPressOnPower(int behavior) {
         mPhoneWindowManager.mShortPressOnPowerBehavior = behavior;
+    }
+
+    void overrideShouldEarlyShortPressOnStemPrimary(boolean shouldEarlyShortPress) {
+        mPhoneWindowManager.mShouldEarlyShortPressOnStemPrimary = shouldEarlyShortPress;
     }
 
      // Override assist perform function.
@@ -666,5 +687,12 @@ class TestPhoneWindowManager {
         verify(() -> FrameworkStatsLog.write(FrameworkStatsLog.KEYBOARD_SYSTEMS_EVENT_REPORTED,
                         vendorId, productId, logEvent.getIntValue(), new int[]{expectedKey},
                         expectedModifierState), description(errorMsg));
+    }
+
+    void assertSwitchToRecent(int persistentId) throws RemoteException {
+        mTestLooper.dispatchAll();
+        verify(mActivityManagerService,
+                timeout(TEST_SINGLE_KEY_DELAY_MILLIS)).startActivityFromRecents(eq(persistentId),
+                isNull());
     }
 }

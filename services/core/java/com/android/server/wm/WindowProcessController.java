@@ -1682,7 +1682,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     private void scheduleClientTransactionItem(@NonNull IApplicationThread thread,
             @NonNull ClientTransactionItem transactionItem) {
         try {
-            mAtm.getLifecycleManager().scheduleTransaction(thread, transactionItem);
+            mAtm.getLifecycleManager().scheduleTransactionItem(thread, transactionItem);
         } catch (Exception e) {
             Slog.e(TAG_CONFIGURATION, "Failed to schedule ClientTransactionItem="
                     + transactionItem + " owner=" + mOwner, e);
@@ -1877,6 +1877,11 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean isHomeProcess() {
         return this == mAtm.mHomeProcess;
+    }
+
+    @HotPath(caller = HotPath.OOM_ADJUSTMENT)
+    public boolean isShowingUiWhileDozing() {
+        return this == mAtm.mVisibleDozeUiProcess;
     }
 
     @HotPath(caller = HotPath.OOM_ADJUSTMENT)

@@ -40,7 +40,7 @@ import kotlinx.coroutines.test.runCurrent
 class FakeKeyguardTransitionRepository @Inject constructor() : KeyguardTransitionRepository {
 
     private val _transitions =
-        MutableSharedFlow<TransitionStep>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        MutableSharedFlow<TransitionStep>(replay = 2, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val transitions: SharedFlow<TransitionStep> = _transitions
 
     init {
@@ -130,7 +130,7 @@ class FakeKeyguardTransitionRepository @Inject constructor() : KeyguardTransitio
      * only a FINISHED step, override [validateStep].
      */
     suspend fun sendTransitionStep(step: TransitionStep, validateStep: Boolean = true) {
-        _transitions.replayCache.getOrNull(0)?.let { lastStep ->
+        _transitions.replayCache.last().let { lastStep ->
             if (
                 validateStep &&
                     step.transitionState == TransitionState.FINISHED &&
@@ -149,6 +149,17 @@ class FakeKeyguardTransitionRepository @Inject constructor() : KeyguardTransitio
         }
 
         _transitions.emit(step)
+    }
+
+    suspend fun sendTransitionSteps(
+        steps: List<TransitionStep>,
+        testScope: TestScope,
+        validateStep: Boolean = true
+    ) {
+        steps.forEach {
+            sendTransitionStep(it, validateStep = validateStep)
+            testScope.testScheduler.runCurrent()
+        }
     }
 
     override fun startTransition(info: TransitionInfo): UUID? {

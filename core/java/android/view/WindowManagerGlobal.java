@@ -61,8 +61,6 @@ import java.util.function.IntConsumer;
 public final class WindowManagerGlobal {
     private static final String TAG = "WindowManager";
 
-    private static boolean sUseBLASTAdapter = false;
-
     /**
      * This is the first time the window is being drawn,
      * so the client must call drawingFinished() when done
@@ -100,7 +98,6 @@ public final class WindowManagerGlobal {
 
     public static final int ADD_FLAG_IN_TOUCH_MODE = 0x1;
     public static final int ADD_FLAG_APP_VISIBLE = 0x2;
-    public static final int ADD_FLAG_USE_BLAST = 0x8;
 
     /**
      * Like {@link #RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS}, but as a "hint" when adding the
@@ -177,7 +174,6 @@ public final class WindowManagerGlobal {
                     if (sWindowManagerService != null) {
                         ValueAnimator.setDurationScale(
                                 sWindowManagerService.getCurrentAnimatorScale());
-                        sUseBLASTAdapter = sWindowManagerService.useBLAST();
                     }
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
@@ -217,13 +213,6 @@ public final class WindowManagerGlobal {
         synchronized (WindowManagerGlobal.class) {
             return sWindowSession;
         }
-    }
-
-    /**
-     * Whether or not to use BLAST for ViewRootImpl
-     */
-    public static boolean useBLAST() {
-        return sUseBLASTAdapter;
     }
 
     @UnsupportedAppUsage

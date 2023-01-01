@@ -30,7 +30,6 @@ import com.android.systemui.keyguard.ui.view.KeyguardRootView
 import com.android.systemui.keyguard.ui.view.layout.items.ClockSection
 import com.android.systemui.keyguard.ui.view.layout.sections.AodBurnInSection
 import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIconsSection
-import com.android.systemui.keyguard.ui.view.layout.sections.DefaultAmbientIndicationAreaSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultDeviceEntryIconSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultIndicationAreaSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultNotificationStackScrollLayoutSection
@@ -41,6 +40,7 @@ import com.android.systemui.keyguard.ui.view.layout.sections.DefaultStatusViewSe
 import com.android.systemui.keyguard.ui.view.layout.sections.SmartspaceSection
 import com.android.systemui.keyguard.ui.view.layout.sections.SplitShadeGuidelines
 import com.android.systemui.util.mockito.whenever
+import java.util.Optional
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,8 +59,7 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
     @Mock private lateinit var defaultIndicationAreaSection: DefaultIndicationAreaSection
     @Mock private lateinit var mDefaultDeviceEntryIconSection: DefaultDeviceEntryIconSection
     @Mock private lateinit var defaultShortcutsSection: DefaultShortcutsSection
-    @Mock
-    private lateinit var defaultAmbientIndicationAreaSection: DefaultAmbientIndicationAreaSection
+    @Mock private lateinit var defaultAmbientIndicationAreaSection: Optional<KeyguardSection>
     @Mock private lateinit var defaultSettingsPopupMenuSection: DefaultSettingsPopupMenuSection
     @Mock private lateinit var defaultStatusViewSection: DefaultStatusViewSection
     @Mock private lateinit var defaultStatusBarViewSection: DefaultStatusBarSection
@@ -98,7 +97,7 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
     fun replaceViews() {
         val constraintLayout = ConstraintLayout(context, null)
         underTest.replaceViews(null, constraintLayout)
-        underTest.sections.forEach { verify(it).addViews(constraintLayout) }
+        underTest.sections.forEach { verify(it)?.addViews(constraintLayout) }
     }
 
     @Test
@@ -110,7 +109,7 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
         val constraintLayout = ConstraintLayout(context, null)
         underTest.replaceViews(prevBlueprint, constraintLayout)
         underTest.sections.minus(mDefaultDeviceEntryIconSection).forEach {
-            verify(it, never()).addViews(constraintLayout)
+            verify(it, never())?.addViews(constraintLayout)
         }
 
         verify(mDefaultDeviceEntryIconSection).addViews(constraintLayout)
@@ -118,9 +117,16 @@ class DefaultKeyguardBlueprintTest : SysuiTestCase() {
     }
 
     @Test
+    fun deviceEntryIconIsOnTop() {
+        val constraintLayout = ConstraintLayout(context, null)
+        underTest.replaceViews(null, constraintLayout)
+        underTest.sections.forEach { verify(it)?.addViews(constraintLayout) }
+    }
+
+    @Test
     fun applyConstraints() {
         val cs = ConstraintSet()
         underTest.applyConstraints(cs)
-        underTest.sections.forEach { verify(it).applyConstraints(cs) }
+        underTest.sections.forEach { verify(it)?.applyConstraints(cs) }
     }
 }

@@ -226,7 +226,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
     private static final int MSG_SHOW_IM_SUBTYPE_PICKER = 1;
 
-    private static final int MSG_HIDE_CURRENT_INPUT_METHOD = 1035;
+    private static final int MSG_HIDE_ALL_INPUT_METHODS = 1035;
     private static final int MSG_REMOVE_IME_SURFACE = 1060;
     private static final int MSG_REMOVE_IME_SURFACE_FROM_WINDOW = 1061;
     private static final int MSG_UPDATE_IME_WINDOW_STATUS = 1070;
@@ -1726,6 +1726,12 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         mHwController = new HandwritingModeController(thread.getLooper(),
                 new InkWindowInitializer());
         registerDeviceListenerAndCheckStylusSupport();
+    }
+
+    @GuardedBy("ImfLock.class")
+    @UserIdInt
+    int getCurrentImeUserIdLocked() {
+        return mSettings.getCurrentUserId();
     }
 
     private final class InkWindowInitializer implements Runnable {
@@ -4829,7 +4835,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
             // ---------------------------------------------------------
 
-            case MSG_HIDE_CURRENT_INPUT_METHOD:
+            case MSG_HIDE_ALL_INPUT_METHODS:
                 synchronized (ImfLock.class) {
                     final @SoftInputShowHideReason int reason = (int) msg.obj;
                     hideCurrentInputLocked(mCurFocusedWindow, null /* statsToken */, 0 /* flags */,
@@ -5585,9 +5591,10 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         }
 
         @Override
-        public void hideCurrentInputMethod(@SoftInputShowHideReason int reason) {
-            mHandler.removeMessages(MSG_HIDE_CURRENT_INPUT_METHOD);
-            mHandler.obtainMessage(MSG_HIDE_CURRENT_INPUT_METHOD, reason).sendToTarget();
+        public void hideAllInputMethods(@SoftInputShowHideReason int reason,
+                int originatingDisplayId) {
+            mHandler.removeMessages(MSG_HIDE_ALL_INPUT_METHODS);
+            mHandler.obtainMessage(MSG_HIDE_ALL_INPUT_METHODS, reason).sendToTarget();
         }
 
         @Override
@@ -5710,8 +5717,9 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
         @Override
         public void onSessionForAccessibilityCreated(int accessibilityConnectionId,
-                IAccessibilityInputMethodSession session) {
+                IAccessibilityInputMethodSession session, @UserIdInt int userId) {
             synchronized (ImfLock.class) {
+                // TODO(b/305829876): Implement user ID verification
                 if (mCurClient != null) {
                     clearClientSessionForAccessibilityLocked(mCurClient, accessibilityConnectionId);
                     mCurClient.mAccessibilitySessions.put(accessibilityConnectionId,
@@ -5738,8 +5746,10 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         }
 
         @Override
-        public void unbindAccessibilityFromCurrentClient(int accessibilityConnectionId) {
+        public void unbindAccessibilityFromCurrentClient(int accessibilityConnectionId,
+                @UserIdInt int userId) {
             synchronized (ImfLock.class) {
+                // TODO(b/305829876): Implement user ID verification
                 if (mCurClient != null) {
                     if (DEBUG) {
                         Slog.v(TAG, "unbindAccessibilityFromCurrentClientLocked: client="

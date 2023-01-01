@@ -24,13 +24,19 @@ import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
+import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardSmartspaceViewModel
 import com.android.systemui.res.R
+import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.shade.NotificationPanelView
+import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
+import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationStackAppearanceViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.SharedNotificationContainerViewModel
 import javax.inject.Inject
 
@@ -39,23 +45,30 @@ class DefaultNotificationStackScrollLayoutSection
 @Inject
 constructor(
     context: Context,
-    featureFlags: FeatureFlags,
+    private val featureFlags: FeatureFlags,
+    sceneContainerFlags: SceneContainerFlags,
     notificationPanelView: NotificationPanelView,
     sharedNotificationContainer: SharedNotificationContainer,
     sharedNotificationContainerViewModel: SharedNotificationContainerViewModel,
+    notificationStackAppearanceViewModel: NotificationStackAppearanceViewModel,
+    ambientState: AmbientState,
     controller: NotificationStackScrollLayoutController,
+    notificationStackSizeCalculator: NotificationStackSizeCalculator,
     private val smartspaceViewModel: KeyguardSmartspaceViewModel,
 ) :
     NotificationStackScrollLayoutSection(
         context,
-        featureFlags,
+        sceneContainerFlags,
         notificationPanelView,
         sharedNotificationContainer,
         sharedNotificationContainerViewModel,
+        notificationStackAppearanceViewModel,
+        ambientState,
         controller,
+        notificationStackSizeCalculator,
     ) {
     override fun applyConstraints(constraintSet: ConstraintSet) {
-        if (!featureFlags.isEnabled(Flags.MIGRATE_NSSL)) {
+        if (!KeyguardShadeMigrationNssl.isEnabled) {
             return
         }
         constraintSet.apply {
@@ -78,7 +91,7 @@ constructor(
             connect(R.id.nssl_placeholder, END, PARENT_ID, END)
 
             val lockId =
-                if (featureFlags.isEnabled(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS)) {
+                if (DeviceEntryUdfpsRefactor.isEnabled) {
                     R.id.device_entry_icon_view
                 } else {
                     R.id.lock_icon_view

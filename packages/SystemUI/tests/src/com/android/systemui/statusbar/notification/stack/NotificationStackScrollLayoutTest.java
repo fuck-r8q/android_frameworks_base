@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.notification.stack;
 import static android.view.View.GONE;
 import static android.view.WindowInsets.Type.ime;
 
+import static com.android.systemui.Flags.FLAG_NEW_AOD_TRANSITION;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.ROWS_ALL;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.ROWS_GENTLE;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.RUBBER_BAND_FACTOR_NORMAL;
@@ -83,6 +84,7 @@ import com.android.systemui.statusbar.notification.collection.render.GroupMember
 import com.android.systemui.statusbar.notification.footer.ui.view.FooterView;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
+import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
@@ -161,7 +163,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         //  in the constructor.
         mFeatureFlags.setDefault(Flags.SENSITIVE_REVEAL_ANIM);
         mFeatureFlags.setDefault(Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
-        mFeatureFlags.setDefault(Flags.NEW_AOD_TRANSITION);
+        mSetFlagsRule.enableFlags(FLAG_NEW_AOD_TRANSITION);
         mFeatureFlags.setDefault(Flags.UNCLEARED_TRANSIENT_HUN_FIX);
 
         // Inject dependencies before initializing the layout
@@ -904,6 +906,20 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
                 .dispatchWindowInsetsAnimationProgress(windowInsets, windowInsetsAnimations);
 
         assertEquals(bottomImeInset, mStackScrollerInternal.mBottomInset);
+    }
+
+    @Test
+    public void testSetMaxDisplayedNotifications_notifiesListeners() {
+        ExpandableView.OnHeightChangedListener listener =
+                mock(ExpandableView.OnHeightChangedListener.class);
+        Runnable runnable = mock(Runnable.class);
+        mStackScroller.setOnHeightChangedListener(listener);
+        mStackScroller.setOnHeightChangedRunnable(runnable);
+
+        mStackScroller.setMaxDisplayedNotifications(50);
+
+        verify(listener).onHeightChanged(mNotificationShelf, false);
+        verify(runnable).run();
     }
 
     private void setBarStateForTest(int state) {

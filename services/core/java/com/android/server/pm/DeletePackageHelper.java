@@ -21,6 +21,7 @@ import static android.Manifest.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS;
 import static android.content.pm.Flags.sdkLibIndependence;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+import static android.content.pm.PackageManager.DELETE_ARCHIVE;
 import static android.content.pm.PackageManager.DELETE_KEEP_DATA;
 import static android.content.pm.PackageManager.DELETE_SUCCEEDED;
 import static android.content.pm.PackageManager.MATCH_KNOWN_PACKAGES;
@@ -590,6 +591,12 @@ final class DeletePackageHelper {
                             ? null
                             : ps.getUserStateOrDefault(nextUserId).getArchiveState();
 
+            // Preserve firstInstallTime in case of DELETE_KEEP_DATA
+            // For full uninstalls, reset firstInstallTime to 0 as if it has never been installed
+            final long firstInstallTime = (flags & DELETE_KEEP_DATA) == 0
+                    ? 0
+                    : ps.getUserStateOrDefault(nextUserId).getFirstInstallTimeMillis();
+
             ps.setUserState(nextUserId,
                     ps.getCeDataInode(nextUserId),
                     ps.getDeDataInode(nextUserId),
@@ -609,9 +616,13 @@ final class DeletePackageHelper {
                     PackageManager.UNINSTALL_REASON_UNKNOWN,
                     null /*harmfulAppWarning*/,
                     null /*splashScreenTheme*/,
-                    0 /*firstInstallTime*/,
+                    firstInstallTime,
                     PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
                     archiveState);
+
+            if ((flags & DELETE_ARCHIVE) != 0) {
+                ps.modifyUserState(nextUserId).setArchiveTimeMillis(System.currentTimeMillis());
+            }
         }
         mPm.mSettings.writeKernelMappingLPr(ps);
     }

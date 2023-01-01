@@ -125,6 +125,7 @@ import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_R
 import static com.android.server.wm.Task.REPARENT_KEEP_ROOT_TASK_AT_FRONT;
 import static com.android.server.wm.WindowManagerService.MY_PID;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
+import static com.android.sdksandbox.flags.Flags.sandboxActivitySdkBasedContext;
 
 import android.Manifest;
 import android.annotation.IntDef;
@@ -167,6 +168,7 @@ import android.app.assist.ActivityId;
 import android.app.assist.AssistContent;
 import android.app.assist.AssistStructure;
 import android.app.compat.CompatChanges;
+import android.app.sdksandbox.sandboxactivity.SdkSandboxActivityAuthority;
 import android.app.usage.UsageStatsManagerInternal;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
@@ -417,6 +419,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     boolean mHasCompanionDeviceSetupFeature;
     /** The process of the top most activity. */
     volatile WindowProcessController mTopApp;
+    /** The process showing UI while the device is dozing. */
+    volatile WindowProcessController mVisibleDozeUiProcess;
     /**
      * This is the process holding the activity the user last visited that is in a different process
      * from the one they are currently in.
@@ -1278,6 +1282,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 true /*validateIncomingUser*/);
     }
 
+    static boolean isSdkSandboxActivity(Context context, Intent intent) {
+        return intent != null
+                && (sandboxActivitySdkBasedContext()
+                        ? SdkSandboxActivityAuthority.isSdkSandboxActivity(context, intent)
+                        : intent.isSandboxActivity(context));
+    }
+
     private int startActivityAsUser(IApplicationThread caller, String callingPackage,
             @Nullable String callingFeatureId, Intent intent, String resolvedType,
             IBinder resultTo, String resultWho, int requestCode, int startFlags,
@@ -1288,7 +1299,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         assertPackageMatchesCallingUid(callingPackage);
         enforceNotIsolatedCaller("startActivityAsUser");
 
-        if (intent != null && intent.isSandboxActivity(mContext)) {
+        if (isSdkSandboxActivity(mContext, intent)) {
             SdkSandboxManagerLocal sdkSandboxManagerLocal = LocalManagerRegistry.getManager(
                     SdkSandboxManagerLocal.class);
             sdkSandboxManagerLocal.enforceAllowedToHostSandboxedActivity(

@@ -278,7 +278,6 @@ import android.app.servertransaction.ActivityConfigurationChangeItem;
 import android.app.servertransaction.ActivityLifecycleItem;
 import android.app.servertransaction.ActivityRelaunchItem;
 import android.app.servertransaction.ActivityResultItem;
-import android.app.servertransaction.ClientTransaction;
 import android.app.servertransaction.ClientTransactionItem;
 import android.app.servertransaction.DestroyActivityItem;
 import android.app.servertransaction.MoveToDisplayItem;
@@ -1466,7 +1465,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     + "display, activityRecord=%s, displayId=%d, config=%s", this, displayId,
                     config);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     MoveToDisplayItem.obtain(token, displayId, config));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1483,7 +1482,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Sending new config to %s, "
                     + "config: %s", this, config);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     ActivityConfigurationChangeItem.obtain(token, config));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1504,7 +1503,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             ProtoLog.v(WM_DEBUG_STATES, "Sending position change to %s, onTop: %b",
                     this, onTop);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     TopResumedActivityChangeItem.obtain(token, onTop));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1573,9 +1572,15 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return false;
         }
 
-        // Transition change for the activity moving into a TaskFragment of different bounds.
-        return newParent.isOrganizedTaskFragment()
-                && !newParent.getBounds().equals(oldParent.getBounds());
+        final boolean isInPip2 = ActivityTaskManagerService.isPip2ExperimentEnabled()
+                && inPinnedWindowingMode();
+        if (!newParent.isOrganizedTaskFragment() && !isInPip2) {
+            // Parent TaskFragment isn't associated with a TF organizer and we are not in PiP2,
+            // so do not allow for initializeChangeTransition() on parent changes
+            return false;
+        }
+        // Transition change for the activity moving into TaskFragment of different bounds.
+        return !newParent.getBounds().equals(oldParent.getBounds());
     }
 
     @Override
@@ -2768,7 +2773,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         try {
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_ATTACH_TO_CLIENT;
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     TransferSplashScreenViewStateItem.obtain(token, parcelable,
                             windowAnimationLeash));
             scheduleTransferSplashScreenTimeout();
@@ -3936,7 +3941,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
             try {
                 if (DEBUG_SWITCH) Slog.i(TAG_SWITCH, "Destroying: " + this);
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                         DestroyActivityItem.obtain(token, finishing, configChangeFlags));
             } catch (Exception e) {
                 // We can just ignore exceptions here...  if the process has crashed, our death
@@ -4852,7 +4857,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             try {
                 final ArrayList<ResultInfo> list = new ArrayList<>();
                 list.add(new ResultInfo(resultWho, requestCode, resultCode, data));
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                         ActivityResultItem.obtain(token, list));
                 return;
             } catch (Exception e) {
@@ -4863,22 +4868,23 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // Schedule sending results now for Media Projection setup.
         if (forceSendForMediaProjection && attachedToProcess() && isState(STARTED, PAUSING, PAUSED,
                 STOPPING, STOPPED)) {
-            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread());
             // Build result to be returned immediately.
-            transaction.addCallback(ActivityResultItem.obtain(
-                    token, List.of(new ResultInfo(resultWho, requestCode, resultCode, data))));
+            final ActivityResultItem activityResultItem = ActivityResultItem.obtain(
+                    token, List.of(new ResultInfo(resultWho, requestCode, resultCode, data)));
             // When the activity result is delivered, the activity will transition to RESUMED.
             // Since the activity is only resumed so the result can be immediately delivered,
             // return it to its original lifecycle state.
-            ActivityLifecycleItem lifecycleItem = getLifecycleItemForCurrentStateForResult();
-            if (lifecycleItem != null) {
-                transaction.setLifecycleStateRequest(lifecycleItem);
-            } else {
-                Slog.w(TAG, "Unable to get the lifecycle item for state " + mState
-                        + " so couldn't immediately send result");
-            }
+            final ActivityLifecycleItem lifecycleItem = getLifecycleItemForCurrentStateForResult();
             try {
-                mAtmService.getLifecycleManager().scheduleTransaction(transaction);
+                if (lifecycleItem != null) {
+                    mAtmService.getLifecycleManager().scheduleTransactionAndLifecycleItems(
+                            app.getThread(), activityResultItem, lifecycleItem);
+                } else {
+                    Slog.w(TAG, "Unable to get the lifecycle item for state " + mState
+                            + " so couldn't immediately send result");
+                    mAtmService.getLifecycleManager().scheduleTransactionItem(
+                            app.getThread(), activityResultItem);
+                }
             } catch (RemoteException e) {
                 Slog.w(TAG, "Exception thrown sending result to " + this, e);
             }
@@ -4958,7 +4964,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // Making sure the client state is RESUMED after transaction completed and doing
                 // so only if activity is currently RESUMED. Otherwise, client may have extra
                 // life-cycle calls to RESUMED (and PAUSED later).
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                         NewIntentItem.obtain(token, ar, mState == RESUMED));
                 unsent = false;
             } catch (RemoteException e) {
@@ -6259,7 +6265,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
                     shortComponentName, "userLeaving=false", "make-active");
             try {
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                         PauseActivityItem.obtain(token, finishing, false /* userLeaving */,
                                 configChangeFlags, false /* dontReport */, mAutoEnteringPip));
             } catch (Exception e) {
@@ -6273,7 +6279,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             setState(STARTED, "makeActiveIfNeeded");
             acquireActivityBoost();
             try {
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+                mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                         StartActivityItem.obtain(token, takeOptions()));
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending start: " + intent.getComponent(), e);
@@ -6581,7 +6587,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
             EventLogTags.writeWmStopActivity(
                     mUserId, System.identityHashCode(this), shortComponentName);
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     StopActivityItem.obtain(token, configChangeFlags));
 
             mAtmService.mH.postDelayed(mStopTimeoutRunnable, STOP_TIMEOUT);
@@ -8362,6 +8368,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      *         aspect ratio.
      */
     boolean shouldCreateCompatDisplayInsets() {
+        if (mLetterboxUiController.shouldApplyUserFullscreenOverride()) {
+            // If the user has forced the applications aspect ratio to be fullscreen, don't use size
+            // compatibility mode in any situation. The user has been warned and therefore accepts
+            // the risk of the application misbehaving.
+            return false;
+        }
         switch (supportsSizeChanges()) {
             case SIZE_CHANGES_SUPPORTED_METADATA:
             case SIZE_CHANGES_SUPPORTED_OVERRIDE:
@@ -10078,10 +10090,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             } else {
                 lifecycleItem = PauseActivityItem.obtain(token);
             }
-            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread());
-            transaction.addCallback(callbackItem);
-            transaction.setLifecycleStateRequest(lifecycleItem);
-            mAtmService.getLifecycleManager().scheduleTransaction(transaction);
+            mAtmService.getLifecycleManager().scheduleTransactionAndLifecycleItems(
+                    app.getThread(), callbackItem, lifecycleItem);
             startRelaunching();
             // Note: don't need to call pauseIfSleepingLocked() here, because the caller will only
             // request resume if this activity is currently resumed, which implies we aren't
@@ -10175,7 +10185,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // The process will be killed until the activity reports stopped with saved state (see
         // {@link ActivityTaskManagerService.activityStopped}).
         try {
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
+            mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
                     StopActivityItem.obtain(token, 0 /* configChanges */));
         } catch (RemoteException e) {
             Slog.w(TAG, "Exception thrown during restart " + this, e);

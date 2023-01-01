@@ -18,7 +18,7 @@ package com.android.systemui.bouncer.ui.viewmodel
 
 import android.annotation.StringRes
 import com.android.systemui.authentication.domain.interactor.AuthenticationResult
-import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +62,13 @@ sealed class AuthMethodBouncerViewModel(
 
     /** Notifies that the UI has been shown to the user. */
     fun onShown() {
+        interactor.resetMessage()
+    }
+
+    /**
+     * Notifies that the UI has been hidden from the user (after any transitions have completed).
+     */
+    fun onHidden() {
         clearInput()
         interactor.resetMessage()
     }
@@ -75,7 +82,7 @@ sealed class AuthMethodBouncerViewModel(
      * Notifies that the input method editor (for example, the software keyboard) has been shown or
      * hidden.
      */
-    fun onImeVisibilityChanged(isVisible: Boolean) {
+    suspend fun onImeVisibilityChanged(isVisible: Boolean) {
         if (isImeVisible && !isVisible) {
             interactor.onImeHidden()
         }
@@ -113,8 +120,6 @@ sealed class AuthMethodBouncerViewModel(
             }
             _animateFailure.value = authenticationResult != AuthenticationResult.SUCCEEDED
 
-            // TODO(b/291528545): On success, this should only be cleared after the view is animated
-            //  away).
             clearInput()
         }
     }

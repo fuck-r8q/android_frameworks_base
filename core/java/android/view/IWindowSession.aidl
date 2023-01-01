@@ -59,8 +59,15 @@ interface IWindowSession {
     int addToDisplayWithoutInputChannel(IWindow window, in WindowManager.LayoutParams attrs,
             in int viewVisibility, in int layerStackId, out InsetsState insetsState,
             out Rect attachedFrame, out float[] sizeCompatScale);
-    @UnsupportedAppUsage
-    void remove(IWindow window);
+
+    /**
+     * Removes a clientToken from WMS, which includes unlinking the input channel.
+     *
+     * @param clientToken The token that should be removed. This will normally be the IWindow token
+     * for a standard window. It can also be the generic clientToken that was used when calling
+     * grantInputChannel
+     */
+    void remove(IBinder clientToken);
 
     /**
      * Change the parameters of a window.  You supply the
@@ -296,9 +303,11 @@ interface IWindowSession {
 
     /**
     * Request the server to call setInputWindowInfo on a given Surface, and return
-    * an input channel where the client can receive input.
+    * an input channel where the client can receive input. For windows, the clientToken should be
+    * the IWindow binder object. For other requests, the token can be any unique IBinder token to
+    * be used as unique identifier.
     */
-    void grantInputChannel(int displayId, in SurfaceControl surface, in IWindow window,
+    void grantInputChannel(int displayId, in SurfaceControl surface, in IBinder clientToken,
             in IBinder hostInputToken, int flags, int privateFlags, int inputFeatures, int type,
             in IBinder windowToken, in IBinder focusGrantToken, String inputHandleName,
             out InputChannel outInputChannel);

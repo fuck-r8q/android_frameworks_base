@@ -15,7 +15,7 @@
  */
 package com.android.systemui.statusbar.phone;
 
-import static com.android.systemui.flags.Flags.NEW_AOD_TRANSITION;
+import static com.android.systemui.Flags.newAodTransition;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -40,7 +40,7 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.demomode.DemoMode;
 import com.android.systemui.demomode.DemoModeController;
 import com.android.systemui.flags.FeatureFlags;
-import com.android.systemui.flags.Flags;
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -106,16 +106,12 @@ public class LegacyNotificationIconAreaControllerImpl implements
     private NotificationIconContainer mAodIcons;
     private final ArrayList<Rect> mTintAreas = new ArrayList<>();
     private final Context mContext;
-
-    private final boolean mNewAodTransition;
-
     private int mAodIconAppearTranslation;
 
     private boolean mAnimationsEnabled;
     private int mAodIconTint;
     private boolean mAodIconsVisible;
     private boolean mShowLowPriority = true;
-    private boolean mIsStatusViewMigrated = false;
 
     @VisibleForTesting
     final NotificationListener.NotificationSettingsListener mSettingsListener =
@@ -146,7 +142,6 @@ public class LegacyNotificationIconAreaControllerImpl implements
         mContrastColorUtil = ContrastColorUtil.getInstance(context);
         mContext = context;
         mStatusBarStateController = statusBarStateController;
-        mNewAodTransition = featureFlags.isEnabled(NEW_AOD_TRANSITION);
         mStatusBarStateController.addCallback(this);
         mMediaManager = notificationMediaManager;
         mDozeParameters = dozeParameters;
@@ -159,7 +154,6 @@ public class LegacyNotificationIconAreaControllerImpl implements
         mStatusBarWindowController = statusBarWindowController;
         mScreenOffAnimationController = screenOffAnimationController;
         notificationListener.addNotificationSettingsListener(mSettingsListener);
-        mIsStatusViewMigrated = featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW);
         initializeNotificationAreaViews(context);
         reloadAodColor();
         darkIconDispatcher.addDarkReceiver(this);
@@ -551,7 +545,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
             return;
         }
         if (mScreenOffAnimationController.shouldAnimateAodIcons()) {
-            if (!mIsStatusViewMigrated) {
+            if (!KeyguardShadeMigrationNssl.isEnabled()) {
                 mAodIcons.setTranslationY(-mAodIconAppearTranslation);
             }
             mAodIcons.setAlpha(0);
@@ -563,14 +557,14 @@ public class LegacyNotificationIconAreaControllerImpl implements
                     .start();
         } else {
             mAodIcons.setAlpha(1.0f);
-            if (!mIsStatusViewMigrated) {
+            if (!KeyguardShadeMigrationNssl.isEnabled()) {
                 mAodIcons.setTranslationY(0);
             }
         }
     }
 
     private void animateInAodIconTranslation() {
-        if (!mIsStatusViewMigrated) {
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
             mAodIcons.animate()
                     .setInterpolator(Interpolators.DECELERATE_QUINT)
                     .translationY(0)
@@ -602,7 +596,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
         boolean animate = true;
         if (!mBypassController.getBypassEnabled()) {
             animate = mDozeParameters.getAlwaysOn() && !mDozeParameters.getDisplayNeedsBlanking();
-            if (!mNewAodTransition) {
+            if (!newAodTransition()) {
                 // We only want the appear animations to happen when the notifications get fully
                 // hidden, since otherwise the unhide animation overlaps
                 animate &= fullyHidden;
@@ -642,7 +636,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
             mAodIconsVisible = visible;
             mAodIcons.animate().cancel();
             if (animate) {
-                if (mNewAodTransition) {
+                if (newAodTransition()) {
                     // Let's make sure the icon are translated to 0, since we cancelled it above
                     animateInAodIconTranslation();
                     if (mAodIconsVisible) {
@@ -673,7 +667,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
                 }
             } else {
                 mAodIcons.setAlpha(1.0f);
-                if (!mIsStatusViewMigrated) {
+                if (!KeyguardShadeMigrationNssl.isEnabled()) {
                     mAodIcons.setTranslationY(0);
                 }
                 mAodIcons.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);

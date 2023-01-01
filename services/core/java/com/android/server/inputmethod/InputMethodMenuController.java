@@ -77,13 +77,15 @@ final class InputMethodMenuController {
     void showInputMethodMenu(boolean showAuxSubtypes, int displayId) {
         if (DEBUG) Slog.v(TAG, "Show switching menu. showAuxSubtypes=" + showAuxSubtypes);
 
-        final boolean isScreenLocked = isScreenLocked();
-
-        final String lastInputMethodId = mSettings.getSelectedInputMethod();
-        int lastInputMethodSubtypeId = mSettings.getSelectedInputMethodSubtypeId(lastInputMethodId);
-        if (DEBUG) Slog.v(TAG, "Current IME: " + lastInputMethodId);
-
         synchronized (ImfLock.class) {
+            final boolean isScreenLocked = mWindowManagerInternal.isKeyguardLocked()
+                    && mWindowManagerInternal.isKeyguardSecure(
+                            mService.getCurrentImeUserIdLocked());
+            final String lastInputMethodId = mSettings.getSelectedInputMethod();
+            int lastInputMethodSubtypeId =
+                    mSettings.getSelectedInputMethodSubtypeId(lastInputMethodId);
+            if (DEBUG) Slog.v(TAG, "Current IME: " + lastInputMethodId);
+
             final List<ImeSubtypeListItem> imList = mSwitchingController
                     .getSortedInputMethodAndSubtypeListForImeMenuLocked(
                             showAuxSubtypes, isScreenLocked);
@@ -200,12 +202,8 @@ final class InputMethodMenuController {
             mService.updateSystemUiLocked();
             mService.sendOnNavButtonFlagsChangedLocked();
             mSwitchingDialog.show();
-        }
-    }
 
-    private boolean isScreenLocked() {
-        return mWindowManagerInternal.isKeyguardLocked()
-                && mWindowManagerInternal.isKeyguardSecure(mSettings.getCurrentUserId());
+        }
     }
 
     void updateKeyboardFromSettingsLocked() {
