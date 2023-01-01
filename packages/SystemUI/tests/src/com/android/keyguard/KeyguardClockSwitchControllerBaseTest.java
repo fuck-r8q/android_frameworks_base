@@ -20,6 +20,7 @@ import static android.view.View.INVISIBLE;
 
 import static com.android.systemui.flags.Flags.FACE_AUTH_REFACTOR;
 import static com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED;
+import static com.android.systemui.flags.Flags.MIGRATE_CLOCKS_TO_BLUEPRINT;
 import static com.android.systemui.flags.Flags.MIGRATE_KEYGUARD_STATUS_VIEW;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -40,7 +41,10 @@ import com.android.systemui.common.ui.ConfigurationState;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory;
+import com.android.systemui.keyguard.ui.view.InWindowLauncherUnlockAnimationManager;
+import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel;
 import com.android.systemui.log.LogBuffer;
 import com.android.systemui.plugins.ClockAnimations;
 import com.android.systemui.plugins.ClockController;
@@ -123,6 +127,9 @@ public class KeyguardClockSwitchControllerBaseTest extends SysuiTestCase {
     @Mock
     protected LogBuffer mLogBuffer;
 
+    @Mock
+    protected KeyguardClockInteractor mKeyguardClockInteractor;
+
     protected final View mFakeDateView = (View) (new ViewGroup(mContext) {
         @Override
         protected void onLayout(boolean changed, int l, int t, int r, int b) {}
@@ -175,6 +182,7 @@ public class KeyguardClockSwitchControllerBaseTest extends SysuiTestCase {
         mFakeFeatureFlags.set(FACE_AUTH_REFACTOR, false);
         mFakeFeatureFlags.set(LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false);
         mFakeFeatureFlags.set(MIGRATE_KEYGUARD_STATUS_VIEW, false);
+        mFakeFeatureFlags.set(MIGRATE_CLOCKS_TO_BLUEPRINT, false);
         mController = new KeyguardClockSwitchController(
                 mView,
                 mStatusBarStateController,
@@ -191,11 +199,14 @@ public class KeyguardClockSwitchControllerBaseTest extends SysuiTestCase {
                 mClockEventController,
                 mLogBuffer,
                 mock(NotificationIconContainerAlwaysOnDisplayViewModel.class),
+                mock(KeyguardRootViewModel.class),
                 mock(ConfigurationState.class),
                 mock(DozeParameters.class),
                 mock(AlwaysOnDisplayNotificationIconViewStore.class),
                 KeyguardInteractorFactory.create(mFakeFeatureFlags).getKeyguardInteractor(),
-                mFakeFeatureFlags
+                mKeyguardClockInteractor,
+                mFakeFeatureFlags,
+                mock(InWindowLauncherUnlockAnimationManager.class)
         );
 
         when(mStatusBarStateController.getState()).thenReturn(StatusBarState.SHADE);

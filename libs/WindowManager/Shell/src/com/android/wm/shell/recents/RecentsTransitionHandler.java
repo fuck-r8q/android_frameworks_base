@@ -59,10 +59,12 @@ import com.android.internal.protolog.common.ProtoLog;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.sysui.ShellInit;
+import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.util.TransitionUtil;
 
 import java.util.ArrayList;
+import java.util.function.Consumer;
 
 /**
  * Handles the Recents (overview) animation. Only one of these can run at a time. A recents
@@ -85,11 +87,15 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
      */
     private final ArrayList<RecentsMixedHandler> mMixers = new ArrayList<>();
 
+    private final HomeTransitionObserver mHomeTransitionObserver;
+
     public RecentsTransitionHandler(ShellInit shellInit, Transitions transitions,
-            @Nullable RecentTasksController recentTasksController) {
+            @Nullable RecentTasksController recentTasksController,
+            HomeTransitionObserver homeTransitionObserver) {
         mTransitions = transitions;
         mExecutor = transitions.getMainExecutor();
         mRecentTasksController = recentTasksController;
+        mHomeTransitionObserver = homeTransitionObserver;
         if (!Transitions.ENABLE_SHELL_TRANSITIONS) return;
         if (recentTasksController == null) return;
         shellInit.addInitCallback(() -> {
@@ -125,21 +131,21 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
         wct.sendPendingIntent(intent, fillIn, options);
         final RecentsController controller = new RecentsController(listener);
         RecentsMixedHandler mixer = null;
-        Transitions.TransitionHandler mixedHandler = null;
+        Consumer<IBinder> setTransitionForMixer = null;
         for (int i = 0; i < mMixers.size(); ++i) {
-            mixedHandler = mMixers.get(i).handleRecentsRequest(wct);
-            if (mixedHandler != null) {
+            setTransitionForMixer = mMixers.get(i).handleRecentsRequest(wct);
+            if (setTransitionForMixer != null) {
                 mixer = mMixers.get(i);
                 break;
             }
         }
         final IBinder transition = mTransitions.startTransition(TRANSIT_TO_FRONT, wct,
-                mixedHandler == null ? this : mixedHandler);
+                mixer == null ? this : mixer);
         for (int i = 0; i < mStateListeners.size(); i++) {
             mStateListeners.get(i).onTransitionStarted(transition);
         }
         if (mixer != null) {
-            mixer.setRecentsTransition(transition);
+            setTransitionForMixer.accept(transition);
         }
         if (transition != null) {
             controller.setTransition(transition);
@@ -584,6 +590,13 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                 cancel("transit_sleep");
                 return;
             }
+            if (mKeyguardLocked) {
+                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
+                        "[%d] RecentsController.merge: keyguard is locked", mInstanceId);
+                // We will not accept new changes if we are swiping over the keyguard.
+                cancel(true /* toHome */, false /* withScreenshots */, "keyguard_locked");
+                return;
+            }
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                     "[%d] RecentsController.merge", mInstanceId);
             // Keep all tasks in one list because order matters.
@@ -911,6 +924,11 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                 Slog.e(TAG, "Duplicate call to finish");
                 return;
             }
+            if (!toHome) {
+                // For some transitions, we may have notified home activity that it became visible.
+                // We need to notify the observer that we are no longer going home.
+                mHomeTransitionObserver.notifyHomeVisibilityChanged(false);
+            }
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                     "[%d] RecentsController.finishInner: toHome=%b userLeave=%b "
                             + "willFinishToHome=%b state=%d",
@@ -1095,22 +1113,17 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
      * An interface for a mixed handler to receive information about recents requests (since these
      * come into this handler directly vs from WMCore request).
      */
-    public interface RecentsMixedHandler {
+    public interface RecentsMixedHandler extends Transitions.TransitionHandler {
         /**
          * Called when a recents request comes in. The handler can add operations to outWCT. If
-         * the handler wants to "accept" the transition, it should return itself; otherwise, it
-         * should return `null`.
+         * the handler wants to "accept" the transition, it should return a Consumer accepting the
+         * IBinder for the transition. If not, it should return `null`.
          *
          * If a mixed-handler accepts this recents, it will be the de-facto handler for this
          * transition and is required to call the associated {@link #startAnimation},
          * {@link #mergeAnimation}, and {@link #onTransitionConsumed} methods.
          */
-        Transitions.TransitionHandler handleRecentsRequest(WindowContainerTransaction outWCT);
-
-        /**
-         * Reports the transition token associated with the accepted recents request. If there was
-         * a problem starting the request, this will be called with `null`.
-         */
-        void setRecentsTransition(@Nullable IBinder transition);
+        @Nullable
+        Consumer<IBinder> handleRecentsRequest(WindowContainerTransaction outWCT);
     }
 }

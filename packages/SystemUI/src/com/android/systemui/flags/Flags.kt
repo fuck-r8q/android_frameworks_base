@@ -68,9 +68,6 @@ object Flags {
             "notification_drag_to_contents"
         )
 
-    // TODO(b/254512538): Tracking Bug
-    val INSTANT_VOICE_REPLY = unreleasedFlag("instant_voice_reply")
-
     /**
      * This flag controls whether we register a listener for StatsD notification memory reports.
      * For statsd to actually call the listener however, a server-side toggle needs to be
@@ -82,10 +79,6 @@ object Flags {
     // TODO(b/260335638): Tracking Bug
     @JvmField
     val NOTIFICATION_INLINE_REPLY_ANIMATION = releasedFlag("notification_inline_reply_animation")
-
-    // TODO(b/277338665): Tracking Bug
-    @JvmField
-    val NOTIFICATION_SHELF_REFACTOR = releasedFlag("notification_shelf_refactor")
 
     // TODO(b/288326013): Tracking Bug
     @JvmField
@@ -251,15 +244,6 @@ object Flags {
 
     /** Keyguard Migration */
 
-    /**
-     * Migrate the bottom area to the new keyguard root view. Because there is no such thing as a
-     * "bottom area" after this, this also breaks it up into many smaller, modular pieces.
-     */
-    // TODO(b/290652751): Tracking bug.
-    @JvmField
-    val MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA =
-        unreleasedFlag("migrate_split_keyguard_bottom_area", teamfood = true)
-
     // TODO(b/297037052): Tracking bug.
     @JvmField
     val REMOVE_NPVC_BOTTOM_AREA_USAGE = unreleasedFlag("remove_npvc_bottom_area_usage")
@@ -270,10 +254,6 @@ object Flags {
 
     // TODO(b/287268101): Tracking bug.
     @JvmField val TRANSIT_CLOCK = releasedFlag("lockscreen_custom_transit_clock")
-
-    /** Migrate the lock icon view to the new keyguard root view. */
-    // TODO(b/286552209): Tracking bug.
-    @JvmField val MIGRATE_LOCK_ICON = unreleasedFlag("migrate_lock_icon", teamfood = true)
 
     // TODO(b/288276738): Tracking bug.
     @JvmField val WIDGET_ON_KEYGUARD = unreleasedFlag("widget_on_keyguard")
@@ -295,11 +275,6 @@ object Flags {
     // TODO(b/301502635): Tracking Bug.
     @JvmField val MIGRATE_CLOCKS_TO_BLUEPRINT =
             unreleasedFlag("migrate_clocks_to_blueprint")
-
-    /** Migrate KeyguardRootView to use composables. */
-    // TODO(b/301969856): Tracking Bug.
-    @JvmField val KEYGUARD_ROOT_VIEW_USE_COMPOSE =
-        unreleasedFlag("keyguard_root_view_use_compose")
 
     /** Enables preview loading animation in the wallpaper picker. */
     // TODO(b/274443705): Tracking Bug
@@ -370,13 +345,6 @@ object Flags {
             "qs_user_detail_shortcut"
         )
 
-    @JvmField
-    val QS_PIPELINE_NEW_HOST = unreleasedFlag("qs_pipeline_new_host", teamfood = true)
-
-    // TODO(b/278068252): Tracking Bug
-    @JvmField
-    val QS_PIPELINE_AUTO_ADD = unreleasedFlag("qs_pipeline_auto_add", teamfood = true)
-
     // TODO(b/296357483): Tracking Bug
     @JvmField
     val QS_PIPELINE_NEW_TILES = unreleasedFlag("qs_pipeline_new_tiles")
@@ -403,14 +371,11 @@ object Flags {
     @JvmField val SIGNAL_CALLBACK_DEPRECATION = releasedFlag("signal_callback_deprecation")
 
     // TODO(b/301610137): Tracking bug
-    @JvmField val NEW_NETWORK_SLICE_UI = unreleasedFlag("new_network_slice_ui", teamfood = true)
+    @JvmField val NEW_NETWORK_SLICE_UI = releasedFlag("new_network_slice_ui")
 
     // TODO(b/308138154): Tracking bug
     val FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS =
         releasedFlag("filter_provisioning_network_subscriptions")
-
-    // TODO(b/265892345): Tracking Bug
-    val PLUG_IN_STATUS_BAR_CHIP = releasedFlag("plug_in_status_bar_chip")
 
     // TODO(b/292533677): Tracking Bug
     val WIFI_TRACKER_LIB_FOR_WIFI_ICON = releasedFlag("wifi_tracker_lib_for_wifi_icon")
@@ -509,12 +474,6 @@ object Flags {
             namespace = DeviceConfig.NAMESPACE_WINDOW_MANAGER,
         )
 
-    // TODO(b/254512674): Tracking Bug
-    @Keep
-    @JvmField
-    val HIDE_NAVBAR_WINDOW =
-        sysPropBooleanFlag("persist.wm.debug.hide_navbar_window", default = false)
-
     @Keep
     @JvmField
     val WM_CAPTION_ON_SHELL =
@@ -535,10 +494,9 @@ object Flags {
     @Keep
     @JvmField
     val WM_ENABLE_PARTIAL_SCREEN_SHARING_ENTERPRISE_POLICIES =
-        unreleasedFlag(
-            name = "screen_record_enterprise_policies",
+        releasedFlag(
+            name = "enable_screen_record_enterprise_policies",
             namespace = DeviceConfig.NAMESPACE_WINDOW_MANAGER,
-            teamfood = false
         )
 
     // TODO(b/293252410) : Tracking Bug
@@ -803,11 +761,7 @@ object Flags {
 
     /** Enable the share wifi button in Quick Settings internet dialog. */
     @JvmField
-    val SHARE_WIFI_QS_BUTTON = unreleasedFlag("share_wifi_qs_button", teamfood = true)
-
-    /** Enable haptic slider component in the brightness slider */
-    @JvmField
-    val HAPTIC_BRIGHTNESS_SLIDER = unreleasedFlag("haptic_brightness_slider", teamfood = true)
+    val SHARE_WIFI_QS_BUTTON = releasedFlag("share_wifi_qs_button")
 
     // TODO(b/287205379): Tracking bug
     @JvmField
@@ -815,7 +769,7 @@ object Flags {
 
     /** Enable showing a dialog when clicking on Quick Settings bluetooth tile. */
     @JvmField
-    val BLUETOOTH_QS_TILE_DIALOG = unreleasedFlag("bluetooth_qs_tile_dialog", teamfood = true)
+    val BLUETOOTH_QS_TILE_DIALOG = unreleasedFlag("bluetooth_qs_tile_dialog")
 
     // TODO(b/300995746): Tracking Bug
     /** A resource flag for whether the communal service is enabled. */

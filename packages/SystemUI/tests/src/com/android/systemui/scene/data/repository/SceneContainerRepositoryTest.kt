@@ -23,12 +23,14 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.sceneKeys
 import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,6 +53,7 @@ class SceneContainerRepositoryTest : SysuiTestCase() {
                     SceneKey.Lockscreen,
                     SceneKey.Bouncer,
                     SceneKey.Gone,
+                    SceneKey.Communal,
                 )
             )
     }
@@ -68,10 +71,8 @@ class SceneContainerRepositoryTest : SysuiTestCase() {
 
     @Test(expected = IllegalStateException::class)
     fun setDesiredScene_noSuchSceneInContainer_throws() {
-        val underTest =
-            utils.fakeSceneContainerRepository(
-                utils.fakeSceneContainerConfig(listOf(SceneKey.QuickSettings, SceneKey.Lockscreen)),
-            )
+        utils.kosmos.sceneKeys = listOf(SceneKey.QuickSettings, SceneKey.Lockscreen)
+        val underTest = utils.fakeSceneContainerRepository(utils.fakeSceneContainerConfig())
         underTest.setDesiredScene(SceneModel(SceneKey.Shade))
     }
 
@@ -119,7 +120,8 @@ class SceneContainerRepositoryTest : SysuiTestCase() {
                     fromScene = SceneKey.Lockscreen,
                     toScene = SceneKey.Shade,
                     progress = progress,
-                    isUserInputDriven = false,
+                    isInitiatedByUserInput = false,
+                    isUserInputOngoing = flowOf(false),
                 )
             assertThat(reflectedTransitionState).isEqualTo(transitionState.value)
 

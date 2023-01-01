@@ -1115,6 +1115,12 @@ public class TransitionTests extends WindowTestsBase {
         assertFalse(asyncRotationController.handleFinishDrawing(statusBar, mMockT));
         assertTrue(asyncRotationController.isTargetToken(statusBar.mToken));
 
+        // Window surface position is frozen while seamless rotation state is active.
+        final Point prevPos = new Point(screenDecor.mLastSurfacePosition);
+        screenDecor.getFrame().left += 1;
+        screenDecor.updateSurfacePosition(mMockT);
+        assertEquals(prevPos, screenDecor.mLastSurfacePosition);
+
         final SurfaceControl.Transaction startTransaction = mock(SurfaceControl.Transaction.class);
         final SurfaceControl.TransactionCommittedListener transactionCommittedListener =
                 onRotationTransactionReady(player, startTransaction);
@@ -2448,6 +2454,7 @@ public class TransitionTests extends WindowTestsBase {
             spyOn(perfHinter);
             doAnswer(invocation -> {
                 session[0] = (SystemPerformanceHinter.HighPerfSession) invocation.callRealMethod();
+                spyOn(session[0]);
                 return session[0];
             }).when(perfHinter).createSession(anyInt(), anyInt(), anyString());
         }

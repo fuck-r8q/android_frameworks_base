@@ -19,12 +19,15 @@ package com.android.systemui.bouncer.ui.composable
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.DialogInterface
+import android.content.res.Configuration
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +39,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +54,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.WindowHeightSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -63,9 +68,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -74,7 +79,9 @@ import androidx.compose.ui.unit.times
 import com.android.compose.PlatformButton
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.SceneScope
+import com.android.compose.modifiers.thenIf
 import com.android.compose.windowsizeclass.LocalWindowSizeClass
+import com.android.systemui.bouncer.shared.model.BouncerActionButtonModel
 import com.android.systemui.bouncer.ui.viewmodel.AuthMethodBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PasswordBouncerViewModel
@@ -136,7 +143,11 @@ private fun SceneScope.BouncerScene(
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor = MaterialTheme.colorScheme.surface
-    val windowSizeClass = LocalWindowSizeClass.current
+    val isSideBySideSupported by viewModel.isSideBySideSupported.collectAsState()
+    val layout =
+        calculateLayout(
+            isSideBySideSupported = isSideBySideSupported,
+        )
 
     Box(modifier) {
         Canvas(Modifier.element(Bouncer.Elements.Background).fillMaxSize()) {
@@ -146,22 +157,30 @@ private fun SceneScope.BouncerScene(
         val childModifier = Modifier.element(Bouncer.Elements.Content).fillMaxSize()
         val isFullScreenUserSwitcherEnabled = viewModel.isUserSwitcherVisible
 
-        when {
-            windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded ->
+        when (layout) {
+            Layout.STANDARD ->
+                Bouncer(
+                    viewModel = viewModel,
+                    dialogFactory = dialogFactory,
+                    userInputAreaVisibility = UserInputAreaVisibility.FULL,
+                    modifier = childModifier,
+                )
+            Layout.SIDE_BY_SIDE ->
                 SideBySide(
                     viewModel = viewModel,
                     dialogFactory = dialogFactory,
+                    isUserSwitcherVisible = isFullScreenUserSwitcherEnabled,
                     modifier = childModifier,
                 )
-            isFullScreenUserSwitcherEnabled &&
-                windowSizeClass.widthSizeClass == WindowWidthSizeClass.Medium ->
+            Layout.STACKED ->
                 Stacked(
                     viewModel = viewModel,
                     dialogFactory = dialogFactory,
+                    isUserSwitcherVisible = isFullScreenUserSwitcherEnabled,
                     modifier = childModifier,
                 )
-            else ->
-                Bouncer(
+            Layout.SPLIT ->
+                Split(
                     viewModel = viewModel,
                     dialogFactory = dialogFactory,
                     modifier = childModifier,
@@ -178,18 +197,17 @@ private fun SceneScope.BouncerScene(
 private fun Bouncer(
     viewModel: BouncerViewModel,
     dialogFactory: BouncerSceneDialogFactory,
+    userInputAreaVisibility: UserInputAreaVisibility,
     modifier: Modifier = Modifier,
 ) {
     val message: BouncerViewModel.MessageViewModel by viewModel.message.collectAsState()
-    val authMethodViewModel: AuthMethodBouncerViewModel? by
-        viewModel.authMethodViewModel.collectAsState()
     val dialogMessage: String? by viewModel.throttlingDialogMessage.collectAsState()
     var dialog: Dialog? by remember { mutableStateOf(null) }
+    val actionButton: BouncerActionButtonModel? by viewModel.actionButton.collectAsState()
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(60.dp),
-        modifier = modifier.padding(start = 32.dp, top = 92.dp, end = 32.dp, bottom = 92.dp)
+        modifier = modifier.padding(start = 32.dp, top = 92.dp, end = 32.dp, bottom = 0.dp)
     ) {
         Crossfade(
             targetState = message,
@@ -203,44 +221,32 @@ private fun Bouncer(
             )
         }
 
+        Spacer(Modifier.heightIn(min = 21.dp, max = 48.dp))
+
         Box(Modifier.weight(1f)) {
-            when (val nonNullViewModel = authMethodViewModel) {
-                is PinBouncerViewModel ->
-                    PinBouncer(
-                        viewModel = nonNullViewModel,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                is PasswordBouncerViewModel ->
-                    PasswordBouncer(
-                        viewModel = nonNullViewModel,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                is PatternBouncerViewModel ->
-                    PatternBouncer(
-                        viewModel = nonNullViewModel,
-                        modifier =
-                            Modifier.aspectRatio(1f, matchHeightConstraintsFirst = false)
-                                .align(Alignment.BottomCenter),
-                    )
-                else -> Unit
+            UserInputArea(
+                viewModel = viewModel,
+                visibility = userInputAreaVisibility,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        Spacer(Modifier.heightIn(min = 21.dp, max = 48.dp))
+
+        val actionButtonModifier = Modifier.height(56.dp)
+
+        actionButton.let { actionButtonViewModel ->
+            if (actionButtonViewModel != null) {
+                BouncerActionButton(
+                    viewModel = actionButtonViewModel,
+                    modifier = actionButtonModifier,
+                )
+            } else {
+                Spacer(modifier = actionButtonModifier)
             }
         }
 
-        if (viewModel.isEmergencyButtonVisible) {
-            Button(
-                onClick = viewModel::onEmergencyServicesButtonClicked,
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    ),
-            ) {
-                Text(
-                    text = stringResource(com.android.internal.R.string.lockscreen_emergency_call),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
+        Spacer(Modifier.height(48.dp))
 
         if (dialogMessage != null) {
             if (dialog == null) {
@@ -262,6 +268,97 @@ private fun Bouncer(
             dialog?.dismiss()
             dialog = null
         }
+    }
+}
+
+/**
+ * Renders the user input area, where the user interacts with the UI to enter their credentials.
+ *
+ * For example, this can be the pattern input area, the password text box, or pin pad.
+ */
+@Composable
+private fun UserInputArea(
+    viewModel: BouncerViewModel,
+    visibility: UserInputAreaVisibility,
+    modifier: Modifier = Modifier,
+) {
+    val authMethodViewModel: AuthMethodBouncerViewModel? by
+        viewModel.authMethodViewModel.collectAsState()
+
+    when (val nonNullViewModel = authMethodViewModel) {
+        is PinBouncerViewModel ->
+            when (visibility) {
+                UserInputAreaVisibility.FULL ->
+                    PinBouncer(
+                        viewModel = nonNullViewModel,
+                        modifier = modifier,
+                    )
+                UserInputAreaVisibility.INPUT_ONLY ->
+                    PinPad(
+                        viewModel = nonNullViewModel,
+                        modifier = modifier,
+                    )
+                UserInputAreaVisibility.OUTPUT_ONLY ->
+                    PinInputDisplay(
+                        viewModel = nonNullViewModel,
+                        modifier = modifier,
+                    )
+                UserInputAreaVisibility.NONE -> {}
+            }
+        is PasswordBouncerViewModel ->
+            when (visibility) {
+                UserInputAreaVisibility.FULL,
+                UserInputAreaVisibility.INPUT_ONLY ->
+                    PasswordBouncer(
+                        viewModel = nonNullViewModel,
+                        modifier = modifier,
+                    )
+                else -> {}
+            }
+        is PatternBouncerViewModel ->
+            when (visibility) {
+                UserInputAreaVisibility.FULL,
+                UserInputAreaVisibility.INPUT_ONLY ->
+                    PatternBouncer(
+                        viewModel = nonNullViewModel,
+                        modifier =
+                            Modifier.aspectRatio(1f, matchHeightConstraintsFirst = false)
+                                .then(modifier)
+                    )
+                else -> {}
+            }
+        else -> Unit
+    }
+}
+
+/**
+ * Renders the action button on the bouncer, which triggers either Return to Call or Emergency Call.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BouncerActionButton(
+    viewModel: BouncerActionButtonModel,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = viewModel.onClick,
+        modifier =
+            modifier.thenIf(viewModel.onLongClick != null) {
+                Modifier.combinedClickable(
+                    onClick = viewModel.onClick,
+                    onLongClick = viewModel.onLongClick,
+                )
+            },
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            ),
+    ) {
+        Text(
+            text = viewModel.label,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -287,62 +384,57 @@ private fun UserSwitcher(
             )
         }
 
-        UserSwitcherDropdown(
-            items = dropdownItems,
-        )
-    }
-}
+        val (isDropdownExpanded, setDropdownExpanded) = remember { mutableStateOf(false) }
 
-@Composable
-private fun UserSwitcherDropdown(
-    items: List<BouncerViewModel.UserSwitcherDropdownItemViewModel>,
-) {
-    val (isDropdownExpanded, setDropdownExpanded) = remember { mutableStateOf(false) }
+        dropdownItems.firstOrNull()?.let { firstDropdownItem ->
+            Spacer(modifier = Modifier.height(40.dp))
 
-    items.firstOrNull()?.let { firstDropdownItem ->
-        Spacer(modifier = Modifier.height(40.dp))
+            Box {
+                PlatformButton(
+                    modifier =
+                        Modifier
+                            // Remove the built-in padding applied inside PlatformButton:
+                            .padding(vertical = 0.dp)
+                            .width(UserSwitcherDropdownWidth)
+                            .height(UserSwitcherDropdownHeight),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    onClick = { setDropdownExpanded(!isDropdownExpanded) },
+                ) {
+                    val context = LocalContext.current
+                    Text(
+                        text = checkNotNull(firstDropdownItem.text.loadText(context)),
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
 
-        Box {
-            PlatformButton(
-                modifier =
-                    Modifier
-                        // Remove the built-in padding applied inside PlatformButton:
-                        .padding(vertical = 0.dp)
-                        .width(UserSwitcherDropdownWidth)
-                        .height(UserSwitcherDropdownHeight),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                onClick = { setDropdownExpanded(!isDropdownExpanded) },
-            ) {
-                val context = LocalContext.current
-                Text(
-                    text = checkNotNull(firstDropdownItem.text.loadText(context)),
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                    Spacer(modifier = Modifier.weight(1f))
 
-                Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                    )
+                }
 
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
+                UserSwitcherDropdownMenu(
+                    isExpanded = isDropdownExpanded,
+                    items = dropdownItems,
+                    onDismissed = { setDropdownExpanded(false) },
                 )
             }
-
-            UserSwitcherDropdownMenu(
-                isExpanded = isDropdownExpanded,
-                items = items,
-                onDismissed = { setDropdownExpanded(false) },
-            )
         }
     }
 }
 
+/**
+ * Renders the dropdowm menu that displays the actual users and/or user actions that can be
+ * selected.
+ */
 @Composable
 private fun UserSwitcherDropdownMenu(
     isExpanded: Boolean,
@@ -396,19 +488,48 @@ private fun UserSwitcherDropdownMenu(
 }
 
 /**
- * Arranges the bouncer contents and user switcher contents side-by-side, supporting a double tap
- * anywhere on the background to flip their positions.
+ * Renders the bouncer UI in split mode, with half on one side and half on the other side, swappable
+ * by double-tapping on the side.
  */
 @Composable
-private fun SideBySide(
+private fun Split(
     viewModel: BouncerViewModel,
     dialogFactory: BouncerSceneDialogFactory,
     modifier: Modifier = Modifier,
 ) {
+    SwappableLayout(
+        startContent = { startContentModifier ->
+            Bouncer(
+                viewModel = viewModel,
+                dialogFactory = dialogFactory,
+                userInputAreaVisibility = UserInputAreaVisibility.OUTPUT_ONLY,
+                modifier = startContentModifier,
+            )
+        },
+        endContent = { endContentModifier ->
+            UserInputArea(
+                viewModel = viewModel,
+                visibility = UserInputAreaVisibility.INPUT_ONLY,
+                modifier = endContentModifier,
+            )
+        },
+        modifier = modifier
+    )
+}
+
+/**
+ * Arranges the given two contents side-by-side, supporting a double tap anywhere on the background
+ * to flip their positions.
+ */
+@Composable
+private fun SwappableLayout(
+    startContent: @Composable (Modifier) -> Unit,
+    endContent: @Composable (Modifier) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val layoutDirection = LocalLayoutDirection.current
     val isLeftToRight = layoutDirection == LayoutDirection.Ltr
-    val (isUserSwitcherFirst, setUserSwitcherFirst) =
-        rememberSaveable(isLeftToRight) { mutableStateOf(isLeftToRight) }
+    val (isSwapped, setSwapped) = rememberSaveable(isLeftToRight) { mutableStateOf(!isLeftToRight) }
 
     Row(
         modifier =
@@ -416,9 +537,8 @@ private fun SideBySide(
                 detectTapGestures(
                     onDoubleTap = { offset ->
                         // Depending on where the user double tapped, switch the elements such that
-                        // the bouncer contents element is closer to the side that was double
-                        // tapped.
-                        setUserSwitcherFirst(offset.x > size.width / 2)
+                        // the endContent is closer to the side that was double tapped.
+                        setSwapped(offset.x < size.width / 2)
                     }
                 )
             },
@@ -426,39 +546,30 @@ private fun SideBySide(
         val animatedOffset by
             animateFloatAsState(
                 targetValue =
-                    if (isUserSwitcherFirst) {
-                        // When the user switcher is first, both elements have their natural
-                        // placement so they are not offset in any way.
+                    if (!isSwapped) {
+                        // When startContent is first, both elements have their natural placement so
+                        // they are not offset in any way.
                         0f
                     } else if (isLeftToRight) {
-                        // Since the user switcher is not first, the elements have to be swapped
-                        // horizontally. In the case of LTR locales, this means pushing the user
-                        // switcher to the right, hence the positive number.
+                        // Since startContent is not first, the elements have to be swapped
+                        // horizontally. In the case of LTR locales, this means pushing startContent
+                        // to the right, hence the positive number.
                         1f
                     } else {
-                        // Since the user switcher is not first, the elements have to be swapped
-                        // horizontally. In the case of RTL locale, this means pushing the user
-                        // switcher to the left, hence the negative number.
+                        // Since startContent is not first, the elements have to be swapped
+                        // horizontally. In the case of RTL locales, this means pushing startContent
+                        // to the left, hence the negative number.
                         -1f
                     },
                 label = "offset",
             )
 
-        val userSwitcherModifier =
+        startContent(
             Modifier.fillMaxHeight().weight(1f).graphicsLayer {
                 translationX = size.width * animatedOffset
                 alpha = animatedAlpha(animatedOffset)
             }
-        if (viewModel.isUserSwitcherVisible) {
-            UserSwitcher(
-                viewModel = viewModel,
-                modifier = userSwitcherModifier,
-            )
-        } else {
-            Box(
-                modifier = userSwitcherModifier,
-            )
-        }
+        )
 
         Box(
             modifier =
@@ -469,39 +580,150 @@ private fun SideBySide(
                     alpha = animatedAlpha(animatedOffset)
                 }
         ) {
-            Bouncer(
-                viewModel = viewModel,
-                dialogFactory = dialogFactory,
-                modifier = Modifier.widthIn(max = 400.dp).align(Alignment.BottomCenter),
-            )
+            endContent(Modifier.widthIn(max = 400.dp).align(Alignment.BottomCenter))
         }
     }
 }
 
-/** Arranges the bouncer contents and user switcher contents one on top of the other. */
+/**
+ * Arranges the bouncer contents and user switcher contents side-by-side, supporting a double tap
+ * anywhere on the background to flip their positions.
+ *
+ * In situations when [isUserSwitcherVisible] is `false`, one of two things may happen: either the
+ * UI for the bouncer will be shown on its own, taking up one side, with the other side just being
+ * empty space or, if that kind of "stand-alone side-by-side" isn't supported, the standard
+ * rendering of the bouncer will be used instead of the side-by-side layout.
+ */
+@Composable
+private fun SideBySide(
+    viewModel: BouncerViewModel,
+    dialogFactory: BouncerSceneDialogFactory,
+    isUserSwitcherVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    SwappableLayout(
+        startContent = { startContentModifier ->
+            if (isUserSwitcherVisible) {
+                UserSwitcher(
+                    viewModel = viewModel,
+                    modifier = startContentModifier,
+                )
+            } else {
+                Box(
+                    modifier = startContentModifier,
+                )
+            }
+        },
+        endContent = { endContentModifier ->
+            Bouncer(
+                viewModel = viewModel,
+                dialogFactory = dialogFactory,
+                userInputAreaVisibility = UserInputAreaVisibility.FULL,
+                modifier = endContentModifier,
+            )
+        },
+        modifier = modifier,
+    )
+}
+
+/** Arranges the bouncer contents and user switcher contents one on top of the other, vertically. */
 @Composable
 private fun Stacked(
     viewModel: BouncerViewModel,
     dialogFactory: BouncerSceneDialogFactory,
+    isUserSwitcherVisible: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
     ) {
-        UserSwitcher(
-            viewModel = viewModel,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
+        if (isUserSwitcherVisible) {
+            UserSwitcher(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
+        }
+
         Bouncer(
             viewModel = viewModel,
             dialogFactory = dialogFactory,
+            userInputAreaVisibility = UserInputAreaVisibility.FULL,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
     }
 }
 
+@Composable
+private fun calculateLayout(
+    isSideBySideSupported: Boolean,
+): Layout {
+    val windowSizeClass = LocalWindowSizeClass.current
+    val width = windowSizeClass.widthSizeClass
+    val height = windowSizeClass.heightSizeClass
+    val isLarge = width > WindowWidthSizeClass.Compact && height > WindowHeightSizeClass.Compact
+    val isTall =
+        when (height) {
+            WindowHeightSizeClass.Expanded -> width < WindowWidthSizeClass.Expanded
+            WindowHeightSizeClass.Medium -> width < WindowWidthSizeClass.Medium
+            else -> false
+        }
+    val isSquare =
+        when (width) {
+            WindowWidthSizeClass.Compact -> height == WindowHeightSizeClass.Compact
+            WindowWidthSizeClass.Medium -> height == WindowHeightSizeClass.Medium
+            WindowWidthSizeClass.Expanded -> height == WindowHeightSizeClass.Expanded
+            else -> false
+        }
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    return when {
+        // Small and tall devices (i.e. phone/folded in portrait) or square device not in landscape
+        // mode (unfolded with hinge along horizontal plane).
+        (!isLarge && isTall) || (isSquare && !isLandscape) -> Layout.STANDARD
+        // Small and wide devices (i.e. phone/folded in landscape).
+        !isLarge -> Layout.SPLIT
+        // Large and tall devices (i.e. tablet in portrait).
+        isTall -> Layout.STACKED
+        // Large and wide/square devices (i.e. tablet in landscape, unfolded).
+        else -> if (isSideBySideSupported) Layout.SIDE_BY_SIDE else Layout.STANDARD
+    }
+}
+
 interface BouncerSceneDialogFactory {
     operator fun invoke(): AlertDialog
+}
+
+/** Enumerates all known adaptive layout configurations. */
+private enum class Layout {
+    /** The default UI with the bouncer laid out normally. */
+    STANDARD,
+    /** The bouncer is displayed vertically stacked with the user switcher. */
+    STACKED,
+    /** The bouncer is displayed side-by-side with the user switcher or an empty space. */
+    SIDE_BY_SIDE,
+    /** The bouncer is split in two with both sides shown side-by-side. */
+    SPLIT,
+}
+
+/** Enumerates all supported user-input area visibilities. */
+private enum class UserInputAreaVisibility {
+    /**
+     * The entire user input area is shown, including where the user enters input and where it's
+     * reflected to the user.
+     */
+    FULL,
+    /**
+     * Only the area where the user enters the input is shown; the area where the input is reflected
+     * back to the user is not shown.
+     */
+    INPUT_ONLY,
+    /**
+     * Only the area where the input is reflected back to the user is shown; the area where the
+     * input is entered by the user is not shown.
+     */
+    OUTPUT_ONLY,
+    /** The entire user input area is hidden. */
+    NONE,
 }
 
 /**

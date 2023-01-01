@@ -29,7 +29,6 @@ import com.android.systemui.BootCompleteCache;
 import com.android.systemui.BootCompleteCacheImpl;
 import com.android.systemui.accessibility.AccessibilityModule;
 import com.android.systemui.accessibility.data.repository.AccessibilityRepositoryModule;
-import com.android.systemui.aconfig.AConfigModule;
 import com.android.systemui.appops.dagger.AppOpsModule;
 import com.android.systemui.assist.AssistModule;
 import com.android.systemui.authentication.AuthenticationModule;
@@ -38,12 +37,13 @@ import com.android.systemui.biometrics.FingerprintReEnrollNotification;
 import com.android.systemui.biometrics.UdfpsDisplayModeProvider;
 import com.android.systemui.biometrics.dagger.BiometricsModule;
 import com.android.systemui.biometrics.domain.BiometricsDomainLayerModule;
+import com.android.systemui.bouncer.domain.interactor.BouncerInteractorModule;
 import com.android.systemui.bouncer.ui.BouncerViewModule;
 import com.android.systemui.classifier.FalsingModule;
 import com.android.systemui.clipboardoverlay.dagger.ClipboardOverlayModule;
-import com.android.systemui.common.ui.data.CommonUiDataLayerModule;
 import com.android.systemui.communal.dagger.CommunalModule;
 import com.android.systemui.complication.dagger.ComplicationComponent;
+import com.android.systemui.common.CommonModule;
 import com.android.systemui.controls.dagger.ControlsModule;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.SystemUser;
@@ -96,6 +96,7 @@ import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.connectivity.ConnectivityModule;
 import com.android.systemui.statusbar.dagger.StatusBarModule;
 import com.android.systemui.statusbar.disableflags.dagger.DisableFlagsModule;
+import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
@@ -109,7 +110,6 @@ import com.android.systemui.statusbar.notification.interruption.VisualInterrupti
 import com.android.systemui.statusbar.notification.people.PeopleHubModule;
 import com.android.systemui.statusbar.notification.row.dagger.ExpandableNotificationRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.NotificationRowComponent;
-import com.android.systemui.statusbar.notification.row.dagger.NotificationShelfComponent;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.LetterboxModule;
 import com.android.systemui.statusbar.phone.NotificationIconAreaControllerModule;
@@ -130,6 +130,7 @@ import com.android.systemui.user.domain.UserDomainLayerModule;
 import com.android.systemui.util.concurrency.SysUIConcurrencyModule;
 import com.android.systemui.util.dagger.UtilModule;
 import com.android.systemui.util.kotlin.CoroutinesModule;
+import com.android.systemui.util.reference.ReferenceModule;
 import com.android.systemui.util.sensors.SensorModule;
 import com.android.systemui.util.settings.SettingsUtilModule;
 import com.android.systemui.util.time.SystemClock;
@@ -162,17 +163,17 @@ import javax.inject.Named;
 @Module(includes = {
         AccessibilityModule.class,
         AccessibilityRepositoryModule.class,
-        AConfigModule.class,
         AppOpsModule.class,
         AssistModule.class,
         AuthenticationModule.class,
         BiometricsModule.class,
         BiometricsDomainLayerModule.class,
+        BouncerInteractorModule.class,
         BouncerViewModule.class,
         ClipboardOverlayModule.class,
         ClockRegistryModule.class,
-        CommonUiDataLayerModule.class,
         CommunalModule.class,
+        CommonModule.class,
         ConnectivityModule.class,
         ControlsModule.class,
         CoroutinesModule.class,
@@ -201,6 +202,7 @@ import javax.inject.Named;
         PrivacyModule.class,
         QRCodeScannerModule.class,
         QSFragmentStartableModule.class,
+        ReferenceModule.class,
         RetailModeModule.class,
         ScreenshotModule.class,
         SensorModule.class,
@@ -209,6 +211,7 @@ import javax.inject.Named;
         SettingsUtilModule.class,
         SmartRepliesInflationModule.class,
         SmartspaceModule.class,
+        StatusBarEventsModule.class,
         StatusBarModule.class,
         StatusBarPipelineModule.class,
         StatusBarPolicyModule.class,
@@ -232,7 +235,6 @@ import javax.inject.Named;
             KeyguardBouncerComponent.class,
             NavigationBarComponent.class,
             NotificationRowComponent.class,
-            NotificationShelfComponent.class,
             WindowRootViewComponent.class,
         })
 public abstract class SystemUIModule {

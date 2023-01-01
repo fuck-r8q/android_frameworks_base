@@ -167,7 +167,6 @@ import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.Overridable;
-import android.content.AttributionSource;
 import android.content.ComponentName;
 import android.content.ComponentName.WithComponentName;
 import android.content.Context;
@@ -1177,12 +1176,8 @@ public final class ActiveServices {
                             SystemClock.uptimeMillis()); // Use current time, not lastActivity.
                 }
             }
-            final AttributionSource attributionSource = new AttributionSource.Builder(r.appInfo.uid)
-                    .setPackageName(r.packageName)
-                    .build();
-            mAm.mAppOpsService.startOperationWithState(AppOpsManager.getToken(mAm.mAppOpsService),
-                    AppOpsManager.OP_START_FOREGROUND,
-                    attributionSource.asState(),
+            mAm.mAppOpsService.startOperation(AppOpsManager.getToken(mAm.mAppOpsService),
+                    AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null,
                     true, false, null, false, AppOpsManager.ATTRIBUTION_FLAGS_NONE,
                     AppOpsManager.ATTRIBUTION_CHAIN_ID_NONE);
         }
@@ -2532,15 +2527,10 @@ public final class ActiveServices {
                             stopProcStatsOp = false;
                         }
 
-                        final AttributionSource attributionSource = new AttributionSource
-                                .Builder(r.appInfo.uid)
-                                .setPackageName(r.packageName)
-                                .build();
-                        mAm.mAppOpsService.startOperationWithState(
+                        mAm.mAppOpsService.startOperation(
                                 AppOpsManager.getToken(mAm.mAppOpsService),
-                                AppOpsManager.OP_START_FOREGROUND, attributionSource.asState(),
-                                true, false, "", false,
-                                AppOpsManager.ATTRIBUTION_FLAGS_NONE,
+                                AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName,
+                                null, true, false, "", false, AppOpsManager.ATTRIBUTION_FLAGS_NONE,
                                 AppOpsManager.ATTRIBUTION_CHAIN_ID_NONE);
                         registerAppOpCallbackLocked(r);
                         mAm.updateForegroundServiceUsageStats(r.name, r.userId, true);
@@ -2600,13 +2590,10 @@ public final class ActiveServices {
                 if (alreadyStartedOp) {
                     // If we had previously done a start op for direct foreground start,
                     // we have cleared the flag so can now drop it.
-                    final AttributionSource attributionSource = new AttributionSource
-                            .Builder(r.appInfo.uid)
-                            .setPackageName(r.packageName)
-                            .build();
-                    mAm.mAppOpsService.finishOperationWithState(
+                    mAm.mAppOpsService.finishOperation(
                             AppOpsManager.getToken(mAm.mAppOpsService),
-                            AppOpsManager.OP_START_FOREGROUND, attributionSource.asState());
+                            AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName,
+                            null);
                 }
             }
         } else {
@@ -2649,13 +2636,9 @@ public final class ActiveServices {
                                 SystemClock.uptimeMillis());
                     }
                 }
-                final AttributionSource attributionSource =
-                        new AttributionSource.Builder(r.appInfo.uid)
-                                .setPackageName(r.packageName)
-                                .build();
-                mAm.mAppOpsService.finishOperationWithState(
+                mAm.mAppOpsService.finishOperation(
                         AppOpsManager.getToken(mAm.mAppOpsService),
-                        AppOpsManager.OP_START_FOREGROUND, attributionSource.asState());
+                        AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
                 unregisterAppOpCallbackLocked(r);
                 logFGSStateChangeLocked(r,
                         FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT,
@@ -6020,12 +6003,8 @@ public final class ActiveServices {
                             SystemClock.uptimeMillis());
                 }
             }
-            final AttributionSource attributionSource = new AttributionSource
-                    .Builder(r.appInfo.uid)
-                    .setPackageName(r.packageName)
-                    .build();
-            mAm.mAppOpsService.finishOperationWithState(AppOpsManager.getToken(mAm.mAppOpsService),
-                    AppOpsManager.OP_START_FOREGROUND, attributionSource.asState());
+            mAm.mAppOpsService.finishOperation(AppOpsManager.getToken(mAm.mAppOpsService),
+                    AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
             mServiceFGAnrTimer.cancel(r);
             if (r.app != null) {
                 Message msg = mAm.mHandler.obtainMessage(
@@ -6090,13 +6069,9 @@ public final class ActiveServices {
                             SystemClock.uptimeMillis());
                 }
             }
-            final AttributionSource attributionSource = new AttributionSource
-                    .Builder(r.appInfo.uid)
-                    .setPackageName(r.packageName)
-                    .build();
-            mAm.mAppOpsService.finishOperationWithState(
+            mAm.mAppOpsService.finishOperation(
                     AppOpsManager.getToken(mAm.mAppOpsService),
-                    AppOpsManager.OP_START_FOREGROUND, attributionSource.asState());
+                    AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
             unregisterAppOpCallbackLocked(r);
             r.mFgsExitTime = SystemClock.uptimeMillis();
             logFGSStateChangeLocked(r,
@@ -8827,11 +8802,8 @@ public final class ActiveServices {
 
         mAm.mBatteryStatsService.noteServiceStartRunning(callingUid, callingPackage,
                 cn.getClassName());
-        final AttributionSource attributionSource = new AttributionSource.Builder(r.appInfo.uid)
-                .setPackageName(r.packageName)
-                .build();
-        mAm.mAppOpsService.startOperationWithState(AppOpsManager.getToken(mAm.mAppOpsService),
-                AppOpsManager.OP_START_FOREGROUND, attributionSource.asState(),
+        mAm.mAppOpsService.startOperation(AppOpsManager.getToken(mAm.mAppOpsService),
+                AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null,
                 true, false, null, false,
                 AppOpsManager.ATTRIBUTION_FLAGS_NONE, AppOpsManager.ATTRIBUTION_CHAIN_ID_NONE);
         registerAppOpCallbackLocked(r);

@@ -30,14 +30,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
-import com.android.compose.ui.util.fastForEach
+import androidx.compose.ui.util.fastForEach
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 
 @VisibleForTesting
@@ -47,6 +47,8 @@ class SceneTransitionLayoutImpl(
     transitions: SceneTransitions,
     internal val state: SceneTransitionLayoutState,
     density: Density,
+    edgeDetector: EdgeDetector,
+    coroutineScope: CoroutineScope,
 ) {
     internal val scenes = SnapshotStateMap<SceneKey, Scene>()
     internal val elements = SnapshotStateMap<ElementKey, Element>()
@@ -57,6 +59,10 @@ class SceneTransitionLayoutImpl(
     internal var onChangeScene by mutableStateOf(onChangeScene)
     internal var transitions by mutableStateOf(transitions)
     internal var density: Density by mutableStateOf(density)
+    internal var edgeDetector by mutableStateOf(edgeDetector)
+
+    private val horizontalGestureHandler: SceneGestureHandler
+    private val verticalGestureHandler: SceneGestureHandler
 
     /**
      * The size of this layout. Note that this could be [IntSize.Zero] if this layour does not have
@@ -66,7 +72,29 @@ class SceneTransitionLayoutImpl(
 
     init {
         setScenes(builder)
+
+        // SceneGestureHandler must wait for the scenes to be initialized, in order to access the
+        // current scene (required for SwipeTransition).
+        horizontalGestureHandler =
+            SceneGestureHandler(
+                layoutImpl = this,
+                orientation = Orientation.Horizontal,
+                coroutineScope = coroutineScope,
+            )
+
+        verticalGestureHandler =
+            SceneGestureHandler(
+                layoutImpl = this,
+                orientation = Orientation.Vertical,
+                coroutineScope = coroutineScope,
+            )
     }
+
+    internal fun gestureHandler(orientation: Orientation): SceneGestureHandler =
+        when (orientation) {
+            Orientation.Vertical -> verticalGestureHandler
+            Orientation.Horizontal -> horizontalGestureHandler
+        }
 
     internal fun scene(key: SceneKey): Scene {
         return scenes[key] ?: error("Scene $key is not configured")
@@ -129,15 +157,14 @@ class SceneTransitionLayoutImpl(
     }
 
     @Composable
-    @OptIn(ExperimentalComposeUiApi::class)
     internal fun Content(modifier: Modifier) {
         Box(
             modifier
                 // Handle horizontal and vertical swipes on this layout.
                 // Note: order here is important and will give a slight priority to the vertical
                 // swipes.
-                .swipeToScene(layoutImpl = this, Orientation.Horizontal)
-                .swipeToScene(layoutImpl = this, Orientation.Vertical)
+                .swipeToScene(gestureHandler(Orientation.Horizontal))
+                .swipeToScene(gestureHandler(Orientation.Vertical))
                 .onSizeChanged { size = it }
         ) {
             LookaheadScope {

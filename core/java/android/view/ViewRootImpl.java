@@ -24,6 +24,8 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InputDevice.SOURCE_CLASS_NONE;
 import static android.view.InsetsSource.ID_IME;
+import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
+import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.View.PFLAG_DRAW_ANIMATION;
 import static android.view.View.SYSTEM_UI_FLAG_FULLSCREEN;
 import static android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
@@ -74,7 +76,10 @@ import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_SIZE_E
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_OPTIMIZE_MEASURE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
+import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+import static android.view.WindowManager.LayoutParams.TYPE_DRAWN_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_ADDITIONAL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
@@ -87,6 +92,7 @@ import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
 import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
+import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 
 import android.Manifest;
 import android.accessibilityservice.AccessibilityService;
@@ -117,6 +123,7 @@ import android.content.res.TypedArray;
 import android.graphics.BLASTBufferQueue;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ForceDarkType;
 import android.graphics.FrameInfo;
 import android.graphics.HardwareRenderer;
 import android.graphics.HardwareRenderer.FrameDrawingCallback;
@@ -740,6 +747,7 @@ public final class ViewRootImpl implements ViewParent,
     private SurfaceControl mBoundsLayer;
     private final SurfaceSession mSurfaceSession = new SurfaceSession();
     private final Transaction mTransaction = new Transaction();
+    private final Transaction mFrameRateTransaction = new Transaction();
 
     @UnsupportedAppUsage
     boolean mAdded;
@@ -963,6 +971,37 @@ public final class ViewRootImpl implements ViewParent,
 
     private AccessibilityWindowAttributes mAccessibilityWindowAttributes;
 
+    /*
+     * for Variable Refresh Rate project
+     */
+
+    // The preferred frame rate category of the view that
+    // could be updated on a frame-by-frame basis.
+    private int mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+    // The preferred frame rate category of the last frame that
+    // could be used to lower frame rate after touch boost
+    private int mLastPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+    // The preferred frame rate of the view that is mainly used for
+    // touch boosting, view velocity handling, and TextureView.
+    private float mPreferredFrameRate = 0;
+    // The last preferred frame rate of the view that is mainly used to
+    // track the difference between the current preferred frame rate and the previous value.
+    private float mLastPreferredFrameRate = 0;
+    // Used to check if there were any view invalidations in
+    // the previous time frame (FRAME_RATE_IDLENESS_REEVALUATE_TIME).
+    private boolean mHasInvalidation = false;
+    // Used to check if it is in the touch boosting period.
+    private boolean mIsFrameRateBoosting = false;
+    // Used to check if there is a message in the message queue
+    // for idleness handling.
+    private boolean mHasIdledMessage = false;
+    // time for touch boost period.
+    private static final int FRAME_RATE_TOUCH_BOOST_TIME = 1500;
+    // time for checking idle status periodically.
+    private static final int FRAME_RATE_IDLENESS_CHECK_TIME_MILLIS = 500;
+    // time for revaluating the idle status before lowering the frame rate.
+    private static final int FRAME_RATE_IDLENESS_REEVALUATE_TIME = 500;
+
     /**
      * A temporary object used so relayoutWindow can return the latest SyncSeqId
      * system. The SyncSeqId system was designed to work without synchronous relayout
@@ -1014,6 +1053,12 @@ public final class ViewRootImpl implements ViewParent,
     boolean mHaveMoveEvent = false;
 
     private final RemoteTaskWindowInsetHelper mRTWindowInsetHelper;
+
+    private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
+
+    static {
+        sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
+    }
 
     public ViewRootImpl(Context context, Display display) {
         this(context, display, WindowManagerGlobal.getWindowSession(), new WindowLayout());
@@ -1767,7 +1812,7 @@ public final class ViewRootImpl implements ViewParent,
 
     /** Returns true if force dark should be enabled according to various settings */
     @VisibleForTesting
-    public boolean isForceDarkEnabled() {
+    public @ForceDarkType.ForceDarkTypeDef int determineForceDarkType() {
         if (forceInvertColor()) {
             boolean isForceInvertEnabled = Settings.Secure.getIntForUser(
                     mContext.getContentResolver(),
@@ -1779,7 +1824,7 @@ public final class ViewRootImpl implements ViewParent,
             // for dark mode in configuration.uiMode. Instead, we assume that the force invert
             // setting will be enabled at the same time dark theme is in the Settings app.
             if (isForceInvertEnabled) {
-                return true;
+                return ForceDarkType.FORCE_INVERT_COLOR_DARK;
             }
         }
 
@@ -1793,12 +1838,12 @@ public final class ViewRootImpl implements ViewParent,
                     && a.getBoolean(R.styleable.Theme_forceDarkAllowed, forceDarkAllowedDefault);
             a.recycle();
         }
-        return useAutoDark;
+        return useAutoDark ? ForceDarkType.FORCE_DARK : ForceDarkType.NONE;
     }
 
     private void updateForceDarkMode() {
         if (mAttachInfo.mThreadedRenderer == null) return;
-        if (mAttachInfo.mThreadedRenderer.setForceDark(isForceDarkEnabled())) {
+        if (mAttachInfo.mThreadedRenderer.setForceDark(determineForceDarkType())) {
             // TODO: Don't require regenerating all display lists to apply this setting
             invalidateWorld(mView);
         }
@@ -3965,6 +4010,16 @@ public final class ViewRootImpl implements ViewParent,
                 mWmsRequestSyncGroupState = WMS_SYNC_NONE;
             }
         }
+
+        // For the variable refresh rate project.
+        // We set the preferred frame rate and frame rate category at the end of performTraversals
+        // when the values are applicable.
+        setPreferredFrameRate(mPreferredFrameRate);
+        setPreferredFrameRateCategory(mPreferredFrameRateCategory);
+        mLastPreferredFrameRateCategory = mPreferredFrameRateCategory;
+        mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+        mLastPreferredFrameRate = mPreferredFrameRate;
+        mPreferredFrameRate = 0;
     }
 
     private void createSyncIfNeeded() {
@@ -6040,6 +6095,8 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_REPORT_KEEP_CLEAR_RECTS = 36;
     private static final int MSG_PAUSED_FOR_SYNC_TIMEOUT = 37;
     private static final int MSG_DECOR_VIEW_GESTURE_INTERCEPTION = 38;
+    private static final int MSG_TOUCH_BOOST_TIMEOUT = 39;
+    private static final int MSG_CHECK_INVALIDATION_IDLE = 40;
 
     final class ViewRootHandler extends Handler {
         @Override
@@ -6334,6 +6391,32 @@ public final class ViewRootImpl implements ViewParent,
                     Log.e(mTag, "Timedout waiting to unpause for sync");
                     mNumPausedForSync = 0;
                     scheduleTraversals();
+                    break;
+                case MSG_TOUCH_BOOST_TIMEOUT:
+                    /**
+                     * Lower the frame rate after the boosting period (FRAME_RATE_TOUCH_BOOST_TIME).
+                     */
+                    mIsFrameRateBoosting = false;
+                    setPreferredFrameRateCategory(Math.max(mPreferredFrameRateCategory,
+                            mLastPreferredFrameRateCategory));
+                    break;
+                case MSG_CHECK_INVALIDATION_IDLE:
+                    if (!mHasInvalidation && !mIsFrameRateBoosting) {
+                        mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+                        setPreferredFrameRateCategory(mPreferredFrameRateCategory);
+                        mHasIdledMessage = false;
+                    } else {
+                        /**
+                         * If there is no invalidation within a certain period,
+                         * we consider the display is idled.
+                         * We then set the frame rate catetogry to NO_PREFERENCE.
+                         * Note that SurfaceFlinger also has a mechanism to lower the refresh rate
+                         * if there is no updates of the buffer.
+                         */
+                        mHasInvalidation = false;
+                        mHandler.sendEmptyMessageDelayed(MSG_CHECK_INVALIDATION_IDLE,
+                                FRAME_RATE_IDLENESS_REEVALUATE_TIME);
+                    }
                     break;
             }
         }
@@ -7300,6 +7383,24 @@ public final class ViewRootImpl implements ViewParent,
                 if (mConsumeBatchedInputScheduled) {
                     scheduleConsumeBatchedInputImmediately();
                 }
+            }
+
+            // For the variable refresh rate project
+            if (handled && shouldTouchBoost(action, mWindowAttributes.type)) {
+                // set the frame rate to the maximum value.
+                mIsFrameRateBoosting = true;
+                setPreferredFrameRateCategory(mPreferredFrameRateCategory);
+            }
+            /**
+             * We want to lower the refresh rate when MotionEvent.ACTION_UP,
+             * MotionEvent.ACTION_CANCEL is detected.
+             * Not using ACTION_MOVE to avoid checking and sending messages too frequently.
+             */
+            if (mIsFrameRateBoosting && (action == MotionEvent.ACTION_UP
+                    || action == MotionEvent.ACTION_CANCEL)) {
+                mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
+                mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
+                        FRAME_RATE_TOUCH_BOOST_TIME);
             }
             return handled ? FINISH_HANDLED : FORWARD;
         }
@@ -11930,5 +12031,137 @@ public final class ViewRootImpl implements ViewParent,
             Trace.instant(Trace.TRACE_TAG_VIEW, mTag + "-" + msg);
         }
         Log.d(mTag, msg);
+    }
+
+    private void setPreferredFrameRateCategory(int preferredFrameRateCategory) {
+        if (!shouldSetFrameRateCategory()) {
+            return;
+        }
+
+        int frameRateCategory = mIsFrameRateBoosting
+                ? FRAME_RATE_CATEGORY_HIGH : preferredFrameRateCategory;
+
+        try {
+            mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
+                    frameRateCategory, false).apply();
+        } catch (Exception e) {
+            Log.e(mTag, "Unable to set frame rate category", e);
+        }
+
+        if (mPreferredFrameRateCategory != FRAME_RATE_CATEGORY_NO_PREFERENCE && !mHasIdledMessage) {
+            // Check where the display is idled periodically.
+            // If so, set the frame rate category to NO_PREFERENCE
+            mHandler.sendEmptyMessageDelayed(MSG_CHECK_INVALIDATION_IDLE,
+                    FRAME_RATE_IDLENESS_CHECK_TIME_MILLIS);
+            mHasIdledMessage = true;
+        }
+    }
+
+    private void setPreferredFrameRate(float preferredFrameRate) {
+        if (!shouldSetFrameRate()) {
+            return;
+        }
+
+        try {
+            mFrameRateTransaction.setFrameRate(mSurfaceControl,
+                    preferredFrameRate, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT).apply();
+        } catch (Exception e) {
+            Log.e(mTag, "Unable to set frame rate", e);
+        }
+    }
+
+    private void sendDelayedEmptyMessage(int message, int delayedTime) {
+        mHandler.removeMessages(message);
+
+        mHandler.sendEmptyMessageDelayed(message, delayedTime);
+    }
+
+    private boolean shouldSetFrameRateCategory() {
+        // use toolkitSetFrameRate flag to gate the change
+        return  mSurface.isValid() && sToolkitSetFrameRateReadOnlyFlagValue;
+    }
+
+    private boolean shouldSetFrameRate() {
+        // use toolkitSetFrameRate flag to gate the change
+        return mPreferredFrameRate > 0 && sToolkitSetFrameRateReadOnlyFlagValue;
+    }
+
+    private boolean shouldTouchBoost(int motionEventAction, int windowType) {
+        boolean desiredAction = motionEventAction == MotionEvent.ACTION_DOWN
+                || motionEventAction == MotionEvent.ACTION_MOVE
+                || motionEventAction == MotionEvent.ACTION_UP;
+        boolean desiredType = windowType == TYPE_BASE_APPLICATION || windowType == TYPE_APPLICATION
+                || windowType == TYPE_APPLICATION_STARTING || windowType == TYPE_DRAWN_APPLICATION;
+        // use toolkitSetFrameRate flag to gate the change
+        return desiredAction && desiredType && sToolkitSetFrameRateReadOnlyFlagValue;
+    }
+
+    /**
+     * Allow Views to vote for the preferred frame rate category
+     *
+     * @param frameRateCategory the preferred frame rate category of a View
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PROTECTED)
+    public void votePreferredFrameRateCategory(int frameRateCategory) {
+        mPreferredFrameRateCategory = Math.max(mPreferredFrameRateCategory, frameRateCategory);
+        mHasInvalidation = true;
+    }
+
+    /**
+     * Allow Views to vote for the preferred frame rate
+     * When determining the preferred frame rate value,
+     * we follow this logic: If no preferred frame rate has been set yet,
+     * we assign the value of frameRate as the preferred frame rate.
+     * If either the current or the new preferred frame rate exceeds 60 Hz,
+     * we select the higher value between them.
+     * However, if both values are 60 Hz or lower, we set the preferred frame rate
+     * to 60 Hz to maintain optimal performance.
+     *
+     * @param frameRate the preferred frame rate of a View
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PROTECTED)
+    public void votePreferredFrameRate(float frameRate) {
+        if (frameRate <= 0) {
+            return;
+        }
+
+        if (mPreferredFrameRate == 0) {
+            mPreferredFrameRate = frameRate;
+        } else if (frameRate > 60 || mPreferredFrameRate > 60) {
+            mPreferredFrameRate = Math.max(mPreferredFrameRate, frameRate);
+        } else if (mPreferredFrameRate != frameRate) {
+            mPreferredFrameRate = 60;
+        }
+
+        mHasInvalidation = true;
+    }
+
+    /**
+     * Get the value of mPreferredFrameRateCategory
+     */
+    @VisibleForTesting
+    public int getPreferredFrameRateCategory() {
+        return mPreferredFrameRateCategory;
+    }
+
+    /**
+     * Get the value of mPreferredFrameRate
+     */
+    @VisibleForTesting
+    public float getPreferredFrameRate() {
+        return mPreferredFrameRate;
+    }
+
+    @Override
+    public boolean transferHostTouchGestureToEmbedded(
+            @NonNull SurfaceControlViewHost.SurfacePackage surfacePackage) {
+        final IWindowSession realWm = WindowManagerGlobal.getWindowSession();
+        try {
+            return realWm.transferHostTouchGestureToEmbedded(mWindow,
+                    surfacePackage.getInputToken());
+        } catch (RemoteException e) {
+            e.rethrowAsRuntimeException();
+        }
+        return false;
     }
 }

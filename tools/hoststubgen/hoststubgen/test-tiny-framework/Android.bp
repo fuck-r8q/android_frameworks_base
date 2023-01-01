@@ -16,6 +16,7 @@ java_library {
     static_libs: [
         "hoststubgen-annotations",
     ],
+    visibility: ["//frameworks/base/tools/hoststubgen:__subpackages__"],
 }
 
 // Create stub/impl jars from "hoststubgen-test-tiny-framework", using the following 3 rules.
@@ -24,11 +25,13 @@ java_genrule_host {
     defaults: ["hoststubgen-command-defaults"],
     cmd: hoststubgen_common_options +
         "--in-jar $(location :hoststubgen-test-tiny-framework) " +
-        "--policy-override-file $(location policy-override-tiny-framework.txt) ",
+        "--policy-override-file $(location policy-override-tiny-framework.txt) " +
+        "--package-redirect com.unsupported:com.supported ",
     srcs: [
         ":hoststubgen-test-tiny-framework",
         "policy-override-tiny-framework.txt",
     ],
+    visibility: ["//visibility:private"],
 }
 
 java_genrule_host {
@@ -40,6 +43,7 @@ java_genrule_host {
     out: [
         "host_stub.jar",
     ],
+    visibility: ["//visibility:private"],
 }
 
 java_genrule_host {
@@ -51,6 +55,7 @@ java_genrule_host {
     out: [
         "host_impl.jar",
     ],
+    visibility: ["//visibility:private"],
 }
 
 // Same as "hoststubgen-test-tiny-framework-host", but with more options, to test more hoststubgen
@@ -61,6 +66,7 @@ java_genrule_host {
     cmd: hoststubgen_common_options +
         "--in-jar $(location :hoststubgen-test-tiny-framework) " +
         "--policy-override-file $(location policy-override-tiny-framework.txt) " +
+        "--package-redirect com.unsupported:com.supported " +
 
         // More options.
         "--default-method-call-hook com.android.hoststubgen.hosthelper.HostTestUtils.logMethodCall " +
@@ -69,6 +75,7 @@ java_genrule_host {
         ":hoststubgen-test-tiny-framework",
         "policy-override-tiny-framework.txt",
     ],
+    visibility: ["//visibility:private"],
 }
 
 java_genrule_host {
@@ -80,6 +87,7 @@ java_genrule_host {
     out: [
         "host_stub.jar",
     ],
+    visibility: ["//visibility:private"],
 }
 
 java_genrule_host {
@@ -91,6 +99,7 @@ java_genrule_host {
     out: [
         "host_impl.jar",
     ],
+    visibility: ["//visibility:private"],
 }
 
 // Compile the test jar, using 2 rules.

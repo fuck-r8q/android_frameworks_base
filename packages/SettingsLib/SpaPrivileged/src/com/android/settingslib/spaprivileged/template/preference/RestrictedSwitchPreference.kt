@@ -21,8 +21,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,7 +28,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
-import com.android.settingslib.spa.framework.compose.stateOf
 import com.android.settingslib.spa.widget.preference.SwitchPreference
 import com.android.settingslib.spa.widget.preference.SwitchPreferenceModel
 import com.android.settingslib.spaprivileged.framework.compose.getPlaceholder
@@ -75,17 +72,16 @@ internal fun RestrictedSwitchPreference(
 internal object RestrictedSwitchPreference {
     fun getSummary(
         context: Context,
-        restrictedMode: RestrictedMode?,
-        summaryIfNoRestricted: State<String>,
-        checked: State<Boolean?>,
-    ): State<String> = when (restrictedMode) {
-        is NoRestricted -> summaryIfNoRestricted
-        is BaseUserRestricted -> stateOf(
-            context.getString(com.android.settingslib.R.string.disabled)
-        )
-
-        is BlockedByAdmin -> derivedStateOf { restrictedMode.getSummary(checked.value) }
-        null -> stateOf(context.getPlaceholder())
+        restrictedModeSupplier: () -> RestrictedMode?,
+        summaryIfNoRestricted: () -> String,
+        checked: () -> Boolean?,
+    ): () -> String = {
+        when (val restrictedMode = restrictedModeSupplier()) {
+            is NoRestricted -> summaryIfNoRestricted()
+            is BaseUserRestricted -> context.getString(com.android.settingslib.R.string.disabled)
+            is BlockedByAdmin -> restrictedMode.getSummary(checked())
+            null -> context.getPlaceholder()
+        }
     }
 }
 
@@ -98,23 +94,23 @@ private class RestrictedSwitchPreferenceModel(
 
     override val summary = RestrictedSwitchPreference.getSummary(
         context = context,
-        restrictedMode = restrictedMode,
+        restrictedModeSupplier = { restrictedMode },
         summaryIfNoRestricted = model.summary,
         checked = model.checked,
     )
 
     override val checked = when (restrictedMode) {
-        null -> stateOf(null)
+        null -> ({ null })
         is NoRestricted -> model.checked
-        is BaseUserRestricted -> stateOf(false)
+        is BaseUserRestricted -> ({ false })
         is BlockedByAdmin -> model.checked
     }
 
     override val changeable = when (restrictedMode) {
-        null -> stateOf(false)
+        null -> ({ false })
         is NoRestricted -> model.changeable
-        is BaseUserRestricted -> stateOf(false)
-        is BlockedByAdmin -> stateOf(false)
+        is BaseUserRestricted -> ({ false })
+        is BlockedByAdmin -> ({ false })
     }
 
     override val onCheckedChange = when (restrictedMode) {
@@ -140,7 +136,7 @@ private class RestrictedSwitchPreferenceModel(
                     onClick = { restrictedMode.sendShowAdminSupportDetailsIntent() },
                 )
                 .semantics {
-                    this.toggleableState = ToggleableState(checked.value)
+                    this.toggleableState = ToggleableState(checked())
                 },
         ) { content() }
     }

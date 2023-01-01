@@ -20,6 +20,7 @@ package com.android.systemui.keyguard.ui.view.layout.blueprints
 import com.android.systemui.communal.ui.view.layout.sections.CommunalTutorialIndicatorSection
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.shared.model.KeyguardBlueprint
+import com.android.systemui.keyguard.ui.view.layout.items.ClockSection
 import com.android.systemui.keyguard.ui.view.layout.sections.AodBurnInSection
 import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIconsSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultAmbientIndicationAreaSection
@@ -30,7 +31,7 @@ import com.android.systemui.keyguard.ui.view.layout.sections.DefaultSettingsPopu
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultShortcutsSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultStatusBarSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultStatusViewSection
-import com.android.systemui.keyguard.ui.view.layout.sections.SplitShadeGuidelines
+import com.android.systemui.keyguard.ui.view.layout.sections.SmartspaceSection
 import javax.inject.Inject
 
 /**
@@ -51,15 +52,16 @@ constructor(
     defaultStatusViewSection: DefaultStatusViewSection,
     defaultStatusBarSection: DefaultStatusBarSection,
     defaultNotificationStackScrollLayoutSection: DefaultNotificationStackScrollLayoutSection,
-    splitShadeGuidelines: SplitShadeGuidelines,
     aodNotificationIconsSection: AodNotificationIconsSection,
     aodBurnInSection: AodBurnInSection,
     communalTutorialIndicatorSection: CommunalTutorialIndicatorSection,
+    clockSection: ClockSection,
+    smartspaceSection: SmartspaceSection
 ) : KeyguardBlueprint {
     override val id: String = DEFAULT
 
     override val sections =
-        setOf(
+        listOf(
             defaultIndicationAreaSection,
             defaultDeviceEntryIconSection,
             defaultShortcutsSection,
@@ -68,10 +70,11 @@ constructor(
             defaultStatusViewSection,
             defaultStatusBarSection,
             defaultNotificationStackScrollLayoutSection,
-            splitShadeGuidelines,
             aodNotificationIconsSection,
             aodBurnInSection,
             communalTutorialIndicatorSection,
+            clockSection,
+            smartspaceSection
         )
 
     companion object {

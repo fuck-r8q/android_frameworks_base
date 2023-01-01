@@ -136,7 +136,8 @@ constructor(
 
     override val defaultMobileIconGroup = flowOf(TelephonyIcons.THREE_G)
 
-    override val isAnySimSecure: Flow<Boolean> = flowOf(false)
+    override val isAnySimSecure: Flow<Boolean> = flowOf(getIsAnySimSecure())
+    override fun getIsAnySimSecure(): Boolean = false
 
     override val defaultMobileIconMapping = MutableStateFlow(TelephonyIcons.ICON_NAME_TO_ICON)
 
@@ -221,6 +222,8 @@ constructor(
         connectionRepoCache.clear()
         subscriptionInfoCache.clear()
     }
+
+    override suspend fun isInEcmMode(): Boolean = false
 
     private fun processMobileEvent(event: FakeNetworkEventModel) {
         when (event) {

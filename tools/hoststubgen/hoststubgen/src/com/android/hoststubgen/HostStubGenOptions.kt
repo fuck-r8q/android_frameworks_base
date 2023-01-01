@@ -47,6 +47,11 @@ class HostStubGenOptions(
         var substituteAnnotations: MutableSet<String> = mutableSetOf(),
         var nativeSubstituteAnnotations: MutableSet<String> = mutableSetOf(),
         var classLoadHookAnnotations: MutableSet<String> = mutableSetOf(),
+        var keepStaticInitializerAnnotations: MutableSet<String> = mutableSetOf(),
+
+        var packageRedirects: MutableList<Pair<String, String>> = mutableListOf(),
+
+        var annotationAllowedClassesFile: String? = null,
 
         var defaultClassLoadHook: String? = null,
         var defaultMethodCallHook: String? = null,
@@ -75,6 +80,15 @@ class HostStubGenOptions(
                 throw InputFileNotFoundException(this)
             }
             return this
+        }
+
+        private fun parsePackageRedirect(fromColonTo: String): Pair<String, String> {
+            val colon = fromColonTo.indexOf(':')
+            if ((colon < 1) || (colon + 1 >= fromColonTo.length)) {
+                throw ArgumentsException("--package-redirect must be a colon-separated string")
+            }
+            // TODO check for duplicates
+            return Pair(fromColonTo.substring(0, colon), fromColonTo.substring(colon + 1))
         }
 
         fun parseArgs(args: Array<String>): HostStubGenOptions {
@@ -150,7 +164,17 @@ class HostStubGenOptions(
 
                     "--class-load-hook-annotation" ->
                         ret.classLoadHookAnnotations +=
-                            ensureUniqueAnnotation(ai.nextArgRequired(arg))
+                                ensureUniqueAnnotation(ai.nextArgRequired(arg))
+
+                    "--keep-static-initializer-annotation" ->
+                        ret.keepStaticInitializerAnnotations +=
+                                ensureUniqueAnnotation(ai.nextArgRequired(arg))
+
+                    "--package-redirect" ->
+                        ret.packageRedirects += parsePackageRedirect(ai.nextArgRequired(arg))
+
+                    "--annotation-allowed-classes-file" ->
+                        ret.annotationAllowedClassesFile = ai.nextArgRequired(arg)
 
                     "--default-class-load-hook" ->
                         ret.defaultClassLoadHook = ai.nextArgRequired(arg)
@@ -294,6 +318,9 @@ class HostStubGenOptions(
               substituteAnnotations=$substituteAnnotations,
               nativeSubstituteAnnotations=$nativeSubstituteAnnotations,
               classLoadHookAnnotations=$classLoadHookAnnotations,
+              keepStaticInitializerAnnotations=$keepStaticInitializerAnnotations,
+              packageRedirects=$packageRedirects,
+              $annotationAllowedClassesFile=$annotationAllowedClassesFile,
               defaultClassLoadHook=$defaultClassLoadHook,
               defaultMethodCallHook=$defaultMethodCallHook,
               intersectStubJars=$intersectStubJars,

@@ -162,6 +162,7 @@ android_library {
         "SystemUI-statsd",
         "SettingsLib",
         "com_android_systemui_flags_lib",
+        "com_android_systemui_shared_flags_lib",
         "androidx.core_core-ktx",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
@@ -183,6 +184,8 @@ android_library {
         "androidx.dynamicanimation_dynamicanimation",
         "androidx-constraintlayout_constraintlayout",
         "androidx.exifinterface_exifinterface",
+        "androidx.room_room-runtime",
+        "androidx.room_room-ktx",
         "com.google.android.material_material",
         "kotlinx_coroutines_android",
         "kotlinx_coroutines",
@@ -210,10 +213,16 @@ android_library {
         "ims-common",
     ],
 
-    javacflags: ["-Adagger.fastInit=enabled"],
+    javacflags: [
+        "-Adagger.fastInit=enabled",
+        "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
+    ],
     kotlincflags: ["-Xjvm-default=all"],
 
-    plugins: ["dagger2-compiler"],
+    plugins: [
+        "androidx.room_room-compiler-plugin",
+        "dagger2-compiler",
+    ],
 
     lint: {
         extra_check_modules: ["SystemUILintChecker"],
@@ -369,6 +378,7 @@ filegroup {
         "tests/src/com/android/systemui/qs/pipeline/shared/TileSpecTest.kt",
         "tests/src/com/android/systemui/qs/tiles/base/**/*.kt",
         "tests/src/com/android/systemui/qs/tiles/viewmodel/**/*.kt",
+        "tests/src/com/android/systemui/qs/tiles/impl/**/*.kt",
 
         /* Authentication */
         "tests/src/com/android/systemui/authentication/data/repository/AuthenticationRepositoryTest.kt",
@@ -449,6 +459,7 @@ android_library {
         "SystemUI-statsd",
         "SettingsLib",
         "com_android_systemui_flags_lib",
+        "com_android_systemui_shared_flags_lib",
         "flag-junit-base",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
@@ -470,6 +481,8 @@ android_library {
         "androidx.dynamicanimation_dynamicanimation",
         "androidx-constraintlayout_constraintlayout",
         "androidx.exifinterface_exifinterface",
+        "androidx.room_room-runtime",
+        "androidx.room_room-ktx",
         "kotlinx-coroutines-android",
         "kotlinx-coroutines-core",
         "kotlinx_coroutines_test",
@@ -536,7 +549,10 @@ android_library {
         "--extra-packages",
         "com.android.systemui",
     ],
-    plugins: ["dagger2-compiler"],
+    plugins: [
+        "androidx.room_room-compiler-plugin",
+        "dagger2-compiler",
+    ],
     lint: {
         test: true,
         extra_check_modules: ["SystemUILintChecker"],

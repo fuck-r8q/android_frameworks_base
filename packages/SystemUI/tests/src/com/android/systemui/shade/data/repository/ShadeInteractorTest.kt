@@ -22,11 +22,14 @@ import android.app.StatusBarManager.DISABLE2_QUICK_SETTINGS
 import android.content.pm.UserInfo
 import android.os.UserManager
 import androidx.test.filters.SmallTest
+import com.android.SysUITestComponent
 import com.android.SysUITestModule
 import com.android.TestMocksModule
+import com.android.collectLastValue
+import com.android.runCurrent
+import com.android.runTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
-import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FakeFeatureFlagsClassicModule
 import com.android.systemui.flags.Flags
@@ -54,74 +57,70 @@ import com.android.systemui.statusbar.policy.data.repository.FakeDeviceProvision
 import com.android.systemui.user.data.model.UserSwitcherSettingsModel
 import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.user.domain.UserDomainLayerModule
+import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import dagger.BindsInstance
 import dagger.Component
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
 
 @SmallTest
-@OptIn(ExperimentalCoroutinesApi::class)
 class ShadeInteractorTest : SysuiTestCase() {
 
-    @Mock private lateinit var dozeParameters: DozeParameters
+    @SysUISingleton
+    @Component(
+        modules =
+            [
+                SysUITestModule::class,
+                UserDomainLayerModule::class,
+            ]
+    )
+    interface TestComponent : SysUITestComponent<ShadeInteractor> {
 
-    private lateinit var testComponent: TestComponent
+        val configurationRepository: FakeConfigurationRepository
+        val deviceProvisioningRepository: FakeDeviceProvisioningRepository
+        val disableFlagsRepository: FakeDisableFlagsRepository
+        val keyguardRepository: FakeKeyguardRepository
+        val keyguardTransitionRepository: FakeKeyguardTransitionRepository
+        val powerRepository: FakePowerRepository
+        val sceneInteractor: SceneInteractor
+        val shadeRepository: FakeShadeRepository
+        val userRepository: FakeUserRepository
+        val userSetupRepository: FakeUserSetupRepository
 
-    private val configurationRepository
-        get() = testComponent.configurationRepository
-    private val deviceProvisioningRepository
-        get() = testComponent.deviceProvisioningRepository
-    private val disableFlagsRepository
-        get() = testComponent.disableFlagsRepository
-    private val keyguardRepository
-        get() = testComponent.keyguardRepository
-    private val keyguardTransitionRepository
-        get() = testComponent.keygaurdTransitionRepository
-    private val powerRepository
-        get() = testComponent.powerRepository
-    private val sceneInteractor
-        get() = testComponent.sceneInteractor
-    private val shadeRepository
-        get() = testComponent.shadeRepository
-    private val testScope
-        get() = testComponent.testScope
-    private val userRepository
-        get() = testComponent.userRepository
-    private val userSetupRepository
-        get() = testComponent.userSetupRepository
+        @Component.Factory
+        interface Factory {
+            fun create(
+                @BindsInstance test: SysuiTestCase,
+                featureFlags: FakeFeatureFlagsClassicModule,
+                mocks: TestMocksModule,
+            ): TestComponent
+        }
+    }
 
-    private lateinit var underTest: ShadeInteractor
+    private val dozeParameters: DozeParameters = mock()
+
+    private val testComponent: TestComponent =
+        DaggerShadeInteractorTest_TestComponent.factory()
+            .create(
+                test = this,
+                featureFlags =
+                    FakeFeatureFlagsClassicModule {
+                        set(Flags.FACE_AUTH_REFACTOR, false)
+                        set(Flags.FULL_SCREEN_USER_SWITCHER, true)
+                    },
+                mocks =
+                    TestMocksModule(
+                        dozeParameters = dozeParameters,
+                    ),
+            )
 
     @Before
     fun setUp() {
-        MockitoAnnotations.initMocks(this)
-
-        testComponent =
-            DaggerShadeInteractorTest_TestComponent.factory()
-                .create(
-                    test = this,
-                    featureFlags =
-                        FakeFeatureFlagsClassicModule {
-                            set(Flags.FACE_AUTH_REFACTOR, false)
-                            set(Flags.FULL_SCREEN_USER_SWITCHER, true)
-                        },
-                    mocks =
-                        TestMocksModule(
-                            dozeParameters = dozeParameters,
-                        ),
-                )
-        underTest = testComponent.underTest
-
         runBlocking {
             val userInfos =
                 listOf(
@@ -135,14 +134,16 @@ class ShadeInteractorTest : SysuiTestCase() {
                         UserManager.USER_TYPE_FULL_SYSTEM,
                     ),
                 )
-            userRepository.setUserInfos(userInfos)
-            userRepository.setSelectedUserInfo(userInfos[0])
+            testComponent.apply {
+                userRepository.setUserInfos(userInfos)
+                userRepository.setSelectedUserInfo(userInfos[0])
+            }
         }
     }
 
     @Test
     fun isShadeEnabled_matchesDisableFlagsRepo() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.isShadeEnabled)
 
             disableFlagsRepository.disableFlags.value =
@@ -156,7 +157,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_deviceNotProvisioned_false() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(false)
 
             val actual by collectLastValue(underTest.isExpandToQsEnabled)
@@ -166,7 +167,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_userNotSetupAndSimpleUserSwitcher_false() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
 
             userSetupRepository.setUserSetup(false)
@@ -179,7 +180,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_shadeNotEnabled_false() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             userSetupRepository.setUserSetup(true)
 
@@ -195,7 +196,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_quickSettingsNotEnabled_false() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             userSetupRepository.setUserSetup(true)
 
@@ -210,7 +211,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_dozing_false() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             userSetupRepository.setUserSetup(true)
             disableFlagsRepository.disableFlags.value =
@@ -227,7 +228,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_userSetup_true() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             keyguardRepository.setIsDozing(false)
             disableFlagsRepository.disableFlags.value =
@@ -244,7 +245,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_notSimpleUserSwitcher_true() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             keyguardRepository.setIsDozing(false)
             disableFlagsRepository.disableFlags.value =
@@ -261,7 +262,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_respondsToDozingUpdates() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             keyguardRepository.setIsDozing(false)
             disableFlagsRepository.disableFlags.value =
@@ -289,7 +290,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_respondsToDisableUpdates() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             keyguardRepository.setIsDozing(false)
             disableFlagsRepository.disableFlags.value =
@@ -321,7 +322,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isExpandToQsEnabled_respondsToUserUpdates() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setDeviceProvisioned(true)
             keyguardRepository.setIsDozing(false)
             disableFlagsRepository.disableFlags.value =
@@ -350,7 +351,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun fullShadeExpansionWhenShadeLocked() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             keyguardRepository.setStatusBarState(StatusBarState.SHADE_LOCKED)
@@ -361,7 +362,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun fullShadeExpansionWhenStatusBarStateIsNotShadeLocked() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
@@ -375,7 +376,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun shadeExpansionWhenInSplitShadeAndQsExpanded() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             // WHEN split shade is enabled and QS is expanded
@@ -392,7 +393,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun shadeExpansionWhenNotInSplitShadeAndQsExpanded() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             // WHEN split shade is not enabled and QS is expanded
@@ -408,7 +409,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun shadeExpansionWhenNotInSplitShadeAndQsCollapsed() =
-        testScope.runTest {
+        testComponent.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             // WHEN split shade is not enabled and QS is expanded
@@ -422,7 +423,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun anyExpansion_shadeGreater() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // WHEN shade is more expanded than QS
             shadeRepository.setLegacyShadeExpansion(.5f)
             shadeRepository.setQsExpansion(0f)
@@ -434,7 +435,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun anyExpansion_qsGreater() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // WHEN qs is more expanded than shade
             shadeRepository.setLegacyShadeExpansion(0f)
             shadeRepository.setQsExpansion(.5f)
@@ -446,7 +447,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun lockscreenShadeExpansion_idle_onScene() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an expansion flow based on transitions to and from a scene
             val key = SceneKey.Shade
             val expansion = underTest.sceneBasedExpansion(sceneInteractor, key)
@@ -463,7 +464,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun lockscreenShadeExpansion_idle_onDifferentScene() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an expansion flow based on transitions to and from a scene
             val expansion = underTest.sceneBasedExpansion(sceneInteractor, SceneKey.Shade)
             val expansionAmount by collectLastValue(expansion)
@@ -481,7 +482,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun lockscreenShadeExpansion_transitioning_toScene() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an expansion flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val expansion = underTest.sceneBasedExpansion(sceneInteractor, key)
@@ -495,7 +496,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = key,
                         progress = progress,
-                        isUserInputDriven = false,
+                        isInitiatedByUserInput = false,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -518,7 +520,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun lockscreenShadeExpansion_transitioning_fromScene() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an expansion flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val expansion = underTest.sceneBasedExpansion(sceneInteractor, key)
@@ -532,7 +534,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = key,
                         toScene = SceneKey.Lockscreen,
                         progress = progress,
-                        isUserInputDriven = false,
+                        isInitiatedByUserInput = false,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -555,7 +558,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun lockscreenShadeExpansion_transitioning_toAndFromDifferentScenes() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an expansion flow based on transitions to and from a scene
             val expansion = underTest.sceneBasedExpansion(sceneInteractor, SceneKey.QuickSettings)
             val expansionAmount by collectLastValue(expansion)
@@ -568,7 +571,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = SceneKey.Shade,
                         progress = progress,
-                        isUserInputDriven = false,
+                        isInitiatedByUserInput = false,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -591,7 +595,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteractingWithShade_shadeDraggedUpAndDown() =
-        testScope.runTest() {
+        testComponent.runTest() {
             val actual by collectLastValue(underTest.isUserInteractingWithShade)
             // GIVEN shade collapsed and not tracking input
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -647,7 +651,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteractingWithShade_shadeExpanded() =
-        testScope.runTest() {
+        testComponent.runTest() {
             val actual by collectLastValue(underTest.isUserInteractingWithShade)
             // GIVEN shade collapsed and not tracking input
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -682,7 +686,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteractingWithShade_shadePartiallyExpanded() =
-        testScope.runTest() {
+        testComponent.runTest() {
             val actual by collectLastValue(underTest.isUserInteractingWithShade)
             // GIVEN shade collapsed and not tracking input
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -723,7 +727,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteractingWithShade_shadeCollapsed() =
-        testScope.runTest() {
+        testComponent.runTest() {
             val actual by collectLastValue(underTest.isUserInteractingWithShade)
             // GIVEN shade expanded and not tracking input
             shadeRepository.setLegacyShadeExpansion(1f)
@@ -758,7 +762,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteractingWithQs_qsDraggedUpAndDown() =
-        testScope.runTest() {
+        testComponent.runTest() {
             val actual by collectLastValue(underTest.isUserInteractingWithQs)
             // GIVEN qs collapsed and not tracking input
             shadeRepository.setQsExpansion(0f)
@@ -813,7 +817,7 @@ class ShadeInteractorTest : SysuiTestCase() {
         }
     @Test
     fun userInteracting_idle() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val key = SceneKey.Shade
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
@@ -830,7 +834,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteracting_transitioning_toScene_programmatic() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
@@ -844,7 +848,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = key,
                         progress = progress,
-                        isUserInputDriven = false,
+                        isInitiatedByUserInput = false,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -867,7 +872,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteracting_transitioning_toScene_userInputDriven() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
@@ -881,7 +886,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = key,
                         progress = progress,
-                        isUserInputDriven = true,
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -904,7 +910,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteracting_transitioning_fromScene_programmatic() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
@@ -918,7 +924,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = key,
                         toScene = SceneKey.Lockscreen,
                         progress = progress,
-                        isUserInputDriven = false,
+                        isInitiatedByUserInput = false,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -941,7 +948,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteracting_transitioning_fromScene_userInputDriven() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val key = SceneKey.QuickSettings
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
@@ -955,7 +962,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = key,
                         toScene = SceneKey.Lockscreen,
                         progress = progress,
-                        isUserInputDriven = true,
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -978,7 +986,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun userInteracting_transitioning_toAndFromDifferentScenes() =
-        testScope.runTest() {
+        testComponent.runTest() {
             // GIVEN an interacting flow based on transitions to and from a scene
             val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, SceneKey.Shade)
             val interacting by collectLastValue(interactingFlow)
@@ -990,8 +998,9 @@ class ShadeInteractorTest : SysuiTestCase() {
                     ObservableTransitionState.Transition(
                         fromScene = SceneKey.Lockscreen,
                         toScene = SceneKey.QuickSettings,
-                        progress = progress,
-                        isUserInputDriven = true,
+                        progress = MutableStateFlow(0f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(false),
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -1002,7 +1011,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isFalse_whenFrpIsActive() =
-        testScope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setFactoryResetProtectionActive(true)
             keyguardTransitionRepository.sendTransitionStep(
                 TransitionStep(
@@ -1016,7 +1025,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isFalse_whenDeviceAsleepAndNotPulsing() =
-        testScope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.ASLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -1043,7 +1052,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isTrue_whenDeviceAsleepAndPulsing() =
-        testScope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.ASLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -1070,7 +1079,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isFalse_whenStartingToSleepAndNotControlScreenOff() =
-        testScope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.STARTING_TO_SLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -1092,7 +1101,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isTrue_whenStartingToSleepAndControlScreenOff() =
-        testScope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.STARTING_TO_SLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -1114,7 +1123,7 @@ class ShadeInteractorTest : SysuiTestCase() {
 
     @Test
     fun isShadeTouchable_isTrue_whenNotAsleep() =
-        testScope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.AWAKE,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -1129,38 +1138,4 @@ class ShadeInteractorTest : SysuiTestCase() {
             runCurrent()
             assertThat(isShadeTouchable).isTrue()
         }
-
-    @SysUISingleton
-    @Component(
-        modules =
-            [
-                SysUITestModule::class,
-                UserDomainLayerModule::class,
-            ]
-    )
-    interface TestComponent {
-
-        val underTest: ShadeInteractor
-
-        val configurationRepository: FakeConfigurationRepository
-        val deviceProvisioningRepository: FakeDeviceProvisioningRepository
-        val disableFlagsRepository: FakeDisableFlagsRepository
-        val keyguardRepository: FakeKeyguardRepository
-        val keygaurdTransitionRepository: FakeKeyguardTransitionRepository
-        val powerRepository: FakePowerRepository
-        val sceneInteractor: SceneInteractor
-        val shadeRepository: FakeShadeRepository
-        val testScope: TestScope
-        val userRepository: FakeUserRepository
-        val userSetupRepository: FakeUserSetupRepository
-
-        @Component.Factory
-        interface Factory {
-            fun create(
-                @BindsInstance test: SysuiTestCase,
-                featureFlags: FakeFeatureFlagsClassicModule,
-                mocks: TestMocksModule,
-            ): TestComponent
-        }
-    }
 }

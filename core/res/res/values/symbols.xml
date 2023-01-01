@@ -332,6 +332,7 @@
   <java-symbol type="integer" name="config_phonenumber_compare_min_match" />
   <java-symbol type="bool" name="config_single_volume" />
   <java-symbol type="bool" name="config_volume_down_to_enter_silent" />
+  <java-symbol type="bool" name="config_volume_up_to_exit_silent" />
   <java-symbol type="bool" name="config_voice_capable" />
   <java-symbol type="bool" name="config_requireCallCapableAccountForHandle" />
   <java-symbol type="bool" name="config_user_notification_of_restrictied_mobile_access" />
@@ -476,6 +477,7 @@
   <java-symbol type="integer" name="config_doublePressOnStemPrimaryBehavior" />
   <java-symbol type="integer" name="config_triplePressOnStemPrimaryBehavior" />
   <java-symbol type="bool" name="config_shortPressEarlyOnPower" />
+  <java-symbol type="bool" name="config_shortPressEarlyOnStemPrimary" />
   <java-symbol type="string" name="config_doublePressOnPowerTargetActivity" />
   <java-symbol type="integer" name="config_searchKeyBehavior" />
   <java-symbol type="string" name="config_searchKeyTargetActivity" />
@@ -1747,6 +1749,8 @@
   <java-symbol type="bool" name="config_startDreamImmediatelyOnDock" />
   <java-symbol type="bool" name="config_carDockEnablesAccelerometer" />
   <java-symbol type="bool" name="config_customUserSwitchUi" />
+  <java-symbol type="bool" name="config_canRemoveFirstAccount" />
+  <java-symbol type="string" name="config_accountTypeToKeepFirstAccount" />
   <java-symbol type="bool" name="config_deskDockEnablesAccelerometer" />
   <java-symbol type="bool" name="config_disableMenuKeyInLockScreen" />
   <java-symbol type="bool" name="config_enableCarDockHomeLaunch" />
@@ -1754,6 +1758,7 @@
   <java-symbol type="bool" name="config_enableLockScreenRotation" />
   <java-symbol type="bool" name="config_remoteInsetsControllerControlsSystemBars" />
   <java-symbol type="bool" name="config_remoteInsetsControllerSystemBarsCanBeShownByUserAction" />
+  <java-symbol type="bool" name="config_decoupleStatusBarAndDisplayCutoutFromScreenSize" />
   <java-symbol type="bool" name="config_lidControlsScreenLock" />
   <java-symbol type="bool" name="config_lidControlsSleep" />
   <java-symbol type="bool" name="config_lockDayNightMode" />
@@ -1977,6 +1982,7 @@
   <java-symbol type="bool" name="config_enableNightMode" />
   <java-symbol type="bool" name="config_tintNotificationActionButtons" />
   <java-symbol type="bool" name="config_dozeAfterScreenOffByDefault" />
+  <java-symbol type="bool" name="config_brightWhenDozing" />
   <java-symbol type="bool" name="config_enableActivityRecognitionHardwareOverlay" />
   <java-symbol type="bool" name="config_defaultAdasGnssLocationEnabled" />
   <java-symbol type="bool" name="config_enableFusedLocationOverlay" />
@@ -2025,6 +2031,7 @@
   <java-symbol type="drawable" name="vpn_connected" />
   <java-symbol type="drawable" name="vpn_disconnected" />
   <java-symbol type="drawable" name="usb_cable_unknown_issue" />
+  <java-symbol type="drawable" name="ic_thermostat_notification" />
   <java-symbol type="id" name="ask_checkbox" />
   <java-symbol type="id" name="compat_checkbox" />
   <java-symbol type="id" name="original_app_icon" />
@@ -2906,6 +2913,7 @@
   <java-symbol type="integer" name="config_defaultNightMode" />
 
   <java-symbol type="integer" name="config_jobSchedulerInactivityIdleThreshold" />
+  <java-symbol type="integer" name="config_jobSchedulerInactivityIdleThresholdOnStablePower" />
   <java-symbol type="integer" name="config_jobSchedulerIdleWindowSlop" />
   <java-symbol type="bool" name="config_jobSchedulerRestrictBackgroundUser" />
   <java-symbol type="integer" name="config_jobSchedulerUserGracePeriod" />
@@ -3097,6 +3105,8 @@
   <java-symbol type="bool" name="config_navBarDefaultTransparent" />
   <java-symbol type="color" name="navigation_bar_default"/>
   <java-symbol type="color" name="navigation_bar_compatible"/>
+  <java-symbol type="color" name="status_bar_default"/>
+  <java-symbol type="color" name="status_bar_compatible"/>
 
   <!-- EditText suggestion popup. -->
   <java-symbol type="id" name="suggestionWindowContainer" />
@@ -5112,6 +5122,7 @@
   <java-symbol type="array" name="device_state_notification_power_save_contents"/>
   <java-symbol type="string" name="connected_display_unavailable_notification_title"/>
   <java-symbol type="string" name="connected_display_unavailable_notification_content"/>
+  <java-symbol type="string" name="connected_display_thermally_unavailable_notification_content"/>
   <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_title"/>
   <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_content"/>
   <java-symbol type="string" name="concurrent_display_notification_name"/>

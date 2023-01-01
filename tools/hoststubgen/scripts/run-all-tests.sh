@@ -24,8 +24,17 @@ READY_TEST_MODULES=(
   hoststubgen-test-tiny-test
 )
 
-# First, build all the test modules. This shouldn't fail.
-run m run-ravenwood-test ${READY_TEST_MODULES[*]} ${NOT_READY_TEST_MODULES[*]}
+MUST_BUILD_MODULES=(
+    run-ravenwood-test
+    "${NOT_READY_TEST_MODULES[*]}"
+    HostStubGenTest-framework-test
+)
+
+# First, build all the test / etc modules. This shouldn't fail.
+run m "${MUST_BUILD_MODULES[@]}"
+
+# Run the hoststubgen unittests / etc
+run atest hoststubgentest hoststubgen-invoke-test
 
 # Next, run the golden check. This should always pass too.
 # The following scripts _should_ pass too, but they depend on the internal paths to soong generated
@@ -43,5 +52,7 @@ run ./scripts/build-framework-hostside-jars-and-extract.sh
 
 # These tests should all pass.
 run-ravenwood-test ${READY_TEST_MODULES[*]}
+
+run atest CtsUtilTestCasesRavenwood
 
 echo ""${0##*/}" finished, with no unexpected failures. Ready to submit!"

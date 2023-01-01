@@ -112,6 +112,7 @@ import android.content.IntentSender;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ArchivedPackageParcel;
 import android.content.pm.DataLoaderType;
+import android.content.pm.Flags;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageInfoLite;
 import android.content.pm.PackageInstaller;
@@ -160,6 +161,7 @@ import com.android.internal.util.CollectionUtils;
 import com.android.server.EventLogTags;
 import com.android.server.LocalManagerRegistry;
 import com.android.server.SystemConfig;
+import com.android.server.art.model.ArtFlags;
 import com.android.server.art.model.DexoptParams;
 import com.android.server.art.model.DexoptResult;
 import com.android.server.pm.Installer.LegacyDexoptDisabledException;
@@ -475,20 +477,30 @@ final class InstallPackageHelper {
             pkgSetting.setLoadingProgress(1f);
         }
 
+        // TODO: passes the package name as an argument in a message to the handler for V+
+        //  so we don't need to rely on creating lambda objects so frequently.
+        if (UpdateOwnershipHelper.hasValidOwnershipDenyList(pkgSetting)) {
+            mPm.mHandler.post(() -> handleUpdateOwnerDenyList(pkgSetting));
+        }
+        return pkg;
+    }
+
+    private void handleUpdateOwnerDenyList(PackageSetting pkgSetting) {
         ArraySet<String> listItems = mUpdateOwnershipHelper.readUpdateOwnerDenyList(pkgSetting);
         if (listItems != null && !listItems.isEmpty()) {
-            mUpdateOwnershipHelper.addToUpdateOwnerDenyList(pkgSetting.getPackageName(), listItems);
-            for (String unownedPackage : listItems) {
-                PackageSetting unownedSetting = mPm.mSettings.getPackageLPr(unownedPackage);
-                SystemConfig config = SystemConfig.getInstance();
-                if (unownedSetting != null
-                        && config.getSystemAppUpdateOwnerPackageName(unownedPackage) == null) {
-                    unownedSetting.setUpdateOwnerPackage(null);
+            mUpdateOwnershipHelper.addToUpdateOwnerDenyList(pkgSetting.getPackageName(),
+                    listItems);
+            SystemConfig config = SystemConfig.getInstance();
+            synchronized (mPm.mLock) {
+                for (String unownedPackage : listItems) {
+                    PackageSetting unownedSetting = mPm.mSettings.getPackageLPr(unownedPackage);
+                    if (unownedSetting != null
+                            && config.getSystemAppUpdateOwnerPackageName(unownedPackage) == null) {
+                        unownedSetting.setUpdateOwnerPackage(null);
+                    }
                 }
             }
         }
-
-        return pkg;
     }
 
     /**
@@ -2546,8 +2558,15 @@ final class InstallPackageHelper {
                             LocalManagerRegistry.getManager(PackageManagerLocal.class);
                     try (PackageManagerLocal.FilteredSnapshot snapshot =
                                     packageManagerLocal.withFilteredSnapshot()) {
-                        DexoptParams params =
-                                dexoptOptions.convertToDexoptParams(0 /* extraFlags */);
+                        boolean ignoreDexoptProfile =
+                                (installRequest.getInstallFlags()
+                                        & PackageManager.INSTALL_IGNORE_DEXOPT_PROFILE)
+                                != 0;
+                        /*@DexoptFlags*/ int extraFlags =
+                                ignoreDexoptProfile && Flags.useArtServiceV2()
+                                ? ArtFlags.FLAG_IGNORE_PROFILE
+                                : 0;
+                        DexoptParams params = dexoptOptions.convertToDexoptParams(extraFlags);
                         DexoptResult dexOptResult = DexOptHelper.getArtManagerLocal().dexoptPackage(
                                 snapshot, packageName, params);
                         installRequest.onDexoptFinished(dexOptResult);

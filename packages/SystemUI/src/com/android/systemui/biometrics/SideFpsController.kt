@@ -53,6 +53,7 @@ import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.model.KeyPath
 import com.android.app.animation.Interpolators
+import com.android.app.tracing.traceSection
 import com.android.internal.annotations.VisibleForTesting
 import com.android.keyguard.KeyguardPINView
 import com.android.systemui.Dumpable
@@ -63,7 +64,6 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.res.R
-import com.android.systemui.tracing.traceSection
 import com.android.systemui.util.boundsOnScreen
 import com.android.systemui.util.concurrency.DelayableExecutor
 import java.io.PrintWriter
@@ -91,7 +91,8 @@ constructor(
     @Main private val handler: Handler,
     private val alternateBouncerInteractor: AlternateBouncerInteractor,
     @Application private val scope: CoroutineScope,
-    dumpManager: DumpManager
+    dumpManager: DumpManager,
+    fpsUnlockTracker: FpsUnlockTracker
 ) : Dumpable {
     private val requests: HashSet<SideFpsUiRequestSource> = HashSet()
 
@@ -167,6 +168,7 @@ constructor(
             }
 
     init {
+        fpsUnlockTracker.startTracking()
         fingerprintManager?.setSidefpsController(
             object : ISidefpsController.Stub() {
                 override fun show(

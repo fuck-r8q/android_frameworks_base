@@ -130,10 +130,11 @@ public class BackAnimationControllerTest extends ShellTestCase {
         mShellInit = spy(new ShellInit(mShellExecutor));
         mShellBackAnimationRegistry =
                 new ShellBackAnimationRegistry(
-                        new CrossActivityAnimation(mContext, mAnimationBackground),
+                        new CrossActivityBackAnimation(mContext, mAnimationBackground),
                         new CrossTaskBackAnimation(mContext, mAnimationBackground),
+                        /* dialogCloseAnimation= */ null,
                         new CustomizeActivityAnimation(mContext, mAnimationBackground),
-                        null);
+                        /* defaultBackToHomeAnimation= */ null);
         mController =
                 new BackAnimationController(
                         mShellInit,
@@ -533,7 +534,7 @@ public class BackAnimationControllerTest extends ShellTestCase {
 
     @Test
     public void testBackToActivity() throws RemoteException {
-        final CrossActivityAnimation animation = new CrossActivityAnimation(mContext,
+        final CrossActivityBackAnimation animation = new CrossActivityBackAnimation(mContext,
                 mAnimationBackground);
         verifySystemBackBehavior(BackNavigationInfo.TYPE_CROSS_ACTIVITY, animation.getRunner());
     }

@@ -759,13 +759,7 @@ public final class MediaRouter2 {
             return;
         }
 
-        synchronized (mLock) {
-            mRoutes.clear();
-            for (MediaRoute2Info route : currentRoutes) {
-                mRoutes.put(route.getId(), route);
-            }
-            updateFilteredRoutesLocked();
-        }
+        updateRoutesOnHandler(currentRoutes);
 
         RoutingSessionInfo oldInfo = mSystemController.getRoutingSessionInfo();
         mSystemController.setRoutingSessionInfo(currentSystemSessionInfo);
@@ -824,10 +818,10 @@ public final class MediaRouter2 {
         }
     }
 
-    void updateRoutesOnHandler(List<MediaRoute2Info> routes) {
+    void updateRoutesOnHandler(List<MediaRoute2Info> newRoutes) {
         synchronized (mLock) {
             mRoutes.clear();
-            for (MediaRoute2Info route : routes) {
+            for (MediaRoute2Info route : newRoutes) {
                 mRoutes.put(route.getId(), route);
             }
             updateFilteredRoutesLocked();
@@ -1396,6 +1390,20 @@ public final class MediaRouter2 {
                 deselectableRouteIds = mSessionInfo.getDeselectableRoutes();
             }
             return getRoutesWithIds(deselectableRouteIds);
+        }
+
+        /**
+         * Returns the unmodifiable list of transferable routes for the session.
+         *
+         * @hide
+         */
+        @NonNull
+        public List<MediaRoute2Info> getTransferableRoutes() {
+            List<String> transferableRoutes;
+            synchronized (mControllerLock) {
+                transferableRoutes = mSessionInfo.getTransferableRoutes();
+            }
+            return getRoutesWithIds(transferableRoutes);
         }
 
         /**
@@ -2689,16 +2697,6 @@ public final class MediaRouter2 {
             notifyRouteListingPreferenceUpdated(routeListingPreference);
         }
 
-        private void onRoutesUpdatedOnHandler(@NonNull List<MediaRoute2Info> routes) {
-            synchronized (mLock) {
-                mRoutes.clear();
-                for (MediaRoute2Info route : routes) {
-                    mRoutes.put(route.getId(), route);
-                }
-                updateFilteredRoutesLocked();
-            }
-        }
-
         private void onRequestFailedOnHandler(int requestId, int reason) {
             MediaRouter2Manager.TransferRequest matchingRequest = null;
             for (MediaRouter2Manager.TransferRequest request : mTransferRequests) {
@@ -2772,9 +2770,7 @@ public final class MediaRouter2 {
             public void notifyRoutesUpdated(List<MediaRoute2Info> routes) {
                 mHandler.sendMessage(
                         obtainMessage(
-                                ProxyMediaRouter2Impl::onRoutesUpdatedOnHandler,
-                                ProxyMediaRouter2Impl.this,
-                                routes));
+                                MediaRouter2::updateRoutesOnHandler, MediaRouter2.this, routes));
             }
 
             @Override

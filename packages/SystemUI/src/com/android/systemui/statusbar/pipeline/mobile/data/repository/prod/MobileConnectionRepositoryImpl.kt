@@ -115,6 +115,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.withContext
 
 /**
  * A repository implementation for a typical mobile connection (as opposed to a carrier merged
@@ -133,7 +134,7 @@ class MobileConnectionRepositoryImpl(
     systemUiCarrierConfig: SystemUiCarrierConfig,
     broadcastDispatcher: BroadcastDispatcher,
     private val mobileMappingsProxy: MobileMappingsProxy,
-    bgDispatcher: CoroutineDispatcher,
+    private val bgDispatcher: CoroutineDispatcher,
     logger: MobileInputLogger,
     override val tableLogBuffer: TableLogBuffer,
     scope: CoroutineScope,
@@ -644,6 +645,9 @@ class MobileConnectionRepositoryImpl(
         Log.d(tag, "getSlotIndex subId: $subId slotIndex: $slotIndex list.size: ${list?.size}")
         return slotIndex
     }
+
+    override suspend fun isInEcmMode(): Boolean =
+        withContext(bgDispatcher) { telephonyManager.emergencyCallbackMode }
 
     /** Typical mobile connections aren't available during airplane mode. */
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false).asStateFlow()

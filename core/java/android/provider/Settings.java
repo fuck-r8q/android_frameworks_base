@@ -5923,6 +5923,7 @@ public final class Settings {
          *
          * @hide
          */
+        @Readable
         public static final String TOUCHPAD_NATURAL_SCROLLING = "touchpad_natural_scrolling";
 
         /**
@@ -10318,6 +10319,13 @@ public final class Settings {
          */
         @Readable
         public static final String SHOW_NOTIFICATION_SNOOZE = "show_notification_snooze";
+
+       /**
+         * 1 if it is allowed to remove the primary GAIA account. 0 by default.
+         * @hide
+         */
+        public static final String ALLOW_PRIMARY_GAIA_ACCOUNT_REMOVAL_FOR_TESTS =
+                "allow_primary_gaia_account_removal_for_tests";
 
         /**
          * List of TV inputs that are currently hidden. This is a string
@@ -15294,6 +15302,7 @@ public final class Settings {
          * max_history_files (int)
          * max_history_buffer_kb (int)
          * battery_charged_delay_ms (int)
+         * battery_charging_enforce_level (int)
          * </pre>
          *
          * <p>
@@ -18329,8 +18338,11 @@ public final class Settings {
 
         /**
          * Delay for sending ACTION_CHARGING after device is plugged in.
-         * This is used as an override for constants defined in BatteryStatsImpl for
-         * ease of experimentation.
+         * This is used as an override for constants defined in BatteryStatsImpl. Its purposes are:
+         * <ol>
+         *     <li>Ease of experimentation</li>
+         *     <li>Customization of different device</li>
+         * </ol>
          *
          * @see com.android.internal.os.BatteryStatsImpl.Constants.KEY_BATTERY_CHARGED_DELAY_MS
          * @hide
@@ -18338,6 +18350,22 @@ public final class Settings {
         @Readable
         public static final String BATTERY_CHARGING_STATE_UPDATE_DELAY =
                 "battery_charging_state_update_delay";
+
+        /**
+         * Threshold battery level to enforce battery state as charging. That means when battery
+         * level is equal to or higher than this threshold, it is always considered charging, even
+         * if battery level lowered.
+         * This is used as an override for constants defined in BatteryStatsImpl. Its purposes are:
+         * <ol>
+         *     <li>Ease of experimentation</li>
+         *     <li>Customization of different device</li>
+         * </ol>
+         *
+         * @hide
+         * @see com.android.internal.os.BatteryStatsImpl.Constants.BATTERY_CHARGING_ENFORCE_LEVEL
+         */
+        public static final String BATTERY_CHARGING_STATE_ENFORCE_LEVEL =
+                "battery_charging_state_enforce_level";
 
         /**
          * A serialized string of params that will be loaded into a text classifier action model.

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // We need this "trampoline" rule to force soong to give a host-side jar to
-// framework-minus-apex.ravenwood. Otherwise, soong would mix up the arch (?) and we'd get
+// framework-minus-apex.ravenwood-base. Otherwise, soong would mix up the arch (?) and we'd get
 // a dex jar.
 java_library {
     name: "framework-minus-apex-for-hoststubgen",
@@ -26,11 +26,11 @@ java_library {
 }
 
 // Generate the stub/impl from framework-all, with hidden APIs.
-java_genrule_host {
+java_genrule {
     name: "framework-minus-apex.ravenwood-base",
     tools: ["hoststubgen"],
     cmd: "$(location hoststubgen) " +
-        "@$(location :ravenwood-standard-options) " +
+        "@$(location ravenwood/ravenwood-standard-options.txt) " +
 
         "--out-stub-jar $(location ravenwood_stub.jar) " +
         "--out-impl-jar $(location ravenwood.jar) " +
@@ -39,11 +39,13 @@ java_genrule_host {
         "--gen-input-dump-file $(location hoststubgen_dump.txt) " +
 
         "--in-jar $(location :framework-minus-apex-for-hoststubgen) " +
-        "--policy-override-file $(location framework-minus-apex-ravenwood-policies.txt) ",
+        "--policy-override-file $(location ravenwood/framework-minus-apex-ravenwood-policies.txt) " +
+        "--annotation-allowed-classes-file $(location ravenwood/ravenwood-annotation-allowed-classes.txt) ",
     srcs: [
         ":framework-minus-apex-for-hoststubgen",
-        "framework-minus-apex-ravenwood-policies.txt",
-        ":ravenwood-standard-options",
+        "ravenwood/framework-minus-apex-ravenwood-policies.txt",
+        "ravenwood/ravenwood-standard-options.txt",
+        "ravenwood/ravenwood-annotation-allowed-classes.txt",
     ],
     out: [
         "ravenwood.jar",
@@ -57,7 +59,9 @@ java_genrule_host {
 }
 
 // Extract the impl jar from "framework-minus-apex.ravenwood-base" for subsequent build rules.
-java_genrule_host {
+// Note this emits a "device side" output, so that ravenwood tests can (implicitly)
+// depend on it.
+java_genrule {
     name: "framework-minus-apex.ravenwood",
     defaults: ["hoststubgen-for-prototype-only-genrule"],
     cmd: "cp $(in) $(out)",
@@ -66,5 +70,26 @@ java_genrule_host {
     ],
     out: [
         "framework-minus-apex.ravenwood.jar",
+    ],
+}
+
+android_ravenwood_libgroup {
+    name: "ravenwood-runtime",
+    libs: [
+        "framework-minus-apex.ravenwood",
+        "hoststubgen-helper-runtime.ravenwood",
+        "hoststubgen-helper-framework-runtime.ravenwood",
+        "junit",
+        "truth",
+        "ravenwood-junit",
+    ],
+}
+
+android_ravenwood_libgroup {
+    name: "ravenwood-utils",
+    libs: [
+        "junit",
+        "truth",
+        "ravenwood-junit",
     ],
 }

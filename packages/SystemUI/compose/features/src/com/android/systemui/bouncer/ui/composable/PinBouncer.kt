@@ -30,7 +30,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,12 +55,12 @@ import androidx.compose.ui.unit.dp
 import com.android.compose.animation.Easings
 import com.android.compose.grid.VerticalGrid
 import com.android.compose.modifiers.thenIf
-import com.android.systemui.res.R
 import com.android.systemui.bouncer.ui.viewmodel.ActionButtonAppearance
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.ui.compose.Icon
+import com.android.systemui.res.R
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
 import kotlinx.coroutines.async
@@ -87,13 +87,16 @@ internal fun PinBouncer(
             }
     ) {
         PinInputDisplay(viewModel)
-        Spacer(Modifier.height(100.dp))
+        Spacer(Modifier.heightIn(min = 34.dp, max = 48.dp))
         PinPad(viewModel)
     }
 }
 
 @Composable
-private fun PinPad(viewModel: PinBouncerViewModel) {
+fun PinPad(
+    viewModel: PinBouncerViewModel,
+    modifier: Modifier = Modifier,
+) {
     val isInputEnabled: Boolean by viewModel.isInputEnabled.collectAsState()
     val backspaceButtonAppearance by viewModel.backspaceButtonAppearance.collectAsState()
     val confirmButtonAppearance by viewModel.confirmButtonAppearance.collectAsState()
@@ -112,6 +115,7 @@ private fun PinPad(viewModel: PinBouncerViewModel) {
         columns = 3,
         verticalSpacing = 12.dp,
         horizontalSpacing = 20.dp,
+        modifier = modifier,
     ) {
         repeat(9) { index ->
             DigitButton(

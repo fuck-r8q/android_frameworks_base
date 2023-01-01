@@ -580,18 +580,21 @@ public class TaskTests extends WindowTestsBase {
         doReturn(task).when(root).getOrganizedTask();
 
         // The button should be eligible to be displayed
-        assertTrue(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+        assertTrue(task.getTaskInfo()
+                .appCompatTaskInfo.topActivityEligibleForUserAspectRatioButton);
 
         // When shouldApplyUserMinAspectRatioOverride is disable the button is not enabled
         doReturn(false).when(root.mLetterboxUiController)
                 .shouldEnableUserAspectRatioSettings();
-        assertFalse(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+        assertFalse(task.getTaskInfo()
+                .appCompatTaskInfo.topActivityEligibleForUserAspectRatioButton);
         doReturn(true).when(root.mLetterboxUiController)
                 .shouldEnableUserAspectRatioSettings();
 
         // When in size compat mode the button is not enabled
         doReturn(true).when(root).inSizeCompatMode();
-        assertFalse(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+        assertFalse(task.getTaskInfo()
+                .appCompatTaskInfo.topActivityEligibleForUserAspectRatioButton);
         doReturn(false).when(root).inSizeCompatMode();
     }
 
@@ -1578,6 +1581,35 @@ public class TaskTests extends WindowTestsBase {
                 task.getTopMostActivity());
         assertEquals("Activity must not be embedded", embeddedActivity,
                 task.getTopChild());
+    }
+
+    @Test
+    public void testSetDragResizing() {
+        final Task task = createTask(mDisplayContent);
+
+        // Allowed for freeform.
+        task.setWindowingMode(WINDOWING_MODE_FREEFORM);
+
+        task.setDragResizing(true);
+        assertTrue(task.isDragResizing());
+        task.setDragResizing(false);
+        assertFalse(task.isDragResizing());
+
+        // Allowed for multi-window.
+        task.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+
+        task.setDragResizing(true);
+        assertTrue(task.isDragResizing());
+        task.setDragResizing(false);
+        assertFalse(task.isDragResizing());
+
+        // Disallowed for fullscreen.
+        task.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+
+        task.setDragResizing(true);
+        assertFalse(task.isDragResizing());
+        task.setDragResizing(false);
+        assertFalse(task.isDragResizing());
     }
 
     private Task getTestTask() {

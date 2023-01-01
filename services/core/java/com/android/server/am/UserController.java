@@ -76,7 +76,6 @@ import android.app.BroadcastOptions;
 import android.app.IStopUserCallback;
 import android.app.IUserSwitchObserver;
 import android.app.KeyguardManager;
-import android.app.admin.DevicePolicyManagerInternal;
 import android.app.usage.UsageEvents;
 import android.appwidget.AppWidgetManagerInternal;
 import android.content.Context;
@@ -1497,10 +1496,8 @@ class UserController implements Handler.Callback {
 
     private boolean shouldStartWithParent(UserInfo user) {
         final UserProperties properties = getUserProperties(user.id);
-        DevicePolicyManagerInternal dpmi =
-                LocalServices.getService(DevicePolicyManagerInternal.class);
         return (properties != null && properties.getStartWithParent())
-                && (!user.isQuietModeEnabled() || dpmi.isKeepProfilesRunningEnabled());
+                && !user.isQuietModeEnabled();
     }
 
     /**
@@ -1999,25 +1996,26 @@ class UserController implements Handler.Callback {
         EventLog.writeEvent(EventLogTags.UC_SWITCH_USER, targetUserId);
         int currentUserId = getCurrentUserId();
         UserInfo targetUserInfo = getUserInfo(targetUserId);
-        if (targetUserId == currentUserId) {
-            Slogf.i(TAG, "user #" + targetUserId + " is already the current user");
-            return true;
-        }
-        if (targetUserInfo == null) {
-            Slogf.w(TAG, "No user info for user #" + targetUserId);
-            return false;
-        }
-        if (!targetUserInfo.supportsSwitchTo()) {
-            Slogf.w(TAG, "Cannot switch to User #" + targetUserId + ": not supported");
-            return false;
-        }
-        if (FactoryResetter.isFactoryResetting()) {
-            Slogf.w(TAG, "Cannot switch to User #" + targetUserId + ": factory reset in progress");
-            return false;
-        }
-
         boolean userSwitchUiEnabled;
         synchronized (mLock) {
+            if (targetUserId == currentUserId && mTargetUserId == UserHandle.USER_NULL) {
+                Slogf.i(TAG, "user #" + targetUserId + " is already the current user");
+                return true;
+            }
+            if (targetUserInfo == null) {
+                Slogf.w(TAG, "No user info for user #" + targetUserId);
+                return false;
+            }
+            if (!targetUserInfo.supportsSwitchTo()) {
+                Slogf.w(TAG, "Cannot switch to User #" + targetUserId + ": not supported");
+                return false;
+            }
+            if (FactoryResetter.isFactoryResetting()) {
+                Slogf.w(TAG, "Cannot switch to User #" + targetUserId
+                        + ": factory reset in progress");
+                return false;
+            }
+
             if (!mInitialized) {
                 Slogf.e(TAG, "Cannot switch to User #" + targetUserId
                         + ": UserController not ready yet");
@@ -2031,6 +2029,9 @@ class UserController implements Handler.Callback {
             }
             mTargetUserId = targetUserId;
             userSwitchUiEnabled = mUserSwitchUiEnabled;
+        }
+        if (android.multiuser.Flags.useAllCpusDuringUserSwitch()) {
+            mInjector.setHasTopUi(true);
         }
         if (userSwitchUiEnabled) {
             UserInfo currentUserInfo = getUserInfo(currentUserId);
@@ -2100,6 +2101,9 @@ class UserController implements Handler.Callback {
     }
 
     private void endUserSwitch() {
+        if (android.multiuser.Flags.useAllCpusDuringUserSwitch()) {
+            mInjector.setHasTopUi(false);
+        }
         final int nextUserId;
         synchronized (mLock) {
             nextUserId = ObjectUtils.getOrElse(mPendingTargetUserIds.poll(), UserHandle.USER_NULL);
@@ -3628,7 +3632,7 @@ class UserController implements Handler.Callback {
 
         void activityManagerForceStopPackage(@UserIdInt int userId, String reason) {
             synchronized (mService) {
-                mService.forceStopPackageLocked(null, -1, false, false, true, false, false,
+                mService.forceStopPackageLocked(null, -1, false, false, true, false, false, false,
                         userId, reason);
             }
         };
@@ -3781,6 +3785,15 @@ class UserController implements Handler.Callback {
 
         void onUserStarting(@UserIdInt int userId) {
             getSystemServiceManager().onUserStarting(TimingsTraceAndSlog.newAsyncLog(), userId);
+        }
+
+        void setHasTopUi(boolean hasTopUi) {
+            try {
+                Slogf.i(TAG, "Setting hasTopUi to " + hasTopUi);
+                mService.setHasTopUi(hasTopUi);
+            } catch (RemoteException e) {
+                Slogf.e(TAG, "Failed to allow using all CPU cores", e);
+            }
         }
 
         void onSystemUserVisibilityChanged(boolean visible) {

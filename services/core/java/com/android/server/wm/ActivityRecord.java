@@ -31,6 +31,10 @@ import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_DOWN;
 import static android.app.ActivityOptions.ANIM_THUMBNAIL_SCALE_UP;
 import static android.app.ActivityOptions.ANIM_UNDEFINED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_DISMISSED;
+import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN;
+import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED;
+import static android.app.AppCompatTaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_SUGGESTED;
 import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.OP_PICTURE_IN_PICTURE;
 import static android.app.WaitResult.INVALID_DELAY;
@@ -259,13 +263,13 @@ import android.annotation.Size;
 import android.app.Activity;
 import android.app.ActivityManager.TaskDescription;
 import android.app.ActivityOptions;
+import android.app.AppCompatTaskInfo;
+import android.app.AppCompatTaskInfo.CameraCompatControlState;
 import android.app.ICompatCameraControlCallback;
 import android.app.IScreenCaptureObserver;
 import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
 import android.app.ResultInfo;
-import android.app.TaskInfo;
-import android.app.TaskInfo.CameraCompatControlState;
 import android.app.WaitResult;
 import android.app.WindowConfiguration;
 import android.app.admin.DevicePolicyManager;
@@ -827,7 +831,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     // State of the Camera app compat control which is used to correct stretched viewfinder
     // in apps that don't handle all possible configurations and changes between them correctly.
     @CameraCompatControlState
-    private int mCameraCompatControlState = TaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN;
+    private int mCameraCompatControlState = CAMERA_COMPAT_CONTROL_HIDDEN;
 
 
     // The callback that allows to ask the calling View to apply the treatment for stretched
@@ -930,7 +934,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     boolean mEnteringAnimation;
     boolean mOverrideTaskTransition;
-    boolean mDismissKeyguard;
+    boolean mDismissKeyguardIfInsecure;
     boolean mShareIdentity;
 
     /** True if the activity has reported stopped; False if the activity becomes visible. */
@@ -1340,7 +1344,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mLetterboxUiController.dump(pw, prefix);
 
         pw.println(prefix + "mCameraCompatControlState="
-                + TaskInfo.cameraCompatControlStateToString(mCameraCompatControlState));
+                + AppCompatTaskInfo.cameraCompatControlStateToString(mCameraCompatControlState));
         pw.println(prefix + "mCameraCompatControlEnabled=" + mCameraCompatControlEnabled);
     }
 
@@ -1878,24 +1882,24 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return;
         }
         if (mCameraCompatControlClickedByUser && (showControl
-                || mCameraCompatControlState == TaskInfo.CAMERA_COMPAT_CONTROL_DISMISSED)) {
+                || mCameraCompatControlState == CAMERA_COMPAT_CONTROL_DISMISSED)) {
             // The user already applied treatment on this activity or dismissed control.
             // Respecting their choice.
             return;
         }
         mCompatCameraControlCallback = callback;
         int newCameraCompatControlState = !showControl
-                ? TaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN
+                ? CAMERA_COMPAT_CONTROL_HIDDEN
                 : transformationApplied
-                        ? TaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED
-                        : TaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_SUGGESTED;
+                        ? CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED
+                        : CAMERA_COMPAT_CONTROL_TREATMENT_SUGGESTED;
         boolean changed = setCameraCompatControlState(newCameraCompatControlState);
         if (!changed) {
             return;
         }
         mTaskSupervisor.getActivityMetricsLogger().logCameraCompatControlAppearedEventReported(
                 newCameraCompatControlState, info.applicationInfo.uid);
-        if (newCameraCompatControlState == TaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN) {
+        if (newCameraCompatControlState == CAMERA_COMPAT_CONTROL_HIDDEN) {
             mCameraCompatControlClickedByUser = false;
             mCompatCameraControlCallback = null;
         }
@@ -1913,7 +1917,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // Feature is disabled by config_isCameraCompatControlForStretchedIssuesEnabled.
             return;
         }
-        if (state == TaskInfo.CAMERA_COMPAT_CONTROL_HIDDEN) {
+        if (state == CAMERA_COMPAT_CONTROL_HIDDEN) {
             Slog.w(TAG, "Unexpected hidden state in updateCameraCompatState");
             return;
         }
@@ -1924,7 +1928,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         mTaskSupervisor.getActivityMetricsLogger().logCameraCompatControlClickedEventReported(
                 state, info.applicationInfo.uid);
-        if (state == TaskInfo.CAMERA_COMPAT_CONTROL_DISMISSED) {
+        if (state == CAMERA_COMPAT_CONTROL_DISMISSED) {
             mCompatCameraControlCallback = null;
             return;
         }
@@ -1933,7 +1937,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return;
         }
         try {
-            if (state == TaskInfo.CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED) {
+            if (state == CAMERA_COMPAT_CONTROL_TREATMENT_APPLIED) {
                 mCompatCameraControlCallback.applyCameraCompatTreatment();
             } else {
                 mCompatCameraControlCallback.revertCameraCompatTreatment();
@@ -2115,7 +2119,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
 
             mOverrideTaskTransition = options.getOverrideTaskTransition();
-            mDismissKeyguard = options.getDismissKeyguard();
+            mDismissKeyguardIfInsecure = options.getDismissKeyguardIfInsecure();
             mShareIdentity = options.isShareIdentityEnabled();
         }
 
@@ -2472,7 +2476,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final int typeParameter = StartingSurfaceController
                 .makeStartingWindowTypeParameter(newTask, taskSwitch, processRunning,
                         allowTaskSnapshot, activityCreated, isSimple, useLegacy, activityAllDrawn,
-                        type, packageName, mUserId);
+                        type, isIconStylePreferred(resolvedTheme), packageName, mUserId);
 
         if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
             if (isActivityTypeHome()) {
@@ -2911,7 +2915,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
 
         final StartingSurfaceController.StartingSurface surface;
-        final WindowState startingWindow = mStartingWindow;
         final boolean animate;
         if (mStartingData != null) {
             if (mStartingData.mWaitForSyncTransactionCommit
@@ -4578,7 +4581,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     mTransitionChangeFlags |= FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
                 }
                 // Post cleanup after the visibility and animation are transferred.
-                fromActivity.postWindowRemoveStartingWindowCleanup();
+                fromActivity.postWindowRemoveStartingWindowCleanup(tStartingWindow);
                 fromActivity.mVisibleSetFromTransferredStartingWindow = false;
 
                 mWmService.updateFocusedWindowLocked(
@@ -7629,7 +7632,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
     }
 
-    void postWindowRemoveStartingWindowCleanup() {
+    void postWindowRemoveStartingWindowCleanup(@NonNull WindowState win) {
+        if (mStartingWindow == win) {
+            // This could only happen when the window is removed from hierarchy. So do not keep its
+            // reference anymore.
+            mStartingWindow = null;
+        }
         if (mChildren.size() == 0 && mVisibleSetFromTransferredStartingWindow) {
             // We set the visible state to true for the token from a transferred starting
             // window. We now reset it back to false since the starting window was the last

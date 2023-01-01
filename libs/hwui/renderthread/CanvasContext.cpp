@@ -664,8 +664,8 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
     bool didDraw = false;
 
     int error = OK;
-    bool didSwap = mRenderPipeline->swapBuffers(frame, drawResult.success, windowDirty,
-                                                mCurrentFrameInfo, &requireSwap);
+    bool didSwap = mRenderPipeline->swapBuffers(frame, drawResult, windowDirty, mCurrentFrameInfo,
+                                                &requireSwap);
 
     mCurrentFrameInfo->set(FrameInfoIndex::CommandSubmissionCompleted) = std::max(
             drawResult.commandSubmissionTime, mCurrentFrameInfo->get(FrameInfoIndex::SwapBuffers));
@@ -969,6 +969,7 @@ void CanvasContext::buildLayer(RenderNode* node) {
     // buildLayer() will leave the tree in an unknown state, so we must stop drawing
     stopDrawing();
 
+    ScopedActiveContext activeContext(this);
     TreeInfo info(TreeInfo::MODE_FULL, *this);
     info.damageAccumulator = &mDamageAccumulator;
     info.layerUpdateQueue = &mLayerUpdateQueue;
