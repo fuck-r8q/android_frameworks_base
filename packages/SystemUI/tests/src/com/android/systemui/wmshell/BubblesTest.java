@@ -145,7 +145,9 @@ import com.android.systemui.statusbar.notification.collection.notifcollection.No
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.interruption.KeyguardNotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptLogger;
-import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderWrapper;
+import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionLogger;
+import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
+import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProviderTestUtil;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.NotificationTestHelper;
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor;
@@ -411,7 +413,6 @@ public class BubblesTest extends SysuiTestCase {
                 keyguardRepository,
                 new FakeCommandQueue(),
                 powerInteractor,
-                featureFlags,
                 sceneContainerFlags,
                 new FakeKeyguardBouncerRepository(),
                 configurationRepository,
@@ -521,7 +522,8 @@ public class BubblesTest extends SysuiTestCase {
                     (sysUiFlags & QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED) != 0;
         });
 
-        mPositioner = new TestableBubblePositioner(mContext, mWindowManager);
+        mPositioner = new TestableBubblePositioner(mContext,
+                mContext.getSystemService(WindowManager.class));
         mPositioner.setMaxBubbles(5);
         mBubbleData = new BubbleData(mContext, mBubbleLogger, mPositioner, mEducationController,
                 syncExecutor);
@@ -532,25 +534,26 @@ public class BubblesTest extends SysuiTestCase {
         final FakeGlobalSettings fakeGlobalSettings = new FakeGlobalSettings();
         fakeGlobalSettings.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON);
 
-        TestableNotificationInterruptStateProviderImpl interruptionStateProvider =
-                new TestableNotificationInterruptStateProviderImpl(
-                        mock(PowerManager.class),
+        final VisualInterruptionDecisionProvider interruptionDecisionProvider =
+                VisualInterruptionDecisionProviderTestUtil.INSTANCE.createProviderByFlag(
                         mock(AmbientDisplayConfiguration.class),
-                        mock(StatusBarStateController.class),
-                        mock(KeyguardStateController.class),
                         mock(BatteryController.class),
-                        mock(HeadsUpManager.class),
-                        mock(NotificationInterruptLogger.class),
-                        mock(Handler.class),
-                        mock(NotifPipelineFlags.class),
-                        mock(KeyguardNotificationVisibilityProvider.class),
-                        mock(UiEventLogger.class),
-                        mock(UserTracker.class),
                         mock(DeviceProvisionedController.class),
-                        mock(SystemClock.class),
+                        new FakeEventLog(),
+                        mock(NotifPipelineFlags.class),
                         fakeGlobalSettings,
-                        new FakeEventLog()
-                );
+                        mock(HeadsUpManager.class),
+                        mock(KeyguardNotificationVisibilityProvider.class),
+                        mock(KeyguardStateController.class),
+                        mock(Handler.class),
+                        mock(VisualInterruptionDecisionLogger.class),
+                        mock(NotificationInterruptLogger.class),
+                        mock(PowerManager.class),
+                        mock(StatusBarStateController.class),
+                        mock(SystemClock.class),
+                        mock(UiEventLogger.class),
+                        mock(UserTracker.class));
+        interruptionDecisionProvider.start();
 
         mShellTaskOrganizer = new ShellTaskOrganizer(mock(ShellInit.class),
                 mock(ShellCommandHandler.class),
@@ -599,7 +602,7 @@ public class BubblesTest extends SysuiTestCase {
                 mock(INotificationManager.class),
                 mIDreamManager,
                 mVisibilityProvider,
-                new NotificationInterruptStateProviderWrapper(interruptionStateProvider),
+                interruptionDecisionProvider,
                 mZenModeController,
                 mLockscreenUserManager,
                 mCommonNotifCollection,

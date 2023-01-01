@@ -79,7 +79,6 @@ import static android.os.PowerExemptionManager.REASON_ACTIVITY_VISIBILITY_GRACE_
 import static android.os.PowerExemptionManager.REASON_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_COMPANION_DEVICE_MANAGER;
-import static android.os.PowerExemptionManager.REASON_DENIED;
 import static android.os.PowerExemptionManager.REASON_INSTR_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_LOCKED_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_PROC_STATE_BTOP;
@@ -4939,8 +4938,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         } else {
             Slog.wtf(TAG, "Mismatched or missing ProcessRecord: " + app + ". Pid: " + pid
                     + ". Uid: " + uid);
-            killProcess(pid);
-            killProcessGroup(uid, pid);
+            if (pid > 0) {
+                killProcess(pid);
+                killProcessGroup(uid, pid);
+            }
             mProcessList.noteAppKill(pid, uid,
                     ApplicationExitInfo.REASON_INITIALIZATION_FAILURE,
                     ApplicationExitInfo.SUBREASON_UNKNOWN,
@@ -5136,7 +5137,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     REASON_LOCKED_BOOT_COMPLETED);
         }
         // Send BOOT_COMPLETED if the user is unlocked
-        if (StorageManager.isUserKeyUnlocked(app.userId)) {
+        if (StorageManager.isCeStorageUnlocked(app.userId)) {
             sendBootBroadcastToAppLocked(app, new Intent(Intent.ACTION_BOOT_COMPLETED),
                     REASON_BOOT_COMPLETED);
         }
@@ -14258,7 +14259,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 || action.startsWith("android.intent.action.PACKAGE_")
                                 || action.startsWith("android.intent.action.UID_")
                                 || action.startsWith("android.intent.action.EXTERNAL_")
-                                || action.startsWith("android.bluetooth.")) {
+                                || action.startsWith("android.bluetooth.")
+                                || action.equals(Intent.ACTION_SHUTDOWN)) {
                             if (DEBUG_BROADCAST) {
                                 Slog.wtf(TAG,
                                         "System internals registering for " + filter.toLongString()

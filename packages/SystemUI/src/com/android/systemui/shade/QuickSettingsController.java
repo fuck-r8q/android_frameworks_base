@@ -61,7 +61,6 @@ import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto;
 import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.internal.policy.SystemBarUtils;
-import com.android.keyguard.FaceAuthApiRequestReason;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.Dumpable;
@@ -87,6 +86,8 @@ import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.PulseExpansionHandler;
 import com.android.systemui.statusbar.QsFrameTranslateController;
 import com.android.systemui.statusbar.StatusBarState;
+import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
+import com.android.systemui.statusbar.notification.footer.shared.FooterViewRefactor;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
@@ -106,11 +107,11 @@ import com.android.systemui.util.kotlin.JavaAdapter;
 
 import dalvik.annotation.optimization.NeverCompile;
 
+import dagger.Lazy;
+
 import java.io.PrintWriter;
 
 import javax.inject.Inject;
-
-import dagger.Lazy;
 
 /** Handles QuickSettings touch handling, expansion and animation state
  * TODO (b/264460656) make this dumpable
@@ -157,6 +158,7 @@ public class QuickSettingsController implements Dumpable {
     private final InteractionJankMonitor mInteractionJankMonitor;
     private final ShadeRepository mShadeRepository;
     private final ShadeInteractor mShadeInteractor;
+    private final ActiveNotificationsInteractor mActiveNotificationsInteractor;
     private final JavaAdapter mJavaAdapter;
     private final FalsingManager mFalsingManager;
     private final AccessibilityManager mAccessibilityManager;
@@ -339,6 +341,7 @@ public class QuickSettingsController implements Dumpable {
             KeyguardFaceAuthInteractor keyguardFaceAuthInteractor,
             ShadeRepository shadeRepository,
             ShadeInteractor shadeInteractor,
+            ActiveNotificationsInteractor activeNotificationsInteractor,
             JavaAdapter javaAdapter,
             CastController castController,
             SplitShadeStateController splitShadeStateController
@@ -386,6 +389,7 @@ public class QuickSettingsController implements Dumpable {
         mInteractionJankMonitor = interactionJankMonitor;
         mShadeRepository = shadeRepository;
         mShadeInteractor = shadeInteractor;
+        mActiveNotificationsInteractor = activeNotificationsInteractor;
         mJavaAdapter = javaAdapter;
 
         mLockscreenShadeTransitionController.addCallback(new LockscreenShadeTransitionCallback());
@@ -976,14 +980,15 @@ public class QuickSettingsController implements Dumpable {
         // this will speed up notification actions.
         if (height == 0 && !mKeyguardStateController.canDismissLockScreen()) {
             mKeyguardFaceAuthInteractor.onQsExpansionStared();
-            mKeyguardUpdateMonitor.requestFaceAuth(FaceAuthApiRequestReason.QS_EXPANDED);
         }
     }
 
     void updateQsState() {
         boolean qsFullScreen = getExpanded() && !mSplitShadeEnabled;
         mShadeRepository.setLegacyQsFullscreen(qsFullScreen);
-        mNotificationStackScrollLayoutController.setQsFullScreen(qsFullScreen);
+        if (!FooterViewRefactor.isEnabled()) {
+            mNotificationStackScrollLayoutController.setQsFullScreen(qsFullScreen);
+        }
         mNotificationStackScrollLayoutController.setScrollingEnabled(
                 mBarState != KEYGUARD && (!qsFullScreen || mExpansionFromOverscroll));
 
@@ -2230,8 +2235,12 @@ public class QuickSettingsController implements Dumpable {
                             mLockscreenShadeTransitionController.getQSDragProgress());
                     setExpansionHeight(qsHeight);
                 }
-                if (mNotificationStackScrollLayoutController.getVisibleNotificationCount() == 0
-                        && !mMediaDataManager.hasActiveMediaOrRecommendation()) {
+
+                boolean hasNotifications = FooterViewRefactor.isEnabled()
+                        ? mActiveNotificationsInteractor.getAreAnyNotificationsPresentValue()
+                        : mNotificationStackScrollLayoutController.getVisibleNotificationCount()
+                                != 0;
+                if (!hasNotifications && !mMediaDataManager.hasActiveMediaOrRecommendation()) {
                     // No notifications are visible, let's animate to the height of qs instead
                     if (isQsFragmentCreated()) {
                         // Let's interpolate to the header height instead of the top padding,

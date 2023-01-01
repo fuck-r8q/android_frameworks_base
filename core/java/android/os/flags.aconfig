@@ -57,15 +57,15 @@ flag {
 }
 
 flag {
+    name: "security_state_service"
+    namespace: "dynamic_spl"
+    description: "Guards the Security State API."
+    bug: "302189431"
+}
+
+flag {
     name: "battery_saver_supported_check_api"
     namespace: "backstage_power"
     description: "Guards a new API in PowerManager to check if battery saver is supported or not."
     bug: "305067031"
-}
-
-flag {
-    name: "adpf_gpu_report_actual_work_duration"
-    namespace: "game"
-    description: "Guards the ADPF GPU APIs."
-    bug: "284324521"
 }

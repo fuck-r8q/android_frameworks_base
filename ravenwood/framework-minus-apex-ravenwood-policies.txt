@@ -1,5 +1,8 @@
 # Ravenwood "policy" file for framework-minus-apex.
 
+# Keep all AIDL interfaces
+class :aidl stubclass
+
 # Collections
 class android.util.ArrayMap stubclass
 class android.util.ArraySet stubclass
@@ -17,12 +20,14 @@ class android.util.MapCollections stubclass
 class android.util.Log stubclass
 class android.util.Log !com.android.hoststubgen.nativesubstitution.Log_host
 class android.util.LogPrinter stubclass
+class android.util.LocalLog stubclass
 
 # String Manipulation
 class android.util.Printer stubclass
 class android.util.PrintStreamPrinter stubclass
 class android.util.PrintWriterPrinter stubclass
 class android.util.StringBuilderPrinter stubclass
+class android.util.IndentingPrintWriter stubclass
 
 # Properties
 class android.util.Property stubclass
@@ -76,6 +81,8 @@ class android.util.Patterns stubclass
 class android.util.UtilConfig stubclass
 
 # Internals
+class com.android.internal.util.FastMath stubclass
+class com.android.internal.util.FastPrintWriter stubclass
 class com.android.internal.util.GrowingArrayUtils stubclass
 class com.android.internal.util.LineBreakBufferedWriter stubclass
 class com.android.internal.util.Preconditions stubclass
@@ -106,6 +113,7 @@ class android.os.Bundle stubclass
 class android.os.PersistableBundle stubclass
 
 # Misc
+class android.os.HandlerExecutor stubclass
 class android.os.PatternMatcher stubclass
 class android.os.ParcelUuid stubclass
 

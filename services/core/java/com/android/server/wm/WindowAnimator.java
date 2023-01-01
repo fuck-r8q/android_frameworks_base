@@ -128,7 +128,6 @@ public class WindowAnimator {
         }
 
         ProtoLog.i(WM_SHOW_TRANSACTIONS, ">>> OPEN TRANSACTION animate");
-        mService.openSurfaceTransaction();
         try {
             // Remove all deferred displays, tasks, and activities.
             root.handleCompleteDeferredRemoval();
@@ -163,6 +162,7 @@ public class WindowAnimator {
                     dc.mLastContainsRunningSurfaceAnimator = false;
                     dc.enableHighFrameRate(false);
                 }
+                mTransaction.merge(dc.getPendingTransaction());
             }
 
             cancelAnimation();
@@ -196,8 +196,10 @@ public class WindowAnimator {
             updateRunningExpensiveAnimationsLegacy();
         }
 
-        SurfaceControl.mergeToGlobalTransaction(mTransaction);
-        mService.closeSurfaceTransaction("WindowAnimator");
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "applyTransaction");
+        mTransaction.apply();
+        Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
+        mService.mWindowTracing.logState("WindowAnimator");
         ProtoLog.i(WM_SHOW_TRANSACTIONS, "<<< CLOSE TRANSACTION animate");
 
         mService.mAtmService.mTaskOrganizerController.dispatchPendingEvents();

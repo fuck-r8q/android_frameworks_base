@@ -20,6 +20,7 @@ import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -2224,6 +2225,11 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     }
 
     @Override
+    public void setBrightnessFromOffload(float brightness) {
+        // The old DPC is no longer supported
+    }
+
+    @Override
     public BrightnessInfo getBrightnessInfo() {
         synchronized (mCachedBrightnessInfo) {
             return new BrightnessInfo(
@@ -3248,12 +3254,15 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         }
     }
 
+    @SuppressLint("AndroidFrameworkRequiresPermission")
     private void noteScreenBrightness(float brightness) {
         if (mBatteryStats != null) {
             try {
                 // TODO(brightnessfloat): change BatteryStats to use float
-                mBatteryStats.noteScreenBrightness(BrightnessSynchronizer.brightnessFloatToInt(
-                        brightness));
+                int brightnessInt = mFlags.isBrightnessIntRangeUserPerceptionEnabled()
+                        ? BrightnessSynchronizer.brightnessFloatToIntSetting(mContext, brightness)
+                        : BrightnessSynchronizer.brightnessFloatToInt(brightness);
+                mBatteryStats.noteScreenBrightness(brightnessInt);
             } catch (RemoteException e) {
                 // same process
             }

@@ -7,6 +7,7 @@
 
 # Uncomment below lines to enable each feature.
 # --enable-non-stub-method-check
+--no-non-stub-method-check
 
 #--default-method-call-hook
 #    com.android.hoststubgen.hosthelper.HostTestUtils.logMethodCall
@@ -17,6 +18,9 @@
 # Note, each line is a single argument, so we need newlines after each `--xxx-annotation`.
 --keep-annotation
     android.ravenwood.annotation.RavenwoodKeep
+
+--keep-annotation
+    android.ravenwood.annotation.RavenwoodKeepPartialClass
 
 --keep-class-annotation
     android.ravenwood.annotation.RavenwoodKeepWholeClass
@@ -35,3 +39,6 @@
 
 --class-load-hook-annotation
     android.ravenwood.annotation.RavenwoodClassLoadHook
+
+--keep-static-initializer-annotation
+    android.ravenwood.annotation.RavenwoodKeepStaticInitializer

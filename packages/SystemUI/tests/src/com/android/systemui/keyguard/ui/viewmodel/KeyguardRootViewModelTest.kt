@@ -32,9 +32,7 @@ import com.android.systemui.common.ui.data.repository.FakeConfigurationRepositor
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository
-import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.FakeFeatureFlagsClassicModule
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.domain.interactor.BurnInInteractor
@@ -109,9 +107,7 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
 
         mSetFlagsRule.enableFlags(AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR)
 
-        val featureFlags = FakeFeatureFlagsClassic().apply { set(Flags.FACE_AUTH_REFACTOR, true) }
-
-        val withDeps = KeyguardInteractorFactory.create(featureFlags = featureFlags)
+        val withDeps = KeyguardInteractorFactory.create()
         keyguardInteractor = withDeps.keyguardInteractor
         repository = withDeps.repository
         configurationRepository = withDeps.configurationRepository
@@ -135,7 +131,6 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
                 deviceEntryInteractor =
                     mock { whenever(isBypassEnabled).thenReturn(MutableStateFlow(false)) },
                 dozeParameters = mock(),
-                featureFlags,
                 keyguardInteractor,
                 keyguardTransitionInteractor,
                 notificationsKeyguardInteractor =
@@ -165,23 +160,6 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
             assertThat(value()).isEqualTo(0.2f)
             repository.setKeyguardAlpha(0f)
             assertThat(value()).isEqualTo(0f)
-        }
-
-    @Test
-    fun alpha_inPreviewMode_doesNotChange() =
-        testScope.runTest {
-            val value = collectLastValue(underTest.alpha)
-            underTest.enablePreviewMode()
-
-            assertThat(value()).isEqualTo(1f)
-            repository.setKeyguardAlpha(0.1f)
-            assertThat(value()).isEqualTo(1f)
-            repository.setKeyguardAlpha(0.5f)
-            assertThat(value()).isEqualTo(1f)
-            repository.setKeyguardAlpha(0.2f)
-            assertThat(value()).isEqualTo(1f)
-            repository.setKeyguardAlpha(0f)
-            assertThat(value()).isEqualTo(1f)
         }
 
     @Test
@@ -347,8 +325,7 @@ class KeyguardRootViewModelTestWithFakes : SysuiTestCase() {
         DaggerKeyguardRootViewModelTestWithFakes_TestComponent.factory()
             .create(
                 test = this,
-                featureFlags =
-                    FakeFeatureFlagsClassicModule { set(Flags.FACE_AUTH_REFACTOR, true) },
+                featureFlags = FakeFeatureFlagsClassicModule(),
                 mocks =
                     TestMocksModule(
                         dozeParameters = dozeParams,

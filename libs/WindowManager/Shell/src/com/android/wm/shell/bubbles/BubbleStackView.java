@@ -61,6 +61,7 @@ import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewPropertyAnimator;
 import android.view.ViewTreeObserver;
+import android.view.WindowManager;
 import android.view.WindowManagerPolicyConstants;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
@@ -536,8 +537,8 @@ public class BubbleStackView extends FrameLayout
                 return;
             }
 
-            final boolean clickedBubbleIsCurrentlyExpandedBubble =
-                    clickedBubble.getKey().equals(mExpandedBubble.getKey());
+            final boolean clickedBubbleIsCurrentlyExpandedBubble = mExpandedBubble != null
+                            && clickedBubble.getKey().equals(mExpandedBubble.getKey());
 
             if (isExpanded()) {
                 mExpandedAnimationController.onGestureFinished();
@@ -1001,7 +1002,8 @@ public class BubbleStackView extends FrameLayout
 
         mOrientationChangedListener =
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-                    mPositioner.update();
+                    mPositioner.update(DeviceConfig.create(mContext, mContext.getSystemService(
+                            WindowManager.class)));
                     onDisplaySizeChanged();
                     mExpandedAnimationController.updateResources();
                     mStackAnimationController.updateResources();
@@ -1522,7 +1524,8 @@ public class BubbleStackView extends FrameLayout
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        mPositioner.update();
+        WindowManager windowManager = mContext.getSystemService(WindowManager.class);
+        mPositioner.update(DeviceConfig.create(mContext, Objects.requireNonNull(windowManager)));
         getViewTreeObserver().addOnComputeInternalInsetsListener(this);
         getViewTreeObserver().addOnDrawListener(mSystemGestureExcludeUpdater);
     }
@@ -3285,6 +3288,7 @@ public class BubbleStackView extends FrameLayout
             mExpandedViewContainer.setTranslationY(mPositioner.getExpandedViewY(mExpandedBubble,
                     mPositioner.showBubblesVertically() ? p.y : p.x));
             mExpandedViewContainer.setTranslationX(0f);
+            mExpandedBubble.getExpandedView().updateTaskViewContentWidth();
             mExpandedBubble.getExpandedView().updateView(
                     mExpandedViewContainer.getLocationOnScreen());
             updatePointerPosition(false /* forIme */);

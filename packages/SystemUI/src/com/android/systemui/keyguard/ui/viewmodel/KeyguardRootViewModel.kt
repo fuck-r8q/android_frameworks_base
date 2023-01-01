@@ -22,10 +22,9 @@ import android.util.MathUtils
 import android.view.View.VISIBLE
 import com.android.app.animation.Interpolators
 import com.android.systemui.Flags.newAodTransition
-import com.android.systemui.common.shared.model.SharedNotificationContainerPosition
+import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
-import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.keyguard.domain.interactor.BurnInInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
@@ -48,13 +47,11 @@ import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -67,7 +64,6 @@ constructor(
     private val context: Context,
     private val deviceEntryInteractor: DeviceEntryInteractor,
     private val dozeParameters: DozeParameters,
-    private val featureFlags: FeatureFlagsClassic,
     private val keyguardInteractor: KeyguardInteractor,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val notificationsKeyguardInteractor: NotificationsKeyguardInteractor,
@@ -76,16 +72,6 @@ constructor(
     private val aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
     screenOffAnimationController: ScreenOffAnimationController,
 ) {
-
-    data class PreviewMode(val isInPreviewMode: Boolean = false)
-
-    /**
-     * Whether this view-model instance is powering the preview experience that renders exclusively
-     * in the wallpaper picker application. This should _always_ be `false` for the real lock screen
-     * experience.
-     */
-    private val previewMode = MutableStateFlow(PreviewMode())
-
     var clockControllerProvider: Provider<ClockController>? = null
 
     /** System insets that keyguard needs to stay out of */
@@ -100,19 +86,12 @@ constructor(
 
     val goneToAodTransition = keyguardTransitionInteractor.goneToAodTransition
 
-    /** the shared notification container position *on the lockscreen* */
-    val notificationPositionOnLockscreen: StateFlow<SharedNotificationContainerPosition>
-        get() = keyguardInteractor.sharedNotificationContainerPosition
+    /** the shared notification container bounds *on the lockscreen* */
+    val notificationBounds: StateFlow<NotificationContainerBounds> =
+        keyguardInteractor.notificationContainerBounds
 
     /** An observable for the alpha level for the entire keyguard root view. */
-    val alpha: Flow<Float> =
-        previewMode.flatMapLatest {
-            if (it.isInPreviewMode) {
-                flowOf(1f)
-            } else {
-                keyguardInteractor.keyguardAlpha.distinctUntilChanged()
-            }
-        }
+    val alpha: Flow<Float> = keyguardInteractor.keyguardAlpha.distinctUntilChanged()
 
     private fun burnIn(): Flow<BurnInModel> {
         val dozingAmount: Flow<Float> =
@@ -149,55 +128,29 @@ constructor(
     val lockscreenStateAlpha: Flow<Float> = aodToLockscreenTransitionViewModel.lockscreenAlpha
 
     /** For elements that appear and move during the animation -> AOD */
-    val burnInLayerAlpha: Flow<Float> =
-        previewMode.flatMapLatest {
-            if (it.isInPreviewMode) {
-                flowOf(1f)
-            } else {
-                goneToAodTransitionViewModel.enterFromTopAnimationAlpha
-            }
-        }
+    val burnInLayerAlpha: Flow<Float> = goneToAodTransitionViewModel.enterFromTopAnimationAlpha
 
     val translationY: Flow<Float> =
-        previewMode.flatMapLatest {
-            if (it.isInPreviewMode) {
-                flowOf(0f)
-            } else {
-                keyguardInteractor.configurationChange.flatMapLatest { _ ->
-                    val enterFromTopAmount =
-                        context.resources.getDimensionPixelSize(
-                            R.dimen.keyguard_enter_from_top_translation_y
-                        )
-                    combine(
-                        keyguardInteractor.keyguardTranslationY.onStart { emit(0f) },
-                        burnIn().map { it.translationY.toFloat() }.onStart { emit(0f) },
-                        goneToAodTransitionViewModel
-                            .enterFromTopTranslationY(enterFromTopAmount)
-                            .onStart { emit(0f) },
-                    ) { keyguardTransitionY, burnInTranslationY, goneToAodTransitionTranslationY ->
-                        // All 3 values need to be combined for a smooth translation
-                        keyguardTransitionY + burnInTranslationY + goneToAodTransitionTranslationY
-                    }
-                }
+        keyguardInteractor.configurationChange.flatMapLatest { _ ->
+            val enterFromTopAmount =
+                context.resources.getDimensionPixelSize(
+                    R.dimen.keyguard_enter_from_top_translation_y
+                )
+            combine(
+                keyguardInteractor.keyguardTranslationY.onStart { emit(0f) },
+                burnIn().map { it.translationY.toFloat() }.onStart { emit(0f) },
+                goneToAodTransitionViewModel.enterFromTopTranslationY(enterFromTopAmount).onStart {
+                    emit(0f)
+                },
+            ) { keyguardTransitionY, burnInTranslationY, goneToAodTransitionTranslationY ->
+                // All 3 values need to be combined for a smooth translation
+                keyguardTransitionY + burnInTranslationY + goneToAodTransitionTranslationY
             }
         }
 
-    val translationX: Flow<Float> =
-        previewMode.flatMapLatest {
-            if (it.isInPreviewMode) {
-                flowOf(0f)
-            } else {
-                burnIn().map { it.translationX.toFloat() }
-            }
-        }
+    val translationX: Flow<Float> = burnIn().map { it.translationX.toFloat() }
 
-    val scale: Flow<Pair<Float, Boolean>> =
-        previewMode.flatMapLatest { previewMode ->
-            burnIn().map {
-                val scale = if (previewMode.isInPreviewMode) 1f else it.scale
-                Pair(scale, it.scaleClockOnly)
-            }
-        }
+    val scale: Flow<Pair<Float, Boolean>> = burnIn().map { Pair(it.scale, it.scaleClockOnly) }
 
     /** Is the notification icon container visible? */
     val isNotifIconContainerVisible: Flow<AnimatedValue<Boolean>> =
@@ -240,23 +193,9 @@ constructor(
             }
             .distinctUntilChanged()
 
-    /**
-     * Puts this view-model in "preview mode", which means it's being used for UI that is rendering
-     * the lock screen preview in wallpaper picker / settings and not the real experience on the
-     * lock screen.
-     */
-    fun enablePreviewMode() {
-        previewMode.value = PreviewMode(true)
-    }
+    fun onNotificationContainerBoundsChanged(top: Float, bottom: Float) {
 
-    fun onSharedNotificationContainerPositionChanged(top: Float, bottom: Float) {
-        // Notifications should not be visible in preview mode
-        if (previewMode.value.isInPreviewMode) {
-            return
-        }
-        keyguardInteractor.setSharedNotificationContainerPosition(
-            SharedNotificationContainerPosition(top, bottom)
-        )
+        keyguardInteractor.setNotificationContainerBounds(NotificationContainerBounds(top, bottom))
     }
 
     /** Is there an expanded pulse, are we animating in response? */

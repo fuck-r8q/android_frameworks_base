@@ -56,6 +56,7 @@ import static com.android.server.wm.ActivityRecord.State.DESTROYED;
 import static com.android.server.wm.ActivityRecord.State.PAUSED;
 import static com.android.server.wm.ActivityRecord.State.PAUSING;
 import static com.android.server.wm.ActivityRecord.State.RESTARTING_PROCESS;
+import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_ALL;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_CLEANUP;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_IDLE;
@@ -1681,7 +1682,12 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
-    private void removeRootTaskInSurfaceTransaction(Task rootTask) {
+    /**
+     * Removes the root task associated with the given {@param rootTask}. If the {@param rootTask}
+     * is the pinned task, then its child tasks are not explicitly removed when the root task is
+     * destroyed, but instead moved back onto the TaskDisplayArea.
+     */
+    void removeRootTask(Task rootTask) {
         if (rootTask.getWindowingMode() == WINDOWING_MODE_PINNED) {
             removePinnedRootTaskInSurfaceTransaction(rootTask);
         } else {
@@ -1689,15 +1695,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 removeTask(task, true /* killProcess */, REMOVE_FROM_RECENTS, "remove-root-task");
             }, true /* traverseTopToBottom */);
         }
-    }
-
-    /**
-     * Removes the root task associated with the given {@param task}. If the {@param task} is the
-     * pinned task, then its child tasks are not explicitly removed when the root task is
-     * destroyed, but instead moved back onto the TaskDisplayArea.
-     */
-    void removeRootTask(Task task) {
-        mWindowManager.inSurfaceTransaction(() -> removeRootTaskInSurfaceTransaction(task));
     }
 
     /**
@@ -1738,7 +1735,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             ArrayList<ActivityRecord> activities = null;
             for (int i = mStoppingActivities.size() - 1; i >= 0; i--) {
                 final ActivityRecord r = mStoppingActivities.get(i);
-                if (r.getTask() == task) {
+                if (!r.finishing && r.isState(RESUMED) && r.getTask() == task) {
                     if (activities == null) {
                         activities = new ArrayList<>();
                     }

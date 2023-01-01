@@ -22,6 +22,9 @@ import static android.Manifest.permission.SYSTEM_APPLICATION_OVERLAY;
 import static android.app.AppOpsManager.OP_CREATE_ACCESSIBILITY_OVERLAY;
 import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
 import static android.app.AppOpsManager.OP_TOAST_WINDOW;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
 import static android.content.pm.PackageManager.FEATURE_AUTOMOTIVE;
 import static android.content.pm.PackageManager.FEATURE_HDMI_CEC;
 import static android.content.pm.PackageManager.FEATURE_LEANBACK;
@@ -206,6 +209,7 @@ import com.android.internal.accessibility.util.AccessibilityStatsLogUtils;
 import com.android.internal.accessibility.util.AccessibilityUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.AssistUtils;
+import com.android.internal.display.BrightnessUtils;
 import com.android.internal.inputmethod.SoftInputShowHideReason;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto;
@@ -225,7 +229,6 @@ import com.android.server.GestureLauncherService;
 import com.android.server.LocalServices;
 import com.android.server.SystemServiceManager;
 import com.android.server.UiThread;
-import com.android.server.display.BrightnessUtils;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.input.KeyboardMetricsCollector;
 import com.android.server.input.KeyboardMetricsCollector.KeyboardLogEvent;
@@ -568,6 +571,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mShortPressOnWindowBehavior;
     int mPowerVolUpBehavior;
     boolean mStylusButtonsEnabled = true;
+    boolean mKidsModeEnabled;
     boolean mHasSoftInput = false;
     boolean mUseTvRouting;
     boolean mAllowStartActivityForLongPressOnPowerDuringSetup;
@@ -907,6 +911,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.STYLUS_BUTTONS_ENABLED), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Secure.getUriFor(
+                    Settings.Secure.NAV_BAR_KIDS_MODE), false, this,
                     UserHandle.USER_ALL);
             updateSettings();
         }
@@ -2998,9 +3005,41 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mStylusButtonsEnabled = Settings.Secure.getIntForUser(resolver,
                     Secure.STYLUS_BUTTONS_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
             mInputManagerInternal.setStylusButtonMotionEventsEnabled(mStylusButtonsEnabled);
+
+            final boolean kidsModeEnabled = Settings.Secure.getIntForUser(resolver,
+                    Settings.Secure.NAV_BAR_KIDS_MODE, 0, UserHandle.USER_CURRENT) == 1;
+            if (mKidsModeEnabled != kidsModeEnabled) {
+                mKidsModeEnabled = kidsModeEnabled;
+                updateKidsModeSettings();
+            }
         }
         if (updateRotation) {
             updateRotation(true);
+        }
+    }
+
+    private void updateKidsModeSettings() {
+        if (mKidsModeEnabled) {
+            // Needed since many Kids apps aren't optimised to support both orientations and it
+            // will be hard for kids to understand the app compat mode.
+            // TODO(229961548): Remove ignoreOrientationRequest exception for Kids Mode once
+            //                  possible.
+            if (mContext.getResources().getBoolean(R.bool.config_reverseDefaultRotation)) {
+                mWindowManagerInternal.setOrientationRequestPolicy(
+                        true /* isIgnoreOrientationRequestDisabled */,
+                        new int[]{SCREEN_ORIENTATION_LANDSCAPE,
+                                SCREEN_ORIENTATION_REVERSE_LANDSCAPE},
+                        new int[]{SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+                                SCREEN_ORIENTATION_SENSOR_LANDSCAPE});
+            } else {
+                mWindowManagerInternal.setOrientationRequestPolicy(
+                        true /* isIgnoreOrientationRequestDisabled */,
+                        null /* fromOrientations */, null /* toOrientations */);
+            }
+        } else {
+            mWindowManagerInternal.setOrientationRequestPolicy(
+                    false /* isIgnoreOrientationRequestDisabled */,
+                    null /* fromOrientations */, null /* toOrientations */);
         }
     }
 
@@ -3473,7 +3512,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             case KeyEvent.KEYCODE_DEL:
-            case KeyEvent.KEYCODE_GRAVE:
+            case KeyEvent.KEYCODE_ESCAPE:
                 if (firstDown && event.isMetaPressed()) {
                     logKeyboardSystemsEvent(event, KeyboardLogEvent.BACK);
                     injectBackGesture(event.getDownTime());
@@ -3577,7 +3616,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mDisplayManager.setBrightness(screenDisplayId, adjustedLinearBrightness);
 
                     Intent intent = new Intent(Intent.ACTION_SHOW_BRIGHTNESS_DIALOG);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION
+                            | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
                     intent.putExtra(EXTRA_FROM_BRIGHTNESS_KEY, true);
                     startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
                     logKeyboardSystemsEvent(event, KeyboardLogEvent.getBrightnessEvent(keyCode));
@@ -3671,15 +3711,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             case KeyEvent.KEYCODE_LANGUAGE_SWITCH:
                 if (firstDown) {
-                    int direction = (metaState & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
-                    sendSwitchKeyboardLayout(event, direction);
-                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LANGUAGE_SWITCH);
-                    return true;
-                }
-                break;
-            case KeyEvent.KEYCODE_SPACE:
-                // Handle keyboard layout switching. (META + SPACE)
-                if (firstDown && event.isMetaPressed()) {
                     int direction = (metaState & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
                     sendSwitchKeyboardLayout(event, direction);
                     logKeyboardSystemsEvent(event, KeyboardLogEvent.LANGUAGE_SWITCH);
@@ -3980,7 +4011,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 return true;
             case KeyEvent.KEYCODE_ESCAPE:
-                if (down && repeatCount == 0) {
+                if (down
+                        && KeyEvent.metaStateHasNoModifiers(metaState)
+                        && repeatCount == 0) {
                     mContext.closeSystemDialogs();
                 }
                 return true;
@@ -6471,6 +6504,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.print(!mAllowLockscreenWhenOnDisplays.isEmpty());
                 pw.print(" mLockScreenTimeout="); pw.print(mLockScreenTimeout);
                 pw.print(" mLockScreenTimerActive="); pw.println(mLockScreenTimerActive);
+        pw.print(prefix); pw.print("mKidsModeEnabled="); pw.println(mKidsModeEnabled);
 
         mHapticFeedbackVibrationProvider.dump(prefix, pw);
         mGlobalKeyManager.dump(prefix, pw);

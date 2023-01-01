@@ -29,7 +29,6 @@ import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.PowerManager.DRAW_WAKE_LOCK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.SurfaceControl.Transaction;
-import static android.view.SurfaceControl.getGlobalTransaction;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_CONTENT;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_FRAME;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION;
@@ -111,6 +110,7 @@ import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_RESIZE;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_STARTING_WINDOW;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_SYNC_ENGINE;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_WINDOW_INSETS;
+import static com.android.internal.protolog.ProtoLogGroup.WM_SHOW_TRANSACTIONS;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
 import static com.android.server.policy.WindowManagerPolicy.TRANSIT_ENTER;
 import static com.android.server.policy.WindowManagerPolicy.TRANSIT_EXIT;
@@ -179,6 +179,7 @@ import static com.android.server.wm.WindowStateProto.UNRESTRICTED_KEEP_CLEAR_ARE
 import static com.android.server.wm.WindowStateProto.VIEW_VISIBILITY;
 import static com.android.server.wm.WindowStateProto.WINDOW_CONTAINER;
 import static com.android.server.wm.WindowStateProto.WINDOW_FRAMES;
+import static com.android.window.flags.Flags.secureWindowState;
 import static com.android.window.flags.Flags.surfaceTrustedOverlay;
 
 import android.annotation.CallSuper;
@@ -1202,6 +1203,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         super.setInitialSurfaceControlProperties(b);
         if (surfaceTrustedOverlay() && isWindowTrustedOverlay()) {
             getPendingTransaction().setTrustedOverlay(mSurfaceControl, true);
+        }
+        if (secureWindowState()) {
+            getPendingTransaction().setSecure(mSurfaceControl, isSecureLocked());
         }
     }
 
@@ -2801,7 +2805,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 clearPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
             }
             if (!isVisibleByPolicy()) {
-                mWinAnimator.hide(getGlobalTransaction(), "checkPolicyVisibilityChange");
+                mWinAnimator.hide(getPendingTransaction(), "checkPolicyVisibilityChange");
                 if (isFocused()) {
                     ProtoLog.i(WM_DEBUG_FOCUS_LIGHT,
                             "setAnimationLocked: setting mFocusMayChange true");
@@ -3284,7 +3288,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // just kill it. And if it is a window of foreground activity, the activity can be
             // restarted automatically if needed.
             Slog.w(TAG, "Exception thrown during dispatchAppVisibility " + this, e);
-            android.os.Process.killProcess(mSession.mPid);
+            if (android.os.Process.getUidForPid(mSession.mPid) == mSession.mUid) {
+                android.os.Process.killProcess(mSession.mPid);
+            }
         }
     }
 
@@ -6047,5 +6053,26 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     public boolean cancelAndRedraw() {
         // Cancel any draw requests during a sync.
         return mPrepareSyncSeqId > 0;
+    }
+
+    void setSecureLocked(boolean isSecure) {
+        ProtoLog.i(WM_SHOW_TRANSACTIONS, "SURFACE isSecure=%b: %s", isSecure, getName());
+        if (secureWindowState()) {
+            if (mSurfaceControl == null) {
+                return;
+            }
+            getPendingTransaction().setSecure(mSurfaceControl, isSecure);
+        } else {
+            if (mWinAnimator.mSurfaceController == null
+                    || mWinAnimator.mSurfaceController.mSurfaceControl == null) {
+                return;
+            }
+            getPendingTransaction().setSecure(mWinAnimator.mSurfaceController.mSurfaceControl,
+                    isSecure);
+        }
+        if (mDisplayContent != null) {
+            mDisplayContent.refreshImeSecureFlag(getSyncTransaction());
+        }
+        mWmService.scheduleAnimationLocked();
     }
 }

@@ -27,12 +27,10 @@ import com.android.keyguard.KeyguardClockSwitch.ClockSize
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
+import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.shared.model.Position
-import com.android.systemui.common.shared.model.SharedNotificationContainerPosition
 import com.android.systemui.common.ui.data.repository.ConfigurationRepository
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.CameraLaunchSourceModel
@@ -76,8 +74,7 @@ class KeyguardInteractor
 constructor(
     private val repository: KeyguardRepository,
     private val commandQueue: CommandQueue,
-    private val powerInteractor: PowerInteractor,
-    featureFlags: FeatureFlags,
+    powerInteractor: PowerInteractor,
     sceneContainerFlags: SceneContainerFlags,
     bouncerRepository: KeyguardBouncerRepository,
     configurationRepository: ConfigurationRepository,
@@ -85,15 +82,14 @@ constructor(
     sceneInteractorProvider: Provider<SceneInteractor>,
 ) {
     // TODO(b/296118689): move to a repository
-    private val _sharedNotificationContainerPosition =
-        MutableStateFlow(SharedNotificationContainerPosition())
+    private val _sharedNotificationContainerBounds = MutableStateFlow(NotificationContainerBounds())
 
-    /** Position information for the shared notification container. */
-    val sharedNotificationContainerPosition: StateFlow<SharedNotificationContainerPosition> =
-        _sharedNotificationContainerPosition.asStateFlow()
+    /** Bounds of the notification container. */
+    val notificationContainerBounds: StateFlow<NotificationContainerBounds> =
+        _sharedNotificationContainerBounds.asStateFlow()
 
-    fun setSharedNotificationContainerPosition(position: SharedNotificationContainerPosition) {
-        _sharedNotificationContainerPosition.value = position
+    fun setNotificationContainerBounds(position: NotificationContainerBounds) {
+        _sharedNotificationContainerBounds.value = position
     }
 
     /**
@@ -197,22 +193,18 @@ constructor(
 
     /** Whether camera is launched over keyguard. */
     val isSecureCameraActive: Flow<Boolean> by lazy {
-        if (featureFlags.isEnabled(Flags.FACE_AUTH_REFACTOR)) {
-            combine(
-                    isKeyguardVisible,
-                    primaryBouncerShowing,
-                    onCameraLaunchDetected,
-                ) { isKeyguardVisible, isPrimaryBouncerShowing, cameraLaunchEvent ->
-                    when {
-                        isKeyguardVisible -> false
-                        isPrimaryBouncerShowing -> false
-                        else -> cameraLaunchEvent == CameraLaunchSourceModel.POWER_DOUBLE_TAP
-                    }
+        combine(
+                isKeyguardVisible,
+                primaryBouncerShowing,
+                onCameraLaunchDetected,
+            ) { isKeyguardVisible, isPrimaryBouncerShowing, cameraLaunchEvent ->
+                when {
+                    isKeyguardVisible -> false
+                    isPrimaryBouncerShowing -> false
+                    else -> cameraLaunchEvent == CameraLaunchSourceModel.POWER_DOUBLE_TAP
                 }
-                .onStart { emit(false) }
-        } else {
-            flowOf(false)
-        }
+            }
+            .onStart { emit(false) }
     }
 
     /** The approximate location on the screen of the fingerprint sensor, if one is available. */

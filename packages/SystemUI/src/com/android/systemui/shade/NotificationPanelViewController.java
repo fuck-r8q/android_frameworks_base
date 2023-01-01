@@ -100,7 +100,6 @@ import com.android.internal.util.LatencyTracker;
 import com.android.keyguard.ActiveUnlockConfig;
 import com.android.keyguard.EmergencyButton;
 import com.android.keyguard.EmergencyButtonController;
-import com.android.keyguard.FaceAuthApiRequestReason;
 import com.android.keyguard.KeyguardClockSwitch.ClockSize;
 import com.android.keyguard.KeyguardStatusView;
 import com.android.keyguard.KeyguardStatusViewController;
@@ -186,6 +185,8 @@ import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator
 import com.android.systemui.statusbar.notification.PropertyAnimator;
 import com.android.systemui.statusbar.notification.ViewGroupFadeHelper;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
+import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
+import com.android.systemui.statusbar.notification.footer.shared.FooterViewRefactor;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
@@ -610,6 +611,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final LockscreenToOccludedTransitionViewModel mLockscreenToOccludedTransitionViewModel;
     private final PrimaryBouncerToGoneTransitionViewModel mPrimaryBouncerToGoneTransitionViewModel;
     private final SharedNotificationContainerInteractor mSharedNotificationContainerInteractor;
+    private final ActiveNotificationsInteractor mActiveNotificationsInteractor;
     private final KeyguardTransitionInteractor mKeyguardTransitionInteractor;
     private final KeyguardInteractor mKeyguardInteractor;
     private final PowerInteractor mPowerInteractor;
@@ -780,6 +782,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             KeyguardInteractor keyguardInteractor,
             ActivityStarter activityStarter,
             SharedNotificationContainerInteractor sharedNotificationContainerInteractor,
+            ActiveNotificationsInteractor activeNotificationsInteractor,
             EmergencyButtonController.Factory emergencyButtonControllerFactory,
             KeyguardViewConfigurator keyguardViewConfigurator,
             KeyguardFaceAuthInteractor keyguardFaceAuthInteractor,
@@ -811,6 +814,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mPrimaryBouncerToGoneTransitionViewModel = primaryBouncerToGoneTransitionViewModel;
         mKeyguardTransitionInteractor = keyguardTransitionInteractor;
         mSharedNotificationContainerInteractor = sharedNotificationContainerInteractor;
+        mActiveNotificationsInteractor = activeNotificationsInteractor;
         mKeyguardInteractor = keyguardInteractor;
         mPowerInteractor = powerInteractor;
         mKeyguardViewConfigurator = keyguardViewConfigurator;
@@ -1306,6 +1310,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     @Override
     public void updateResources() {
+        Trace.beginSection("NSSLC#updateResources");
         final boolean newSplitShadeEnabled =
                 mSplitShadeStateController.shouldUseSplitNotificationShade(mResources);
         final boolean splitShadeChanged = mSplitShadeEnabled != newSplitShadeEnabled;
@@ -1313,7 +1318,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mQsController.updateResources();
         mNotificationsQSContainerController.updateResources();
         updateKeyguardStatusViewAlignment(/* animate= */false);
-        mKeyguardMediaController.refreshMediaPosition();
+        mKeyguardMediaController.refreshMediaPosition(
+                "NotificationPanelViewController.updateResources");
 
         if (splitShadeChanged) {
             onSplitShadeEnabledChanged();
@@ -1321,6 +1327,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
         mSplitShadeFullTransitionDistance =
                 mResources.getDimensionPixelSize(R.dimen.split_shade_full_transition_distance);
+        Trace.endSection();
     }
 
     private void onSplitShadeEnabledChanged() {
@@ -1807,9 +1814,14 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private boolean hasVisibleNotifications() {
-        return mNotificationStackScrollLayoutController
-                .getVisibleNotificationCount() != 0
-                || mMediaDataManager.hasActiveMediaOrRecommendation();
+        if (FooterViewRefactor.isEnabled()) {
+            return mActiveNotificationsInteractor.getAreAnyNotificationsPresentValue()
+                    || mMediaDataManager.hasActiveMediaOrRecommendation();
+        } else {
+            return mNotificationStackScrollLayoutController
+                    .getVisibleNotificationCount() != 0
+                    || mMediaDataManager.hasActiveMediaOrRecommendation();
+        }
     }
 
     /** Returns space between top of lock icon and bottom of NotificationStackScrollLayout. */
@@ -2968,10 +2980,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                     // Try triggering face auth, this "might" run. Check
                     // KeyguardUpdateMonitor#shouldListenForFace to see when face auth won't run.
                     mKeyguardFaceAuthInteractor.onNotificationPanelClicked();
-                    boolean didFaceAuthRun = mUpdateMonitor.requestFaceAuth(
-                            FaceAuthApiRequestReason.NOTIFICATION_PANEL_CLICKED);
 
-                    if (didFaceAuthRun) {
+                    if (mKeyguardFaceAuthInteractor.canFaceAuthRun()) {
                         mUpdateMonitor.requestActiveUnlock(
                                 ActiveUnlockConfig.ActiveUnlockRequestOrigin.UNLOCK_INTENT,
                                 "lockScreenEmptySpaceTap");
@@ -3016,7 +3026,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     @Override
     public void setBouncerShowing(boolean bouncerShowing) {
         mBouncerShowing = bouncerShowing;
-        mNotificationStackScrollLayoutController.updateShowEmptyShadeView();
+        if (!FooterViewRefactor.isEnabled()) {
+            mNotificationStackScrollLayoutController.updateShowEmptyShadeView();
+        }
         updateVisibility();
     }
 

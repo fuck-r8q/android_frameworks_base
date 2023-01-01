@@ -46,7 +46,6 @@ import android.app.BackgroundStartPrivileges;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
-import android.compat.annotation.Overridable;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -62,9 +61,9 @@ import android.widget.Toast;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.FrameworkStatsLog;
-import com.android.internal.util.Preconditions;
 import com.android.server.UiThread;
 import com.android.server.am.PendingIntentRecord;
+import com.android.window.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.util.HashMap;
@@ -89,7 +88,6 @@ public class BackgroundActivityStartController {
     /** If enabled the creator will not allow BAL on its behalf by default. */
     @ChangeId
     @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-    @Overridable
     private static final long DEFAULT_RESCIND_BAL_PRIVILEGES_FROM_PENDING_INTENT_CREATOR =
             296478951;
     public static final ActivityOptions ACTIVITY_OPTIONS_SYSTEM_DEFINED =
@@ -239,6 +237,7 @@ public class BackgroundActivityStartController {
         private final @ActivityManager.ProcessState int mCallingUidProcState;
         private final boolean mIsCallingUidPersistentSystemProcess;
         private final BackgroundStartPrivileges mBalAllowedByPiSender;
+        private final BackgroundStartPrivileges mBalAllowedByPiCreatorWithHardening;
         private final BackgroundStartPrivileges mBalAllowedByPiCreator;
         private final String mRealCallingPackage;
         private final int mRealCallingUid;
@@ -270,20 +269,33 @@ public class BackgroundActivityStartController {
             mIntent = intent;
             mRealCallingPackage = mService.getPackageNameIfUnique(realCallingUid, realCallingPid);
             if (originatingPendingIntent == null) {
-                // grant creator BAL privileges unless explicitly opted out
-                mBalAllowedByPiCreator =
+                // grant BAL privileges unless explicitly opted out
+                mBalAllowedByPiCreatorWithHardening = mBalAllowedByPiCreator =
                         checkedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
+                                == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED
+                                ? BackgroundStartPrivileges.NONE
+                                : BackgroundStartPrivileges.ALLOW_BAL;
+                mBalAllowedByPiSender =
+                        checkedOptions.getPendingIntentBackgroundActivityStartMode()
                                 == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED
                                 ? BackgroundStartPrivileges.NONE
                                 : BackgroundStartPrivileges.ALLOW_BAL;
             } else {
                 // for PendingIntents we restrict BAL based on target_sdk
-                mBalAllowedByPiCreator = getBackgroundStartPrivilegesAllowedByCreator(
+                mBalAllowedByPiCreatorWithHardening = getBackgroundStartPrivilegesAllowedByCreator(
                         callingUid, callingPackage, checkedOptions);
+                final BackgroundStartPrivileges mBalAllowedByPiCreatorWithoutHardening =
+                        checkedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
+                                == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED
+                                ? BackgroundStartPrivileges.NONE
+                                : BackgroundStartPrivileges.ALLOW_BAL;
+                mBalAllowedByPiCreator = balRequireOptInByPendingIntentCreator()
+                        ? mBalAllowedByPiCreatorWithHardening
+                        : mBalAllowedByPiCreatorWithoutHardening;
+                mBalAllowedByPiSender =
+                        PendingIntentRecord.getBackgroundStartPrivilegesAllowedByCaller(
+                                checkedOptions, realCallingUid, mRealCallingPackage);
             }
-            mBalAllowedByPiSender =
-                    PendingIntentRecord.getBackgroundStartPrivilegesAllowedByCaller(
-                            checkedOptions, realCallingUid, mRealCallingPackage);
             mAppSwitchState = mService.getBalAppSwitchesState();
             mCallingUidProcState = mService.mActiveUids.getUidState(callingUid);
             mIsCallingUidPersistentSystemProcess =
@@ -322,19 +334,12 @@ public class BackgroundActivityStartController {
                     return BackgroundStartPrivileges.NONE;
                 case ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED:
                     // no explicit choice by the app - let us decide what to do
-                    Slog.i(TAG, "balRequireOptInByPendingIntentCreator = "
-                            + balRequireOptInByPendingIntentCreator());
-                    if (!balRequireOptInByPendingIntentCreator()) {
-                        // if feature is disabled allow
-                        return BackgroundStartPrivileges.ALLOW_BAL;
-                    }
                     if (callingPackage != null) {
                         // determine based on the calling/creating package
                         boolean changeEnabled = CompatChanges.isChangeEnabled(
                                 DEFAULT_RESCIND_BAL_PRIVILEGES_FROM_PENDING_INTENT_CREATOR,
                                 callingPackage,
                                 UserHandle.getUserHandleForUid(callingUid));
-                        Slog.i(TAG, "changeEnabled = " + changeEnabled);
                         return changeEnabled ? BackgroundStartPrivileges.NONE
                                 : BackgroundStartPrivileges.ALLOW_BAL;
                     }
@@ -343,7 +348,6 @@ public class BackgroundActivityStartController {
                     boolean changeEnabled = CompatChanges.isChangeEnabled(
                             DEFAULT_RESCIND_BAL_PRIVILEGES_FROM_PENDING_INTENT_CREATOR,
                             callingUid);
-                    Slog.i(TAG, "changeEnabled = " + changeEnabled);
                     return changeEnabled ? BackgroundStartPrivileges.NONE
                             : BackgroundStartPrivileges.ALLOW_BAL;
                 default:
@@ -374,11 +378,6 @@ public class BackgroundActivityStartController {
             return mOriginatingPendingIntent != null && hasRealCaller();
         }
 
-        private String dump(BalVerdict resultIfPiCreatorAllowsBal) {
-            Preconditions.checkState(!isPendingIntent());
-            return dump(resultIfPiCreatorAllowsBal, null);
-        }
-
         private boolean callerIsRealCaller() {
             return mCallingUid == mRealCallingUid;
         }
@@ -403,6 +402,8 @@ public class BackgroundActivityStartController {
                 sb.append("; inVisibleTask: ").append(mCallerApp.hasActivityInVisibleTask());
             }
             sb.append("; balAllowedByPiCreator: ").append(mBalAllowedByPiCreator);
+            sb.append("; balAllowedByPiCreatorWithHardening: ")
+                    .append(mBalAllowedByPiCreatorWithHardening);
             sb.append("; resultIfPiCreatorAllowsBal: ").append(resultIfPiCreatorAllowsBal);
             sb.append("; hasRealCaller: ").append(hasRealCaller());
             sb.append("; isPendingIntent: ").append(isPendingIntent());
@@ -434,10 +435,15 @@ public class BackgroundActivityStartController {
     static class BalVerdict {
 
         static final BalVerdict BLOCK = new BalVerdict(BAL_BLOCK, false, "Blocked");
+        static final BalVerdict ALLOW_BY_DEFAULT =
+                new BalVerdict(BAL_ALLOW_DEFAULT, false, "Default");
         private final @BalCode int mCode;
         private final boolean mBackground;
         private final String mMessage;
         private String mProcessInfo;
+        // indicates BAL would be blocked because only creator of the PI has the privilege to allow
+        // BAL, the sender does not have the privilege to allow BAL.
+        private boolean mOnlyCreatorAllows;
 
         BalVerdict(@BalCode int balCode, boolean background, String message) {
             this.mBackground = background;
@@ -456,6 +462,15 @@ public class BackgroundActivityStartController {
 
         boolean allows() {
             return !blocks();
+        }
+
+        BalVerdict setOnlyCreatorAllows(boolean onlyCreatorAllows) {
+            mOnlyCreatorAllows = onlyCreatorAllows;
+            return this;
+        }
+
+        boolean onlyCreatorAllows() {
+            return mOnlyCreatorAllows;
         }
 
         public String toString() {
@@ -567,12 +582,17 @@ public class BackgroundActivityStartController {
         BalVerdict resultForRealCaller = state.callerIsRealCaller() && resultForCaller.allows()
                 ? resultForCaller
                 : checkBackgroundActivityStartAllowedBySender(state, checkedOptions);
+        if (state.isPendingIntent()) {
+            resultForCaller.setOnlyCreatorAllows(
+                    resultForCaller.allows() && resultForRealCaller.blocks());
+        }
 
+        // Handle cases with explicit opt-in
         if (resultForCaller.allows()
                 && checkedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
                 == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED) {
             if (DEBUG_ACTIVITY_STARTS) {
-                Slog.d(TAG, "Activity start explicitly allowed by PI creator. "
+                Slog.d(TAG, "Activity start explicitly allowed by caller. "
                         + state.dump(resultForCaller, resultForRealCaller));
             }
             return statsLog(resultForCaller, state);
@@ -581,11 +601,12 @@ public class BackgroundActivityStartController {
                 && checkedOptions.getPendingIntentBackgroundActivityStartMode()
                 == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED) {
             if (DEBUG_ACTIVITY_STARTS) {
-                Slog.d(TAG, "Activity start explicitly allowed by PI sender. "
+                Slog.d(TAG, "Activity start explicitly allowed by real caller. "
                         + state.dump(resultForCaller, resultForRealCaller));
             }
             return statsLog(resultForRealCaller, state);
         }
+        // Handle PendingIntent cases with default behavior next
         boolean callerCanAllow = resultForCaller.allows()
                 && checkedOptions.getPendingIntentCreatorBackgroundActivityStartMode()
                 == ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED;
@@ -712,17 +733,18 @@ public class BackgroundActivityStartController {
         // is allowed, or apps like live wallpaper with non app visible window will be allowed.
         final boolean appSwitchAllowedOrFg =
                 appSwitchState == APP_SWITCH_ALLOW || appSwitchState == APP_SWITCH_FG_ONLY;
-        final boolean allowCallingUidStartActivity =
-                ((appSwitchAllowedOrFg || mService.mActiveUids.hasNonAppVisibleWindow(callingUid))
-                        && callingUidHasAnyVisibleWindow)
-                        || isCallingUidPersistentSystemProcess;
-        if (allowCallingUidStartActivity) {
+        if (appSwitchAllowedOrFg && callingUidHasAnyVisibleWindow) {
             return new BalVerdict(BAL_ALLOW_VISIBLE_WINDOW,
-                    /*background*/ false,
-                    "callingUidHasAnyVisibleWindow = "
-                            + callingUid
-                            + ", isCallingUidPersistentSystemProcess = "
-                            + isCallingUidPersistentSystemProcess);
+                    /*background*/ false, "callingUid has visible window");
+        }
+        if (mService.mActiveUids.hasNonAppVisibleWindow(callingUid)) {
+            return new BalVerdict(BAL_ALLOW_VISIBLE_WINDOW,
+                    /*background*/ false, "callingUid has non-app visible window");
+        }
+
+        if (isCallingUidPersistentSystemProcess) {
+            return new BalVerdict(BAL_ALLOW_ALLOWLISTED_COMPONENT,
+                    /*background*/ false, "callingUid is persistent system process");
         }
 
         // don't abort if the callingUid has START_ACTIVITIES_FROM_BACKGROUND permission
@@ -802,13 +824,29 @@ public class BackgroundActivityStartController {
                     "realCallingUid has BAL permission.");
         }
 
-        // don't abort if the realCallingUid has a visible window
-        // TODO(b/171459802): We should check appSwitchAllowed also
-        if (state.mRealCallingUidHasAnyVisibleWindow) {
-            return new BalVerdict(BAL_ALLOW_PENDING_INTENT,
-                    /*background*/ false,
-                    "realCallingUid has visible (non-toast) window.");
+        // Normal apps with visible app window will be allowed to start activity if app switching
+        // is allowed, or apps like live wallpaper with non app visible window will be allowed.
+        final boolean appSwitchAllowedOrFg = state.mAppSwitchState == APP_SWITCH_ALLOW
+                || state.mAppSwitchState == APP_SWITCH_FG_ONLY;
+        if (Flags.balImproveRealCallerVisibilityCheck()) {
+            if (appSwitchAllowedOrFg && state.mRealCallingUidHasAnyVisibleWindow) {
+                return new BalVerdict(BAL_ALLOW_PENDING_INTENT,
+                        /*background*/ false, "realCallingUid has visible window");
+            }
+            if (mService.mActiveUids.hasNonAppVisibleWindow(state.mRealCallingUid)) {
+                return new BalVerdict(BAL_ALLOW_PENDING_INTENT,
+                        /*background*/ false, "realCallingUid has non-app visible window");
+            }
+        } else {
+            // don't abort if the realCallingUid has a visible window
+            // TODO(b/171459802): We should check appSwitchAllowed also
+            if (state.mRealCallingUidHasAnyVisibleWindow) {
+                return new BalVerdict(BAL_ALLOW_PENDING_INTENT,
+                        /*background*/ false,
+                        "realCallingUid has visible (non-toast) window.");
+            }
         }
+
         // if the realCallingUid is a persistent system process, abort if the IntentSender
         // wasn't allowed to start an activity
         if (state.mForcedBalByPiSender.allowsBackgroundActivityStarts()

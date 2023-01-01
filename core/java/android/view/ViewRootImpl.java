@@ -130,7 +130,6 @@ import android.graphics.FrameInfo;
 import android.graphics.HardwareRenderer;
 import android.graphics.HardwareRenderer.FrameDrawingCallback;
 import android.graphics.HardwareRendererObserver;
-import android.graphics.Insets;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
@@ -208,7 +207,6 @@ import android.view.accessibility.IAccessibilityInteractionConnection;
 import android.view.accessibility.IAccessibilityInteractionConnectionCallback;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Interpolator;
-import android.view.autofill.AutofillId;
 import android.view.autofill.AutofillManager;
 import android.view.contentcapture.ContentCaptureManager;
 import android.view.contentcapture.ContentCaptureSession;
@@ -820,6 +818,8 @@ public final class ViewRootImpl implements ViewParent,
     private long mFpsPrevTime = -1;
     private int mFpsNumFrames;
 
+    private boolean mInsetsAnimationRunning;
+
     /**
      * The resolved pointer icon type requested by this window.
      * A null value indicates the resolved pointer icon has not yet been calculated.
@@ -995,7 +995,7 @@ public final class ViewRootImpl implements ViewParent,
     // for idleness handling.
     private boolean mHasIdledMessage = false;
     // time for touch boost period.
-    private static final int FRAME_RATE_TOUCH_BOOST_TIME = 1500;
+    private static final int FRAME_RATE_TOUCH_BOOST_TIME = 3000;
     // time for checking idle status periodically.
     private static final int FRAME_RATE_IDLENESS_CHECK_TIME_MILLIS = 500;
     // time for revaluating the idle status before lowering the frame rate.
@@ -2196,6 +2196,10 @@ public final class ViewRootImpl implements ViewParent,
         if (!mIsInTraversal) {
             scheduleTraversals();
         }
+    }
+
+    void notifyInsetsAnimationRunningStateChanged(boolean running) {
+        mInsetsAnimationRunning = running;
     }
 
     @Override
@@ -4047,56 +4051,20 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void notifyContentCaptureEvents() {
-        try {
-            if (!isContentCaptureEnabled()) {
-                if (DEBUG_CONTENT_CAPTURE) {
-                    Log.d(mTag, "notifyContentCaptureEvents while disabled");
-                }
-                mAttachInfo.mContentCaptureEvents = null;
-                return;
-            }
-            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
-                Trace.traceBegin(Trace.TRACE_TAG_VIEW, "notifyContentCaptureEvents");
-            }
-            MainContentCaptureSession mainSession = mAttachInfo.mContentCaptureManager
-                    .getMainContentCaptureSession();
-            for (int i = 0; i < mAttachInfo.mContentCaptureEvents.size(); i++) {
-                int sessionId = mAttachInfo.mContentCaptureEvents.keyAt(i);
-                mainSession.notifyViewTreeEvent(sessionId, /* started= */ true);
-                ArrayList<Object> events = mAttachInfo.mContentCaptureEvents
-                        .valueAt(i);
-                for_each_event: for (int j = 0; j < events.size(); j++) {
-                    Object event = events.get(j);
-                    if (event instanceof AutofillId) {
-                        mainSession.notifyViewDisappeared(sessionId, (AutofillId) event);
-                    } else if (event instanceof View) {
-                        View view = (View) event;
-                        ContentCaptureSession session = view.getContentCaptureSession();
-                        if (session == null) {
-                            Log.w(mTag, "no content capture session on view: " + view);
-                            continue for_each_event;
-                        }
-                        int actualId = session.getId();
-                        if (actualId != sessionId) {
-                            Log.w(mTag, "content capture session mismatch for view (" + view
-                                    + "): was " + sessionId + " before, it's " + actualId + " now");
-                            continue for_each_event;
-                        }
-                        ViewStructure structure = session.newViewStructure(view);
-                        view.onProvideContentCaptureStructure(structure, /* flags= */ 0);
-                        session.notifyViewAppeared(structure);
-                    } else if (event instanceof Insets) {
-                        mainSession.notifyViewInsetsChanged(sessionId, (Insets) event);
-                    } else {
-                        Log.w(mTag, "invalid content capture event: " + event);
-                    }
-                }
-                mainSession.notifyViewTreeEvent(sessionId, /* started= */ false);
+        if (!isContentCaptureEnabled()) {
+            if (DEBUG_CONTENT_CAPTURE) {
+                Log.d(mTag, "notifyContentCaptureEvents while disabled");
             }
             mAttachInfo.mContentCaptureEvents = null;
-        } finally {
-            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            return;
         }
+
+        final ContentCaptureManager manager = mAttachInfo.mContentCaptureManager;
+        if (manager != null && mAttachInfo.mContentCaptureEvents != null) {
+            final MainContentCaptureSession session = manager.getMainContentCaptureSession();
+            session.notifyContentCaptureEvents(mAttachInfo.mContentCaptureEvents);
+        }
+        mAttachInfo.mContentCaptureEvents = null;
     }
 
     private void notifyHolderSurfaceDestroyed() {
