@@ -19,12 +19,17 @@ package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.telephony.CellSignalStrength
 import com.android.settingslib.SignalIcon
 import com.android.settingslib.mobile.TelephonyIcons
+import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class FakeMobileIconInteractor : MobileIconInteractor {
+class FakeMobileIconInteractor(
+    override val tableLogBuffer: TableLogBuffer,
+) : MobileIconInteractor {
     override val alwaysShowDataRatIcon = MutableStateFlow(false)
+
+    override val alwaysUseCdmaLevel = MutableStateFlow(false)
 
     override val activity =
         MutableStateFlow(
@@ -48,6 +53,8 @@ class FakeMobileIconInteractor : MobileIconInteractor {
     override val isDefaultConnectionFailed = _isFailedConnection
 
     override val isDataConnected = MutableStateFlow(true)
+
+    override val isInService = MutableStateFlow(true)
 
     private val _isDataEnabled = MutableStateFlow(true)
     override val isDataEnabled = _isDataEnabled

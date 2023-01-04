@@ -2135,6 +2135,12 @@
     <string name="config_defaultAutomotiveNavigation" translatable="false"></string>
     <!-- The name of the package that will hold the system wear health service role. -->
     <string name="config_systemWearHealthService" translatable="false"></string>
+    <!-- The name of the package that will hold the default notes role. -->
+    <string name="config_defaultNotes" translatable="false"></string>
+    <!-- Whether the default notes role should be enabled. -->
+    <bool name="config_enableDefaultNotes">false</bool>
+    <!-- Whether the default notes role for work profile should be enabled. -->
+    <bool name="config_enableDefaultNotesForWorkProfile">false</bool>
 
     <!-- The name of the package that will handle updating the device management role. -->
     <string name="config_devicePolicyManagementUpdater" translatable="false"></string>
@@ -2700,6 +2706,10 @@
 
     <!-- Whether UI for multi user should be shown -->
     <bool name="config_enableMultiUserUI">false</bool>
+
+    <!-- Whether multiple admins are allowed on the device. If set to true, new users can be created
+     with admin privileges and admin privileges can be granted/revoked from existing users. -->
+    <bool name="config_enableMultipleAdmins">false</bool>
 
     <!-- Whether the new Auto Selection Network UI should be shown -->
     <bool name="config_enableNewAutoSelectNetworkUI">false</bool>
@@ -5365,6 +5375,11 @@
     <!-- Whether the specific behaviour for translucent activities letterboxing is enabled.
          TODO(b/255532890) Enable when ignoreOrientationRequest is set -->
     <bool name="config_letterboxIsEnabledForTranslucentActivities">false</bool>
+
+    <!-- Whether sending compat fake focus for split screen resumed activities is enabled.
+         Needed because some game engines wait to get focus before drawing the content of
+         the app which isn't guaranteed by default in multi-window modes. -->
+    <bool name="config_isCompatFakeFocusEnabled">false</bool>
 
     <!-- Whether camera compat treatment is enabled for issues caused by orientation mismatch
         between camera buffers and an app window. This includes force rotation of fixed

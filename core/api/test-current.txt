@@ -814,7 +814,7 @@ package android.content.pm {
   public class ApplicationInfo extends android.content.pm.PackageItemInfo implements android.os.Parcelable {
     method public boolean hasRequestForegroundServiceExemption();
     method public boolean isOnBackInvokedCallbackEnabled();
-    method public boolean isPrivilegedApp();
+    method @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public boolean isPrivilegedApp();
     method public boolean isSystemApp();
     method public void setEnableOnBackInvokedCallback(boolean);
     field public static final int PRIVATE_FLAG_PRIVILEGED = 8; // 0x8
@@ -831,7 +831,6 @@ package android.content.pm {
 
   public static class PackageInstaller.SessionParams implements android.os.Parcelable {
     method public void setInstallFlagAllowTest();
-    method public void setInstallerPackageName(@Nullable String);
   }
 
   public abstract class PackageManager {
@@ -2562,7 +2561,7 @@ package android.service.voice {
     method @NonNull public android.service.voice.AlwaysOnHotwordDetector.EventPayload.Builder setKeyphraseRecognitionExtras(@NonNull java.util.List<android.hardware.soundtrigger.SoundTrigger.KeyphraseRecognitionExtra>);
   }
 
-  public abstract class HotwordDetectionService extends android.app.Service {
+  public abstract class HotwordDetectionService extends android.app.Service implements android.service.voice.SandboxedDetectionServiceBase {
     field public static final boolean ENABLE_PROXIMITY_RESULT = true;
   }
 

@@ -499,13 +499,22 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private static final String PROPERTY_KNOWN_DIGESTERS_LIST = "known_digesters_list";
 
     /**
-     * Whether of not requesting the approval before committing sessions is available.
+     * Whether or not requesting the approval before committing sessions is available.
      *
      * Flag type: {@code boolean}
      * Namespace: NAMESPACE_PACKAGE_MANAGER_SERVICE
      */
     private static final String PROPERTY_IS_PRE_APPROVAL_REQUEST_AVAILABLE =
             "is_preapproval_available";
+
+    /**
+     * Whether or not the update ownership enforcement is available.
+     *
+     * Flag type: {@code boolean}
+     * Namespace: NAMESPACE_PACKAGE_MANAGER_SERVICE
+     */
+    private static final String PROPERTY_IS_UPDATE_OWNERSHIP_ENFORCEMENT_AVAILABLE =
+            "is_update_ownership_enforcement_available";
 
     /**
      * The default response for package verification timeout.
@@ -1105,8 +1114,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     @Deprecated
     @NonNull
     public Computer snapshotComputer(boolean allowLiveComputer) {
+        var isHoldingPackageLock = Thread.holdsLock(mLock);
         if (allowLiveComputer) {
-            if (Thread.holdsLock(mLock)) {
+            if (isHoldingPackageLock) {
                 // If the current thread holds mLock then it may have modified state but not
                 // yet invalidated the snapshot.  Always give the thread the live computer.
                 return mLiveComputer;
@@ -1118,6 +1128,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         if (oldSnapshot != null && oldSnapshot.getVersion() == pendingVersion) {
             return oldSnapshot.use();
+        }
+
+        if (isHoldingPackageLock) {
+            // If the current thread holds mLock then it already has exclusive write access to the
+            // two snapshot fields, and we can just go ahead and rebuild the snapshot.
+            @SuppressWarnings("GuardedBy")
+            var newSnapshot = rebuildSnapshot(oldSnapshot, pendingVersion);
+            sSnapshot.set(newSnapshot);
+            return newSnapshot.use();
         }
 
         synchronized (mSnapshotLock) {
@@ -1137,7 +1156,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 // Fetch version one last time to ensure that the rebuilt snapshot matches
                 // the latest invalidation, which could have come in between entering the
                 // SnapshotLock and mLock sync blocks.
+                rebuildSnapshot = sSnapshot.get();
                 rebuildVersion = sSnapshotPendingVersion.get();
+                if (rebuildSnapshot != null && rebuildSnapshot.getVersion() == rebuildVersion) {
+                    return rebuildSnapshot.use();
+                }
 
                 // Build the snapshot for this version
                 var newSnapshot = rebuildSnapshot(rebuildSnapshot, rebuildVersion);
@@ -1147,7 +1170,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
     }
 
-    @GuardedBy({ "mLock", "mSnapshotLock"})
+    @GuardedBy("mLock")
     private Computer rebuildSnapshot(@Nullable Computer oldSnapshot, int newVersion) {
         var now = SystemClock.currentTimeMicro();
         var hits = oldSnapshot == null ? -1 : oldSnapshot.getUsed();
@@ -2065,6 +2088,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mInitAppsHelper.initNonSystemApps(packageParser, userIds, startTime);
             packageParser.close();
 
+            mRequiredVerifierPackages = getRequiredButNotReallyRequiredVerifiersLPr(computer);
+            mRequiredInstallerPackage = getRequiredInstallerLPr(computer);
+            mRequiredUninstallerPackage = getRequiredUninstallerLPr(computer);
+
+            // PermissionController hosts default permission granting and role management, so it's a
+            // critical part of the core system.
+            mRequiredPermissionControllerPackage = getRequiredPermissionControllerLPr(computer);
+
             // Resolve the storage manager.
             mStorageManagerPackage = getStorageManagerPackageName(computer);
 
@@ -2210,9 +2241,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             EventLog.writeEvent(EventLogTags.BOOT_PROGRESS_PMS_READY,
                     SystemClock.uptimeMillis());
 
-            mRequiredVerifierPackages = getRequiredButNotReallyRequiredVerifiersLPr(computer);
-            mRequiredInstallerPackage = getRequiredInstallerLPr(computer);
-            mRequiredUninstallerPackage = getRequiredUninstallerLPr(computer);
             ComponentName intentFilterVerifierComponent =
                     getIntentFilterVerifierComponentNameLPr(computer);
             ComponentName domainVerificationAgent =
@@ -2229,10 +2257,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mSharedSystemSharedLibraryPackageName = getRequiredSharedLibrary(computer,
                     PackageManager.SYSTEM_SHARED_LIBRARY_SHARED,
                     SharedLibraryInfo.VERSION_UNDEFINED);
-
-            // PermissionController hosts default permission granting and role management, so it's a
-            // critical part of the core system.
-            mRequiredPermissionControllerPackage = getRequiredPermissionControllerLPr(computer);
 
             mSettings.setPermissionControllerVersion(
                     computer.getPackageInfo(mRequiredPermissionControllerPackage, 0,
@@ -2878,7 +2902,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     static void renameStaticSharedLibraryPackage(ParsedPackage parsedPackage) {
         // Derive the new package synthetic package name
         parsedPackage.setPackageName(toStaticSharedLibraryPackageName(
-                parsedPackage.getPackageName(), parsedPackage.getStaticSharedLibVersion()));
+                parsedPackage.getPackageName(), parsedPackage.getStaticSharedLibraryVersion()));
     }
 
     private static String toStaticSharedLibraryPackageName(
@@ -7055,6 +7079,16 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         try {
             return DeviceConfig.getBoolean(NAMESPACE_PACKAGE_MANAGER_SERVICE,
                     PROPERTY_IS_PRE_APPROVAL_REQUEST_AVAILABLE, true /* defaultValue */);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    static boolean isUpdateOwnershipEnforcementAvailable() {
+        final long token = Binder.clearCallingIdentity();
+        try {
+            return DeviceConfig.getBoolean(NAMESPACE_PACKAGE_MANAGER_SERVICE,
+                    PROPERTY_IS_UPDATE_OWNERSHIP_ENFORCEMENT_AVAILABLE, false /* defaultValue */);
         } finally {
             Binder.restoreCallingIdentity(token);
         }

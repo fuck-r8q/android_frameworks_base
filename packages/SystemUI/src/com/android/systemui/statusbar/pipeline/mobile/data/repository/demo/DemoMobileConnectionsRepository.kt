@@ -24,6 +24,8 @@ import com.android.settingslib.SignalIcon
 import com.android.settingslib.mobile.MobileMappings
 import com.android.settingslib.mobile.TelephonyIcons
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.log.table.TableLogBuffer
+import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileConnectionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileConnectivityModel
@@ -60,6 +62,7 @@ constructor(
     private val dataSource: DemoModeMobileConnectionDataSource,
     @Application private val scope: CoroutineScope,
     context: Context,
+    private val logFactory: TableLogBufferFactory,
 ) : MobileConnectionsRepository {
 
     private var demoCommandJob: Job? = null
@@ -149,7 +152,16 @@ constructor(
 
     override fun getRepoForSubId(subId: Int): DemoMobileConnectionRepository {
         return connectionRepoCache[subId]
-            ?: DemoMobileConnectionRepository(subId).also { connectionRepoCache[subId] = it }
+            ?: createDemoMobileConnectionRepo(subId).also { connectionRepoCache[subId] = it }
+    }
+
+    private fun createDemoMobileConnectionRepo(subId: Int): DemoMobileConnectionRepository {
+        val tableLogBuffer = logFactory.create("DemoMobileConnectionLog [$subId]", 100)
+
+        return DemoMobileConnectionRepository(
+            subId,
+            tableLogBuffer,
+        )
     }
 
     override val globalMobileDataSettingChangedEvent = MutableStateFlow(Unit)
@@ -235,6 +247,7 @@ constructor(
         return MobileConnectionModel(
             isEmergencyOnly = false, // TODO(b/261029387): not yet supported
             isRoaming = roaming,
+            isInService = (level ?: 0) > 0,
             isGsm = false, // TODO(b/261029387): not yet supported
             cdmaLevel = level ?: 0,
             primaryLevel = level ?: 0,
@@ -260,7 +273,10 @@ constructor(
     }
 }
 
-class DemoMobileConnectionRepository(override val subId: Int) : MobileConnectionRepository {
+class DemoMobileConnectionRepository(
+    override val subId: Int,
+    override val tableLogBuffer: TableLogBuffer,
+) : MobileConnectionRepository {
     override val connectionInfo = MutableStateFlow(MobileConnectionModel())
 
     override val dataEnabled = MutableStateFlow(true)

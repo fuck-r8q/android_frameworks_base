@@ -330,6 +330,8 @@ object Flags {
     // TODO(b/254512758): Tracking Bug
     @JvmField val ROUNDED_BOX_RIPPLE = releasedFlag(1002, "rounded_box_ripple")
 
+    val SHOW_LOWLIGHT_ON_DIRECT_BOOT = unreleasedFlag(1003, "show_lowlight_on_direct_boot")
+
     // 1100 - windowing
     @Keep
     @JvmField
@@ -415,6 +417,9 @@ object Flags {
     @JvmField
     val WM_ENABLE_PREDICTIVE_BACK_SYSUI =
         unreleasedFlag(1204, "persist.wm.debug.predictive_back_sysui_enable", teamfood = true)
+
+    // TODO(b/255697805): Tracking Bug
+    @JvmField val TRACKPAD_GESTURE_BACK = unreleasedFlag(1205, "trackpad_gesture_back", teamfood = false)
 
     // 1300 - screenshots
     // TODO(b/254512719): Tracking Bug

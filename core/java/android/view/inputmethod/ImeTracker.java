@@ -43,6 +43,12 @@ public interface ImeTracker {
 
     String TAG = "ImeTracker";
 
+    /** The debug flag for IME visibility event log. */
+    boolean DEBUG_IME_VISIBILITY = SystemProperties.getBoolean("persist.debug.imf_event", false);
+
+    /** The message to indicate if there is no valid {@link Token}. */
+    String TOKEN_NONE = "TOKEN_NONE";
+
     /** The type of the IME request. */
     @IntDef(prefix = { "TYPE_" }, value = {
             TYPE_SHOW,

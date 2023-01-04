@@ -36,12 +36,14 @@ import android.media.IAudioServerStateDispatcher;
 import android.media.ICapturePresetDevicesRoleDispatcher;
 import android.media.ICommunicationDeviceDispatcher;
 import android.media.IDeviceVolumeBehaviorDispatcher;
+import android.media.IDevicesForAttributesCallback;
 import android.media.IMuteAwaitConnectionCallback;
 import android.media.IPlaybackConfigDispatcher;
 import android.media.IPreferredMixerAttributesDispatcher;
 import android.media.IRecordingConfigDispatcher;
 import android.media.IRingtonePlayer;
 import android.media.IStrategyPreferredDevicesDispatcher;
+import android.media.IStrategyNonDefaultDevicesDispatcher;
 import android.media.ISpatializerCallback;
 import android.media.ISpatializerHeadTrackerAvailableCallback;
 import android.media.ISpatializerHeadTrackingModeCallback;
@@ -163,6 +165,9 @@ interface IAudioService {
 
     @EnforcePermission("ACCESS_ULTRASOUND")
     boolean isUltrasoundSupported();
+
+    @EnforcePermission("CAPTURE_AUDIO_HOTWORD")
+    boolean isHotwordStreamSupported(boolean lookbackAudio);
 
     void setMicrophoneMute(boolean on, String callingPackage, int userId, in String attributionTag);
 
@@ -330,7 +335,8 @@ interface IAudioService {
 
     boolean isCallScreeningModeSupported();
 
-    int setPreferredDevicesForStrategy(in int strategy, in List<AudioDeviceAttributes> device);
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
+    int setPreferredDevicesForStrategy(in int strategy, in List<AudioDeviceAttributes> devices);
 
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     int removePreferredDevicesForStrategy(in int strategy);
@@ -338,9 +344,24 @@ interface IAudioService {
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     List<AudioDeviceAttributes> getPreferredDevicesForStrategy(in int strategy);
 
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
+    int setDeviceAsNonDefaultForStrategy(in int strategy, in AudioDeviceAttributes device);
+
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
+    int removeDeviceAsNonDefaultForStrategy(in int strategy, in AudioDeviceAttributes device);
+
+    @EnforcePermission("MODIFY_AUDIO_ROUTING")
+    List<AudioDeviceAttributes> getNonDefaultDevicesForStrategy(in int strategy);
+
     List<AudioDeviceAttributes> getDevicesForAttributes(in AudioAttributes attributes);
 
     List<AudioDeviceAttributes> getDevicesForAttributesUnprotected(in AudioAttributes attributes);
+
+    void addOnDevicesForAttributesChangedListener(in AudioAttributes attributes,
+            in IDevicesForAttributesCallback callback);
+
+    oneway void removeOnDevicesForAttributesChangedListener(
+            in IDevicesForAttributesCallback callback);
 
     int setAllowedCapturePolicy(in int capturePolicy);
 
@@ -350,6 +371,12 @@ interface IAudioService {
 
     oneway void unregisterStrategyPreferredDevicesDispatcher(
             IStrategyPreferredDevicesDispatcher dispatcher);
+
+    void registerStrategyNonDefaultDevicesDispatcher(
+            IStrategyNonDefaultDevicesDispatcher dispatcher);
+
+    oneway void unregisterStrategyNonDefaultDevicesDispatcher(
+            IStrategyNonDefaultDevicesDispatcher dispatcher);
 
     oneway void setRttEnabled(in boolean rttEnabled);
 
