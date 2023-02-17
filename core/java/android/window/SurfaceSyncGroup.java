@@ -16,64 +16,44 @@
 
 package android.window;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UiThread;
+import android.os.Binder;
+import android.os.BinderProxy;
 import android.os.Debug;
+import android.os.IBinder;
+import android.os.RemoteException;
 import android.os.Trace;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Pair;
 import android.view.AttachedSurfaceControl;
 import android.view.SurfaceControl.Transaction;
+import android.view.SurfaceControlViewHost;
 import android.view.SurfaceView;
+import android.view.WindowManagerGlobal;
 
 import com.android.internal.annotations.GuardedBy;
 
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Used to organize syncs for surfaces.
- *
- * The SurfaceSyncGroup allows callers to add desired syncs into a set and wait for them to all
- * complete before getting a callback. The purpose of the SurfaceSyncGroup is to be an accounting
- * mechanism so each sync implementation doesn't need to handle it themselves. The SurfaceSyncGroup
- * class is used the following way.
- *
- * 1. {@link #addToSync(SurfaceSyncGroup, boolean)} is called for every SurfaceSyncGroup object that
- * wants to be included in the sync. If the addSync is called for an {@link AttachedSurfaceControl}
- * or {@link SurfaceView} it needs to be called on the UI thread. When addToSync is called, it's
- * guaranteed that any UI updates that were requested before addToSync but after the last frame
- * drew, will be included in the sync.
- * 2. {@link #markSyncReady()} should be called when all the {@link SurfaceSyncGroup}s have been
- * added to the SurfaceSyncGroup. At this point, the SurfaceSyncGroup is closed and no more
- * SurfaceSyncGroups can be added to it.
- * 3. The SurfaceSyncGroup will gather the data for each SurfaceSyncGroup using the steps described
- * below. When all the SurfaceSyncGroups have finished, the syncRequestComplete will be invoked and
- * the transaction will either be applied or sent to the caller. In most cases, only the
- * SurfaceSyncGroup should be handling the Transaction object directly. However, there are some
- * cases where the framework needs to send the Transaction elsewhere, like in ViewRootImpl, so that
- * option is provided.
- *
- * The following is what happens within the {@link android.window.SurfaceSyncGroup}
- * 1. Each SurfaceSyncGroup will get a
- * {@link SurfaceSyncGroup#onAddedToSyncGroup(SurfaceSyncGroup, TransactionReadyCallback)} callback
- * that contains a  {@link TransactionReadyCallback}.
- * 2. Each {@link SurfaceSyncGroup} needs to invoke
- * {@link SurfaceSyncGroup#onTransactionReady(Transaction)}.
- * This makes sure the parent SurfaceSyncGroup knows when the SurfaceSyncGroup is complete, allowing
- * the parent SurfaceSyncGroup to get the Transaction that contains the changes for the child
- * SurfaceSyncGroup
- * 3. When the final TransactionReadyCallback finishes for the child SurfaceSyncGroups, the
- * transaction is either applied if it's the top most parent or the final merged transaction is sent
- * up to its parent SurfaceSyncGroup.
- *
- * @hide
+ * A way for data to be gathered so multiple surfaces can be synced. This is intended to be
+ * used with AttachedSurfaceControl, SurfaceView, and SurfaceControlViewHost. This allows different
+ * parts of the system to synchronize different surfaces themselves without having to manage timing
+ * of different rendering threads.
+ * This will also allow synchronization of surfaces across multiple processes. The caller can add
+ * SurfaceControlViewHosts from another process to the SurfaceSyncGroup in a different process
+ * and this clas will ensure all the surfaces are ready before applying everything together.
+ * </p>
+ * see the <a href="https://android.googlesource.com/platform/frameworks/base/+/master/core/java/android/window/SurfaceSyncGroup.md">SurfaceSyncGroup documentation</a>
+ * </p>
  */
-public class SurfaceSyncGroup {
+public final class SurfaceSyncGroup {
     private static final String TAG = "SurfaceSyncGroup";
     private static final boolean DEBUG = false;
 
@@ -92,7 +72,7 @@ public class SurfaceSyncGroup {
     private final String mName;
 
     @GuardedBy("mLock")
-    private final Set<TransactionReadyCallback> mPendingSyncs = new ArraySet<>();
+    private final ArraySet<ITransactionReadyCallback> mPendingSyncs = new ArraySet<>();
     @GuardedBy("mLock")
     private final Transaction mTransaction = sTransactionFactory.get();
     @GuardedBy("mLock")
@@ -102,13 +82,45 @@ public class SurfaceSyncGroup {
     private boolean mFinished;
 
     @GuardedBy("mLock")
-    private TransactionReadyCallback mTransactionReadyCallback;
+    private Consumer<Transaction> mTransactionReadyConsumer;
 
     @GuardedBy("mLock")
-    private SurfaceSyncGroup mParentSyncGroup;
+    private ISurfaceSyncGroup mParentSyncGroup;
 
     @GuardedBy("mLock")
     private final ArraySet<Pair<Executor, Runnable>> mSyncCompleteCallbacks = new ArraySet<>();
+
+    @GuardedBy("mLock")
+    private boolean mHasWMSync;
+
+    @GuardedBy("mLock")
+    private ISurfaceSyncGroupCompletedListener mSurfaceSyncGroupCompletedListener;
+
+    /**
+     * @hide
+     */
+    public final ISurfaceSyncGroup mISurfaceSyncGroup = new ISurfaceSyncGroupImpl();
+
+    @GuardedBy("mLock")
+    private Runnable mAddedToSyncListener;
+
+    /**
+     * Token to identify this SurfaceSyncGroup. This is used to register the SurfaceSyncGroup in
+     * WindowManager. This token is also sent to other processes' SurfaceSyncGroup that want to be
+     * included in this SurfaceSyncGroup.
+     */
+    private final Binder mToken = new Binder();
+
+    private static boolean isLocalBinder(IBinder binder) {
+        return !(binder instanceof BinderProxy);
+    }
+
+    private static SurfaceSyncGroup getSurfaceSyncGroup(ISurfaceSyncGroup iSurfaceSyncGroup) {
+        if (iSurfaceSyncGroup instanceof ISurfaceSyncGroupImpl) {
+            return ((ISurfaceSyncGroupImpl) iSurfaceSyncGroup).getSurfaceSyncGroup();
+        }
+        return null;
+    }
 
     /**
      * @hide
@@ -119,8 +131,10 @@ public class SurfaceSyncGroup {
 
     /**
      * Starts a sync and will automatically apply the final, merged transaction.
+     *
+     * @param name Used for identifying and debugging.
      */
-    public SurfaceSyncGroup(String name) {
+    public SurfaceSyncGroup(@NonNull String name) {
         this(name, transaction -> {
             if (transaction != null) {
                 if (DEBUG) {
@@ -129,20 +143,20 @@ public class SurfaceSyncGroup {
                 transaction.apply();
             }
         });
-
     }
 
     /**
      * Creates a sync.
      *
-     * @param transactionReadyCallback The complete callback that contains the syncId and
+     * @param name                     Used for identifying and debugging.
+     * @param transactionReadyConsumer The complete callback that contains the syncId and
      *                                 transaction with all the sync data merged. The Transaction
      *                                 passed back can be null.
-     *
+     *                                 <p>
      *                                 NOTE: Only should be used by ViewRootImpl
      * @hide
      */
-    public SurfaceSyncGroup(String name, Consumer<Transaction> transactionReadyCallback) {
+    public SurfaceSyncGroup(String name, Consumer<Transaction> transactionReadyConsumer) {
         // sCounter is a way to give the SurfaceSyncGroup a unique name even if the name passed in
         // is not.
         // Avoid letting the count get too big so just reset to 0. It's unlikely that we'll have
@@ -153,26 +167,39 @@ public class SurfaceSyncGroup {
 
         mName = name + "#" + sCounter.getAndIncrement();
 
-        mTransactionReadyCallback = transaction -> {
+        mTransactionReadyConsumer = (transaction) -> {
             if (DEBUG && transaction != null) {
                 Log.d(TAG, "Sending non null transaction " + transaction + " to callback for "
                         + mName);
             }
-            Trace.instant(Trace.TRACE_TAG_VIEW,
-                    "Final TransactionCallback with " + transaction + " for " + mName);
-            transactionReadyCallback.accept(transaction);
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.instant(Trace.TRACE_TAG_VIEW,
+                        "Final TransactionCallback with " + transaction + " for " + mName);
+            }
+            transactionReadyConsumer.accept(transaction);
             synchronized (mLock) {
-                for (Pair<Executor, Runnable> callback : mSyncCompleteCallbacks) {
-                    callback.first.execute(callback.second);
+                // If there's a registered listener with WMS, that means we aren't actually complete
+                // until WMS notifies us that the parent has completed.
+                if (mSurfaceSyncGroupCompletedListener == null) {
+                    invokeSyncCompleteCallbacks();
                 }
             }
         };
 
-        Trace.instant(Trace.TRACE_TAG_VIEW, "new SurfaceSyncGroup " + mName);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.instant(Trace.TRACE_TAG_VIEW, "new SurfaceSyncGroup " + mName);
+        }
 
         if (DEBUG) {
             Log.d(TAG, "setupSync " + mName + " " + Debug.getCallers(2));
         }
+    }
+
+    @GuardedBy("mLock")
+    private void invokeSyncCompleteCallbacks() {
+        mSyncCompleteCallbacks.forEach(
+                executorRunnablePair -> executorRunnablePair.first.execute(
+                        executorRunnablePair.second));
     }
 
     /**
@@ -180,6 +207,7 @@ public class SurfaceSyncGroup {
      *
      * @param executor The Executor to invoke the Runnable on
      * @param runnable The Runnable to get called
+     * @hide
      */
     public void addSyncCompleteCallback(Executor executor, Runnable runnable) {
         synchronized (mLock) {
@@ -188,176 +216,330 @@ public class SurfaceSyncGroup {
     }
 
     /**
-     * Mark the sync set as ready to complete. No more data can be added to the specified
-     * syncId.
-     * Once the sync set is marked as ready, it will be able to complete once all Syncables in the
-     * set have completed their sync
+     * Mark the SurfaceSyncGroup as ready to complete. No more data can be added to this
+     * SurfaceSyncGroup.
+     * <p>
+     * Once the SurfaceSyncGroup is marked as ready, it will be able to complete once all child
+     * SurfaceSyncGroup have completed their sync.
      */
     public void markSyncReady() {
-        onTransactionReady(null);
-    }
-
-    /**
-     * Similar to {@link #markSyncReady()}, but a transaction is passed in to merge with the
-     * SurfaceSyncGroup.
-     *
-     * @param t The transaction that merges into the main Transaction for the SurfaceSyncGroup.
-     */
-    public void onTransactionReady(@Nullable Transaction t) {
-        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "markSyncReady " + mName);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceBegin(Trace.TRACE_TAG_VIEW, "markSyncReady " + mName);
+        }
         synchronized (mLock) {
-            mSyncReady = true;
-            if (t != null) {
-                mTransaction.merge(t);
+            if (mHasWMSync) {
+                try {
+                    WindowManagerGlobal.getWindowManagerService().markSurfaceSyncGroupReady(mToken);
+                } catch (RemoteException e) {
+                }
             }
+            mSyncReady = true;
             checkIfSyncIsComplete();
         }
-        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
     }
 
     /**
-     * Add a SurfaceView to a sync set. This is different than
-     * {@link #addToSync(AttachedSurfaceControl)} because it requires the caller to notify the start
-     * and finish drawing in order to sync.
+     * Add a SurfaceView to a SurfaceSyncGroup. This requires the caller to notify the start
+     * and finish drawing in order to sync since the client owns the rendering of the SurfaceView.
      *
      * @param surfaceView           The SurfaceView to add to the sync.
      * @param frameCallbackConsumer The callback that's invoked to allow the caller to notify
-     *                              the
-     *                              Syncer when the SurfaceView has started drawing and
-     *                              finished.
+     *                              SurfaceSyncGroup when the SurfaceView has started drawing.
      * @return true if the SurfaceView was successfully added to the SyncGroup, false otherwise.
+     * @hide
      */
     @UiThread
-    public boolean addToSync(SurfaceView surfaceView,
+    public boolean add(SurfaceView surfaceView,
             Consumer<SurfaceViewFrameCallback> frameCallbackConsumer) {
         SurfaceSyncGroup surfaceSyncGroup = new SurfaceSyncGroup(surfaceView.getName());
-        if (addToSync(surfaceSyncGroup, false /* parentSyncGroupMerge */)) {
-            frameCallbackConsumer.accept(
-                    () -> surfaceView.syncNextFrame(surfaceSyncGroup::onTransactionReady));
+        if (add(surfaceSyncGroup.mISurfaceSyncGroup, false /* parentSyncGroupMerge */,
+                null /* runnable */)) {
+            frameCallbackConsumer.accept(() -> surfaceView.syncNextFrame(transaction -> {
+                surfaceSyncGroup.addTransaction(transaction);
+                surfaceSyncGroup.markSyncReady();
+            }));
             return true;
         }
         return false;
     }
 
     /**
-     * Add a View's rootView to a sync set.
+     * Add an AttachedSurfaceControl to the SurfaceSyncGroup. The AttachedSurfaceControl will pause
+     * rendering to ensure the runnable can be invoked and that the sync picks up the frame that
+     * contains the changes.
      *
-     * @param viewRoot The viewRoot that will be add to the sync set
-     * @return true if the View was successfully added to the SyncGroup, false otherwise.
+     * @param attachedSurfaceControl The AttachedSurfaceControl that will be add to this
+     *                               SurfaceSyncGroup.
+     * @param runnable               This is run on the same thread that the call was made on, but
+     *                               after the rendering is paused and before continuing to render
+     *                               the next frame. This method will not return until the
+     *                               execution of the runnable completes. This can be used to make
+     *                               changes to the AttachedSurfaceControl, ensuring that the
+     *                               changes are included in the sync.
+     * @return true if the AttachedSurfaceControl was successfully added to the SurfaceSyncGroup,
+     * false otherwise.
      */
     @UiThread
-    public boolean addToSync(@Nullable AttachedSurfaceControl viewRoot) {
-        if (viewRoot == null) {
+    public boolean add(@Nullable AttachedSurfaceControl attachedSurfaceControl,
+            @Nullable Runnable runnable) {
+        if (attachedSurfaceControl == null) {
             return false;
         }
-        SurfaceSyncGroup surfaceSyncGroup = viewRoot.getOrCreateSurfaceSyncGroup();
+        SurfaceSyncGroup surfaceSyncGroup = attachedSurfaceControl.getOrCreateSurfaceSyncGroup();
         if (surfaceSyncGroup == null) {
             return false;
         }
-        return addToSync(surfaceSyncGroup, false /* parentSyncGroupMerge */);
+
+        return add(surfaceSyncGroup, runnable);
     }
 
     /**
-     * Add a {@link SurfaceSyncGroup} to a sync set. The sync set will wait for all
-     * SyncableSurfaces to complete before notifying.
+     * Add a SurfaceControlViewHost.SurfacePackage to the SurfaceSyncGroup. This will
+     * get the SurfaceSyncGroup from the SurfacePackage, which will pause rendering for the
+     * SurfaceControlViewHost. The runnable will be invoked to allow the host to update the SCVH
+     * in a synchronized way. Finally, it will add the SCVH to the SurfaceSyncGroup and unpause
+     * rendering in the SCVH, allowing the changes to get picked up and included in the sync.
      *
-     * @param surfaceSyncGroup A SyncableSurface that implements how to handle syncing
-     *                         buffers.
+     * @param surfacePackage The SurfacePackage that will be added to this SurfaceSyncGroup.
+     * @param runnable       This is run on the same thread that the call was made on, but
+     *                       after the rendering is paused and before continuing to render
+     *                       the next frame. This method will not return until the
+     *                       execution of the runnable completes. This can be used to make
+     *                       changes to the SurfaceControlViewHost, ensuring that the
+     *                       changes are included in the sync.
+     * @return true if the SurfaceControlViewHost was successfully added to the current
+     * SurfaceSyncGroup, false otherwise.
+     */
+    public boolean add(@NonNull SurfaceControlViewHost.SurfacePackage surfacePackage,
+            @Nullable Runnable runnable) {
+        ISurfaceSyncGroup surfaceSyncGroup;
+        try {
+            surfaceSyncGroup = surfacePackage.getRemoteInterface().getSurfaceSyncGroup();
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to add SurfaceControlViewHost to SurfaceSyncGroup");
+            return false;
+        }
+
+        if (surfaceSyncGroup == null) {
+            Log.e(TAG, "Failed to add SurfaceControlViewHost to SurfaceSyncGroup. "
+                    + "SCVH returned null SurfaceSyncGroup");
+            return false;
+        }
+        return add(surfaceSyncGroup, false /* parentSyncGroupMerge */, runnable);
+    }
+
+    /**
+     * Add a SurfaceSyncGroup to the current SurfaceSyncGroup.
+     *
+     * @param surfaceSyncGroup The SurfaceSyncGroup that will be added to this SurfaceSyncGroup.
+     * @param runnable         This is run on the same thread that the call was made on, This
+     *                         method will not return until the execution of the runnable
+     *                         completes. This can be used to make changes to the SurfaceSyncGroup,
+     *                         ensuring that the changes are included in the sync.
+     * @return true if the requested SurfaceSyncGroup was successfully added to the
+     * SurfaceSyncGroup, false otherwise.
+     * @hide
+     */
+    public boolean add(@NonNull SurfaceSyncGroup surfaceSyncGroup,
+            @Nullable Runnable runnable) {
+        return add(surfaceSyncGroup.mISurfaceSyncGroup, false /* parentSyncGroupMerge */,
+                runnable);
+    }
+
+    /**
+     * Add a {@link ISurfaceSyncGroup} to a SurfaceSyncGroup.
+     *
+     * @param surfaceSyncGroup     An ISyncableSurface that will be added to this SurfaceSyncGroup.
+     * @param parentSyncGroupMerge true if the ISurfaceSyncGroup is added because its child was
+     *                             added to a new SurfaceSyncGroup. That would require the code to
+     *                             call newParent.addToSync(oldParent). When this occurs, we need to
+     *                             reverse the merge order because the oldParent should always be
+     *                             considered older than any other SurfaceSyncGroups.
+     * @param runnable             The Runnable that's invoked before adding the SurfaceSyncGroup
      * @return true if the SyncGroup was successfully added to the current SyncGroup, false
      * otherwise.
+     * @hide
      */
-    public boolean addToSync(SurfaceSyncGroup surfaceSyncGroup, boolean parentSyncGroupMerge) {
-        Trace.traceBegin(Trace.TRACE_TAG_VIEW,
-                "addToSync child=" + surfaceSyncGroup.mName + " parent=" + mName);
-        TransactionReadyCallback transactionReadyCallback = new TransactionReadyCallback() {
-            @Override
-            public void onTransactionReady(Transaction t) {
-                if (DEBUG) {
-                    Log.d(TAG, "onTransactionReady called for" + surfaceSyncGroup.mName
-                            + " and sent to " + mName);
-                }
-                synchronized (mLock) {
-                    if (t != null) {
-                        // When an older parent sync group is added due to a child syncGroup getting
-                        // added to multiple groups, we need to maintain merge order so the older
-                        // parentSyncGroup transactions are overwritten by anything in the newer
-                        // parentSyncGroup.
-                        if (parentSyncGroupMerge) {
-                            t.merge(mTransaction);
-                        }
-                        mTransaction.merge(t);
-                    }
-                    mPendingSyncs.remove(this);
-                    Trace.instant(Trace.TRACE_TAG_VIEW,
-                            "onTransactionReady child=" + surfaceSyncGroup.mName + " parent="
-                                    + mName);
-                    checkIfSyncIsComplete();
-                }
-            }
-        };
-
+    public boolean add(ISurfaceSyncGroup surfaceSyncGroup, boolean parentSyncGroupMerge,
+            @Nullable Runnable runnable) {
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                    "addToSync token=" + mToken.hashCode() + " parent=" + mName);
+        }
         synchronized (mLock) {
             if (mSyncReady) {
-                Log.e(TAG, "Sync " + mName + " was already marked as ready. No more "
-                        + "SurfaceSyncGroups can be added.");
-                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                Log.w(TAG, "Trying to add to sync when already marked as ready " + mName);
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                    Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                }
                 return false;
-            }
-            mPendingSyncs.add(transactionReadyCallback);
-            if (DEBUG) {
-                Log.d(TAG, "addToSync " + surfaceSyncGroup.mName + " to " + mName + " mSyncReady="
-                        + mSyncReady + " mPendingSyncs=" + mPendingSyncs.size());
             }
         }
 
-        surfaceSyncGroup.onAddedToSyncGroup(this, transactionReadyCallback);
-        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        if (runnable != null) {
+            runnable.run();
+        }
+
+        if (isLocalBinder(surfaceSyncGroup.asBinder())) {
+            boolean didAddLocalSync = addLocalSync(surfaceSyncGroup, parentSyncGroupMerge);
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            }
+            return didAddLocalSync;
+        }
+
+        synchronized (mLock) {
+            if (!mHasWMSync) {
+                // We need to add a signal into WMS since WMS will be creating a new parent
+                // SurfaceSyncGroup. When the parent SSG in WMS completes, only then do we
+                // notify the registered listeners that the entire SurfaceSyncGroup is complete.
+                // This is because the callers don't realize that when adding a different process
+                // to this SSG, it isn't actually adding to this SSG and really just creating a
+                // link in WMS. Because of this, the callers would expect the complete listeners
+                // to only be called when everything, including the other process's
+                // SurfaceSyncGroups, have completed. Only WMS has that info so we need to send the
+                // listener to WMS when we set up a server side sync.
+                mSurfaceSyncGroupCompletedListener = new ISurfaceSyncGroupCompletedListener.Stub() {
+                    @Override
+                    public void onSurfaceSyncGroupComplete() {
+                        synchronized (mLock) {
+                            invokeSyncCompleteCallbacks();
+                        }
+                    }
+                };
+                if (!addSyncToWm(mToken, false /* parentSyncGroupMerge */,
+                        mSurfaceSyncGroupCompletedListener)) {
+                    mSurfaceSyncGroupCompletedListener = null;
+                    if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                    }
+                    return false;
+                }
+                mHasWMSync = true;
+            }
+        }
+
+        try {
+            surfaceSyncGroup.onAddedToSyncGroup(mToken, parentSyncGroupMerge);
+        } catch (RemoteException e) {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            }
+            return false;
+        }
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
         return true;
     }
 
     /**
-     * Add a Transaction to this sync set. This allows the caller to provide other info that
-     * should be synced with the transactions.
+     * Add a Transaction to this SurfaceSyncGroup. This allows the caller to provide other info that
+     * should be synced with the other transactions in this SurfaceSyncGroup.
+     *
+     * @param transaction The transaction to add to the SurfaceSyncGroup.
      */
-    public void addTransactionToSync(Transaction t) {
+    public void addTransaction(@NonNull Transaction transaction) {
         synchronized (mLock) {
-            mTransaction.merge(t);
+            mTransaction.merge(transaction);
         }
     }
 
-    @GuardedBy("mLock")
-    private void checkIfSyncIsComplete() {
-        if (mFinished) {
-            if (DEBUG) {
-                Log.d(TAG, "SurfaceSyncGroup=" + mName + " is already complete");
-            }
-            return;
+    /**
+     * Add a Runnable to be invoked when the SurfaceSyncGroup has been added to another
+     * SurfaceSyncGroup. This is useful to know when it's safe to proceed rendering.
+     *
+     * @hide
+     */
+    public void setAddedToSyncListener(Runnable addedToSyncListener) {
+        synchronized (mLock) {
+            mAddedToSyncListener = addedToSyncListener;
         }
+    }
 
-        Trace.instant(Trace.TRACE_TAG_VIEW,
-                "checkIfSyncIsComplete " + mName + " mSyncReady=" + mSyncReady + " mPendingSyncs="
-                        + mPendingSyncs.size());
-        if (!mSyncReady || !mPendingSyncs.isEmpty()) {
+    private boolean addSyncToWm(IBinder token, boolean parentSyncGroupMerge,
+            @Nullable ISurfaceSyncGroupCompletedListener surfaceSyncGroupCompletedListener) {
+        try {
             if (DEBUG) {
-                Log.d(TAG,
-                        "SurfaceSyncGroup=" + mName + " is not complete. mSyncReady=" + mSyncReady
-                                + " mPendingSyncs=" + mPendingSyncs.size());
+                Log.d(TAG, "Attempting to add remote sync to " + mName
+                        + ". Setting up Sync in WindowManager.");
             }
-            return;
-        }
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                        "addSyncToWm=" + token.hashCode() + " group=" + mName);
+            }
+            AddToSurfaceSyncGroupResult addToSyncGroupResult = new AddToSurfaceSyncGroupResult();
+            if (!WindowManagerGlobal.getWindowManagerService().addToSurfaceSyncGroup(token,
+                    parentSyncGroupMerge, surfaceSyncGroupCompletedListener,
+                    addToSyncGroupResult)) {
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                    Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                }
+                return false;
+            }
 
+            setTransactionCallbackFromParent(addToSyncGroupResult.mParentSyncGroup,
+                    addToSyncGroupResult.mTransactionReadyCallback);
+        } catch (RemoteException e) {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            }
+            return false;
+        }
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
+        return true;
+    }
+
+    private boolean addLocalSync(ISurfaceSyncGroup childSyncToken, boolean parentSyncGroupMerge) {
         if (DEBUG) {
-            Log.d(TAG, "Successfully finished sync id=" + mName);
+            Log.d(TAG, "Adding local sync " + mName);
         }
-        mTransactionReadyCallback.onTransactionReady(mTransaction);
-        mFinished = true;
+
+        SurfaceSyncGroup childSurfaceSyncGroup = getSurfaceSyncGroup(childSyncToken);
+        if (childSurfaceSyncGroup == null) {
+            Log.e(TAG, "Trying to add a local sync that's either not valid or not from the"
+                    + " local process=" + childSyncToken);
+            return false;
+        }
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                    "addLocalSync=" + childSurfaceSyncGroup.mName + " parent=" + mName);
+        }
+        ITransactionReadyCallback callback =
+                createTransactionReadyCallback(parentSyncGroupMerge);
+
+        if (callback == null) {
+            return false;
+        }
+
+        childSurfaceSyncGroup.setTransactionCallbackFromParent(mISurfaceSyncGroup, callback);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
+        return true;
     }
 
-    private void onAddedToSyncGroup(SurfaceSyncGroup parentSyncGroup,
-            TransactionReadyCallback transactionReadyCallback) {
-        Trace.traceBegin(Trace.TRACE_TAG_VIEW,
-                "onAddedToSyncGroup child=" + mName + " parent=" + parentSyncGroup.mName);
+    private void setTransactionCallbackFromParent(ISurfaceSyncGroup parentSyncGroup,
+            ITransactionReadyCallback transactionReadyCallback) {
+        if (DEBUG) {
+            Log.d(TAG, "setTransactionCallbackFromParent " + mName);
+        }
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                    "setTransactionCallbackFromParent " + mName + " callback="
+                            + transactionReadyCallback.hashCode());
+        }
+
         boolean finished = false;
+        Runnable addedToSyncListener = null;
         synchronized (mLock) {
             if (mFinished) {
                 finished = true;
@@ -370,62 +552,191 @@ public class SurfaceSyncGroup {
                 // from the original parent are also combined with the new parent SurfaceSyncGroup.
                 if (mParentSyncGroup != null && mParentSyncGroup != parentSyncGroup) {
                     if (DEBUG) {
-                        Log.d(TAG, "Trying to add to " + parentSyncGroup.mName
-                                + " but already part of sync group " + mParentSyncGroup.mName + " "
+                        Log.d(TAG, "Trying to add to " + parentSyncGroup
+                                + " but already part of sync group " + mParentSyncGroup + " "
                                 + mName);
                     }
-                    parentSyncGroup.addToSync(mParentSyncGroup, true /* parentSyncGroupMerge */);
-                }
-
-                if (mParentSyncGroup == parentSyncGroup) {
-                    if (DEBUG) {
-                        Log.d(TAG, "Added to parent that was already the parent");
+                    try {
+                        parentSyncGroup.addToSync(mParentSyncGroup,
+                                true /* parentSyncGroupMerge */);
+                    } catch (RemoteException e) {
                     }
                 }
+
+                if (DEBUG && mParentSyncGroup == parentSyncGroup) {
+                    Log.d(TAG, "Added to parent that was already the parent");
+                }
+
+                Consumer<Transaction> lastCallback = mTransactionReadyConsumer;
                 mParentSyncGroup = parentSyncGroup;
-                final TransactionReadyCallback lastCallback = mTransactionReadyCallback;
-                mTransactionReadyCallback = t -> {
-                    Trace.traceBegin(Trace.TRACE_TAG_VIEW,
-                            "transactionReadyCallback " + mName + " parent="
-                                    + parentSyncGroup.mName);
-                    lastCallback.onTransactionReady(null);
-                    transactionReadyCallback.onTransactionReady(t);
-                    Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                mTransactionReadyConsumer = (transaction) -> {
+                    if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                        Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                                "transactionReadyCallback " + mName + " callback="
+                                        + transactionReadyCallback.hashCode());
+                    }
+                    lastCallback.accept(null);
+
+                    try {
+                        transactionReadyCallback.onTransactionReady(transaction);
+                    } catch (RemoteException e) {
+                        transaction.apply();
+                    }
+                    if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                    }
                 };
+                addedToSyncListener = mAddedToSyncListener;
             }
         }
 
         // Invoke the callback outside of the lock when the SurfaceSyncGroup being added was already
         // complete.
         if (finished) {
-            transactionReadyCallback.onTransactionReady(null);
+            try {
+                transactionReadyCallback.onTransactionReady(null);
+            } catch (RemoteException e) {
+            }
+        } else if (addedToSyncListener != null) {
+            addedToSyncListener.run();
         }
-        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
     }
 
+    /**
+     * @hide
+     */
     public String getName() {
         return mName;
     }
 
+    @GuardedBy("mLock")
+    private void checkIfSyncIsComplete() {
+        if (mFinished) {
+            if (DEBUG) {
+                Log.d(TAG, "SurfaceSyncGroup=" + mName + " is already complete");
+            }
+            mTransaction.apply();
+            return;
+        }
+
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+            Trace.instant(Trace.TRACE_TAG_VIEW,
+                    "checkIfSyncIsComplete " + mName + " mSyncReady=" + mSyncReady
+                            + " mPendingSyncs=" + mPendingSyncs.size());
+        }
+
+        if (!mSyncReady || !mPendingSyncs.isEmpty()) {
+            if (DEBUG) {
+                Log.d(TAG, "SurfaceSyncGroup=" + mName + " is not complete. mSyncReady="
+                        + mSyncReady + " mPendingSyncs=" + mPendingSyncs.size());
+            }
+            return;
+        }
+
+        if (DEBUG) {
+            Log.d(TAG, "Successfully finished sync id=" + mName);
+        }
+        mTransactionReadyConsumer.accept(mTransaction);
+        mFinished = true;
+    }
+
     /**
-     * Interface so the SurfaceSyncer can know when it's safe to start and when everything has been
-     * completed. The caller should invoke the calls when the rendering has started and finished a
-     * frame.
+     * Create an {@link ITransactionReadyCallback} that the current SurfaceSyncGroup will wait on
+     * before completing. The caller must ensure that the
+     * {@link ITransactionReadyCallback#onTransactionReady(Transaction)} is called in order for this
+     * SurfaceSyncGroup to complete.
+     *
+     * @param parentSyncGroupMerge true if the ISurfaceSyncGroup is added because its child was
+     *                             added to a new SurfaceSyncGroup. That would require the code to
+     *                             call newParent.addToSync(oldParent). When this occurs, we need to
+     *                             reverse the merge order because the oldParent should always be
+     *                             considered older than any other SurfaceSyncGroups.
+     * @hide
      */
-    private interface TransactionReadyCallback {
-        /**
-         * Invoked when the transaction is ready to sync.
-         *
-         * @param t The transaction that contains the anything to be included in the synced. This
-         *          can be null if there's nothing to sync
-         */
-        void onTransactionReady(@Nullable Transaction t);
+    public ITransactionReadyCallback createTransactionReadyCallback(boolean parentSyncGroupMerge) {
+        if (DEBUG) {
+            Log.d(TAG, "createTransactionReadyCallback " + mName);
+        }
+        ITransactionReadyCallback transactionReadyCallback =
+                new ITransactionReadyCallback.Stub() {
+                    @Override
+                    public void onTransactionReady(Transaction t) {
+                        synchronized (mLock) {
+                            if (t != null) {
+                                // When an older parent sync group is added due to a child syncGroup
+                                // getting added to multiple groups, we need to maintain merge order
+                                // so the older parentSyncGroup transactions are overwritten by
+                                // anything in the newer parentSyncGroup.
+                                if (parentSyncGroupMerge) {
+                                    t.merge(mTransaction);
+                                }
+                                mTransaction.merge(t);
+                            }
+                            mPendingSyncs.remove(this);
+                            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                                Trace.instant(Trace.TRACE_TAG_VIEW,
+                                        "onTransactionReady group=" + mName + " callback="
+                                                + hashCode());
+                            }
+                            checkIfSyncIsComplete();
+                        }
+                    }
+                };
+
+        synchronized (mLock) {
+            if (mSyncReady) {
+                Log.e(TAG, "Sync " + mName
+                        + " was already marked as ready. No more SurfaceSyncGroups can be added.");
+                return null;
+            }
+            mPendingSyncs.add(transactionReadyCallback);
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.instant(Trace.TRACE_TAG_VIEW,
+                        "createTransactionReadyCallback " + mName + " mPendingSyncs="
+                                + mPendingSyncs.size() + " transactionReady="
+                                + transactionReadyCallback.hashCode());
+            }
+        }
+
+        return transactionReadyCallback;
+    }
+
+    private class ISurfaceSyncGroupImpl extends ISurfaceSyncGroup.Stub {
+        @Override
+        public boolean onAddedToSyncGroup(IBinder parentSyncGroupToken,
+                boolean parentSyncGroupMerge) {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceBegin(Trace.TRACE_TAG_VIEW,
+                        "onAddedToSyncGroup token=" + parentSyncGroupToken.hashCode() + " child="
+                                + mName);
+            }
+            boolean didAdd = addSyncToWm(parentSyncGroupToken, parentSyncGroupMerge, null);
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+            }
+            return didAdd;
+        }
+
+        @Override
+        public boolean addToSync(ISurfaceSyncGroup surfaceSyncGroup, boolean parentSyncGroupMerge) {
+            return SurfaceSyncGroup.this.add(surfaceSyncGroup, parentSyncGroupMerge,
+                    null /* runnable */);
+        }
+
+        SurfaceSyncGroup getSurfaceSyncGroup() {
+            return SurfaceSyncGroup.this;
+        }
     }
 
     /**
      * A frame callback that is used to synchronize SurfaceViews. The owner of the SurfaceView must
      * implement onFrameStarted when trying to sync the SurfaceView. This is to ensure the sync
      * knows when the frame is ready to add to the sync.
+     *
+     * @hide
      */
     public interface SurfaceViewFrameCallback {
         /**

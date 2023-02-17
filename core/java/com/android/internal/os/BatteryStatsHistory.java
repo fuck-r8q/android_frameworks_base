@@ -40,12 +40,12 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.TimeUtils;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ParseUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -115,9 +115,11 @@ public class BatteryStatsHistory {
     static final int STATE_BATTERY_HEALTH_SHIFT = 26;
     static final int STATE_BATTERY_PLUG_MASK = 0x00000003;
     static final int STATE_BATTERY_PLUG_SHIFT = 24;
+
     // We use the low bit of the battery state int to indicate that we have full details
     // from a battery level change.
-    static final int BATTERY_DELTA_LEVEL_FLAG = 0x00000001;
+    static final int BATTERY_LEVEL_DETAILS_FLAG = 0x00000001;
+
     // Flag in history tag index: indicates that this is the first occurrence of this tag,
     // therefore the tag value is written in the parcel
     static final int TAG_FIRST_OCCURRENCE_FLAG = 0x8000;
@@ -187,8 +189,6 @@ public class BatteryStatsHistory {
     private int mNextHistoryTagIdx = 0;
     private int mNumHistoryTagChars = 0;
     private int mHistoryBufferLastPos = -1;
-    private int mActiveHistoryStates = 0xffffffff;
-    private int mActiveHistoryStates2 = 0xffffffff;
     private long mLastHistoryElapsedRealtimeMs = 0;
     private long mTrackRunningHistoryElapsedRealtimeMs = 0;
     private long mTrackRunningHistoryUptimeMs = 0;
@@ -198,6 +198,8 @@ public class BatteryStatsHistory {
     private final VarintParceler mVarintParceler = new VarintParceler();
     private byte mLastHistoryStepLevel = 0;
     private boolean mMutable = true;
+    private final BatteryStatsHistory mWritableHistory;
+    private boolean mCleanupEnabled = true;
 
     /**
      * A delegate responsible for computing additional details for a step in battery history.
@@ -276,6 +278,14 @@ public class BatteryStatsHistory {
     public BatteryStatsHistory(Parcel historyBuffer, File systemDir,
             int maxHistoryFiles, int maxHistoryBufferSize,
             HistoryStepDetailsCalculator stepDetailsCalculator, Clock clock, TraceDelegate tracer) {
+        this(historyBuffer, systemDir, maxHistoryFiles, maxHistoryBufferSize, stepDetailsCalculator,
+                clock, tracer, null);
+    }
+
+    private BatteryStatsHistory(Parcel historyBuffer, File systemDir,
+            int maxHistoryFiles, int maxHistoryBufferSize,
+            HistoryStepDetailsCalculator stepDetailsCalculator, Clock clock, TraceDelegate tracer,
+            BatteryStatsHistory writableHistory) {
         mHistoryBuffer = historyBuffer;
         mSystemDir = systemDir;
         mMaxHistoryFiles = maxHistoryFiles;
@@ -283,6 +293,10 @@ public class BatteryStatsHistory {
         mStepDetailsCalculator = stepDetailsCalculator;
         mTracer = tracer;
         mClock = clock;
+        mWritableHistory = writableHistory;
+        if (mWritableHistory != null) {
+            mMutable = false;
+        }
 
         mHistoryDir = new File(systemDir, HISTORY_DIR);
         mHistoryDir.mkdirs();
@@ -292,21 +306,17 @@ public class BatteryStatsHistory {
 
         final Set<Integer> dedup = new ArraySet<>();
         // scan directory, fill mFileNumbers and mActiveFile.
-        mHistoryDir.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                final int b = name.lastIndexOf(FILE_SUFFIX);
-                if (b <= 0) {
-                    return false;
-                }
-                final Integer c =
-                        ParseUtils.parseInt(name.substring(0, b), -1);
-                if (c != -1) {
-                    dedup.add(c);
-                    return true;
-                } else {
-                    return false;
-                }
+        mHistoryDir.listFiles((dir, name) -> {
+            final int b = name.lastIndexOf(FILE_SUFFIX);
+            if (b <= 0) {
+                return false;
+            }
+            final int c = ParseUtils.parseInt(name.substring(0, b), -1);
+            if (c != -1) {
+                dedup.add(c);
+                return true;
+            } else {
+                return false;
             }
         });
         if (!dedup.isEmpty()) {
@@ -328,21 +338,29 @@ public class BatteryStatsHistory {
         mHistoryBuffer = Parcel.obtain();
         mSystemDir = null;
         mHistoryDir = null;
+        mWritableHistory = null;
         initHistoryBuffer();
     }
 
     /**
-     * Used when BatteryStatsImpl object is created from deserialization of a parcel,
-     * such as a checkin file.
+     * Used when BatteryStatsHistory object is created from deserialization of a BatteryUsageStats
+     * parcel.
      */
-    private BatteryStatsHistory(Parcel historyBuffer,
-            HistoryStepDetailsCalculator stepDetailsCalculator, Clock clock) {
-        mHistoryBuffer = historyBuffer;
-        mTracer = new TraceDelegate();
-        mClock = clock;
+    private BatteryStatsHistory(Parcel parcel) {
+        mClock = Clock.SYSTEM_CLOCK;
+        mTracer = null;
         mSystemDir = null;
         mHistoryDir = null;
-        mStepDetailsCalculator = stepDetailsCalculator;
+        mStepDetailsCalculator = null;
+        mWritableHistory = null;
+        mMutable = false;
+
+        final byte[] historyBlob = parcel.readBlob();
+
+        mHistoryBuffer = Parcel.obtain();
+        mHistoryBuffer.unmarshall(historyBlob, 0, historyBlob.length);
+
+        readFromParcel(parcel, true /* useBlobs */);
     }
 
     private void initHistoryBuffer() {
@@ -362,8 +380,6 @@ public class BatteryStatsHistory {
         mNextHistoryTagIdx = 0;
         mNumHistoryTagChars = 0;
         mHistoryBufferLastPos = -1;
-        mActiveHistoryStates = 0xffffffff;
-        mActiveHistoryStates2 = 0xffffffff;
         if (mStepDetailsCalculator != null) {
             mStepDetailsCalculator.clear();
         }
@@ -388,10 +404,14 @@ public class BatteryStatsHistory {
      * in the system directory, so it is not safe while actively writing history.
      */
     public BatteryStatsHistory copy() {
-        // Make a copy of battery history to avoid concurrent modification.
-        Parcel historyBuffer = Parcel.obtain();
-        historyBuffer.appendFrom(mHistoryBuffer, 0, mHistoryBuffer.dataSize());
-        return new BatteryStatsHistory(historyBuffer, mSystemDir, 0, 0, null, null, mTracer);
+        synchronized (this) {
+            // Make a copy of battery history to avoid concurrent modification.
+            Parcel historyBufferCopy = Parcel.obtain();
+            historyBufferCopy.appendFrom(mHistoryBuffer, 0, mHistoryBuffer.dataSize());
+
+            return new BatteryStatsHistory(historyBufferCopy, mSystemDir, 0, 0, null, null, null,
+                    this);
+        }
     }
 
     /**
@@ -450,6 +470,25 @@ public class BatteryStatsHistory {
             Slog.e(TAG, "Could not create history file: " + mActiveFile.getBaseFile());
         }
 
+        synchronized (this) {
+            cleanupLocked();
+        }
+    }
+
+    @GuardedBy("this")
+    private void setCleanupEnabledLocked(boolean enabled) {
+        mCleanupEnabled = enabled;
+        if (mCleanupEnabled) {
+            cleanupLocked();
+        }
+    }
+
+    @GuardedBy("this")
+    private void cleanupLocked() {
+        if (!mCleanupEnabled || mHistoryDir == null) {
+            return;
+        }
+
         // if free disk space is less than 100MB, delete oldest history file.
         if (!hasFreeDiskSpace()) {
             int oldest = mFileNumbers.remove(0);
@@ -463,6 +502,16 @@ public class BatteryStatsHistory {
             int oldest = mFileNumbers.get(0);
             getFile(oldest).delete();
             mFileNumbers.remove(0);
+        }
+    }
+
+    /**
+     * Returns true if it is safe to reset history. It will return false if the history is
+     * currently being read.
+     */
+    public boolean isResetEnabled() {
+        synchronized (this) {
+            return mCleanupEnabled;
         }
     }
 
@@ -493,6 +542,11 @@ public class BatteryStatsHistory {
         mCurrentParcelEnd = 0;
         mParcelIndex = 0;
         mMutable = false;
+        if (mWritableHistory != null) {
+            synchronized (mWritableHistory) {
+                mWritableHistory.setCleanupEnabledLocked(false);
+            }
+        }
         return new BatteryStatsHistoryIterator(this);
     }
 
@@ -502,7 +556,13 @@ public class BatteryStatsHistory {
     void iteratorFinished() {
         // setDataPosition so mHistoryBuffer Parcel can be written.
         mHistoryBuffer.setDataPosition(mHistoryBuffer.dataSize());
-        mMutable = true;
+        if (mWritableHistory != null) {
+            synchronized (mWritableHistory) {
+                mWritableHistory.setCleanupEnabledLocked(true);
+            }
+        } else {
+            mMutable = true;
+        }
     }
 
     /**
@@ -719,15 +779,7 @@ public class BatteryStatsHistory {
      * the {@link #writeToBatteryUsageStatsParcel} method.
      */
     public static BatteryStatsHistory createFromBatteryUsageStatsParcel(Parcel in) {
-        final byte[] historyBlob = in.readBlob();
-
-        Parcel historyBuffer = Parcel.obtain();
-        historyBuffer.unmarshall(historyBlob, 0, historyBlob.length);
-
-        BatteryStatsHistory history = new BatteryStatsHistory(historyBuffer, null,
-                Clock.SYSTEM_CLOCK);
-        history.readFromParcel(in, true /* useBlobs */);
-        return history;
+        return new BatteryStatsHistory(in);
     }
 
     /**
@@ -1098,8 +1150,9 @@ public class BatteryStatsHistory {
      */
     public void recordScreenBrightnessEvent(long elapsedRealtimeMs, long uptimeMs,
             int brightnessBin) {
-        mHistoryCur.states = (mHistoryCur.states & ~HistoryItem.STATE_BRIGHTNESS_MASK)
-                | (brightnessBin << HistoryItem.STATE_BRIGHTNESS_SHIFT);
+        mHistoryCur.states = setBitField(mHistoryCur.states, brightnessBin,
+                HistoryItem.STATE_BRIGHTNESS_SHIFT,
+                HistoryItem.STATE_BRIGHTNESS_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1108,8 +1161,9 @@ public class BatteryStatsHistory {
      */
     public void recordGpsSignalQualityEvent(long elapsedRealtimeMs, long uptimeMs,
             int signalLevel) {
-        mHistoryCur.states2 = (mHistoryCur.states2 & ~HistoryItem.STATE2_GPS_SIGNAL_QUALITY_MASK)
-                | (signalLevel << HistoryItem.STATE2_GPS_SIGNAL_QUALITY_SHIFT);
+        mHistoryCur.states2 = setBitField(mHistoryCur.states2, signalLevel,
+                HistoryItem.STATE2_GPS_SIGNAL_QUALITY_SHIFT,
+                HistoryItem.STATE2_GPS_SIGNAL_QUALITY_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1117,8 +1171,9 @@ public class BatteryStatsHistory {
      * Records a device idle mode change event.
      */
     public void recordDeviceIdleEvent(long elapsedRealtimeMs, long uptimeMs, int mode) {
-        mHistoryCur.states2 = (mHistoryCur.states2 & ~HistoryItem.STATE2_DEVICE_IDLE_MASK)
-                | (mode << HistoryItem.STATE2_DEVICE_IDLE_SHIFT);
+        mHistoryCur.states2 = setBitField(mHistoryCur.states2, mode,
+                HistoryItem.STATE2_DEVICE_IDLE_SHIFT,
+                HistoryItem.STATE2_DEVICE_IDLE_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1130,13 +1185,15 @@ public class BatteryStatsHistory {
         mHistoryCur.states = (mHistoryCur.states | addStateFlag) & ~removeStateFlag;
         if (state != -1) {
             mHistoryCur.states =
-                    (mHistoryCur.states & ~HistoryItem.STATE_PHONE_STATE_MASK)
-                            | (state << HistoryItem.STATE_PHONE_STATE_SHIFT);
+                    setBitField(mHistoryCur.states, state,
+                            HistoryItem.STATE_PHONE_STATE_SHIFT,
+                            HistoryItem.STATE_PHONE_STATE_MASK);
         }
         if (signalStrength != -1) {
             mHistoryCur.states =
-                    (mHistoryCur.states & ~HistoryItem.STATE_PHONE_SIGNAL_STRENGTH_MASK)
-                            | (signalStrength << HistoryItem.STATE_PHONE_SIGNAL_STRENGTH_SHIFT);
+                    setBitField(mHistoryCur.states, signalStrength,
+                            HistoryItem.STATE_PHONE_SIGNAL_STRENGTH_SHIFT,
+                            HistoryItem.STATE_PHONE_SIGNAL_STRENGTH_MASK);
         }
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
@@ -1146,8 +1203,9 @@ public class BatteryStatsHistory {
      */
     public void recordDataConnectionTypeChangeEvent(long elapsedRealtimeMs, long uptimeMs,
             int dataConnectionType) {
-        mHistoryCur.states = (mHistoryCur.states & ~HistoryItem.STATE_DATA_CONNECTION_MASK)
-                | (dataConnectionType << HistoryItem.STATE_DATA_CONNECTION_SHIFT);
+        mHistoryCur.states = setBitField(mHistoryCur.states, dataConnectionType,
+                HistoryItem.STATE_DATA_CONNECTION_SHIFT,
+                HistoryItem.STATE_DATA_CONNECTION_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1157,8 +1215,9 @@ public class BatteryStatsHistory {
     public void recordWifiSupplicantStateChangeEvent(long elapsedRealtimeMs, long uptimeMs,
             int supplState) {
         mHistoryCur.states2 =
-                (mHistoryCur.states2 & ~HistoryItem.STATE2_WIFI_SUPPL_STATE_MASK)
-                        | (supplState << HistoryItem.STATE2_WIFI_SUPPL_STATE_SHIFT);
+                setBitField(mHistoryCur.states2, supplState,
+                        HistoryItem.STATE2_WIFI_SUPPL_STATE_SHIFT,
+                        HistoryItem.STATE2_WIFI_SUPPL_STATE_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1168,8 +1227,9 @@ public class BatteryStatsHistory {
     public void recordWifiSignalStrengthChangeEvent(long elapsedRealtimeMs, long uptimeMs,
             int strengthBin) {
         mHistoryCur.states2 =
-                (mHistoryCur.states2 & ~HistoryItem.STATE2_WIFI_SIGNAL_STRENGTH_MASK)
-                        | (strengthBin << HistoryItem.STATE2_WIFI_SIGNAL_STRENGTH_SHIFT);
+                setBitField(mHistoryCur.states2, strengthBin,
+                        HistoryItem.STATE2_WIFI_SIGNAL_STRENGTH_SHIFT,
+                        HistoryItem.STATE2_WIFI_SIGNAL_STRENGTH_MASK);
         writeHistoryItem(elapsedRealtimeMs, uptimeMs);
     }
 
@@ -1227,6 +1287,16 @@ public class BatteryStatsHistory {
         }
     }
 
+    private int setBitField(int bits, int value, int shift, int mask) {
+        int shiftedValue = value << shift;
+        if ((shiftedValue & ~mask) != 0) {
+            Slog.wtfStack(TAG, "Value " + Integer.toHexString(value)
+                    + " does not fit in the bit field: " + Integer.toHexString(mask));
+            shiftedValue &= mask;
+        }
+        return (bits & ~mask) | shiftedValue;
+    }
+
     /**
      * Writes the current history item to history.
      */
@@ -1260,8 +1330,8 @@ public class BatteryStatsHistory {
         }
 
         final long timeDiffMs = (mHistoryBaseTimeMs + elapsedRealtimeMs) - mHistoryLastWritten.time;
-        final int diffStates = mHistoryLastWritten.states ^ (cur.states & mActiveHistoryStates);
-        final int diffStates2 = mHistoryLastWritten.states2 ^ (cur.states2 & mActiveHistoryStates2);
+        final int diffStates = mHistoryLastWritten.states ^ cur.states;
+        final int diffStates2 = mHistoryLastWritten.states2 ^ cur.states2;
         final int lastDiffStates = mHistoryLastWritten.states ^ mHistoryLastLastWritten.states;
         final int lastDiffStates2 = mHistoryLastWritten.states2 ^ mHistoryLastLastWritten.states2;
         if (DEBUG) {
@@ -1274,9 +1344,9 @@ public class BatteryStatsHistory {
 
         recordTraceEvents(cur.eventCode, cur.eventTag);
         recordTraceCounters(mHistoryLastWritten.states,
-                cur.states & mActiveHistoryStates, BatteryStats.HISTORY_STATE_DESCRIPTIONS);
+                cur.states, BatteryStats.HISTORY_STATE_DESCRIPTIONS);
         recordTraceCounters(mHistoryLastWritten.states2,
-                cur.states2 & mActiveHistoryStates2, BatteryStats.HISTORY_STATE2_DESCRIPTIONS);
+                cur.states2, BatteryStats.HISTORY_STATE2_DESCRIPTIONS);
 
         if (mHistoryBufferLastPos >= 0 && mHistoryLastWritten.cmd == HistoryItem.CMD_UPDATE
                 && timeDiffMs < 1000 && (diffStates & lastDiffStates) == 0
@@ -1371,8 +1441,17 @@ public class BatteryStatsHistory {
 
         if (dataSize == 0) {
             // The history is currently empty; we need it to start with a time stamp.
-            cur.currentTime = mClock.currentTimeMillis();
-            writeHistoryItem(elapsedRealtimeMs, uptimeMs, cur, HistoryItem.CMD_RESET);
+            HistoryItem copy = new HistoryItem();
+            copy.setTo(cur);
+            copy.currentTime = mClock.currentTimeMillis();
+            copy.wakelockTag = null;
+            copy.wakeReasonTag = null;
+            copy.eventCode = HistoryItem.EVENT_NONE;
+            copy.eventTag = null;
+            copy.tagsFirstOccurrence = false;
+            copy.energyConsumerDetails = null;
+            copy.cpuUsageDetails = null;
+            writeHistoryItem(elapsedRealtimeMs, uptimeMs, copy, HistoryItem.CMD_RESET);
         }
         writeHistoryItem(elapsedRealtimeMs, uptimeMs, cur, HistoryItem.CMD_UPDATE);
     }
@@ -1387,8 +1466,6 @@ public class BatteryStatsHistory {
         final boolean hasTags = mHistoryLastWritten.tagsFirstOccurrence || cur.tagsFirstOccurrence;
         mHistoryLastWritten.setTo(mHistoryBaseTimeMs + elapsedRealtimeMs, cmd, cur);
         mHistoryLastWritten.tagsFirstOccurrence = hasTags;
-        mHistoryLastWritten.states &= mActiveHistoryStates;
-        mHistoryLastWritten.states2 &= mActiveHistoryStates2;
         writeHistoryDelta(mHistoryBuffer, mHistoryLastWritten, mHistoryLastLastWritten);
         mLastHistoryElapsedRealtimeMs = elapsedRealtimeMs;
         cur.wakelockTag = null;
@@ -1504,10 +1581,19 @@ public class BatteryStatsHistory {
             deltaTimeToken = (int) deltaTime;
         }
         int firstToken = deltaTimeToken | (cur.states & BatteryStatsHistory.DELTA_STATE_MASK);
-        final int includeStepDetails = mLastHistoryStepLevel > cur.batteryLevel
-                ? BatteryStatsHistory.BATTERY_DELTA_LEVEL_FLAG : 0;
-        mLastHistoryStepLevel = cur.batteryLevel;
-        final int batteryLevelInt = buildBatteryLevelInt(cur) | includeStepDetails;
+        int batteryLevelInt = buildBatteryLevelInt(cur);
+
+        if (cur.batteryLevel < mLastHistoryStepLevel || mLastHistoryStepLevel == 0) {
+            cur.stepDetails = mStepDetailsCalculator.getHistoryStepDetails();
+            if (cur.stepDetails != null) {
+                batteryLevelInt |= BatteryStatsHistory.BATTERY_LEVEL_DETAILS_FLAG;
+                mLastHistoryStepLevel = cur.batteryLevel;
+            }
+        } else {
+            cur.stepDetails = null;
+            mLastHistoryStepLevel = cur.batteryLevel;
+        }
+
         final boolean batteryLevelIntChanged = batteryLevelInt != lastBatteryLevelInt;
         if (batteryLevelIntChanged) {
             firstToken |= BatteryStatsHistory.DELTA_BATTERY_LEVEL_FLAG;
@@ -1627,7 +1713,7 @@ public class BatteryStatsHistory {
         }
         if (cur.eventCode != HistoryItem.EVENT_NONE) {
             final int index = writeHistoryTag(cur.eventTag);
-            final int codeAndIndex = (cur.eventCode & 0xffff) | (index << 16);
+            final int codeAndIndex = setBitField(cur.eventCode & 0xffff, index, 16, 0xFFFF0000);
             dest.writeInt(codeAndIndex);
             if ((index & BatteryStatsHistory.TAG_FIRST_OCCURRENCE_FLAG) != 0) {
                 cur.eventTag.writeToParcel(dest, 0);
@@ -1640,8 +1726,7 @@ public class BatteryStatsHistory {
             }
         }
 
-        cur.stepDetails = mStepDetailsCalculator.getHistoryStepDetails();
-        if (includeStepDetails != 0) {
+        if (cur.stepDetails != null) {
             cur.stepDetails.writeToParcel(dest);
         }
 
@@ -1689,9 +1774,11 @@ public class BatteryStatsHistory {
     }
 
     private int buildBatteryLevelInt(HistoryItem h) {
-        return ((((int) h.batteryLevel) << 25) & 0xfe000000)
-                | ((((int) h.batteryTemperature) << 15) & 0x01ff8000)
-                | ((((int) h.batteryVoltage) << 1) & 0x00007ffe);
+        int bits = 0;
+        bits = setBitField(bits, h.batteryLevel, 25, 0xfe000000 /* 7F << 25 */);
+        bits = setBitField(bits, h.batteryTemperature, 15, 0x01ff8000 /* 3FF << 15 */);
+        bits = setBitField(bits, h.batteryVoltage, 1, 0x00007ffe /* 3FFF << 1 */);
+        return bits;
     }
 
     private int buildStateInt(HistoryItem h) {

@@ -158,10 +158,22 @@ public interface PackageState {
     PackageUserState getStateForUser(@NonNull UserHandle user);
 
     /**
-     * @see R.styleable#AndroidManifestUsesLibrary
+     * List of shared libraries that this package declares a dependency on. This includes all
+     * types of libraries, system or app provided and Java or native.
+     * <p/>
+     * This includes libraries declared in the manifest under the following tags:
+     * <ul>
+     *     <li>uses-library</li>
+     *     <li>uses-native-library</li>
+     *     <li>uses-sdk-library</li>
+     *     <li>uses-static-library</li>
+     * </ul>
      */
     @NonNull
-    List<SharedLibrary> getUsesLibraries();
+    List<SharedLibrary> getSharedLibraryDependencies();
+
+    /** Whether this represents an APEX module. This is different from an APK inside an APEX. */
+    boolean isApex();
 
     /**
      * @see ApplicationInfo#PRIVATE_FLAG_PRIVILEGED
@@ -414,4 +426,11 @@ public interface PackageState {
      * @hide
      */
     boolean isVendor();
+
+    /**
+     * The name of the APEX module containing this package, if it is an APEX or APK-in-APEX.
+     * @hide
+     */
+    @Nullable
+    String getApexModuleName();
 }

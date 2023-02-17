@@ -27,6 +27,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
+import android.annotation.UserIdInt;
 import android.app.PendingIntent;
 import android.companion.AssociationInfo;
 import android.companion.virtual.audio.VirtualAudioDevice;
@@ -34,7 +35,6 @@ import android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChan
 import android.companion.virtual.camera.VirtualCameraDevice;
 import android.companion.virtual.camera.VirtualCameraInput;
 import android.companion.virtual.sensor.VirtualSensor;
-import android.companion.virtual.sensor.VirtualSensorConfig;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -68,6 +68,8 @@ import android.os.ResultReceiver;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.view.Surface;
+
+import com.android.internal.annotations.GuardedBy;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -258,6 +260,26 @@ public final class VirtualDeviceManager {
     }
 
     /**
+     * Checks whether the passed {@code deviceId} is a valid virtual device ID or not.
+     * {@link VirtualDeviceManager#DEVICE_ID_DEFAULT} is not valid as it is the ID of the default
+     * device which is not a virtual device. {@code deviceId} must correspond to a virtual device
+     * created by {@link VirtualDeviceManager#createVirtualDevice(int, VirtualDeviceParams)}.
+     *
+     * @hide
+     */
+    public boolean isValidVirtualDeviceId(int deviceId) {
+        if (mService == null) {
+            Log.w(TAG, "Failed to retrieve virtual devices; no virtual device manager service.");
+            return false;
+        }
+        try {
+            return mService.isValidVirtualDeviceId(deviceId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns device-specific audio session id for audio playback.
      *
      * @param deviceId - id of the virtual audio device
@@ -313,10 +335,15 @@ public final class VirtualDeviceManager {
      * @hide
      */
     public void playSoundEffect(int deviceId, @AudioManager.SystemSoundEffect int effectType) {
-        //TODO - handle requests to play sound effects by custom callbacks or SoundPool asociated
-        // with device session id.
-        // For now, this is intentionally left empty and effectively disables sound effects for
-        // virtual devices with custom device audio policy.
+        if (mService == null) {
+            Log.w(TAG, "Failed to dispatch sound effect; no virtual device manager service.");
+            return;
+        }
+        try {
+            mService.playSoundEffect(deviceId, effectType);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -334,21 +361,34 @@ public final class VirtualDeviceManager {
         private final Context mContext;
         private final IVirtualDeviceManager mService;
         private final IVirtualDevice mVirtualDevice;
+        private final Object mActivityListenersLock = new Object();
+        @GuardedBy("mActivityListenersLock")
         private final ArrayMap<ActivityListener, ActivityListenerDelegate> mActivityListeners =
                 new ArrayMap<>();
+        private final Object mIntentInterceptorListenersLock = new Object();
+        @GuardedBy("mIntentInterceptorListenersLock")
         private final ArrayMap<IntentInterceptorCallback,
                      VirtualIntentInterceptorDelegate> mIntentInterceptorListeners =
                 new ArrayMap<>();
+        private final Object mSoundEffectListenersLock = new Object();
+        @GuardedBy("mSoundEffectListenersLock")
+        private final ArrayMap<SoundEffectListener, SoundEffectListenerDelegate>
+                mSoundEffectListeners = new ArrayMap<>();
         private final IVirtualDeviceActivityListener mActivityListenerBinder =
                 new IVirtualDeviceActivityListener.Stub() {
 
                     @Override
-                    public void onTopActivityChanged(int displayId, ComponentName topActivity) {
+                    public void onTopActivityChanged(int displayId, ComponentName topActivity,
+                            @UserIdInt int userId) {
                         final long token = Binder.clearCallingIdentity();
                         try {
-                            for (int i = 0; i < mActivityListeners.size(); i++) {
-                                mActivityListeners.valueAt(i)
-                                        .onTopActivityChanged(displayId, topActivity);
+                            synchronized (mActivityListenersLock) {
+                                for (int i = 0; i < mActivityListeners.size(); i++) {
+                                    mActivityListeners.valueAt(i)
+                                            .onTopActivityChanged(displayId, topActivity);
+                                    mActivityListeners.valueAt(i)
+                                          .onTopActivityChanged(displayId, topActivity, userId);
+                                }
                             }
                         } finally {
                             Binder.restoreCallingIdentity(token);
@@ -359,8 +399,26 @@ public final class VirtualDeviceManager {
                     public void onDisplayEmpty(int displayId) {
                         final long token = Binder.clearCallingIdentity();
                         try {
-                            for (int i = 0; i < mActivityListeners.size(); i++) {
-                                mActivityListeners.valueAt(i).onDisplayEmpty(displayId);
+                            synchronized (mActivityListenersLock) {
+                                for (int i = 0; i < mActivityListeners.size(); i++) {
+                                    mActivityListeners.valueAt(i).onDisplayEmpty(displayId);
+                                }
+                            }
+                        } finally {
+                            Binder.restoreCallingIdentity(token);
+                        }
+                    }
+                };
+        private final IVirtualDeviceSoundEffectListener mSoundEffectListener =
+                new IVirtualDeviceSoundEffectListener.Stub() {
+                    @Override
+                    public void onPlaySoundEffect(int soundEffect) {
+                        final long token = Binder.clearCallingIdentity();
+                        try {
+                            synchronized (mSoundEffectListenersLock) {
+                                for (int i = 0; i < mSoundEffectListeners.size(); i++) {
+                                    mSoundEffectListeners.valueAt(i).onPlaySoundEffect(soundEffect);
+                                }
                             }
                         } finally {
                             Binder.restoreCallingIdentity(token);
@@ -369,8 +427,6 @@ public final class VirtualDeviceManager {
                 };
         @Nullable
         private VirtualCameraDevice mVirtualCameraDevice;
-        @NonNull
-        private final List<VirtualSensor> mVirtualSensors = new ArrayList<>();
         @Nullable
         private VirtualAudioDevice mVirtualAudioDevice;
 
@@ -387,11 +443,8 @@ public final class VirtualDeviceManager {
                     mContext.getPackageName(),
                     associationId,
                     params,
-                    mActivityListenerBinder);
-            final List<VirtualSensorConfig> virtualSensorConfigs = params.getVirtualSensorConfigs();
-            for (int i = 0; i < virtualSensorConfigs.size(); ++i) {
-                mVirtualSensors.add(createVirtualSensor(virtualSensorConfigs.get(i)));
-            }
+                    mActivityListenerBinder,
+                    mSoundEffectListener);
         }
 
         /**
@@ -418,20 +471,19 @@ public final class VirtualDeviceManager {
         }
 
         /**
-         * Returns this device's sensor with the given type and name, if any.
+         * Returns this device's sensors.
          *
          * @see VirtualDeviceParams.Builder#addVirtualSensorConfig
          *
-         * @param type The type of the sensor.
-         * @param name The name of the sensor.
-         * @return The matching sensor if found, {@code null} otherwise.
+         * @return A list of all sensors for this device, or an empty list if no sensors exist.
          */
-        @Nullable
-        public VirtualSensor getVirtualSensor(int type, @NonNull String name) {
-            return mVirtualSensors.stream()
-                    .filter(sensor -> sensor.getType() == type && sensor.getName().equals(name))
-                    .findAny()
-                    .orElse(null);
+        @NonNull
+        public List<VirtualSensor> getVirtualSensorList() {
+            try {
+                return mVirtualDevice.getVirtualSensorList();
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
         }
 
         /**
@@ -570,9 +622,6 @@ public final class VirtualDeviceManager {
                 @NonNull VirtualDisplayConfig config,
                 @Nullable @CallbackExecutor Executor executor,
                 @Nullable VirtualDisplay.Callback callback) {
-            // TODO(b/205343547): Handle display groups properly instead of creating a new display
-            //  group for every new virtual display created using this API.
-            // belongs to the same display group.
             IVirtualDisplayCallback callbackWrapper =
                     new DisplayManagerGlobal.VirtualDisplayCallback(callback, executor);
             final int displayId;
@@ -881,28 +930,6 @@ public final class VirtualDeviceManager {
         }
 
         /**
-         * Creates a virtual sensor, capable of injecting sensor events into the system. Only for
-         * internal use, since device sensors must remain valid for the entire lifetime of the
-         * device.
-         *
-         * @param config The configuration of the sensor.
-         * @hide
-         */
-        @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
-        @NonNull
-        public VirtualSensor createVirtualSensor(@NonNull VirtualSensorConfig config) {
-            Objects.requireNonNull(config);
-            try {
-                final IBinder token = new Binder(
-                        "android.hardware.sensor.VirtualSensor:" + config.getName());
-                mVirtualDevice.createVirtualSensor(token, config);
-                return new VirtualSensor(config.getType(), config.getName(), mVirtualDevice, token);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
-
-        /**
          * Adds an activity listener to listen for events such as top activity change or virtual
          * display task stack became empty.
          *
@@ -912,7 +939,11 @@ public final class VirtualDeviceManager {
          */
         public void addActivityListener(
                 @CallbackExecutor @NonNull Executor executor, @NonNull ActivityListener listener) {
-            mActivityListeners.put(listener, new ActivityListenerDelegate(listener, executor));
+            final ActivityListenerDelegate delegate = new ActivityListenerDelegate(
+                    Objects.requireNonNull(listener), Objects.requireNonNull(executor));
+            synchronized (mActivityListenersLock) {
+                mActivityListeners.put(listener, delegate);
+            }
         }
 
         /**
@@ -923,7 +954,38 @@ public final class VirtualDeviceManager {
          * @see #addActivityListener(Executor, ActivityListener)
          */
         public void removeActivityListener(@NonNull ActivityListener listener) {
-            mActivityListeners.remove(listener);
+            synchronized (mActivityListenersLock) {
+                mActivityListeners.remove(Objects.requireNonNull(listener));
+            }
+        }
+
+        /**
+         * Adds a sound effect listener.
+         *
+         * @param executor The executor where the listener is executed on.
+         * @param soundEffectListener The listener to add.
+         * @see #removeActivityListener(ActivityListener)
+         */
+        public void addSoundEffectListener(@CallbackExecutor @NonNull Executor executor,
+                @NonNull SoundEffectListener soundEffectListener) {
+            final SoundEffectListenerDelegate delegate =
+                    new SoundEffectListenerDelegate(Objects.requireNonNull(executor),
+                            Objects.requireNonNull(soundEffectListener));
+            synchronized (mSoundEffectListenersLock) {
+                mSoundEffectListeners.put(soundEffectListener, delegate);
+            }
+        }
+
+        /**
+         * Removes a sound effect listener previously added with {@link #addActivityListener}.
+         *
+         * @param soundEffectListener The listener to remove.
+         * @see #addActivityListener(Executor, ActivityListener)
+         */
+        public void removeSoundEffectListener(@NonNull SoundEffectListener soundEffectListener) {
+            synchronized (mSoundEffectListenersLock) {
+                mSoundEffectListeners.remove(Objects.requireNonNull(soundEffectListener));
+            }
         }
 
         /**
@@ -931,16 +993,16 @@ public final class VirtualDeviceManager {
          * when matching the provided IntentFilter and calls the callback with the intercepted
          * intent.
          *
-         * @param executor The executor where the interceptor is executed on.
          * @param interceptorFilter The filter to match intents intended for interception.
+         * @param executor The executor where the interceptor is executed on.
          * @param interceptorCallback The callback called when an intent matching interceptorFilter
          * is intercepted.
          * @see #unregisterIntentInterceptor(IntentInterceptorCallback)
          */
         @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
         public void registerIntentInterceptor(
-                @CallbackExecutor @NonNull Executor executor,
                 @NonNull IntentFilter interceptorFilter,
+                @CallbackExecutor @NonNull Executor executor,
                 @NonNull IntentInterceptorCallback interceptorCallback) {
             Objects.requireNonNull(executor);
             Objects.requireNonNull(interceptorFilter);
@@ -952,7 +1014,9 @@ public final class VirtualDeviceManager {
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
-            mIntentInterceptorListeners.put(interceptorCallback, delegate);
+            synchronized (mIntentInterceptorListenersLock) {
+                mIntentInterceptorListeners.put(interceptorCallback, delegate);
+            }
         }
 
         /**
@@ -963,14 +1027,17 @@ public final class VirtualDeviceManager {
         public void unregisterIntentInterceptor(
                     @NonNull IntentInterceptorCallback interceptorCallback) {
             Objects.requireNonNull(interceptorCallback);
-            final VirtualIntentInterceptorDelegate delegate =
-                    mIntentInterceptorListeners.get(interceptorCallback);
-            try {
-                mVirtualDevice.unregisterIntentInterceptor(delegate);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
+            final VirtualIntentInterceptorDelegate delegate;
+            synchronized (mIntentInterceptorListenersLock) {
+                delegate = mIntentInterceptorListeners.remove(interceptorCallback);
             }
-            mIntentInterceptorListeners.remove(interceptorCallback);
+            if (delegate != null) {
+                try {
+                    mVirtualDevice.unregisterIntentInterceptor(delegate);
+                } catch (RemoteException e) {
+                    throw e.rethrowFromSystemServer();
+                }
+            }
         }
     }
 
@@ -991,8 +1058,23 @@ public final class VirtualDeviceManager {
          *
          * @param displayId The display ID on which the activity change happened.
          * @param topActivity The component name of the top activity.
+         * @deprecated Use {@link #onTopActivityChanged(int, ComponentName, int)} instead
          */
         void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity);
+
+        /**
+         * Called when the top activity is changed.
+         *
+         * <p>Note: When there are no activities running on the virtual display, the
+         * {@link #onDisplayEmpty(int)} will be called. If the value topActivity is cached, it
+         * should be cleared when {@link #onDisplayEmpty(int)} is called.
+         *
+         * @param displayId   The display ID on which the activity change happened.
+         * @param topActivity The component name of the top activity.
+         * @param userId      The user ID associated with the top activity.
+         */
+        default void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity,
+                @UserIdInt int userId) {}
 
         /**
          * Called when the display becomes empty (e.g. if the user hits back on the last
@@ -1017,6 +1099,12 @@ public final class VirtualDeviceManager {
 
         public void onTopActivityChanged(int displayId, ComponentName topActivity) {
             mExecutor.execute(() -> mActivityListener.onTopActivityChanged(displayId, topActivity));
+        }
+
+        public void onTopActivityChanged(int displayId, ComponentName topActivity,
+                @UserIdInt int userId) {
+            mExecutor.execute(() ->
+                    mActivityListener.onTopActivityChanged(displayId, topActivity, userId));
         }
 
         public void onDisplayEmpty(int displayId) {
@@ -1068,6 +1156,40 @@ public final class VirtualDeviceManager {
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
+        }
+    }
+
+    /**
+     * Listener for system sound effect playback on virtual device.
+     * @hide
+     */
+    @SystemApi
+    public interface SoundEffectListener {
+
+        /**
+         * Called when there's a system sound effect to be played on virtual device.
+         *
+         * @param effectType - system sound effect type, see
+         *     {@code android.media.AudioManager.SystemSoundEffect}
+         */
+        void onPlaySoundEffect(@AudioManager.SystemSoundEffect int effectType);
+    }
+
+    /**
+     * A wrapper for {@link SoundEffectListener} that executes callbacks on the given executor.
+     */
+    private static class SoundEffectListenerDelegate {
+        @NonNull private final SoundEffectListener mSoundEffectListener;
+        @NonNull private final Executor mExecutor;
+
+        private SoundEffectListenerDelegate(Executor executor,
+                SoundEffectListener soundEffectCallback) {
+            mSoundEffectListener = soundEffectCallback;
+            mExecutor = executor;
+        }
+
+        public void onPlaySoundEffect(@AudioManager.SystemSoundEffect int effectType) {
+            mExecutor.execute(() -> mSoundEffectListener.onPlaySoundEffect(effectType));
         }
     }
 }

@@ -478,11 +478,37 @@ public class ActivityClient {
         }
     }
 
+    void setAllowCrossUidActivitySwitchFromBelow(IBinder token, boolean allowed) {
+        try {
+            getActivityClientController().setAllowCrossUidActivitySwitchFromBelow(token, allowed);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
     int setVrMode(IBinder token, boolean enabled, ComponentName packageName) {
         try {
             return getActivityClientController().setVrMode(token, enabled, packageName);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    void overrideActivityTransition(IBinder token, boolean open, int enterAnim, int exitAnim,
+            int backgroundColor) {
+        try {
+            getActivityClientController().overrideActivityTransition(
+                    token, open, enterAnim, exitAnim, backgroundColor);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
+    void clearOverrideActivityTransition(IBinder token, boolean open) {
+        try {
+            getActivityClientController().clearOverrideActivityTransition(token, open);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
         }
     }
 
@@ -558,6 +584,14 @@ public class ActivityClient {
     void reportSplashScreenAttached(IBinder token) {
         try {
             getActivityClientController().splashScreenAttached(token);
+        } catch (RemoteException e) {
+            e.rethrowFromSystemServer();
+        }
+    }
+
+    void enableTaskLocaleOverride(IBinder token) {
+        try {
+            getActivityClientController().enableTaskLocaleOverride(token);
         } catch (RemoteException e) {
             e.rethrowFromSystemServer();
         }

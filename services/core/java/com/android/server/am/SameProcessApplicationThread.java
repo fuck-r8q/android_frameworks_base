@@ -47,12 +47,13 @@ public class SameProcessApplicationThread extends IApplicationThread.Default {
 
     @Override
     public void scheduleReceiver(Intent intent, ActivityInfo info, CompatibilityInfo compatInfo,
-            int resultCode, String data, Bundle extras, boolean sync, int sendingUser,
-            int processState) {
+            int resultCode, String data, Bundle extras, boolean ordered, boolean assumeDelivered,
+            int sendingUser, int processState, int sendingUid, String sendingPackage) {
         mHandler.post(() -> {
             try {
-                mWrapped.scheduleReceiver(intent, info, compatInfo, resultCode, data, extras, sync,
-                        sendingUser, processState);
+                mWrapped.scheduleReceiver(intent, info, compatInfo, resultCode, data, extras,
+                        ordered, assumeDelivered, sendingUser, processState, sendingUid,
+                        sendingPackage);
             } catch (RemoteException e) {
                 throw new RuntimeException(e);
             }
@@ -61,12 +62,13 @@ public class SameProcessApplicationThread extends IApplicationThread.Default {
 
     @Override
     public void scheduleRegisteredReceiver(IIntentReceiver receiver, Intent intent, int resultCode,
-            String data, Bundle extras, boolean ordered, boolean sticky, int sendingUser,
-            int processState) {
+            String data, Bundle extras, boolean ordered, boolean sticky, boolean assumeDelivered,
+            int sendingUser, int processState, int sendingUid, String sendingPackage) {
         mHandler.post(() -> {
             try {
                 mWrapped.scheduleRegisteredReceiver(receiver, intent, resultCode, data, extras,
-                        ordered, sticky, sendingUser, processState);
+                        ordered, sticky, assumeDelivered, sendingUser, processState, sendingUid,
+                        sendingPackage);
             } catch (RemoteException e) {
                 throw new RuntimeException(e);
             }
@@ -79,12 +81,12 @@ public class SameProcessApplicationThread extends IApplicationThread.Default {
             ReceiverInfo r = info.get(i);
             if (r.registered) {
                 scheduleRegisteredReceiver(r.receiver, r.intent,
-                        r.resultCode, r.data, r.extras, r.ordered, r.sticky,
-                        r.sendingUser, r.processState);
+                        r.resultCode, r.data, r.extras, r.ordered, r.sticky, r.assumeDelivered,
+                        r.sendingUser, r.processState, r.sendingUid, r.sendingPackage);
             } else {
                 scheduleReceiver(r.intent, r.activityInfo, r.compatInfo,
-                        r.resultCode, r.data, r.extras, r.sync,
-                        r.sendingUser, r.processState);
+                        r.resultCode, r.data, r.extras, r.sync, r.assumeDelivered,
+                        r.sendingUser, r.processState, r.sendingUid, r.sendingPackage);
             }
         }
     }

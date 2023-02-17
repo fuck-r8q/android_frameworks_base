@@ -20,10 +20,12 @@ import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FIRST_CUSTOM;
 import static android.view.WindowManager.TRANSIT_KEYGUARD_GOING_AWAY;
+import static android.view.WindowManager.TRANSIT_KEYGUARD_UNOCCLUDE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.fixScale;
+import static android.window.TransitionInfo.FLAG_IS_DISPLAY;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 import static android.window.TransitionInfo.FLAG_NO_ANIMATION;
@@ -45,6 +47,7 @@ import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Log;
+import android.util.Pair;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.ITransitionPlayer;
@@ -81,7 +84,7 @@ public class Transitions implements RemoteCallable<Transitions> {
 
     /** Set to {@code true} to enable shell transitions. */
     public static final boolean ENABLE_SHELL_TRANSITIONS =
-            SystemProperties.getBoolean("persist.wm.debug.shell_transit", false);
+            SystemProperties.getBoolean("persist.wm.debug.shell_transit", true);
     public static final boolean SHELL_TRANSITIONS_ROTATION = ENABLE_SHELL_TRANSITIONS
             && SystemProperties.getBoolean("persist.wm.debug.shell_transit_rotate", false);
 
@@ -328,6 +331,17 @@ public class Transitions implements RemoteCallable<Transitions> {
         return type == TRANSIT_CLOSE || type == TRANSIT_TO_BACK;
     }
 
+    /** Returns {@code true} if the transition has a display change. */
+    public static boolean hasDisplayChange(@NonNull TransitionInfo info) {
+        for (int i = info.getChanges().size() - 1; i >= 0; --i) {
+            final TransitionInfo.Change change = info.getChanges().get(i);
+            if (change.getMode() == TRANSIT_CHANGE && change.hasFlags(FLAG_IS_DISPLAY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Sets up visibility/alpha/transforms to resemble the starting state of an animation.
      */
@@ -492,7 +506,9 @@ public class Transitions implements RemoteCallable<Transitions> {
             mObservers.get(i).onTransitionReady(transitionToken, info, t, finishT);
         }
 
-        if (!info.getRootLeash().isValid()) {
+        // Allow to notify keyguard un-occluding state to KeyguardService, which can happen while
+        // screen-off, so there might no visibility change involved.
+        if (!info.getRootLeash().isValid() && info.getType() != TRANSIT_KEYGUARD_UNOCCLUDE) {
             // Invalid root-leash implies that the transition is empty/no-op, so just do
             // housekeeping and return.
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, "Invalid root leash (%s): %s",
@@ -612,13 +628,14 @@ public class Transitions implements RemoteCallable<Transitions> {
      * Gives every handler (in order) a chance to handle request until one consumes the transition.
      * @return the WindowContainerTransaction given by the handler which consumed the transition.
      */
-    public WindowContainerTransaction dispatchRequest(@NonNull IBinder transition,
-            @NonNull TransitionRequestInfo request, @Nullable TransitionHandler skip) {
+    public Pair<TransitionHandler, WindowContainerTransaction> dispatchRequest(
+            @NonNull IBinder transition, @NonNull TransitionRequestInfo request,
+            @Nullable TransitionHandler skip) {
         for (int i = mHandlers.size() - 1; i >= 0; --i) {
             if (mHandlers.get(i) == skip) continue;
             WindowContainerTransaction wct = mHandlers.get(i).handleRequest(transition, request);
             if (wct != null) {
-                return wct;
+                return new Pair<>(mHandlers.get(i), wct);
             }
         }
         return null;
@@ -683,9 +700,9 @@ public class Transitions implements RemoteCallable<Transitions> {
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
                 "Transition animation finished (abort=%b), notifying core %s", abort, transition);
         if (active.mStartT != null) {
-            // Applied by now, so close immediately. Do not set to null yet, though, since nullness
-            // is used later to disambiguate malformed transitions.
-            active.mStartT.close();
+            // Applied by now, so clear immediately to remove any references. Do not set to null
+            // yet, though, since nullness is used later to disambiguate malformed transitions.
+            active.mStartT.clear();
         }
         // Merge all relevant transactions together
         SurfaceControl.Transaction fullFinish = active.mFinishT;
@@ -817,7 +834,15 @@ public class Transitions implements RemoteCallable<Transitions> {
         }
         mOrganizer.startTransition(transitionToken, wct != null && wct.isEmpty() ? null : wct);
         active.mToken = transitionToken;
-        mActiveTransitions.add(active);
+        int insertIdx = 0;
+        for (; insertIdx < mActiveTransitions.size(); ++insertIdx) {
+            if (mActiveTransitions.get(insertIdx).mInfo == null) {
+                // A `startNewTransition` was sent to WMCore, but wasn't acknowledged before WMCore
+                // made this request, so insert this request beforehand to keep order in sync.
+                break;
+            }
+        }
+        mActiveTransitions.add(insertIdx, active);
     }
 
     /** Start a new transition directly. */

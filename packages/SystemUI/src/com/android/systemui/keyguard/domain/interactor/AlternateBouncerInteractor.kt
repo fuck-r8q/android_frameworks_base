@@ -20,7 +20,8 @@ import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.data.repository.BiometricRepository
+import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
+import com.android.systemui.keyguard.data.repository.DeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.KeyguardBouncerRepository
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager.LegacyAlternateBouncer
 import com.android.systemui.util.time.SystemClock
@@ -33,7 +34,8 @@ class AlternateBouncerInteractor
 @Inject
 constructor(
     private val bouncerRepository: KeyguardBouncerRepository,
-    private val biometricRepository: BiometricRepository,
+    private val biometricSettingsRepository: BiometricSettingsRepository,
+    private val deviceEntryFingerprintAuthRepository: DeviceEntryFingerprintAuthRepository,
     private val systemClock: SystemClock,
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
     featureFlags: FeatureFlags,
@@ -42,7 +44,7 @@ constructor(
     var legacyAlternateBouncer: LegacyAlternateBouncer? = null
     var legacyAlternateBouncerVisibleTime: Long = NOT_VISIBLE
 
-    val isVisible: Flow<Boolean> = bouncerRepository.isAlternateBouncerVisible
+    val isVisible: Flow<Boolean> = bouncerRepository.alternateBouncerVisible
 
     /**
      * Sets the correct bouncer states to show the alternate bouncer if it can show.
@@ -84,7 +86,7 @@ constructor(
 
     fun isVisibleState(): Boolean {
         return if (isModernAlternateBouncerEnabled) {
-            bouncerRepository.isAlternateBouncerVisible.value
+            bouncerRepository.alternateBouncerVisible.value
         } else {
             legacyAlternateBouncer?.isShowingAlternateBouncer ?: false
         }
@@ -96,10 +98,11 @@ constructor(
 
     fun canShowAlternateBouncerForFingerprint(): Boolean {
         return if (isModernAlternateBouncerEnabled) {
-            bouncerRepository.isAlternateBouncerUIAvailable.value &&
-                biometricRepository.isFingerprintEnrolled.value &&
-                biometricRepository.isStrongBiometricAllowed.value &&
-                biometricRepository.isFingerprintEnabledByDevicePolicy.value
+            bouncerRepository.alternateBouncerUIAvailable.value &&
+                biometricSettingsRepository.isFingerprintEnrolled.value &&
+                biometricSettingsRepository.isStrongBiometricAllowed.value &&
+                biometricSettingsRepository.isFingerprintEnabledByDevicePolicy.value &&
+                !deviceEntryFingerprintAuthRepository.isLockedOut.value
         } else {
             legacyAlternateBouncer != null &&
                 keyguardUpdateMonitor.isUnlockingWithBiometricAllowed(true)

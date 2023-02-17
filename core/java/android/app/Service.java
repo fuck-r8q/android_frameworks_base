@@ -1080,7 +1080,6 @@ public abstract class Service extends ContextWrapper implements ComponentCallbac
             if (mForegroundServiceTraceTitle != null) {
                 Trace.asyncTraceForTrackEnd(TRACE_TAG_ACTIVITY_MANAGER,
                         TRACE_TRACK_NAME_FOREGROUND_SERVICE,
-                        mForegroundServiceTraceTitle,
                         System.identityHashCode(this));
                 mForegroundServiceTraceTitle = null;
             }
@@ -1140,6 +1139,22 @@ public abstract class Service extends ContextWrapper implements ComponentCallbac
     /**
      * Callback called on timeout for {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SHORT_SERVICE}.
      * See {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SHORT_SERVICE} for more details.
+     *
+     * <p>If the foreground service of type
+     * {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SHORT_SERVICE}
+     * doesn't finish even after it's timed out,
+     * the app will be declared an ANR after a short grace period of several seconds.
+     *
+     * <p>Note, even though
+     * {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SHORT_SERVICE}
+     * was added
+     * on Android version {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE},
+     * it can be also used on
+     * on prior android versions (just like other new foreground service types can be used).
+     * However, because {@link android.app.Service#onTimeout(int)} did not exist on prior versions,
+     * it will never called on such versions.
+     * Because of this, developers must make sure to stop the foreground service even if
+     * {@link android.app.Service#onTimeout(int)} is not called on such versions.
      *
      * @param startId the startId passed to {@link #onStartCommand(Intent, int, int)} when
      * the service started.

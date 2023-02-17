@@ -255,6 +255,12 @@ public abstract class IPackageManagerBase extends IPackageManager.Stub {
 
     @Override
     @Deprecated
+    public final void clearPersistentPreferredActivity(IntentFilter filter, int userId) {
+        mPreferredActivityHelper.clearPersistentPreferredActivity(filter, userId);
+    }
+
+    @Override
+    @Deprecated
     public final void clearPackagePreferredActivities(String packageName) {
         mPreferredActivityHelper.clearPackagePreferredActivities(snapshot(),
                 packageName);
@@ -293,12 +299,6 @@ public abstract class IPackageManagerBase extends IPackageManager.Stub {
     @Deprecated
     public final ResolveInfo findPersistentPreferredActivity(Intent intent, int userId) {
         return mPreferredActivityHelper.findPersistentPreferredActivity(snapshot(), intent, userId);
-    }
-
-    @Override
-    @Deprecated
-    public final void forceDexOpt(String packageName) {
-        mDexOptHelper.forceDexOpt(snapshot(), packageName);
     }
 
     @Override

@@ -49,6 +49,7 @@ import android.view.WindowManager;
 import android.window.ITaskFragmentOrganizer;
 import android.window.ITaskFragmentOrganizerController;
 import android.window.TaskFragmentInfo;
+import android.window.TaskFragmentOperation;
 import android.window.TaskFragmentParentInfo;
 import android.window.TaskFragmentTransaction;
 import android.window.WindowContainerTransaction;
@@ -297,7 +298,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
         @NonNull
         TaskFragmentTransaction.Change prepareTaskFragmentError(
                 @Nullable IBinder errorCallbackToken, @Nullable TaskFragment taskFragment,
-                int opType, @NonNull Throwable exception) {
+                @TaskFragmentOperation.OperationType int opType, @NonNull Throwable exception) {
             ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER,
                     "Sending TaskFragment error exception=%s", exception.toString());
             final TaskFragmentInfo info =
@@ -540,9 +541,12 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
         synchronized (mGlobalLock) {
             final TaskFragmentOrganizerState organizerState =
                     mTaskFragmentOrganizerState.get(organizer.asBinder());
-            return organizerState != null
-                    ? organizerState.mRemoteAnimationDefinition
-                    : null;
+            if (organizerState == null) {
+                Slog.e(TAG, "TaskFragmentOrganizer has been unregistered or died when trying"
+                        + " to play animation on its organized windows.");
+                return null;
+            }
+            return organizerState.mRemoteAnimationDefinition;
         }
     }
 
@@ -629,7 +633,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
 
     void onTaskFragmentError(@NonNull ITaskFragmentOrganizer organizer,
             @Nullable IBinder errorCallbackToken, @Nullable TaskFragment taskFragment,
-            int opType, @NonNull Throwable exception) {
+            @TaskFragmentOperation.OperationType int opType, @NonNull Throwable exception) {
         if (taskFragment != null && taskFragment.mTaskFragmentVanishedSent) {
             return;
         }
@@ -803,6 +807,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
         // Set when the event is deferred due to the host task is invisible. The defer time will
         // be the last active time of the host task.
         private long mDeferTime;
+        @TaskFragmentOperation.OperationType
         private int mOpType;
 
         private PendingTaskFragmentEvent(@EventType int eventType,
@@ -812,7 +817,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                 @Nullable Throwable exception,
                 @Nullable ActivityRecord activity,
                 @Nullable Task task,
-                int opType) {
+                @TaskFragmentOperation.OperationType int opType) {
             mEventType = eventType;
             mTaskFragmentOrg = taskFragmentOrg;
             mTaskFragment = taskFragment;
@@ -853,6 +858,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
             private ActivityRecord mActivity;
             @Nullable
             private Task mTask;
+            @TaskFragmentOperation.OperationType
             private int mOpType;
 
             Builder(@EventType int eventType, @NonNull ITaskFragmentOrganizer taskFragmentOrg) {
@@ -885,7 +891,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                 return this;
             }
 
-            Builder setOpType(int opType) {
+            Builder setOpType(@TaskFragmentOperation.OperationType int opType) {
                 mOpType = opType;
                 return this;
             }

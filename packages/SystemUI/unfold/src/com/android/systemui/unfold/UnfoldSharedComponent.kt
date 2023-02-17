@@ -22,8 +22,9 @@ import android.hardware.SensorManager
 import android.os.Handler
 import android.view.IWindowManager
 import com.android.systemui.unfold.config.UnfoldTransitionConfig
-import com.android.systemui.unfold.dagger.UnfoldBackground
 import com.android.systemui.unfold.dagger.UnfoldMain
+import com.android.systemui.unfold.dagger.UnfoldSingleThreadBg
+import com.android.systemui.unfold.progress.RemoteUnfoldTransitionReceiver
 import com.android.systemui.unfold.updates.FoldProvider
 import com.android.systemui.unfold.updates.RotationChangeProvider
 import com.android.systemui.unfold.updates.screen.ScreenStatusProvider
@@ -58,7 +59,7 @@ interface UnfoldSharedComponent {
             @BindsInstance sensorManager: SensorManager,
             @BindsInstance @UnfoldMain handler: Handler,
             @BindsInstance @UnfoldMain executor: Executor,
-            @BindsInstance @UnfoldBackground backgroundExecutor: Executor,
+            @BindsInstance @UnfoldSingleThreadBg singleThreadBgExecutor: Executor,
             @BindsInstance @UnfoldTransitionATracePrefix tracingTagPrefix: String,
             @BindsInstance windowManager: IWindowManager,
             @BindsInstance contentResolver: ContentResolver = context.contentResolver
@@ -68,3 +69,38 @@ interface UnfoldSharedComponent {
     val unfoldTransitionProvider: Optional<UnfoldTransitionProgressProvider>
     val rotationChangeProvider: RotationChangeProvider
 }
+
+/**
+ * Generates a [RemoteTransitionProgress] usable to receive unfold transition progress from another
+ * process.
+ */
+@Singleton
+@Component(modules = [UnfoldRemoteModule::class])
+interface RemoteUnfoldSharedComponent {
+
+    @Component.Factory
+    interface Factory {
+        fun create(
+            @BindsInstance context: Context,
+            @BindsInstance config: UnfoldTransitionConfig,
+            @BindsInstance @UnfoldMain executor: Executor,
+            @BindsInstance @UnfoldSingleThreadBg singleThreadBgExecutor: Executor,
+            @BindsInstance windowManager: IWindowManager,
+            @BindsInstance @UnfoldTransitionATracePrefix tracingTagPrefix: String,
+        ): RemoteUnfoldSharedComponent
+    }
+
+    val remoteTransitionProgress: Optional<RemoteUnfoldTransitionReceiver>
+    val rotationChangeProvider: RotationChangeProvider
+}
+
+/**
+ * Usable to receive and propagate unfold transition progresses
+ *
+ * All unfold events received by [remoteReceiver] will be propagated to [localProvider].
+ * [remoteReceiver] is meant to receive events from a remote process (E.g. from a binder service).
+ */
+data class RemoteTransitionProgress(
+    val localProvider: UnfoldTransitionProgressProvider,
+    val remoteReceiver: UnfoldTransitionProgressProvider.TransitionProgressListener
+)

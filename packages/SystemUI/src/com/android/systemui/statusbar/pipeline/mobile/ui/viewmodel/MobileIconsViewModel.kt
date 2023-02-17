@@ -17,13 +17,14 @@
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
 import androidx.annotation.VisibleForTesting
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.pipeline.StatusBarPipelineFlags
+import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
-import com.android.systemui.statusbar.pipeline.shared.ConnectivityPipelineLogger
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -39,7 +40,7 @@ class MobileIconsViewModel
 constructor(
     val subscriptionIdsFlow: StateFlow<List<Int>>,
     private val interactor: MobileIconsInteractor,
-    private val logger: ConnectivityPipelineLogger,
+    private val airplaneModeInteractor: AirplaneModeInteractor,
     private val constants: ConnectivityConstants,
     @Application private val scope: CoroutineScope,
     private val statusBarPipelineFlags: StatusBarPipelineFlags,
@@ -56,7 +57,7 @@ constructor(
                 ?: MobileIconViewModel(
                         subId,
                         interactor.createMobileConnectionInteractorForSubId(subId),
-                        logger,
+                        airplaneModeInteractor,
                         constants,
                         scope,
                     )
@@ -74,11 +75,12 @@ constructor(
         subIdsToRemove.forEach { mobileIconSubIdCache.remove(it) }
     }
 
+    @SysUISingleton
     class Factory
     @Inject
     constructor(
         private val interactor: MobileIconsInteractor,
-        private val logger: ConnectivityPipelineLogger,
+        private val airplaneModeInteractor: AirplaneModeInteractor,
         private val constants: ConnectivityConstants,
         @Application private val scope: CoroutineScope,
         private val statusBarPipelineFlags: StatusBarPipelineFlags,
@@ -87,7 +89,7 @@ constructor(
             return MobileIconsViewModel(
                 subscriptionIdsFlow,
                 interactor,
-                logger,
+                airplaneModeInteractor,
                 constants,
                 scope,
                 statusBarPipelineFlags,

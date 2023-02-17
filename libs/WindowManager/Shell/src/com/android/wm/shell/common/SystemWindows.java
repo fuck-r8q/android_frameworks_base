@@ -223,7 +223,7 @@ public class SystemWindows {
             }
             final Display display = mDisplayController.getDisplay(mDisplayId);
             SurfaceControlViewHost viewRoot =
-                    new SurfaceControlViewHost(view.getContext(), display, wwm);
+                    new SurfaceControlViewHost(view.getContext(), display, wwm, "SystemWindows");
             attrs.flags |= FLAG_HARDWARE_ACCELERATED;
             viewRoot.setView(view, attrs);
             mViewRoots.put(view, viewRoot);
@@ -306,7 +306,9 @@ public class SystemWindows {
             }
         }
 
-        protected void attachToParentSurface(IWindow window, SurfaceControl.Builder b) {
+        @Override
+        protected SurfaceControl getParentSurface(IWindow window,
+                WindowManager.LayoutParams attrs) {
             SurfaceControl leash = new SurfaceControl.Builder(new SurfaceSession())
                   .setContainerLayer()
                   .setName("SystemWindowLeash")
@@ -316,7 +318,7 @@ public class SystemWindows {
             synchronized (this) {
                 mLeashForWindow.put(window.asBinder(), leash);
             }
-            b.setParent(leash);
+            return leash;
         }
 
         @Override

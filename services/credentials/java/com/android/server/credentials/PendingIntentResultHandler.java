@@ -23,8 +23,8 @@ import android.credentials.CreateCredentialResponse;
 import android.credentials.GetCredentialException;
 import android.credentials.GetCredentialResponse;
 import android.credentials.ui.ProviderPendingIntentResponse;
+import android.service.credentials.BeginGetCredentialResponse;
 import android.service.credentials.CredentialProviderService;
-import android.service.credentials.CredentialsResponseContent;
 
 /**
  * Helper class for setting up pending intent, and extracting objects from it.
@@ -39,14 +39,20 @@ public class PendingIntentResultHandler {
         return pendingIntentResponse.getResultCode() == Activity.RESULT_OK;
     }
 
-    /** Extracts the {@link CredentialsResponseContent} object added to the result data. */
-    public static CredentialsResponseContent extractResponseContent(Intent resultData) {
+    /** Returns true if the pending intent was cancelled by the user. */
+    public static boolean isCancelledResponse(
+            ProviderPendingIntentResponse pendingIntentResponse) {
+        return pendingIntentResponse.getResultCode() == Activity.RESULT_CANCELED;
+    }
+
+    /** Extracts the {@link BeginGetCredentialResponse} object added to the result data. */
+    public static BeginGetCredentialResponse extractResponseContent(Intent resultData) {
         if (resultData == null) {
             return null;
         }
         return resultData.getParcelableExtra(
-                CredentialProviderService.EXTRA_CREDENTIALS_RESPONSE_CONTENT,
-                CredentialsResponseContent.class);
+                CredentialProviderService.EXTRA_BEGIN_GET_CREDENTIAL_RESPONSE,
+                BeginGetCredentialResponse.class);
     }
 
     /** Extracts the {@link CreateCredentialResponse} object added to the result data. */

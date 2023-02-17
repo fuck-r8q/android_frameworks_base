@@ -24,7 +24,7 @@ import com.android.server.wm.flicker.FlickerTest
 import com.android.server.wm.flicker.FlickerTestFactory
 import com.android.server.wm.flicker.junit.FlickerParametersRunnerFactory
 import com.android.server.wm.flicker.statusBarLayerPositionAtEnd
-import com.android.server.wm.traces.common.ComponentNameMatcher
+import com.android.server.wm.traces.common.component.matchers.ComponentNameMatcher
 import org.junit.FixMethodOrder
 import org.junit.Ignore
 import org.junit.Test
@@ -61,9 +61,9 @@ open class OpenAppFromNotificationCold(flicker: FlickerTest) :
             }
         }
 
-    @Postsubmit @Test override fun appWindowBecomesVisible() = appWindowBecomesVisible_coldStart()
+    @Presubmit @Test override fun appWindowBecomesVisible() = appWindowBecomesVisible_coldStart()
 
-    @Postsubmit @Test override fun appLayerBecomesVisible() = appLayerBecomesVisible_coldStart()
+    @Presubmit @Test override fun appLayerBecomesVisible() = appLayerBecomesVisible_coldStart()
 
     /** {@inheritDoc} */
     @Test

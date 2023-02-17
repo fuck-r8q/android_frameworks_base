@@ -20,6 +20,7 @@ import static com.android.server.wm.ActivityTaskSupervisor.REMOVE_FROM_RECENTS;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS;
 
 import android.app.ActivityManager;
+import android.app.BackgroundStartPrivileges;
 import android.app.IAppTask;
 import android.app.IApplicationThread;
 import android.content.Intent;
@@ -99,7 +100,7 @@ class AppTaskImpl extends IAppTask.Stub {
                     throw new IllegalArgumentException("Unable to find task ID " + mTaskId);
                 }
                 return mService.getRecentTasks().createRecentTaskInfo(task,
-                        false /* stripExtras */);
+                        false /* stripExtras */, true /* getTasksAllowed */);
             } finally {
                 Binder.restoreCallingIdentity(origId);
             }
@@ -131,7 +132,7 @@ class AppTaskImpl extends IAppTask.Stub {
                         -1,
                         callerApp,
                         null,
-                        false,
+                        BackgroundStartPrivileges.NONE,
                         null,
                         null)) {
                     if (!mService.isBackgroundActivityStartsEnabled()) {

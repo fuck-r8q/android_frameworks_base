@@ -85,7 +85,14 @@ public class UserManagerServiceUserTypeTest {
         final UserProperties.Builder userProps = new UserProperties.Builder()
                 .setShowInLauncher(17)
                 .setUseParentsContacts(true)
-                .setCrossProfileIntentFilterAccessControl(10);
+                .setCrossProfileIntentFilterAccessControl(10)
+                .setCrossProfileIntentResolutionStrategy(1)
+                .setMediaSharedWithParent(true)
+                .setCredentialShareableWithParent(false)
+                .setShowInSettings(900)
+                .setInheritDevicePolicy(340)
+                .setDeleteAppWithParent(true);
+
         final UserTypeDetails type = new UserTypeDetails.Builder()
                 .setName("a.name")
                 .setEnabled(1)
@@ -145,6 +152,14 @@ public class UserManagerServiceUserTypeTest {
         assertTrue(type.getDefaultUserPropertiesReference().getUseParentsContacts());
         assertEquals(10, type.getDefaultUserPropertiesReference()
                 .getCrossProfileIntentFilterAccessControl());
+        assertEquals(1, type.getDefaultUserPropertiesReference()
+                .getCrossProfileIntentResolutionStrategy());
+        assertTrue(type.getDefaultUserPropertiesReference().isMediaSharedWithParent());
+        assertFalse(type.getDefaultUserPropertiesReference().isCredentialShareableWithParent());
+        assertEquals(900, type.getDefaultUserPropertiesReference().getShowInSettings());
+        assertEquals(340, type.getDefaultUserPropertiesReference()
+                .getInheritDevicePolicy());
+        assertTrue(type.getDefaultUserPropertiesReference().getDeleteAppWithParent());
 
         assertEquals(23, type.getBadgeLabel(0));
         assertEquals(24, type.getBadgeLabel(1));
@@ -191,6 +206,10 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(UserProperties.CROSS_PROFILE_INTENT_FILTER_ACCESS_LEVEL_ALL,
                 props.getCrossProfileIntentFilterAccessControl());
         assertEquals(UserProperties.SHOW_IN_LAUNCHER_WITH_PARENT, props.getShowInLauncher());
+        assertEquals(UserProperties.CROSS_PROFILE_INTENT_RESOLUTION_STRATEGY_DEFAULT,
+                props.getCrossProfileIntentResolutionStrategy());
+        assertFalse(props.isMediaSharedWithParent());
+        assertFalse(props.isCredentialShareableWithParent());
 
         assertFalse(type.hasBadge());
     }
@@ -273,7 +292,14 @@ public class UserManagerServiceUserTypeTest {
                 .setShowInLauncher(19)
                 .setStartWithParent(true)
                 .setUseParentsContacts(true)
-                .setCrossProfileIntentFilterAccessControl(10);
+                .setCrossProfileIntentFilterAccessControl(10)
+                .setCrossProfileIntentResolutionStrategy(1)
+                .setMediaSharedWithParent(false)
+                .setCredentialShareableWithParent(true)
+                .setShowInSettings(20)
+                .setInheritDevicePolicy(21)
+                .setDeleteAppWithParent(true);
+
         final ArrayMap<String, UserTypeDetails.Builder> builders = new ArrayMap<>();
         builders.put(userTypeAosp1, new UserTypeDetails.Builder()
                 .setName(userTypeAosp1)
@@ -301,9 +327,18 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(19, aospType.getDefaultUserPropertiesReference().getShowInLauncher());
         assertEquals(10, aospType.getDefaultUserPropertiesReference()
                 .getCrossProfileIntentFilterAccessControl());
+        assertEquals(1, aospType.getDefaultUserPropertiesReference()
+                .getCrossProfileIntentResolutionStrategy());
         assertTrue(aospType.getDefaultUserPropertiesReference().getStartWithParent());
         assertTrue(aospType.getDefaultUserPropertiesReference()
                 .getUseParentsContacts());
+        assertFalse(aospType.getDefaultUserPropertiesReference().isMediaSharedWithParent());
+        assertTrue(aospType.getDefaultUserPropertiesReference()
+                .isCredentialShareableWithParent());
+        assertEquals(20, aospType.getDefaultUserPropertiesReference().getShowInSettings());
+        assertEquals(21, aospType.getDefaultUserPropertiesReference()
+                .getInheritDevicePolicy());
+        assertTrue(aospType.getDefaultUserPropertiesReference().getDeleteAppWithParent());
 
         // userTypeAosp2 should be modified.
         aospType = builders.get(userTypeAosp2).createUserTypeDetails();
@@ -335,9 +370,19 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(2020, aospType.getDefaultUserPropertiesReference().getShowInLauncher());
         assertEquals(20, aospType.getDefaultUserPropertiesReference()
                 .getCrossProfileIntentFilterAccessControl());
+        assertEquals(0, aospType.getDefaultUserPropertiesReference()
+                .getCrossProfileIntentResolutionStrategy());
         assertFalse(aospType.getDefaultUserPropertiesReference().getStartWithParent());
         assertFalse(aospType.getDefaultUserPropertiesReference()
                 .getUseParentsContacts());
+        assertTrue(aospType.getDefaultUserPropertiesReference().isMediaSharedWithParent());
+        assertFalse(aospType.getDefaultUserPropertiesReference()
+                .isCredentialShareableWithParent());
+        assertEquals(23, aospType.getDefaultUserPropertiesReference().getShowInSettings());
+        assertEquals(450, aospType.getDefaultUserPropertiesReference()
+                .getInheritDevicePolicy());
+        assertFalse(aospType.getDefaultUserPropertiesReference()
+                .getDeleteAppWithParent());
 
         // userTypeOem1 should be created.
         UserTypeDetails.Builder customType = builders.get(userTypeOem1);

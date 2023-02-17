@@ -37,8 +37,10 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Client-side container for a stack of activities. Corresponds to an instance of TaskFragment
@@ -116,6 +118,27 @@ class TaskFragmentContainer {
     private TaskFragmentAnimationParams mLastAnimationParams = TaskFragmentAnimationParams.DEFAULT;
 
     /**
+     * TaskFragment token that was requested last via
+     * {@link android.window.TaskFragmentOperation#OP_TYPE_SET_ADJACENT_TASK_FRAGMENTS}.
+     */
+    @Nullable
+    private IBinder mLastAdjacentTaskFragment;
+
+    /**
+     * {@link WindowContainerTransaction.TaskFragmentAdjacentParams} token that was requested last
+     * via {@link android.window.TaskFragmentOperation#OP_TYPE_SET_ADJACENT_TASK_FRAGMENTS}.
+     */
+    @Nullable
+    private WindowContainerTransaction.TaskFragmentAdjacentParams mLastAdjacentParams;
+
+    /**
+     * TaskFragment token that was requested last via
+     * {@link android.window.TaskFragmentOperation#OP_TYPE_SET_COMPANION_TASK_FRAGMENT}.
+     */
+    @Nullable
+    private IBinder mLastCompanionTaskFragment;
+
+    /**
      * When the TaskFragment has appeared in server, but is empty, we should remove the TaskFragment
      * if it is still empty after the timeout.
      */
@@ -141,12 +164,26 @@ class TaskFragmentContainer {
         mToken = new Binder("TaskFragmentContainer");
         mTaskContainer = taskContainer;
         if (pairedPrimaryContainer != null) {
+            // The TaskFragment will be positioned right above the paired container.
             if (pairedPrimaryContainer.getTaskContainer() != taskContainer) {
                 throw new IllegalArgumentException(
                         "pairedPrimaryContainer must be in the same Task");
             }
             final int primaryIndex = taskContainer.mContainers.indexOf(pairedPrimaryContainer);
             taskContainer.mContainers.add(primaryIndex + 1, this);
+        } else if (pendingAppearedActivity != null) {
+            // The TaskFragment will be positioned right above the pending appeared Activity. If any
+            // existing TaskFragment is empty with pending Intent, it is likely that the Activity of
+            // the pending Intent hasn't been created yet, so the new Activity should be below the
+            // empty TaskFragment.
+            int i = taskContainer.mContainers.size() - 1;
+            for (; i >= 0; i--) {
+                final TaskFragmentContainer container = taskContainer.mContainers.get(i);
+                if (!container.isEmpty() || container.getPendingAppearedIntent() == null) {
+                    break;
+                }
+            }
+            taskContainer.mContainers.add(i + 1, this);
         } else {
             taskContainer.mContainers.add(this);
         }
@@ -229,7 +266,7 @@ class TaskFragmentContainer {
 
     @NonNull
     ActivityStack toActivityStack() {
-        return new ActivityStack(collectNonFinishingActivities(), isEmpty());
+        return new ActivityStack(collectNonFinishingActivities(), isEmpty(), mToken);
     }
 
     /** Adds the activity that will be reparented to this container. */
@@ -422,10 +459,17 @@ class TaskFragmentContainer {
      * Removes a container that should be finished when this container is finished.
      */
     void removeContainerToFinishOnExit(@NonNull TaskFragmentContainer containerToRemove) {
+        removeContainersToFinishOnExit(Collections.singletonList(containerToRemove));
+    }
+
+    /**
+     * Removes container list that should be finished when this container is finished.
+     */
+    void removeContainersToFinishOnExit(@NonNull List<TaskFragmentContainer> containersToRemove) {
         if (mIsFinished) {
             return;
         }
-        mContainersToFinishOnExit.remove(containerToRemove);
+        mContainersToFinishOnExit.removeAll(containersToRemove);
     }
 
     /**
@@ -464,6 +508,16 @@ class TaskFragmentContainer {
     @GuardedBy("mController.mLock")
     void finish(boolean shouldFinishDependent, @NonNull SplitPresenter presenter,
             @NonNull WindowContainerTransaction wct, @NonNull SplitController controller) {
+        finish(shouldFinishDependent, presenter, wct, controller, true /* shouldRemoveRecord */);
+    }
+
+    /**
+     * Removes all activities that belong to this process and finishes other containers/activities
+     * configured to finish together.
+     */
+    void finish(boolean shouldFinishDependent, @NonNull SplitPresenter presenter,
+            @NonNull WindowContainerTransaction wct, @NonNull SplitController controller,
+            boolean shouldRemoveRecord) {
         if (!mIsFinished) {
             mIsFinished = true;
             if (mAppearEmptyTimeout != null) {
@@ -480,8 +534,10 @@ class TaskFragmentContainer {
 
         // Cleanup the visuals
         presenter.deleteTaskFragment(wct, getTaskFragmentToken());
-        // Cleanup the records
-        controller.removeContainer(this);
+        if (shouldRemoveRecord) {
+            // Cleanup the records
+            controller.removeContainer(this);
+        }
         // Clean up task fragment information
         mInfo = null;
     }
@@ -500,6 +556,8 @@ class TaskFragmentContainer {
         }
 
         if (!shouldFinishDependent) {
+            // Always finish the placeholder when the primary is finished.
+            finishPlaceholderIfAny(wct, presenter);
             return;
         }
 
@@ -526,36 +584,58 @@ class TaskFragmentContainer {
         mActivitiesToFinishOnExit.clear();
     }
 
+    @GuardedBy("mController.mLock")
+    private void finishPlaceholderIfAny(@NonNull WindowContainerTransaction wct,
+            @NonNull SplitPresenter presenter) {
+        final List<TaskFragmentContainer> containersToRemove = new ArrayList<>();
+        for (TaskFragmentContainer container : mContainersToFinishOnExit) {
+            if (container.mIsFinished) {
+                continue;
+            }
+            final SplitContainer splitContainer = mController.getActiveSplitForContainers(
+                    this, container);
+            if (splitContainer != null && splitContainer.isPlaceholderContainer()
+                    && splitContainer.getSecondaryContainer() == container) {
+                // Remove the placeholder secondary TaskFragment.
+                containersToRemove.add(container);
+            }
+        }
+        mContainersToFinishOnExit.removeAll(containersToRemove);
+        for (TaskFragmentContainer container : containersToRemove) {
+            container.finish(false /* shouldFinishDependent */, presenter, wct, mController);
+        }
+    }
+
     boolean isFinished() {
         return mIsFinished;
     }
 
     /**
      * Checks if last requested bounds are equal to the provided value.
+     * The requested bounds are relative bounds in parent coordinate.
+     * @see WindowContainerTransaction#setRelativeBounds
      */
-    boolean areLastRequestedBoundsEqual(@Nullable Rect bounds) {
-        return (bounds == null && mLastRequestedBounds.isEmpty())
-                || mLastRequestedBounds.equals(bounds);
+    boolean areLastRequestedBoundsEqual(@Nullable Rect relBounds) {
+        return (relBounds == null && mLastRequestedBounds.isEmpty())
+                || mLastRequestedBounds.equals(relBounds);
     }
 
     /**
      * Updates the last requested bounds.
+     * The requested bounds are relative bounds in parent coordinate.
+     * @see WindowContainerTransaction#setRelativeBounds
      */
-    void setLastRequestedBounds(@Nullable Rect bounds) {
-        if (bounds == null) {
+    void setLastRequestedBounds(@Nullable Rect relBounds) {
+        if (relBounds == null) {
             mLastRequestedBounds.setEmpty();
         } else {
-            mLastRequestedBounds.set(bounds);
+            mLastRequestedBounds.set(relBounds);
         }
-    }
-
-    @NonNull
-    Rect getLastRequestedBounds() {
-        return mLastRequestedBounds;
     }
 
     /**
      * Checks if last requested windowing mode is equal to the provided value.
+     * @see WindowContainerTransaction#setWindowingMode
      */
     boolean isLastRequestedWindowingModeEqual(@WindowingMode int windowingMode) {
         return mLastRequestedWindowingMode == windowingMode;
@@ -563,6 +643,7 @@ class TaskFragmentContainer {
 
     /**
      * Updates the last requested windowing mode.
+     * @see WindowContainerTransaction#setWindowingMode
      */
     void setLastRequestedWindowingMode(@WindowingMode int windowingModes) {
         mLastRequestedWindowingMode = windowingModes;
@@ -570,6 +651,7 @@ class TaskFragmentContainer {
 
     /**
      * Checks if last requested {@link TaskFragmentAnimationParams} are equal to the provided value.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_ANIMATION_PARAMS
      */
     boolean areLastRequestedAnimationParamsEqual(
             @NonNull TaskFragmentAnimationParams animationParams) {
@@ -578,9 +660,64 @@ class TaskFragmentContainer {
 
     /**
      * Updates the last requested {@link TaskFragmentAnimationParams}.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_ANIMATION_PARAMS
      */
     void setLastRequestAnimationParams(@NonNull TaskFragmentAnimationParams animationParams) {
         mLastAnimationParams = animationParams;
+    }
+
+    /**
+     * Checks if last requested adjacent TaskFragment token and params are equal to the provided
+     * values.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_ADJACENT_TASK_FRAGMENTS
+     * @see android.window.TaskFragmentOperation#OP_TYPE_CLEAR_ADJACENT_TASK_FRAGMENTS
+     */
+    boolean isLastAdjacentTaskFragmentEqual(@Nullable IBinder fragmentToken,
+            @Nullable WindowContainerTransaction.TaskFragmentAdjacentParams params) {
+        return Objects.equals(mLastAdjacentTaskFragment, fragmentToken)
+                && Objects.equals(mLastAdjacentParams, params);
+    }
+
+    /**
+     * Updates the last requested adjacent TaskFragment token and params.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_ADJACENT_TASK_FRAGMENTS
+     */
+    void setLastAdjacentTaskFragment(@NonNull IBinder fragmentToken,
+            @NonNull WindowContainerTransaction.TaskFragmentAdjacentParams params) {
+        mLastAdjacentTaskFragment = fragmentToken;
+        mLastAdjacentParams = params;
+    }
+
+    /**
+     * Clears the last requested adjacent TaskFragment token and params.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_CLEAR_ADJACENT_TASK_FRAGMENTS
+     */
+    void clearLastAdjacentTaskFragment() {
+        final TaskFragmentContainer lastAdjacentTaskFragment = mLastAdjacentTaskFragment != null
+                ? mController.getContainer(mLastAdjacentTaskFragment)
+                : null;
+        mLastAdjacentTaskFragment = null;
+        mLastAdjacentParams = null;
+        if (lastAdjacentTaskFragment != null) {
+            // Clear the previous adjacent TaskFragment as well.
+            lastAdjacentTaskFragment.clearLastAdjacentTaskFragment();
+        }
+    }
+
+    /**
+     * Checks if last requested companion TaskFragment token is equal to the provided value.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_COMPANION_TASK_FRAGMENT
+     */
+    boolean isLastCompanionTaskFragmentEqual(@Nullable IBinder fragmentToken) {
+        return Objects.equals(mLastCompanionTaskFragment, fragmentToken);
+    }
+
+    /**
+     * Updates the last requested companion TaskFragment token.
+     * @see android.window.TaskFragmentOperation#OP_TYPE_SET_COMPANION_TASK_FRAGMENT
+     */
+    void setLastCompanionTaskFragment(@Nullable IBinder fragmentToken) {
+        mLastCompanionTaskFragment = fragmentToken;
     }
 
     /** Gets the parent leaf Task id. */

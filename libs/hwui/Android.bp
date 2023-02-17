@@ -73,7 +73,6 @@ cc_defaults {
     target: {
         android: {
             include_dirs: [
-                "external/skia/src/effects",
                 "external/skia/src/image",
                 "external/skia/src/utils",
                 "external/skia/src/gpu",
@@ -214,6 +213,15 @@ filegroup {
     path: "apex/java",
 }
 
+java_api_contribution {
+    name: "framework-graphics-public-stubs",
+    api_surface: "public",
+    api_file: "api/current.txt",
+    visibility: [
+        "//build/orchestrator/apis",
+    ],
+}
+
 // ------------------------
 // APEX
 // ------------------------
@@ -329,6 +337,7 @@ cc_defaults {
         "jni/android_util_PathParser.cpp",
 
         "jni/Bitmap.cpp",
+        "jni/HardwareBufferHelpers.cpp",
         "jni/BitmapFactory.cpp",
         "jni/ByteBufferStreamAdaptor.cpp",
         "jni/Camera.cpp",
@@ -337,6 +346,7 @@ cc_defaults {
         "jni/CreateJavaOutputStreamAdaptor.cpp",
         "jni/FontFamily.cpp",
         "jni/FontUtils.cpp",
+        "jni/Gainmap.cpp",
         "jni/Graphics.cpp",
         "jni/ImageDecoder.cpp",
         "jni/Interpolator.cpp",
@@ -353,6 +363,7 @@ cc_defaults {
         "jni/PathMeasure.cpp",
         "jni/Picture.cpp",
         "jni/Region.cpp",
+        "jni/ScopedParcel.cpp",
         "jni/Shader.cpp",
         "jni/RenderEffect.cpp",
         "jni/Typeface.cpp",
@@ -365,25 +376,27 @@ cc_defaults {
         "jni/text/TextShaper.cpp",
     ],
 
-    header_libs: ["android_graphics_jni_headers"],
+    header_libs: [
+        "android_graphics_jni_headers",
+        "libnativewindow_headers",
+    ],
 
     include_dirs: [
         "external/skia/include/private",
         "external/skia/src/codec",
         "external/skia/src/core",
-        "external/skia/src/effects",
-        "external/skia/src/image",
-        "external/skia/src/images",
     ],
 
     shared_libs: [
         "libbase",
         "libcutils",
         "libharfbuzz_ng",
+        "libimage_io",
+        "libjpeg",
+        "libjpegrecoverymap",
         "liblog",
         "libminikin",
         "libz",
-        "libjpeg",
     ],
 
     static_libs: [
@@ -397,6 +410,7 @@ cc_defaults {
                 "jni/AnimatedImageDrawable.cpp",
                 "jni/android_graphics_TextureLayer.cpp",
                 "jni/android_graphics_HardwareRenderer.cpp",
+                "jni/android_graphics_HardwareBufferRenderer.cpp",
                 "jni/BitmapRegionDecoder.cpp",
                 "jni/GIFMovie.cpp",
                 "jni/GraphicsStatsService.cpp",
@@ -492,6 +506,7 @@ cc_defaults {
         "canvas/CanvasOpBuffer.cpp",
         "canvas/CanvasOpRasterizer.cpp",
         "effects/StretchEffect.cpp",
+        "effects/GainmapRenderer.cpp",
         "pipeline/skia/HolePunch.cpp",
         "pipeline/skia/SkiaDisplayList.cpp",
         "pipeline/skia/SkiaRecordingCanvas.cpp",
@@ -534,6 +549,7 @@ cc_defaults {
         "RootRenderNode.cpp",
         "SkiaCanvas.cpp",
         "SkiaInterpolator.cpp",
+        "Tonemapper.cpp",
         "VectorDrawable.cpp",
     ],
 
@@ -592,7 +608,6 @@ cc_defaults {
                 "ProfileData.cpp",
                 "ProfileDataContainer.cpp",
                 "Readback.cpp",
-                "Tonemapper.cpp",
                 "TreeInfo.cpp",
                 "WebViewFunctorManager.cpp",
                 "protos/graphicsstats.proto",

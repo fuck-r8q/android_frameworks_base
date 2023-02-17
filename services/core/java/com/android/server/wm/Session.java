@@ -310,6 +310,11 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         }
     }
 
+    @Override
+    public void performHapticFeedbackAsync(int effectId, boolean always) {
+        performHapticFeedback(effectId, always);
+    }
+
     /* Drag/drop */
 
     @Override
@@ -907,6 +912,22 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         } finally {
             Binder.restoreCallingIdentity(identity);
         }
+    }
+
+    @Override
+    public boolean transferEmbeddedTouchFocusToHost(IWindow embeddedWindow) {
+        if (embeddedWindow == null) {
+            return false;
+        }
+
+        final long identity = Binder.clearCallingIdentity();
+        boolean didTransfer = false;
+        try {
+            didTransfer = mService.transferEmbeddedTouchFocusToHost(embeddedWindow);
+        } finally {
+            Binder.restoreCallingIdentity(identity);
+        }
+        return didTransfer;
     }
 
     @Override

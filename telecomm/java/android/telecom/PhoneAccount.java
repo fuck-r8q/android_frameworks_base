@@ -540,6 +540,11 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Creates a builder with the specified {@link PhoneAccountHandle} and label.
+         * <p>
+         * Note: each CharSequence or String field is limited to 256 characters. This check is
+         * enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if the character field limit is over 256.
          */
         public Builder(PhoneAccountHandle accountHandle, CharSequence label) {
             this.mAccountHandle = accountHandle;
@@ -570,6 +575,11 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Sets the label. See {@link PhoneAccount#getLabel()}.
+         * <p>
+         * Note: Each CharSequence or String field is limited to 256 characters. This check is
+         * enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if the character field limit is over 256.
          *
          * @param label The label of the phone account.
          * @return The builder.
@@ -582,6 +592,11 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Sets the address. See {@link PhoneAccount#getAddress}.
+         * <p>
+         * Note: The entire URI value is limited to 256 characters. This check is
+         * enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if URI is over 256.
          *
          * @param value The address of the phone account.
          * @return The builder.
@@ -615,6 +630,10 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Sets the icon. See {@link PhoneAccount#getIcon}.
+         * <p>
+         * Note: An {@link IllegalArgumentException} if the Icon cannot be written to memory.
+         * This check is enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)}
          *
          * @param icon The icon to set.
          */
@@ -636,6 +655,11 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Sets the short description. See {@link PhoneAccount#getShortDescription}.
+         * <p>
+         * Note: Each CharSequence or String field is limited to 256 characters. This check is
+         * enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if the character field limit is over 256.
          *
          * @param value The short description.
          * @return The builder.
@@ -647,6 +671,10 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Specifies an additional URI scheme supported by the {@link PhoneAccount}.
+         *
+         * <p>
+         * Each URI scheme is limited to 256 characters.  Adding a scheme over 256 characters will
+         * cause an {@link IllegalArgumentException} to be thrown when the account is registered.
          *
          * @param uriScheme The URI scheme.
          * @return The builder.
@@ -660,6 +688,12 @@ public final class PhoneAccount implements Parcelable {
 
         /**
          * Specifies the URI schemes supported by the {@link PhoneAccount}.
+         *
+         * <p>
+         * A max of 10 URI schemes can be added per account.  Additionally, each URI scheme is
+         * limited to 256 characters. Adding more than 10 URI schemes or 256 characters on any
+         * scheme will cause an {@link IllegalArgumentException} to be thrown when the account
+         * is registered.
          *
          * @param uriSchemes The URI schemes.
          * @return The builder.
@@ -680,6 +714,13 @@ public final class PhoneAccount implements Parcelable {
          * <p>
          * {@code PhoneAccount}s only support extra values of type: {@link String}, {@link Integer},
          * and {@link Boolean}.  Extras which are not of these types are ignored.
+         * <p>
+         * Note: Each Bundle (Key, Value) String field is limited to 256 characters. Additionally,
+         * the bundle is limited to 100 (Key, Value) pairs total.  This check is
+         * enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if the character field limit is over 256
+         * or more than 100 (Key, Value) pairs are in the Bundle.
          *
          * @param extras
          * @return
@@ -711,6 +752,11 @@ public final class PhoneAccount implements Parcelable {
          * <p>
          * Note: This is an API specific to the Telephony stack; the group Id will be ignored for
          * callers not holding the correct permission.
+         * <p>
+         * Additionally, each CharSequence or String field is limited to 256 characters.
+         * This check is enforced when registering the PhoneAccount via
+         * {@link TelecomManager#registerPhoneAccount(PhoneAccount)} and will cause an
+         * {@link IllegalArgumentException} to be thrown if the character field limit is over 256.
          *
          * @param groupId The group Id of the {@link PhoneAccount} that will replace any other
          * registered {@link PhoneAccount} in Telecom with the same Group Id.

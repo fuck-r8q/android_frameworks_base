@@ -118,7 +118,7 @@ public final class CachedAppOptimizer {
     private static final int FREEZE_BINDER_TIMEOUT_MS = 100;
 
     // Defaults for phenotype flags.
-    @VisibleForTesting static final Boolean DEFAULT_USE_COMPACTION = false;
+    @VisibleForTesting static final Boolean DEFAULT_USE_COMPACTION = true;
     @VisibleForTesting static final Boolean DEFAULT_USE_FREEZER = true;
     @VisibleForTesting static final int DEFAULT_COMPACT_ACTION_2 = COMPACT_ACTION_ALL;
     @VisibleForTesting static final int DEFAULT_COMPACT_ACTION_1 = COMPACT_ACTION_FILE;
@@ -742,9 +742,6 @@ public final class CachedAppOptimizer {
                         "compactApp " + app.mOptRecord.getReqCompactSource().name() + " "
                                 + app.mOptRecord.getReqCompactProfile().name() + " " + processName);
             }
-            Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER, ATRACE_COMPACTION_TRACK,
-                    "compactApp " + app.mOptRecord.getReqCompactSource().name() + " "
-                            + app.mOptRecord.getReqCompactProfile().name() + " " + processName);
             app.mOptRecord.setHasPendingCompact(true);
             app.mOptRecord.setForceCompact(force);
             mPendingCompactionProcesses.add(app);
@@ -1509,6 +1506,12 @@ public final class CachedAppOptimizer {
         return profile;
     }
 
+    boolean isProcessFrozen(int pid) {
+        synchronized (mProcLock) {
+            return mFrozenProcesses.contains(pid);
+        }
+    }
+
     @VisibleForTesting
     static final class SingleCompactionStats {
         private static final float STATSD_SAMPLE_RATE = 0.1f;
@@ -1814,7 +1817,8 @@ public final class CachedAppOptimizer {
                     try {
                         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                                 "Compact " + resolvedAction.name() + ": " + name
-                                        + " lastOomAdjReason: " + oomAdjReason);
+                                        + " lastOomAdjReason: " + oomAdjReason
+                                        + " source: " + compactSource.name());
                         long zramUsedKbBefore = getUsedZramMemory();
                         long startCpuTime = threadCpuTimeNs();
                         mProcessDependencies.performCompaction(resolvedAction, pid);
@@ -1860,7 +1864,10 @@ public final class CachedAppOptimizer {
                                 mLastCompactionStats.remove(pid);
                                 mLastCompactionStats.put(pid, memStats);
                                 mCompactionStatsHistory.add(memStats);
-                                memStats.sendStat();
+                                if (!forceCompaction) {
+                                    // Avoid polluting field metrics with forced compactions.
+                                    memStats.sendStat();
+                                }
                                 break;
                             default:
                                 // We likely missed adding this category, it needs to be added

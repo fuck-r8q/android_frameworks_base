@@ -25,7 +25,6 @@ import android.credentials.ui.ProviderPendingIntentResponse;
 import android.service.credentials.CallingAppInfo;
 import android.service.credentials.ClearCredentialStateRequest;
 import android.service.credentials.CredentialProviderInfo;
-import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
 
@@ -34,7 +33,7 @@ import android.util.Slog;
  *
  * @hide
  */
-public final class ProviderClearSession extends ProviderSession<ClearCredentialStateRequest,
+public final class  ProviderClearSession extends ProviderSession<ClearCredentialStateRequest,
         Void>
         implements
         RemoteCredentialService.ProviderCallbacks<Void> {
@@ -52,7 +51,7 @@ public final class ProviderClearSession extends ProviderSession<ClearCredentialS
         ClearCredentialStateRequest providerRequest =
                 createProviderRequest(
                         clearRequestSession.mClientRequest,
-                        clearRequestSession.mClientCallingPackage);
+                        clearRequestSession.mClientAppInfo);
         return new ProviderClearSession(context, providerInfo, clearRequestSession, userId,
                     remoteCredentialService, providerRequest);
     }
@@ -60,11 +59,11 @@ public final class ProviderClearSession extends ProviderSession<ClearCredentialS
     @Nullable
     private static ClearCredentialStateRequest createProviderRequest(
             android.credentials.ClearCredentialStateRequest clientRequest,
-            String clientCallingPackage
+            CallingAppInfo callingAppInfo
     ) {
         // TODO: Determine if provider needs to declare clear capability in manifest
         return new ClearCredentialStateRequest(
-                new CallingAppInfo(clientCallingPackage, new ArraySet<>()),
+                callingAppInfo,
                 clientRequest.getData());
     }
 
@@ -115,5 +114,13 @@ public final class ProviderClearSession extends ProviderSession<ClearCredentialS
     protected void onUiEntrySelected(String entryType, String entryId,
             ProviderPendingIntentResponse providerPendingIntentResponse) {
         //Not applicable for clearCredential as response is not picked by the user
+    }
+
+    @Override
+    protected void invokeSession() {
+        if (mRemoteCredentialService != null) {
+            mRemoteCredentialService.onClearCredentialState(mProviderRequest, this);
+            mCandidateProviderMetric.setStartTimeNanoseconds(System.nanoTime());
+        }
     }
 }

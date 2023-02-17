@@ -18,13 +18,15 @@ package com.android.server.wm;
 
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_ATM;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_WITH_CLASS_NAME;
+import static com.android.server.wm.LetterboxConfigurationDeviceConfig.KEY_ALLOW_IGNORE_ORIENTATION_REQUEST;
+import static com.android.server.wm.LetterboxConfigurationDeviceConfig.KEY_ENABLE_CAMERA_COMPAT_TREATMENT;
+import static com.android.server.wm.LetterboxConfigurationDeviceConfig.KEY_ENABLE_COMPAT_FAKE_FOCUS;
+import static com.android.server.wm.LetterboxConfigurationDeviceConfig.KEY_ENABLE_DISPLAY_ROTATION_IMMERSIVE_APP_COMPAT_POLICY;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
-import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.provider.DeviceConfig;
 import android.util.Slog;
@@ -40,10 +42,6 @@ import java.util.function.Function;
 final class LetterboxConfiguration {
 
     private static final String TAG = TAG_WITH_CLASS_NAME ? "LetterboxConfiguration" : TAG_ATM;
-
-    @VisibleForTesting
-    static final String DEVICE_CONFIG_KEY_ENABLE_COMPAT_FAKE_FOCUS =
-            "enable_compat_fake_focus";
 
     /**
      * Override of aspect ratio for fixed orientation letterboxing that is set via ADB with
@@ -113,12 +111,6 @@ final class LetterboxConfiguration {
 
     /** Letterboxed app window is aligned to the right side. */
     static final int LETTERBOX_VERTICAL_REACHABILITY_POSITION_BOTTOM = 2;
-
-    @VisibleForTesting
-    static final String PROPERTY_COMPAT_FAKE_FOCUS_OPT_IN = "com.android.COMPAT_FAKE_FOCUS_OPT_IN";
-    @VisibleForTesting
-    static final String PROPERTY_COMPAT_FAKE_FOCUS_OPT_OUT =
-            "com.android.COMPAT_FAKE_FOCUS_OPT_OUT";
 
     final Context mContext;
 
@@ -196,6 +188,12 @@ final class LetterboxConfiguration {
     // Whether using split screen aspect ratio as a default aspect ratio for unresizable apps.
     private boolean mIsSplitScreenAspectRatioForUnresizableAppsEnabled;
 
+    // Whether using display aspect ratio as a default aspect ratio for all letterboxed apps.
+    // mIsSplitScreenAspectRatioForUnresizableAppsEnabled and
+    // config_letterboxDefaultMinAspectRatioForUnresizableApps take priority over this for
+    // unresizable apps
+    private boolean mIsDisplayAspectRatioEnabledForFixedOrientationLetterbox;
+
     // Whether letterboxing strategy is enabled for translucent activities. If {@value false}
     // all the feature is disabled
     private boolean mTranslucentLetterboxingEnabled;
@@ -227,23 +225,35 @@ final class LetterboxConfiguration {
     // LetterboxUiController#shouldIgnoreRequestedOrientation for details.
     private final boolean mIsPolicyForIgnoringRequestedOrientationEnabled;
 
-    LetterboxConfiguration(Context systemUiContext) {
-        this(systemUiContext, new LetterboxConfigurationPersister(systemUiContext,
-                () -> readLetterboxHorizontalReachabilityPositionFromConfig(systemUiContext,
-                        /* forBookMode */ false),
-                () -> readLetterboxVerticalReachabilityPositionFromConfig(systemUiContext,
-                        /* forTabletopMode */ false),
-                () -> readLetterboxHorizontalReachabilityPositionFromConfig(systemUiContext,
-                        /* forBookMode */ true),
-                () -> readLetterboxVerticalReachabilityPositionFromConfig(systemUiContext,
-                        /* forTabletopMode */ true)
-        ));
+    // Whether enabling rotation compat policy for immersive apps that prevents auto rotation
+    // into non-optimal screen orientation while in fullscreen. This is needed because immersive
+    // apps, such as games, are often not optimized for all orientations and can have a poor UX
+    // when rotated. Additionally, some games rely on sensors for the gameplay so users can trigger
+    // such rotations accidentally when auto rotation is on.
+    private final boolean mIsDisplayRotationImmersiveAppCompatPolicyEnabled;
+
+    // Flags dynamically updated with {@link android.provider.DeviceConfig}.
+    @NonNull private final LetterboxConfigurationDeviceConfig mDeviceConfig;
+
+    LetterboxConfiguration(@NonNull final Context systemUiContext) {
+        this(systemUiContext,
+                new LetterboxConfigurationPersister(systemUiContext,
+                        () -> readLetterboxHorizontalReachabilityPositionFromConfig(
+                                systemUiContext, /* forBookMode */ false),
+                        () -> readLetterboxVerticalReachabilityPositionFromConfig(
+                                systemUiContext, /* forTabletopMode */ false),
+                        () -> readLetterboxHorizontalReachabilityPositionFromConfig(
+                                systemUiContext, /* forBookMode */ true),
+                        () -> readLetterboxVerticalReachabilityPositionFromConfig(
+                                systemUiContext, /* forTabletopMode */ true)));
     }
 
     @VisibleForTesting
-    LetterboxConfiguration(Context systemUiContext,
-            LetterboxConfigurationPersister letterboxConfigurationPersister) {
+    LetterboxConfiguration(@NonNull final Context systemUiContext,
+            @NonNull final LetterboxConfigurationPersister letterboxConfigurationPersister) {
         mContext = systemUiContext;
+        mDeviceConfig = new LetterboxConfigurationDeviceConfig(systemUiContext.getMainExecutor());
+
         mFixedOrientationLetterboxAspectRatio = mContext.getResources().getFloat(
                 R.dimen.config_fixedOrientationLetterboxAspectRatio);
         mLetterboxActivityCornersRadius = mContext.getResources().getInteger(
@@ -275,6 +285,9 @@ final class LetterboxConfiguration {
                 R.dimen.config_letterboxDefaultMinAspectRatioForUnresizableApps));
         mIsSplitScreenAspectRatioForUnresizableAppsEnabled = mContext.getResources().getBoolean(
                 R.bool.config_letterboxIsSplitScreenAspectRatioForUnresizableAppsEnabled);
+        mIsDisplayAspectRatioEnabledForFixedOrientationLetterbox = mContext.getResources()
+                .getBoolean(R.bool
+                        .config_letterboxIsDisplayAspectRatioForFixedOrientationLetterboxEnabled);
         mTranslucentLetterboxingEnabled = mContext.getResources().getBoolean(
                 R.bool.config_letterboxIsEnabledForTranslucentActivities);
         mIsCameraCompatTreatmentEnabled = mContext.getResources().getBoolean(
@@ -284,8 +297,31 @@ final class LetterboxConfiguration {
         mIsPolicyForIgnoringRequestedOrientationEnabled = mContext.getResources().getBoolean(
                 R.bool.config_letterboxIsPolicyForIgnoringRequestedOrientationEnabled);
 
+        mIsDisplayRotationImmersiveAppCompatPolicyEnabled = mContext.getResources().getBoolean(
+                R.bool.config_letterboxIsDisplayRotationImmersiveAppCompatPolicyEnabled);
+        mDeviceConfig.updateFlagActiveStatus(
+                /* isActive */ mIsCameraCompatTreatmentEnabled,
+                /* key */ KEY_ENABLE_CAMERA_COMPAT_TREATMENT);
+        mDeviceConfig.updateFlagActiveStatus(
+                /* isActive */ mIsDisplayRotationImmersiveAppCompatPolicyEnabled,
+                /* key */ KEY_ENABLE_DISPLAY_ROTATION_IMMERSIVE_APP_COMPAT_POLICY);
+        mDeviceConfig.updateFlagActiveStatus(
+                /* isActive */ true,
+                /* key */ KEY_ALLOW_IGNORE_ORIENTATION_REQUEST);
+        mDeviceConfig.updateFlagActiveStatus(
+                /* isActive */ mIsCompatFakeFocusEnabled,
+                /* key */ KEY_ENABLE_COMPAT_FAKE_FOCUS);
+
         mLetterboxConfigurationPersister = letterboxConfigurationPersister;
         mLetterboxConfigurationPersister.start();
+    }
+
+    /**
+     * Whether enabling ignoreOrientationRequest is allowed on the device. This value is controlled
+     * via {@link android.provider.DeviceConfig}.
+     */
+    boolean isIgnoreOrientationRequestAllowed() {
+        return mDeviceConfig.getFlag(KEY_ALLOW_IGNORE_ORIENTATION_REQUEST);
     }
 
     /**
@@ -924,11 +960,26 @@ final class LetterboxConfiguration {
     }
 
     /**
+     * Whether using display aspect ratio as a default aspect ratio for all letterboxed apps.
+     */
+    boolean getIsDisplayAspectRatioEnabledForFixedOrientationLetterbox() {
+        return mIsDisplayAspectRatioEnabledForFixedOrientationLetterbox;
+    }
+
+    /**
      * Overrides whether using split screen aspect ratio as a default aspect ratio for unresizable
      * apps.
      */
     void setIsSplitScreenAspectRatioForUnresizableAppsEnabled(boolean enabled) {
         mIsSplitScreenAspectRatioForUnresizableAppsEnabled = enabled;
+    }
+
+    /**
+     * Overrides whether using display aspect ratio as a default aspect ratio for all letterboxed
+     * apps.
+     */
+    void setIsDisplayAspectRatioEnabledForFixedOrientationLetterbox(boolean enabled) {
+        mIsDisplayAspectRatioEnabledForFixedOrientationLetterbox = enabled;
     }
 
     /**
@@ -938,6 +989,16 @@ final class LetterboxConfiguration {
     void resetIsSplitScreenAspectRatioForUnresizableAppsEnabled() {
         mIsSplitScreenAspectRatioForUnresizableAppsEnabled = mContext.getResources().getBoolean(
                 R.bool.config_letterboxIsSplitScreenAspectRatioForUnresizableAppsEnabled);
+    }
+
+    /**
+     * Resets whether using display aspect ratio as a default aspect ratio for all letterboxed
+     * apps {@link R.bool.config_letterboxIsDisplayAspectRatioForFixedOrientationLetterboxEnabled}.
+     */
+    void resetIsDisplayAspectRatioEnabledForFixedOrientationLetterbox() {
+        mIsDisplayAspectRatioEnabledForFixedOrientationLetterbox = mContext.getResources()
+                .getBoolean(R.bool
+                        .config_letterboxIsDisplayAspectRatioForFixedOrientationLetterboxEnabled);
     }
 
     boolean isTranslucentLetterboxingEnabled() {
@@ -997,41 +1058,9 @@ final class LetterboxConfiguration {
                 "enable_translucent_activity_letterbox", false);
     }
 
-    @VisibleForTesting
-    boolean getPackageManagerProperty(PackageManager pm, String property) {
-        boolean enabled = false;
-        try {
-            final PackageManager.Property p = pm.getProperty(property, mContext.getPackageName());
-            enabled = p.getBoolean();
-        } catch (PackageManager.NameNotFoundException e) {
-            // Property not found
-        }
-        return enabled;
-    }
-
-    @VisibleForTesting
-    boolean isCompatFakeFocusEnabled(ActivityInfo info) {
-        if (!isCompatFakeFocusEnabledOnDevice()) {
-            return false;
-        }
-        // See if the developer has chosen to opt in / out of treatment
-        PackageManager pm = mContext.getPackageManager();
-        if (getPackageManagerProperty(pm, PROPERTY_COMPAT_FAKE_FOCUS_OPT_OUT)) {
-            return false;
-        } else if (getPackageManagerProperty(pm, PROPERTY_COMPAT_FAKE_FOCUS_OPT_IN)) {
-            return true;
-        }
-        if (info.isChangeEnabled(ActivityInfo.OVERRIDE_ENABLE_COMPAT_FAKE_FOCUS)) {
-            return true;
-        }
-        return false;
-    }
-
     /** Whether fake sending focus is enabled for unfocused apps in splitscreen */
-    boolean isCompatFakeFocusEnabledOnDevice() {
-        return mIsCompatFakeFocusEnabled
-                && DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_WINDOW_MANAGER,
-                        DEVICE_CONFIG_KEY_ENABLE_COMPAT_FAKE_FOCUS, true);
+    boolean isCompatFakeFocusEnabled() {
+        return mIsCompatFakeFocusEnabled && mDeviceConfig.getFlag(KEY_ENABLE_COMPAT_FAKE_FOCUS);
     }
 
     /**
@@ -1053,15 +1082,8 @@ final class LetterboxConfiguration {
 
     /** Whether camera compatibility treatment is enabled. */
     boolean isCameraCompatTreatmentEnabled(boolean checkDeviceConfig) {
-        return mIsCameraCompatTreatmentEnabled
-                && (!checkDeviceConfig || isCameraCompatTreatmentAllowed());
-    }
-
-    // TODO(b/262977416): Cache a runtime flag and implement
-    // DeviceConfig.OnPropertiesChangedListener
-    private static boolean isCameraCompatTreatmentAllowed() {
-        return DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_WINDOW_MANAGER,
-                "enable_compat_camera_treatment", true);
+        return mIsCameraCompatTreatmentEnabled && (!checkDeviceConfig
+                || mDeviceConfig.getFlag(KEY_ENABLE_CAMERA_COMPAT_TREATMENT));
     }
 
     /** Whether camera compatibility refresh is enabled. */
@@ -1103,6 +1125,22 @@ final class LetterboxConfiguration {
      */
     void resetCameraCompatRefreshCycleThroughStopEnabled() {
         mIsCameraCompatRefreshCycleThroughStopEnabled = true;
+    }
+
+    /**
+     * Checks whether rotation compat policy for immersive apps that prevents auto rotation
+     * into non-optimal screen orientation while in fullscreen is enabled.
+     *
+     * <p>This is needed because immersive apps, such as games, are often not optimized for all
+     * orientations and can have a poor UX when rotated. Additionally, some games rely on sensors
+     * for the gameplay so users can trigger such rotations accidentally when auto rotation is on.
+     *
+     * @param checkDeviceConfig whether should check both static config and a dynamic property
+     *        from {@link DeviceConfig} or only static value.
+     */
+    boolean isDisplayRotationImmersiveAppCompatPolicyEnabled(final boolean checkDeviceConfig) {
+        return mIsDisplayRotationImmersiveAppCompatPolicyEnabled && (!checkDeviceConfig
+                || mDeviceConfig.getFlag(KEY_ENABLE_DISPLAY_ROTATION_IMMERSIVE_APP_COMPAT_POLICY));
     }
 
 }

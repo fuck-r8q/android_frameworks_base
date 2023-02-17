@@ -23,6 +23,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
+    <!-- Extra marginBottom to give room for the drop shadow. -->
     <LinearLayout
         android:id="@+id/chipbar_inner"
         android:orientation="horizontal"
@@ -33,6 +34,8 @@
         android:layout_marginTop="20dp"
         android:layout_marginStart="@dimen/notification_side_paddings"
         android:layout_marginEnd="@dimen/notification_side_paddings"
+        android:translationZ="4dp"
+        android:layout_marginBottom="8dp"
         android:clipToPadding="false"
         android:gravity="center_vertical"
         android:alpha="0.0"
@@ -57,14 +60,13 @@
             />
 
         <!-- At most one of [loading, failure_icon, undo] will be visible at a time. -->
-        <ProgressBar
+        <ImageView
             android:id="@+id/loading"
-            android:indeterminate="true"
             android:layout_width="@dimen/media_ttt_status_icon_size"
             android:layout_height="@dimen/media_ttt_status_icon_size"
             android:layout_marginStart="@dimen/media_ttt_last_item_start_margin"
-            android:indeterminateTint="?androidprv:attr/colorAccentPrimaryVariant"
-            style="?android:attr/progressBarStyleSmall"
+            android:src="@drawable/ic_progress_activity"
+            android:tint="?androidprv:attr/colorAccentPrimaryVariant"
             android:alpha="0.0"
             />
 

@@ -17,21 +17,30 @@
 package com.android.systemui.stylus
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.BatteryState
 import android.hardware.input.InputManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.UserHandle
-import android.view.InputDevice
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.android.internal.annotations.VisibleForTesting
+import com.android.internal.logging.InstanceId
+import com.android.internal.logging.InstanceIdSequence
+import com.android.internal.logging.UiEventLogger
 import com.android.systemui.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.shared.hardware.hasInputDevice
+import com.android.systemui.shared.hardware.isAnyStylusSource
 import com.android.systemui.util.NotificationChannels
 import java.text.NumberFormat
 import javax.inject.Inject
@@ -48,11 +57,16 @@ constructor(
     private val notificationManager: NotificationManagerCompat,
     private val inputManager: InputManager,
     @Background private val handler: Handler,
+    private val uiEventLogger: UiEventLogger,
 ) {
 
     // These values must only be accessed on the handler.
     private var batteryCapacity = 1.0f
     private var suppressed = false
+    private var inputDeviceId: Int? = null
+    private var instanceId: InstanceId? = null
+
+    @VisibleForTesting var instanceIdSequence = InstanceIdSequence(1 shl 13)
 
     fun init() {
         val filter =
@@ -73,12 +87,13 @@ constructor(
 
     fun refresh() {
         handler.post refreshNotification@{
-            if (!suppressed && !hasConnectedBluetoothStylus() && isBatteryBelowThreshold()) {
+            val batteryBelowThreshold = isBatteryBelowThreshold()
+            if (!suppressed && !hasConnectedBluetoothStylus() && batteryBelowThreshold) {
                 showOrUpdateNotification()
                 return@refreshNotification
             }
 
-            if (!isBatteryBelowThreshold()) {
+            if (!batteryBelowThreshold) {
                 // Reset suppression when stylus battery is recharged, so that the next time
                 // it reaches a low battery, the notification will show again.
                 suppressed = false
@@ -87,10 +102,12 @@ constructor(
         }
     }
 
-    fun updateBatteryState(batteryState: BatteryState) {
+    fun updateBatteryState(deviceId: Int, batteryState: BatteryState) {
         handler.post updateBattery@{
-            if (batteryState.capacity == batteryCapacity) return@updateBattery
+            if (batteryState.capacity == batteryCapacity || batteryState.capacity <= 0f)
+                return@updateBattery
 
+            inputDeviceId = deviceId
             batteryCapacity = batteryState.capacity
             refresh()
         }
@@ -114,6 +131,7 @@ constructor(
     }
 
     private fun hideNotification() {
+        instanceId = null
         notificationManager.cancel(USI_NOTIFICATION_ID)
     }
 
@@ -123,18 +141,19 @@ constructor(
                 .setSmallIcon(R.drawable.ic_power_low)
                 .setDeleteIntent(getPendingBroadcast(ACTION_DISMISSED_LOW_BATTERY))
                 .setContentIntent(getPendingBroadcast(ACTION_CLICKED_LOW_BATTERY))
-                .setContentTitle(context.getString(R.string.stylus_battery_low))
-                .setContentText(
+                .setContentTitle(
                     context.getString(
-                        R.string.battery_low_percent_format,
+                        R.string.stylus_battery_low_percentage,
                         NumberFormat.getPercentInstance().format(batteryCapacity)
                     )
                 )
+                .setContentText(context.getString(R.string.stylus_battery_low_subtitle))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setLocalOnly(true)
                 .setAutoCancel(true)
                 .build()
 
+        logUiEvent(StylusUiEvent.STYLUS_LOW_BATTERY_NOTIFICATION_SHOWN)
         notificationManager.notify(USI_NOTIFICATION_ID, notification)
     }
 
@@ -143,43 +162,92 @@ constructor(
     }
 
     private fun hasConnectedBluetoothStylus(): Boolean {
-        // TODO(b/257936830): get bt address once input api available
-        return inputManager.inputDeviceIds.any { deviceId ->
-            inputManager.getInputDevice(deviceId).supportsSource(InputDevice.SOURCE_STYLUS)
-        }
+        return inputManager.hasInputDevice { it.isAnyStylusSource && it.bluetoothAddress != null }
     }
 
     private fun getPendingBroadcast(action: String): PendingIntent? {
-        return PendingIntent.getBroadcastAsUser(
+        return PendingIntent.getBroadcast(
             context,
             0,
-            Intent(action),
+            Intent(action).setPackage(context.packageName),
             PendingIntent.FLAG_IMMUTABLE,
-            UserHandle.CURRENT
         )
     }
 
-    private val receiver: BroadcastReceiver =
+    @VisibleForTesting
+    internal val receiver: BroadcastReceiver =
         object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-                    ACTION_DISMISSED_LOW_BATTERY -> updateSuppression(true)
-                    ACTION_CLICKED_LOW_BATTERY -> {
+                    ACTION_DISMISSED_LOW_BATTERY -> {
+                        logUiEvent(StylusUiEvent.STYLUS_LOW_BATTERY_NOTIFICATION_DISMISSED)
                         updateSuppression(true)
-                        // TODO(b/261584943): open USI device details page
+                    }
+                    ACTION_CLICKED_LOW_BATTERY -> {
+                        logUiEvent(StylusUiEvent.STYLUS_LOW_BATTERY_NOTIFICATION_CLICKED)
+                        updateSuppression(true)
+                        if (inputDeviceId == null) return
+
+                        val args = Bundle()
+                        args.putInt(KEY_DEVICE_INPUT_ID, inputDeviceId!!)
+                        try {
+                            context.startActivity(
+                                Intent(ACTION_STYLUS_USI_DETAILS)
+                                    .putExtra(KEY_SETTINGS_FRAGMENT_ARGS, args)
+                                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } catch (e: ActivityNotFoundException) {
+                            // In the rare scenario where the Settings app manifest doesn't contain
+                            // the USI details activity, ignore the intent.
+                            Log.e(
+                                StylusUsiPowerUI::class.java.simpleName,
+                                "Cannot open USI details page."
+                            )
+                        }
                     }
                 }
             }
         }
+
+    /**
+     * Logs a stylus USI battery event with instance ID and battery level. The instance ID
+     * represents the notification instance, and is reset when a notification is cancelled.
+     */
+    private fun logUiEvent(metricId: StylusUiEvent) {
+        uiEventLogger.logWithInstanceIdAndPosition(
+            metricId,
+            ActivityManager.getCurrentUser(),
+            context.packageName,
+            getInstanceId(),
+            (batteryCapacity * 100.0).toInt()
+        )
+    }
+
+    @VisibleForTesting
+    fun getInstanceId(): InstanceId? {
+        if (instanceId == null) {
+            instanceId = instanceId ?: instanceIdSequence.newInstanceId()
+        }
+        return instanceId
+    }
 
     companion object {
         // Low battery threshold matches CrOS, see:
         // https://source.chromium.org/chromium/chromium/src/+/main:ash/system/power/peripheral_battery_notifier.cc;l=41
         private const val LOW_BATTERY_THRESHOLD = 0.16f
 
-        private val USI_NOTIFICATION_ID = R.string.stylus_battery_low
+        private val USI_NOTIFICATION_ID = R.string.stylus_battery_low_percentage
 
-        private const val ACTION_DISMISSED_LOW_BATTERY = "StylusUsiPowerUI.dismiss"
-        private const val ACTION_CLICKED_LOW_BATTERY = "StylusUsiPowerUI.click"
+        @VisibleForTesting const val ACTION_DISMISSED_LOW_BATTERY = "StylusUsiPowerUI.dismiss"
+
+        @VisibleForTesting const val ACTION_CLICKED_LOW_BATTERY = "StylusUsiPowerUI.click"
+
+        @VisibleForTesting
+        const val ACTION_STYLUS_USI_DETAILS = "com.android.settings.STYLUS_USI_DETAILS_SETTINGS"
+
+        @VisibleForTesting const val KEY_DEVICE_INPUT_ID = "device_input_id"
+
+        @VisibleForTesting const val KEY_SETTINGS_FRAGMENT_ARGS = ":settings:show_fragment_args"
     }
 }

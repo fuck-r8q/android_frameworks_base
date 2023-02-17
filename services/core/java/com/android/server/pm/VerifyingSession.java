@@ -233,7 +233,8 @@ final class VerifyingSession {
                 PackageManagerInternal.EXTRA_ENABLE_ROLLBACK_SESSION_ID,
                 mSessionId);
         enableRollbackIntent.setType(PACKAGE_MIME_TYPE);
-        enableRollbackIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        enableRollbackIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_RECEIVER_FOREGROUND);
 
         // Allow the broadcast to be sent before boot complete.
         // This is needed when committing the apk part of a staged
@@ -680,12 +681,15 @@ final class VerifyingSession {
         }
 
         final int installerUid = mVerificationInfo == null ? -1 : mVerificationInfo.mInstallerUid;
+        final boolean requestedDisableVerification =
+                (mInstallFlags & PackageManager.INSTALL_DISABLE_VERIFICATION) != 0;
 
         // Check if installing from ADB
         if ((mInstallFlags & PackageManager.INSTALL_FROM_ADB) != 0) {
-            boolean requestedDisableVerification =
-                    (mInstallFlags & PackageManager.INSTALL_DISABLE_VERIFICATION) != 0;
             return isAdbVerificationEnabled(pkgInfoLite, userId, requestedDisableVerification);
+        } else if (requestedDisableVerification) {
+            // Skip verification for non-adb installs
+            return false;
         }
 
         // only when not installed from ADB, skip verification for instant apps when

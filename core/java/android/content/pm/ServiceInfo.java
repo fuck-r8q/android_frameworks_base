@@ -133,20 +133,15 @@ public class ServiceInfo extends ComponentInfo
      * Data(photo, file, account) upload/download, backup/restore, import/export, fetch,
      * transfer over network between device and cloud.
      *
-     * <p>Apps targeting API level {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} and
-     * later should NOT use this type:
-     * calling {@link android.app.Service#startForeground(int, android.app.Notification, int)} with
-     * this type on devices running {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} is still
-     * allowed, but calling it with this type on devices running future platform releases may get a
-     * {@link android.app.InvalidForegroundServiceTypeException}.</p>
-     *
-     * @deprecated Use {@link android.app.job.JobInfo.Builder} data transfer APIs instead.
+     * <p class="note">
+     * Use the {@link android.app.job.JobInfo.Builder#setDataTransfer} API for data transfers
+     * that can be deferred until conditions are ideal for the app or device.
+     * </p>
      */
     @RequiresPermission(
             value = Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC,
             conditional = true
     )
-    @Deprecated
     public static final int FOREGROUND_SERVICE_TYPE_DATA_SYNC = 1 << 0;
 
     /**
@@ -219,12 +214,15 @@ public class ServiceInfo extends ComponentInfo
      * {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} and later, will require permission
      * {@link android.Manifest.permission#FOREGROUND_SERVICE_CONNECTED_DEVICE} and one of the
      * following permissions:
+     * {@link android.Manifest.permission#BLUETOOTH_ADVERTISE},
      * {@link android.Manifest.permission#BLUETOOTH_CONNECT},
+     * {@link android.Manifest.permission#BLUETOOTH_SCAN},
      * {@link android.Manifest.permission#CHANGE_NETWORK_STATE},
      * {@link android.Manifest.permission#CHANGE_WIFI_STATE},
      * {@link android.Manifest.permission#CHANGE_WIFI_MULTICAST_STATE},
      * {@link android.Manifest.permission#NFC},
      * {@link android.Manifest.permission#TRANSMIT_IR},
+     * {@link android.Manifest.permission#UWB_RANGING},
      * or has been granted the access to one of the attached USB devices/accessories.
      */
     @RequiresPermission(
@@ -232,12 +230,15 @@ public class ServiceInfo extends ComponentInfo
                 Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE,
             },
             anyOf = {
+                Manifest.permission.BLUETOOTH_ADVERTISE,
                 Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.CHANGE_NETWORK_STATE,
                 Manifest.permission.CHANGE_WIFI_STATE,
                 Manifest.permission.CHANGE_WIFI_MULTICAST_STATE,
                 Manifest.permission.NFC,
                 Manifest.permission.TRANSMIT_IR,
+                Manifest.permission.UWB_RANGING,
             },
             conditional = true
     )
@@ -245,8 +246,17 @@ public class ServiceInfo extends ComponentInfo
 
     /**
      * Constant corresponding to {@code mediaProjection} in
-     * the {@link android.R.attr#foregroundServiceType} attribute.
-     * Managing a media projection session, e.g for screen recording or taking screenshots.
+     * the {@link android.R.attr#foregroundServiceType foregroundServiceType} attribute.
+     *
+     * <p>
+     * To capture through {@link android.media.projection.MediaProjection}, an app must start a
+     * foreground service with the type corresponding to this constant. This type should only be
+     * used for {@link android.media.projection.MediaProjection}. Capturing screen contents via
+     * {@link android.media.projection.MediaProjection#createVirtualDisplay(String, int, int, int,
+     * int, android.view.Surface, android.hardware.display.VirtualDisplay.Callback,
+     * android.os.Handler) createVirtualDisplay} conveniently allows recording, presenting screen
+     * contents into a meeting, taking screenshots, or several other scenarios.
+     * </p>
      *
      * <p>Starting foreground service with this type from apps targeting API level
      * {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} and later, will require permission
@@ -322,6 +332,7 @@ public class ServiceInfo extends ComponentInfo
      * permissions:
      * {@link android.Manifest.permission#ACTIVITY_RECOGNITION},
      * {@link android.Manifest.permission#BODY_SENSORS},
+     * {@link android.Manifest.permission#BODY_SENSORS_WRIST_TEMPERATURE},
      * {@link android.Manifest.permission#HIGH_SAMPLING_RATE_SENSORS}.
      */
     @RequiresPermission(
@@ -331,6 +342,7 @@ public class ServiceInfo extends ComponentInfo
             anyOf = {
                 Manifest.permission.ACTIVITY_RECOGNITION,
                 Manifest.permission.BODY_SENSORS,
+                Manifest.permission.BODY_SENSORS_WRIST_TEMPERATURE,
                 Manifest.permission.HIGH_SAMPLING_RATE_SENSORS,
             }
     )
@@ -356,8 +368,8 @@ public class ServiceInfo extends ComponentInfo
      *   <li>App has a UID &lt; {@link android.os.Process#FIRST_APPLICATION_UID}</li>
      *   <li>App is on Doze allowlist</li>
      *   <li>Device is running in <a href="https://android.googlesource.com/platform/frameworks/base/+/master/packages/SystemUI/docs/demo_mode.md">Demo Mode</a></li>
-     *   <li><a href="https://source.android.com/devices/tech/admin/provision">Device owner app</a><li>
-     *   <li><a href="https://source.android.com/devices/tech/admin/managed-profiles">Profile owner apps</a><li>
+     *   <li><a href="https://source.android.com/devices/tech/admin/provision">Device owner app</a></li>
+     *   <li><a href="https://source.android.com/devices/tech/admin/managed-profiles">Profile owner apps</a></li>
      *   <li>Persistent apps</li>
      *   <li><a href="https://source.android.com/docs/core/connect/carrier">Carrier privileged apps</a></li>
      *   <li>Apps that have the {@code android.app.role.RoleManager#ROLE_EMERGENCY} role</li>
@@ -387,7 +399,7 @@ public class ServiceInfo extends ComponentInfo
      *
      * <ul>
      *     <li>
-     *         The type has a 1 minute timeout.
+     *         The type has a 3 minute timeout.
      *         A foreground service of this type must be stopped within the timeout by
      *         {@link android.app.Service#stopSelf),
      *         or {@link android.content.Context#stopService).
@@ -398,8 +410,9 @@ public class ServiceInfo extends ComponentInfo
      *
      *         <p>If the service isn't stopped within the timeout,
      *         {@link android.app.Service#onTimeout(int)} will be called.
-     *         If the service is still not stopped after the callback,
-     *         the app will be declared an ANR.
+     *
+     *         <p>If the service is still not stopped after the callback,
+     *         the app will be declared an ANR after a short grace period of several seconds.
      *
      *     <li>
      *         A foreground service of this type cannot be made "sticky"
@@ -416,6 +429,17 @@ public class ServiceInfo extends ComponentInfo
      *         </a>
      * </ul>
      *
+     * <p>Note, even though
+     * {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SHORT_SERVICE}
+     * was added
+     * on Android version {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE},
+     * it can be also used on
+     * on prior android versions (just like other new foreground service types can be used).
+     * However, because {@link android.app.Service#onTimeout(int)} did not exist on prior versions,
+     * it will never called on such versions.
+     * Because of this, developers must make sure to stop the foreground service even if
+     * {@link android.app.Service#onTimeout(int)} is not called on such versions.
+     *
      * @see android.app.Service#onTimeout(int)
      */
     public static final int FOREGROUND_SERVICE_TYPE_SHORT_SERVICE = 1 << 11;
@@ -425,6 +449,8 @@ public class ServiceInfo extends ComponentInfo
      * the {@link android.R.attr#foregroundServiceType} attribute.
      * The file management use case which manages files/directories, often involving file I/O
      * across the file system.
+     *
+     * @hide
      */
     @RequiresPermission(
             value = Manifest.permission.FOREGROUND_SERVICE_FILE_MANAGEMENT

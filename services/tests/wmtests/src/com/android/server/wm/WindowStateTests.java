@@ -20,7 +20,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.view.InsetsState.ITYPE_IME;
+import static android.view.InsetsSource.ID_IME;
 import static android.view.InsetsState.ITYPE_NAVIGATION_BAR;
 import static android.view.InsetsState.ITYPE_STATUS_BAR;
 import static android.view.Surface.ROTATION_0;
@@ -47,7 +47,6 @@ import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 
-import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doThrow;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
@@ -102,7 +101,6 @@ import android.window.TaskFragmentOrganizer;
 
 import androidx.test.filters.SmallTest;
 
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -122,15 +120,6 @@ import java.util.List;
 @Presubmit
 @RunWith(WindowTestRunner.class)
 public class WindowStateTests extends WindowTestsBase {
-
-    @Before
-    public void setUp() {
-        // TODO: Let the insets source with new mode keep the visibility control, and remove this
-        // setup code. Now mTopFullscreenOpaqueWindowState will take back the control of insets
-        // visibility.
-        spyOn(mDisplayContent);
-        doNothing().when(mDisplayContent).layoutAndAssignWindowLayersIfNeeded();
-    }
 
     @Test
     public void testIsParentWindowHidden() {
@@ -436,13 +425,15 @@ public class WindowStateTests extends WindowTestsBase {
         final WindowState app = mAppWindow;
         statusBar.mHasSurface = true;
         assertTrue(statusBar.isVisible());
-        mDisplayContent.getInsetsStateController().getSourceProvider(ITYPE_STATUS_BAR)
+        mDisplayContent.getInsetsStateController()
+                .getOrCreateSourceProvider(ITYPE_STATUS_BAR, statusBars())
                 .setWindowContainer(statusBar, null /* frameProvider */,
                         null /* imeFrameProvider */);
         mDisplayContent.getInsetsStateController().onBarControlTargetChanged(
                 app, null /* fakeTopControlling */, app, null /* fakeNavControlling */);
         app.setRequestedVisibleTypes(0, statusBars());
-        mDisplayContent.getInsetsStateController().getSourceProvider(ITYPE_STATUS_BAR)
+        mDisplayContent.getInsetsStateController()
+                .getOrCreateSourceProvider(ITYPE_STATUS_BAR, statusBars())
                 .updateClientVisibility(app);
         waitUntilHandlersIdle();
         assertFalse(statusBar.isVisible());
@@ -551,7 +542,12 @@ public class WindowStateTests extends WindowTestsBase {
         win.applyWithNextDraw(t -> handledT[0] = t);
         assertTrue(win.useBLASTSync());
         final SurfaceControl.Transaction drawT = new StubTransaction();
+        final SurfaceControl.Transaction currT = win.getSyncTransaction();
+        clearInvocations(currT);
+        win.mWinAnimator.mLastHidden = true;
         assertTrue(win.finishDrawing(drawT, Integer.MAX_VALUE));
+        // The draw transaction should be merged to current transaction even if the state is hidden.
+        verify(currT).merge(eq(drawT));
         assertEquals(drawT, handledT[0]);
         assertFalse(win.useBLASTSync());
 
@@ -734,9 +730,8 @@ public class WindowStateTests extends WindowTestsBase {
         invisibleApp.requestDrawIfNeeded(outWaitingForDrawn);
         assertTrue(outWaitingForDrawn.isEmpty());
 
-        // Drawn state should not be changed for insets change when screen is off.
-        spyOn(mWm.mPolicy);
-        doReturn(false).when(mWm.mPolicy).isScreenOn();
+        // Drawn state should not be changed for insets change if the window is not visible.
+        startingApp.mActivityRecord.setVisibleRequested(false);
         makeWindowVisibleAndDrawn(startingApp);
         startingApp.getConfiguration().orientation = 0; // Reset to be the same as last reported.
         startingApp.getWindowFrames().setInsetsChanged(true);
@@ -746,9 +741,7 @@ public class WindowStateTests extends WindowTestsBase {
         assertFalse(startingApp.getOrientationChanging());
 
         // Even if the display is frozen, invisible requested window should not be affected.
-        startingApp.mActivityRecord.setVisibleRequested(false);
         mWm.startFreezingDisplay(0, 0, mDisplayContent);
-        doReturn(true).when(mWm.mPolicy).isScreenOn();
         startingApp.getWindowFrames().setInsetsChanged(true);
         startingApp.updateResizingWindowIfNeeded();
         assertTrue(startingApp.isDrawn());
@@ -834,11 +827,7 @@ public class WindowStateTests extends WindowTestsBase {
         win.reportResized();
         embeddedTf.setBounds(500, 0, 1000, 2000);
 
-        // Clear all drawn when the embedded TaskFragment is in mDisplayContent.mChangingContainers.
-        win.updateResizingWindowIfNeeded();
-        verify(embeddedActivity, never()).clearAllDrawn();
-
-        mDisplayContent.mChangingContainers.add(embeddedTf);
+        // Clear all drawn when the window config of embedded TaskFragment is changed.
         win.updateResizingWindowIfNeeded();
         verify(embeddedActivity).clearAllDrawn();
     }
@@ -1020,12 +1009,16 @@ public class WindowStateTests extends WindowTestsBase {
         mAppWindow.mAboveInsetsState.addSource(navSource);
 
         navSource.setVisible(false);
-        assertTrue(mImeWindow.getInsetsState().getSourceOrDefaultVisibility(ITYPE_NAVIGATION_BAR));
-        assertFalse(mAppWindow.getInsetsState().getSourceOrDefaultVisibility(ITYPE_NAVIGATION_BAR));
+        assertTrue(mImeWindow.getInsetsState().isSourceOrDefaultVisible(
+                ITYPE_NAVIGATION_BAR, navigationBars()));
+        assertFalse(mAppWindow.getInsetsState().isSourceOrDefaultVisible(
+                ITYPE_NAVIGATION_BAR, navigationBars()));
 
         navSource.setVisible(true);
-        assertTrue(mImeWindow.getInsetsState().getSourceOrDefaultVisibility(ITYPE_NAVIGATION_BAR));
-        assertTrue(mAppWindow.getInsetsState().getSourceOrDefaultVisibility(ITYPE_NAVIGATION_BAR));
+        assertTrue(mImeWindow.getInsetsState().isSourceOrDefaultVisible(
+                ITYPE_NAVIGATION_BAR, navigationBars()));
+        assertTrue(mAppWindow.getInsetsState().isSourceOrDefaultVisible(
+                ITYPE_NAVIGATION_BAR, navigationBars()));
     }
 
     @Test
@@ -1050,8 +1043,8 @@ public class WindowStateTests extends WindowTestsBase {
         controller.updateAboveInsetsState(false);
 
         // Expect all app windows behind IME can receive IME insets visible.
-        assertTrue(app.getInsetsState().getSource(ITYPE_IME).isVisible());
-        assertTrue(app2.getInsetsState().getSource(ITYPE_IME).isVisible());
+        assertTrue(app.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
+        assertTrue(app2.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
 
         // Simulate app plays closing transition to app2.
         app.mActivityRecord.commitVisibility(false, false);
@@ -1059,8 +1052,8 @@ public class WindowStateTests extends WindowTestsBase {
         assertTrue(app.mActivityRecord.mImeInsetsFrozenUntilStartInput);
 
         // Verify the IME insets is visible on app, but not for app2 during app task switching.
-        assertTrue(app.getInsetsState().getSource(ITYPE_IME).isVisible());
-        assertFalse(app2.getInsetsState().getSource(ITYPE_IME).isVisible());
+        assertTrue(app.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
+        assertFalse(app2.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
     }
 
     @Test
@@ -1089,8 +1082,8 @@ public class WindowStateTests extends WindowTestsBase {
 
         // Expect app windows behind IME can receive IME insets visible,
         // but not for app2 in background.
-        assertTrue(app.getInsetsState().getSource(ITYPE_IME).isVisible());
-        assertFalse(app2.getInsetsState().getSource(ITYPE_IME).isVisible());
+        assertTrue(app.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
+        assertFalse(app2.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
 
         // Simulate app plays closing transition to app2.
         // And app2 is now IME layering target but not yet to be the IME input target.
@@ -1100,8 +1093,8 @@ public class WindowStateTests extends WindowTestsBase {
         assertTrue(app.mActivityRecord.mImeInsetsFrozenUntilStartInput);
 
         // Verify the IME insets is still visible on app, but not for app2 during task switching.
-        assertTrue(app.getInsetsState().getSource(ITYPE_IME).isVisible());
-        assertFalse(app2.getInsetsState().getSource(ITYPE_IME).isVisible());
+        assertTrue(app.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
+        assertFalse(app2.getInsetsState().isSourceOrDefaultVisible(ID_IME, ime()));
     }
 
     @SetupWindows(addWindows = W_ACTIVITY)
@@ -1126,7 +1119,9 @@ public class WindowStateTests extends WindowTestsBase {
         spyOn(app.getDisplayContent());
         app.mActivityRecord.getRootTask().setWindowingMode(WINDOWING_MODE_FULLSCREEN);
 
-        verify(app.getDisplayContent()).updateImeControlTarget();
+        // Expect updateImeParent will be invoked when the configuration of the IME control
+        // target has changed.
+        verify(app.getDisplayContent()).updateImeControlTarget(eq(true) /* updateImeParent */);
         assertEquals(mAppWindow, mDisplayContent.getImeTarget(IME_TARGET_CONTROL).getWindow());
     }
 
@@ -1144,18 +1139,18 @@ public class WindowStateTests extends WindowTestsBase {
         mNotificationShadeWindow.setHasSurface(true);
         mNotificationShadeWindow.mAttrs.flags &= ~FLAG_NOT_FOCUSABLE;
         assertTrue(mNotificationShadeWindow.canBeImeTarget());
-        mDisplayContent.getInsetsStateController().getSourceProvider(ITYPE_IME).setWindowContainer(
-                mImeWindow, null, null);
+        mDisplayContent.getInsetsStateController().getOrCreateSourceProvider(ID_IME, ime())
+                .setWindowContainer(mImeWindow, null, null);
 
         mDisplayContent.computeImeTarget(true);
         assertEquals(mNotificationShadeWindow, mDisplayContent.getImeTarget(IME_TARGET_LAYERING));
         mDisplayContent.getInsetsStateController().getRawInsetsState()
-                .setSourceVisible(ITYPE_IME, true);
+                .setSourceVisible(ID_IME, true);
 
         // Verify notificationShade can still get IME insets even windowing mode is multi-window.
         InsetsState state = mNotificationShadeWindow.getInsetsState();
-        assertNotNull(state.peekSource(ITYPE_IME));
-        assertTrue(state.getSource(ITYPE_IME).isVisible());
+        assertNotNull(state.peekSource(ID_IME));
+        assertTrue(state.isSourceOrDefaultVisible(ID_IME, ime()));
     }
 
     @Test

@@ -38,6 +38,7 @@ import android.graphics.Region;
 import android.hardware.display.DisplayManagerInternal;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.DeviceConfig;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.MathUtils;
@@ -48,18 +49,22 @@ import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.MagnificationSpec;
 import android.view.View;
+import android.view.WindowManager;
 import android.view.accessibility.MagnificationAnimationCallback;
 import android.view.animation.DecelerateInterpolator;
 
 import com.android.internal.R;
+import com.android.internal.accessibility.common.MagnificationConstants;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.LocalServices;
+import com.android.server.accessibility.AccessibilityManagerService;
 import com.android.server.accessibility.AccessibilityTraceManager;
 import com.android.server.wm.WindowManagerInternal;
 
 import java.util.Locale;
+import java.util.function.Supplier;
 
 /**
  * This class is used to control and query the state of display magnification
@@ -98,8 +103,11 @@ public class FullScreenMagnificationController implements
     private final Rect mTempRect = new Rect();
     // Whether the following typing focus feature for magnification is enabled.
     private boolean mMagnificationFollowTypingEnabled = true;
-
+    // Whether the always on magnification feature is enabled.
+    private boolean mAlwaysOnMagnificationEnabled = false;
     private final DisplayManagerInternal mDisplayManagerInternal;
+
+    @NonNull private final Supplier<MagnificationThumbnail> mThumbnailSupplier;
 
     /**
      * This class implements {@link WindowManagerInternal.MagnificationCallbacks} and holds
@@ -126,12 +134,12 @@ public class FullScreenMagnificationController implements
         private boolean mUnregisterPending;
         private boolean mDeleteAfterUnregister;
 
-        private boolean mForceShowMagnifiableBounds;
-
         private final int mDisplayId;
 
         private int mIdOfLastServiceToMagnify = INVALID_SERVICE_ID;
         private boolean mMagnificationActivated = false;
+
+        @GuardedBy("mLock") @Nullable private MagnificationThumbnail mMagnificationThumbnail;
 
         DisplayMagnification(int displayId) {
             mDisplayId = displayId;
@@ -165,6 +173,11 @@ public class FullScreenMagnificationController implements
             mControllerCtx.getWindowManager().getMagnificationRegion(
                     mDisplayId, mMagnificationRegion);
             mMagnificationRegion.getBounds(mMagnificationBounds);
+
+            if (mMagnificationThumbnail == null) {
+                mMagnificationThumbnail = mThumbnailSupplier.get();
+            }
+
             return true;
         }
 
@@ -190,6 +203,8 @@ public class FullScreenMagnificationController implements
                 mMagnificationRegion.setEmpty();
                 mRegistered = false;
                 unregisterCallbackLocked(mDisplayId, delete);
+
+                destroyThumbNail();
             }
             mUnregisterPending = false;
         }
@@ -213,8 +228,8 @@ public class FullScreenMagnificationController implements
             return mRegistered;
         }
 
-        boolean isMagnifying() {
-            return mCurrentMagnificationSpec.scale > 1.0f;
+        boolean isActivated() {
+            return mMagnificationActivated;
         }
 
         float getScale() {
@@ -292,18 +307,15 @@ public class FullScreenMagnificationController implements
 
         @Override
         public void onDisplaySizeChanged() {
-            // Treat as context change and reset
-            final Message m = PooledLambda.obtainMessage(
-                    FullScreenMagnificationController::resetIfNeeded,
-                    FullScreenMagnificationController.this, mDisplayId, true);
-            mControllerCtx.getHandler().sendMessage(m);
+            // Treat as context change
+            onUserContextChanged();
         }
 
         @Override
         public void onUserContextChanged() {
             final Message m = PooledLambda.obtainMessage(
-                    FullScreenMagnificationController::resetIfNeeded,
-                    FullScreenMagnificationController.this, mDisplayId, true);
+                    FullScreenMagnificationController::onUserContextChanged,
+                    FullScreenMagnificationController.this, mDisplayId);
             mControllerCtx.getHandler().sendMessage(m);
         }
 
@@ -329,6 +341,9 @@ public class FullScreenMagnificationController implements
                 if (!mMagnificationRegion.equals(magnified)) {
                     mMagnificationRegion.set(magnified);
                     mMagnificationRegion.getBounds(mMagnificationBounds);
+
+                    refreshThumbNail(getScale(), getCenterX(), getCenterY());
+
                     // It's possible that our magnification spec is invalid with the new bounds.
                     // Adjust the current spec's offsets if necessary.
                     if (updateCurrentSpecWithOffsetsLocked(
@@ -370,22 +385,24 @@ public class FullScreenMagnificationController implements
         @GuardedBy("mLock")
         void onMagnificationChangedLocked() {
             final float scale = getScale();
-            final boolean lastMagnificationActivated = mMagnificationActivated;
-            mMagnificationActivated = scale > 1.0f;
-            if (mMagnificationActivated != lastMagnificationActivated) {
-                mMagnificationInfoChangedCallback.onFullScreenMagnificationActivationState(
-                        mDisplayId, mMagnificationActivated);
-            }
-
+            final float centerX = getCenterX();
+            final float centerY = getCenterY();
             final MagnificationConfig config = new MagnificationConfig.Builder()
                     .setMode(MAGNIFICATION_MODE_FULLSCREEN)
+                    .setActivated(mMagnificationActivated)
                     .setScale(scale)
-                    .setCenterX(getCenterX())
-                    .setCenterY(getCenterY()).build();
+                    .setCenterX(centerX)
+                    .setCenterY(centerY).build();
             mMagnificationInfoChangedCallback.onFullScreenMagnificationChanged(mDisplayId,
                     mMagnificationRegion, config);
-            if (mUnregisterPending && !isMagnifying()) {
+            if (mUnregisterPending && !isActivated()) {
                 unregister(mDeleteAfterUnregister);
+            }
+
+            if (isActivated()) {
+                updateThumbNail(scale, centerX, centerY);
+            } else {
+                hideThumbNail();
             }
         }
 
@@ -476,21 +493,22 @@ public class FullScreenMagnificationController implements
         }
 
         @GuardedBy("mLock")
-        void setForceShowMagnifiableBounds(boolean show) {
-            if (mRegistered) {
-                mForceShowMagnifiableBounds = show;
-                if (traceEnabled()) {
-                    logTrace("setForceShowMagnifiableBounds",
-                            "displayID=" + mDisplayId + ";show=" + show);
-                }
-                mControllerCtx.getWindowManager().setForceShowMagnifiableBounds(
-                        mDisplayId, show);
+        private boolean setActivated(boolean activated) {
+            if (DEBUG) {
+                Slog.i(LOG_TAG, "setActivated(activated = " + activated + ")");
             }
-        }
 
-        @GuardedBy("mLock")
-        boolean isForceShowMagnifiableBounds() {
-            return mRegistered && mForceShowMagnifiableBounds;
+            final boolean changed = (mMagnificationActivated != activated);
+
+            if (changed) {
+                mMagnificationActivated = activated;
+                mMagnificationInfoChangedCallback.onFullScreenMagnificationActivationState(
+                        mDisplayId, mMagnificationActivated);
+                mControllerCtx.getWindowManager().setForceShowMagnifiableBounds(
+                        mDisplayId, activated);
+            }
+
+            return changed;
         }
 
         @GuardedBy("mLock")
@@ -504,14 +522,17 @@ public class FullScreenMagnificationController implements
                 return false;
             }
             final MagnificationSpec spec = mCurrentMagnificationSpec;
-            final boolean changed = !spec.isNop();
+            final boolean changed = isActivated();
+            setActivated(false);
             if (changed) {
                 spec.clear();
                 onMagnificationChangedLocked();
             }
             mIdOfLastServiceToMagnify = INVALID_SERVICE_ID;
-            mForceShowMagnifiableBounds = false;
             sendSpecToAnimation(spec, animationCallback);
+
+            hideThumbNail();
+
             return changed;
         }
 
@@ -554,14 +575,49 @@ public class FullScreenMagnificationController implements
                                 + ", centerY = " + centerY + ", endCallback = "
                                 + animationCallback + ", id = " + id + ")");
             }
-            final boolean changed = updateMagnificationSpecLocked(scale, centerX, centerY);
+            boolean changed = setActivated(true);
+            changed |= updateMagnificationSpecLocked(scale, centerX, centerY);
             sendSpecToAnimation(mCurrentMagnificationSpec, animationCallback);
-            if (isMagnifying() && (id != INVALID_SERVICE_ID)) {
+            if (isActivated() && (id != INVALID_SERVICE_ID)) {
                 mIdOfLastServiceToMagnify = id;
                 mMagnificationInfoChangedCallback.onRequestMagnificationSpec(mDisplayId,
                         mIdOfLastServiceToMagnify);
             }
             return changed;
+        }
+
+        @GuardedBy("mLock")
+        void updateThumbNail(float scale, float centerX, float centerY) {
+            if (mMagnificationThumbnail != null) {
+                mMagnificationThumbnail.updateThumbNail(scale, centerX, centerY);
+            }
+        }
+
+        @GuardedBy("mLock")
+        void refreshThumbNail(float scale, float centerX, float centerY) {
+            if (mMagnificationThumbnail != null) {
+                mMagnificationThumbnail.setThumbNailBounds(
+                        mMagnificationBounds,
+                        scale,
+                        centerX,
+                        centerY
+                );
+            }
+        }
+
+        @GuardedBy("mLock")
+        void hideThumbNail() {
+            if (mMagnificationThumbnail != null) {
+                mMagnificationThumbnail.hideThumbNail();
+            }
+        }
+
+        @GuardedBy("mLock")
+        void destroyThumbNail() {
+            if (mMagnificationThumbnail != null) {
+                hideThumbNail();
+                mMagnificationThumbnail = null;
+            }
         }
 
         /**
@@ -693,21 +749,40 @@ public class FullScreenMagnificationController implements
             @NonNull AccessibilityTraceManager traceManager, @NonNull Object lock,
             @NonNull MagnificationInfoChangedCallback magnificationInfoChangedCallback,
             @NonNull MagnificationScaleProvider scaleProvider) {
-        this(new ControllerContext(context, traceManager,
-                LocalServices.getService(WindowManagerInternal.class),
-                new Handler(context.getMainLooper()),
-                context.getResources().getInteger(R.integer.config_longAnimTime)), lock,
-                magnificationInfoChangedCallback, scaleProvider);
+        this(
+                new ControllerContext(
+                        context,
+                        traceManager,
+                        LocalServices.getService(WindowManagerInternal.class),
+                        new Handler(context.getMainLooper()),
+                        context.getResources().getInteger(R.integer.config_longAnimTime)),
+                lock,
+                magnificationInfoChangedCallback,
+                scaleProvider,
+                () -> {
+                    if (DeviceConfig.getBoolean(
+                            DeviceConfig.NAMESPACE_ACCESSIBILITY,
+                            "enable_magnifier_thumbnail",
+                            /* defaultValue= */ false)) {
+                        return new MagnificationThumbnail(
+                            context,
+                            context.getSystemService(WindowManager.class),
+                            new Handler(context.getMainLooper())
+                        );
+                    }
+
+                    return null;
+                });
     }
 
-    /**
-     * Constructor for tests
-     */
+    /** Constructor for tests */
     @VisibleForTesting
-    public FullScreenMagnificationController(@NonNull ControllerContext ctx,
+    public FullScreenMagnificationController(
+            @NonNull ControllerContext ctx,
             @NonNull Object lock,
             @NonNull MagnificationInfoChangedCallback magnificationInfoChangedCallback,
-            @NonNull MagnificationScaleProvider scaleProvider) {
+            @NonNull MagnificationScaleProvider scaleProvider,
+            @NonNull Supplier<MagnificationThumbnail> thumbnailSupplier) {
         mControllerCtx = ctx;
         mLock = lock;
         mMainThreadId = mControllerCtx.getContext().getMainLooper().getThread().getId();
@@ -715,6 +790,7 @@ public class FullScreenMagnificationController implements
         mMagnificationInfoChangedCallback = magnificationInfoChangedCallback;
         mScaleProvider = scaleProvider;
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
+        mThumbnailSupplier = thumbnailSupplier;
     }
 
     /**
@@ -779,7 +855,7 @@ public class FullScreenMagnificationController implements
             if (display == null) {
                 return;
             }
-            if (!display.isMagnifying()) {
+            if (!display.isActivated()) {
                 return;
             }
             final Rect magnifiedRegionBounds = mTempRect;
@@ -797,6 +873,33 @@ public class FullScreenMagnificationController implements
 
     boolean isMagnificationFollowTypingEnabled() {
         return mMagnificationFollowTypingEnabled;
+    }
+
+    void setAlwaysOnMagnificationEnabled(boolean enabled) {
+        mAlwaysOnMagnificationEnabled = enabled;
+    }
+
+    boolean isAlwaysOnMagnificationEnabled() {
+        return mAlwaysOnMagnificationEnabled;
+    }
+
+    /**
+     * if the magnifier with given displayId is activated:
+     * 1. if {@link #isAlwaysOnMagnificationEnabled()}, zoom the magnifier to 100%,
+     * 2. otherwise, reset the magnification.
+     *
+     * @param displayId The logical display id.
+     */
+    void onUserContextChanged(int displayId) {
+        synchronized (mLock) {
+            if (isAlwaysOnMagnificationEnabled()) {
+                setScaleAndCenter(displayId, 1.0f, Float.NaN, Float.NaN,
+                        true,
+                        AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
+            } else {
+                reset(displayId, true);
+            }
+        }
     }
 
     /**
@@ -831,16 +934,16 @@ public class FullScreenMagnificationController implements
 
     /**
      * @param displayId The logical display id.
-     * @return {@code true} if magnification is active, e.g. the scale
-     *         is > 1, {@code false} otherwise
+     * @return {@code true} if magnification is activated,
+     *         {@code false} otherwise
      */
-    public boolean isMagnifying(int displayId) {
+    public boolean isActivated(int displayId) {
         synchronized (mLock) {
             final DisplayMagnification display = mDisplays.get(displayId);
             if (display == null) {
                 return false;
             }
-            return display.isMagnifying();
+            return display.isActivated();
         }
     }
 
@@ -1162,10 +1265,16 @@ public class FullScreenMagnificationController implements
     }
 
     /**
-     * Persists the default display magnification scale to the current user's settings.
+     * Persists the default display magnification scale to the current user's settings
+     * <strong>if scale is >= {@link MagnificationConstants.PERSISTED_SCALE_MIN_VALUE}</strong>.
+     * We assume if the scale is < {@link MagnificationConstants.PERSISTED_SCALE_MIN_VALUE}, there
+     * will be no obvious magnification effect.
      */
     public void persistScale(int displayId) {
         final float scale = getScale(Display.DEFAULT_DISPLAY);
+        if (scale < MagnificationConstants.PERSISTED_SCALE_MIN_VALUE) {
+            return;
+        }
         mScaleProvider.putScale(scale, displayId);
     }
 
@@ -1177,7 +1286,9 @@ public class FullScreenMagnificationController implements
      *         scale if none is available
      */
     public float getPersistedScale(int displayId) {
-        return mScaleProvider.getScale(displayId);
+        return MathUtils.constrain(mScaleProvider.getScale(displayId),
+                MagnificationConstants.PERSISTED_SCALE_MIN_VALUE,
+                MagnificationScaleProvider.MAX_SCALE);
     }
 
     /**
@@ -1198,12 +1309,12 @@ public class FullScreenMagnificationController implements
      *
      * @param displayId The logical display id.
      * @param animate whether the animate the transition
-     * @return whether was {@link #isMagnifying(int) magnifying}
+     * @return whether was {@link #isActivated(int)}  activated}
      */
     boolean resetIfNeeded(int displayId, boolean animate) {
         synchronized (mLock) {
             final DisplayMagnification display = mDisplays.get(displayId);
-            if (display == null || !display.isMagnifying()) {
+            if (display == null || !display.isActivated()) {
                 return false;
             }
             display.reset(animate);
@@ -1221,22 +1332,12 @@ public class FullScreenMagnificationController implements
     boolean resetIfNeeded(int displayId, int connectionId) {
         synchronized (mLock) {
             final DisplayMagnification display = mDisplays.get(displayId);
-            if (display == null || !display.isMagnifying()
+            if (display == null || !display.isActivated()
                     || connectionId != display.getIdOfLastServiceToMagnify()) {
                 return false;
             }
             display.reset(true);
             return true;
-        }
-    }
-
-    void setForceShowMagnifiableBounds(int displayId, boolean show) {
-        synchronized (mLock) {
-            final DisplayMagnification display = mDisplays.get(displayId);
-            if (display == null) {
-                return;
-            }
-            display.setForceShowMagnifiableBounds(show);
         }
     }
 
@@ -1249,21 +1350,6 @@ public class FullScreenMagnificationController implements
      */
     void notifyImeWindowVisibilityChanged(int displayId, boolean shown) {
         mMagnificationInfoChangedCallback.onImeWindowVisibilityChanged(displayId, shown);
-    }
-
-    /**
-     * Returns {@code true} if the magnifiable regions of the display is forced to be shown.
-     *
-     * @param displayId The logical display id.
-     */
-    public boolean isForceShowMagnifiableBounds(int displayId) {
-        synchronized (mLock) {
-            final DisplayMagnification display = mDisplays.get(displayId);
-            if (display == null) {
-                return false;
-            }
-            return display.isForceShowMagnifiableBounds();
-        }
     }
 
     private void onScreenTurnedOff() {
@@ -1295,7 +1381,7 @@ public class FullScreenMagnificationController implements
             }
             return;
         }
-        if (!display.isMagnifying()) {
+        if (!display.isActivated()) {
             display.unregister(delete);
         } else {
             display.unregisterPending(delete);

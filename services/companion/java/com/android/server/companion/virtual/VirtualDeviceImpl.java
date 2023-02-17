@@ -26,6 +26,7 @@ import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.StringRes;
+import android.annotation.UserIdInt;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.PendingIntent;
@@ -34,11 +35,13 @@ import android.companion.AssociationInfo;
 import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.IVirtualDeviceActivityListener;
 import android.companion.virtual.IVirtualDeviceIntentInterceptor;
+import android.companion.virtual.IVirtualDeviceSoundEffectListener;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.ActivityListener;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.IAudioConfigChangedCallback;
 import android.companion.virtual.audio.IAudioRoutingCallback;
+import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtual.sensor.VirtualSensorConfig;
 import android.companion.virtual.sensor.VirtualSensorEvent;
 import android.content.ComponentName;
@@ -84,10 +87,11 @@ import com.android.server.companion.virtual.audio.VirtualAudioController;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Consumer;
 
 
@@ -113,12 +117,13 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     private final CameraAccessController mCameraAccessController;
     private VirtualAudioController mVirtualAudioController;
     @VisibleForTesting
-    final Set<Integer> mVirtualDisplayIds = new ArraySet<>();
+    final ArraySet<Integer> mVirtualDisplayIds = new ArraySet<>();
     private final OnDeviceCloseListener mOnDeviceCloseListener;
     private final IBinder mAppToken;
     private final VirtualDeviceParams mParams;
     private final Map<Integer, PowerManager.WakeLock> mPerDisplayWakelocks = new ArrayMap<>();
     private final IVirtualDeviceActivityListener mActivityListener;
+    private final IVirtualDeviceSoundEffectListener mSoundEffectListener;
     @GuardedBy("mVirtualDeviceLock")
     private final Map<IBinder, IntentFilter> mIntentInterceptors = new ArrayMap<>();
     @NonNull
@@ -129,6 +134,11 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     @GuardedBy("mVirtualDeviceLock")
     @Nullable
     private LocaleList mLocaleList = null;
+    // This device's sensors, keyed by sensor handle.
+    @GuardedBy("mVirtualDeviceLock")
+    private SparseArray<VirtualSensor> mVirtualSensors = new SparseArray<>();
+    @GuardedBy("mVirtualDeviceLock")
+    private List<VirtualSensor> mVirtualSensorList = null;
 
     private ActivityListener createListenerAdapter() {
         return new ActivityListener() {
@@ -136,7 +146,18 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             @Override
             public void onTopActivityChanged(int displayId, ComponentName topActivity) {
                 try {
-                    mActivityListener.onTopActivityChanged(displayId, topActivity);
+                    mActivityListener.onTopActivityChanged(displayId, topActivity,
+                            UserHandle.USER_NULL);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "Unable to call mActivityListener", e);
+                }
+            }
+
+            @Override
+            public void onTopActivityChanged(int displayId, ComponentName topActivity,
+                    @UserIdInt int userId) {
+                try {
+                    mActivityListener.onTopActivityChanged(displayId, topActivity, userId);
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Unable to call mActivityListener", e);
                 }
@@ -170,6 +191,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             OnDeviceCloseListener onDeviceCloseListener,
             PendingTrampolineCallback pendingTrampolineCallback,
             IVirtualDeviceActivityListener activityListener,
+            IVirtualDeviceSoundEffectListener soundEffectListener,
             Consumer<ArraySet<Integer>> runningAppsChangedCallback,
             VirtualDeviceParams params) {
         this(
@@ -184,6 +206,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 onDeviceCloseListener,
                 pendingTrampolineCallback,
                 activityListener,
+                soundEffectListener,
                 runningAppsChangedCallback,
                 params);
     }
@@ -201,6 +224,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             OnDeviceCloseListener onDeviceCloseListener,
             PendingTrampolineCallback pendingTrampolineCallback,
             IVirtualDeviceActivityListener activityListener,
+            IVirtualDeviceSoundEffectListener soundEffectListener,
             Consumer<ArraySet<Integer>> runningAppsChangedCallback,
             VirtualDeviceParams params) {
         super(PermissionEnforcer.fromContext(context));
@@ -209,6 +233,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         mAssociationInfo = associationInfo;
         mPendingTrampolineCallback = pendingTrampolineCallback;
         mActivityListener = activityListener;
+        mSoundEffectListener = soundEffectListener;
         mRunningAppsChangedCallback = runningAppsChangedCallback;
         mOwnerUid = ownerUid;
         mDeviceId = deviceId;
@@ -223,9 +248,14 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             mInputController = inputController;
         }
         if (sensorController == null) {
-            mSensorController = new SensorController(mVirtualDeviceLock, mDeviceId);
+            mSensorController = new SensorController(
+                    mVirtualDeviceLock, mDeviceId, mParams.getVirtualSensorCallback());
         } else {
             mSensorController = sensorController;
+        }
+        final List<VirtualSensorConfig> virtualSensorConfigs = mParams.getVirtualSensorConfigs();
+        for (int i = 0; i < virtualSensorConfigs.size(); ++i) {
+            createVirtualSensor(virtualSensorConfigs.get(i));
         }
         mCameraAccessController = cameraAccessController;
         mCameraAccessController.startObservingIfNeeded();
@@ -367,6 +397,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 mVirtualAudioController = null;
             }
             mLocaleList = null;
+            mVirtualSensorList = null;
+            mVirtualSensors.clear();
         }
         mOnDeviceCloseListener.onClose(mDeviceId);
         mAppToken.unlinkToDeath(this, 0);
@@ -681,17 +713,17 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         }
     }
 
-    @Override // Binder call
-    @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
-    public void createVirtualSensor(
-            @NonNull IBinder deviceToken,
-            @NonNull VirtualSensorConfig config) {
-        super.createVirtualSensor_enforcePermission();
-        Objects.requireNonNull(config);
-        Objects.requireNonNull(deviceToken);
+    private void createVirtualSensor(@NonNull VirtualSensorConfig config) {
+        final IBinder sensorToken =
+                new Binder("android.hardware.sensor.VirtualSensor:" + config.getName());
         final long ident = Binder.clearCallingIdentity();
         try {
-            mSensorController.createSensor(deviceToken, config);
+            int handle = mSensorController.createSensor(sensorToken, config);
+            VirtualSensor sensor = new VirtualSensor(handle, config.getType(), config.getName(),
+                    this, sensorToken);
+            synchronized (mVirtualDeviceLock) {
+                mVirtualSensors.put(handle, sensor);
+            }
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -699,13 +731,24 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
 
     @Override // Binder call
     @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
-    public void unregisterSensor(@NonNull IBinder token) {
-        super.unregisterSensor_enforcePermission();
-        final long ident = Binder.clearCallingIdentity();
-        try {
-            mSensorController.unregisterSensor(token);
-        } finally {
-            Binder.restoreCallingIdentity(ident);
+    @Nullable
+    public List<VirtualSensor> getVirtualSensorList() {
+        super.getVirtualSensorList_enforcePermission();
+        synchronized (mVirtualDeviceLock) {
+            if (mVirtualSensorList == null) {
+                mVirtualSensorList = new ArrayList<>();
+                for (int i = 0; i < mVirtualSensors.size(); ++i) {
+                    mVirtualSensorList.add(mVirtualSensors.valueAt(i));
+                }
+                mVirtualSensorList = Collections.unmodifiableList(mVirtualSensorList);
+            }
+            return mVirtualSensorList;
+        }
+    }
+
+    VirtualSensor getVirtualSensorByHandle(int handle) {
+        synchronized (mVirtualDeviceLock) {
+            return mVirtualSensors.get(handle);
         }
     }
 
@@ -935,6 +978,14 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     void onEnteringPipBlocked(int uid) {
         showToastWhereUidIsRunning(uid, com.android.internal.R.string.vdm_pip_blocked,
                 Toast.LENGTH_LONG, mContext.getMainLooper());
+    }
+
+    void playSoundEffect(int effectType) {
+        try {
+            mSoundEffectListener.onPlaySoundEffect(effectType);
+        } catch (RemoteException exception) {
+            Slog.w(TAG, "Unable to invoke sound effect listener", exception);
+        }
     }
 
     /**

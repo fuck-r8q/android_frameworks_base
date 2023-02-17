@@ -17,7 +17,9 @@ per-file android_view_Input* = file:/services/core/java/com/android/server/input
 per-file android_view_KeyCharacterMap.* = file:/services/core/java/com/android/server/input/OWNERS
 per-file android_view_*KeyEvent.* = file:/services/core/java/com/android/server/input/OWNERS
 per-file android_view_*MotionEvent.* = file:/services/core/java/com/android/server/input/OWNERS
+per-file android_view_MotionPredictor.* = file:/services/core/java/com/android/server/input/OWNERS
 per-file android_view_PointerIcon.* = file:/services/core/java/com/android/server/input/OWNERS
+per-file android_view_VelocityTracker.* = file:/services/core/java/com/android/server/input/OWNERS
 
 # WindowManager
 per-file android_graphics_BLASTBufferQueue.cpp = file:/services/core/java/com/android/server/wm/OWNERS
@@ -70,6 +72,7 @@ per-file com_android_internal_net_* = file:/services/core/java/com/android/serve
 per-file android_graphics_* = file:/graphics/java/android/graphics/OWNERS
 per-file *HardwareBuffer* = file:/graphics/java/android/graphics/OWNERS
 per-file android_hardware_SyncFence.cpp = file:/graphics/java/android/graphics/OWNERS
+per-file android_hardware_OverlayProperties.cpp = file:/graphics/java/android/graphics/OWNERS
 per-file android_os_GraphicsEnvironment.cpp = file:platform/frameworks/native:/opengl/OWNERS
 
 ### Text ###

@@ -58,6 +58,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.ShadeInterpolation;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.statusbar.policy.FakeConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -629,6 +630,7 @@ public class ScrimControllerTest extends SysuiTestCase {
 
     @Test
     public void transitionToUnlocked() {
+        mScrimController.setClipsQsScrim(false);
         mScrimController.setRawPanelExpansionFraction(0f);
         mScrimController.transitionTo(ScrimState.UNLOCKED);
         finishAnimationsImmediately();
@@ -644,14 +646,21 @@ public class ScrimControllerTest extends SysuiTestCase {
         ));
 
         // Back scrim should be visible after start dragging
-        mScrimController.setRawPanelExpansionFraction(0.3f);
+        mScrimController.setRawPanelExpansionFraction(0.29f);
         assertScrimAlpha(Map.of(
                 mScrimInFront, TRANSPARENT,
                 mNotificationsScrim, TRANSPARENT,
                 mScrimBehind, SEMI_TRANSPARENT));
 
+        // Back scrim should be opaque at 30%
+        mScrimController.setRawPanelExpansionFraction(0.3f);
+        assertScrimAlpha(Map.of(
+                mScrimInFront, TRANSPARENT,
+                mNotificationsScrim, TRANSPARENT,
+                mScrimBehind, OPAQUE));
+
         // Then, notification scrim should fade in
-        mScrimController.setRawPanelExpansionFraction(0.7f);
+        mScrimController.setRawPanelExpansionFraction(0.31f);
         assertScrimAlpha(Map.of(
                 mScrimInFront, TRANSPARENT,
                 mNotificationsScrim, SEMI_TRANSPARENT,
@@ -1562,7 +1571,7 @@ public class ScrimControllerTest extends SysuiTestCase {
     @Test
     public void transitionToDreaming() {
         mScrimController.setRawPanelExpansionFraction(0f);
-        mScrimController.setBouncerHiddenFraction(KeyguardBouncer.EXPANSION_HIDDEN);
+        mScrimController.setBouncerHiddenFraction(KeyguardBouncerConstants.EXPANSION_HIDDEN);
         mScrimController.transitionTo(ScrimState.DREAMING);
         finishAnimationsImmediately();
 

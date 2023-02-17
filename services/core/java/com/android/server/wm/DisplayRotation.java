@@ -19,7 +19,6 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
-import static android.util.RotationUtils.deltaRotation;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_JUMPCUT;
 import static android.view.WindowManager.LayoutParams.ROTATION_ANIMATION_ROTATE;
@@ -41,6 +40,7 @@ import static com.android.server.wm.WindowManagerService.WINDOW_FREEZE_TIMEOUT_D
 
 import android.annotation.AnimRes;
 import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.content.ContentResolver;
@@ -57,6 +57,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.ArraySet;
+import android.util.RotationUtils;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
@@ -100,6 +101,8 @@ public class DisplayRotation {
     private final DisplayWindowSettings mDisplayWindowSettings;
     private final Context mContext;
     private final Object mLock;
+    @Nullable
+    private final DisplayRotationImmersiveAppCompatPolicy mCompatPolicyForImmersiveApps;
 
     public final boolean isDefaultDisplay;
     private final boolean mSupportAutoRotation;
@@ -115,6 +118,13 @@ public class DisplayRotation {
     private SettingsObserver mSettingsObserver;
     @Nullable
     private FoldController mFoldController;
+    @NonNull
+    private final DeviceStateController mDeviceStateController;
+    @NonNull
+    private final DisplayRotationCoordinator mDisplayRotationCoordinator;
+    @NonNull
+    @VisibleForTesting
+    final Runnable mDefaultDisplayRotationChangedCallback;
 
     @ScreenOrientation
     private int mCurrentAppOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
@@ -205,7 +215,7 @@ public class DisplayRotation {
 
     /**
      * A flag to indicate if the display rotation should be fixed to user specified rotation
-     * regardless of all other states (including app requrested orientation). {@code true} the
+     * regardless of all other states (including app requested orientation). {@code true} the
      * display rotation should be fixed to user specified rotation, {@code false} otherwise.
      */
     private int mFixedToUserRotation = IWindowManager.FIXED_TO_USER_ROTATION_DEFAULT;
@@ -216,22 +226,28 @@ public class DisplayRotation {
     private boolean mDemoRotationLock;
 
     DisplayRotation(WindowManagerService service, DisplayContent displayContent,
-            DisplayAddress displayAddress) {
+            DisplayAddress displayAddress, @NonNull DeviceStateController deviceStateController,
+            @NonNull DisplayRotationCoordinator displayRotationCoordinator) {
         this(service, displayContent, displayAddress, displayContent.getDisplayPolicy(),
-                service.mDisplayWindowSettings, service.mContext, service.getWindowManagerLock());
+                service.mDisplayWindowSettings, service.mContext, service.getWindowManagerLock(),
+                deviceStateController, displayRotationCoordinator);
     }
 
     @VisibleForTesting
     DisplayRotation(WindowManagerService service, DisplayContent displayContent,
             DisplayAddress displayAddress, DisplayPolicy displayPolicy,
-            DisplayWindowSettings displayWindowSettings, Context context, Object lock) {
+            DisplayWindowSettings displayWindowSettings, Context context, Object lock,
+            @NonNull DeviceStateController deviceStateController,
+            @NonNull DisplayRotationCoordinator displayRotationCoordinator) {
         mService = service;
         mDisplayContent = displayContent;
         mDisplayPolicy = displayPolicy;
         mDisplayWindowSettings = displayWindowSettings;
         mContext = context;
         mLock = lock;
+        mDeviceStateController = deviceStateController;
         isDefaultDisplay = displayContent.isDefaultDisplay;
+        mCompatPolicyForImmersiveApps = initImmersiveAppCompatPolicy(service, displayContent);
 
         mSupportAutoRotation =
                 mContext.getResources().getBoolean(R.bool.config_supportAutoRotation);
@@ -240,11 +256,26 @@ public class DisplayRotation {
         mDeskDockRotation = readRotation(R.integer.config_deskDockRotation);
         mUndockedHdmiRotation = readRotation(R.integer.config_undockedHdmiRotation);
 
-        mRotation = readDefaultDisplayRotation(displayAddress);
+        int defaultRotation = readDefaultDisplayRotation(displayAddress);
+        mRotation = defaultRotation;
+
+        mDisplayRotationCoordinator = displayRotationCoordinator;
+        if (isDefaultDisplay) {
+            mDisplayRotationCoordinator.setDefaultDisplayDefaultRotation(mRotation);
+        }
+        mDefaultDisplayRotationChangedCallback = this::updateRotationAndSendNewConfigIfChanged;
+
+        if (DisplayRotationCoordinator.isSecondaryInternalDisplay(displayContent)
+                && mDeviceStateController
+                        .shouldMatchBuiltInDisplayOrientationToReverseDefaultDisplay()) {
+            mDisplayRotationCoordinator.setDefaultDisplayRotationChangedCallback(
+                    mDefaultDisplayRotationChangedCallback);
+        }
 
         if (isDefaultDisplay) {
             final Handler uiHandler = UiThread.getHandler();
-            mOrientationListener = new OrientationListener(mContext, uiHandler);
+            mOrientationListener =
+                    new OrientationListener(mContext, uiHandler, defaultRotation);
             mOrientationListener.setCurrentRotation(mRotation);
             mSettingsObserver = new SettingsObserver(uiHandler);
             mSettingsObserver.observe();
@@ -253,6 +284,14 @@ public class DisplayRotation {
                 mFoldController = new FoldController();
             }
         }
+    }
+
+    @VisibleForTesting
+    @Nullable
+    DisplayRotationImmersiveAppCompatPolicy initImmersiveAppCompatPolicy(
+                WindowManagerService service, DisplayContent displayContent) {
+        return DisplayRotationImmersiveAppCompatPolicy.createIfNeeded(
+                service.mLetterboxConfiguration, this, displayContent);
     }
 
     // Change the default value to the value specified in the sysprop
@@ -475,8 +514,11 @@ public class DisplayRotation {
             return false;
         }
 
+        @Surface.Rotation
         final int oldRotation = mRotation;
+        @ScreenOrientation
         final int lastOrientation = mLastOrientation;
+        @Surface.Rotation
         int rotation = rotationForOrientation(lastOrientation, oldRotation);
         // Use the saved rotation for tabletop mode, if set.
         if (mFoldController != null && mFoldController.shouldRevertOverriddenRotation()) {
@@ -488,6 +530,14 @@ public class DisplayRotation {
                     Surface.rotationToString(oldRotation),
                     Surface.rotationToString(prevRotation));
         }
+
+        if (DisplayRotationCoordinator.isSecondaryInternalDisplay(mDisplayContent)
+                && mDeviceStateController
+                        .shouldMatchBuiltInDisplayOrientationToReverseDefaultDisplay()) {
+            rotation = RotationUtils.reverseRotationDirectionAroundZAxis(
+                    mDisplayRotationCoordinator.getDefaultDisplayCurrentRotation());
+        }
+
         ProtoLog.v(WM_DEBUG_ORIENTATION,
                 "Computed rotation=%s (%d) for display id=%d based on lastOrientation=%s (%d) and "
                         + "oldRotation=%s (%d)",
@@ -506,6 +556,10 @@ public class DisplayRotation {
             return false;
         }
 
+        if (isDefaultDisplay) {
+            mDisplayRotationCoordinator.onDefaultDisplayRotationChanged(rotation);
+        }
+
         // Preemptively cancel the running recents animation -- SysUI can't currently handle this
         // case properly since the signals it receives all happen post-change. We do this earlier
         // in the rotation flow, since DisplayContent.updateDisplayOverrideConfigurationLocked seems
@@ -520,13 +574,10 @@ public class DisplayRotation {
                 "Display id=%d rotation changed to %d from %d, lastOrientation=%d",
                         displayId, rotation, oldRotation, lastOrientation);
 
-        if (deltaRotation(oldRotation, rotation) != Surface.ROTATION_180) {
-            mDisplayContent.mWaitingForConfig = true;
-        }
-
         mRotation = rotation;
 
         mDisplayContent.setLayoutNeeded();
+        mDisplayContent.mWaitingForConfig = true;
 
         if (mDisplayContent.mTransitionController.isShellTransitionsEnabled()) {
             final boolean wasCollecting = mDisplayContent.mTransitionController.isCollecting();
@@ -580,7 +631,8 @@ public class DisplayRotation {
 
         if (mDisplayContent.mTransitionController.isShellTransitionsEnabled()) {
             if (!mDisplayContent.mTransitionController.isCollecting()) {
-                throw new IllegalStateException("Trying to rotate outside a transition");
+                // The remote may be too slow to response before transition timeout.
+                Slog.e(TAG, "Trying to continue rotation outside a transition");
             }
             mDisplayContent.mTransitionController.collect(mDisplayContent);
         }
@@ -1123,9 +1175,13 @@ public class DisplayRotation {
             return mUserRotation;
         }
 
+        @Surface.Rotation
         int sensorRotation = mOrientationListener != null
                 ? mOrientationListener.getProposedRotation() // may be -1
                 : -1;
+        if (mDeviceStateController.shouldReverseRotationDirectionAroundZAxis()) {
+            sensorRotation = RotationUtils.reverseRotationDirectionAroundZAxis(sensorRotation);
+        }
         mLastSensorRotation = sensorRotation;
         if (sensorRotation < 0) {
             sensorRotation = lastRotation;
@@ -1139,6 +1195,7 @@ public class DisplayRotation {
         final boolean deskDockEnablesAccelerometer =
                 mDisplayPolicy.isDeskDockEnablesAccelerometer();
 
+        @Surface.Rotation
         final int preferredRotation;
         if (!isDefaultDisplay) {
             // For secondary displays we ignore things like displays sensors, docking mode and
@@ -1305,11 +1362,11 @@ public class DisplayRotation {
         return mAllowAllRotations;
     }
 
-    private boolean isLandscapeOrSeascape(int rotation) {
+    boolean isLandscapeOrSeascape(@Surface.Rotation final int rotation) {
         return rotation == mLandscapeRotation || rotation == mSeascapeRotation;
     }
 
-    private boolean isAnyPortrait(int rotation) {
+    boolean isAnyPortrait(@Surface.Rotation final int rotation) {
         return rotation == mPortraitRotation || rotation == mUpsideDownRotation;
     }
 
@@ -1348,9 +1405,16 @@ public class DisplayRotation {
         return mFoldController != null && mFoldController.overrideFrozenRotation();
     }
 
-    private boolean isRotationChoicePossible(int orientation) {
-        // Rotation choice is only shown when the user is in locked mode.
-        if (mUserRotationMode != WindowManagerPolicy.USER_ROTATION_LOCKED) return false;
+    private boolean isRotationChoiceAllowed(@Surface.Rotation final int proposedRotation) {
+        final boolean isRotationLockEnforced = mCompatPolicyForImmersiveApps != null
+                && mCompatPolicyForImmersiveApps.isRotationLockEnforced(proposedRotation);
+
+        // Don't show rotation choice button if
+        if (!isRotationLockEnforced // not enforcing locked rotation
+                // and the screen rotation is not locked by the user.
+                && mUserRotationMode != WindowManagerPolicy.USER_ROTATION_LOCKED) {
+            return false;
+        }
 
         // Don't show rotation choice if we are in tabletop or book modes.
         if (isTabletopAutoRotateOverrideEnabled()) return false;
@@ -1402,7 +1466,7 @@ public class DisplayRotation {
         }
 
         // Ensure that some rotation choice is possible for the given orientation.
-        switch (orientation) {
+        switch (mCurrentAppOrientation) {
             case ActivityInfo.SCREEN_ORIENTATION_FULL_USER:
             case ActivityInfo.SCREEN_ORIENTATION_USER:
             case ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED:
@@ -1423,6 +1487,15 @@ public class DisplayRotation {
         }
         if (mStatusBarManagerInternal != null) {
             mStatusBarManagerInternal.onProposedRotationChanged(rotation, isValid);
+        }
+    }
+
+    void dispatchProposedRotation(@Surface.Rotation int rotation) {
+        if (mService.mRotationWatcherController.hasProposedRotationListeners()) {
+            synchronized (mLock) {
+                mService.mRotationWatcherController.dispatchProposedRotation(
+                        mDisplayContent, rotation);
+            }
         }
     }
 
@@ -1501,6 +1574,12 @@ public class DisplayRotation {
         return shouldUpdateRotation;
     }
 
+    void removeDefaultDisplayRotationChangedCallback() {
+        if (DisplayRotationCoordinator.isSecondaryInternalDisplay(mDisplayContent)) {
+            mDisplayRotationCoordinator.removeDefaultDisplayRotationChangedCallback();
+        }
+    }
+
     void dump(String prefix, PrintWriter pw) {
         pw.println(prefix + "DisplayRotation");
         pw.println(prefix + "  mCurrentAppOrientation="
@@ -1555,7 +1634,7 @@ public class DisplayRotation {
         proto.end(token);
     }
 
-    boolean isDeviceInPosture(DeviceStateController.FoldState state, boolean isTabletop) {
+    boolean isDeviceInPosture(DeviceStateController.DeviceState state, boolean isTabletop) {
         if (mFoldController == null) return false;
         return mFoldController.isDeviceInPosture(state, isTabletop);
     }
@@ -1567,10 +1646,10 @@ public class DisplayRotation {
     /**
      * Called by the DeviceStateManager callback when the device state changes.
      */
-    void foldStateChanged(DeviceStateController.FoldState foldState) {
+    void foldStateChanged(DeviceStateController.DeviceState deviceState) {
         if (mFoldController != null) {
             synchronized (mLock) {
-                mFoldController.foldStateChanged(foldState);
+                mFoldController.foldStateChanged(deviceState);
             }
         }
     }
@@ -1578,8 +1657,8 @@ public class DisplayRotation {
     private class FoldController {
         @Surface.Rotation
         private int mHalfFoldSavedRotation = -1; // No saved rotation
-        private DeviceStateController.FoldState mFoldState =
-                DeviceStateController.FoldState.UNKNOWN;
+        private DeviceStateController.DeviceState mDeviceState =
+                DeviceStateController.DeviceState.UNKNOWN;
         private boolean mInHalfFoldTransition = false;
         private final boolean mIsDisplayAlwaysSeparatingHinge;
         private final Set<Integer> mTabletopRotations;
@@ -1619,32 +1698,33 @@ public class DisplayRotation {
                     R.bool.config_isDisplayHingeAlwaysSeparating);
         }
 
-        boolean isDeviceInPosture(DeviceStateController.FoldState state, boolean isTabletop) {
-            if (state != mFoldState) {
+        boolean isDeviceInPosture(DeviceStateController.DeviceState state, boolean isTabletop) {
+            if (state != mDeviceState) {
                 return false;
             }
-            if (mFoldState == DeviceStateController.FoldState.HALF_FOLDED) {
+            if (mDeviceState == DeviceStateController.DeviceState.HALF_FOLDED) {
                 return !(isTabletop ^ mTabletopRotations.contains(mRotation));
             }
             return true;
         }
 
-        DeviceStateController.FoldState getFoldState() {
-            return mFoldState;
+        DeviceStateController.DeviceState getFoldState() {
+            return mDeviceState;
         }
 
         boolean isSeparatingHinge() {
-            return mFoldState == DeviceStateController.FoldState.HALF_FOLDED
-                    || (mFoldState == DeviceStateController.FoldState.OPEN
+            return mDeviceState == DeviceStateController.DeviceState.HALF_FOLDED
+                    || (mDeviceState == DeviceStateController.DeviceState.OPEN
                         && mIsDisplayAlwaysSeparatingHinge);
         }
 
         boolean overrideFrozenRotation() {
-            return mFoldState == DeviceStateController.FoldState.HALF_FOLDED;
+            return mDeviceState == DeviceStateController.DeviceState.HALF_FOLDED;
         }
 
         boolean shouldRevertOverriddenRotation() {
-            return mFoldState == DeviceStateController.FoldState.OPEN // When transitioning to open.
+            // When transitioning to open.
+            return mDeviceState == DeviceStateController.DeviceState.OPEN
                     && mInHalfFoldTransition
                     && mHalfFoldSavedRotation != -1 // Ignore if we've already reverted.
                     && mUserRotationMode
@@ -1658,30 +1738,30 @@ public class DisplayRotation {
             return savedRotation;
         }
 
-        void foldStateChanged(DeviceStateController.FoldState newState) {
+        void foldStateChanged(DeviceStateController.DeviceState newState) {
             ProtoLog.v(WM_DEBUG_ORIENTATION,
                     "foldStateChanged: displayId %d, halfFoldStateChanged %s, "
                     + "saved rotation: %d, mUserRotation: %d, mLastSensorRotation: %d, "
                     + "mLastOrientation: %d, mRotation: %d",
                     mDisplayContent.getDisplayId(), newState.name(), mHalfFoldSavedRotation,
                     mUserRotation, mLastSensorRotation, mLastOrientation, mRotation);
-            if (mFoldState == DeviceStateController.FoldState.UNKNOWN) {
-                mFoldState = newState;
+            if (mDeviceState == DeviceStateController.DeviceState.UNKNOWN) {
+                mDeviceState = newState;
                 return;
             }
-            if (newState == DeviceStateController.FoldState.HALF_FOLDED
-                    && mFoldState != DeviceStateController.FoldState.HALF_FOLDED) {
+            if (newState == DeviceStateController.DeviceState.HALF_FOLDED
+                    && mDeviceState != DeviceStateController.DeviceState.HALF_FOLDED) {
                 // The device has transitioned to HALF_FOLDED state: save the current rotation and
                 // update the device rotation.
                 mHalfFoldSavedRotation = mRotation;
-                mFoldState = newState;
+                mDeviceState = newState;
                 // Now mFoldState is set to HALF_FOLDED, the overrideFrozenRotation function will
                 // return true, so rotation is unlocked.
                 mService.updateRotation(false /* alwaysSendConfiguration */,
                         false /* forceRelayout */);
             } else {
                 mInHalfFoldTransition = true;
-                mFoldState = newState;
+                mDeviceState = newState;
                 // Tell the device to update its orientation.
                 mService.updateRotation(false /* alwaysSendConfiguration */,
                         false /* forceRelayout */);
@@ -1701,8 +1781,9 @@ public class DisplayRotation {
     private class OrientationListener extends WindowOrientationListener implements Runnable {
         transient boolean mEnabled;
 
-        OrientationListener(Context context, Handler handler) {
-            super(context, handler);
+        OrientationListener(Context context, Handler handler,
+                @Surface.Rotation int defaultRotation) {
+            super(context, handler, defaultRotation);
         }
 
         @Override
@@ -1719,11 +1800,12 @@ public class DisplayRotation {
 
 
         @Override
-        public void onProposedRotationChanged(int rotation) {
+        public void onProposedRotationChanged(@Surface.Rotation int rotation) {
             ProtoLog.v(WM_DEBUG_ORIENTATION, "onProposedRotationChanged, rotation=%d", rotation);
             // Send interaction power boost to improve redraw performance.
             mService.mPowerManagerInternal.setPowerBoost(Boost.INTERACTION, 0);
-            if (isRotationChoicePossible(mCurrentAppOrientation)) {
+            dispatchProposedRotation(rotation);
+            if (isRotationChoiceAllowed(rotation)) {
                 final boolean isValid = isValidRotationChoice(rotation);
                 sendProposedRotationChangeToStatusBarInternal(rotation, isValid);
             } else {
@@ -1804,7 +1886,7 @@ public class DisplayRotation {
             final long mTimestamp = System.currentTimeMillis();
             final int mHalfFoldSavedRotation;
             final boolean mInHalfFoldTransition;
-            final DeviceStateController.FoldState mFoldState;
+            final DeviceStateController.DeviceState mDeviceState;
             @Nullable final String mDisplayRotationCompatPolicySummary;
 
             Record(DisplayRotation dr, int fromRotation, int toRotation) {
@@ -1825,8 +1907,9 @@ public class DisplayRotation {
                 if (source != null) {
                     mLastOrientationSource = source.toString();
                     final WindowState w = source.asWindowState();
-                    mSourceOrientation =
-                            w != null ? w.mAttrs.screenOrientation : source.mOrientation;
+                    mSourceOrientation = w != null
+                            ? w.mAttrs.screenOrientation
+                            : source.getOverrideOrientation();
                 } else {
                     mLastOrientationSource = null;
                     mSourceOrientation = SCREEN_ORIENTATION_UNSET;
@@ -1834,11 +1917,11 @@ public class DisplayRotation {
                 if (dr.mFoldController != null) {
                     mHalfFoldSavedRotation = dr.mFoldController.mHalfFoldSavedRotation;
                     mInHalfFoldTransition = dr.mFoldController.mInHalfFoldTransition;
-                    mFoldState = dr.mFoldController.mFoldState;
+                    mDeviceState = dr.mFoldController.mDeviceState;
                 } else {
                     mHalfFoldSavedRotation = NO_FOLD_CONTROLLER;
                     mInHalfFoldTransition = false;
-                    mFoldState = DeviceStateController.FoldState.UNKNOWN;
+                    mDeviceState = DeviceStateController.DeviceState.UNKNOWN;
                 }
                 mDisplayRotationCompatPolicySummary = dc.mDisplayRotationCompatPolicy == null
                         ? null
@@ -1864,7 +1947,7 @@ public class DisplayRotation {
                     pw.println(prefix + " halfFoldSavedRotation="
                             + mHalfFoldSavedRotation
                             + " mInHalfFoldTransition=" + mInHalfFoldTransition
-                            + " mFoldState=" + mFoldState);
+                            + " mFoldState=" + mDeviceState);
                 }
                 if (mDisplayRotationCompatPolicySummary != null) {
                     pw.println(prefix + mDisplayRotationCompatPolicySummary);

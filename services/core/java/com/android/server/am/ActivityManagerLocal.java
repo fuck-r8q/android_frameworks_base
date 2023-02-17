@@ -17,10 +17,11 @@
 package com.android.server.am;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.content.Context;
+import android.content.Context.BindServiceFlags;
+import android.content.Context.BindServiceFlagsBits;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
@@ -76,6 +77,9 @@ public interface ActivityManagerLocal {
      * @param conn Receives information as the service is started and stopped.
      *        This must be a valid ServiceConnection object; it must not be null.
      * @param clientAppUid Uid of the app for which the sdk sandbox process needs to be spawned.
+     * @param clientAppProcessToken process token used to uniquely identify the client app
+     *        process binding to the SDK sandbox. This is obtained using
+     *        {@link Context#getProcessToken()}.
      * @param clientAppPackage Package of the app for which the sdk sandbox process needs to
      *        be spawned. This package must belong to the clientAppUid.
      * @param processName Unique identifier for the service instance. Each unique name here will
@@ -91,40 +95,41 @@ public interface ActivityManagerLocal {
      */
     @SuppressLint("RethrowRemoteException")
     boolean bindSdkSandboxService(@NonNull Intent service, @NonNull ServiceConnection conn,
+            int clientAppUid, @NonNull IBinder clientAppProcessToken,
+            @NonNull String clientAppPackage, @NonNull String processName,
+            @BindServiceFlagsBits int flags)
+            throws RemoteException;
+
+    /**
+     * See {@link #bindSdkSandboxService(Intent, ServiceConnection, int, IBinder, String, String,
+     *       int)}
+     */
+    @SuppressLint("RethrowRemoteException")
+    boolean bindSdkSandboxService(@NonNull Intent service, @NonNull ServiceConnection conn,
+            int clientAppUid, @NonNull IBinder clientAppProcessToken,
+            @NonNull String clientAppPackage, @NonNull String processName,
+            @NonNull BindServiceFlags flags)
+            throws RemoteException;
+
+    /**
+     * @deprecated Please use
+     * {@link #bindSdkSandboxService(Intent, ServiceConnection, int, IBinder, String, String,
+     *       BindServiceFlags)}
+     *
+     * This API can't be deleted yet because it can be used by early AdService module versions.
+     */
+    @SuppressLint("RethrowRemoteException")
+    boolean bindSdkSandboxService(@NonNull Intent service, @NonNull ServiceConnection conn,
             int clientAppUid, @NonNull String clientAppPackage, @NonNull String processName,
-            @Context.BindServiceFlags int flags)
+            @BindServiceFlagsBits int flags)
             throws RemoteException;
 
     /**
      * Kill an app process associated with an SDK sandbox.
      *
-     * @param clientApplicationThreadBinder binder value of the
-     *        {@link android.app.IApplicationThread} of a client app process associated with a
-     *        sandbox. This is obtained using {@link Context#getIApplicationThreadBinder()}.
+     * @param clientAppProcessToken process token used to uniquely identify the client app
+     *        process associated with an SDK sandbox. This is obtained using
+     *        {@link Context#getProcessToken()}.
      */
-    void killSdkSandboxClientAppProcess(@NonNull IBinder clientApplicationThreadBinder);
-
-    /**
-     * Start a foreground service delegate.
-     * @param options foreground service delegate options.
-     * @param connection a service connection served as callback to caller.
-     * @return true if delegate is started successfully, false otherwise.
-     * @hide
-     */
-    boolean startForegroundServiceDelegate(@NonNull ForegroundServiceDelegationOptions options,
-            @Nullable ServiceConnection connection);
-
-    /**
-     * Stop a foreground service delegate.
-     * @param options the foreground service delegate options.
-     * @hide
-     */
-    void stopForegroundServiceDelegate(@NonNull ForegroundServiceDelegationOptions options);
-
-    /**
-     * Stop a foreground service delegate by service connection.
-     * @param connection service connection used to start delegate previously.
-     * @hide
-     */
-    void stopForegroundServiceDelegate(@NonNull ServiceConnection connection);
+    void killSdkSandboxClientAppProcess(@NonNull IBinder clientAppProcessToken);
 }

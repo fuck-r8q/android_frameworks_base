@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -46,6 +47,7 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.os.Bundle;
 
 import androidx.test.annotation.UiThreadTest;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -86,7 +88,6 @@ import org.mockito.MockitoAnnotations;
 public class SplitScreenControllerTests extends ShellTestCase {
 
     @Mock ShellInit mShellInit;
-    @Mock ShellController mShellController;
     @Mock ShellCommandHandler mShellCommandHandler;
     @Mock ShellTaskOrganizer mTaskOrganizer;
     @Mock SyncTransactionQueue mSyncQueue;
@@ -103,12 +104,15 @@ public class SplitScreenControllerTests extends ShellTestCase {
     @Mock RecentTasksController mRecentTasks;
     @Captor ArgumentCaptor<Intent> mIntentCaptor;
 
+    private ShellController mShellController;
     private SplitScreenController mSplitScreenController;
 
     @Before
     public void setup() {
         assumeTrue(ActivityTaskManager.supportsSplitScreenMultiWindow(mContext));
         MockitoAnnotations.initMocks(this);
+        mShellController = spy(new ShellController(mShellInit, mShellCommandHandler,
+                mMainExecutor));
         mSplitScreenController = spy(new SplitScreenController(mContext, mShellInit,
                 mShellCommandHandler, mShellController, mTaskOrganizer, mSyncQueue,
                 mRootTDAOrganizer, mDisplayController, mDisplayImeController,
@@ -118,7 +122,7 @@ public class SplitScreenControllerTests extends ShellTestCase {
 
     @Test
     public void instantiateController_addInitCallback() {
-        verify(mShellInit, times(1)).addInitCallback(any(), any());
+        verify(mShellInit, times(1)).addInitCallback(any(), isA(SplitScreenController.class));
     }
 
     @Test
@@ -159,6 +163,19 @@ public class SplitScreenControllerTests extends ShellTestCase {
     }
 
     @Test
+    public void testInvalidateExternalInterface_unregistersListener() {
+        mSplitScreenController.onInit();
+        mSplitScreenController.registerSplitScreenListener(
+                new SplitScreen.SplitScreenListener() {});
+        verify(mStageCoordinator).registerSplitScreenListener(any());
+        // Create initial interface
+        mShellController.createExternalInterfaces(new Bundle());
+        // Recreate the interface to trigger invalidation of the previous instance
+        mShellController.createExternalInterfaces(new Bundle());
+        verify(mStageCoordinator).unregisterSplitScreenListener(any());
+    }
+
+    @Test
     public void testStartIntent_appendsNoUserActionFlag() {
         Intent startIntent = createStartIntent("startActivity");
         PendingIntent pendingIntent =
@@ -182,7 +199,6 @@ public class SplitScreenControllerTests extends ShellTestCase {
         ActivityManager.RunningTaskInfo topRunningTask =
                 createTaskInfo(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, startIntent);
         doReturn(topRunningTask).when(mRecentTasks).getTopRunningTask();
-        doReturn(true).when(mStageCoordinator).isValidToEnterSplitScreen(any());
 
         mSplitScreenController.startIntent(pendingIntent, null, SPLIT_POSITION_TOP_OR_LEFT, null);
 
@@ -203,7 +219,6 @@ public class SplitScreenControllerTests extends ShellTestCase {
         ActivityManager.RunningTaskInfo topRunningTask =
                 createTaskInfo(WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, startIntent);
         doReturn(topRunningTask).when(mRecentTasks).getTopRunningTask();
-        doReturn(true).when(mStageCoordinator).isValidToEnterSplitScreen(any());
         // Put the same component into a task in the background
         ActivityManager.RecentTaskInfo sameTaskInfo = new ActivityManager.RecentTaskInfo();
         doReturn(sameTaskInfo).when(mRecentTasks).findTaskInBackground(any());

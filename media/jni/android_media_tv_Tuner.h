@@ -198,6 +198,7 @@ struct JTuner : public RefBase {
     jobject openDescrambler();
     jobject openDvr(DvrType type, jlong bufferSize);
     jobject getDemuxCaps();
+    jobject getDemuxInfo(int handle);
     jobject getFrontendStatus(jintArray types);
     Result openDemux(int handle);
     jint close();
@@ -235,6 +236,7 @@ private:
     static jobject getIsdbsFrontendCaps(JNIEnv* env, FrontendCapabilities& caps);
     static jobject getIsdbtFrontendCaps(JNIEnv* env, FrontendCapabilities& caps);
     static jobject getDtmbFrontendCaps(JNIEnv* env, FrontendCapabilities& caps);
+    static jobject getIptvFrontendCaps(JNIEnv* env, FrontendCapabilities& caps);
 };
 
 class C2DataIdInfo : public C2Param {

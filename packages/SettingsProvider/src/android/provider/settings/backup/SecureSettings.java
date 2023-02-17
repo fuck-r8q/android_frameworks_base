@@ -29,7 +29,7 @@ public class SecureSettings {
      */
     @UnsupportedAppUsage
     public static final String[] SETTINGS_TO_BACKUP = {
-        Settings.Secure.BUGREPORT_IN_POWER_MENU,                            // moved to global
+        Settings.Secure.BUGREPORT_IN_POWER_MENU,
         Settings.Secure.ALLOW_MOCK_LOCATION,
         Settings.Secure.USB_MASS_STORAGE_ENABLED,                           // moved to global
         Settings.Secure.ACCESSIBILITY_DISPLAY_INVERSION_ENABLED,
@@ -123,13 +123,15 @@ public class SecureSettings {
         Settings.Secure.FINGERPRINT_SIDE_FPS_BP_POWER_WINDOW,
         Settings.Secure.FINGERPRINT_SIDE_FPS_ENROLL_TAP_WINDOW,
         Settings.Secure.FINGERPRINT_SIDE_FPS_AUTH_DOWNTIME,
-        Settings.Secure.SFPS_REQUIRE_SCREEN_ON_TO_AUTH_ENABLED,
+        Settings.Secure.SFPS_PERFORMANT_AUTH_ENABLED,
         Settings.Secure.ACTIVE_UNLOCK_ON_WAKE,
         Settings.Secure.ACTIVE_UNLOCK_ON_UNLOCK_INTENT,
         Settings.Secure.ACTIVE_UNLOCK_ON_BIOMETRIC_FAIL,
         Settings.Secure.ACTIVE_UNLOCK_ON_FACE_ERRORS,
         Settings.Secure.ACTIVE_UNLOCK_ON_FACE_ACQUIRE_INFO,
         Settings.Secure.ACTIVE_UNLOCK_ON_UNLOCK_INTENT_WHEN_BIOMETRIC_ENROLLED,
+        Settings.Secure.ACTIVE_UNLOCK_WAKEUPS_CONSIDERED_UNLOCK_INTENTS,
+        Settings.Secure.ACTIVE_UNLOCK_WAKEUPS_TO_FORCE_DISMISS_KEYGUARD,
         Settings.Secure.VR_DISPLAY_MODE,
         Settings.Secure.NOTIFICATION_BADGING,
         Settings.Secure.NOTIFICATION_DISMISS_RTL,
@@ -210,6 +212,8 @@ public class SecureSettings {
         Settings.Secure.ACCESSIBILITY_FLOATING_MENU_ICON_TYPE,
         Settings.Secure.ACCESSIBILITY_FLOATING_MENU_OPACITY,
         Settings.Secure.ACCESSIBILITY_FLOATING_MENU_FADE_ENABLED,
+        Settings.Secure.ACCESSIBILITY_MAGNIFICATION_ALWAYS_ON_ENABLED,
+        Settings.Secure.ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED,
         Settings.Secure.ODI_CAPTIONS_VOLUME_UI_ENABLED,
         Settings.Secure.NOTIFICATION_BUBBLES,
         Settings.Secure.LOCATION_TIME_ZONE_DETECTION_ENABLED,
@@ -225,6 +229,13 @@ public class SecureSettings {
         Settings.Secure.ASSIST_LONG_PRESS_HOME_ENABLED,
         Settings.Secure.BLUETOOTH_LE_BROADCAST_PROGRAM_INFO,
         Settings.Secure.BLUETOOTH_LE_BROADCAST_CODE,
-        Settings.Secure.BLUETOOTH_LE_BROADCAST_APP_SOURCE_NAME
+        Settings.Secure.BLUETOOTH_LE_BROADCAST_APP_SOURCE_NAME,
+        Settings.Secure.CUSTOM_BUGREPORT_HANDLER_APP,
+        Settings.Secure.CUSTOM_BUGREPORT_HANDLER_USER,
+        Settings.Secure.LOCK_SCREEN_WEATHER_ENABLED,
+        Settings.Secure.HEARING_AID_RINGTONE_ROUTING,
+        Settings.Secure.HEARING_AID_CALL_ROUTING,
+        Settings.Secure.HEARING_AID_MEDIA_ROUTING,
+        Settings.Secure.HEARING_AID_SYSTEM_SOUNDS_ROUTING,
     };
 }

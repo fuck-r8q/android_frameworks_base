@@ -53,6 +53,7 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.statusbar.notification.stack.ViewState;
@@ -147,7 +148,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
      * 0, the bouncer is visible.
      */
     @FloatRange(from = 0, to = 1)
-    private float mBouncerHiddenFraction = KeyguardBouncer.EXPANSION_HIDDEN;
+    private float mBouncerHiddenFraction = KeyguardBouncerConstants.EXPANSION_HIDDEN;
 
     /**
      * Set whether an unocclusion animation is currently running on the notification panel. Used
@@ -790,27 +791,35 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             if (!mScreenOffAnimationController.shouldExpandNotifications()
                     && !mAnimatingPanelExpansionOnUnlock
                     && !occluding) {
-                float behindFraction = getInterpolatedFraction();
-                behindFraction = (float) Math.pow(behindFraction, 0.8f);
                 if (mClipsQsScrim) {
+                    float behindFraction = getInterpolatedFraction();
+                    behindFraction = (float) Math.pow(behindFraction, 0.8f);
                     mBehindAlpha = mTransparentScrimBackground ? 0 : 1;
                     mNotificationsAlpha =
                             mTransparentScrimBackground ? 0 : behindFraction * mDefaultScrimAlpha;
                 } else {
-                    mBehindAlpha =
-                            mTransparentScrimBackground ? 0 : behindFraction * mDefaultScrimAlpha;
-                    // Delay fade-in of notification scrim a bit further, to coincide with the
-                    // view fade in. Otherwise the empty panel can be quite jarring.
-                    mNotificationsAlpha = mTransparentScrimBackground
-                            ? 0 : MathUtils.constrainedMap(0f, 1f, 0.3f, 0.75f,
-                            mPanelExpansionFraction);
+                    if (mTransparentScrimBackground) {
+                        mBehindAlpha = 0;
+                        mNotificationsAlpha = 0;
+                    } else {
+                        // Behind scrim will finish fading in at 30% expansion.
+                        float behindFraction = MathUtils
+                                .constrainedMap(0f, 1f, 0f, 0.3f, mPanelExpansionFraction);
+                        mBehindAlpha = behindFraction * mDefaultScrimAlpha;
+                        // Delay fade-in of notification scrim a bit further, to coincide with the
+                        // behind scrim finishing fading in.
+                        // Also to coincide with the view starting to fade in, otherwise the empty
+                        // panel can be quite jarring.
+                        mNotificationsAlpha = MathUtils
+                                .constrainedMap(0f, 1f, 0.3f, 0.75f, mPanelExpansionFraction);
+                    }
                 }
                 mBehindTint = mState.getBehindTint();
                 mInFrontAlpha = 0;
             }
 
             if (mState == ScrimState.DREAMING
-                    && mBouncerHiddenFraction != KeyguardBouncer.EXPANSION_HIDDEN) {
+                    && mBouncerHiddenFraction != KeyguardBouncerConstants.EXPANSION_HIDDEN) {
                 final float interpolatedFraction =
                         BouncerPanelExpansionCalculator.aboutToShowBouncerProgress(
                                 mBouncerHiddenFraction);

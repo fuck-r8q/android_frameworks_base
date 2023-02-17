@@ -18,6 +18,7 @@
 package com.android.systemui.keyguard.domain.interactor
 
 import android.os.UserHandle
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
 import com.android.systemui.R
@@ -35,6 +36,7 @@ import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanc
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceLegacySettingSyncer
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceLocalUserSelectionManager
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceRemoteUserSelectionManager
+import com.android.systemui.keyguard.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.KeyguardQuickAffordanceRepository
 import com.android.systemui.keyguard.domain.model.KeyguardQuickAffordanceModel
@@ -46,6 +48,7 @@ import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.settings.UserFileManager
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.shared.keyguard.shared.model.KeyguardQuickAffordanceSlots
+import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.FakeSharedPreferences
 import com.android.systemui.util.mockito.mock
@@ -59,7 +62,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
@@ -67,7 +69,7 @@ import org.mockito.MockitoAnnotations
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
-@RunWith(JUnit4::class)
+@RunWith(AndroidJUnit4::class)
 class KeyguardQuickAffordanceInteractorTest : SysuiTestCase() {
 
     @Mock private lateinit var lockPatternUtils: LockPatternUtils
@@ -75,6 +77,7 @@ class KeyguardQuickAffordanceInteractorTest : SysuiTestCase() {
     @Mock private lateinit var userTracker: UserTracker
     @Mock private lateinit var activityStarter: ActivityStarter
     @Mock private lateinit var launchAnimator: DialogLaunchAnimator
+    @Mock private lateinit var commandQueue: CommandQueue
 
     private lateinit var underTest: KeyguardQuickAffordanceInteractor
 
@@ -148,11 +151,18 @@ class KeyguardQuickAffordanceInteractorTest : SysuiTestCase() {
         featureFlags =
             FakeFeatureFlags().apply {
                 set(Flags.CUSTOMIZABLE_LOCK_SCREEN_QUICK_AFFORDANCES, false)
+                set(Flags.FACE_AUTH_REFACTOR, true)
             }
 
         underTest =
             KeyguardQuickAffordanceInteractor(
-                keyguardInteractor = KeyguardInteractor(repository = repository),
+                keyguardInteractor =
+                    KeyguardInteractor(
+                        repository = repository,
+                        commandQueue = commandQueue,
+                        featureFlags = featureFlags,
+                        bouncerRepository = FakeKeyguardBouncerRepository(),
+                    ),
                 registry =
                     FakeKeyguardQuickAffordanceRegistry(
                         mapOf(

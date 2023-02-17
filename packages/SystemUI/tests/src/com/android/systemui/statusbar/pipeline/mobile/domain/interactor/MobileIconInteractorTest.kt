@@ -25,6 +25,7 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileConnectionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
+import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.CarrierMergedNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.DefaultNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.OverrideNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeMobileConnectionRepository
@@ -60,9 +61,12 @@ class MobileIconInteractorTest : SysuiTestCase() {
                 mobileIconsInteractor.activeDataConnectionHasDataEnabled,
                 mobileIconsInteractor.alwaysShowDataRatIcon,
                 mobileIconsInteractor.alwaysUseCdmaLevel,
+                mobileIconsInteractor.defaultMobileNetworkConnectivity,
                 mobileIconsInteractor.defaultMobileIconMapping,
                 mobileIconsInteractor.defaultMobileIconGroup,
+                mobileIconsInteractor.defaultDataSubId,
                 mobileIconsInteractor.isDefaultConnectionFailed,
+                mobileIconsInteractor.isForceHidden,
                 connectionRepository,
             )
     }
@@ -266,6 +270,47 @@ class MobileIconInteractorTest : SysuiTestCase() {
             val job = underTest.networkTypeIconGroup.onEach { latest = it }.launchIn(this)
 
             assertThat(latest).isEqualTo(FakeMobileIconsInteractor.DEFAULT_ICON)
+
+            job.cancel()
+        }
+
+    @Test
+    fun iconGroup_carrierMerged_usesOverride() =
+        runBlocking(IMMEDIATE) {
+            connectionRepository.setConnectionInfo(
+                MobileConnectionModel(
+                    resolvedNetworkType = CarrierMergedNetworkType,
+                ),
+            )
+
+            var latest: MobileIconGroup? = null
+            val job = underTest.networkTypeIconGroup.onEach { latest = it }.launchIn(this)
+
+            assertThat(latest).isEqualTo(CarrierMergedNetworkType.iconGroupOverride)
+
+            job.cancel()
+        }
+
+    @Test
+    fun `icon group - checks default data`() =
+        runBlocking(IMMEDIATE) {
+            mobileIconsInteractor.defaultDataSubId.value = SUB_1_ID
+            connectionRepository.setConnectionInfo(
+                MobileConnectionModel(
+                    resolvedNetworkType = DefaultNetworkType(mobileMappingsProxy.toIconKey(THREE_G))
+                ),
+            )
+
+            var latest: MobileIconGroup? = null
+            val job = underTest.networkTypeIconGroup.onEach { latest = it }.launchIn(this)
+
+            assertThat(latest).isEqualTo(TelephonyIcons.THREE_G)
+
+            // Default data sub id changes to something else
+            mobileIconsInteractor.defaultDataSubId.value = 123
+            yield()
+
+            assertThat(latest).isEqualTo(TelephonyIcons.NOT_DEFAULT_DATA)
 
             job.cancel()
         }
@@ -486,7 +531,7 @@ class MobileIconInteractorTest : SysuiTestCase() {
             )
             yield()
 
-            assertThat(latest).isEqualTo(NetworkNameModel.Derived(testOperatorName))
+            assertThat(latest).isEqualTo(NetworkNameModel.IntentDerived(testOperatorName))
 
             // Default network name, operator name is null, uses the default
             connectionRepository.setConnectionInfo(MobileConnectionModel(operatorAlphaShort = null))
@@ -506,6 +551,21 @@ class MobileIconInteractorTest : SysuiTestCase() {
             job.cancel()
         }
 
+    @Test
+    fun isForceHidden_matchesParent() =
+        runBlocking(IMMEDIATE) {
+            var latest: Boolean? = null
+            val job = underTest.isForceHidden.onEach { latest = it }.launchIn(this)
+
+            mobileIconsInteractor.isForceHidden.value = true
+            assertThat(latest).isTrue()
+
+            mobileIconsInteractor.isForceHidden.value = false
+            assertThat(latest).isFalse()
+
+            job.cancel()
+        }
+
     companion object {
         private val IMMEDIATE = Dispatchers.Main.immediate
 
@@ -515,6 +575,6 @@ class MobileIconInteractorTest : SysuiTestCase() {
         private const val SUB_1_ID = 1
 
         private val DEFAULT_NAME = NetworkNameModel.Default("test default name")
-        private val DERIVED_NAME = NetworkNameModel.Derived("test derived name")
+        private val DERIVED_NAME = NetworkNameModel.IntentDerived("test derived name")
     }
 }

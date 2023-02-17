@@ -21,10 +21,7 @@ import com.android.server.wm.flicker.FlickerBuilder
 import com.android.server.wm.flicker.FlickerTest
 import com.android.server.wm.flicker.FlickerTestFactory
 import com.android.server.wm.flicker.helpers.CameraAppHelper
-import com.android.server.wm.flicker.helpers.isShellTransitionsEnabled
 import com.android.server.wm.flicker.junit.FlickerParametersRunnerFactory
-import org.junit.Assume
-import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
@@ -42,11 +39,6 @@ import org.junit.runners.Parameterized
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 open class OpenAppAfterCameraTest(flicker: FlickerTest) : OpenAppFromLauncherTransition(flicker) {
-    @Before
-    open fun before() {
-        Assume.assumeFalse(isShellTransitionsEnabled)
-    }
-
     private val cameraApp = CameraAppHelper(instrumentation)
     /** {@inheritDoc} */
     override val transition: FlickerBuilder.() -> Unit
@@ -57,8 +49,9 @@ open class OpenAppAfterCameraTest(flicker: FlickerTest) : OpenAppFromLauncherTra
                 // 1. Open camera - cold -> close it first
                 cameraApp.exit(wmHelper)
                 cameraApp.launchViaIntent(wmHelper)
-                // 2. Press home button (button nav mode) / swipe up to home (gesture nav mode)
-                tapl.goHome()
+                // Can't use TAPL due to Recents not showing in 3 Button Nav in full screen mode
+                device.pressHome()
+                tapl.getWorkspace()
             }
             teardown { testApp.exit(wmHelper) }
             transitions { testApp.launchViaIntent(wmHelper) }

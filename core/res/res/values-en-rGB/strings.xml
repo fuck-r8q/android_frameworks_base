@@ -386,6 +386,8 @@
     <string name="permdesc_killBackgroundProcesses" msgid="2357013583055434685">"Allows the app to end background processes of other apps. This may cause other apps to stop running."</string>
     <string name="permlab_systemAlertWindow" msgid="5757218350944719065">"This app can appear on top of other apps"</string>
     <string name="permdesc_systemAlertWindow" msgid="1145660714855738308">"This app can appear on top of other apps or other parts of the screen. This may interfere with normal app usage and change the way that other apps appear."</string>
+    <string name="permlab_hideOverlayWindows" msgid="6382697828482271802">"hide other apps\' overlays"</string>
+    <string name="permdesc_hideOverlayWindows" msgid="5660242821651958225">"This app can request that the system hides overlays originating from apps from being shown on top of it."</string>
     <string name="permlab_runInBackground" msgid="541863968571682785">"run in the background"</string>
     <string name="permdesc_runInBackground" msgid="4344539472115495141">"This app can run in the background. This may drain battery faster."</string>
     <string name="permlab_useDataInBackground" msgid="783415807623038947">"use data in the background"</string>
@@ -456,6 +458,10 @@
     <string name="permdesc_bodySensors" product="default" msgid="7652650410295512140">"Allows the app to access body sensor data, such as heart rate, temperature and blood oxygen percentage, while the app is in use."</string>
     <string name="permlab_bodySensors_background" msgid="4912560779957760446">"Access body sensor data, like heart rate, while in the background"</string>
     <string name="permdesc_bodySensors_background" product="default" msgid="8870726027557749417">"Allows the app to access body sensor data, such as heart rate, temperature and blood oxygen percentage, while the app is in the background."</string>
+    <string name="permlab_bodySensorsWristTemperature" msgid="5007987988922337657">"Access body sensor wrist temperature data while the app is in use."</string>
+    <string name="permdesc_bodySensorsWristTemperature" product="default" msgid="4978345709781045181">"Allows the app to access body sensor wrist temperature data, while the app is in use."</string>
+    <string name="permlab_bodySensors_wristTemperature_background" msgid="7692772783509074356">"Access body sensor wrist temperature data while the app is in the background."</string>
+    <string name="permdesc_bodySensors_wristTemperature_background" product="default" msgid="3170369705518699219">"Allows the app to access body sensor wrist temperature data, while the app is in the background."</string>
     <string name="permlab_readCalendar" msgid="6408654259475396200">"Read calendar events and details"</string>
     <string name="permdesc_readCalendar" product="tablet" msgid="515452384059803326">"This app can read all calendar events stored on your tablet and share or save your calendar data."</string>
     <string name="permdesc_readCalendar" product="tv" msgid="5811726712981647628">"This app can read all calendar events stored on your Android TV device and share or save your calendar data."</string>
@@ -1054,50 +1060,12 @@
     <string name="js_dialog_before_unload_positive_button" msgid="4274257182303565509">"Leave this Page"</string>
     <string name="js_dialog_before_unload_negative_button" msgid="3873765747622415310">"Stay on this Page"</string>
     <string name="js_dialog_before_unload" msgid="7213364985774778744">"<xliff:g id="MESSAGE">%s</xliff:g>\n\nAre you sure you want to navigate away from this page?"</string>
-    <string name="save_password_label" msgid="9161712335355510035">"Confirm"</string>
-    <string name="double_tap_toast" msgid="7065519579174882778">"Tip: double-tap to zoom in and out."</string>
-    <string name="autofill_this_form" msgid="3187132440451621492">"Auto-fill"</string>
-    <string name="setup_autofill" msgid="5431369130866618567">"Set up Auto-fill"</string>
     <string name="autofill_window_title" msgid="4379134104008111961">"Autofill with <xliff:g id="SERVICENAME">%1$s</xliff:g>"</string>
-    <string name="autofill_address_name_separator" msgid="8190155636149596125">" "</string>
-    <string name="autofill_address_summary_name_format" msgid="3402882515222673691">"$1$2$3"</string>
-    <string name="autofill_address_summary_separator" msgid="760522655085707045">", "</string>
-    <string name="autofill_address_summary_format" msgid="8417010069362125194">"$1$2$3"</string>
-    <string name="autofill_province" msgid="3676846437741893159">"Province"</string>
-    <string name="autofill_postal_code" msgid="7034789388968295591">"Postcode"</string>
-    <string name="autofill_state" msgid="3341725337190434069">"State"</string>
-    <string name="autofill_zip_code" msgid="1315503730274962450">"Zip code"</string>
-    <string name="autofill_county" msgid="7781382735643492173">"County"</string>
-    <string name="autofill_island" msgid="5367139008536593734">"Island"</string>
-    <string name="autofill_district" msgid="6428712062213557327">"District"</string>
-    <string name="autofill_department" msgid="9047276226873531529">"Department"</string>
-    <string name="autofill_prefecture" msgid="7267397763720241872">"Prefecture"</string>
-    <string name="autofill_parish" msgid="6847960518334530198">"Parish"</string>
-    <string name="autofill_area" msgid="8289022370678448983">"Area"</string>
-    <string name="autofill_emirate" msgid="2544082046790551168">"Emirate"</string>
-    <string name="permlab_readHistoryBookmarks" msgid="9102293913842539697">"read your Web bookmarks and history"</string>
-    <string name="permdesc_readHistoryBookmarks" msgid="2323799501008967852">"Allows the app to read the history of all URLs that the Browser has visited, and all of the Browser\'s bookmarks. Note: this permission may not be enforced by third-party browsers or other applications with web browsing capabilities."</string>
-    <string name="permlab_writeHistoryBookmarks" msgid="6090259925187986937">"write web bookmarks and history"</string>
-    <string name="permdesc_writeHistoryBookmarks" product="tablet" msgid="573341025292489065">"Allows the app to modify the Browser\'s history or bookmarks stored on your tablet. This may allow the app to delete or modify Browser data. Note: this permission may not be enforced by third-party browsers or other applications with web browsing capabilities."</string>
-    <string name="permdesc_writeHistoryBookmarks" product="tv" msgid="88642768580408561">"Allows the app to modify the browser\'s history or bookmarks stored on your Android TV device. This may allow the app to delete or modify browser data. Note: This permission may not be enforced by third-party browsers or other applications with web browsing capabilities."</string>
-    <string name="permdesc_writeHistoryBookmarks" product="default" msgid="2245203087160913652">"Allows the app to modify the Browser\'s history or bookmarks stored on your phone. This may allow the app to delete or modify Browser data. Note: this permission may not be enforced by third-party browsers or other applications with web browsing capabilities."</string>
     <string name="permlab_setAlarm" msgid="1158001610254173567">"set an alarm"</string>
     <string name="permdesc_setAlarm" msgid="2185033720060109640">"Allows the app to set an alarm in an installed alarm clock app. Some alarm clock apps may not implement this feature."</string>
     <string name="permlab_addVoicemail" msgid="4770245808840814471">"add voicemail"</string>
     <string name="permdesc_addVoicemail" msgid="5470312139820074324">"Allows the app to add messages to your voicemail inbox."</string>
-    <string name="permlab_writeGeolocationPermissions" msgid="8605631647492879449">"Modify Browser geo-location permissions"</string>
-    <string name="permdesc_writeGeolocationPermissions" msgid="5817346421222227772">"Allows the app to modify the Browser\'s geo-location permissions. Malicious apps may use this to allow sending location information to arbitrary websites."</string>
-    <string name="save_password_message" msgid="2146409467245462965">"Do you want the browser to remember this password?"</string>
-    <string name="save_password_notnow" msgid="2878327088951240061">"Not now"</string>
-    <string name="save_password_remember" msgid="6490888932657708341">"Remember"</string>
-    <string name="save_password_never" msgid="6776808375903410659">"Never"</string>
-    <string name="open_permission_deny" msgid="5136793905306987251">"You don\'t have permission to open this page."</string>
-    <string name="text_copied" msgid="2531420577879738860">"Text copied to clipboard."</string>
-    <string name="pasted_from_app" msgid="5627698450808256545">"<xliff:g id="PASTING_APP_NAME">%1$s</xliff:g> pasted from <xliff:g id="SOURCE_APP_NAME">%2$s</xliff:g>"</string>
     <string name="pasted_from_clipboard" msgid="7355790625710831847">"<xliff:g id="PASTING_APP_NAME">%1$s</xliff:g> pasted from your clipboard"</string>
-    <string name="pasted_text" msgid="4298871641549173733">"<xliff:g id="PASTING_APP_NAME">%1$s</xliff:g> pasted text that you copied"</string>
-    <string name="pasted_image" msgid="4729097394781491022">"<xliff:g id="PASTING_APP_NAME">%1$s</xliff:g> pasted an image that you copied"</string>
-    <string name="pasted_content" msgid="646276353060777131">"<xliff:g id="PASTING_APP_NAME">%1$s</xliff:g> pasted content that you copied"</string>
     <string name="more_item_label" msgid="7419249600215749115">"More"</string>
     <string name="prepend_shortcut_label" msgid="1743716737502867951">"Menu+"</string>
     <string name="menu_meta_shortcut_label" msgid="1623390163674762478">"Meta+"</string>
@@ -1277,10 +1245,8 @@
     <string name="android_start_title" product="automotive" msgid="7917984412828168079">"Android is starting…"</string>
     <string name="android_start_title" product="tablet" msgid="4429767260263190344">"Tablet is starting…"</string>
     <string name="android_start_title" product="device" msgid="6967413819673299309">"Device is starting…"</string>
-    <string name="android_upgrading_fstrim" msgid="3259087575528515329">"Optimising storage."</string>
     <string name="android_upgrading_notification_title" product="default" msgid="3509927005342279257">"Finishing system update…"</string>
     <string name="app_upgrading_toast" msgid="1016267296049455585">"<xliff:g id="APPLICATION">%1$s</xliff:g> is upgrading…"</string>
-    <string name="android_upgrading_apk" msgid="1339564803894466737">"Optimising app <xliff:g id="NUMBER_0">%1$d</xliff:g> of <xliff:g id="NUMBER_1">%2$d</xliff:g>."</string>
     <string name="android_preparing_apk" msgid="589736917792300956">"Preparing <xliff:g id="APPNAME">%1$s</xliff:g>."</string>
     <string name="android_upgrading_starting_apps" msgid="6206161195076057075">"Starting apps."</string>
     <string name="android_upgrading_complete" msgid="409800058018374746">"Finishing boot."</string>
@@ -1392,6 +1358,7 @@
     <string name="usb_ptp_notification_title" msgid="5043437571863443281">"PTP via USB turned on"</string>
     <string name="usb_tether_notification_title" msgid="8828527870612663771">"USB tethering turned on"</string>
     <string name="usb_midi_notification_title" msgid="7404506788950595557">"MIDI via USB turned on"</string>
+    <string name="usb_uvc_notification_title" msgid="2030032862673400008">"Device connected as webcam"</string>
     <string name="usb_accessory_notification_title" msgid="1385394660861956980">"USB accessory connected"</string>
     <string name="usb_notification_message" msgid="4715163067192110676">"Tap for more options."</string>
     <string name="usb_power_notification_message" msgid="7284765627437897702">"Charging connected device. Tap for more options."</string>
@@ -1709,6 +1676,10 @@
     <string name="kg_text_message_separator" product="default" msgid="4503708889934976866">" — "</string>
     <string name="kg_reordering_delete_drop_target_text" msgid="2034358143731750914">"Remove"</string>
     <string name="safe_media_volume_warning" product="default" msgid="3751676824423049994">"Raise volume above recommended level?\n\nListening at high volume for long periods may damage your hearing."</string>
+    <string name="csd_dose_reached_warning" product="default" msgid="1032473160590983236">"Warning,\nYou have exceeded the amount of loud sound signals one can safely listen to in a week over headphones.\n\nGoing over this limit will permanently damage your hearing."</string>
+    <string name="csd_dose_repeat_warning" product="default" msgid="6765471037071089401">"Warning,\nYou have exceeded five times the amount of loud sound signals one can safely listen to in a week over headphones.\n\nVolume has been lowered to protect your hearing."</string>
+    <string name="csd_entering_RS2_warning" product="default" msgid="3699509945325496807">"The level at which you are listening to media can result in hearing damage when sustained over long periods of time.\n\nContinuing to play at this level for long periods of time could damage your hearing."</string>
+    <string name="csd_momentary_exposure_warning" product="default" msgid="7861896191081176454">"Warning,\nYou are currently listening to loud content played at an unsafe level.\n\nContinuing to listen this loud will permanently damage your hearing."</string>
     <string name="accessibility_shortcut_warning_dialog_title" msgid="4017995837692622933">"Use Accessibility Shortcut?"</string>
     <string name="accessibility_shortcut_toogle_warning" msgid="4161716521310929544">"When the shortcut is on, pressing both volume buttons for three seconds will start an accessibility feature."</string>
     <string name="accessibility_shortcut_multiple_service_warning_title" msgid="3135860819356676426">"Turn on shortcut for accessibility features?"</string>
@@ -1736,10 +1707,11 @@
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Done"</string>
     <string name="disable_accessibility_shortcut" msgid="5806091378745232383">"Turn off Shortcut"</string>
     <string name="leave_accessibility_shortcut_on" msgid="6543362062336990814">"Use Shortcut"</string>
-    <string name="color_inversion_feature_name" msgid="326050048927789012">"Colour Inversion"</string>
+    <string name="color_inversion_feature_name" msgid="2672824491933264951">"Colour inversion"</string>
     <string name="color_correction_feature_name" msgid="7975133554160979214">"Colour correction"</string>
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"One-handed mode"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Extra dim"</string>
+    <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Hearing devices"</string>
     <string name="accessibility_shortcut_enabling_service" msgid="5473495203759847687">"Held volume keys. <xliff:g id="SERVICE_NAME">%1$s</xliff:g> turned on."</string>
     <string name="accessibility_shortcut_disabling_service" msgid="8675244165062700619">"Held volume keys. <xliff:g id="SERVICE_NAME">%1$s</xliff:g> turned off."</string>
     <string name="accessibility_shortcut_spoken_feedback" msgid="4228997042855695090">"Press and hold both volume keys for three seconds to use <xliff:g id="SERVICE_NAME">%1$s</xliff:g>"</string>
@@ -1873,6 +1845,8 @@
     <string name="immersive_cling_title" msgid="2307034298721541791">"Viewing full screen"</string>
     <string name="immersive_cling_description" msgid="7092737175345204832">"To exit, swipe down from the top."</string>
     <string name="immersive_cling_positive" msgid="7047498036346489883">"Got it"</string>
+    <string name="display_rotation_camera_compat_toast_after_rotation" msgid="7600891546249829854">"Rotate for a better view"</string>
+    <string name="display_rotation_camera_compat_toast_in_split_screen" msgid="8393302456336805466">"Exit split screen for a better view"</string>
     <string name="done_label" msgid="7283767013231718521">"Done"</string>
     <string name="hour_picker_description" msgid="5153757582093524635">"Hours circular slider"</string>
     <string name="minute_picker_description" msgid="9029797023621927294">"Minutes circular slider"</string>
@@ -1884,6 +1858,7 @@
     <string name="managed_profile_label_badge" msgid="6762559569999499495">"Work <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"2nd Work <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3rd Work <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="clone_profile_label_badge" msgid="1871997694718793964">"Clone <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Ask for PIN before unpinning"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Ask for unlock pattern before unpinning"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Ask for password before unpinning"</string>
@@ -1974,6 +1949,8 @@
     <string name="work_mode_off_title" msgid="961171256005852058">"Turn on work apps?"</string>
     <string name="work_mode_off_message" msgid="7319580997683623309">"Get access to your work apps and notifications"</string>
     <string name="work_mode_turn_on" msgid="3662561662475962285">"Turn on"</string>
+    <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Emergency"</string>
+    <string name="work_mode_dialer_off_message" msgid="2193299184850387465">"Get access to your work apps and calls"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"App is not available"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> is not available right now."</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> unavailable"</string>
@@ -2334,8 +2311,12 @@
     <string name="permdesc_deliverCompanionMessages" msgid="2170847384281412850">"Allows a companion app to deliver companion messages to other devices."</string>
     <string name="permlab_startForegroundServicesFromBackground" msgid="6363004936218638382">"Start foreground services from background"</string>
     <string name="permdesc_startForegroundServicesFromBackground" msgid="4071826571656001537">"Allows a companion app to start foreground services from background."</string>
-    <!-- no translation found for mic_access_on_toast (2666925317663845156) -->
-    <skip />
-    <!-- no translation found for mic_access_off_toast (8111040892954242437) -->
-    <skip />
+    <string name="mic_access_on_toast" msgid="2666925317663845156">"Microphone is available"</string>
+    <string name="mic_access_off_toast" msgid="8111040892954242437">"Microphone is blocked"</string>
+    <string name="concurrent_display_notification_name" msgid="1526911253558311131">"Dual Screen"</string>
+    <string name="concurrent_display_notification_active_title" msgid="4892473462327943673">"Dual Screen is on"</string>
+    <string name="concurrent_display_notification_active_content" msgid="5889355473710601270">"<xliff:g id="APP_NAME">%1$s</xliff:g> is using both displays to show content"</string>
+    <string name="concurrent_display_notification_thermal_title" msgid="5921609404644739229">"Device is too warm"</string>
+    <string name="concurrent_display_notification_thermal_content" msgid="2075484836527609319">"Dual Screen is unavailable because your phone is getting too warm"</string>
+    <string name="device_state_notification_turn_off_button" msgid="6327161707661689232">"Turn off"</string>
 </resources>

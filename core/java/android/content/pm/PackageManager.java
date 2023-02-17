@@ -49,6 +49,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentSender;
+import android.content.pm.PackageInstaller.SessionParams;
 import android.content.pm.dex.ArtManager;
 import android.content.pm.pkg.FrameworkPackageUserState;
 import android.content.pm.verify.domain.DomainVerificationManager;
@@ -149,6 +150,29 @@ public abstract class PackageManager {
      */
     public static final String PROPERTY_MEDIA_CAPABILITIES =
             "android.media.PROPERTY_MEDIA_CAPABILITIES";
+
+    /**
+     * &lt;application&gt; level {@link android.content.pm.PackageManager.Property} tag
+     * specifying the XML resource ID containing the declaration of the self-certified network
+     * capabilities used by the application.
+     *
+     * <p> Starting from Android 14, usage of some network capabilities in
+     * {@link android.net.ConnectivityManager#requestNetwork} require the application to
+     * declare its usage of that particular capability in this resource. Only some capabilities
+     * require a declaration. Please look up the specific capability you want to use in
+     * {@link android.net.NetworkCapabilities} to see if it needs declaration in this property.
+     *
+     * For example:
+     * &lt;application&gt;
+     *   &lt;property android:name="android.net.PROPERTY_SELF_CERTIFIED_NETWORK_CAPABILITIES"
+     *     android:resource="@xml/self_certified_network_capabilities"&gt;
+     * &lt;application&gt;
+     *
+     * <p> The detail format of self_certified_network_capabilities.xml is described in
+     * {@link android.net.NetworkRequest}
+     */
+    public static final String PROPERTY_SELF_CERTIFIED_NETWORK_CAPABILITIES =
+            "android.net.PROPERTY_SELF_CERTIFIED_NETWORK_CAPABILITIES";
 
     /**
      * Application level property that an app can specify to opt-out from having private data
@@ -717,7 +741,7 @@ public abstract class PackageManager {
             GET_DISABLED_UNTIL_USED_COMPONENTS,
             GET_UNINSTALLED_PACKAGES,
             MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
-            GET_ATTRIBUTIONS,
+            GET_ATTRIBUTIONS_LONG,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PackageInfoFlagsBits {}
@@ -783,6 +807,7 @@ public abstract class PackageManager {
             GET_DISABLED_COMPONENTS,
             GET_DISABLED_UNTIL_USED_COMPONENTS,
             GET_UNINSTALLED_PACKAGES,
+            MATCH_CLONE_PROFILE
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ResolveInfoFlagsBits {}
@@ -1113,8 +1138,22 @@ public abstract class PackageManager {
     public static final int MATCH_DIRECT_BOOT_AUTO = 0x10000000;
 
     /**
-     * {@link PackageInfo} flag: return all attributions declared in the package manifest
+     * {@link ResolveInfo} flag: allow matching components across clone profile
+     * <p>
+     * This flag is used only for query and not resolution, the default behaviour would be to
+     * restrict querying across clone profile. This flag would be honored only if caller have
+     * permission {@link Manifest.permission.QUERY_CLONED_APPS}.
+     *
+     *  @hide
+     * <p>
      */
+    @SystemApi
+    public static final int MATCH_CLONE_PROFILE = 0x20000000;
+
+    /**
+     * @deprecated Use {@link #GET_ATTRIBUTIONS_LONG} to avoid unintended sign extension.
+     */
+    @Deprecated
     public static final int GET_ATTRIBUTIONS = 0x80000000;
 
     /** @hide */
@@ -1137,6 +1176,11 @@ public abstract class PackageManager {
      * for activation at next reboot.
      */
     public static final int MATCH_APEX = 0x40000000;
+
+    /**
+     * {@link PackageInfo} flag: return all attributions declared in the package manifest
+     */
+    public static final long GET_ATTRIBUTIONS_LONG = 0x80000000L;
 
     /**
      * Flag for {@link #addCrossProfileIntentFilter}: if this flag is set: when
@@ -1342,7 +1386,7 @@ public abstract class PackageManager {
             INSTALL_FROM_ADB,
             INSTALL_ALL_USERS,
             INSTALL_REQUEST_DOWNGRADE,
-            INSTALL_GRANT_RUNTIME_PERMISSIONS,
+            INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS,
             INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS,
             INSTALL_FORCE_VOLUME_UUID,
             INSTALL_FORCE_PERMISSION_PROMPT,
@@ -1355,6 +1399,7 @@ public abstract class PackageManager {
             INSTALL_ENABLE_ROLLBACK,
             INSTALL_ALLOW_DOWNGRADE,
             INSTALL_STAGED,
+            INSTALL_REQUEST_UPDATE_OWNERSHIP,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -1418,14 +1463,16 @@ public abstract class PackageManager {
     public static final int INSTALL_REQUEST_DOWNGRADE = 0x00000080;
 
     /**
-     * Flag parameter for {@link #installPackage} to indicate that all runtime
-     * permissions should be granted to the package. If {@link #INSTALL_ALL_USERS}
-     * is set the runtime permissions will be granted to all users, otherwise
-     * only to the owner.
+     * Flag parameter for package install to indicate that all requested permissions should be
+     * granted to the package. If {@link #INSTALL_ALL_USERS} is set the runtime permissions will
+     * be granted to all users, otherwise only to the owner.
+     * <p/>
+     * If this flag is set, {@link SessionParams#setPermissionState(String, int)} should not be
+     * called.
      *
      * @hide
      */
-    public static final int INSTALL_GRANT_RUNTIME_PERMISSIONS = 0x00000100;
+    public static final int INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS = 0x00000100;
 
     /** {@hide} */
     public static final int INSTALL_FORCE_VOLUME_UUID = 0x00000200;
@@ -1544,6 +1591,21 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_DISABLE_ALLOWED_APEX_UPDATE_CHECK = 0x00800000;
+
+    /**
+     * Flag parameter for {@link #installPackage} to bypass the low targer sdk version block
+     * for this install.
+     *
+     * @hide
+     */
+    public static final int INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK = 0x01000000;
+
+    /**
+     * Flag parameter for {@link SessionParams} to indicate that the
+     * update ownership enforcement is requested.
+     * @hide
+     */
+    public static final int INSTALL_REQUEST_UPDATE_OWNERSHIP = 1 << 25;
 
     /** @hide */
     @IntDef(flag = true, value = {
@@ -2233,6 +2295,15 @@ public abstract class PackageManager {
      */
     public static final int INSTALL_FAILED_PRE_APPROVAL_NOT_AVAILABLE = -129;
 
+    /**
+     * Installation return code: this is passed in the {@link PackageInstaller#EXTRA_LEGACY_STATUS}
+     * if the new package declares bad certificate digest for a shared library in the package
+     * manifest.
+     *
+     * @hide
+     */
+    public static final int INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST = -130;
+
     /** @hide */
     @IntDef(flag = true, prefix = { "DELETE_" }, value = {
             DELETE_KEEP_DATA,
@@ -2359,6 +2430,14 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int DELETE_FAILED_APP_PINNED = -7;
+
+    /**
+     * Deletion failed return code: this is passed to the
+     * {@link IPackageDeleteObserver} if the system failed to delete the package
+     * for any child profile with {@link UserProperties#getDeleteAppWithParent()} as true.
+     * @hide
+     */
+    public static final int DELETE_FAILED_FOR_CHILD_PROFILE = -8;
 
     /**
      * Return code that is passed to the {@link IPackageMoveObserver} when the
@@ -2986,14 +3065,6 @@ public abstract class PackageManager {
             "android.software.virtualization_framework";
 
     /**
-     * Feature for {@link #getSystemAvailableFeatures()} and {@link #hasSystemFeature(String)}.
-     * This feature indicates whether device supports seamless refresh rate switching.
-     */
-    @SdkConstant(SdkConstantType.FEATURE)
-    public static final String FEATURE_SEAMLESS_REFRESH_RATE_SWITCHING
-            = "android.software.seamless_refresh_rate_switching";
-
-    /**
      * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature(String, int)}: If this feature is supported, the Vulkan
      * implementation on this device is hardware accelerated, and the Vulkan native API will
@@ -3440,6 +3511,18 @@ public abstract class PackageManager {
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_TELEPHONY_RADIO_ACCESS =
             "android.hardware.telephony.radio.access";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
+     * The device supports Telephony APIs for Satellite communication.
+     *
+     * <p>This feature should only be defined if {@link #FEATURE_TELEPHONY_MESSAGING}
+     * has been defined.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_SATELLITE = "android.hardware.telephony.satellite";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
@@ -5776,7 +5859,7 @@ public abstract class PackageManager {
     /**
      * Returns the app metadata for a package.
      *
-     * @param packageName
+     * @param packageName The package name for which to get the app metadata.
      * @return A PersistableBundle containing the app metadata that was provided by the installer.
      *         In the case where a package does not have any metadata, an empty PersistableBundle is
      *         returned.
@@ -9582,6 +9665,23 @@ public abstract class PackageManager {
             @UserIdInt int sourceUserId, @UserIdInt int targetUserId, int flags);
 
     /**
+     * Removes all {@code CrossProfileIntentFilter}s which matches the specified intent filer,
+     * source, target and flag.
+     *
+     * @param filter       The {@link IntentFilter} the intent has to match
+     * @param sourceUserId The source user id.
+     * @param targetUserId The target user id.
+     * @param flags        The possible values are {@link #SKIP_CURRENT_PROFILE} and
+     *                     {@link #ONLY_IF_NO_MATCH_FOUND}.
+     * @hide
+     */
+    public boolean removeCrossProfileIntentFilter(@NonNull IntentFilter filter,
+            @UserIdInt int sourceUserId, @UserIdInt int targetUserId, int flags) {
+        throw new UnsupportedOperationException(
+                "removeCrossProfileIntentFilter not implemented in subclass");
+    }
+
+    /**
      * Clearing {@code CrossProfileIntentFilter}s which have the specified user
      * as their source, and have been set by the app calling this method.
      *
@@ -9681,6 +9781,8 @@ public abstract class PackageManager {
             case INSTALL_FAILED_WRONG_INSTALLED_VERSION: return "INSTALL_FAILED_WRONG_INSTALLED_VERSION";
             case INSTALL_FAILED_PROCESS_NOT_DEFINED: return "INSTALL_FAILED_PROCESS_NOT_DEFINED";
             case INSTALL_FAILED_SESSION_INVALID: return "INSTALL_FAILED_SESSION_INVALID";
+            case INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST:
+                return "INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST";
             default: return Integer.toString(status);
         }
     }
@@ -10849,5 +10951,20 @@ public abstract class PackageManager {
     public boolean shouldShowNewAppInstalledNotification() {
         throw new UnsupportedOperationException(
                 "isShowNewAppInstalledNotificationEnabled not implemented in subclass");
+    }
+
+    /**
+     * Attempt to relinquish the update ownership of the given package. Only the current
+     * update owner of the given package can use this API.
+     *
+     * @param targetPackage The installed package whose update owner will be changed.
+     * @throws IllegalArgumentException if the given package is invalid.
+     * @throws SecurityException if you are not the current update owner of the given package.
+     *
+     * @see PackageInstaller.SessionParams#setRequestUpdateOwnership
+     */
+    public void relinquishUpdateOwnership(@NonNull String targetPackage) {
+        throw new UnsupportedOperationException(
+                "relinquishUpdateOwnership not implemented in subclass");
     }
 }

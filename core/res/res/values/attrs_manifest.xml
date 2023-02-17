@@ -1648,14 +1648,25 @@
             or has been granted the access to one of the attached USB devices/accessories.
         -->
         <flag name="connectedDevice" value="0x10" />
-        <!-- Managing a media projection session, e.g, for screen recording or taking
-            screenshots.
+        <!-- Managing a {@link android.media.projection.MediaProjection MediaProjection} session,
+             e.g., for screen recording or takingscreenshots.
 
-            <p>For apps with <code>targetSdkVersion</code>
-            {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} and above, starting a foreground
-            service with this type will require permission
-            {@link android.Manifest.permission#FOREGROUND_SERVICE_MEDIA_PROJECTION}, and the user
-            must have allowed the screen capture request from this app.
+             <p>
+             To capture through {@link android.media.projection.MediaProjection}, an app must start
+             a foreground service with the type corresponding to this constant. This type should
+             only be used for {@link android.media.projection.MediaProjection}. Capturing screen
+             contents via
+             {@link android.media.projection.MediaProjection#createVirtualDisplay(String, int, int,
+             int, int, android.view.Surface, android.hardware.display.VirtualDisplay.Callback,
+             android.os.Handler) createVirtualDisplay} conveniently allows recording, presenting
+             screen contents into a meeting, taking screenshots, or several other scenarios.
+             </p>
+
+             <p>For apps with <code>targetSdkVersion</code>
+             {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} and above, starting a
+             foreground service with this type will require permission
+             {@link android.Manifest.permission#FOREGROUND_SERVICE_MEDIA_PROJECTION}, and the user
+             must have allowed the screen capture request from this app.
         -->
         <flag name="mediaProjection" value="0x20" />
         <!-- Use the camera device or record video.
@@ -1720,8 +1731,10 @@
             <p>Requires the app to hold the permission
             {@link android.Manifest.permission#FOREGROUND_SERVICE_FILE_MANAGEMENT} in order to use
             this type.
+
+            TODO: b/258855262 mark this field as {@code hide} once this bug is fixed.
+            <flag name="fileManagement" value="0x1000" />
         -->
-        <flag name="fileManagement" value="0x1000" />
         <!-- Use cases that can't be categorized into any other foreground service types, but also
             can't use @link android.app.job.JobInfo.Builder} APIs.
             See {@link android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_SPECIAL_USE} for the
@@ -1783,6 +1796,14 @@
     -->
     <attr name="attributionTags" format="string" />
 
+    <!-- Default value <code>true</code> allows an installer to enable update
+         ownership enforcement for this package via {@link
+         android.content.pm.PackageInstaller.SessionParams#setRequestUpdateOwnership}
+         during initial installation. This overrides the installer's use of {@link
+         android.content.pm.PackageInstaller.SessionParams#setRequestUpdateOwnership}.
+    -->
+    <attr name="allowUpdateOwnership" format="boolean" />
+
     <!-- The <code>manifest</code> tag is the root of an
          <code>AndroidManifest.xml</code> file,
          describing the contents of an Android package (.apk) file.  One
@@ -1820,6 +1841,7 @@
         <attr name="isSplitRequired" />
         <attr name="requiredSplitTypes" />
         <attr name="splitTypes" />
+        <attr name="allowUpdateOwnership" />
     </declare-styleable>
 
     <!-- The <code>application</code> tag describes application-level components

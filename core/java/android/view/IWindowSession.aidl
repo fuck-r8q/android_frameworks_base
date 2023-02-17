@@ -153,6 +153,12 @@ interface IWindowSession {
     boolean performHapticFeedback(int effectId, boolean always);
 
     /**
+     * Called by attached views to perform predefined haptic feedback without requiring VIBRATE
+     * permission.
+     */
+    oneway void performHapticFeedbackAsync(int effectId, boolean always);
+
+    /**
      * Initiate the drag operation itself
      *
      * @param window Window which initiates drag operation.
@@ -353,4 +359,6 @@ interface IWindowSession {
      * Returns whether this window needs to cancel draw and retry later.
      */
     boolean cancelDraw(IWindow window);
+
+    boolean transferEmbeddedTouchFocusToHost(IWindow embeddedWindow);
 }

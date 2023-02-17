@@ -640,7 +640,7 @@ public class WallpaperManager {
                 Bundle params = new Bundle();
                 try (ParcelFileDescriptor pfd = mService.getWallpaperWithFeature(
                         context.getOpPackageName(), context.getAttributionTag(), this, which,
-                        params, userId)) {
+                        params, userId, /* getCropped = */ true)) {
                     // Let's peek user wallpaper first.
                     if (pfd != null) {
                         BitmapFactory.Options options = new BitmapFactory.Options();
@@ -690,7 +690,7 @@ public class WallpaperManager {
                 Bundle params = new Bundle();
                 ParcelFileDescriptor pfd = mService.getWallpaperWithFeature(
                         context.getOpPackageName(), context.getAttributionTag(), this, which,
-                        params, userId);
+                        params, userId, /* getCropped = */ true);
 
                 if (pfd != null) {
                     try (BufferedInputStream bis = new BufferedInputStream(
@@ -784,6 +784,7 @@ public class WallpaperManager {
      * @return true if the lockscreen wallpaper always uses a wallpaperService, not a static image
      * @hide
      */
+    @TestApi
     public boolean isLockscreenLiveWallpaperEnabled() {
         return mLockscreenLiveWallpaper;
     }
@@ -1258,6 +1259,8 @@ public class WallpaperManager {
      * @param which Specifies home or lock screen
      * @hide
      */
+    @TestApi
+    @Nullable
     public Bitmap getBitmapAsUser(int userId, boolean hardware, @SetWallpaperFlags int which) {
         final ColorManagementProxy cmProxy = getColorManagementProxy();
         return sGlobals.peekWallpaperBitmap(mContext, true, which, userId, hardware, cmProxy);
@@ -1437,6 +1440,27 @@ public class WallpaperManager {
      */
     @UnsupportedAppUsage
     public ParcelFileDescriptor getWallpaperFile(@SetWallpaperFlags int which, int userId) {
+        return getWallpaperFile(which, userId, /* getCropped = */ true);
+    }
+
+    /**
+     * Version of {@link #getWallpaperFile(int)} that allows specifying whether to get the
+     * cropped version of the wallpaper file or the original.
+     *
+     * @param which The wallpaper whose image file is to be retrieved.  Must be a single
+     *    defined kind of wallpaper, either {@link #FLAG_SYSTEM} or {@link #FLAG_LOCK}.
+     * @param getCropped If true the cropped file will be retrieved, if false the original will
+     *                   be retrieved.
+     *
+     * @hide
+     */
+    @Nullable
+    public ParcelFileDescriptor getWallpaperFile(@SetWallpaperFlags int which, boolean getCropped) {
+        return getWallpaperFile(which, mContext.getUserId(), getCropped);
+    }
+
+    private ParcelFileDescriptor getWallpaperFile(@SetWallpaperFlags int which, int userId,
+            boolean getCropped) {
         checkExactlyOneWallpaperFlagSet(which);
 
         if (sGlobals.mService == null) {
@@ -1446,7 +1470,8 @@ public class WallpaperManager {
             try {
                 Bundle outParams = new Bundle();
                 return sGlobals.mService.getWallpaperWithFeature(mContext.getOpPackageName(),
-                        mContext.getAttributionTag(), null, which, outParams, userId);
+                        mContext.getAttributionTag(), null, which, outParams,
+                        userId, getCropped);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             } catch (SecurityException e) {
@@ -1474,6 +1499,13 @@ public class WallpaperManager {
     /**
      * Returns the information about the home screen wallpaper if its current wallpaper is a live
      * wallpaper component. Otherwise, if the wallpaper is a static image, this returns null.
+     *
+     * <p>
+     * In order to use this, apps should declare a {@code <queries>} tag with the action
+     * {@code "android.service.wallpaper.WallpaperService"}. Otherwise,
+     * this method will return {@code null} if the caller doesn't otherwise have
+     * <a href="{@docRoot}training/package-visibility">visibility</a> of the wallpaper package.
+     * </p>
      */
     public WallpaperInfo getWallpaperInfo() {
         return getWallpaperInfoForUser(mContext.getUserId());
@@ -1494,6 +1526,13 @@ public class WallpaperManager {
      * Returns the information about the home screen wallpaper if its current wallpaper is a live
      * wallpaper component. Otherwise, if the wallpaper is a static image or is not set, this
      * returns null.
+     *
+     * <p>
+     * In order to use this, apps should declare a {@code <queries>} tag with the action
+     * {@code "android.service.wallpaper.WallpaperService"}. Otherwise,
+     * this method will return {@code null} if the caller doesn't otherwise have
+     * <a href="{@docRoot}training/package-visibility">visibility</a> of the wallpaper package.
+     * </p>
      *
      * @param which Specifies wallpaper to request (home or lock).
      * @throws IllegalArgumentException if {@code which} is not exactly one of
@@ -1526,6 +1565,28 @@ public class WallpaperManager {
             }
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Get an open, readable file descriptor for the file that contains metadata about the
+     * context user's wallpaper.
+     *
+     * The caller is responsible for closing the file descriptor when done ingesting the file.
+     *
+     * @hide
+     */
+    @Nullable
+    public ParcelFileDescriptor getWallpaperInfoFile() {
+        if (sGlobals.mService == null) {
+            Log.w(TAG, "WallpaperService not running");
+            throw new RuntimeException(new DeadSystemException());
+        } else {
+            try {
+                return sGlobals.mService.getWallpaperInfoFile(mContext.getUserId());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
         }
     }
 
@@ -2377,6 +2438,7 @@ public class WallpaperManager {
      *
      * @hide
      */
+    @TestApi
     public void setWallpaperZoomOut(@NonNull IBinder windowToken, float zoom) {
         if (zoom < 0 || zoom > 1f) {
             throw new IllegalArgumentException("zoom must be between 0 and 1: " + zoom);

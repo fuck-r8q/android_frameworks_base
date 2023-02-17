@@ -107,9 +107,8 @@ public abstract class ForegroundServiceTypePolicy {
      *
      * @hide
      */
-    // TODO (b/254661666): Change to @EnabledAfter(T)
     @ChangeId
-    @Disabled
+    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.TIRAMISU)
     @Overridable
     public static final long FGS_TYPE_NONE_DISABLED_CHANGE_ID = 255038118L;
 
@@ -117,14 +116,10 @@ public abstract class ForegroundServiceTypePolicy {
      * The FGS type enforcement:
      * deprecating the {@link android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_DATA_SYNC}.
      *
-     * <p>Starting a FGS with this type from apps with targetSdkVersion
-     * {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} or later will
-     * result in a warning in the log.</p>
-     *
      * @hide
      */
     @ChangeId
-    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.TIRAMISU)
+    @Disabled
     @Overridable
     public static final long FGS_TYPE_DATA_SYNC_DEPRECATION_CHANGE_ID = 255039210L;
 
@@ -132,13 +127,8 @@ public abstract class ForegroundServiceTypePolicy {
      * The FGS type enforcement:
      * disabling the {@link android.content.pm.ServiceInfo#FOREGROUND_SERVICE_TYPE_DATA_SYNC}.
      *
-     * <p>Starting a FGS with this type from apps with targetSdkVersion
-     * {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE} or later will
-     * result in an exception.</p>
-     *
      * @hide
      */
-    // TODO (b/254661666): Change to @EnabledSince(U) in next OS release
     @ChangeId
     @Disabled
     @Overridable
@@ -151,9 +141,8 @@ public abstract class ForegroundServiceTypePolicy {
      *
      * @hide
      */
-    // TODO (b/254661666): Change to @EnabledAfter(T)
     @ChangeId
-    @Disabled
+    @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.TIRAMISU)
     @Overridable
     public static final long FGS_TYPE_PERMISSION_CHANGE_ID = 254662522L;
 
@@ -268,12 +257,15 @@ public abstract class ForegroundServiceTypePolicy {
                 new RegularPermission(Manifest.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE)
             }, true),
             new ForegroundServiceTypePermissions(new ForegroundServiceTypePermission[] {
+                new RegularPermission(Manifest.permission.BLUETOOTH_ADVERTISE),
                 new RegularPermission(Manifest.permission.BLUETOOTH_CONNECT),
+                new RegularPermission(Manifest.permission.BLUETOOTH_SCAN),
                 new RegularPermission(Manifest.permission.CHANGE_NETWORK_STATE),
                 new RegularPermission(Manifest.permission.CHANGE_WIFI_STATE),
                 new RegularPermission(Manifest.permission.CHANGE_WIFI_MULTICAST_STATE),
                 new RegularPermission(Manifest.permission.NFC),
                 new RegularPermission(Manifest.permission.TRANSMIT_IR),
+                new RegularPermission(Manifest.permission.UWB_RANGING),
                 new UsbDevicePermission(),
                 new UsbAccessoryPermission(),
             }, false)
@@ -292,10 +284,7 @@ public abstract class ForegroundServiceTypePolicy {
             new ForegroundServiceTypePermissions(new ForegroundServiceTypePermission[] {
                 new RegularPermission(Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION)
             }, true),
-            new ForegroundServiceTypePermissions(new ForegroundServiceTypePermission[] {
-                new RegularPermission(Manifest.permission.CAPTURE_VIDEO_OUTPUT),
-                new AppOpPermission(AppOpsManager.OP_PROJECT_MEDIA)
-            }, false)
+            null
     );
 
     /**
@@ -356,6 +345,7 @@ public abstract class ForegroundServiceTypePolicy {
             new ForegroundServiceTypePermissions(new ForegroundServiceTypePermission[] {
                 new RegularPermission(Manifest.permission.ACTIVITY_RECOGNITION),
                 new RegularPermission(Manifest.permission.BODY_SENSORS),
+                new RegularPermission(Manifest.permission.BODY_SENSORS_WRIST_TEMPERATURE),
                 new RegularPermission(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS),
             }, false)
     );
@@ -393,7 +383,6 @@ public abstract class ForegroundServiceTypePolicy {
                 new RegularPermission(Manifest.permission.SCHEDULE_EXACT_ALARM),
                 new RegularPermission(Manifest.permission.USE_EXACT_ALARM),
                 new AppOpPermission(AppOpsManager.OP_ACTIVATE_VPN),
-                new AppOpPermission(AppOpsManager.OP_ACTIVATE_PLATFORM_VPN),
             }, false)
     );
 
@@ -1064,7 +1053,7 @@ public abstract class ForegroundServiceTypePolicy {
             if (policy.isTypeDisabled(callerUid)) {
                 return FGS_TYPE_POLICY_CHECK_DISABLED;
             }
-            int permissionResult = PERMISSION_DENIED;
+            int permissionResult = PERMISSION_GRANTED;
             // Do we have the permission to start FGS with this type.
             if (policy.mAllOfPermissions != null) {
                 permissionResult = policy.mAllOfPermissions.checkPermissions(context,

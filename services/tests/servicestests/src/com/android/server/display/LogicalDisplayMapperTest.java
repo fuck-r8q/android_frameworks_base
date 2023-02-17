@@ -16,8 +16,11 @@
 
 package com.android.server.display;
 
+import static android.hardware.devicestate.DeviceStateManager.INVALID_DEVICE_STATE;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.DEFAULT_DISPLAY_GROUP;
+import static android.view.Display.FLAG_REAR;
+import static android.view.Display.TYPE_EXTERNAL;
 import static android.view.Display.TYPE_INTERNAL;
 import static android.view.Display.TYPE_VIRTUAL;
 
@@ -28,6 +31,8 @@ import static com.android.server.display.DisplayAdapter.DISPLAY_DEVICE_EVENT_REM
 import static com.android.server.display.DisplayDeviceInfo.FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY;
 import static com.android.server.display.LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_ADDED;
 import static com.android.server.display.LogicalDisplayMapper.LOGICAL_DISPLAY_EVENT_REMOVED;
+import static com.android.server.display.layout.Layout.Display.POSITION_REAR;
+import static com.android.server.display.layout.Layout.Display.POSITION_UNKNOWN;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -70,6 +75,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.Spy;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
@@ -81,6 +87,7 @@ public class LogicalDisplayMapperTest {
     private static final int DEVICE_STATE_CLOSED = 0;
     private static final int DEVICE_STATE_OPEN = 2;
     private static int sNextNonDefaultDisplayId = DEFAULT_DISPLAY + 1;
+    private static final File NON_EXISTING_FILE = new File("/non_existing_folder/should_not_exist");
 
     private DisplayDeviceRepository mDisplayDeviceRepo;
     private LogicalDisplayMapper mLogicalDisplayMapper;
@@ -97,7 +104,7 @@ public class LogicalDisplayMapperTest {
     @Mock IPowerManager mIPowerManagerMock;
     @Mock IThermalService mIThermalServiceMock;
     @Spy DeviceStateToLayoutMap mDeviceStateToLayoutMapSpy =
-            new DeviceStateToLayoutMap(mIdProducer);
+            new DeviceStateToLayoutMap(mIdProducer, NON_EXISTING_FILE);
 
     @Captor ArgumentCaptor<LogicalDisplay> mDisplayCaptor;
 
@@ -177,7 +184,7 @@ public class LogicalDisplayMapperTest {
 
     @Test
     public void testDisplayDeviceAddAndRemove_NonInternalTypes() {
-        testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_EXTERNAL);
+        testDisplayDeviceAddAndRemove_NonInternal(TYPE_EXTERNAL);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_WIFI);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_OVERLAY);
         testDisplayDeviceAddAndRemove_NonInternal(TYPE_VIRTUAL);
@@ -222,7 +229,7 @@ public class LogicalDisplayMapperTest {
 
     @Test
     public void testDisplayDeviceAddAndRemove_OneExternalDefault() {
-        DisplayDevice device = createDisplayDevice(Display.TYPE_EXTERNAL, 600, 800,
+        DisplayDevice device = createDisplayDevice(TYPE_EXTERNAL, 600, 800,
                 FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
 
         // add
@@ -272,7 +279,7 @@ public class LogicalDisplayMapperTest {
     public void testGetDisplayIdsLocked() {
         add(createDisplayDevice(TYPE_INTERNAL, 600, 800,
                 FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY));
-        add(createDisplayDevice(Display.TYPE_EXTERNAL, 600, 800, 0));
+        add(createDisplayDevice(TYPE_EXTERNAL, 600, 800, 0));
         add(createDisplayDevice(TYPE_VIRTUAL, 600, 800, 0));
 
         int [] ids = mLogicalDisplayMapper.getDisplayIdsLocked(Process.SYSTEM_UID,
@@ -294,9 +301,13 @@ public class LogicalDisplayMapperTest {
 
         Layout layout1 = new Layout();
         layout1.createDisplayLocked(info(device1).address, /* isDefault= */ true,
-                /* isEnabled= */ true, mIdProducer);
+                /* isEnabled= */ true, /* displayGroup= */ null, mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         layout1.createDisplayLocked(info(device2).address, /* isDefault= */ false,
-                /* isEnabled= */ true, mIdProducer);
+                /* isEnabled= */ true, /* displayGroup= */ null, mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         when(mDeviceStateToLayoutMapSpy.get(STATE_DEFAULT)).thenReturn(layout1);
         assertThat(layout1.size()).isEqualTo(2);
         final int logicalId2 = layout1.getByAddress(info(device2).address).getLogicalDisplayId();
@@ -329,17 +340,23 @@ public class LogicalDisplayMapperTest {
         add(device3);
 
         Layout layout1 = new Layout();
-        layout1.createDisplayLocked(info(device1).address,
-                /* isDefault= */ true, /* isEnabled= */ true, mIdProducer);
+        layout1.createDisplayLocked(info(device1).address, /* isDefault= */ true,
+                /* isEnabled= */ true, /* displayGroup= */ null, mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         when(mDeviceStateToLayoutMapSpy.get(STATE_DEFAULT)).thenReturn(layout1);
 
         final int layoutState2 = 2;
         Layout layout2 = new Layout();
-        layout2.createDisplayLocked(info(device2).address,
-                /* isDefault= */ false, /* isEnabled= */ true, mIdProducer);
+        layout2.createDisplayLocked(info(device2).address, /* isDefault= */ false,
+                /* isEnabled= */ true, /* displayGroup= */ null, mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         // Device3 is the default display.
-        layout2.createDisplayLocked(info(device3).address,
-                /* isDefault= */ true, /* isEnabled= */ true, mIdProducer);
+        layout2.createDisplayLocked(info(device3).address, /* isDefault= */ true,
+                /* isEnabled= */ true, /* displayGroup= */ null, mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         when(mDeviceStateToLayoutMapSpy.get(layoutState2)).thenReturn(layout2);
         assertThat(layout2.size()).isEqualTo(2);
         final int logicalId2 = layout2.getByAddress(info(device2).address).getLogicalDisplayId();
@@ -367,6 +384,56 @@ public class LogicalDisplayMapperTest {
         assertThat(displayInfoLayout2Other.displayId).isEqualTo(logicalId2);
         assertThat(displayInfoLayout2Other.logicalWidth).isEqualTo(width(device2));
         assertThat(displayInfoLayout2Other.logicalHeight).isEqualTo(height(device2));
+    }
+
+    @Test
+    public void testGetDisplayInfoForStateLocked_multipleDisplayGroups() {
+        DisplayDevice device1 = createDisplayDevice(TYPE_INTERNAL, 600, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        DisplayDevice device2 = createDisplayDevice(TYPE_INTERNAL, 200, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        DisplayDevice device3 = createDisplayDevice(TYPE_INTERNAL, 700, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        DisplayDevice device4 = createDisplayDevice(TYPE_INTERNAL, 400, 600,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+
+        Layout layout = new Layout();
+        layout.createDisplayLocked(info(device1).address,
+                /* isDefault= */ true, /* isEnabled= */ true, /* displayGroup= */ null,
+                mIdProducer, /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
+        layout.createDisplayLocked(info(device2).address,
+                /* isDefault= */ false, /* isEnabled= */ true, "group1", mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
+        layout.createDisplayLocked(info(device3).address,
+                /* isDefault= */ false, /* isEnabled= */ true, "group1", mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
+        layout.createDisplayLocked(info(device4).address,
+                /* isDefault= */ false, /* isEnabled= */ true, "group2", mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
+        when(mDeviceStateToLayoutMapSpy.get(STATE_DEFAULT)).thenReturn(layout);
+
+        LogicalDisplay display1 = add(device1);
+        LogicalDisplay display2 = add(device2);
+        LogicalDisplay display3 = add(device3);
+        LogicalDisplay display4 = add(device4);
+
+        int displayGroupId1 =
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display1));
+        int displayGroupId2 =
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display2));
+        int displayGroupId3 =
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display3));
+        int displayGroupId4 =
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display4));
+        assertThat(displayGroupId1).isEqualTo(DEFAULT_DISPLAY_GROUP);
+        assertThat(displayGroupId2).isNotEqualTo(DEFAULT_DISPLAY_GROUP);
+        assertThat(displayGroupId2).isEqualTo(displayGroupId3);
+        assertThat(displayGroupId3).isNotEqualTo(DEFAULT_DISPLAY_GROUP);
+        assertThat(displayGroupId2).isNotEqualTo(displayGroupId4);
     }
 
     @Test
@@ -536,6 +603,11 @@ public class LogicalDisplayMapperTest {
                 /* isOverrideActive= */false,
                 /* isInteractive= */true,
                 /* isBootCompleted= */true));
+        assertFalse(mLogicalDisplayMapper.shouldDeviceBePutToSleep(DEVICE_STATE_CLOSED,
+                INVALID_DEVICE_STATE,
+                /* isOverrideActive= */false,
+                /* isInteractive= */true,
+                /* isBootCompleted= */true));
     }
 
     @Test
@@ -556,18 +628,28 @@ public class LogicalDisplayMapperTest {
 
         Layout layout = new Layout();
         layout.createDisplayLocked(device1.getDisplayDeviceInfoLocked().address,
-                true, true, mIdProducer);
+                /* isDefault= */ true, /* isEnabled= */ true, /* displayGroup= */ null,
+                mIdProducer, /* brightnessThrottlingMapId= */ "concurrent",
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         layout.createDisplayLocked(device2.getDisplayDeviceInfoLocked().address,
-                false, false, mIdProducer);
+                /* isDefault= */ false, /* isEnabled= */ true, /* displayGroup= */ null,
+                mIdProducer, /* brightnessThrottlingMapId= */ "concurrent",
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         when(mDeviceStateToLayoutMapSpy.get(0)).thenReturn(layout);
 
         layout = new Layout();
         layout.createDisplayLocked(device1.getDisplayDeviceInfoLocked().address,
-                false, false, mIdProducer);
+                /* isDefault= */ false, /* isEnabled= */ false, /* displayGroup= */ null,
+                mIdProducer, /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         layout.createDisplayLocked(device2.getDisplayDeviceInfoLocked().address,
-                true, true, mIdProducer);
+                /* isDefault= */ true, /* isEnabled= */ true, /* displayGroup= */ null,
+                mIdProducer, /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         when(mDeviceStateToLayoutMapSpy.get(1)).thenReturn(layout);
         when(mDeviceStateToLayoutMapSpy.get(2)).thenReturn(layout);
+
+        when(mDeviceStateToLayoutMapSpy.size()).thenReturn(4);
 
         LogicalDisplay display1 = add(device1);
         assertEquals(info(display1).address, info(device1).address);
@@ -580,10 +662,24 @@ public class LogicalDisplayMapperTest {
 
         mLogicalDisplayMapper.setDeviceStateLocked(0, false);
         advanceTime(1000);
+        // The new state is not applied until the boot is completed
         assertTrue(mLogicalDisplayMapper.getDisplayLocked(device1).isEnabledLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
+
+        mLogicalDisplayMapper.onBootCompleted();
+        advanceTime(1000);
+        assertTrue(mLogicalDisplayMapper.getDisplayLocked(device1).isEnabledLocked());
+        assertTrue(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device1).isInTransitionLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device2).isInTransitionLocked());
+        assertEquals(-1, mLogicalDisplayMapper.getDisplayLocked(device1)
+                .getLeadDisplayIdLocked());
+        assertEquals(0, mLogicalDisplayMapper.getDisplayLocked(device2)
+                .getLeadDisplayIdLocked());
+        assertEquals("concurrent", mLogicalDisplayMapper.getDisplayLocked(device1)
+                .getBrightnessThrottlingDataIdLocked());
+        assertEquals("concurrent", mLogicalDisplayMapper.getDisplayLocked(device2)
+                .getBrightnessThrottlingDataIdLocked());
 
         mLogicalDisplayMapper.setDeviceStateLocked(1, false);
         advanceTime(1000);
@@ -591,6 +687,12 @@ public class LogicalDisplayMapperTest {
         assertTrue(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device1).isInTransitionLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device2).isInTransitionLocked());
+        assertEquals(DisplayDeviceConfig.DEFAULT_BRIGHTNESS_THROTTLING_DATA_ID,
+                mLogicalDisplayMapper.getDisplayLocked(device1)
+                        .getBrightnessThrottlingDataIdLocked());
+        assertEquals(DisplayDeviceConfig.DEFAULT_BRIGHTNESS_THROTTLING_DATA_ID,
+                mLogicalDisplayMapper.getDisplayLocked(device2)
+                        .getBrightnessThrottlingDataIdLocked());
 
         mLogicalDisplayMapper.setDeviceStateLocked(2, false);
         advanceTime(1000);
@@ -598,6 +700,12 @@ public class LogicalDisplayMapperTest {
         assertTrue(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device1).isInTransitionLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device2).isInTransitionLocked());
+        assertEquals(DisplayDeviceConfig.DEFAULT_BRIGHTNESS_THROTTLING_DATA_ID,
+                mLogicalDisplayMapper.getDisplayLocked(device1)
+                        .getBrightnessThrottlingDataIdLocked());
+        assertEquals(DisplayDeviceConfig.DEFAULT_BRIGHTNESS_THROTTLING_DATA_ID,
+                mLogicalDisplayMapper.getDisplayLocked(device2)
+                        .getBrightnessThrottlingDataIdLocked());
     }
 
     @Test
@@ -618,17 +726,26 @@ public class LogicalDisplayMapperTest {
                 displayAddressOne,
                 /* isDefault= */ true,
                 /* isEnabled= */ true,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         threeDevicesEnabledLayout.createDisplayLocked(
                 displayAddressTwo,
                 /* isDefault= */ false,
                 /* isEnabled= */ true,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         threeDevicesEnabledLayout.createDisplayLocked(
                 displayAddressThree,
                 /* isDefault= */ false,
                 /* isEnabled= */ true,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
 
         when(mDeviceStateToLayoutMapSpy.get(STATE_DEFAULT))
                 .thenReturn(threeDevicesEnabledLayout);
@@ -663,17 +780,26 @@ public class LogicalDisplayMapperTest {
                 displayAddressOne,
                 /* isDefault= */ true,
                 /* isEnabled= */ true,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         oneDeviceEnabledLayout.createDisplayLocked(
                 displayAddressTwo,
                 /* isDefault= */ false,
                 /* isEnabled= */ false,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
         oneDeviceEnabledLayout.createDisplayLocked(
                 displayAddressThree,
                 /* isDefault= */ false,
                 /* isEnabled= */ false,
-                mIdProducer);
+                /* displayGroup= */ null,
+                mIdProducer,
+                /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
 
         when(mDeviceStateToLayoutMapSpy.get(0)).thenReturn(oneDeviceEnabledLayout);
         when(mDeviceStateToLayoutMapSpy.get(1)).thenReturn(threeDevicesEnabledLayout);
@@ -682,6 +808,7 @@ public class LogicalDisplayMapperTest {
         // 2) Mark the displays as STATE_OFF so that it can continue with transition
         // 3) Send DISPLAY_DEVICE_EVENT_CHANGE to inform the mapper of the new display state
         // 4) Dispatch handler events.
+        mLogicalDisplayMapper.onBootCompleted();
         mLogicalDisplayMapper.setDeviceStateLocked(0, false);
         mDisplayDeviceRepo.onDisplayDeviceEvent(device3, DISPLAY_DEVICE_EVENT_CHANGED);
         advanceTime(1000);
@@ -720,6 +847,63 @@ public class LogicalDisplayMapperTest {
 
         // ensure all three displays are returned
         assertEquals(3, threeDisplaysEnabled.length);
+    }
+
+    @Test
+    public void testCreateNewLogicalDisplay() {
+        DisplayDevice device1 = createDisplayDevice(TYPE_EXTERNAL, 600, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        when(mDeviceStateToLayoutMapSpy.size()).thenReturn(1);
+        LogicalDisplay display1 = add(device1);
+
+        assertTrue(display1.isEnabledLocked());
+
+        DisplayDevice device2 = createDisplayDevice(TYPE_INTERNAL, 600, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        when(mDeviceStateToLayoutMapSpy.size()).thenReturn(2);
+        LogicalDisplay display2 = add(device2);
+
+        assertFalse(display2.isEnabledLocked());
+    }
+    @Test
+    public void testDisplayFlagRear() {
+        DisplayDevice device1 = createDisplayDevice(TYPE_INTERNAL, 600, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY);
+        DisplayDevice device2 = createDisplayDevice(TYPE_INTERNAL, 600, 800,
+                FLAG_REAR);
+
+        Layout layout = new Layout();
+        layout.createDisplayLocked(device1.getDisplayDeviceInfoLocked().address,
+                true, true, null, mIdProducer, /* brightnessThrottlingMapId= */ null,
+                /* leadDisplayId= */ Display.DEFAULT_DISPLAY);
+        layout.createDisplayLocked(device2.getDisplayDeviceInfoLocked().address,
+                false, true, null, mIdProducer, /* brightnessThrottlingMapId= */ null,
+                POSITION_REAR, Display.DEFAULT_DISPLAY);
+        when(mDeviceStateToLayoutMapSpy.get(0)).thenReturn(layout);
+
+        when(mDeviceStateToLayoutMapSpy.size()).thenReturn(1);
+
+        LogicalDisplay display1 = add(device1);
+        assertEquals(info(display1).address, info(device1).address);
+        assertEquals(DEFAULT_DISPLAY, id(display1));
+
+        LogicalDisplay display2 = add(device2);
+        assertEquals(info(display2).address, info(device2).address);
+        // We can only have one default display
+        assertEquals(DEFAULT_DISPLAY, id(display1));
+
+        mLogicalDisplayMapper.setDeviceStateLocked(0, false);
+        advanceTime(1000);
+        mLogicalDisplayMapper.onBootCompleted();
+        advanceTime(1000);
+
+        assertTrue(mLogicalDisplayMapper.getDisplayLocked(device1).isEnabledLocked());
+        assertTrue(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
+
+        assertEquals(POSITION_UNKNOWN,
+                mLogicalDisplayMapper.getDisplayLocked(device1).getDevicePositionLocked());
+        assertEquals(POSITION_REAR,
+                mLogicalDisplayMapper.getDisplayLocked(device2).getDevicePositionLocked());
     }
 
     /////////////////

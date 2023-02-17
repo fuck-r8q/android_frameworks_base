@@ -134,6 +134,7 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.platform.test.annotations.Presubmit;
+import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.security.KeyChain;
 import android.security.keystore.AttestationUtils;
@@ -259,6 +260,8 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     private static final String PROFILE_OFF_SUSPENSION_TITLE = "suspension_title";
     private static final String PROFILE_OFF_SUSPENSION_TEXT = "suspension_text";
     private static final String PROFILE_OFF_SUSPENSION_SOON_TEXT = "suspension_tomorrow_text";
+    private static final String FLAG_ENABLE_WORK_PROFILE_TELEPHONY =
+            "enable_work_profile_telephony";
 
     @Before
     public void setUp() throws Exception {
@@ -270,6 +273,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         mContext = getContext();
         mServiceContext = mContext;
         mServiceContext.binder.callingUid = DpmMockContext.CALLER_UID;
+        when(getServices().userManagerInternal.getUserIds()).thenReturn(new int[]{0});
         when(getServices().packageManager.hasSystemFeature(eq(PackageManager.FEATURE_DEVICE_ADMIN)))
                 .thenReturn(true);
         doReturn(Collections.singletonList(new ResolveInfo()))
@@ -1083,27 +1087,6 @@ public class DevicePolicyManagerTest extends DpmTestBase {
 
         // TODO Test getDeviceOwnerName() too. To do so, we need to change
         // DPMS.getApplicationLabel() because Context.createPackageContextAsUser() is not mockable.
-    }
-
-    /**
-     * TODO(b/174859111): move to automotive-only section
-     * Test for {@link DevicePolicyManager#setDeviceOwner} in headless system user mode.
-     */
-    @Test
-    public void testSetDeviceOwner_headlessSystemUserMode() throws Exception {
-        when(getServices().userManagerForMock.isHeadlessSystemUserMode()).thenReturn(true);
-        setDeviceOwner_headlessSystemUser();
-
-        // Try to set a profile owner on the same user, which should fail.
-        setUpPackageManagerForAdmin(admin2, DpmMockContext.CALLER_UID);
-        dpm.setActiveAdmin(admin2, /* refreshing= */ true, CALLER_USER_HANDLE);
-        assertExpectException(IllegalStateException.class,
-                /* messageRegex= */ "profile owner is already set",
-                () -> dpm.setProfileOwner(admin2, CALLER_USER_HANDLE));
-
-        // DO admin can't be deactivated.
-        dpm.removeActiveAdmin(admin1);
-        assertThat(dpm.isAdminActive(admin1)).isTrue();
     }
 
     private void setDeviceOwner() throws Exception {
@@ -2792,8 +2775,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         // Can't set message for admin in another uid.
         {
             mContext.binder.callingUid = DpmMockContext.CALLER_UID + 1;
-            assertExpectException(SecurityException.class,
-                    /* messageRegex= */ "is not owned by uid",
+            assertThrows(SecurityException.class,
                     () -> dpm.setShortSupportMessage(admin1, "Some text"));
             mContext.binder.callingUid = DpmMockContext.CALLER_UID;
         }
@@ -5003,7 +4985,8 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     public void testWipeDataManagedProfileOnOrganizationOwnedDevice() throws Exception {
         setupProfileOwner();
         configureProfileOwnerOfOrgOwnedDevice(admin1, CALLER_USER_HANDLE);
-
+        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_DEVICE_POLICY_MANAGER,
+                FLAG_ENABLE_WORK_PROFILE_TELEPHONY, "true", false);
         // Even if the caller is the managed profile, the current user is the user 0
         when(getServices().iactivityManager.getCurrentUser())
                 .thenReturn(new UserInfo(UserHandle.USER_SYSTEM, "user system", 0));
@@ -5014,7 +4997,8 @@ public class DevicePolicyManagerTest extends DpmTestBase {
                 .thenReturn(new UserInfo(UserHandle.USER_SYSTEM, "user system", 0));
         when(getServices().userManager.getPrimaryUser())
                 .thenReturn(new UserInfo(UserHandle.USER_SYSTEM, "user system", 0));
-
+        when(getServices().subscriptionManager.getActiveSubscriptionIdList(false)).thenReturn(
+                new int[1]);
         // Set some device-wide policies:
         // Security logging
         when(getServices().settings.securityLogGetLoggingEnabledProperty()).thenReturn(true);
@@ -5062,6 +5046,9 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         // Unsuspend personal apps
         verify(getServices().packageManagerInternal)
                 .unsuspendForSuspendingPackage(PLATFORM_PACKAGE_NAME, UserHandle.USER_SYSTEM);
+        verify(getServices().subscriptionManager).setSubscriptionUserHandle(0, null);
+        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_DEVICE_POLICY_MANAGER,
+                FLAG_ENABLE_WORK_PROFILE_TELEPHONY, "false", false);
     }
 
     @Test
@@ -7394,7 +7381,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         verify(getServices().alarmManager, times(1)).set(anyInt(), eq(PROFILE_OFF_DEADLINE), any());
         // Now the user should see a warning notification.
         verify(getServices().notificationManager, times(1))
-                .notify(anyInt(), any());
+                .notifyAsUser(any(), anyInt(), any(), any());
         // Apps shouldn't be suspended yet.
         verifyZeroInteractions(getServices().ipackageManager);
         clearInvocations(getServices().alarmManager);
@@ -7408,10 +7395,10 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         verifyZeroInteractions(getServices().alarmManager);
         // Now the user should see a notification about suspended apps.
         verify(getServices().notificationManager, times(1))
-                .notify(anyInt(), any());
+                .notifyAsUser(any(), anyInt(), any(), any());
         // Verify that the apps are suspended.
-        verify(getServices().ipackageManager, times(1)).setPackagesSuspendedAsUser(
-                any(), eq(true), any(), any(), any(), any(), anyInt());
+        verify(getServices().packageManagerInternal, times(1))
+                .setPackagesSuspendedByAdmin(anyInt(), any(), eq(true));
     }
 
     /**

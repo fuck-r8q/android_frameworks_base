@@ -26,14 +26,16 @@ import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.data.BouncerView
-import com.android.systemui.keyguard.data.repository.BiometricRepository
+import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
+import com.android.systemui.keyguard.data.repository.DeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.KeyguardBouncerRepository
+import com.android.systemui.keyguard.data.repository.KeyguardBouncerRepositoryImpl
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.keyguard.domain.interactor.PrimaryBouncerCallbackInteractor
 import com.android.systemui.keyguard.domain.interactor.PrimaryBouncerInteractor
+import com.android.systemui.keyguard.shared.constants.KeyguardBouncerConstants
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.StatusBarState
-import com.android.systemui.statusbar.phone.KeyguardBouncer
 import com.android.systemui.statusbar.phone.KeyguardBypassController
 import com.android.systemui.util.time.FakeSystemClock
 import com.android.systemui.util.time.SystemClock
@@ -64,7 +66,7 @@ class UdfpsKeyguardViewControllerWithCoroutinesTest : UdfpsKeyguardViewControlle
         allowTestableLooperAsMainThread() // repeatWhenAttached requires the main thread
         MockitoAnnotations.initMocks(this)
         keyguardBouncerRepository =
-            KeyguardBouncerRepository(
+            KeyguardBouncerRepositoryImpl(
                 mock(com.android.keyguard.ViewMediatorCallback::class.java),
                 FakeSystemClock(),
                 TestCoroutineScope(),
@@ -90,7 +92,8 @@ class UdfpsKeyguardViewControllerWithCoroutinesTest : UdfpsKeyguardViewControlle
         mAlternateBouncerInteractor =
             AlternateBouncerInteractor(
                 keyguardBouncerRepository,
-                mock(BiometricRepository::class.java),
+                mock(BiometricSettingsRepository::class.java),
+                mock(DeviceEntryFingerprintAuthRepository::class.java),
                 mock(SystemClock::class.java),
                 mock(KeyguardUpdateMonitor::class.java),
                 mock(FeatureFlags::class.java)
@@ -133,7 +136,7 @@ class UdfpsKeyguardViewControllerWithCoroutinesTest : UdfpsKeyguardViewControlle
             // WHEN the bouncer expansion is VISIBLE
             val job = mController.listenForBouncerExpansion(this)
             keyguardBouncerRepository.setPrimaryVisible(true)
-            keyguardBouncerRepository.setPanelExpansion(KeyguardBouncer.EXPANSION_VISIBLE)
+            keyguardBouncerRepository.setPanelExpansion(KeyguardBouncerConstants.EXPANSION_VISIBLE)
             yield()
 
             // THEN UDFPS shouldPauseAuth == true

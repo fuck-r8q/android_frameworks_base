@@ -16,7 +16,6 @@
 
 package com.android.server.wm.flicker.rotation
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.IwTest
 import android.platform.test.annotations.Presubmit
 import android.view.WindowManager
@@ -28,7 +27,7 @@ import com.android.server.wm.flicker.ScenarioBuilder
 import com.android.server.wm.flicker.helpers.SeamlessRotationAppHelper
 import com.android.server.wm.flicker.junit.FlickerParametersRunnerFactory
 import com.android.server.wm.flicker.testapp.ActivityOptions
-import com.android.server.wm.traces.common.ComponentNameMatcher
+import com.android.server.wm.traces.common.component.matchers.ComponentNameMatcher
 import org.junit.FixMethodOrder
 import org.junit.Ignore
 import org.junit.Test
@@ -112,9 +111,9 @@ open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(fl
                 val appWindow = it.windowState(testApp.`package`)
                 val flags = appWindow.windowState?.attributes?.flags ?: 0
                 appWindow
-                    .verify("isFullScreen")
+                    .check { "isFullScreen" }
                     .that(flags.and(WindowManager.LayoutParams.FLAG_FULLSCREEN))
-                    .isGreaterThan(0)
+                    .isGreater(0)
             }
         }
     }
@@ -128,13 +127,13 @@ open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(fl
                 val appWindow = it.windowState(testApp.`package`)
                 val rotationAnimation = appWindow.windowState?.attributes?.rotationAnimation ?: 0
                 appWindow
-                    .verify("isRotationSeamless")
+                    .check { "isRotationSeamless" }
                     .that(
                         rotationAnimation.and(
                             WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLESS
                         )
                     )
-                    .isGreaterThan(0)
+                    .isGreater(0)
             }
         }
     }
@@ -201,11 +200,6 @@ open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(fl
         flicker.assertEventLog { this.focusDoesNotChange() }
     }
 
-    /** {@inheritDoc} */
-    @FlakyTest
-    @Test
-    override fun navBarLayerPositionAtStartAndEnd() = super.navBarLayerPositionAtStartAndEnd()
-
     @Test
     @IwTest(focusArea = "framework")
     override fun cujCompleted() {
@@ -224,6 +218,7 @@ open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(fl
         runAndIgnoreAssumptionViolation { appLayerAlwaysVisible() }
         runAndIgnoreAssumptionViolation { navBarLayerIsVisibleAtStartAndEnd() }
         runAndIgnoreAssumptionViolation { navBarWindowIsAlwaysVisible() }
+        runAndIgnoreAssumptionViolation { navBarLayerPositionAtStartAndEnd() }
         runAndIgnoreAssumptionViolation { taskBarLayerIsVisibleAtStartAndEnd() }
         runAndIgnoreAssumptionViolation { taskBarWindowIsAlwaysVisible() }
     }
@@ -234,7 +229,11 @@ open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(fl
                 getConfigValue<Boolean>(ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD)
                     ?: false
 
-        private fun createConfig(sourceConfig: FlickerTest, starveUiThread: Boolean): FlickerTest {
+        @JvmStatic
+        protected fun createConfig(
+            sourceConfig: FlickerTest,
+            starveUiThread: Boolean
+        ): FlickerTest {
             val originalScenario = sourceConfig.initialize("createConfig")
             val nameExt = if (starveUiThread) "_BUSY_UI_THREAD" else ""
             val newConfig =

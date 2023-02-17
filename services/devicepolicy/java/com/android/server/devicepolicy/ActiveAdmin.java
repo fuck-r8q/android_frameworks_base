@@ -34,6 +34,7 @@ import android.annotation.Nullable;
 import android.app.admin.DeviceAdminInfo;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.FactoryResetProtectionPolicy;
+import android.app.admin.ManagedSubscriptionsPolicy;
 import android.app.admin.PackagePolicy;
 import android.app.admin.PasswordPolicy;
 import android.app.admin.PreferentialNetworkServiceConfig;
@@ -168,12 +169,17 @@ class ActiveAdmin {
     private static final String TAG_PROTECTED_PACKAGES = "protected_packages";
     private static final String TAG_SUSPENDED_PACKAGES = "suspended-packages";
     private static final String TAG_MTE_POLICY = "mte-policy";
+    private static final String TAG_MANAGED_SUBSCRIPTIONS_POLICY = "managed_subscriptions_policy";
     private static final String ATTR_VALUE = "value";
     private static final String ATTR_LAST_NETWORK_LOGGING_NOTIFICATION = "last-notification";
     private static final String ATTR_NUM_NETWORK_LOGGING_NOTIFICATIONS = "num-notifications";
     private static final String ATTR_PACKAGE_POLICY_MODE = "package-policy-type";
+    private static final String TAG_CREDENTIAL_MANAGER_POLICY = "credential-manager-policy";
+    private static final String TAG_DIALER_PACKAGE = "dialer_package";
+    private static final String TAG_SMS_PACKAGE = "sms_package";
 
-
+    // If the ActiveAdmin is a permission-based admin, then info will be null because the
+    // permission-based admin is not mapped to a device administrator component.
     DeviceAdminInfo info;
 
     static final int DEF_PASSWORD_HISTORY_LENGTH = 0;
@@ -272,6 +278,9 @@ class ActiveAdmin {
     // Wi-Fi SSID restriction policy.
     WifiSsidPolicy mWifiSsidPolicy;
 
+    // Managed subscriptions policy.
+    ManagedSubscriptionsPolicy mManagedSubscriptionsPolicy;
+
     // TODO: review implementation decisions with frameworks team
     boolean specifiesGlobalProxy = false;
     String globalProxySpec = null;
@@ -327,6 +336,9 @@ class ActiveAdmin {
     // The package policy for Cross Profile Contacts Search
     PackagePolicy mManagedProfileContactsAccess = null;
 
+    // The package policy for Credential Manager
+    PackagePolicy mCredentialManagerPolicy = null;
+
     public String mAlwaysOnVpnPackage;
     public boolean mAlwaysOnVpnLockdown;
     boolean mCommonCriteriaMode;
@@ -340,6 +352,8 @@ class ActiveAdmin {
     boolean mUsbDataSignalingEnabled = USB_DATA_SIGNALING_ENABLED_DEFAULT;
 
     int mWifiMinimumSecurityLevel = DevicePolicyManager.WIFI_SECURITY_OPEN;
+    String mDialerPackage;
+    String mSmsPackage;
 
     ActiveAdmin(DeviceAdminInfo info, boolean isParent) {
         this.info = info;
@@ -369,9 +383,11 @@ class ActiveAdmin {
 
     void writeToXml(TypedXmlSerializer out)
             throws IllegalArgumentException, IllegalStateException, IOException {
-        out.startTag(null, TAG_POLICIES);
-        info.writePoliciesToXml(out);
-        out.endTag(null, TAG_POLICIES);
+        if (info != null) {
+            out.startTag(null, TAG_POLICIES);
+            info.writePoliciesToXml(out);
+            out.endTag(null, TAG_POLICIES);
+        }
         if (mPasswordPolicy.quality != PASSWORD_QUALITY_UNSPECIFIED) {
             writeAttributeValueToXml(
                     out, TAG_PASSWORD_QUALITY, mPasswordPolicy.quality);
@@ -642,6 +658,19 @@ class ActiveAdmin {
                 mManagedProfileCallerIdAccess);
         writePackagePolicy(out, TAG_CROSS_PROFILE_CONTACTS_SEARCH_POLICY,
                 mManagedProfileContactsAccess);
+        writePackagePolicy(out, TAG_CREDENTIAL_MANAGER_POLICY,
+                mCredentialManagerPolicy);
+        if (mManagedSubscriptionsPolicy != null) {
+            out.startTag(null, TAG_MANAGED_SUBSCRIPTIONS_POLICY);
+            mManagedSubscriptionsPolicy.saveToXml(out);
+            out.endTag(null, TAG_MANAGED_SUBSCRIPTIONS_POLICY);
+        }
+        if (!TextUtils.isEmpty(mDialerPackage)) {
+            writeAttributeValueToXml(out, TAG_DIALER_PACKAGE, mDialerPackage);
+        }
+        if (!TextUtils.isEmpty(mSmsPackage)) {
+            writeAttributeValueToXml(out, TAG_SMS_PACKAGE, mSmsPackage);
+        }
     }
 
     private void writePackagePolicy(TypedXmlSerializer out, String tag,
@@ -946,6 +975,14 @@ class ActiveAdmin {
                 mManagedProfileCallerIdAccess = readPackagePolicy(parser);
             } else if (TAG_CROSS_PROFILE_CONTACTS_SEARCH_POLICY.equals(tag)) {
                 mManagedProfileContactsAccess = readPackagePolicy(parser);
+            } else if (TAG_MANAGED_SUBSCRIPTIONS_POLICY.equals(tag)) {
+                mManagedSubscriptionsPolicy = ManagedSubscriptionsPolicy.readFromXml(parser);
+            } else if (TAG_CREDENTIAL_MANAGER_POLICY.equals(tag)) {
+                mCredentialManagerPolicy = readPackagePolicy(parser);
+            } else if (TAG_DIALER_PACKAGE.equals(tag)) {
+                mDialerPackage = parser.getAttributeValue(null, ATTR_VALUE);
+            } else if (TAG_SMS_PACKAGE.equals(tag)) {
+                mSmsPackage = parser.getAttributeValue(null, ATTR_VALUE);
             } else {
                 Slogf.w(LOG_TAG, "Unknown admin tag: %s", tag);
                 XmlUtils.skipCurrentTag(parser);
@@ -1168,14 +1205,16 @@ class ActiveAdmin {
         pw.print("testOnlyAdmin=");
         pw.println(testOnlyAdmin);
 
-        pw.println("policies:");
-        ArrayList<DeviceAdminInfo.PolicyInfo> pols = info.getUsedPolicies();
-        if (pols != null) {
-            pw.increaseIndent();
-            for (int i = 0; i < pols.size(); i++) {
-                pw.println(pols.get(i).tag);
+        if (info != null) {
+            pw.println("policies:");
+            ArrayList<DeviceAdminInfo.PolicyInfo> pols = info.getUsedPolicies();
+            if (pols != null) {
+                pw.increaseIndent();
+                for (int i = 0; i < pols.size(); i++) {
+                    pw.println(pols.get(i).tag);
+                }
+                pw.decreaseIndent();
             }
-            pw.decreaseIndent();
         }
 
         pw.print("passwordQuality=0x");
@@ -1320,6 +1359,9 @@ class ActiveAdmin {
         dumpPackagePolicy(pw, "managedProfileContactsPolicy",
                 mManagedProfileContactsAccess);
 
+        dumpPackagePolicy(pw, "credentialManagerPolicy",
+                mCredentialManagerPolicy);
+
         pw.print("isParent=");
         pw.println(isParent);
 
@@ -1414,5 +1456,17 @@ class ActiveAdmin {
 
         pw.print("accountTypesWithManagementDisabled=");
         pw.println(accountTypesWithManagementDisabled);
+
+        if (mManagedSubscriptionsPolicy != null) {
+            pw.println("mManagedSubscriptionsPolicy:");
+            pw.increaseIndent();
+            pw.println(mManagedSubscriptionsPolicy);
+            pw.decreaseIndent();
+        }
+
+        pw.print("mDialerPackage=");
+        pw.println(mDialerPackage);
+        pw.print("mSmsPackage=");
+        pw.println(mSmsPackage);
     }
 }

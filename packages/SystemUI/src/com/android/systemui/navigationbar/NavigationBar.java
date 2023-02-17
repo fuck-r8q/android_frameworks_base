@@ -16,6 +16,7 @@
 
 package com.android.systemui.navigationbar;
 
+import static android.app.ActivityManager.LOCK_TASK_MODE_PINNED;
 import static android.app.StatusBarManager.NAVIGATION_HINT_BACK_ALT;
 import static android.app.StatusBarManager.NAVIGATION_HINT_IME_SWITCHER_SHOWN;
 import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
@@ -24,13 +25,11 @@ import static android.app.StatusBarManager.WindowType;
 import static android.app.StatusBarManager.WindowVisibleState;
 import static android.app.StatusBarManager.windowStateToString;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
-import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.InsetsState.ITYPE_BOTTOM_MANDATORY_GESTURES;
 import static android.view.InsetsState.ITYPE_BOTTOM_TAPPABLE_ELEMENT;
 import static android.view.InsetsState.ITYPE_LEFT_GESTURES;
 import static android.view.InsetsState.ITYPE_NAVIGATION_BAR;
 import static android.view.InsetsState.ITYPE_RIGHT_GESTURES;
-import static android.view.InsetsState.containsType;
 import static android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION;
@@ -49,6 +48,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.isGesturalMode;
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_OPAQUE;
 import static com.android.systemui.statusbar.phone.BarTransitions.TransitionMode;
@@ -75,7 +75,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.os.UserHandle;
 import android.provider.DeviceConfig;
 import android.telecom.TelecomManager;
 import android.text.TextUtils;
@@ -85,7 +84,6 @@ import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.InsetsFrameProvider;
-import android.view.InsetsState.InternalInsetsType;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.Surface;
@@ -97,6 +95,7 @@ import android.view.ViewRootImpl.SurfaceChangedCallback;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.InternalInsetsInfo;
 import android.view.ViewTreeObserver.OnComputeInternalInsetsListener;
+import android.view.WindowInsets;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowInsetsController.Appearance;
 import android.view.WindowInsetsController.Behavior;
@@ -135,6 +134,7 @@ import com.android.systemui.navigationbar.gestural.QuickswitchOrientedNavHandle;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.recents.OverviewProxyService;
 import com.android.systemui.recents.Recents;
+import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserContextProvider;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
@@ -142,9 +142,10 @@ import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.systemui.shared.recents.utilities.Utilities;
 import com.android.systemui.shared.rotation.RotationButton;
 import com.android.systemui.shared.rotation.RotationButtonController;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.SysUiStatsLog;
+import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.systemui.statusbar.AutoHideUiElement;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.CommandQueue.Callbacks;
@@ -189,7 +190,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private static final String EXTRA_TRANSIENT_STATE = "transient_state";
 
     /** Allow some time inbetween the long press for back and recents. */
-    private static final int LOCK_TO_APP_GESTURE_TOLERENCE = 200;
+    private static final int LOCK_TO_APP_GESTURE_TOLERANCE = 200;
     private static final long AUTODIM_TIMEOUT_MS = 2250;
 
     private final Context mContext;
@@ -222,6 +223,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private final OnComputeInternalInsetsListener mOnComputeInternalInsetsListener;
     private final UserContextProvider mUserContextProvider;
     private final WakefulnessLifecycle mWakefulnessLifecycle;
+    private final DisplayTracker mDisplayTracker;
     private final RegionSamplingHelper mRegionSamplingHelper;
     private final int mNavColorSampleMargin;
     private NavigationBarFrame mFrame;
@@ -264,6 +266,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private final AutoHideController.Factory mAutoHideControllerFactory;
     private final Optional<TelecomManager> mTelecomManagerOptional;
     private final InputMethodManager mInputMethodManager;
+    private final TaskStackChangeListeners mTaskStackChangeListeners;
 
     @VisibleForTesting
     public int mDisplayId;
@@ -347,15 +350,16 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                 }
 
                 @Override
-                public void updateAssistantAvailable(boolean available) {
+                public void updateAssistantAvailable(boolean available,
+                        boolean longPressHomeEnabled) {
                     // TODO(b/198002034): Content observers currently can still be called back after
                     //  being unregistered, and in this case we can ignore the change if the nav bar
                     //  has been destroyed already
                     if (mView == null) {
                         return;
                     }
-                    mLongPressHomeEnabled = mNavBarHelper.getLongPressHomeEnabled();
-                    updateAssistantEntrypoints(available);
+                    mLongPressHomeEnabled = longPressHomeEnabled;
+                    updateAssistantEntrypoints(available, longPressHomeEnabled);
                 }
             };
 
@@ -469,7 +473,8 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                 @Override
                 public void onStartedWakingUp() {
                     notifyScreenStateChanged(true);
-                    if (isGesturalModeOnDefaultDisplay(getContext(), mNavBarMode)) {
+                    if (isGesturalModeOnDefaultDisplay(getContext(), mDisplayTracker,
+                            mNavBarMode)) {
                         mRegionSamplingHelper.start(mSamplingBounds);
                     }
                 }
@@ -497,6 +502,18 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
             public void surfaceReplaced(Transaction t) {
                 notifyNavigationBarSurface();
             }
+    };
+
+    private boolean mScreenPinningActive = false;
+    private final TaskStackChangeListener mTaskStackListener = new TaskStackChangeListener() {
+        @Override
+        public void onLockTaskModeChanged(int mode) {
+            mScreenPinningActive = (mode == LOCK_TASK_MODE_PINNED);
+            mSysUiFlagsContainer.setFlag(SYSUI_STATE_SCREEN_PINNING, mScreenPinningActive)
+                    .commitUpdate(mDisplayId);
+            mView.setInScreenPinning(mScreenPinningActive);
+            updateScreenPinningGestures();
+        }
     };
 
     @Inject
@@ -540,7 +557,9 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
             EdgeBackGestureHandler edgeBackGestureHandler,
             Optional<BackAnimation> backAnimation,
             UserContextProvider userContextProvider,
-            WakefulnessLifecycle wakefulnessLifecycle) {
+            WakefulnessLifecycle wakefulnessLifecycle,
+            TaskStackChangeListeners taskStackChangeListeners,
+            DisplayTracker displayTracker) {
         super(navigationBarView);
         mFrame = navigationBarFrame;
         mContext = context;
@@ -579,6 +598,8 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         mInputMethodManager = inputMethodManager;
         mUserContextProvider = userContextProvider;
         mWakefulnessLifecycle = wakefulnessLifecycle;
+        mTaskStackChangeListeners = taskStackChangeListeners;
+        mDisplayTracker = displayTracker;
 
         mNavColorSampleMargin = getResources()
                 .getDimensionPixelSize(R.dimen.navigation_handle_sample_horizontal_margin);
@@ -626,12 +647,14 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
 
                     @Override
                     public boolean isSamplingEnabled() {
-                        return isGesturalModeOnDefaultDisplay(getContext(), mNavBarMode);
+                        return isGesturalModeOnDefaultDisplay(getContext(), mDisplayTracker,
+                                mNavBarMode);
                     }
                 }, mainExecutor, bgExecutor);
 
         mView.setBackgroundExecutor(bgExecutor);
         mView.setEdgeBackGestureHandler(mEdgeBackGestureHandler);
+        mView.setDisplayTracker(mDisplayTracker);
         mNavBarMode = mNavigationModeController.addListener(mModeChangedListener);
     }
 
@@ -663,7 +686,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                 getBarLayoutParams(mContext.getResources().getConfiguration().windowConfiguration
                         .getRotation()));
         mDisplayId = mContext.getDisplayId();
-        mIsOnDefaultDisplay = mDisplayId == DEFAULT_DISPLAY;
+        mIsOnDefaultDisplay = mDisplayId == mDisplayTracker.getDefaultDisplayId();
 
         // Ensure we try to get currentSysuiState from navBarHelper before command queue callbacks
         // start firing, since the latter is source of truth
@@ -691,6 +714,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         mCommandQueue.recomputeDisableFlags(mDisplayId, false);
 
         mNotificationShadeDepthController.addListener(mDepthListener);
+        mTaskStackChangeListeners.registerTaskStackListener(mTaskStackListener);
     }
 
     public void destroyView() {
@@ -704,6 +728,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         mNotificationShadeDepthController.removeListener(mDepthListener);
 
         mDeviceConfigProxy.removeOnPropertiesChangedListener(mOnPropertiesChangedListener);
+        mTaskStackChangeListeners.unregisterTaskStackListener(mTaskStackListener);
     }
 
     @Override
@@ -724,6 +749,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         setWindowVisible(isNavBarWindowVisible());
         mView.setBehavior(mBehavior);
         setNavBarMode(mNavBarMode);
+        repositionNavigationBar(mCurrentRotation);
         mView.setUpdateActiveTouchRegionsCallback(
                 () -> mOverviewProxyService.onActiveNavBarRegionChanges(
                         getButtonLocations(
@@ -1004,11 +1030,15 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         pw.println("  mTransientShown=" + mTransientShown);
         pw.println("  mTransientShownFromGestureOnSystemBar="
                 + mTransientShownFromGestureOnSystemBar);
+        pw.println("  mScreenPinningActive=" + mScreenPinningActive);
         dumpBarTransitions(pw, "mNavigationBarView", getBarTransitions());
 
         pw.println("  mOrientedHandleSamplingRegion: " + mOrientedHandleSamplingRegion);
         mView.dump(pw);
         mRegionSamplingHelper.dump(pw);
+        if (mAutoHideController != null) {
+            mAutoHideController.dump(pw);
+        }
     }
 
     // ----- CommandQueue Callbacks -----
@@ -1119,12 +1149,11 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     }
 
     @Override
-    public void showTransient(int displayId, @InternalInsetsType int[] types,
-            boolean isGestureOnSystemBar) {
+    public void showTransient(int displayId, @InsetsType int types, boolean isGestureOnSystemBar) {
         if (displayId != mDisplayId) {
             return;
         }
-        if (!containsType(types, ITYPE_NAVIGATION_BAR)) {
+        if ((types & WindowInsets.Type.navigationBars()) == 0) {
             return;
         }
         if (!mTransientShown) {
@@ -1135,11 +1164,11 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     }
 
     @Override
-    public void abortTransient(int displayId, @InternalInsetsType int[] types) {
+    public void abortTransient(int displayId, @InsetsType int types) {
         if (displayId != mDisplayId) {
             return;
         }
-        if (!containsType(types, ITYPE_NAVIGATION_BAR)) {
+        if ((types & WindowInsets.Type.navigationBars()) == 0) {
             return;
         }
         clearTransient();
@@ -1227,10 +1256,9 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
 
     private void updateScreenPinningGestures() {
         // Change the cancel pin gesture to home and back if recents button is invisible
-        boolean pinningActive = ActivityManagerWrapper.getInstance().isScreenPinningActive();
         ButtonDispatcher backButton = mView.getBackButton();
         ButtonDispatcher recentsButton = mView.getRecentsButton();
-        if (pinningActive) {
+        if (mScreenPinningActive) {
             boolean recentsVisible = mView.isRecentsButtonVisible();
             backButton.setOnLongClickListener(recentsVisible
                     ? this::onLongPressBackRecents
@@ -1241,8 +1269,8 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
             recentsButton.setOnLongClickListener(null);
         }
         // Note, this needs to be set after even if we're setting the listener to null
-        backButton.setLongClickable(pinningActive);
-        recentsButton.setLongClickable(pinningActive);
+        backButton.setLongClickable(mScreenPinningActive);
+        recentsButton.setLongClickable(mScreenPinningActive);
     }
 
     private void notifyNavigationBarScreenOn() {
@@ -1325,8 +1353,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
 
     @VisibleForTesting
     boolean onHomeLongClick(View v) {
-        if (!mView.isRecentsButtonVisible()
-                && ActivityManagerWrapper.getInstance().isScreenPinningActive()) {
+        if (!mView.isRecentsButtonVisible() && mScreenPinningActive) {
             return onLongPressBackHome(v);
         }
         if (shouldDisableNavbarGestures()) {
@@ -1410,7 +1437,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
 
                     // If we recently long-pressed the other button then they were
                     // long-pressed 'together'
-                    if ((time - mLastLockToAppLongPress) < LOCK_TO_APP_GESTURE_TOLERENCE) {
+                    if ((time - mLastLockToAppLongPress) < LOCK_TO_APP_GESTURE_TOLERANCE) {
                         stopLockTaskMode = true;
                         return true;
                     } else if (v.getId() == btnId1) {
@@ -1461,7 +1488,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
     private void onAccessibilityClick(View v) {
         final Display display = v.getDisplay();
         mAccessibilityManager.notifyAccessibilityButtonClicked(
-                display != null ? display.getDisplayId() : DEFAULT_DISPLAY);
+                display != null ? display.getDisplayId() : mDisplayTracker.getDefaultDisplayId());
     }
 
     private boolean onAccessibilityLongClick(View v) {
@@ -1469,7 +1496,7 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         final String chooserClassName = AccessibilityButtonChooserActivity.class.getName();
         intent.setClassName(CHOOSER_PACKAGE_NAME, chooserClassName);
-        mContext.startActivityAsUser(intent, UserHandle.CURRENT);
+        mContext.startActivityAsUser(intent, mUserTracker.getUserHandle());
         return true;
     }
 
@@ -1500,10 +1527,12 @@ public class NavigationBar extends ViewController<NavigationBarView> implements 
                 .commitUpdate(mDisplayId);
     }
 
-    private void updateAssistantEntrypoints(boolean assistantAvailable) {
+    private void updateAssistantEntrypoints(boolean assistantAvailable,
+            boolean longPressHomeEnabled) {
         if (mOverviewProxyService.getProxy() != null) {
             try {
-                mOverviewProxyService.getProxy().onAssistantAvailable(assistantAvailable);
+                mOverviewProxyService.getProxy().onAssistantAvailable(assistantAvailable,
+                        longPressHomeEnabled);
             } catch (RemoteException e) {
                 Log.w(TAG, "Unable to send assistant availability data to launcher");
             }

@@ -89,7 +89,6 @@ import android.util.proto.ProtoOutputStream;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
-import com.android.internal.security.VerityUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.internal.util.IndentingPrintWriter;
@@ -120,6 +119,7 @@ import com.android.server.pm.resolution.ComponentResolver;
 import com.android.server.pm.verify.domain.DomainVerificationLegacySettings;
 import com.android.server.pm.verify.domain.DomainVerificationManagerInternal;
 import com.android.server.pm.verify.domain.DomainVerificationPersistence;
+import com.android.server.security.FileIntegrity;
 import com.android.server.utils.Slogf;
 import com.android.server.utils.Snappable;
 import com.android.server.utils.SnapshotCache;
@@ -1040,7 +1040,7 @@ public final class Settings implements Watchable, Snappable {
             File codePath, String legacyNativeLibraryPath, String primaryCpuAbi,
             String secondaryCpuAbi, long versionCode, int pkgFlags, int pkgPrivateFlags,
             UserHandle installUser, boolean allowInstall, boolean instantApp,
-            boolean virtualPreload, UserManagerService userManager,
+            boolean virtualPreload, boolean isStoppedSystemApp, UserManagerService userManager,
             String[] usesSdkLibraries, long[] usesSdkLibrariesVersions,
             String[] usesStaticLibraries, long[] usesStaticLibrariesVersions,
             Set<String> mimeGroupNames, @NonNull UUID domainSetId) {
@@ -1067,6 +1067,9 @@ public final class Settings implements Watchable, Snappable {
             pkgSetting.setFlags(pkgFlags)
                     .setPrivateFlags(pkgPrivateFlags);
         } else {
+            int installUserId = installUser != null ? installUser.getIdentifier()
+                    : UserHandle.USER_SYSTEM;
+
             pkgSetting = new PackageSetting(pkgName, realPkgName, codePath,
                     legacyNativeLibraryPath, primaryCpuAbi, secondaryCpuAbi,
                     null /*cpuAbiOverrideString*/, versionCode, pkgFlags, pkgPrivateFlags,
@@ -1085,8 +1088,6 @@ public final class Settings implements Watchable, Snappable {
                     Slog.i(PackageManagerService.TAG, "Stopping package " + pkgName, e);
                 }
                 List<UserInfo> users = getAllUsers(userManager);
-                int installUserId = installUser != null ? installUser.getIdentifier()
-                        : UserHandle.USER_SYSTEM;
                 if (users != null && allowInstall) {
                     for (UserInfo user : users) {
                         // By default we consider this app to be installed
@@ -1125,6 +1126,13 @@ public final class Settings implements Watchable, Snappable {
                         );
                     }
                 }
+            } else if (isStoppedSystemApp) {
+                if (DEBUG_STOPPED) {
+                    RuntimeException e = new RuntimeException("here");
+                    e.fillInStackTrace();
+                    Slog.i(PackageManagerService.TAG, "Stopping system package " + pkgName, e);
+                }
+                pkgSetting.setStopped(true, installUserId);
             }
             if (sharedUser != null) {
                 pkgSetting.setAppId(sharedUser.mAppId);
@@ -2272,7 +2280,7 @@ public final class Settings implements Watchable, Snappable {
                                 ustate.getInstallReason());
                     }
                     serializer.attributeLongHex(null, ATTR_FIRST_INSTALL_TIME,
-                            ustate.getFirstInstallTime());
+                            ustate.getFirstInstallTimeMillis());
                     if (ustate.getUninstallReason() != PackageManager.UNINSTALL_REASON_UNKNOWN) {
                         serializer.attributeInt(null, ATTR_UNINSTALL_REASON,
                                 ustate.getUninstallReason());
@@ -2693,15 +2701,20 @@ public final class Settings implements Watchable, Snappable {
                     FileUtils.S_IRUSR | FileUtils.S_IWUSR | FileUtils.S_IRGRP | FileUtils.S_IWGRP,
                     -1, -1);
 
-            try {
-                FileUtils.copy(mSettingsFilename, mSettingsReserveCopyFilename);
+            try (FileInputStream in = new FileInputStream(mSettingsFilename);
+                 FileOutputStream out = new FileOutputStream(mSettingsReserveCopyFilename)) {
+                FileUtils.copy(in, out);
+                out.flush();
+                FileUtils.sync(out);
             } catch (IOException e) {
-                Slog.e(TAG, "Failed to backup settings", e);
+                Slog.e(TAG,
+                        "Failed to write reserve copy of settings: " + mSettingsReserveCopyFilename,
+                        e);
             }
 
             try {
-                VerityUtils.setUpFsverity(mSettingsFilename.getAbsolutePath());
-                VerityUtils.setUpFsverity(mSettingsReserveCopyFilename.getAbsolutePath());
+                FileIntegrity.setUpFsVerity(mSettingsFilename);
+                FileIntegrity.setUpFsVerity(mSettingsReserveCopyFilename);
             } catch (IOException e) {
                 Slog.e(TAG, "Failed to verity-protect settings", e);
             }
@@ -3049,6 +3062,9 @@ public final class Settings implements Watchable, Snappable {
         }
         if (installSource.mInstallerPackageUid != INVALID_UID) {
             serializer.attributeInt(null, "installerUid", installSource.mInstallerPackageUid);
+        }
+        if (installSource.mUpdateOwnerPackageName != null) {
+            serializer.attribute(null, "updateOwner", installSource.mUpdateOwnerPackageName);
         }
         if (installSource.mInstallerAttributionTag != null) {
             serializer.attribute(null, "installerAttributionTag",
@@ -3880,6 +3896,7 @@ public final class Settings implements Watchable, Snappable {
         String systemStr = null;
         String installerPackageName = null;
         int installerPackageUid = INVALID_UID;
+        String updateOwnerPackageName = null;
         String installerAttributionTag = null;
         int packageSource = PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED;
         boolean isOrphaned = false;
@@ -3923,6 +3940,7 @@ public final class Settings implements Watchable, Snappable {
             versionCode = parser.getAttributeLong(null, "version", 0);
             installerPackageName = parser.getAttributeValue(null, "installer");
             installerPackageUid = parser.getAttributeInt(null, "installerUid", INVALID_UID);
+            updateOwnerPackageName = parser.getAttributeValue(null, "updateOwner");
             installerAttributionTag = parser.getAttributeValue(null, "installerAttributionTag");
             packageSource = parser.getAttributeInt(null, "packageSource",
                     PackageInstaller.PACKAGE_SOURCE_UNSPECIFIED);
@@ -4065,8 +4083,9 @@ public final class Settings implements Watchable, Snappable {
         if (packageSetting != null) {
             InstallSource installSource = InstallSource.create(
                     installInitiatingPackageName, installOriginatingPackageName,
-                    installerPackageName, installerPackageUid, installerAttributionTag,
-                    packageSource, isOrphaned, installInitiatorUninstalled);
+                    installerPackageName, installerPackageUid, updateOwnerPackageName,
+                    installerAttributionTag, packageSource, isOrphaned,
+                    installInitiatorUninstalled);
             packageSetting.setInstallSource(installSource)
                     .setVolumeUuid(volumeUuid)
                     .setCategoryOverride(categoryHint)
@@ -4410,6 +4429,15 @@ public final class Settings implements Watchable, Snappable {
                                 ps.getPackageName()));
                 // Only system apps are initially installed.
                 ps.setInstalled(shouldReallyInstall, userHandle);
+
+                // Non-Apex system apps, that are not included in the allowlist in
+                // initialNonStoppedSystemPackages, should be marked as stopped by default.
+                final boolean shouldBeStopped = service.mShouldStopSystemPackagesByDefault
+                        && ps.isSystem()
+                        && !ps.isApex()
+                        && !service.mInitialNonStoppedSystemPackages.contains(ps.getPackageName());
+                ps.setStopped(shouldBeStopped, userHandle);
+
                 // If userTypeInstallablePackages is the *only* reason why we're not installing,
                 // then uninstallReason is USER_TYPE. If there's a different reason, or if we
                 // actually are installing, put UNKNOWN.
@@ -4734,6 +4762,8 @@ public final class Settings implements Watchable, Snappable {
             pw.print(ps.getInstallSource().mInstallerPackageName != null
                     ? ps.getInstallSource().mInstallerPackageName : "?");
             pw.print(ps.getInstallSource().mInstallerPackageUid);
+            pw.print(ps.getInstallSource().mUpdateOwnerPackageName != null
+                    ? ps.getInstallSource().mUpdateOwnerPackageName : "?");
             pw.print(ps.getInstallSource().mInstallerAttributionTag != null
                     ? "(" + ps.getInstallSource().mInstallerAttributionTag + ")" : "");
             pw.print(",");
@@ -4773,7 +4803,7 @@ public final class Settings implements Watchable, Snappable {
                 pw.print(",");
                 pw.print(lastDisabledAppCaller != null ? lastDisabledAppCaller : "?");
                 pw.print(",");
-                pw.print(ps.readUserState(user.id).getFirstInstallTime());
+                pw.print(ps.readUserState(user.id).getFirstInstallTimeMillis());
                 pw.print(",");
                 pw.println();
             }
@@ -4834,7 +4864,7 @@ public final class Settings implements Watchable, Snappable {
         pw.println();
         if (pkg != null) {
             pw.print(prefix); pw.print("  versionName="); pw.println(pkg.getVersionName());
-            pw.print(prefix); pw.print("  usesNonSdkApi="); pw.println(pkg.isUsesNonSdkApi());
+            pw.print(prefix); pw.print("  usesNonSdkApi="); pw.println(pkg.isNonSdkApiRequested());
             pw.print(prefix); pw.print("  splits="); dumpSplitNames(pw, pkg); pw.println();
             final int apkSigningVersion = pkg.getSigningDetails().getSignatureSchemeVersion();
             pw.print(prefix); pw.print("  apkSigningVersion="); pw.println(apkSigningVersion);
@@ -4867,25 +4897,25 @@ public final class Settings implements Watchable, Snappable {
             pw.print(prefix); pw.print("  dataDir="); pw.println(dataDir.getAbsolutePath());
             pw.print(prefix); pw.print("  supportsScreens=[");
             boolean first = true;
-            if (pkg.isSupportsSmallScreens()) {
+            if (pkg.isSmallScreensSupported()) {
                 if (!first)
                     pw.print(", ");
                 first = false;
                 pw.print("small");
             }
-            if (pkg.isSupportsNormalScreens()) {
+            if (pkg.isNormalScreensSupported()) {
                 if (!first)
                     pw.print(", ");
                 first = false;
                 pw.print("medium");
             }
-            if (pkg.isSupportsLargeScreens()) {
+            if (pkg.isLargeScreensSupported()) {
                 if (!first)
                     pw.print(", ");
                 first = false;
                 pw.print("large");
             }
-            if (pkg.isSupportsExtraLargeScreens()) {
+            if (pkg.isExtraLargeScreensSupported()) {
                 if (!first)
                     pw.print(", ");
                 first = false;
@@ -5017,6 +5047,10 @@ public final class Settings implements Watchable, Snappable {
             pw.print(prefix); pw.print("  installerPackageUid=");
             pw.println(ps.getInstallSource().mInstallerPackageUid);
         }
+        if (ps.getInstallSource().mUpdateOwnerPackageName != null) {
+            pw.print(prefix); pw.print("  updateOwnerPackageName=");
+            pw.println(ps.getInstallSource().mUpdateOwnerPackageName);
+        }
         if (ps.getInstallSource().mInstallerAttributionTag != null) {
             pw.print(prefix); pw.print("  installerAttributionTag=");
             pw.println(ps.getInstallSource().mInstallerAttributionTag);
@@ -5040,6 +5074,7 @@ public final class Settings implements Watchable, Snappable {
         pw.print(prefix); pw.print("  privatePkgFlags="); printFlags(pw, ps.getPrivateFlags(),
                 PRIVATE_FLAG_DUMP_SPEC);
         pw.println();
+        pw.print(prefix); pw.print("  apexModuleName="); pw.println(ps.getApexModuleName());
 
         if (pkg != null && pkg.getOverlayTarget() != null) {
             pw.print(prefix); pw.print("  overlayTarget="); pw.println(pkg.getOverlayTarget());
@@ -5122,7 +5157,7 @@ public final class Settings implements Watchable, Snappable {
 
             final PackageUserStateInternal pus = ps.readUserState(user.id);
             pw.print("      firstInstallTime=");
-            date.setTime(pus.getFirstInstallTime());
+            date.setTime(pus.getFirstInstallTimeMillis());
             pw.println(sdf.format(date));
 
             pw.print("      uninstallReason=");
@@ -5251,7 +5286,8 @@ public final class Settings implements Watchable, Snappable {
                     && !packageName.equals(ps.getPackageName())) {
                 continue;
             }
-            if (ps.getPkg() != null && ps.getPkg().isApex()) {
+            if (ps.getPkg() != null && ps.getPkg().isApex()
+                    && !dumpState.isOptionEnabled(DumpState.OPTION_INCLUDE_APEX)) {
                 // Filter APEX packages which will be dumped in the APEX section
                 continue;
             }
@@ -5307,7 +5343,8 @@ public final class Settings implements Watchable, Snappable {
                         && !packageName.equals(ps.getPackageName())) {
                     continue;
                 }
-                if (ps.getPkg() != null && ps.getPkg().isApex()) {
+                if (ps.getPkg() != null && ps.getPkg().isApex()
+                        && !dumpState.isOptionEnabled(DumpState.OPTION_INCLUDE_APEX)) {
                     // Filter APEX packages which will be dumped in the APEX section
                     continue;
                 }
@@ -6255,6 +6292,24 @@ public final class Settings implements Watchable, Snappable {
                     ppir.removeFilter(ppa);
                 }
                 changed = true;
+            }
+        }
+        if (changed) {
+            onChanged();
+        }
+        return changed;
+    }
+
+    boolean clearPersistentPreferredActivity(IntentFilter filter, int userId) {
+        PersistentPreferredIntentResolver ppir = mPersistentPreferredActivities.get(userId);
+        Iterator<PersistentPreferredActivity> it = ppir.filterIterator();
+        boolean changed = false;
+        while (it.hasNext()) {
+            PersistentPreferredActivity ppa = it.next();
+            if (IntentFilter.filterEquals(ppa.getIntentFilter(), filter)) {
+                ppir.removeFilter(ppa);
+                changed = true;
+                break;
             }
         }
         if (changed) {

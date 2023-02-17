@@ -58,17 +58,19 @@ public class DreamActivity extends Activity {
             setTitle(title);
         }
 
-        final Bundle extras = getIntent().getExtras();
-        mCallback = (DreamService.DreamActivityCallbacks) extras.getBinder(EXTRA_CALLBACK);
-
-        if (mCallback != null) {
+        final Object callback = getIntent().getExtras().getBinder(EXTRA_CALLBACK);
+        if (callback instanceof DreamService.DreamActivityCallbacks) {
+            mCallback = (DreamService.DreamActivityCallbacks) callback;
             mCallback.onActivityCreated(this);
+        } else {
+            mCallback = null;
+            finishAndRemoveTask();
         }
     }
 
     @Override
     public void onDestroy() {
-        if (mCallback != null) {
+        if (mCallback != null && !isFinishing()) {
             mCallback.onActivityDestroyed();
         }
 

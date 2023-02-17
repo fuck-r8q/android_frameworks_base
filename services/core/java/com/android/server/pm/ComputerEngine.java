@@ -124,6 +124,7 @@ import com.android.internal.util.CollectionUtils;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.modules.utils.TypedXmlSerializer;
+import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.dex.DexManager;
 import com.android.server.pm.dex.PackageDexUsage;
 import com.android.server.pm.parsing.PackageInfoUtils;
@@ -765,7 +766,7 @@ public class ComputerEngine implements Computer {
              */
             crossProfileResults = mCrossProfileIntentResolverEngine.resolveIntent(this, intent,
                     resolvedType, userId, flags, pkgName, hasNonNegativePriorityResult,
-                    mSettings::getPackage);
+                    resolveForStart, mSettings::getPackage);
             if (intent.hasWebURI() || !crossProfileResults.isEmpty()) sortResult = true;
         } else {
             final PackageStateInternal setting =
@@ -790,7 +791,7 @@ public class ComputerEngine implements Computer {
              */
             crossProfileResults = mCrossProfileIntentResolverEngine.resolveIntent(this, intent,
                     resolvedType, userId, flags, pkgName, false,
-                    mSettings::getPackage);
+                    resolveForStart, mSettings::getPackage);
         }
 
         /*
@@ -1475,14 +1476,18 @@ public class ComputerEngine implements Computer {
             // Compute GIDs only if requested
             final int[] gids = (flags & PackageManager.GET_GIDS) == 0 ? EMPTY_INT_ARRAY
                     : mPermissionManager.getGidsForUid(UserHandle.getUid(userId, ps.getAppId()));
+            // Compute installed permissions only if requested
+            final Set<String> installedPermissions = ((flags & PackageManager.GET_PERMISSIONS) == 0
+                    || ArrayUtils.isEmpty(p.getPermissions())) ? Collections.emptySet()
+                    : mPermissionManager.getInstalledPermissions(ps.getPackageName());
             // Compute granted permissions only if package has requested permissions
-            final Set<String> permissions = ((flags & PackageManager.GET_PERMISSIONS) == 0
+            final Set<String> grantedPermissions = ((flags & PackageManager.GET_PERMISSIONS) == 0
                     || ArrayUtils.isEmpty(p.getRequestedPermissions())) ? Collections.emptySet()
                     : mPermissionManager.getGrantedPermissions(ps.getPackageName(), userId);
 
             PackageInfo packageInfo = PackageInfoUtils.generate(p, gids, flags,
-                    state.getFirstInstallTime(), ps.getLastUpdateTime(), permissions, state, userId,
-                    ps);
+                    state.getFirstInstallTimeMillis(), ps.getLastUpdateTime(), installedPermissions,
+                    grantedPermissions, state, userId, ps);
 
             if (packageInfo == null) {
                 return null;
@@ -1499,7 +1504,7 @@ public class ComputerEngine implements Computer {
             pi.setLongVersionCode(ps.getVersionCode());
             SharedUserApi sharedUser = mSettings.getSharedUserFromPackageName(pi.packageName);
             pi.sharedUserId = (sharedUser != null) ? sharedUser.getName() : null;
-            pi.firstInstallTime = state.getFirstInstallTime();
+            pi.firstInstallTime = state.getFirstInstallTimeMillis();
             pi.lastUpdateTime = ps.getLastUpdateTime();
 
             ApplicationInfo ai = new ApplicationInfo();
@@ -1750,6 +1755,7 @@ public class ComputerEngine implements Computer {
         forwardingResolveInfo.isDefault = true;
         forwardingResolveInfo.filter = new IntentFilter(filter.getIntentFilter());
         forwardingResolveInfo.targetUserId = targetUserId;
+        forwardingResolveInfo.userHandle = UserHandle.of(sourceUserId);
         return forwardingResolveInfo;
     }
 
@@ -1850,8 +1856,7 @@ public class ComputerEngine implements Computer {
         // Figure out which lib versions the caller can see
         LongSparseLongArray versionsCallerCanSee = null;
         final int callingAppId = UserHandle.getAppId(callingUid);
-        if (callingAppId != Process.SYSTEM_UID && callingAppId != Process.SHELL_UID
-                && callingAppId != Process.ROOT_UID) {
+        if (!PackageManagerServiceUtils.isSystemOrRootOrShell(callingAppId)) {
             versionsCallerCanSee = new LongSparseLongArray();
             String libName = versionedLib.valueAt(0).getName();
             String[] uidPackages = getPackagesForUidInternal(callingUid, callingUid);
@@ -2028,8 +2033,7 @@ public class ComputerEngine implements Computer {
         if ((flags & PackageManager.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES) != 0) {
             // System/shell/root get to see all static libs
             final int appId = UserHandle.getAppId(uid);
-            if (appId == Process.SYSTEM_UID || appId == Process.SHELL_UID
-                    || appId == Process.ROOT_UID) {
+            if (PackageManagerServiceUtils.isSystemOrRootOrShell(appId)) {
                 return false;
             }
             // Installer gets to see all static libs.
@@ -2085,8 +2089,7 @@ public class ComputerEngine implements Computer {
         if ((flags & PackageManager.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES) != 0) {
             // System/shell/root get to see all SDK libs.
             final int appId = UserHandle.getAppId(uid);
-            if (appId == Process.SYSTEM_UID || appId == Process.SHELL_UID
-                    || appId == Process.ROOT_UID) {
+            if (PackageManagerServiceUtils.isSystemOrRootOrShell(appId)) {
                 return false;
             }
             // Installer gets to see all SDK libs.
@@ -2146,7 +2149,7 @@ public class ComputerEngine implements Computer {
         if (!requirePermissionWhenSameUser && userId == callingUserId) {
             return true;
         }
-        if (callingUid == Process.SYSTEM_UID || callingUid == Process.ROOT_UID) {
+        if (PackageManagerServiceUtils.isSystemOrRoot(callingUid)) {
             return true;
         }
         if (requireFullPermission) {
@@ -2992,30 +2995,40 @@ public class ComputerEngine implements Computer {
                 }
                 ipw.println("Dexopt state:");
                 ipw.increaseIndent();
-                Collection<? extends PackageStateInternal> pkgSettings;
-                if (setting != null) {
-                    pkgSettings = Collections.singletonList(setting);
+                if (DexOptHelper.useArtService()) {
+                    DexOptHelper.dumpDexoptState(ipw, packageName);
                 } else {
-                    pkgSettings = mSettings.getPackages().values();
-                }
-
-                for (PackageStateInternal pkgSetting : pkgSettings) {
-                    final AndroidPackage pkg = pkgSetting.getPkg();
-                    if (pkg == null || pkg.isApex()) {
-                        // Skip APEX which is not dex-optimized
-                        continue;
+                    Collection<? extends PackageStateInternal> pkgSettings;
+                    if (setting != null) {
+                        pkgSettings = Collections.singletonList(setting);
+                    } else {
+                        pkgSettings = mSettings.getPackages().values();
                     }
-                    final String pkgName = pkg.getPackageName();
-                    ipw.println("[" + pkgName + "]");
-                    ipw.increaseIndent();
 
-                    mPackageDexOptimizer.dumpDexoptState(ipw, pkg, pkgSetting,
-                            mDexManager.getPackageUseInfoOrDefault(pkgName));
+                    for (PackageStateInternal pkgSetting : pkgSettings) {
+                        final AndroidPackage pkg = pkgSetting.getPkg();
+                        if (pkg == null || pkg.isApex()) {
+                            // Skip APEX which is not dex-optimized
+                            continue;
+                        }
+                        final String pkgName = pkg.getPackageName();
+                        ipw.println("[" + pkgName + "]");
+                        ipw.increaseIndent();
+
+                        // TODO(b/251903639): Call into ART Service.
+                        try {
+                            mPackageDexOptimizer.dumpDexoptState(ipw, pkg, pkgSetting,
+                                    mDexManager.getPackageUseInfoOrDefault(pkgName));
+                        } catch (LegacyDexoptDisabledException e) {
+                            throw new RuntimeException(e);
+                        }
+                        ipw.decreaseIndent();
+                    }
+                    ipw.println("BgDexopt state:");
+                    ipw.increaseIndent();
+                    mBackgroundDexOptService.dump(ipw);
                     ipw.decreaseIndent();
                 }
-                ipw.println("BgDexopt state:");
-                ipw.increaseIndent();
-                mBackgroundDexOptService.dump(ipw);
                 ipw.decreaseIndent();
                 break;
             }
@@ -3797,8 +3810,7 @@ public class ComputerEngine implements Computer {
     public boolean canRequestPackageInstalls(@NonNull String packageName, int callingUid,
             int userId, boolean throwIfPermNotDeclared) {
         int uid = getPackageUidInternal(packageName, 0, userId, callingUid);
-        if (callingUid != uid && callingUid != Process.ROOT_UID
-                && callingUid != Process.SYSTEM_UID) {
+        if (callingUid != uid && !PackageManagerServiceUtils.isSystemOrRoot(callingUid)) {
             throw new SecurityException(
                     "Caller uid " + callingUid + " does not own package " + packageName);
         }
@@ -4971,6 +4983,7 @@ public class ComputerEngine implements Computer {
         String installerPackageName;
         String initiatingPackageName;
         String originatingPackageName;
+        String updateOwnerPackageName;
 
         final InstallSource installSource = getInstallSource(packageName, callingUid, userId);
         if (installSource == null) {
@@ -4983,6 +4996,15 @@ public class ComputerEngine implements Computer {
             if (ps == null
                     || shouldFilterApplicationIncludingUninstalled(ps, callingUid, userId)) {
                 installerPackageName = null;
+            }
+        }
+
+        updateOwnerPackageName = installSource.mUpdateOwnerPackageName;
+        if (updateOwnerPackageName != null) {
+            final PackageStateInternal ps = mSettings.getPackage(updateOwnerPackageName);
+            if (ps == null
+                    || shouldFilterApplicationIncludingUninstalled(ps, callingUid, userId)) {
+                updateOwnerPackageName = null;
             }
         }
 
@@ -5042,7 +5064,8 @@ public class ComputerEngine implements Computer {
         }
 
         return new InstallSourceInfo(initiatingPackageName, initiatingPackageSigningInfo,
-                originatingPackageName, installerPackageName, installSource.mPackageSource);
+                originatingPackageName, installerPackageName, updateOwnerPackageName,
+                installSource.mPackageSource);
     }
 
     @PackageManager.EnabledState
@@ -5513,8 +5536,8 @@ public class ComputerEngine implements Computer {
         enforceCrossUserPermission(callingUid, userId, true /*requireFullPermission*/,
                 true /*checkShell*/, "getHarmfulAppInfo");
 
-        if (callingAppId != Process.SYSTEM_UID && callingAppId != Process.ROOT_UID &&
-                checkUidPermission(SET_HARMFUL_APP_WARNINGS, callingUid) != PERMISSION_GRANTED) {
+        if (!PackageManagerServiceUtils.isSystemOrRoot(callingAppId)
+                && checkUidPermission(SET_HARMFUL_APP_WARNINGS, callingUid) != PERMISSION_GRANTED) {
             throw new SecurityException("Caller must have the "
                     + SET_HARMFUL_APP_WARNINGS + " permission.");
         }

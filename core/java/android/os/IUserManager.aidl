@@ -116,8 +116,6 @@ interface IUserManager {
     boolean someUserHasSeedAccount(in String accountName, in String accountType);
     boolean someUserHasAccount(in String accountName, in String accountType);
     String getProfileType(int userId);
-    boolean isMediaSharedWithParent(int userId);
-    boolean isCredentialSharableWithParent(int userId);
     boolean isDemoUser(int userId);
     boolean isPreCreated(int userId);
     UserInfo createProfileForUserEvenWhenDisallowedWithThrow(in String name, in String userType, int flags,
@@ -135,6 +133,7 @@ interface IUserManager {
     boolean isUserForeground(int userId);
     boolean isUserVisible(int userId);
     int[] getVisibleUsers();
+    int getDisplayIdAssignedToUser();
     boolean isUserNameSet(int userId);
     boolean hasRestrictedProfiles(int userId);
     boolean requestQuietModeEnabled(String callingPackage, boolean enableQuietMode, int userId, in IntentSender target, int flags);
@@ -142,4 +141,8 @@ interface IUserManager {
     long getUserStartRealtime();
     long getUserUnlockRealtime();
     boolean setUserEphemeral(int userId, boolean enableEphemeral);
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(anyOf = {android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS})")
+    void setBootUser(int userId);
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(anyOf = {android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS})")
+    int getBootUser();
 }

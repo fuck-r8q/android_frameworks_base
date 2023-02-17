@@ -27,6 +27,7 @@ import android.content.Context
 import android.os.IBinder
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CHANGE
+import android.view.WindowManager.TRANSIT_NONE
 import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.TransitionInfo
@@ -84,17 +85,22 @@ class DesktopTasksController(
     fun showDesktopApps() {
         ProtoLog.v(WM_SHELL_DESKTOP_MODE, "showDesktopApps")
         val wct = WindowContainerTransaction()
-
-        bringDesktopAppsToFront(wct)
+        bringDesktopAppsToFront(wct, force = true)
 
         // Execute transaction if there are pending operations
         if (!wct.isEmpty) {
             if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-                transitions.startTransition(TRANSIT_TO_FRONT, wct, null /* handler */)
+                // TODO(b/268662477): add animation for the transition
+                transitions.startTransition(TRANSIT_NONE, wct, null /* handler */)
             } else {
                 shellTaskOrganizer.applyTransaction(wct)
             }
         }
+    }
+
+    /** Get number of tasks that are marked as visible */
+    fun getVisibleTaskCount(): Int {
+        return desktopModeTaskRepository.getVisibleTaskCount()
     }
 
     /** Move a task with given `taskId` to desktop */
@@ -150,11 +156,11 @@ class DesktopTasksController(
             ?: WINDOWING_MODE_UNDEFINED
     }
 
-    private fun bringDesktopAppsToFront(wct: WindowContainerTransaction) {
+    private fun bringDesktopAppsToFront(wct: WindowContainerTransaction, force: Boolean = false) {
         val activeTasks = desktopModeTaskRepository.getActiveTasks()
 
         // Skip if all tasks are already visible
-        if (activeTasks.isNotEmpty() && activeTasks.all(desktopModeTaskRepository::isVisibleTask)) {
+        if (!force && activeTasks.all(desktopModeTaskRepository::isVisibleTask)) {
             ProtoLog.d(
                 WM_SHELL_DESKTOP_MODE,
                 "bringDesktopAppsToFront: active tasks are already in front, skipping."
@@ -309,6 +315,17 @@ class DesktopTasksController(
                 "showDesktopApps",
                 Consumer(DesktopTasksController::showDesktopApps)
             )
+        }
+
+        override fun getVisibleTaskCount(): Int {
+            val result = IntArray(1)
+            ExecutorUtils.executeRemoteCallWithTaskPermission(
+                controller,
+                "getVisibleTaskCount",
+                { controller -> result[0] = controller.getVisibleTaskCount() },
+                true /* blocking */
+            )
+            return result[0]
         }
     }
 }

@@ -85,11 +85,17 @@
     <string name="screenshot_share_description" msgid="2861628935812656612">"स्क्रीनशॉट शेयर करें"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"ज़्यादा कॉन्टेंट कैप्चर करें"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"स्क्रीनशॉट को खारिज करें"</string>
+    <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"वर्क प्रोफ़ाइल मैसेज को खारिज करें"</string>
     <string name="screenshot_preview_description" msgid="7606510140714080474">"स्क्रीनशॉट की झलक"</string>
     <string name="screenshot_top_boundary_pct" msgid="2520148599096479332">"ऊपरी किनारे से <xliff:g id="PERCENT">%1$d</xliff:g> प्रतिशत"</string>
     <string name="screenshot_bottom_boundary_pct" msgid="3880821519814946478">"निचले किनारे से <xliff:g id="PERCENT">%1$d</xliff:g> प्रतिशत"</string>
     <string name="screenshot_left_boundary_pct" msgid="8502323556112287469">"बाएं किनारे से <xliff:g id="PERCENT">%1$d</xliff:g> प्रतिशत"</string>
     <string name="screenshot_right_boundary_pct" msgid="1201150713021779321">"दाएं किनारे से <xliff:g id="PERCENT">%1$d</xliff:g> प्रतिशत"</string>
+    <string name="screenshot_work_profile_notification" msgid="203041724052970693">"वर्क प्रोफ़ाइल में मौजूद <xliff:g id="APP">%1$s</xliff:g> में सेव किया गया है"</string>
+    <string name="screenshot_default_files_app_name" msgid="8721579578575161912">"Files"</string>
+    <string name="screenshot_detected_template" msgid="7940376642921719915">"<xliff:g id="APPNAME">%1$s</xliff:g> को इस स्क्रीनशॉट का पता चला है."</string>
+    <string name="screenshot_detected_multiple_template" msgid="7644827792093819241">"<xliff:g id="APPNAME">%1$s</xliff:g> और खुले हुए अन्य ऐप्लिकेशन को इस स्क्रीनशॉट का पता चला है."</string>
+    <string name="app_clips_save_add_to_note" msgid="3460200751278069445">"नोट में जोड़ें"</string>
     <string name="screenrecord_name" msgid="2596401223859996572">"स्क्रीन रिकॉर्डर"</string>
     <string name="screenrecord_background_processing_label" msgid="7244617554884238898">"स्क्रीन रिकॉर्डिंग को प्रोसेस किया जा रहा है"</string>
     <string name="screenrecord_channel_description" msgid="4147077128486138351">"स्क्रीन रिकॉर्ड सेशन के लिए जारी सूचना"</string>
@@ -317,8 +323,7 @@
     <string name="sensor_privacy_camera_unblocked_dialog_content" msgid="7847190103011782278">"कैमरे का ऐक्सेस, सभी ऐप्लिकेशन और सेवाओं के लिए चालू किया गया."</string>
     <string name="sensor_privacy_camera_blocked_dialog_content" msgid="3182428709314874616">"सभी ऐप्लिकेशन और सेवाओं के लिए कैमरे का ऐक्सेस बंद किया गया."</string>
     <string name="sensor_privacy_htt_blocked_dialog_content" msgid="3333321592997666441">"माइक्रोफ़ोन बटन का इस्तेमाल करने के लिए, सेटिंग में जाकर माइक्रोफ़ोन का ऐक्सेस चालू करें."</string>
-    <!-- no translation found for sensor_privacy_dialog_open_settings (5635865896053011859) -->
-    <skip />
+    <string name="sensor_privacy_dialog_open_settings" msgid="5635865896053011859">"सेटिंग खोलें"</string>
     <string name="media_seamless_other_device" msgid="4654849800789196737">"अन्य डिवाइस"</string>
     <string name="quick_step_accessibility_toggle_overview" msgid="7908949976727578403">"खास जानकारी टॉगल करें"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"आपको अलार्म, रिमाइंडर, इवेंट और चुनिंदा कॉल करने वालों के अलावा किसी और तरह से (आवाज़ करके और थरथरा कर ) परेशान नहीं किया जाएगा. आप फिर भी संगीत, वीडियो और गेम सहित अपना चुना हुआ सब कुछ सुन सकते हैं."</string>
@@ -337,12 +342,6 @@
     <string name="keyguard_face_successful_unlock_press_alt_3" msgid="7219030481255573962">"चेहरे की पहचान हो गई. डिवाइस खोलने के लिए अनलॉक आइकॉन को टैप करें."</string>
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"चेहरे से अनलॉक किया गया"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"चेहरे की पहचान हो गई"</string>
-  <string-array name="udfps_accessibility_touch_hints">
-    <item msgid="1901953991150295169">"बाईं ओर ले जाएं"</item>
-    <item msgid="5558598599408514296">"नीचे ले जाएं"</item>
-    <item msgid="4844142668312841831">"दाईं ओर ले जाएं"</item>
-    <item msgid="5640521437931460125">"ऊपर ले जाएं"</item>
-  </string-array>
     <string name="keyguard_retry" msgid="886802522584053523">"फिर से कोशिश करने के लिए ऊपर की ओर स्वाइप करें"</string>
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"एनएफ़सी इस्तेमाल करने के लिए स्क्रीन को अनलॉक करें"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"इस डिवाइस का मालिकाना हक आपके संगठन के पास है"</string>
@@ -382,11 +381,11 @@
     <string name="media_projection_dialog_service_text" msgid="958000992162214611">"इस फ़ंक्शन को उपलब्ध कराने वाली सेवा, रिकॉर्ड या कास्ट करते समय, आपकी स्क्रीन पर दिखने वाली या चलाई जाने वाली जानकारी को ऐक्सेस कर सकती है. इसमें पासवर्ड, पैसे चुकाने से जुड़ी जानकारी, फ़ोटो, मैसेज, और चलाए जाने वाले ऑडियो शामिल हैं."</string>
     <string name="media_projection_dialog_service_title" msgid="2888507074107884040">"रिकॉर्डिंग या कास्ट करना शुरू करें?"</string>
     <string name="media_projection_dialog_title" msgid="3316063622495360646">"<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> का इस्तेमाल करके रिकॉर्ड और कास्ट करना शुरू करें?"</string>
-    <string name="media_projection_permission_dialog_title" msgid="7130975432309482596">"<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> को शेयर या रिकॉर्ड करने की अनुमति दें?"</string>
+    <string name="media_projection_permission_dialog_title" msgid="7130975432309482596">"क्या आपको शेयर या रिकॉर्ड करने की <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> को अनुमति देनी है?"</string>
     <string name="media_projection_permission_dialog_option_entire_screen" msgid="392086473225692983">"पूरी स्क्रीन"</string>
     <string name="media_projection_permission_dialog_option_single_app" msgid="1591110238124910521">"सिर्फ़ एक ऐप्लिकेशन"</string>
     <string name="media_projection_permission_dialog_warning_entire_screen" msgid="3989078820637452717">"शेयर, रिकॉर्ड या कास्ट करते समय, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> के पास स्क्रीन पर दिख रही हर चीज़ या डिवाइस पर चल रहे हर मीडिया का ऐक्सेस होता है. इसलिए, शेयर, रिकॉर्ड या कास्ट करते समय, पासवर्ड, पेमेंट के तरीके की जानकारी, मैसेज या किसी और संवेदनशील जानकारी को लेकर खास सावधानी बरतें."</string>
-    <string name="media_projection_permission_dialog_warning_single_app" msgid="1659532781536753059">"शेयर, रिकॉर्ड या कास्ट करते समय, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> के पास उस ऐप्लिकेशन पर दिख रही हर चीज़ या उस पर चल रहे हर मीडिया का ऐक्सेस होता है. इसलिए, शेयर, रिकॉर्ड या कास्ट करते समय, पासवर्ड, पेमेंट के तरीके की जानकारी, मैसेज या किसी और संवेदनशील जानकारी को लेकर खास सावधानी बरतें."</string>
+    <string name="media_projection_permission_dialog_warning_single_app" msgid="1659532781536753059">"शेयर, रिकॉर्ड या कास्ट करते समय, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> के पास उस ऐप्लिकेशन पर दिख रही हर चीज़ या उस पर चल रहे हर मीडिया का ऐक्सेस होता है. इसलिए, पासवर्ड, पेमेंट के तरीके की जानकारी, मैसेज या किसी और संवेदनशील जानकारी को लेकर खास सावधानी बरतें."</string>
     <string name="media_projection_permission_dialog_continue" msgid="1827799658916736006">"जारी रखें"</string>
     <string name="media_projection_permission_app_selector_title" msgid="894251621057480704">"ऐप्लिकेशन शेयर करें या उसकी रिकॉर्डिंग करें"</string>
     <string name="media_projection_permission_dialog_system_service_title" msgid="6827129613741303726">"क्या इस ऐप्लिकेशन को शेयर या रिकॉर्ड करने की अनुमति देनी है?"</string>
@@ -541,8 +540,8 @@
     <string name="notification_automatic_title" msgid="3745465364578762652">"अपने-आप"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"किसी तरह की आवाज़ या वाइब्रेशन न हो"</string>
     <string name="notification_conversation_summary_low" msgid="1734433426085468009">"इससे किसी तरह की आवाज़ या वाइब्रेशन नहीं होता और बातचीत, सेक्शन में सबसे नीचे दिखती है"</string>
-    <string name="notification_channel_summary_default" msgid="3282930979307248890">"फ़ोन की सेटिंग के आधार पर, सूचना आने पर घंटी बज सकती है या वाइब्रेशन हो सकता है"</string>
-    <string name="notification_channel_summary_default_with_bubbles" msgid="1782419896613644568">"फ़ोन की सेटिंग के आधार पर, सूचना आने पर घंटी बज सकती है या वाइब्रेशन हो सकता है. <xliff:g id="APP_NAME">%1$s</xliff:g> में होने वाली बातचीत, डिफ़ॉल्ट रूप से बबल के तौर पर दिखती है."</string>
+    <string name="notification_channel_summary_default" msgid="777294388712200605">"डिवाइस की सेटिंग के आधार पर, सूचना आने पर घंटी बज सकती है या वाइब्रेशन हो सकता है"</string>
+    <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"डिवाइस की सेटिंग के आधार पर, सूचना आने पर घंटी बज सकती है या वाइब्रेशन हो सकता है. <xliff:g id="APP_NAME">%1$s</xliff:g> पर होने वाली बातचीत, डिफ़ॉल्ट रूप से बबल के तौर पर दिखती है."</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"सिस्टम को यह तय करने की अनुमति दें कि इस सूचना के मिलने पर आवाज़ हो या वाइब्रेशन हो"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;स्थिति:&lt;/b&gt; लेवल बढ़ाकर, डिफ़ॉल्ट के तौर पर सेट किया गया"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;स्थिति:&lt;/b&gt; लेवल घटाकर, साइलेंट पर सेट किया गया"</string>
@@ -743,6 +742,7 @@
     <string name="wifi_is_off" msgid="5389597396308001471">"वाई-फ़ाई बंद है"</string>
     <string name="bt_is_off" msgid="7436344904889461591">"ब्लूटूथ बंद है"</string>
     <string name="dnd_is_off" msgid="3185706903793094463">"परेशान न करें बंद है"</string>
+    <string name="dnd_is_on" msgid="7009368176361546279">"\'परेशान न करें\' सुविधा चालू है"</string>
     <string name="qs_dnd_prompt_auto_rule" msgid="3535469468310002616">"एक ऑटोमैटिक नियम (<xliff:g id="ID_1">%s</xliff:g>) ने परेशान न करें को चालू कर दिया था."</string>
     <string name="qs_dnd_prompt_app" msgid="4027984447935396820">"एक ऐप्लिकेशन (<xliff:g id="ID_1">%s</xliff:g>) ने परेशान न करें को चालू कर दिया था."</string>
     <string name="qs_dnd_prompt_auto_rule_app" msgid="1841469944118486580">"एक ऑटोमैटिक नियम या ऐप्लिकेशन ने परेशान न करें को चालू कर दिया था."</string>
@@ -809,13 +809,14 @@
     <string name="accessibility_magnification_medium" msgid="6994632616884562625">"मध्यम"</string>
     <string name="accessibility_magnification_small" msgid="8144502090651099970">"छोटा"</string>
     <string name="accessibility_magnification_large" msgid="6602944330021308774">"बड़ा"</string>
-    <string name="accessibility_magnification_close" msgid="1099965835844673375">"बंद करें"</string>
+    <string name="accessibility_magnification_done" msgid="263349129937348512">"हो गया"</string>
     <string name="accessibility_magnifier_edit" msgid="1522877239671820636">"बदलाव करें"</string>
     <string name="accessibility_magnification_magnifier_window_settings" msgid="2834685072221468434">"ज़ूम करने की सुविधा वाली विंडो से जुड़ी सेटिंग"</string>
     <string name="accessibility_floating_button_migration_tooltip" msgid="5217151214439341902">"सुलभता सुविधाएं खोलने के लिए टैप करें. सेटिंग में, इस बटन को बदलें या अपने हिसाब से सेट करें.\n\n"<annotation id="link">"सेटिंग देखें"</annotation></string>
     <string name="accessibility_floating_button_docking_tooltip" msgid="6814897496767461517">"बटन को कुछ समय छिपाने के लिए, उसे किनारे पर ले जाएं"</string>
     <string name="accessibility_floating_button_undo" msgid="511112888715708241">"पहले जैसा करें"</string>
-    <string name="accessibility_floating_button_undo_message_text" msgid="3044079592757099698">"{count,plural, =1{{label} शॉर्टकट हटाया गया}one{# शॉर्टकट हटाया गया}other{# शॉर्टकट हटाए गए}}"</string>
+    <string name="accessibility_floating_button_undo_message_label_text" msgid="9017658016426242640">"<xliff:g id="FEATURE_NAME">%s</xliff:g> का शॉर्टकट हटाया गया"</string>
+    <string name="accessibility_floating_button_undo_message_number_text" msgid="4909270290725226075">"{count,plural, =1{# शॉर्टकट हटाया गया}one{# शॉर्टकट हटाया गया}other{# शॉर्टकट हटाए गए}}"</string>
     <string name="accessibility_floating_button_action_move_top_left" msgid="6253520703618545705">"सबसे ऊपर बाईं ओर ले जाएं"</string>
     <string name="accessibility_floating_button_action_move_top_right" msgid="6106225581993479711">"सबसे ऊपर दाईं ओर ले जाएं"</string>
     <string name="accessibility_floating_button_action_move_bottom_left" msgid="8063394111137429725">"सबसे नीचे बाईं ओर ले जाएं"</string>
@@ -828,6 +829,8 @@
     <string name="controls_providers_title" msgid="6879775889857085056">"कंट्रोल जोड़ने के लिए ऐप्लिकेशन चुनें"</string>
     <string name="controls_number_of_favorites" msgid="4481806788981836355">"{count,plural, =1{# कंट्रोल जोड़ा गया.}one{# कंट्रोल जोड़ा गया.}other{# कंट्रोल जोड़े गए.}}"</string>
     <string name="controls_removed" msgid="3731789252222856959">"हटाया गया"</string>
+    <string name="controls_panel_authorization_title" msgid="267429338785864842">"<xliff:g id="APPNAME">%s</xliff:g> को जोड़ना है?"</string>
+    <string name="controls_panel_authorization" msgid="4540047176861801815">"<xliff:g id="APPNAME">%s</xliff:g> को जोड़ने पर, वह इस पैनल पर कुछ कंट्रोल और कॉन्टेंट दिखा सकता है. कुछ ऐप्लिकेशन के लिए यह चुना जा सकता है कि वे इस पैनल पर कौनसे कंट्रोल दिखाएं."</string>
     <string name="accessibility_control_favorite" msgid="8694362691985545985">"पसंदीदा बनाया गया"</string>
     <string name="accessibility_control_favorite_position" msgid="54220258048929221">"पसंदीदा बनाया गया, क्रम संख्या <xliff:g id="NUMBER">%d</xliff:g>"</string>
     <string name="accessibility_control_not_favorite" msgid="1291760269563092359">"पसंदीदा से हटाया गया"</string>
@@ -878,11 +881,18 @@
     <string name="controls_media_smartspace_rec_description" msgid="4136242327044070732">"<xliff:g id="APP_LABEL">%1$s</xliff:g> खोलें"</string>
     <string name="controls_media_smartspace_rec_item_description" msgid="2189271793070870883">"<xliff:g id="APP_LABEL">%3$s</xliff:g> पर, <xliff:g id="ARTIST_NAME">%2$s</xliff:g> का <xliff:g id="SONG_NAME">%1$s</xliff:g> चलाएं"</string>
     <string name="controls_media_smartspace_rec_item_no_artist_description" msgid="8703614798636591077">"<xliff:g id="APP_LABEL">%2$s</xliff:g> पर, <xliff:g id="SONG_NAME">%1$s</xliff:g> चलाएं"</string>
+    <string name="controls_media_smartspace_rec_header" msgid="5053461390357112834">"आपके लिए सुझाव"</string>
     <string name="media_transfer_undo" msgid="1895606387620728736">"पहले जैसा करें"</string>
     <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"<xliff:g id="DEVICENAME">%1$s</xliff:g> पर मीडिया चलाने के लिए, अपने डिवाइस को उसके पास ले जाएं"</string>
-    <string name="media_move_closer_to_end_cast" msgid="6495907340926563656">"अपने डिवाइस पर मीडिया फ़ाइल ट्रांसफ़र करने के लिए, उसे <xliff:g id="DEVICENAME">%1$s</xliff:g> के पास ले जाएं"</string>
+    <string name="media_move_closer_to_end_cast" msgid="7302555909119374738">"मीडिया ट्रांसफ़र करने के लिए, <xliff:g id="DEVICENAME">%1$s</xliff:g> के करीब जाएं"</string>
     <string name="media_transfer_playing_different_device" msgid="7186806382609785610">"<xliff:g id="DEVICENAME">%1$s</xliff:g> पर मीडिया चल रहा है"</string>
     <string name="media_transfer_failed" msgid="7955354964610603723">"कोई गड़बड़ी हुई. फिर से कोशिश करें."</string>
+    <string name="media_transfer_loading" msgid="5544017127027152422">"लोड हो रहा है"</string>
+    <string name="media_ttt_default_device_type" msgid="4457646436153370169">"टैबलेट"</string>
+    <!-- no translation found for media_transfer_receiver_content_description_unknown_app (7381771464846263667) -->
+    <skip />
+    <!-- no translation found for media_transfer_receiver_content_description_with_app_name (8555975056850659389) -->
+    <skip />
     <string name="controls_error_timeout" msgid="794197289772728958">"काम नहीं कर रहा, ऐप जांचें"</string>
     <string name="controls_error_removed" msgid="6675638069846014366">"कंट्रोल नहीं है"</string>
     <string name="controls_error_removed_title" msgid="1207794911208047818">"कंट्रोल मौजूद नहीं है"</string>
@@ -892,6 +902,7 @@
     <string name="controls_error_failed" msgid="960228639198558525">"गड़बड़ी हुई, फिर से कोशिश करें"</string>
     <string name="controls_menu_add" msgid="4447246119229920050">"कंट्राेल जोड़ें"</string>
     <string name="controls_menu_edit" msgid="890623986951347062">"कंट्रोल में बदलाव करें"</string>
+    <string name="controls_menu_add_another_app" msgid="8661172304650786705">"ऐप्लिकेशन जोड़ें"</string>
     <string name="media_output_dialog_add_output" msgid="5642703238877329518">"आउटपुट जोड़ें"</string>
     <string name="media_output_dialog_group" msgid="5571251347877452212">"ग्रुप"</string>
     <string name="media_output_dialog_single_device" msgid="3102758980643351058">"एक डिवाइस चुना गया"</string>
@@ -905,6 +916,8 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"ऑडियो आउटपुट के लिए उपलब्ध डिवाइस."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"वॉल्यूम"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"स्पीकर और डिसप्ले"</string>
+    <string name="media_output_group_title_suggested_device" msgid="4157186235837903826">"सुझाए गए डिवाइस"</string>
     <string name="media_output_first_broadcast_title" msgid="6292237789860753022">"ब्रॉडकास्ट करने की सुविधा कैसे काम करती है"</string>
     <string name="media_output_broadcast" msgid="3555580945878071543">"ब्रॉडकास्ट करें"</string>
     <string name="media_output_first_notify_broadcast_message" msgid="6353857724136398494">"आपके आस-पास मौजूद लोग, ब्रॉडकास्ट किए जा रहे मीडिया को सुन सकते हैं. हालांकि, इसके लिए उनके पास ऐसे ब्लूटूथ डिवाइस होने चाहिए जिन पर मीडिया चलाया जा सके"</string>
@@ -916,6 +929,10 @@
     <string name="media_output_broadcast_start_failed" msgid="3670835946856129775">"ब्रॉडकास्ट नहीं किया जा सकता"</string>
     <string name="media_output_broadcast_update_error" msgid="1420868236079122521">"सेव नहीं किया जा सका. फिर से कोशिश करें."</string>
     <string name="media_output_broadcast_last_update_error" msgid="5484328807296895491">"सेव नहीं किया जा सका."</string>
+    <!-- no translation found for media_output_broadcast_code_hint_no_less_than_min (4663836092607696185) -->
+    <skip />
+    <!-- no translation found for media_output_broadcast_code_hint_no_more_than_max (9181869364856175638) -->
+    <skip />
     <string name="build_number_clip_data_label" msgid="3623176728412560914">"बिल्ड नंबर"</string>
     <string name="build_number_copy_toast" msgid="877720921605503046">"बिल्ड नंबर को क्लिपबोर्ड पर कॉपी किया गया."</string>
     <string name="basic_status" msgid="2315371112182658176">"ऐसी बातचीत जिसमें इंटरैक्शन डेटा मौजूद नहीं है"</string>
@@ -1016,6 +1033,7 @@
     <string name="dream_overlay_status_bar_camera_off" msgid="5273073778969890823">"कैमरा बंद है"</string>
     <string name="dream_overlay_status_bar_mic_off" msgid="8366534415013819396">"माइक्रोफ़ोन बंद है"</string>
     <string name="dream_overlay_status_bar_camera_mic_off" msgid="3199425257833773569">"कैमरा और माइक बंद हैं"</string>
+    <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"Assistant सुन रही है"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# सूचना}one{# सूचना}other{# सूचनाएं}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
     <string name="note_task_button_label" msgid="8718616095800343136">"नोट बनाएं"</string>
@@ -1031,21 +1049,30 @@
     <string name="log_access_confirmation_allow" msgid="752147861593202968">"एक बार ऐक्सेस करने की अनुमति दें"</string>
     <string name="log_access_confirmation_deny" msgid="2389461495803585795">"अनुमति न दें"</string>
     <string name="log_access_confirmation_body" msgid="6883031912003112634">"डिवाइस लॉग में आपके डिवाइस पर की गई कार्रवाइयां रिकॉर्ड होती हैं. ऐप्लिकेशन, इन लॉग का इस्तेमाल गड़बड़ियां ढूंढने और उन्हें सही करने के लिए करता है.\n\nकुछ लॉग में संवेदनशील जानकारी हो सकती है. इसलिए, सिर्फ़ भरोसेमंद ऐप्लिकेशन को डिवाइस के सभी लॉग का ऐक्सेस दें. \n\nअगर इस ऐप्लिकेशन को डिवाइस के सभी लॉग का ऐक्सेस नहीं दिया जाता है, तब भी यह डिवाइस पर मौजूद अपने लॉग ऐक्सेस कर सकता है. डिवाइस को बनाने वाली कंपनी अब भी डिवाइस के कुछ लॉग या जानकारी को ऐक्सेस कर सकती है."</string>
+    <string name="log_access_confirmation_learn_more" msgid="3134565480986328004">"ज़्यादा जानें"</string>
+    <string name="log_access_confirmation_learn_more_at" msgid="5635666259505215905">"ज़्यादा जानने के लिए <xliff:g id="URL">%s</xliff:g> पर जाएं"</string>
     <string name="keyguard_affordance_enablement_dialog_action_template" msgid="8164857863036314664">"<xliff:g id="APPNAME">%1$s</xliff:g> खोलें"</string>
-    <string name="keyguard_affordance_enablement_dialog_message" msgid="2790910660524887941">"<xliff:g id="APPNAME">%1$s</xliff:g> ऐप्लिकेशन को शॉर्टकट के तौर पर जोड़ने के लिए, पक्का करें कि"</string>
     <string name="keyguard_affordance_enablement_dialog_wallet_instruction_1" msgid="8439655049139819278">"• ऐप्लिकेशन को सेट अप किया गया है"</string>
     <string name="keyguard_affordance_enablement_dialog_wallet_instruction_2" msgid="4321089250629477835">"• Wallet में कम से कम एक कार्ड जोड़ा गया है"</string>
     <string name="keyguard_affordance_enablement_dialog_qr_scanner_instruction" msgid="5355839079232119791">"• कैमरा ऐप्लिकेशन इंस्टॉल किया गया है"</string>
     <string name="keyguard_affordance_enablement_dialog_home_instruction_1" msgid="8438311171750568633">"• ऐप्लिकेशन को सेट अप किया गया है"</string>
     <string name="keyguard_affordance_enablement_dialog_home_instruction_2" msgid="8308525385889021652">"• कम से कम एक डिवाइस उपलब्ध है"</string>
+    <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"शॉर्टकट को दबाकर रखें"</string>
     <string name="rear_display_bottom_sheet_cancel" msgid="3461468855493357248">"रद्द करें"</string>
-    <string name="rear_display_bottom_sheet_confirm" msgid="4383356544661421206">"कैमरा अभी स्विच करें"</string>
+    <string name="rear_display_bottom_sheet_confirm" msgid="4383356544661421206">"अभी स्विच करें"</string>
     <string name="rear_display_fold_bottom_sheet_title" msgid="6081542277622721548">"बेहतर सेल्फ़ी के लिए फ़ोन को अनफ़ोल्ड करें"</string>
     <string name="rear_display_unfold_bottom_sheet_title" msgid="2137403802960396357">"बेहतर सेल्फ़ी के लिए फ़्रंट डिसप्ले पर स्विच करें?"</string>
     <string name="rear_display_bottom_sheet_description" msgid="1852662982816810352">"वाइड ऐंगल में हाई रिज़ॉल्यूशन वाली फ़ोटो लेने के लिए, पीछे का कैमरा इस्तेमाल करें."</string>
     <string name="rear_display_bottom_sheet_warning" msgid="800995919558238930"><b>"✱ यह स्क्रीन बंद हो जाएगी"</b></string>
-    <!-- no translation found for rear_display_accessibility_folded_animation (1538121649587978179) -->
-    <skip />
-    <!-- no translation found for rear_display_accessibility_unfolded_animation (1946153682258289040) -->
-    <skip />
+    <string name="rear_display_accessibility_folded_animation" msgid="1538121649587978179">"फ़ोल्ड किया जा सकने वाला डिवाइस अनफ़ोल्ड किया जा रहा है"</string>
+    <string name="rear_display_accessibility_unfolded_animation" msgid="1946153682258289040">"फ़ोल्ड किया जा सकने वाला डिवाइस पलटा जा रहा है"</string>
+    <string name="stylus_battery_low_percentage" msgid="1620068112350141558">"<xliff:g id="PERCENTAGE">%s</xliff:g> बैटरी बची है"</string>
+    <string name="stylus_battery_low_subtitle" msgid="3583843128908823273">"अपने स्टाइलस को चार्ज करें"</string>
+    <string name="stylus_battery_low" msgid="7134370101603167096">"स्टाइलस की बैटरी कम है"</string>
+    <string name="video_camera" msgid="7654002575156149298">"वीडियो कैमरा"</string>
+    <string name="call_from_work_profile_title" msgid="6991157106804289643">"यह प्रोफ़ाइल होने पर कॉल नहीं की जा सकती"</string>
+    <string name="call_from_work_profile_text" msgid="3458704745640229638">"ऑफ़िस की नीति के तहत, वर्क प्रोफ़ाइल होने पर ही फ़ोन कॉल किए जा सकते हैं"</string>
+    <string name="call_from_work_profile_action" msgid="2937701298133010724">"वर्क प्रोफ़ाइल पर स्विच करें"</string>
+    <string name="call_from_work_profile_close" msgid="7927067108901068098">"बंद करें"</string>
+    <string name="lock_screen_settings" msgid="9197175446592718435">"लॉक स्क्रीन की सेटिंग"</string>
 </resources>

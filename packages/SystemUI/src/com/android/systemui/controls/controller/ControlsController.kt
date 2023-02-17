@@ -188,6 +188,16 @@ interface ControlsController : UserAwareController {
     /** See [ControlsUiController.getPreferredSelectedItem]. */
     fun getPreferredSelection(): SelectedItem
 
+    fun setPreferredSelection(selectedItem: SelectedItem)
+
+    /**
+     * Bind to a service that provides a Device Controls panel (embedded activity). This will allow
+     * the app to remain "warm", and reduce latency.
+     *
+     * @param component The [ComponentName] of the [ControlsProviderService] to bind.
+     */
+    fun bindComponentForPanel(componentName: ComponentName)
+
     /**
      * Interface for structure to pass data to [ControlsFavoritingActivity].
      */

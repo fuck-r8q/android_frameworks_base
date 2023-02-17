@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
 
 import android.Manifest;
 import android.annotation.Nullable;
+import android.app.ActivityManager;
 import android.app.GameManager;
 import android.app.GameModeConfiguration;
 import android.app.GameModeInfo;
@@ -260,6 +262,16 @@ public class GameManagerServiceTests {
         gameManagerService.onUserSwitching(/* from */ new SystemService.TargetUser(userInfoFrom),
                 /* to */ new SystemService.TargetUser(userInfoTo));
         mTestLooper.dispatchAll();
+    }
+
+    private void mockQueryAllPackageGranted() {
+        mMockContext.setPermission(Manifest.permission.QUERY_ALL_PACKAGES,
+                PackageManager.PERMISSION_GRANTED);
+    }
+
+    private void mockQueryAllPackageDenied() {
+        mMockContext.setPermission(Manifest.permission.QUERY_ALL_PACKAGES,
+                PackageManager.PERMISSION_DENIED);
     }
 
     private void mockManageUsersGranted() {
@@ -527,7 +539,7 @@ public class GameManagerServiceTests {
     }
 
     /**
-     * Test permission.MANAGE_GAME_MODE is checked
+     * Test invalid package name is queried
      */
     @Test
     public void testGetGameModeInvalidPackageName() {
@@ -536,16 +548,16 @@ public class GameManagerServiceTests {
 
         startUser(gameManagerService, USER_ID_1);
         try {
+            when(mMockPackageManager.getApplicationInfoAsUser(anyString(), anyInt(), anyInt()))
+                    .thenThrow(new PackageManager.NameNotFoundException());
             assertEquals(GameManager.GAME_MODE_UNSUPPORTED,
                     gameManagerService.getGameMode(PACKAGE_NAME_INVALID,
                             USER_ID_1));
-
-            fail("GameManagerService failed to generate SecurityException when "
-                    + "permission.MANAGE_GAME_MODE is not granted.");
-        } catch (SecurityException ignored) {
+        } catch (PackageManager.NameNotFoundException e) {
+            // should never get here as isPackageGame() catches this exception
+            // fail this test if we ever get here
+            fail("Unexpected NameNotFoundException caught.");
         }
-
-        // The test should throw an exception, so the test is passing if we get here.
     }
 
     /**
@@ -1874,16 +1886,20 @@ public class GameManagerServiceTests {
     @Test
     public void testUpdateCustomGameModeConfiguration() throws InterruptedException {
         mockModifyGameModeGranted();
-        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        GameManagerService gameManagerService = Mockito.spy(createServiceAndStartUser(USER_ID_1));
+        gameManagerService.setGameMode(mPackageName, GameManager.GAME_MODE_CUSTOM, USER_ID_1);
         gameManagerService.updateCustomGameModeConfiguration(mPackageName,
                 new GameModeConfiguration.Builder().setScalingFactor(0.35f).setFpsOverride(
                         60).build(),
                 USER_ID_1);
-
         assertTrue(gameManagerService.mHandler.hasEqualMessages(WRITE_SETTINGS, USER_ID_1));
         assertTrue(
                 gameManagerService.mHandler.hasEqualMessages(WRITE_GAME_MODE_INTERVENTION_LIST_FILE,
                         USER_ID_1));
+        Mockito.verify(gameManagerService).setOverrideFrameRate(
+                ArgumentMatchers.eq(DEFAULT_PACKAGE_UID),
+                ArgumentMatchers.eq(60.0f));
+        checkFps(gameManagerService, GameManager.GAME_MODE_CUSTOM, 60);
 
         GameManagerService.GamePackageConfiguration pkgConfig = gameManagerService.getConfig(
                 mPackageName, USER_ID_1);
@@ -2179,5 +2195,125 @@ public class GameManagerServiceTests {
         gameManagerService.notifyGraphicsEnvironmentSetup(someGamePkg, USER_ID_1);
         verify(mMockPowerManager, never()).setPowerMode(anyInt(), anyBoolean());
         assertFalse(gameManagerService.mHandler.hasMessages(CANCEL_GAME_LOADING_MODE));
+    }
+
+    @Test
+    public void testGetInterventionList_permissionDenied() throws Exception {
+        String configString = "mode=2,downscaleFactor=0.5";
+        when(DeviceConfig.getProperty(anyString(), anyString()))
+                .thenReturn(configString);
+        mockQueryAllPackageDenied();
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        assertThrows(SecurityException.class,
+                () -> gameManagerService.getInterventionList(mPackageName, USER_ID_1));
+
+        mockQueryAllPackageGranted();
+        String expectedInterventionListOutput = "\n[Name:" + mPackageName
+                 + " Modes: {2=[Game Mode:2,Scaling:0.5,Use Angle:false,"
+                 + "Fps:,Loading Boost Duration:-1]}]";
+        assertEquals(expectedInterventionListOutput,
+                gameManagerService.getInterventionList(mPackageName, USER_ID_1));
+    }
+
+    @Test
+    public void testGamePowerMode_gamePackage() throws Exception {
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages = {mPackageName};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        verify(mMockPowerManager, times(1)).setPowerMode(Mode.GAME, true);
+    }
+
+    @Test
+    public void testGamePowerMode_twoGames() throws Exception {
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages1 = {mPackageName};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages1);
+        String someGamePkg = "some.game";
+        String[] packages2 = {someGamePkg};
+        int somePackageId = DEFAULT_PACKAGE_UID + 1;
+        when(mMockPackageManager.getPackagesForUid(somePackageId)).thenReturn(packages2);
+        HashMap<Integer, Boolean> powerState = new HashMap<>();
+        doAnswer(inv -> powerState.put(inv.getArgument(0), inv.getArgument(1)))
+                .when(mMockPowerManager).setPowerMode(anyInt(), anyBoolean());
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        assertTrue(powerState.get(Mode.GAME));
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                somePackageId, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        assertTrue(powerState.get(Mode.GAME));
+        gameManagerService.mUidObserver.onUidStateChanged(
+                somePackageId, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        assertFalse(powerState.get(Mode.GAME));
+    }
+
+    @Test
+    public void testGamePowerMode_twoGamesOverlap() throws Exception {
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages1 = {mPackageName};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages1);
+        String someGamePkg = "some.game";
+        String[] packages2 = {someGamePkg};
+        int somePackageId = DEFAULT_PACKAGE_UID + 1;
+        when(mMockPackageManager.getPackagesForUid(somePackageId)).thenReturn(packages2);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                somePackageId, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                somePackageId, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        verify(mMockPowerManager, times(1)).setPowerMode(Mode.GAME, true);
+        verify(mMockPowerManager, times(1)).setPowerMode(Mode.GAME, false);
+    }
+
+    @Test
+    public void testGamePowerMode_released() throws Exception {
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages = {mPackageName};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        verify(mMockPowerManager, times(1)).setPowerMode(Mode.GAME, false);
+    }
+
+    @Test
+    public void testGamePowerMode_noPackage() throws Exception {
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages = {};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        verify(mMockPowerManager, times(0)).setPowerMode(Mode.GAME, true);
+    }
+
+    @Test
+    public void testGamePowerMode_notAGamePackage() throws Exception {
+        mockAppCategory(mPackageName, ApplicationInfo.CATEGORY_IMAGE);
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages = {"someapp"};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        verify(mMockPowerManager, times(0)).setPowerMode(Mode.GAME, true);
+    }
+
+    @Test
+    public void testGamePowerMode_notAGamePackageNotReleased() throws Exception {
+        mockAppCategory(mPackageName, ApplicationInfo.CATEGORY_IMAGE);
+        GameManagerService gameManagerService = createServiceAndStartUser(USER_ID_1);
+        String[] packages = {"someapp"};
+        when(mMockPackageManager.getPackagesForUid(DEFAULT_PACKAGE_UID)).thenReturn(packages);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, 0, 0);
+        gameManagerService.mUidObserver.onUidStateChanged(
+                DEFAULT_PACKAGE_UID, ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND, 0, 0);
+        verify(mMockPowerManager, times(0)).setPowerMode(Mode.GAME, false);
     }
 }

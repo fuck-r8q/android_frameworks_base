@@ -20,6 +20,7 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.UserHandle
 import android.service.controls.ControlsProviderService
@@ -28,6 +29,7 @@ import android.testing.TestableLooper
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.test.filters.SmallTest
 import com.android.systemui.R
@@ -39,8 +41,10 @@ import com.android.systemui.controls.controller.ControlsController
 import com.android.systemui.controls.controller.StructureInfo
 import com.android.systemui.controls.management.ControlsListingController
 import com.android.systemui.controls.management.ControlsProviderSelectorActivity
+import com.android.systemui.controls.panels.AuthorizedPanelsRepository
 import com.android.systemui.controls.settings.FakeControlsSettingsRepository
 import com.android.systemui.dump.DumpManager
+import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.settings.UserFileManager
 import com.android.systemui.settings.UserTracker
@@ -91,6 +95,9 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
     @Mock lateinit var userTracker: UserTracker
     @Mock lateinit var taskViewFactory: TaskViewFactory
     @Mock lateinit var dumpManager: DumpManager
+    @Mock lateinit var authorizedPanelsRepository: AuthorizedPanelsRepository
+    @Mock lateinit var featureFlags: FeatureFlags
+    @Mock lateinit var packageManager: PackageManager
     val sharedPreferences = FakeSharedPreferences()
     lateinit var controlsSettingsRepository: FakeControlsSettingsRepository
 
@@ -120,6 +127,7 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
             ControlsUiControllerImpl(
                 Lazy { controlsController },
                 context,
+                packageManager,
                 uiExecutor,
                 bgExecutor,
                 Lazy { controlsListingController },
@@ -132,6 +140,8 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
                 userTracker,
                 Optional.of(taskViewFactory),
                 controlsSettingsRepository,
+                authorizedPanelsRepository,
+                featureFlags,
                 dumpManager
             )
         `when`(
@@ -229,9 +239,20 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
     }
 
     @Test
+    fun testPanelBindsForPanel() {
+        val panel = SelectedItem.PanelItem("App name", ComponentName("pkg", "cls"))
+        setUpPanel(panel)
+
+        underTest.show(parent, {}, context)
+        verify(controlsController).bindComponentForPanel(panel.componentName)
+    }
+
+    @Test
     fun testPanelCallsTaskViewFactoryCreate() {
         mockLayoutInflater()
-        val panel = SelectedItem.PanelItem("App name", ComponentName("pkg", "cls"))
+        val packageName = "pkg"
+        `when`(authorizedPanelsRepository.getAuthorizedPanels()).thenReturn(setOf(packageName))
+        val panel = SelectedItem.PanelItem("App name", ComponentName(packageName, "cls"))
         val serviceInfo = setUpPanel(panel)
 
         underTest.show(parent, {}, context)
@@ -249,9 +270,11 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
     @Test
     fun testPanelControllerStartActivityWithCorrectArguments() {
         mockLayoutInflater()
+        val packageName = "pkg"
+        `when`(authorizedPanelsRepository.getAuthorizedPanels()).thenReturn(setOf(packageName))
         controlsSettingsRepository.setAllowActionOnTrivialControlsInLockscreen(true)
 
-        val panel = SelectedItem.PanelItem("App name", ComponentName("pkg", "cls"))
+        val panel = SelectedItem.PanelItem("App name", ComponentName(packageName, "cls"))
         val serviceInfo = setUpPanel(panel)
 
         underTest.show(parent, {}, context)
@@ -281,9 +304,11 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
     @Test
     fun testPendingIntentExtrasAreModified() {
         mockLayoutInflater()
+        val packageName = "pkg"
+        `when`(authorizedPanelsRepository.getAuthorizedPanels()).thenReturn(setOf(packageName))
         controlsSettingsRepository.setAllowActionOnTrivialControlsInLockscreen(true)
 
-        val panel = SelectedItem.PanelItem("App name", ComponentName("pkg", "cls"))
+        val panel = SelectedItem.PanelItem("App name", ComponentName(packageName, "cls"))
         val serviceInfo = setUpPanel(panel)
 
         underTest.show(parent, {}, context)
@@ -304,7 +329,7 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
             )
             .isTrue()
 
-        underTest.hide()
+        underTest.hide(parent)
 
         clearInvocations(controlsListingController, taskViewFactory)
         controlsSettingsRepository.setAllowActionOnTrivialControlsInLockscreen(false)
@@ -361,6 +386,28 @@ class ControlsUiControllerImplTest : SysuiTestCase() {
         whenever(controlsListingController.getCurrentServices()).thenReturn(listOf(csi))
 
         assertThat(underTest.resolveActivity()).isEqualTo(ControlsActivity::class.java)
+    }
+
+    @Test
+    fun testRemoveViewsOnlyForParentPassedInHide() {
+        underTest.show(parent, {}, context)
+        parent.addView(View(context))
+
+        val mockParent: ViewGroup = mock()
+
+        underTest.hide(mockParent)
+
+        verify(mockParent).removeAllViews()
+        assertThat(parent.childCount).isGreaterThan(0)
+    }
+
+    @Test
+    fun testHideDifferentParentDoesntCancelListeners() {
+        underTest.show(parent, {}, context)
+        underTest.hide(mock())
+
+        verify(controlsController, never()).unsubscribe()
+        verify(controlsListingController, never()).removeCallback(any())
     }
 
     private fun setUpPanel(panel: SelectedItem.PanelItem): ControlsServiceInfo {

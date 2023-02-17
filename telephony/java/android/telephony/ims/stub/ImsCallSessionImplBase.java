@@ -74,6 +74,7 @@ public class ImsCallSessionImplBase implements AutoCloseable {
 
     /** @hide */
     @IntDef(
+        prefix = "MEDIA_STREAM_TYPE_",
         value = {
             MEDIA_STREAM_TYPE_AUDIO,
             MEDIA_STREAM_TYPE_VIDEO
@@ -94,6 +95,7 @@ public class ImsCallSessionImplBase implements AutoCloseable {
 
     /** @hide */
     @IntDef(
+        prefix = "MEDIA_STREAM_DIRECTION_",
         value = {
             MEDIA_STREAM_DIRECTION_UPLINK,
             MEDIA_STREAM_DIRECTION_DOWNLINK
@@ -218,8 +220,9 @@ public class ImsCallSessionImplBase implements AutoCloseable {
 
         @Override
         public void setListener(IImsCallSessionListener listener) {
-            executeMethodAsync(() -> ImsCallSessionImplBase.this.setListener(
-                    new ImsCallSessionListener(listener)), "setListener");
+            ImsCallSessionListener iCSL = new ImsCallSessionListener(listener);
+            iCSL.setDefaultExecutor(mExecutor);
+            executeMethodAsync(() -> ImsCallSessionImplBase.this.setListener(iCSL), "setListener");
         }
 
         @Override

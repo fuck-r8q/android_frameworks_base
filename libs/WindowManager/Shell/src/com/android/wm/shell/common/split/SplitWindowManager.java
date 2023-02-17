@@ -93,7 +93,7 @@ public final class SplitWindowManager extends WindowlessWindowManager {
     }
 
     @Override
-    protected void attachToParentSurface(IWindow window, SurfaceControl.Builder b) {
+    protected SurfaceControl getParentSurface(IWindow window, WindowManager.LayoutParams attrs) {
         // Can't set position for the ViewRootImpl SC directly. Create a leash to manipulate later.
         final SurfaceControl.Builder builder = new SurfaceControl.Builder(new SurfaceSession())
                 .setContainerLayer()
@@ -103,7 +103,7 @@ public final class SplitWindowManager extends WindowlessWindowManager {
         mParentContainerCallbacks.attachToParentSurface(builder);
         mLeash = builder.build();
         mParentContainerCallbacks.onLeashReady(mLeash);
-        b.setParent(mLeash);
+        return mLeash;
     }
 
     /** Inflates {@link DividerView} on to the root surface. */
@@ -113,7 +113,8 @@ public final class SplitWindowManager extends WindowlessWindowManager {
                     "Try to inflate divider view again without release first");
         }
 
-        mViewHost = new SurfaceControlViewHost(mContext, mContext.getDisplay(), this);
+        mViewHost = new SurfaceControlViewHost(mContext, mContext.getDisplay(), this,
+                "SplitWindowManager");
         mDividerView = (DividerView) LayoutInflater.from(mContext)
                 .inflate(R.layout.split_divider, null /* root */);
 

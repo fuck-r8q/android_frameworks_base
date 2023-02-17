@@ -33,6 +33,7 @@ import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY;
 
 import static com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_CONTROLLER_NAME;
+import static com.android.internal.accessibility.util.AccessibilityUtils.ACCESSIBILITY_MENU_IN_SYSTEM;
 import static com.android.providers.settings.SettingsState.FALLBACK_FILE_SUFFIX;
 
 import android.Manifest;
@@ -96,7 +97,6 @@ import android.provider.Settings.Config.SyncDisabledMode;
 import android.provider.Settings.Global;
 import android.provider.Settings.Secure;
 import android.provider.Settings.SetAllResult;
-import android.provider.UpdatableDeviceConfigServiceReadiness;
 import android.provider.settings.validators.SystemSettingsValidators;
 import android.provider.settings.validators.Validator;
 import android.text.TextUtils;
@@ -107,6 +107,7 @@ import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.proto.ProtoOutputStream;
 
+import com.android.internal.accessibility.util.AccessibilityUtils;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.os.BackgroundThread;
@@ -417,14 +418,8 @@ public class SettingsProvider extends ContentProvider {
             startWatchingUserRestrictionChanges();
         });
         ServiceManager.addService("settings", new SettingsService(this));
-        addDeviceConfigServiceIfNeeded();
+        ServiceManager.addService("device_config", new DeviceConfigService(this));
         return true;
-    }
-
-    private void addDeviceConfigServiceIfNeeded() {
-        if (!UpdatableDeviceConfigServiceReadiness.shouldStartUpdatableService()) {
-            ServiceManager.addService("device_config", new DeviceConfigService(this));
-        }
     }
 
     @Override
@@ -3681,7 +3676,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 212;
+            private static final int SETTINGS_VERSION = 214;
 
             private final int mUserId;
 
@@ -3791,6 +3786,7 @@ public class SettingsProvider extends ContentProvider {
              *     currentVersion = 119;
              * }
              */
+            @GuardedBy("mLock")
             private int onUpgradeLocked(int userId, int oldVersion, int newVersion) {
                 if (DEBUG) {
                     Slog.w(LOG_TAG, "Upgrading settings for user: " + userId + " from version: "
@@ -5588,6 +5584,53 @@ public class SettingsProvider extends ContentProvider {
                     currentVersion = 212;
                 }
 
+                if (currentVersion == 212) {
+                    final SettingsState globalSettings = getGlobalSettingsLocked();
+                    final SettingsState secureSettings = getSecureSettingsLocked(userId);
+
+                    final Setting bugReportInPowerMenu = globalSettings.getSettingLocked(
+                            Global.BUGREPORT_IN_POWER_MENU);
+
+                    if (!bugReportInPowerMenu.isNull()) {
+                        Slog.i(LOG_TAG, "Setting bugreport_in_power_menu to "
+                                + bugReportInPowerMenu.getValue() + " in Secure settings.");
+                        secureSettings.insertSettingLocked(
+                                Secure.BUGREPORT_IN_POWER_MENU,
+                                bugReportInPowerMenu.getValue(), null /* tag */,
+                                false /* makeDefault */, SettingsState.SYSTEM_PACKAGE_NAME);
+
+                        // set global bug_report_in_power_menu setting to null since it's deprecated
+                        Slog.i(LOG_TAG, "Setting bugreport_in_power_menu to null"
+                                + " in Global settings since it's deprecated.");
+                        globalSettings.insertSettingLocked(
+                                Global.BUGREPORT_IN_POWER_MENU, null /* value */, null /* tag */,
+                                true /* makeDefault */, SettingsState.SYSTEM_PACKAGE_NAME);
+                    }
+
+                    currentVersion = 213;
+                }
+
+                if (currentVersion == 213) {
+                    final ComponentName accessibilityMenuToMigrate =
+                            AccessibilityUtils.getAccessibilityMenuComponentToMigrate(
+                                    getContext().getPackageManager(), userId);
+                    if (accessibilityMenuToMigrate != null) {
+                        final SettingsState secureSettings = getSecureSettingsLocked(userId);
+                        final String toRemove = accessibilityMenuToMigrate.flattenToString();
+                        final String toAdd = ACCESSIBILITY_MENU_IN_SYSTEM.flattenToString();
+                        // Migrate the accessibility shortcuts and enabled state.
+                        migrateColonDelimitedStringSettingLocked(secureSettings,
+                                Secure.ACCESSIBILITY_BUTTON_TARGETS, toRemove, toAdd);
+                        migrateColonDelimitedStringSettingLocked(secureSettings,
+                                Secure.ACCESSIBILITY_BUTTON_TARGET_COMPONENT, toRemove, toAdd);
+                        migrateColonDelimitedStringSettingLocked(secureSettings,
+                                Secure.ACCESSIBILITY_SHORTCUT_TARGET_SERVICE, toRemove, toAdd);
+                        migrateColonDelimitedStringSettingLocked(secureSettings,
+                                Secure.ENABLED_ACCESSIBILITY_SERVICES, toRemove, toAdd);
+                    }
+                    currentVersion = 214;
+                }
+
                 // vXXX: Add new settings above this point.
 
                 if (currentVersion != newVersion) {
@@ -5807,6 +5850,22 @@ public class SettingsProvider extends ContentProvider {
                 items.add(str);
             }
             return items;
+        }
+
+        @GuardedBy("mLock")
+        private void migrateColonDelimitedStringSettingLocked(SettingsState settingsState,
+                String setting, String toRemove, String toAdd) {
+            final Set<String> componentNames = transformColonDelimitedStringToSet(
+                    settingsState.getSettingLocked(setting).getValue());
+            if (componentNames != null && componentNames.contains(toRemove)) {
+                componentNames.remove(toRemove);
+                componentNames.add(toAdd);
+                settingsState.insertSettingLocked(
+                        setting,
+                        TextUtils.join(":", componentNames),
+                        null /* tag */, false /* makeDefault */,
+                        SettingsState.SYSTEM_PACKAGE_NAME);
+            }
         }
 
         private boolean isAccessibilityButtonInNavigationBarOn(SettingsState secureSettings) {

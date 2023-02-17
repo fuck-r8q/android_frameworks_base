@@ -82,8 +82,10 @@ final class ReconcilePackageUtils {
                 for (SharedLibraryInfo info : allowedSharedLibInfos) {
                     if (!SharedLibraryUtils.addSharedLibraryToPackageVersionMap(
                             incomingSharedLibraries, info)) {
-                        throw new ReconcileFailure("Shared Library " + info.getName()
-                                + " is being installed twice in this set!");
+                        throw ReconcileFailure.ofInternalError(
+                                "Shared Library " + info.getName()
+                                + " is being installed twice in this set!",
+                                PackageManagerException.INTERNAL_ERROR_SHARED_LIB_INSTALLED_TWICE);
                     }
                 }
             }
@@ -213,8 +215,9 @@ final class ReconcilePackageUtils {
                     if (sharedUserSetting != null) {
                         if (sharedUserSetting.signaturesChanged != null
                                 && !PackageManagerServiceUtils.canJoinSharedUserId(
-                                parsedPackage.getSigningDetails(),
-                                sharedUserSetting.getSigningDetails())) {
+                                parsedPackage.getPackageName(), parsedPackage.getSigningDetails(),
+                                sharedUserSetting,
+                                PackageManagerServiceUtils.SHARED_USER_ID_JOIN_TYPE_SYSTEM)) {
                             if (SystemProperties.getInt("ro.product.first_api_level", 0) <= 29) {
                                 // Mismatched signatures is an error and silently skipping system
                                 // packages will likely break the device in unforeseen ways.

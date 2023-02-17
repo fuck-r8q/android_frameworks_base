@@ -110,7 +110,8 @@ public final class Trace {
     public static final long TRACE_TAG_THERMAL = 1L << 27;
 
     private static final long TRACE_TAG_NOT_READY = 1L << 63;
-    private static final int MAX_SECTION_NAME_LEN = 127;
+    /** @hide **/
+    public static final int MAX_SECTION_NAME_LEN = 127;
 
     // Must be volatile to avoid word tearing.
     // This is only kept in case any apps get this by reflection but do not
@@ -389,19 +390,6 @@ public final class Trace {
      */
     public static void asyncTraceForTrackEnd(long traceTag,
             @NonNull String trackName, int cookie) {
-        if (isTagEnabled(traceTag)) {
-            nativeAsyncTraceForTrackEnd(traceTag, trackName, cookie);
-        }
-    }
-
-    /**
-     * @deprecated use asyncTraceForTrackEnd without methodName argument
-     *
-     * @hide
-     */
-    @Deprecated
-    public static void asyncTraceForTrackEnd(long traceTag,
-            @NonNull String trackName, @NonNull String methodName, int cookie) {
         if (isTagEnabled(traceTag)) {
             nativeAsyncTraceForTrackEnd(traceTag, trackName, cookie);
         }

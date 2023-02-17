@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -70,6 +71,8 @@ import org.mockito.quality.Strictness;
 
 /** Base class for testing {@link InputMethodManagerService}. */
 public class InputMethodManagerServiceTestBase {
+    private static final int NO_VERIFY_SHOW_FLAGS = -1;
+
     protected static final String TEST_SELECTED_IME_ID = "test.ime";
     protected static final String TEST_EDITOR_PKG_NAME = "test.editor";
     protected static final String TEST_FOCUSED_WINDOW_NAME = "test.editor/activity";
@@ -200,9 +203,8 @@ public class InputMethodManagerServiceTestBase {
                         "TestServiceThread",
                         Process.THREAD_PRIORITY_FOREGROUND, /* allowIo */
                         false);
-        mInputMethodManagerService =
-                new InputMethodManagerService(
-                        mContext, mServiceThread, mMockInputMethodBindingController);
+        mInputMethodManagerService = new InputMethodManagerService(mContext, mServiceThread,
+                mMockInputMethodBindingController);
 
         // Start a InputMethodManagerService.Lifecycle to publish and manage the lifecycle of
         // InputMethodManagerService, which is closer to the real situation.
@@ -239,12 +241,18 @@ public class InputMethodManagerServiceTestBase {
 
     protected void verifyShowSoftInput(boolean setVisible, boolean showSoftInput)
             throws RemoteException {
+        verifyShowSoftInput(setVisible, showSoftInput, NO_VERIFY_SHOW_FLAGS);
+    }
+
+    protected void verifyShowSoftInput(boolean setVisible, boolean showSoftInput, int showFlags)
+            throws RemoteException {
         synchronized (ImfLock.class) {
             verify(mMockInputMethodBindingController, times(setVisible ? 1 : 0))
                     .setCurrentMethodVisible();
         }
         verify(mMockInputMethod, times(showSoftInput ? 1 : 0))
-                .showSoftInput(any(), any(), anyInt(), any());
+                .showSoftInput(any(), any(),
+                        showFlags != NO_VERIFY_SHOW_FLAGS ? eq(showFlags) : anyInt(), any());
     }
 
     protected void verifyHideSoftInput(boolean setNotVisible, boolean hideSoftInput)

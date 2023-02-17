@@ -17,20 +17,20 @@
 package com.android.systemui.recents;
 
 import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
-import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_UP;
-import static android.view.WindowManager.ScreenshotSource.SCREENSHOT_OVERVIEW;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 
 import static com.android.internal.accessibility.common.ShortcutConstants.CHOOSER_PACKAGE_NAME;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SUPPORTS_WINDOW_CORNERS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
+import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_WINDOW_CORNER_RADIUS;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BOUNCER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DOZING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TRACING_ENABLED;
@@ -44,8 +44,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.graphics.Insets;
-import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.input.InputManager;
 import android.os.Binder;
@@ -77,6 +75,7 @@ import com.android.internal.app.IVoiceInteractionSessionListener;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.internal.util.ScreenshotHelper;
+import com.android.internal.util.ScreenshotRequest;
 import com.android.systemui.Dumpable;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -90,17 +89,18 @@ import com.android.systemui.navigationbar.NavigationBarView;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.navigationbar.buttons.KeyButtonView;
 import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener;
+import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
-import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.StatusBarWindowCallback;
 import com.android.systemui.statusbar.policy.CallbackController;
+import com.android.systemui.unfold.progress.UnfoldTransitionProgressForwarder;
 import com.android.wm.shell.sysui.ShellInterface;
 
 import java.io.PrintWriter;
@@ -146,7 +146,9 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private final CommandQueue mCommandQueue;
     private final UserTracker mUserTracker;
     private final KeyguardUnlockAnimationController mSysuiUnlockAnimationController;
+    private final Optional<UnfoldTransitionProgressForwarder> mUnfoldTransitionProgressForwarder;
     private final UiEventLogger mUiEventLogger;
+    private final DisplayTracker mDisplayTracker;
 
     private Region mActiveNavBarRegion;
     private SurfaceControl mNavigationBarSurface;
@@ -228,11 +230,11 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
 
         @Override
         public void onImeSwitcherPressed() {
-            // TODO(b/204901476) We're intentionally using DEFAULT_DISPLAY for now since
+            // TODO(b/204901476) We're intentionally using the default display for now since
             // Launcher/Taskbar isn't display aware.
             mContext.getSystemService(InputMethodManager.class)
                     .showInputMethodPickerFromSystem(true /* showAuxiliarySubtypes */,
-                            DEFAULT_DISPLAY);
+                            mDisplayTracker.getDefaultDisplayId());
             mUiEventLogger.log(KeyButtonView.NavBarButtonEvent.NAVBAR_IME_SWITCHER_BUTTON_TAP);
         }
 
@@ -311,7 +313,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                         intent.setClassName(CHOOSER_PACKAGE_NAME, chooserClassName);
                         intent.addFlags(
                                 Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        mContext.startActivityAsUser(intent, UserHandle.CURRENT);
+                        mContext.startActivityAsUser(intent, mUserTracker.getUserHandle());
                     });
         }
 
@@ -322,18 +324,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
 
         @Override
-        public void handleImageBundleAsScreenshot(Bundle screenImageBundle, Rect locationInScreen,
-                Insets visibleInsets, Task.TaskKey task) {
-            mScreenshotHelper.provideScreenshot(
-                    screenImageBundle,
-                    locationInScreen,
-                    visibleInsets,
-                    task.id,
-                    task.userId,
-                    task.sourceComponent,
-                    SCREENSHOT_OVERVIEW,
-                    mHandler,
-                    null);
+        public void takeScreenshot(ScreenshotRequest request) {
+            mScreenshotHelper.takeScreenshot(request, mHandler, null);
         }
 
         @Override
@@ -426,6 +418,10 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             params.putBoolean(KEY_EXTRA_SUPPORTS_WINDOW_CORNERS, mSupportsRoundedCornersOnWindows);
             params.putBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER,
                     mSysuiUnlockAnimationController.asBinder());
+            mUnfoldTransitionProgressForwarder.ifPresent(
+                    unfoldProgressForwarder -> params.putBinder(
+                            KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER,
+                            unfoldProgressForwarder.asBinder()));
             // Add all the interfaces exposed by the shell
             mShellInterface.createExternalInterfaces(params);
 
@@ -520,9 +516,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             UserTracker userTracker,
             ScreenLifecycle screenLifecycle,
             UiEventLogger uiEventLogger,
+            DisplayTracker displayTracker,
             KeyguardUnlockAnimationController sysuiUnlockAnimationController,
             AssistUtils assistUtils,
-            DumpManager dumpManager) {
+            DumpManager dumpManager,
+            Optional<UnfoldTransitionProgressForwarder> unfoldTransitionProgressForwarder
+    ) {
         // b/241601880: This component shouldn't be running for a non-primary user
         if (!Process.myUserHandle().equals(UserHandle.SYSTEM)) {
             Log.e(TAG_OPS, "Unexpected initialization for non-primary user", new Throwable());
@@ -547,6 +546,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mSysUiState = sysUiState;
         mSysUiState.addCallback(this::notifySystemUiStateFlags);
         mUiEventLogger = uiEventLogger;
+        mDisplayTracker = displayTracker;
+        mUnfoldTransitionProgressForwarder = unfoldTransitionProgressForwarder;
 
         dumpManager.registerDumpable(getClass().getSimpleName(), this);
 
@@ -665,13 +666,14 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     }
 
     private void onStatusBarStateChanged(boolean keyguardShowing, boolean keyguardOccluded,
-            boolean bouncerShowing, boolean isDozing, boolean panelExpanded) {
+            boolean bouncerShowing, boolean isDozing, boolean panelExpanded, boolean isDreaming) {
         mSysUiState.setFlag(SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING,
                         keyguardShowing && !keyguardOccluded)
                 .setFlag(SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED,
                         keyguardShowing && keyguardOccluded)
                 .setFlag(SYSUI_STATE_BOUNCER_SHOWING, bouncerShowing)
                 .setFlag(SYSUI_STATE_DEVICE_DOZING, isDozing)
+                .setFlag(SYSUI_STATE_DEVICE_DREAMING, isDreaming)
                 .commitUpdate(mContext.getDisplayId());
     }
 

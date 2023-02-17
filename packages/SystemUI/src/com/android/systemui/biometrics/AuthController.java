@@ -55,7 +55,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.UserManager;
-import android.util.DisplayUtils;
 import android.util.Log;
 import android.util.RotationUtils;
 import android.util.SparseBooleanArray;
@@ -69,6 +68,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.widget.LockPatternUtils;
+import com.android.settingslib.udfps.UdfpsOverlayParams;
+import com.android.settingslib.udfps.UdfpsUtils;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.biometrics.domain.interactor.BiometricPromptCredentialInteractor;
 import com.android.systemui.biometrics.domain.interactor.LogContextInteractor;
@@ -133,7 +134,6 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
     private float mScaleFactor = 1f;
     // sensor locations without any resolution scaling nor rotation adjustments:
     @Nullable private final Point mFaceSensorLocationDefault;
-    @Nullable private final Point mFingerprintSensorLocationDefault;
     // cached sensor locations:
     @Nullable private Point mFaceSensorLocation;
     @Nullable private Point mFingerprintSensorLocation;
@@ -169,6 +169,7 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
     @NonNull private final UserManager mUserManager;
     @NonNull private final LockPatternUtils mLockPatternUtils;
     @NonNull private final InteractionJankMonitor mInteractionJankMonitor;
+    @NonNull private final UdfpsUtils mUdfpsUtils;
     private final @Background DelayableExecutor mBackgroundExecutor;
     private final DisplayInfo mCachedDisplayInfo = new DisplayInfo();
 
@@ -578,17 +579,7 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
      */
     private void updateSensorLocations() {
         mDisplay.getDisplayInfo(mCachedDisplayInfo);
-        final Display.Mode maxDisplayMode =
-                DisplayUtils.getMaximumResolutionDisplayMode(mCachedDisplayInfo.supportedModes);
-        final float scaleFactor = android.util.DisplayUtils.getPhysicalPixelDisplaySizeRatio(
-                maxDisplayMode.getPhysicalWidth(), maxDisplayMode.getPhysicalHeight(),
-                mCachedDisplayInfo.getNaturalWidth(), mCachedDisplayInfo.getNaturalHeight());
-        if (scaleFactor == Float.POSITIVE_INFINITY) {
-            mScaleFactor = 1f;
-        } else {
-            mScaleFactor = scaleFactor;
-        }
-
+        mScaleFactor = mUdfpsUtils.getScaleFactor(mCachedDisplayInfo);
         updateUdfpsLocation();
         updateFingerprintLocation();
         updateFaceLocation();
@@ -603,11 +594,23 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
     @Nullable private Point getFingerprintSensorLocationInNaturalOrientation() {
         if (getUdfpsLocation() != null) {
             return getUdfpsLocation();
+        } else {
+            int xFpLocation = mCachedDisplayInfo.getNaturalWidth() / 2;
+            try {
+                xFpLocation = mContext.getResources().getDimensionPixelSize(
+                        com.android.systemui.R.dimen
+                                .physical_fingerprint_sensor_center_screen_location_x);
+            } catch (Resources.NotFoundException e) {
+            }
+
+            return new Point(
+                    (int) (xFpLocation * mScaleFactor),
+                    (int) (mContext.getResources().getDimensionPixelSize(
+                            com.android.systemui.R.dimen
+                                    .physical_fingerprint_sensor_center_screen_location_y)
+                            * mScaleFactor)
+            );
         }
-        return new Point(
-                (int) (mFingerprintSensorLocationDefault.x * mScaleFactor),
-                (int) (mFingerprintSensorLocationDefault.y * mScaleFactor)
-        );
     }
 
     /**
@@ -732,7 +735,8 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
             @NonNull InteractionJankMonitor jankMonitor,
             @Main Handler handler,
             @Background DelayableExecutor bgExecutor,
-            @NonNull VibratorHelper vibrator) {
+            @NonNull VibratorHelper vibrator,
+            @NonNull UdfpsUtils udfpsUtils) {
         mContext = context;
         mExecution = execution;
         mUserManager = userManager;
@@ -753,6 +757,7 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
         mSfpsEnrolledForUser = new SparseBooleanArray();
         mFaceEnrolledForUser = new SparseBooleanArray();
         mVibratorHelper = vibrator;
+        mUdfpsUtils = udfpsUtils;
 
         mLogContextInteractor = logContextInteractor;
         mBiometricPromptInteractor = biometricPromptInteractor;
@@ -784,19 +789,6 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
         }
 
         mDisplay = mContext.getDisplay();
-        mDisplay.getDisplayInfo(mCachedDisplayInfo);
-        int xFpLocation = mCachedDisplayInfo.getNaturalWidth() / 2;
-        try {
-            xFpLocation = mContext.getResources().getDimensionPixelSize(
-                    com.android.systemui.R.dimen
-                            .physical_fingerprint_sensor_center_screen_location_x);
-        } catch (Resources.NotFoundException e) {
-        }
-        mFingerprintSensorLocationDefault = new Point(
-                xFpLocation,
-                mContext.getResources().getDimensionPixelSize(com.android.systemui.R.dimen
-                        .physical_fingerprint_sensor_center_screen_location_y)
-        );
         updateSensorLocations();
 
         IntentFilter filter = new IntentFilter();
@@ -1271,7 +1263,6 @@ public class AuthController implements CoreStartable,  CommandQueue.Callbacks,
         pw.println("  mScaleFactor=" + mScaleFactor);
         pw.println("  faceAuthSensorLocationDefault=" + mFaceSensorLocationDefault);
         pw.println("  faceAuthSensorLocation=" + getFaceSensorLocation());
-        pw.println("  fingerprintSensorLocationDefault=" + mFingerprintSensorLocationDefault);
         pw.println("  fingerprintSensorLocationInNaturalOrientation="
                 + getFingerprintSensorLocationInNaturalOrientation());
         pw.println("  fingerprintSensorLocation=" + getFingerprintSensorLocation());

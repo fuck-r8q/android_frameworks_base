@@ -16,8 +16,10 @@
 
 package com.android.server.wm;
 
+import static android.app.ActivityOptions.ANIM_SCENE_TRANSITION;
 import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_EXT_ENABLE_ON_BACK_INVOKED_CALLBACK;
 import static android.view.WindowManager.LayoutParams.FIRST_APPLICATION_WINDOW;
+import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.window.BackNavigationInfo.typeToString;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
@@ -32,13 +34,14 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.os.Bundle;
 import android.os.RemoteException;
 import android.platform.test.annotations.Presubmit;
 import android.view.WindowManager;
@@ -92,9 +95,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
                 .isEqualTo(typeToString(BackNavigationInfo.TYPE_RETURN_TO_HOME));
 
         // verify if back animation would start.
-        verify(mBackNavigationController).scheduleAnimationLocked(
-                eq(BackNavigationInfo.TYPE_RETURN_TO_HOME), any(), eq(mBackAnimationAdapter),
-                any());
+        assertTrue("Animation scheduled", backNavigationInfo.isPrepareRemoteAnimation());
     }
 
     @Test
@@ -111,9 +112,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
                 .isEqualTo(typeToString(BackNavigationInfo.TYPE_CROSS_TASK));
 
         // verify if back animation would start.
-        verify(mBackNavigationController).scheduleAnimationLocked(
-                eq(BackNavigationInfo.TYPE_CROSS_TASK), any(), eq(mBackAnimationAdapter),
-                any());
+        assertTrue("Animation scheduled", backNavigationInfo.isPrepareRemoteAnimation());
 
         // reset drawning status
         topTask.forAllWindows(w -> {
@@ -217,6 +216,35 @@ public class BackNavigationControllerTests extends WindowTestsBase {
         assertThat(typeToString(backNavigationInfo.getType()))
                 .isEqualTo(typeToString(BackNavigationInfo.TYPE_CALLBACK));
         assertThat(backNavigationInfo.getOnBackInvokedCallback()).isEqualTo(appCallback);
+    }
+
+    // TODO (b/259427810) Remove this test when we figure out new API
+    @Test
+    public void backAnimationSkipSharedElementTransition() {
+        // Simulate ActivityOptions#makeSceneTransitionAnimation
+        final Bundle myBundle = new Bundle();
+        myBundle.putInt(ActivityOptions.KEY_ANIM_TYPE, ANIM_SCENE_TRANSITION);
+        myBundle.putParcelable("android:activity.transitionCompleteListener",
+                mock(android.os.ResultReceiver.class));
+        final ActivityOptions options = new ActivityOptions(myBundle);
+
+        final ActivityRecord testActivity = new ActivityBuilder(mAtm)
+                .setCreateTask(true)
+                .setActivityOptions(options)
+                .build();
+        testActivity.info.applicationInfo.privateFlagsExt |=
+                PRIVATE_FLAG_EXT_ENABLE_ON_BACK_INVOKED_CALLBACK;
+        final WindowState window = createWindow(null, TYPE_BASE_APPLICATION, testActivity,
+                "window");
+        addToWindowMap(window, true);
+        makeWindowVisibleAndDrawn(window);
+        IOnBackInvokedCallback callback = withSystemCallback(testActivity.getTask());
+
+        BackNavigationInfo backNavigationInfo = startBackNavigation();
+        assertTrue(testActivity.mHasSceneTransition);
+        assertThat(typeToString(backNavigationInfo.getType()))
+                .isEqualTo(typeToString(BackNavigationInfo.TYPE_CALLBACK));
+        assertThat(backNavigationInfo.getOnBackInvokedCallback()).isEqualTo(callback);
     }
 
     @Test

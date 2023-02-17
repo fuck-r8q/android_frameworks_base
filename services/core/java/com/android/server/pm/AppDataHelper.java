@@ -18,7 +18,9 @@ package com.android.server.pm;
 
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
 
+import static com.android.server.pm.DexOptHelper.useArtService;
 import static com.android.server.pm.PackageManagerService.TAG;
+import static com.android.server.pm.PackageManagerServiceUtils.getPackageManagerLocal;
 import static com.android.server.pm.PackageManagerServiceUtils.logCriticalInfo;
 
 import android.annotation.NonNull;
@@ -45,6 +47,7 @@ import android.util.TimingsTraceLog;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.Preconditions;
 import com.android.server.SystemServerInitThreadPool;
+import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.dex.ArtManagerService;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
 import com.android.server.pm.pkg.AndroidPackage;
@@ -242,33 +245,39 @@ public class AppDataHelper {
                 }
             }
 
-            // Prepare the application profiles only for upgrades and
-            // first boot (so that we don't repeat the same operation at
-            // each boot).
-            //
-            // We only have to cover the upgrade and first boot here
-            // because for app installs we prepare the profiles before
-            // invoking dexopt (in installPackageLI).
-            //
-            // We also have to cover non system users because we do not
-            // call the usual install package methods for them.
-            //
-            // NOTE: in order to speed up first boot time we only create
-            // the current profile and do not update the content of the
-            // reference profile. A system image should already be
-            // configured with the right profile keys and the profiles
-            // for the speed-profile prebuilds should already be copied.
-            // That's done in #performDexOptUpgrade.
-            //
-            // TODO(calin, mathieuc): We should use .dm files for
-            // prebuilds profiles instead of manually copying them in
-            // #performDexOptUpgrade. When we do that we should have a
-            // more granular check here and only update the existing
-            // profiles.
-            if (mPm.isDeviceUpgrading() || mPm.isFirstBoot()
-                    || (userId != UserHandle.USER_SYSTEM)) {
-                mArtManagerService.prepareAppProfiles(pkg, userId,
-                        /* updateReferenceProfileContent= */ false);
+            if (!useArtService()) { // ART Service handles this on demand instead.
+                // Prepare the application profiles only for upgrades and
+                // first boot (so that we don't repeat the same operation at
+                // each boot).
+                //
+                // We only have to cover the upgrade and first boot here
+                // because for app installs we prepare the profiles before
+                // invoking dexopt (in installPackageLI).
+                //
+                // We also have to cover non system users because we do not
+                // call the usual install package methods for them.
+                //
+                // NOTE: in order to speed up first boot time we only create
+                // the current profile and do not update the content of the
+                // reference profile. A system image should already be
+                // configured with the right profile keys and the profiles
+                // for the speed-profile prebuilds should already be copied.
+                // That's done in #performDexOptUpgrade.
+                //
+                // TODO(calin, mathieuc): We should use .dm files for
+                // prebuilds profiles instead of manually copying them in
+                // #performDexOptUpgrade. When we do that we should have a
+                // more granular check here and only update the existing
+                // profiles.
+                if (mPm.isDeviceUpgrading() || mPm.isFirstBoot()
+                        || (userId != UserHandle.USER_SYSTEM)) {
+                    try {
+                        mArtManagerService.prepareAppProfiles(pkg, userId,
+                                /* updateReferenceProfileContent= */ false);
+                    } catch (LegacyDexoptDisabledException e2) {
+                        throw new RuntimeException(e2);
+                    }
+                }
             }
 
             if ((flags & StorageManager.FLAG_STORAGE_CE) != 0 && ceDataInode != -1) {
@@ -476,18 +485,22 @@ public class AppDataHelper {
             String packageName, int userId) throws PackageManagerException {
         final PackageStateInternal packageState = snapshot.getPackageStateInternal(packageName);
         if (packageState == null) {
-            throw new PackageManagerException("Package " + packageName + " is unknown");
+            throw PackageManagerException.ofInternalError("Package " + packageName + " is unknown",
+                    PackageManagerException.INTERNAL_ERROR_STORAGE_INVALID_PACKAGE_UNKNOWN);
         } else if (!TextUtils.equals(volumeUuid, packageState.getVolumeUuid())) {
-            throw new PackageManagerException(
+            throw PackageManagerException.ofInternalError(
                     "Package " + packageName + " found on unknown volume " + volumeUuid
-                            + "; expected volume " + packageState.getVolumeUuid());
+                            + "; expected volume " + packageState.getVolumeUuid(),
+                    PackageManagerException.INTERNAL_ERROR_STORAGE_INVALID_VOLUME_UNKNOWN);
         } else if (!packageState.getUserStateOrDefault(userId).isInstalled()) {
-            throw new PackageManagerException(
-                    "Package " + packageName + " not installed for user " + userId);
+            throw PackageManagerException.ofInternalError(
+                    "Package " + packageName + " not installed for user " + userId,
+                    PackageManagerException.INTERNAL_ERROR_STORAGE_INVALID_NOT_INSTALLED_FOR_USER);
         } else if (packageState.getPkg() != null
                 && !shouldHaveAppStorage(packageState.getPkg())) {
-            throw new PackageManagerException(
-                    "Package " + packageName + " shouldn't have storage");
+            throw PackageManagerException.ofInternalError(
+                    "Package " + packageName + " shouldn't have storage",
+                    PackageManagerException.INTERNAL_ERROR_STORAGE_INVALID_SHOULD_NOT_HAVE_STORAGE);
         }
     }
 
@@ -578,7 +591,15 @@ public class AppDataHelper {
             Slog.wtf(TAG, "Package was null!", new Throwable());
             return;
         }
-        mArtManagerService.clearAppProfiles(pkg);
+        if (useArtService()) {
+            destroyAppProfilesWithArtService(pkg);
+        } else {
+            try {
+                mArtManagerService.clearAppProfiles(pkg);
+            } catch (LegacyDexoptDisabledException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     public void destroyAppDataLIF(AndroidPackage pkg, int userId, int flags) {
@@ -603,6 +624,7 @@ public class AppDataHelper {
                 Slog.w(TAG, String.valueOf(e));
             }
             mPm.getDexManager().notifyPackageDataDestroyed(pkg.getPackageName(), userId);
+            mPm.getDynamicCodeLogger().notifyPackageDataDestroyed(pkg.getPackageName(), userId);
         }
     }
 
@@ -615,10 +637,28 @@ public class AppDataHelper {
     }
 
     private void destroyAppProfilesLeafLIF(AndroidPackage pkg) {
-        try {
-            mInstaller.destroyAppProfiles(pkg.getPackageName());
-        } catch (Installer.InstallerException e) {
-            Slog.w(TAG, String.valueOf(e));
+        if (useArtService()) {
+            destroyAppProfilesWithArtService(pkg);
+        } else {
+            try {
+                mInstaller.destroyAppProfiles(pkg.getPackageName());
+            } catch (LegacyDexoptDisabledException e) {
+                throw new RuntimeException(e);
+            } catch (Installer.InstallerException e) {
+                Slog.w(TAG, String.valueOf(e));
+            }
+        }
+    }
+
+    private void destroyAppProfilesWithArtService(AndroidPackage pkg) {
+        try (PackageManagerLocal.FilteredSnapshot snapshot =
+                        getPackageManagerLocal().withFilteredSnapshot()) {
+            try {
+                DexOptHelper.getArtManagerLocal().clearAppProfiles(snapshot, pkg.getPackageName());
+            } catch (IllegalArgumentException e) {
+                // Package isn't found, but that should only happen due to race.
+                Slog.w(TAG, e);
+            }
         }
     }
 

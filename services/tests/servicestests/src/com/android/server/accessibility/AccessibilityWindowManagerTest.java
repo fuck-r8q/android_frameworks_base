@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 
 import android.graphics.Region;
 import android.os.IBinder;
+import android.os.LocaleList;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -909,7 +910,7 @@ public class AccessibilityWindowManagerTest {
         final WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
         layoutParams.accessibilityTitle = "accessibility window title";
         final AccessibilityWindowAttributes attributes = new AccessibilityWindowAttributes(
-                layoutParams);
+                layoutParams, new LocaleList());
 
         mA11yWindowManager.setAccessibilityWindowAttributes(Display.DEFAULT_DISPLAY, windowId,
                 USER_SYSTEM_ID, attributes);
@@ -1019,7 +1020,7 @@ public class AccessibilityWindowManagerTest {
             windowInfosForDisplay.get(DEFAULT_FOCUSED_INDEX).focused = true;
         }
         // Turns on windows tracking, and update window info.
-        mA11yWindowManager.startTrackingWindows(displayId);
+        mA11yWindowManager.startTrackingWindows(displayId, false);
         // Puts window lists into array.
         mWindowInfos.put(displayId, windowInfosForDisplay);
         // Sets the default display is the top focused display and

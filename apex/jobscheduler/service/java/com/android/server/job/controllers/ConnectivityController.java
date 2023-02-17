@@ -98,6 +98,13 @@ public final class ConnectivityController extends RestrictingController implemen
             ~(ConnectivityManager.BLOCKED_REASON_APP_STANDBY
                     | ConnectivityManager.BLOCKED_REASON_BATTERY_SAVER
                     | ConnectivityManager.BLOCKED_REASON_DOZE);
+    // TODO(261999509): allow bypassing data saver & user-restricted. However, when we allow a UI
+    //     job to run while data saver restricts the app, we must ensure that we don't run regular
+    //     jobs when we put a hole in the data saver wall for the UI job
+    private static final int UNBYPASSABLE_UI_BLOCKED_REASONS =
+            ~(ConnectivityManager.BLOCKED_REASON_APP_STANDBY
+                    | ConnectivityManager.BLOCKED_REASON_BATTERY_SAVER
+                    | ConnectivityManager.BLOCKED_REASON_DOZE);
     private static final int UNBYPASSABLE_FOREGROUND_BLOCKED_REASONS =
             ~(ConnectivityManager.BLOCKED_REASON_APP_STANDBY
                     | ConnectivityManager.BLOCKED_REASON_BATTERY_SAVER
@@ -427,7 +434,7 @@ public final class ConnectivityController extends RestrictingController implemen
         final UidStats uidStats =
                 getUidStats(jobStatus.getSourceUid(), jobStatus.getSourcePackageName(), true);
 
-        if (jobStatus.shouldTreatAsExpeditedJob() && jobStatus.shouldTreatAsUserInitiatedJob()) {
+        if (jobStatus.shouldTreatAsExpeditedJob() || jobStatus.shouldTreatAsUserInitiatedJob()) {
             if (!jobStatus.isConstraintSatisfied(JobStatus.CONSTRAINT_CONNECTIVITY)) {
                 // Don't request a direct hole through any of the firewalls. Instead, mark the
                 // constraint as satisfied if the network is available, and the job will get
@@ -437,7 +444,9 @@ public final class ConnectivityController extends RestrictingController implemen
             }
             // Don't need to update constraint here if the network goes away. We'll do that as part
             // of regular processing when we're notified about the drop.
-        } else if (jobStatus.isRequestedExpeditedJob()
+        } else if (((jobStatus.isRequestedExpeditedJob() && !jobStatus.shouldTreatAsExpeditedJob())
+                || (jobStatus.getJob().isUserInitiated()
+                        && !jobStatus.shouldTreatAsUserInitiatedJob()))
                 && jobStatus.isConstraintSatisfied(JobStatus.CONSTRAINT_CONNECTIVITY)) {
             // Make sure we don't accidentally keep the constraint as satisfied if the job went
             // from being expedited-ready to not-expeditable.
@@ -1080,6 +1089,11 @@ public final class ConnectivityController extends RestrictingController implemen
                 Slog.d(TAG, "Using FG bypass for " + jobStatus.getSourceUid());
             }
             unbypassableBlockedReasons = UNBYPASSABLE_FOREGROUND_BLOCKED_REASONS;
+        } else if (jobStatus.shouldTreatAsUserInitiatedJob()) {
+            if (DEBUG) {
+                Slog.d(TAG, "Using UI bypass for " + jobStatus.getSourceUid());
+            }
+            unbypassableBlockedReasons = UNBYPASSABLE_UI_BLOCKED_REASONS;
         } else if (jobStatus.shouldTreatAsExpeditedJob() || jobStatus.startedAsExpeditedJob) {
             if (DEBUG) {
                 Slog.d(TAG, "Using EJ bypass for " + jobStatus.getSourceUid());
@@ -1115,6 +1129,22 @@ public final class ConnectivityController extends RestrictingController implemen
 
         final boolean satisfied = isSatisfied(jobStatus, network, capabilities, mConstants);
 
+        if (!satisfied && jobStatus.network != null
+                && mService.isCurrentlyRunningLocked(jobStatus)
+                && isSatisfied(jobStatus, jobStatus.network,
+                        getNetworkCapabilities(jobStatus.network), mConstants)) {
+            // A new network became available for a currently running job
+            // (and most likely became the default network for the app),
+            // but it doesn't yet satisfy the requested constraints and the old network
+            // is still available and satisfies the constraints. Don't change the network
+            // given to the job for now and let it keep running. We will re-evaluate when
+            // the capabilities or connection state of the either network change.
+            if (DEBUG) {
+                Slog.i(TAG, "Not reassigning network for running job " + jobStatus);
+            }
+            return false;
+        }
+
         final boolean changed = jobStatus.setConnectivityConstraintSatisfied(nowElapsed, satisfied);
 
         if (jobStatus.getPreferUnmetered()) {
@@ -1125,6 +1155,17 @@ public final class ConnectivityController extends RestrictingController implemen
                     mFlexibilityController.isFlexibilitySatisfiedLocked(jobStatus));
         }
 
+        // Try to handle network transitions in a reasonable manner. See the lengthy note inside
+        // UidDefaultNetworkCallback for more details.
+        if (!changed && satisfied && jobStatus.network != null
+                && mService.isCurrentlyRunningLocked(jobStatus)) {
+            // The job's connectivity constraint continues to be satisfied even though the network
+            // has changed.
+            // Inform the job of the new network so that it can attempt to switch over. This is the
+            // ideal behavior for certain transitions such as going from a metered network to an
+            // unmetered network.
+            mStateChangedListener.onNetworkChanged(jobStatus, network);
+        }
 
         // Pass along the evaluated network for job to use; prevents race
         // conditions as default routes change over time, and opens the door to
@@ -1419,8 +1460,8 @@ public final class ConnectivityController extends RestrictingController implemen
         // the onBlockedStatusChanged() call, we re-evaluate the job, but keep it running
         // (assuming the new network satisfies constraints). The app continues to use the old
         // network (if they use the network object provided through JobParameters.getNetwork())
-        // because we don't notify them of the default network change. If the old network no
-        // longer satisfies requested constraints, then we have a problem. Depending on the order
+        // because we don't notify them of the default network change. If the old network later
+        // stops satisfying requested constraints, then we have a problem. Depending on the order
         // of calls, if the per-UID callback gets notified of the network change before the
         // general callback gets notified of the capabilities change, then the job's network
         // object will point to the new network and we won't stop the job, even though we told it

@@ -21,6 +21,7 @@ import android.annotation.Nullable;
 import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SharedMemory;
 
 /**
  * A response for Table from broadcast signal.
@@ -46,17 +47,80 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
     private final Uri mTableUri;
     private final int mVersion;
     private final int mSize;
+    private final byte[] mTableByteArray;
+    private final SharedMemory mTableSharedMemory;
 
     static TableResponse createFromParcelBody(Parcel in) {
         return new TableResponse(in);
     }
 
+    /**
+     * Constructs a TableResponse with a table URI.
+     *
+     * @param requestId The ID is used to associate the response with the request.
+     * @param sequence The sequence number which indicates the order of related responses.
+     * @param responseResult The result for the response. It's one of {@link #RESPONSE_RESULT_OK},
+     *                       {@link #RESPONSE_RESULT_CANCEL}, {@link #RESPONSE_RESULT_ERROR}.
+     * @param tableUri The URI of the table in the database.
+     * @param version The version number of requested table.
+     * @param size The Size number of table in bytes.
+     */
     public TableResponse(int requestId, int sequence, @ResponseResult int responseResult,
             @Nullable Uri tableUri, int version, int size) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
-        mTableUri = tableUri;
         mVersion = version;
         mSize = size;
+        mTableUri = tableUri;
+        mTableByteArray = null;
+        mTableSharedMemory = null;
+    }
+
+    /**
+     * Constructs a TableResponse with a table URI.
+     *
+     * @param requestId The ID is used to associate the response with the request.
+     * @param sequence The sequence number which indicates the order of related responses.
+     * @param responseResult The result for the response. It's one of {@link #RESPONSE_RESULT_OK},
+     *                       {@link #RESPONSE_RESULT_CANCEL}, {@link #RESPONSE_RESULT_ERROR}.
+     * @param tableByteArray The byte array which stores the table in bytes. The structure and
+     *                       syntax of the table depends on the table name in
+     *                       {@link TableRequest#getTableName()} and the corresponding standard.
+     * @param version The version number of requested table.
+     * @param size The Size number of table in bytes.
+     */
+    public TableResponse(int requestId, int sequence, @ResponseResult int responseResult,
+            @NonNull byte[] tableByteArray, int version, int size) {
+        super(RESPONSE_TYPE, requestId, sequence, responseResult);
+        mVersion = version;
+        mSize = size;
+        mTableUri = null;
+        mTableByteArray = tableByteArray;
+        mTableSharedMemory = null;
+    }
+
+    /**
+     * Constructs a TableResponse with a table URI.
+     *
+     * @param requestId The ID is used to associate the response with the request.
+     * @param sequence The sequence number which indicates the order of related responses.
+     * @param responseResult The result for the response. It's one of {@link #RESPONSE_RESULT_OK},
+     *                       {@link #RESPONSE_RESULT_CANCEL}, {@link #RESPONSE_RESULT_ERROR}.
+     * @param tableSharedMemory The shared memory which stores the table. The table size can be
+     *                          large so using a shared memory optimizes the data
+     *                          communication between the table data source and the receiver. The
+     *                          structure syntax of the table depends on the table name in
+     *                          {@link TableRequest#getTableName()} and the corresponding standard.
+     * @param version The version number of requested table.
+     * @param size The Size number of table in bytes.
+     */
+    public TableResponse(int requestId, int sequence, @ResponseResult int responseResult,
+            @NonNull SharedMemory tableSharedMemory, int version, int size) {
+        super(RESPONSE_TYPE, requestId, sequence, responseResult);
+        mVersion = version;
+        mSize = size;
+        mTableUri = null;
+        mTableByteArray = null;
+        mTableSharedMemory = tableSharedMemory;
     }
 
     TableResponse(Parcel source) {
@@ -65,6 +129,14 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
         mTableUri = uriString == null ? null : Uri.parse(uriString);
         mVersion = source.readInt();
         mSize = source.readInt();
+        int arrayLength = source.readInt();
+        if (arrayLength >= 0) {
+            mTableByteArray = new byte[arrayLength];
+            source.readByteArray(mTableByteArray);
+        } else {
+            mTableByteArray = null;
+        }
+        mTableSharedMemory = (SharedMemory) source.readTypedObject(SharedMemory.CREATOR);
     }
 
     /**
@@ -73,6 +145,34 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
     @Nullable
     public Uri getTableUri() {
         return mTableUri;
+    }
+
+    /**
+     * Gets the data of the table as a byte array.
+     *
+     * @return the table data as a byte array, or {@code null} if the data is not stored as a byte
+     *         array.
+     */
+    @Nullable
+    public byte[] getTableByteArray() {
+        return mTableByteArray;
+    }
+
+    /**
+     * Gets the data of the table as a {@link SharedMemory} object.
+     *
+     * <p> This data lives in a {@link SharedMemory} instance because of the potentially large
+     * amount of data needed to store the table. This optimizes the data communication between the
+     * table data source and the receiver.
+     *
+     * @return the table data as a {@link SharedMemory} object, or {@code null} if the data is not
+     *         stored in shared memory.
+     *
+     * @see SharedMemory#map(int, int, int)
+     */
+    @Nullable
+    public SharedMemory getTableSharedMemory() {
+        return mTableSharedMemory;
     }
 
     /**
@@ -106,5 +206,12 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
         dest.writeString(uriString);
         dest.writeInt(mVersion);
         dest.writeInt(mSize);
+        if (mTableByteArray != null) {
+            dest.writeInt(mTableByteArray.length);
+            dest.writeByteArray(mTableByteArray);
+        } else {
+            dest.writeInt(-1);
+        }
+        dest.writeTypedObject(mTableSharedMemory, flags);
     }
 }

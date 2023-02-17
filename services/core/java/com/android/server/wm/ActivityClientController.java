@@ -46,6 +46,7 @@ import static com.android.server.wm.ActivityRecord.State.DESTROYING;
 import static com.android.server.wm.ActivityRecord.State.PAUSING;
 import static com.android.server.wm.ActivityRecord.State.RESTARTING_PROCESS;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
+import static com.android.server.wm.ActivityRecord.State.STOPPING;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_ALL;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_SWITCH;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.TAG_ATM;
@@ -240,11 +241,21 @@ class ActivityClientController extends IActivityClientController.Stub {
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "activityStopped");
             r = ActivityRecord.isInRootTaskLocked(token);
             if (r != null) {
+                if (!r.isState(STOPPING, RESTARTING_PROCESS)
+                        && mTaskSupervisor.hasScheduledRestartTimeouts(r)) {
+                    // Recover the restarting state which was replaced by other lifecycle changes.
+                    r.setState(RESTARTING_PROCESS, "continue-restart");
+                }
                 if (r.attachedToProcess() && r.isState(RESTARTING_PROCESS)) {
                     // The activity was requested to restart from
                     // {@link #restartActivityProcessIfVisible}.
                     restartingName = r.app.mName;
                     restartingUid = r.app.mUid;
+                    // Make EnsureActivitiesVisibleHelper#makeVisibleAndRestartIfNeeded not skip
+                    // restarting non-top activity.
+                    if (r != r.getTask().topRunningActivity()) {
+                        r.setVisibleRequested(false);
+                    }
                 }
                 r.activityStopped(icicle, persistentState, description);
             }
@@ -738,6 +749,8 @@ class ActivityClientController extends IActivityClientController.Stub {
             synchronized (mGlobalLock) {
                 final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
                 if (r != null) {
+                    EventLogTags.writeWmSetRequestedOrientation(requestedOrientation,
+                            r.shortComponentName);
                     r.setRequestedOrientation(requestedOrientation);
                 }
             }
@@ -751,7 +764,8 @@ class ActivityClientController extends IActivityClientController.Stub {
         synchronized (mGlobalLock) {
             final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
             return r != null
-                    ? r.getRequestedOrientation() : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+                    ? r.getOverrideOrientation()
+                    : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
         }
     }
 
@@ -767,6 +781,7 @@ class ActivityClientController extends IActivityClientController.Stub {
                 // the running transition finish.
                 final Transition transition = r != null
                         && r.mTransitionController.inPlayingTransition(r)
+                        && !r.mTransitionController.isCollecting()
                         ? r.mTransitionController.createTransition(TRANSIT_TO_BACK) : null;
                 if (transition != null) {
                     r.mTransitionController.requestStartTransition(transition, null /*startTask */,
@@ -806,6 +821,7 @@ class ActivityClientController extends IActivityClientController.Stub {
                 // visibility while playing transition, there won't able to commit visibility until
                 // the running transition finish.
                 final Transition transition = r.mTransitionController.inPlayingTransition(r)
+                        && !r.mTransitionController.isCollecting()
                         ? r.mTransitionController.createTransition(TRANSIT_TO_FRONT) : null;
                 if (transition != null) {
                     r.mTransitionController.requestStartTransition(transition, null /*startTask */,
@@ -1349,6 +1365,20 @@ class ActivityClientController extends IActivityClientController.Stub {
         }
     }
 
+    public void setAllowCrossUidActivitySwitchFromBelow(IBinder token, boolean allowed) {
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
+                if (r != null) {
+                    r.setAllowCrossUidActivitySwitchFromBelow(allowed);
+                }
+            }
+        } finally {
+            Binder.restoreCallingIdentity(origId);
+        }
+    }
+
     @Override
     public void reportActivityFullyDrawn(IBinder token, boolean restoredFromBundle) {
         final long origId = Binder.clearCallingIdentity();
@@ -1363,6 +1393,31 @@ class ActivityClientController extends IActivityClientController.Stub {
         } finally {
             Binder.restoreCallingIdentity(origId);
         }
+    }
+
+    @Override
+    public void overrideActivityTransition(IBinder token, boolean open, int enterAnim, int exitAnim,
+            int backgroundColor) {
+        final long origId = Binder.clearCallingIdentity();
+        synchronized (mGlobalLock) {
+            final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
+            if (r != null) {
+                r.overrideCustomTransition(open, enterAnim, exitAnim, backgroundColor);
+            }
+        }
+        Binder.restoreCallingIdentity(origId);
+    }
+
+    @Override
+    public void clearOverrideActivityTransition(IBinder token, boolean open) {
+        final long origId = Binder.clearCallingIdentity();
+        synchronized (mGlobalLock) {
+            final ActivityRecord r = ActivityRecord.isInRootTaskLocked(token);
+            if (r != null) {
+                r.clearCustomTransition(open);
+            }
+        }
+        Binder.restoreCallingIdentity(origId);
     }
 
     @Override
@@ -1643,5 +1698,20 @@ class ActivityClientController extends IActivityClientController.Stub {
             Slog.e(TAG, "Failed to query intent activities", e);
         }
         return false;
+    }
+
+    @Override
+    public void enableTaskLocaleOverride(IBinder token) {
+        if (UserHandle.getAppId(Binder.getCallingUid()) != SYSTEM_UID) {
+            // Only allow system to align locale.
+            return;
+        }
+
+        synchronized (mGlobalLock) {
+            final ActivityRecord r = ActivityRecord.forTokenLocked(token);
+            if (r != null) {
+                r.getTask().mAlignActivityLocaleWithTask = true;
+            }
+        }
     }
 }

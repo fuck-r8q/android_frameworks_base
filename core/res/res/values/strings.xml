@@ -556,6 +556,16 @@
     <!-- Title for the button that turns work profile on. To be used in a notification
         [CHAR LIMIT=NONE] -->
     <string name="personal_apps_suspended_turn_profile_on">Turn on</string>
+    <!-- Notification title. This notification lets the user know that they will be unable to
+     receive phone calls or texts until the work profile is turned on. [CHAR LIMIT=40] -->
+    <string name="work_profile_telephony_paused_title">Calls and messages are off</string>
+    <!-- Notification text. This notification lets the user know that they will be unable to
+     receive phone calls or texts until the work profile is turned on. [CHAR LIMIT=NONE] -->
+    <string name="work_profile_telephony_paused_text">You have paused work apps.
+        You won\'t receive phone calls or text messages.</string>
+    <!-- Label for notification button. This button lets the user turn the work profile on.
+         [CHAR LIMIT=15]  -->
+    <string name="work_profile_telephony_paused_turn_on_button">Unpause work apps</string>
 
     <!-- Display name for any time a piece of data refers to the owner of the phone. For example, this could be used in place of the phone's phone number. -->
     <string name="me">Me</string>
@@ -965,6 +975,11 @@
     <!-- Description for the capability of an accessibility service to take screenshot. [CHAR LIMIT=NONE] -->
     <string name="capability_desc_canTakeScreenshot">Can take a screenshot of the display.</string>
 
+    <!-- Dream -->
+
+    <!-- The title to use when a dream is opened in preview mode. [CHAR LIMIT=NONE] -->
+    <string name="dream_preview_title">Preview, <xliff:g id="dream_name" example="Clock">%1$s</xliff:g></string>
+
     <!--  Permissions -->
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
@@ -1328,6 +1343,16 @@
     <string name="permlab_bodySensors_background">Access body sensor data, like heart rate, while in the background</string>
     <!-- Description of the background body sensors permission, listed so the user can decide whether to allow the application to access data from body sensors in the background. [CHAR LIMIT=NONE] -->
     <string name="permdesc_bodySensors_background" product="default">Allows the app to access body sensor data, such as heart rate, temperature, and blood oxygen percentage, while the app is in the background.</string>
+
+    <!-- Title of the body sensors wrist temperature permission, listed so the user can decide whether to allow the application to access body sensor wrist temperature data. [CHAR LIMIT=NONE] -->
+    <string name="permlab_bodySensorsWristTemperature">Access body sensor wrist temperature data while the app is in use.</string>
+    <!-- Description of the body sensors wrist temperature permission, listed so the user can decide whether to allow the application to access data from body sensors. [CHAR LIMIT=NONE] -->
+    <string name="permdesc_bodySensorsWristTemperature" product="default">Allows the app to access body sensor wrist temperature data, while the app is in use.</string>
+
+    <!-- Title of the body sensors wrist temperature permission, listed so the user can decide whether to allow the application to access body sensor wrist temperature data. [CHAR LIMIT=NONE] -->
+    <string name="permlab_bodySensors_wristTemperature_background">Access body sensor wrist temperature data while the app is in the background.</string>
+    <!-- Description of the body sensors wrist temperature permission, listed so the user can decide whether to allow the application to access data from body sensors. [CHAR LIMIT=NONE] -->
+    <string name="permdesc_bodySensors_wristTemperature_background" product="default">Allows the app to access body sensor wrist temperature data, while the app is in the background.</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_readCalendar">Read calendar events and details</string>
@@ -3386,18 +3411,12 @@
     <string name="android_start_title" product="device">Device is starting\u2026</string>
 
     <!-- [CHAR LIMIT=NONE] Message shown in upgrading dialog when doing an fstrim. -->
-    <string name="android_upgrading_fstrim">Optimizing storage.</string>
 
     <!-- [CHAR LIMIT=40] Title of notification that is shown when finishing a system update. -->
     <string name="android_upgrading_notification_title" product="default">Finishing system update\u2026</string>
 
     <!-- [CHAR LIMIT=40] Toast that is shown when an app is still upgrading. -->
     <string name="app_upgrading_toast"><xliff:g id="application">%1$s</xliff:g> is upgrading\u2026</string>
-
-    <!-- [CHAR LIMIT=NONE] Message shown in upgrading dialog for each .apk that is optimized. -->
-    <string name="android_upgrading_apk">Optimizing app
-        <xliff:g id="number" example="123">%1$d</xliff:g> of
-        <xliff:g id="number" example="123">%2$d</xliff:g>.</string>
 
     <!-- [CHAR LIMIT=NONE] Message shown in upgrading dialog for each .apk pre boot broadcast -->
     <string name="android_preparing_apk">Preparing <xliff:g id="appname">%1$s</xliff:g>.</string>
@@ -3689,6 +3708,8 @@
     <string name="usb_tether_notification_title">USB tethering turned on</string>
     <!-- USB_PREFERENCES: Notification for when the user connects the phone to a computer via USB in MIDI mode.  This is the title -->
     <string name="usb_midi_notification_title">MIDI via USB turned on</string>
+    <!-- USB_PREFERENCES: Notification for when the user connects the phone to a computer via USB in UVC mode.  This is the title -->
+    <string name="usb_uvc_notification_title">Device connected as Webcam</string>
     <!-- USB_PREFERENCES: Notification for when a USB accessory is attached.  This is the title -->
     <string name="usb_accessory_notification_title">USB accessory connected</string>
     <!-- See USB_PREFERENCES. This is the message. -->
@@ -4703,7 +4724,7 @@
 
     <!-- Title of Color Inversion feature shown in the warning dialog about the accessibility
     shortcut. -->
-    <string name="color_inversion_feature_name">Color Inversion</string>
+    <string name="color_inversion_feature_name">Color inversion</string>
 
     <!-- Title of Color Correction feature, which is mostly used to help users who are colorblind,
      shown in the warning dialog about the accessibility shortcut. -->
@@ -4714,6 +4735,9 @@
 
     <!-- Title of Reduce Brightness feature, shown in the warning dialog about the accessibility shortcut. [CHAR LIMIT=none] -->
     <string name="reduce_bright_colors_feature_name">Extra dim</string>
+
+    <!-- Title of hearing aids feature, shown in the warning dialog about the accessibility shortcut. [CHAR LIMIT=none] -->
+    <string name="hearing_aids_feature_name">Hearing devices</string>
 
     <!-- Text in toast to alert the user that the accessibility shortcut turned on an accessibility service. [CHAR LIMIT=none] -->
     <string name="accessibility_shortcut_enabling_service">Held volume keys. <xliff:g id="service_name" example="TalkBack">%1$s</xliff:g> turned on.</string>
@@ -5011,6 +5035,14 @@
     <!-- Cling help message confirmation button when hiding the navigation bar entering immersive mode [CHAR LIMIT=30] -->
     <string name="immersive_cling_positive">Got it</string>
 
+    <!-- Text on a toast shown after the system rotates the screen for camera app
+         compatibility. [CHAR LIMIT=NONE] -->
+    <string name="display_rotation_camera_compat_toast_after_rotation">Rotate for a better view</string>
+
+    <!-- Text on a toast shown when a camera view is started within the app that may not be able
+         to display the camera preview correctly while in split screen. [CHAR LIMIT=NONE] -->
+    <string name="display_rotation_camera_compat_toast_in_split_screen">Exit split screen for a better view</string>
+
     <!-- Label for button to confirm chosen date or time [CHAR LIMIT=30] -->
     <string name="done_label">Done</string>
     <!--
@@ -5045,6 +5077,13 @@
     <string name="managed_profile_label_badge">Work <xliff:g id="label" example="Email">%1$s</xliff:g></string>
     <string name="managed_profile_label_badge_2">2nd Work <xliff:g id="label" example="Email">%1$s</xliff:g></string>
     <string name="managed_profile_label_badge_3">3rd Work <xliff:g id="label" example="Email">%1$s</xliff:g></string>
+
+    <!--
+        Used to wrap a label for content description for a Clone profile, e.g. "Clone Messenger"
+        instead of Messenger when the Messenger app is cloned.
+        [CHAR LIMIT=20]
+    -->
+    <string name="clone_profile_label_badge">Clone <xliff:g id="label" example="Messenger">%1$s</xliff:g></string>
 
     <!-- DO NOT TRANSLATE -->
     <string name="time_placeholder">--</string>
@@ -5326,6 +5365,10 @@
     <string name="work_mode_off_message">Get access to your work apps and notifications</string>
     <!-- Title for button to turn on work profile. [CHAR LIMIT=NONE] -->
     <string name="work_mode_turn_on">Turn on</string>
+    <!-- Title for button to launch the personal safety app to make an emergency call    -->
+    <string name="work_mode_emergency_call_button">Emergency</string>
+    <!-- Text shown in a dialog when the user tries to launch a disabled work profile app when work apps are paused-->
+    <string name="work_mode_dialer_off_message">Get access to your work apps and calls</string>
 
     <!-- Title of the dialog that is shown when the user tries to launch a blocked application [CHAR LIMIT=50] -->
     <string name="app_blocked_title">App is not available</string>
@@ -6209,4 +6252,17 @@ ul.</string>
     <string name="mic_access_on_toast">Microphone is available</string>
     <!-- Toast message that is shown when the user mutes the microphone from the keyboard. [CHAR LIMIT=TOAST] -->
     <string name="mic_access_off_toast">Microphone is blocked</string>
+
+    <!-- Name of concurrent display notifications. [CHAR LIMIT=NONE] -->
+    <string name="concurrent_display_notification_name">Dual screen</string>
+    <!-- Title of concurrent display active notification. [CHAR LIMIT=NONE] -->
+    <string name="concurrent_display_notification_active_title">Dual screen is on</string>
+    <!-- Content of concurrent display active notification. [CHAR LIMIT=NONE] -->
+    <string name="concurrent_display_notification_active_content"><xliff:g id="app_name" example="Camera app">%1$s</xliff:g> is using both displays to show content</string>
+    <!-- Title of concurrent display thermal notification. [CHAR LIMIT=NONE] -->
+    <string name="concurrent_display_notification_thermal_title">Device is too warm</string>
+    <!-- Content of concurrent display thermal notification. [CHAR LIMIT=NONE] -->
+    <string name="concurrent_display_notification_thermal_content">Dual Screen is unavailable because your phone is getting too warm</string>
+    <!-- Text of device state notification turn off button. [CHAR LIMIT=NONE] -->
+    <string name="device_state_notification_turn_off_button">Turn off</string>
 </resources>

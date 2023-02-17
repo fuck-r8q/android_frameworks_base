@@ -21,6 +21,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.credentials.CredentialManager;
 import android.credentials.ui.DisabledProviderData;
 import android.credentials.ui.IntentFactory;
 import android.credentials.ui.ProviderData;
@@ -56,16 +57,29 @@ public class CredentialManagerUi {
     };
 
     private void handleUiResult(int resultCode, Bundle resultData) {
-        if (resultCode == UserSelectionDialogResult.RESULT_CODE_DIALOG_COMPLETE_WITH_SELECTION) {
-            UserSelectionDialogResult selection = UserSelectionDialogResult
-                    .fromResultData(resultData);
-            if (selection != null) {
-                mCallbacks.onUiSelection(selection);
-            } else {
-                Slog.i(TAG, "No selection found in UI result");
-            }
-        } else if (resultCode == UserSelectionDialogResult.RESULT_CODE_DIALOG_CANCELED) {
-            mCallbacks.onUiCancellation();
+        switch (resultCode) {
+            case UserSelectionDialogResult.RESULT_CODE_DIALOG_COMPLETE_WITH_SELECTION:
+                UserSelectionDialogResult selection = UserSelectionDialogResult
+                        .fromResultData(resultData);
+                if (selection != null) {
+                    mCallbacks.onUiSelection(selection);
+                } else {
+                    Slog.i(TAG, "No selection found in UI result");
+                }
+                break;
+            case UserSelectionDialogResult.RESULT_CODE_DIALOG_USER_CANCELED:
+                mCallbacks.onUiCancellation(/* isUserCancellation= */ true);
+                break;
+            case UserSelectionDialogResult.RESULT_CODE_CANCELED_AND_LAUNCHED_SETTINGS:
+                mCallbacks.onUiCancellation(/* isUserCancellation= */ false);
+                break;
+            case UserSelectionDialogResult.RESULT_CODE_DATA_PARSING_FAILURE:
+                mCallbacks.onUiSelectorInvocationFailure();
+                break;
+            default:
+                Slog.i(TAG, "Unknown error code returned from the UI");
+                mCallbacks.onUiSelectorInvocationFailure();
+                break;
         }
     }
 
@@ -75,8 +89,11 @@ public class CredentialManagerUi {
     public interface CredentialManagerUiCallback {
         /** Called when the user makes a selection. */
         void onUiSelection(UserSelectionDialogResult selection);
-        /** Called when the user cancels the UI. */
-        void onUiCancellation();
+        /** Called when the UI is canceled without a successful provider result. */
+        void onUiCancellation(boolean isUserCancellation);
+
+        /** Called when the selector UI fails to come up (mostly due to parsing issue today). */
+        void onUiSelectorInvocationFailure();
     }
     public CredentialManagerUi(Context context, int userId,
             CredentialManagerUiCallback callbacks) {
@@ -100,13 +117,17 @@ public class CredentialManagerUi {
         Set<String> enabledProviders = providerDataList.stream()
                 .map(ProviderData::getProviderFlattenedComponentName)
                 .collect(Collectors.toUnmodifiableSet());
-        // TODO("Filter out non user configurable providers")
         Set<String> allProviders =
-                CredentialProviderInfo.getAvailableServices(mContext, mUserId).stream()
-                .map(CredentialProviderInfo::getServiceInfo)
-                .map(ServiceInfo::getComponentName)
-                .map(ComponentName::flattenToString)
-                .collect(Collectors.toUnmodifiableSet());
+                CredentialProviderInfo.getCredentialProviderServices(
+                                mContext,
+                                mUserId,
+                                /* disableSystemAppVerificationForTests= */ false,
+                                CredentialManager.PROVIDER_FILTER_USER_PROVIDERS_ONLY)
+                        .stream()
+                        .map(CredentialProviderInfo::getServiceInfo)
+                        .map(ServiceInfo::getComponentName)
+                        .map(ComponentName::flattenToString)
+                        .collect(Collectors.toUnmodifiableSet());
 
         for (String provider: allProviders) {
             if (!enabledProviders.contains(provider)) {
@@ -114,7 +135,7 @@ public class CredentialManagerUi {
             }
         }
 
-        Intent intent = IntentFactory.newIntent(requestInfo, providerDataList,
+        Intent intent = IntentFactory.createCredentialSelectorIntent(requestInfo, providerDataList,
                         disabledProviderDataList, mResultReceiver)
                 .setAction(UUID.randomUUID().toString());
         //TODO: Create unique pending intent using request code and cancel any pre-existing pending

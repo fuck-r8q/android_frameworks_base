@@ -48,6 +48,7 @@ import com.android.systemui.Dumpable;
 import com.android.systemui.R;
 import com.android.systemui.animation.Interpolators;
 import com.android.systemui.animation.ShadeInterpolation;
+import com.android.systemui.compose.ComposeFacade;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.media.controls.ui.MediaHost;
@@ -67,6 +68,7 @@ import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
 import com.android.systemui.util.LifecycleFragment;
+import com.android.systemui.util.Utils;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -226,9 +228,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
 
         mQSFooterActionsViewModel = mFooterActionsViewModelFactory.create(/* lifecycleOwner */
                 this);
-        LinearLayout footerActionsView = view.findViewById(R.id.qs_footer_actions);
-        FooterActionsViewBinder.bind(footerActionsView, mQSFooterActionsViewModel,
-                mListeningAndVisibilityLifecycleOwner);
+        bindFooterActionsView(view);
         mFooterActionsController.init();
 
         mQSPanelScrollView = view.findViewById(R.id.expanded_qs_scroll_view);
@@ -287,6 +287,33 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
                     mQSPanelController.getMediaHost().getHostView().setAlpha(1.0f);
                     mQSAnimator.requestAnimatorUpdate();
                 });
+    }
+
+    private void bindFooterActionsView(View root) {
+        LinearLayout footerActionsView = root.findViewById(R.id.qs_footer_actions);
+
+        if (!ComposeFacade.INSTANCE.isComposeAvailable()) {
+            Log.d(TAG, "Binding the View implementation of the QS footer actions");
+            FooterActionsViewBinder.bind(footerActionsView, mQSFooterActionsViewModel,
+                    mListeningAndVisibilityLifecycleOwner);
+            return;
+        }
+
+        // Compose is available, so let's use the Compose implementation of the footer actions.
+        Log.d(TAG, "Binding the Compose implementation of the QS footer actions");
+        View composeView = ComposeFacade.INSTANCE.createFooterActionsView(root.getContext(),
+                mQSFooterActionsViewModel, mListeningAndVisibilityLifecycleOwner);
+
+        // The id R.id.qs_footer_actions is used by QSContainerImpl to set the horizontal margin
+        // to all views except for qs_footer_actions, so we set it to the Compose view.
+        composeView.setId(R.id.qs_footer_actions);
+
+        // Replace the View by the Compose provided one.
+        ViewGroup parent = (ViewGroup) footerActionsView.getParent();
+        ViewGroup.LayoutParams layoutParams = footerActionsView.getLayoutParams();
+        int index = parent.indexOfChild(footerActionsView);
+        parent.removeViewAt(index);
+        parent.addView(composeView, index, layoutParams);
     }
 
     @Override
@@ -682,7 +709,7 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
         } else {
             mQsMediaHost.setSquishFraction(mSquishinessFraction);
         }
-
+        updateMediaPositions();
     }
 
     private void setAlphaAnimationProgress(float progress) {
@@ -755,6 +782,22 @@ public class QSFragment extends LifecycleFragment implements QS, CommandQueue.Ca
                 left + getView().getMeasuredWidth(),
                 top + mQSPanelScrollView.getMeasuredHeight()
                         - mQSPanelController.getPaddingBottom());
+    }
+
+    private void updateMediaPositions() {
+        if (Utils.useQsMediaPlayer(getContext())) {
+            View hostView = mQsMediaHost.getHostView();
+            // Make sure the media appears a bit from the top to make it look nicer
+            if (mLastQSExpansion > 0 && !isKeyguardState() && !mQqsMediaHost.getVisible()
+                    && !mQSPanelController.shouldUseHorizontalLayout() && !mInSplitShade) {
+                float interpolation = 1.0f - mLastQSExpansion;
+                interpolation = Interpolators.ACCELERATE.getInterpolation(interpolation);
+                float translationY = -hostView.getHeight() * 1.3f * interpolation;
+                hostView.setTranslationY(translationY);
+            } else {
+                hostView.setTranslationY(0);
+            }
+        }
     }
 
     private boolean headerWillBeAnimating() {

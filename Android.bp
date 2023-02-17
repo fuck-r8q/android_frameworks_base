@@ -110,6 +110,7 @@ filegroup {
         ":android.security.maintenance-java-source",
         ":android.security.metrics-java-source",
         ":android.system.keystore2-V3-java-source",
+        ":android.hardware.cas-V1-java-source",
         ":credstore_aidl",
         ":dumpstate_aidl",
         ":framework_native_aidl",
@@ -200,6 +201,7 @@ java_library {
         "updatable-driver-protos",
         "ota_metadata_proto_java",
         "android.hidl.base-V1.0-java",
+        "android.hardware.cas-V1-java", // AIDL
         "android.hardware.cas-V1.0-java",
         "android.hardware.cas-V1.1-java",
         "android.hardware.cas-V1.2-java",
@@ -222,6 +224,7 @@ java_library {
         "android.hardware.radio.messaging-V2-java",
         "android.hardware.radio.modem-V2-java",
         "android.hardware.radio.network-V2-java",
+        "android.hardware.radio.satellite-V1-java",
         "android.hardware.radio.sim-V2-java",
         "android.hardware.radio.voice-V2-java",
         "android.hardware.thermal-V1.0-java-constants",
@@ -232,6 +235,7 @@ java_library {
         "android.hardware.usb-V1.0-java-constants",
         "android.hardware.usb-V1.1-java-constants",
         "android.hardware.usb-V1.2-java-constants",
+        "android.hardware.usb.gadget-V1-java",
         "android.hardware.usb.gadget-V1.0-java",
         "android.hardware.usb.gadget-V1.1-java",
         "android.hardware.usb.gadget-V1.2-java",
@@ -692,3 +696,12 @@ build = [
     "ProtoLibraries.bp",
     "TestProtoLibraries.bp",
 ]
+
+java_api_contribution {
+    name: "api-stubs-docs-non-updatable-public-stubs",
+    api_surface: "public",
+    api_file: "core/api/current.txt",
+    visibility: [
+        "//build/orchestrator/apis",
+    ],
+}

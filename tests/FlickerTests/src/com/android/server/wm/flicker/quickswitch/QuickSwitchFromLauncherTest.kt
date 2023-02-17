@@ -26,8 +26,8 @@ import com.android.server.wm.flicker.FlickerTestFactory
 import com.android.server.wm.flicker.helpers.SimpleAppHelper
 import com.android.server.wm.flicker.helpers.isShellTransitionsEnabled
 import com.android.server.wm.flicker.junit.FlickerParametersRunnerFactory
-import com.android.server.wm.traces.common.ComponentNameMatcher
 import com.android.server.wm.traces.common.Rect
+import com.android.server.wm.traces.common.component.matchers.ComponentNameMatcher
 import com.android.server.wm.traces.common.service.PlatformConsts
 import org.junit.Assume
 import org.junit.FixMethodOrder
@@ -53,7 +53,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class QuickSwitchFromLauncherTest(flicker: FlickerTest) : BaseTest(flicker) {
+open class QuickSwitchFromLauncherTest(flicker: FlickerTest) : BaseTest(flicker) {
     private val testApp = SimpleAppHelper(instrumentation)
 
     /** {@inheritDoc} */

@@ -16,6 +16,8 @@
 
 package com.android.server.usb;
 
+import static android.hardware.usb.DisplayPortAltModeInfo.DISPLAYPORT_ALT_MODE_STATUS_UNKNOWN;
+import static android.hardware.usb.DisplayPortAltModeInfo.LINK_TRAINING_STATUS_UNKNOWN;
 import static android.hardware.usb.UsbOperationInternal.USB_OPERATION_ERROR_INTERNAL;
 import static android.hardware.usb.UsbPortStatus.DATA_ROLE_DEVICE;
 import static android.hardware.usb.UsbPortStatus.DATA_ROLE_HOST;
@@ -36,6 +38,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.hardware.usb.IUsbManager;
+import android.hardware.usb.IDisplayPortAltModeInfoListener;
 import android.hardware.usb.IUsbOperationInternal;
 import android.hardware.usb.ParcelableUsbPort;
 import android.hardware.usb.UsbAccessory;
@@ -43,6 +46,7 @@ import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbPort;
 import android.hardware.usb.UsbPortStatus;
+import android.hardware.usb.DisplayPortAltModeInfo;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
@@ -902,6 +906,45 @@ public class UsbService extends IUsbManager.Stub {
         }
     }
 
+    @Override
+    public boolean registerForDisplayPortEvents(
+            @NonNull IDisplayPortAltModeInfoListener listener) {
+        Objects.requireNonNull(listener, "registerForDisplayPortEvents: listener " +
+                "must not be null.");
+
+        mContext.enforceCallingOrSelfPermission(android.Manifest.permission.MANAGE_USB, null);
+
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            if (mPortManager != null) {
+                return mPortManager.registerForDisplayPortEvents(listener);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+
+        return false;
+    }
+
+    @Override
+    public void unregisterForDisplayPortEvents(
+            @NonNull IDisplayPortAltModeInfoListener listener) {
+        Objects.requireNonNull(listener, "unregisterForDisplayPortEvents: listener " +
+                "must not be null.");
+
+        mContext.enforceCallingOrSelfPermission(android.Manifest.permission.MANAGE_USB, null);
+
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            if (mPortManager != null) {
+                mPortManager.unregisterForDisplayPortEvents(listener);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+
     @NeverCompile // Avoid size overhead of debugging code.
     @Override
     public void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
@@ -993,6 +1036,7 @@ public class UsbService extends IUsbManager.Stub {
 
                 int i;
                 boolean supportsComplianceWarnings = false;
+                boolean supportsDisplayPortAltMode = false;
                 switch (args[2]) {
                     case "ufp":
                         supportedModes = MODE_UFP;
@@ -1015,14 +1059,17 @@ public class UsbService extends IUsbManager.Stub {
                     case "--compliance-warnings":
                         supportsComplianceWarnings = true;
                         continue;
+                    case "--displayport":
+                        supportsDisplayPortAltMode = true;
+                        continue;
                     default:
                         pw.println("Invalid Identifier: " + args[i]);
                     }
                 }
                 if (mPortManager != null) {
                     mPortManager.addSimulatedPort(portId, supportedModes,
-                            supportsComplianceWarnings,
-                            pw);
+                        supportsComplianceWarnings, supportsDisplayPortAltMode,
+                        pw);
                     pw.println();
                     mPortManager.dump(new DualDumpOutputStream(new IndentingPrintWriter(pw, "  ")),
                             "", 0);
@@ -1124,6 +1171,35 @@ public class UsbService extends IUsbManager.Stub {
                     mPortManager.dump(new DualDumpOutputStream(new IndentingPrintWriter(pw, "  ")),
                             "", 0);
                 }
+            } else if ("set-displayport-status".equals(args[0]) && args.length == 7) {
+                final String portId = args[1];
+                final int partnerSinkStatus = Integer.parseInt(args[2]);
+                final int cableStatus = Integer.parseInt(args[3]);
+                final int displayPortNumLanes = Integer.parseInt(args[4]);
+                final boolean hpd = Boolean.parseBoolean(args[5]);
+                final int linkTrainingStatus = Integer.parseInt(args[6]);
+                if (mPortManager != null) {
+                    mPortManager.simulateDisplayPortAltModeInfo(portId,
+                            partnerSinkStatus, cableStatus, displayPortNumLanes,
+                            hpd, linkTrainingStatus, pw);
+                    pw.println();
+                    mPortManager.dump(new DualDumpOutputStream(new IndentingPrintWriter(pw, "  ")),
+                            "", 0);
+                }
+            } else if ("reset-displayport-status".equals(args[0]) && args.length == 2) {
+                final String portId = args[1];
+                if (mPortManager != null) {
+                    mPortManager.simulateDisplayPortAltModeInfo(portId,
+                            DISPLAYPORT_ALT_MODE_STATUS_UNKNOWN,
+                            DISPLAYPORT_ALT_MODE_STATUS_UNKNOWN,
+                            0,
+                            false,
+                            LINK_TRAINING_STATUS_UNKNOWN,
+                            pw);
+                    pw.println();
+                    mPortManager.dump(new DualDumpOutputStream(new IndentingPrintWriter(pw, "  ")),
+                            "", 0);
+                }
             } else if ("ports".equals(args[0]) && args.length == 1) {
                 if (mPortManager != null) {
                     mPortManager.dump(new DualDumpOutputStream(new IndentingPrintWriter(pw, "  ")),
@@ -1138,6 +1214,7 @@ public class UsbService extends IUsbManager.Stub {
                 pw.println("  add-port <id> <ufp|dfp|dual|none> <optional args>");
                 pw.println("    <optional args> include:");
                 pw.println("      --compliance-warnings: enables compliance warnings on port");
+                pw.println("      --displayport: enables DisplayPort Alt Mode on port");
                 pw.println("  connect-port <id> <ufp|dfp><?> <source|sink><?> <host|device><?>");
                 pw.println("    (add ? suffix if mode, power role, or data role can be changed)");
                 pw.println("  disconnect-port <id>");
@@ -1148,7 +1225,8 @@ public class UsbService extends IUsbManager.Stub {
                 pw.println("  dumpsys usb set-port-roles \"default\" source device");
                 pw.println();
                 pw.println("Example USB type C port simulation with full capabilities:");
-                pw.println("  dumpsys usb add-port \"matrix\" dual --compliance-warnings");
+                pw.println("  dumpsys usb add-port \"matrix\" dual --compliance-warnings "
+                        + "--displayport");
                 pw.println("  dumpsys usb connect-port \"matrix\" ufp? sink? device?");
                 pw.println("  dumpsys usb ports");
                 pw.println("  dumpsys usb disconnect-port \"matrix\"");
@@ -1185,6 +1263,20 @@ public class UsbService extends IUsbManager.Stub {
                 pw.println("  2: debug accessory");
                 pw.println("  3: bc12");
                 pw.println("  4: missing rp");
+                pw.println();
+                pw.println("Example simulate DisplayPort Alt Mode Changes:");
+                pw.println("  dumpsys usb add-port \"matrix\" dual --displayport");
+                pw.println("  dumpsys usb set-displayport-status \"matrix\" <partner-sink>"
+                        + " <cable> <num-lanes> <hpd> <link-training-status>");
+                pw.println("The required fields are as followed:");
+                pw.println("    <partner-sink>: type DisplayPortAltModeStatus");
+                pw.println("    <cable>: type DisplayPortAltModeStatus");
+                pw.println("    <num-lanes>: type int, expected 0, 2, or 4");
+                pw.println("    <hpd>: type boolean, expected true or false");
+                pw.println("    <link-training-status>: type LinkTrainingStatus");
+                pw.println("  dumpsys usb reset-displayport-status \"matrix\"");
+                pw.println("reset-displayport-status can also be used in order to set");
+                pw.println("the DisplayPortInfo to default values.");
                 pw.println();
                 pw.println("Example USB device descriptors:");
                 pw.println("  dumpsys usb dump-descriptors -dump-short");

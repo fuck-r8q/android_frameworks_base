@@ -50,10 +50,12 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityThread;
+import android.app.BackgroundStartPrivileges;
 import android.app.IApplicationThread;
 import android.app.ProfilerInfo;
 import android.app.servertransaction.ConfigurationChangeItem;
 import android.companion.virtual.VirtualDeviceManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
@@ -62,18 +64,18 @@ import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
 import android.os.Binder;
 import android.os.Build;
-import android.os.IBinder;
+import android.os.FactoryTest;
 import android.os.LocaleList;
 import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.IRemoteAnimationRunner;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.HeavyWeightSwitcherActivity;
 import com.android.internal.protolog.common.ProtoLog;
@@ -116,7 +118,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     // communicate back to the activity manager side.
     public final Object mOwner;
     // List of packages running in the process
-    final ArraySet<String> mPkgList = new ArraySet<>();
+    @GuardedBy("itself")
+    private final ArrayList<String> mPkgList = new ArrayList<>(1);
     private final WindowProcessListener mListener;
     private final ActivityTaskManagerService mAtm;
     private final BackgroundLaunchProcessController mBgLaunchController;
@@ -543,17 +546,18 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     /**
-     * @see BackgroundLaunchProcessController#addOrUpdateAllowBackgroundActivityStartsToken(Binder,
-     * IBinder)
+     * @see BackgroundLaunchProcessController#addOrUpdateAllowBackgroundStartPrivileges(Binder,
+     * BackgroundStartPrivileges)
      */
-    public void addOrUpdateAllowBackgroundActivityStartsToken(Binder entity,
-            @Nullable IBinder originatingToken) {
-        mBgLaunchController.addOrUpdateAllowBackgroundActivityStartsToken(entity, originatingToken);
+    public void addOrUpdateBackgroundStartPrivileges(Binder entity,
+            BackgroundStartPrivileges backgroundStartPrivileges) {
+        mBgLaunchController.addOrUpdateAllowBackgroundStartPrivileges(entity,
+                backgroundStartPrivileges);
     }
 
-    /** @see BackgroundLaunchProcessController#removeAllowBackgroundActivityStartsToken(Binder) */
-    public void removeAllowBackgroundActivityStartsToken(Binder entity) {
-        mBgLaunchController.removeAllowBackgroundActivityStartsToken(entity);
+    /** @see BackgroundLaunchProcessController#removeAllowBackgroundStartPrivileges(Binder) */
+    public void removeBackgroundStartPrivileges(Binder entity) {
+        mBgLaunchController.removeAllowBackgroundStartPrivileges(entity);
     }
 
     /**
@@ -589,8 +593,18 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mBgLaunchController.canCloseSystemDialogsByToken(mUid);
     }
 
-    public void setBoundClientUids(ArraySet<Integer> boundClientUids) {
-        mBgLaunchController.setBoundClientUids(boundClientUids);
+    /**
+     * Clear all bound client Uids.
+     */
+    public void clearBoundClientUids() {
+        mBgLaunchController.clearBalOptInBoundClientUids();
+    }
+
+    /**
+     * Add bound client Uid.
+     */
+    public void addBoundClientUid(int clientUid, String clientPackageName, long bindFlags) {
+        mBgLaunchController.addBoundClientUid(clientUid, clientPackageName, bindFlags);
     }
 
     /**
@@ -643,15 +657,23 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     @HotPath(caller = HotPath.PROCESS_CHANGE)
     public void addPackage(String packageName) {
-        synchronized (mAtm.mGlobalLockWithoutBoost) {
-            mPkgList.add(packageName);
+        synchronized (mPkgList) {
+            if (!mPkgList.contains(packageName)) {
+                mPkgList.add(packageName);
+            }
         }
     }
 
     @HotPath(caller = HotPath.PROCESS_CHANGE)
     public void clearPackageList() {
-        synchronized (mAtm.mGlobalLockWithoutBoost) {
+        synchronized (mPkgList) {
             mPkgList.clear();
+        }
+    }
+
+    boolean containsPackage(String packageName) {
+        synchronized (mPkgList) {
+            return mPkgList.contains(packageName);
         }
     }
 
@@ -993,7 +1015,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
 
     /**
      * Returns display UI context list which there is any app window shows or starting activities
-     * int this process.
+     * in this process.
      */
     public void getDisplayContextsWithErrorDialogs(List<Context> displayContexts) {
         if (displayContexts == null) {
@@ -1716,6 +1738,22 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     @HotPath(caller = HotPath.OOM_ADJUSTMENT)
     public boolean isHeavyWeightProcess() {
         return this == mAtm.mHeavyWeightProcess;
+    }
+
+    @HotPath(caller = HotPath.PROCESS_CHANGE)
+    public boolean isFactoryTestProcess() {
+        final int factoryTestMode = mAtm.mFactoryTest;
+        if (factoryTestMode == FactoryTest.FACTORY_TEST_OFF) {
+            return false;
+        }
+        if (factoryTestMode == FactoryTest.FACTORY_TEST_LOW_LEVEL) {
+            final ComponentName topComponent = mAtm.mTopComponent;
+            if (topComponent != null && mName.equals(topComponent.getPackageName())) {
+                return true;
+            }
+        }
+        return factoryTestMode == FactoryTest.FACTORY_TEST_HIGH_LEVEL
+                && (mInfo.flags & ApplicationInfo.FLAG_FACTORY_TEST) != 0;
     }
 
     void setRunningRecentsAnimation(boolean running) {

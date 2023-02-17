@@ -44,6 +44,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.app.ActivityManager;
 import android.app.IWallpaperManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -118,12 +119,14 @@ import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.recents.ScreenPinningRequest;
+import com.android.systemui.settings.UserTracker;
 import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.NotificationPanelView;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.shade.NotificationShadeWindowView;
 import com.android.systemui.shade.NotificationShadeWindowViewController;
+import com.android.systemui.shade.QuickSettingsController;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeControllerImpl;
 import com.android.systemui.shade.ShadeExpansionStateManager;
@@ -178,8 +181,6 @@ import com.android.systemui.volume.VolumeComponent;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.StartingSurface;
 
-import dagger.Lazy;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -191,6 +192,8 @@ import org.mockito.MockitoAnnotations;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.util.Optional;
+
+import dagger.Lazy;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
@@ -216,6 +219,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Mock private HeadsUpManagerPhone mHeadsUpManager;
     @Mock private NotificationPanelViewController mNotificationPanelViewController;
     @Mock private NotificationPanelView mNotificationPanelView;
+    @Mock private QuickSettingsController mQuickSettingsController;
     @Mock private IStatusBarService mBarService;
     @Mock private IDreamManager mDreamManager;
     @Mock private LightRevealScrimViewModel mLightRevealScrimViewModel;
@@ -306,6 +310,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
      */
     @Mock private ViewRootImpl mViewRootImpl;
     @Mock private WindowOnBackInvokedDispatcher mOnBackInvokedDispatcher;
+    @Mock private UserTracker mUserTracker;
     @Captor private ArgumentCaptor<OnBackInvokedCallback> mOnBackInvokedCallback;
     @Mock IPowerManager mPowerManagerService;
 
@@ -320,6 +325,12 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     @Before
     public void setup() throws Exception {
         MockitoAnnotations.initMocks(this);
+
+        // CentralSurfacesImpl's runtime flag check fails if the flag is absent.
+        // This value is unused, because test manifest is opted in.
+        mFeatureFlags.set(Flags.WM_ENABLE_PREDICTIVE_BACK_SYSUI, false);
+        // Set default value to avoid IllegalStateException.
+        mFeatureFlags.set(Flags.SHORTCUT_LIST_SEARCH_LAYOUT, false);
 
         IThermalService thermalService = mock(IThermalService.class);
         mPowerManager = new PowerManager(mContext, mPowerManagerService, thermalService,
@@ -338,7 +349,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                         new Handler(TestableLooper.get(this).getLooper()),
                         mock(NotifPipelineFlags.class),
                         mock(KeyguardNotificationVisibilityProvider.class),
-                        mock(UiEventLogger.class));
+                        mock(UiEventLogger.class),
+                        mUserTracker);
 
         mContext.addMockSystemService(TrustManager.class, mock(TrustManager.class));
         mContext.addMockSystemService(FingerprintManager.class, mock(FingerprintManager.class));
@@ -380,7 +392,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         }).when(mStatusBarKeyguardViewManager).addAfterKeyguardGoneRunnable(any());
 
         mWakefulnessLifecycle =
-                new WakefulnessLifecycle(mContext, mIWallpaperManager, mDumpManager);
+                new WakefulnessLifecycle(mContext, mIWallpaperManager, mFakeSystemClock,
+                        mDumpManager);
         mWakefulnessLifecycle.dispatchStartedWakingUp(PowerManager.WAKE_REASON_UNKNOWN);
         mWakefulnessLifecycle.dispatchFinishedWakingUp();
 
@@ -418,6 +431,9 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
 
         when(mOperatorNameViewControllerFactory.create(any()))
                 .thenReturn(mOperatorNameViewController);
+        when(mUserTracker.getUserId()).thenReturn(ActivityManager.getCurrentUser());
+        when(mUserTracker.getUserHandle()).thenReturn(
+                UserHandle.of(ActivityManager.getCurrentUser()));
 
         mCentralSurfaces = new CentralSurfacesImpl(
                 mContext,
@@ -507,7 +523,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mDreamManager,
                 mCameraLauncherLazy,
                 () -> mLightRevealScrimViewModel,
-                mAlternateBouncerInteractor
+                mAlternateBouncerInteractor,
+                mUserTracker
         ) {
             @Override
             protected ViewRootImpl getViewRootImpl() {
@@ -533,6 +550,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         // initialized automatically and make NPVC private.
         mCentralSurfaces.mNotificationShadeWindowView = mNotificationShadeWindowView;
         mCentralSurfaces.mNotificationPanelViewController = mNotificationPanelViewController;
+        mCentralSurfaces.mQsController = mQuickSettingsController;
         mCentralSurfaces.mDozeScrimController = mDozeScrimController;
         mCentralSurfaces.mPresenter = mNotificationPresenter;
         mCentralSurfaces.mKeyguardIndicationController = mKeyguardIndicationController;
@@ -543,6 +561,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         mCentralSurfaces.startKeyguard();
         mInitController.executePostInitTasks();
         notificationLogger.setUpWithContainer(mNotificationListContainer);
+        mCentralSurfaces.registerCallbacks();
     }
 
     @Test
@@ -996,6 +1015,18 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     }
 
     @Test
+    public void testSetDozingNotUnlocking_transitionToAOD_cancelKeyguardFadingAway() {
+        setDozing(true);
+        when(mKeyguardStateController.isShowing()).thenReturn(false);
+        when(mKeyguardStateController.isKeyguardFadingAway()).thenReturn(true);
+
+        mCentralSurfaces.updateScrimController();
+
+        verify(mScrimController, times(2)).transitionTo(eq(ScrimState.AOD));
+        verify(mStatusBarKeyguardViewManager).onKeyguardFadedAway();
+    }
+
+    @Test
     public void testShowKeyguardImplementation_setsState() {
         when(mLockscreenUserManager.getCurrentProfiles()).thenReturn(new SparseArray<>());
 
@@ -1278,7 +1309,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 Handler mainHandler,
                 NotifPipelineFlags flags,
                 KeyguardNotificationVisibilityProvider keyguardNotificationVisibilityProvider,
-                UiEventLogger uiEventLogger) {
+                UiEventLogger uiEventLogger,
+                UserTracker userTracker) {
             super(
                     contentResolver,
                     powerManager,
@@ -1292,7 +1324,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                     mainHandler,
                     flags,
                     keyguardNotificationVisibilityProvider,
-                    uiEventLogger
+                    uiEventLogger,
+                    userTracker
             );
             mUseHeadsUp = true;
         }

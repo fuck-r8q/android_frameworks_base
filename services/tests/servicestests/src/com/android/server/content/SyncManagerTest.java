@@ -24,6 +24,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -39,16 +40,12 @@ import android.test.suitebuilder.annotation.SmallTest;
 
 import androidx.test.core.app.ApplicationProvider;
 
-import com.android.server.job.JobSchedulerInternal;
-
 import junit.framework.TestCase;
 
 import org.jetbrains.annotations.NotNull;
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.util.ArrayList;
 
 /**
  * Tests for SyncManager.
@@ -68,19 +65,12 @@ public class SyncManagerTest extends TestCase {
     private UserManager mUserManager;
     @Mock
     private AccountManagerInternal mAccountManagerInternal;
-    @Mock
-    private JobSchedulerInternal mJobSchedulerInternal;
 
     private class SyncManagerWithMockedServices extends SyncManager {
 
         @Override
         protected AccountManagerInternal getAccountManagerInternal() {
             return mAccountManagerInternal;
-        }
-
-        @Override
-        protected JobSchedulerInternal getJobSchedulerInternal() {
-            return mJobSchedulerInternal;
         }
 
         private SyncManagerWithMockedServices(Context context, boolean factoryTest) {
@@ -94,8 +84,7 @@ public class SyncManagerTest extends TestCase {
         mContext = spy(ApplicationProvider.getApplicationContext());
         when(mContext.getSystemService(Context.USER_SERVICE)).thenReturn(mUserManager);
         doNothing().when(mAccountManagerInternal).addOnAppPermissionChangeListener(any());
-        when(mJobSchedulerInternal.getSystemScheduledPendingJobs()).thenReturn(new ArrayList<>());
-        mSyncManager = new SyncManagerWithMockedServices(mContext, true);
+        mSyncManager = spy(new SyncManagerWithMockedServices(mContext, true));
     }
 
     public void testSyncExtrasEquals_WithNull() throws Exception {
@@ -233,6 +222,7 @@ public class SyncManagerTest extends TestCase {
     }
 
     public void testShouldDisableSync() {
+        doReturn(true).when(mSyncManager).isContactSharingAllowedForCloneProfile();
         UserInfo primaryUserInfo = createUserInfo("primary", 0 /* id */, 0 /* groupId */,
                 UserInfo.FLAG_PRIMARY | UserInfo.FLAG_ADMIN);
         UserInfo cloneUserInfo = createUserInfo("clone", 10 /* id */, 0 /* groupId */,

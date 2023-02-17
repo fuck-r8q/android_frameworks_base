@@ -55,6 +55,7 @@ import com.android.wm.shell.pip.PipMediaController;
 import com.android.wm.shell.pip.PipParamsChangedForwarder;
 import com.android.wm.shell.pip.PipTaskOrganizer;
 import com.android.wm.shell.pip.PipTransitionController;
+import com.android.wm.shell.pip.phone.PipSizeSpecHandler;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.sysui.ConfigurationChangeListener;
 import com.android.wm.shell.sysui.ShellController;
@@ -118,6 +119,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
 
     private final ShellController mShellController;
     private final TvPipBoundsState mTvPipBoundsState;
+    private final PipSizeSpecHandler mPipSizeSpecHandler;
     private final TvPipBoundsAlgorithm mTvPipBoundsAlgorithm;
     private final TvPipBoundsController mTvPipBoundsController;
     private final PipAppOpsListener mAppOpsListener;
@@ -152,6 +154,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
             ShellInit shellInit,
             ShellController shellController,
             TvPipBoundsState tvPipBoundsState,
+            PipSizeSpecHandler pipSizeSpecHandler,
             TvPipBoundsAlgorithm tvPipBoundsAlgorithm,
             TvPipBoundsController tvPipBoundsController,
             PipAppOpsListener pipAppOpsListener,
@@ -171,6 +174,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
                 shellInit,
                 shellController,
                 tvPipBoundsState,
+                pipSizeSpecHandler,
                 tvPipBoundsAlgorithm,
                 tvPipBoundsController,
                 pipAppOpsListener,
@@ -192,6 +196,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
             ShellInit shellInit,
             ShellController shellController,
             TvPipBoundsState tvPipBoundsState,
+            PipSizeSpecHandler pipSizeSpecHandler,
             TvPipBoundsAlgorithm tvPipBoundsAlgorithm,
             TvPipBoundsController tvPipBoundsController,
             PipAppOpsListener pipAppOpsListener,
@@ -212,10 +217,13 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
         mShellController = shellController;
         mDisplayController = displayController;
 
-        mTvPipBoundsState = tvPipBoundsState;
-        mTvPipBoundsState.setDisplayId(context.getDisplayId());
-        mTvPipBoundsState.setDisplayLayout(new DisplayLayout(context, context.getDisplay()));
+        DisplayLayout layout = new DisplayLayout(context, context.getDisplay());
 
+        mTvPipBoundsState = tvPipBoundsState;
+        mTvPipBoundsState.setDisplayLayout(layout);
+        mTvPipBoundsState.setDisplayId(context.getDisplayId());
+        mPipSizeSpecHandler = pipSizeSpecHandler;
+        mPipSizeSpecHandler.setDisplayLayout(layout);
         mTvPipBoundsAlgorithm = tvPipBoundsAlgorithm;
         mTvPipBoundsController = tvPipBoundsController;
         mTvPipBoundsController.setListener(this);
@@ -450,18 +458,6 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
         mPipMediaController.registerSessionListenerForCurrentUser();
     }
 
-    private void checkIfPinnedTaskAppeared() {
-        final TaskInfo pinnedTask = getPinnedTaskInfo();
-        ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
-                "%s: checkIfPinnedTaskAppeared(), task=%s", TAG, pinnedTask);
-        if (pinnedTask == null || pinnedTask.topActivity == null) return;
-        mPinnedTaskId = pinnedTask.taskId;
-
-        mPipMediaController.onActivityPinned();
-        mActionBroadcastReceiver.register();
-        mPipNotificationController.show(pinnedTask.topActivity.getPackageName());
-    }
-
     private void checkIfPinnedTaskIsGone() {
         ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
                 "%s: onTaskStackChanged()", TAG);
@@ -482,7 +478,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
 
         mTvPipMenuController.closeMenu();
         mTvPipBoundsState.resetTvPipState();
-        mTvPipBoundsController.onPipDismissed();
+        mTvPipBoundsController.reset();
         setState(STATE_NO_PIP);
         mPinnedTaskId = NONEXISTENT_TASK_ID;
     }
@@ -537,7 +533,16 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
         taskStackListener.addListener(new TaskStackListenerCallback() {
             @Override
             public void onActivityPinned(String packageName, int userId, int taskId, int stackId) {
-                checkIfPinnedTaskAppeared();
+                final TaskInfo pinnedTask = getPinnedTaskInfo();
+                ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
+                        "%s: onActivityPinned(), task=%s", TAG, pinnedTask);
+                if (pinnedTask == null || pinnedTask.topActivity == null) return;
+                mPinnedTaskId = pinnedTask.taskId;
+
+                mPipMediaController.onActivityPinned();
+                mActionBroadcastReceiver.register();
+                mPipNotificationController.show(pinnedTask.topActivity.getPackageName());
+                mTvPipBoundsController.reset();
                 mAppOpsListener.onActivityPinned(packageName);
             }
 
@@ -735,7 +740,7 @@ public class TvPipController implements PipTransitionController.PipTransitionCal
             if (mRegistered) return;
 
             mContext.registerReceiverForAllUsers(this, mIntentFilter, SYSTEMUI_PERMISSION,
-                    mMainHandler);
+                    mMainHandler, Context.RECEIVER_NOT_EXPORTED);
             mRegistered = true;
         }
 

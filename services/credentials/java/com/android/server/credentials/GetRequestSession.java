@@ -16,15 +16,21 @@
 
 package com.android.server.credentials;
 
+import static com.android.server.credentials.MetricUtilities.METRICS_PROVIDER_STATUS_FINAL_FAILURE;
+import static com.android.server.credentials.MetricUtilities.METRICS_PROVIDER_STATUS_FINAL_SUCCESS;
+
 import android.annotation.Nullable;
 import android.content.ComponentName;
 import android.content.Context;
+import android.credentials.GetCredentialException;
 import android.credentials.GetCredentialRequest;
 import android.credentials.GetCredentialResponse;
 import android.credentials.IGetCredentialCallback;
 import android.credentials.ui.ProviderData;
 import android.credentials.ui.RequestInfo;
+import android.os.CancellationSignal;
 import android.os.RemoteException;
+import android.service.credentials.CallingAppInfo;
 import android.service.credentials.CredentialProviderInfo;
 import android.util.Log;
 
@@ -39,10 +45,11 @@ public final class GetRequestSession extends RequestSession<GetCredentialRequest
         implements ProviderSession.ProviderInternalCallback<GetCredentialResponse> {
     private static final String TAG = "GetRequestSession";
 
-    public GetRequestSession(Context context, int userId,
+    public GetRequestSession(Context context, int userId, int callingUid,
             IGetCredentialCallback callback, GetCredentialRequest request,
-            String callingPackage) {
-        super(context, userId, request, callback, RequestInfo.TYPE_GET, callingPackage);
+            CallingAppInfo callingAppInfo, CancellationSignal cancellationSignal) {
+        super(context, userId, callingUid, request, callback, RequestInfo.TYPE_GET,
+                callingAppInfo, cancellationSignal);
     }
 
     /**
@@ -71,30 +78,27 @@ public final class GetRequestSession extends RequestSession<GetCredentialRequest
         try {
             mClientCallback.onPendingIntent(mCredentialManagerUi.createPendingIntent(
                     RequestInfo.newGetRequestInfo(
-                    mRequestId, null, mIsFirstUiTurn, ""),
+                    mRequestId, mClientRequest, mClientAppInfo.getPackageName()),
                     providerDataList));
         } catch (RemoteException e) {
-            Log.i(TAG, "Issue with invoking pending intent: " + e.getMessage());
-            // TODO: Propagate failure
+            respondToClientWithErrorAndFinish(
+                    GetCredentialException.TYPE_UNKNOWN, "Unable to instantiate selector");
         }
     }
-
-    @Override // from provider session
-    public void onProviderStatusChanged(ProviderSession.Status status,
-            ComponentName componentName) {
-        super.onProviderStatusChanged(status, componentName);
-    }
-
 
     @Override
     public void onFinalResponseReceived(ComponentName componentName,
             @Nullable GetCredentialResponse response) {
         Log.i(TAG, "onFinalCredentialReceived from: " + componentName.flattenToString());
+        setChosenMetric(componentName);
         if (response != null) {
+            mChosenProviderMetric.setChosenProviderStatus(
+                    METRICS_PROVIDER_STATUS_FINAL_SUCCESS);
             respondToClientWithResponseAndFinish(response);
         } else {
-            // TODO("Replace with no credentials/unknown type when ready)
-            respondToClientWithErrorAndFinish("unknown_type",
+            mChosenProviderMetric.setChosenProviderStatus(
+                    METRICS_PROVIDER_STATUS_FINAL_FAILURE);
+            respondToClientWithErrorAndFinish(GetCredentialException.TYPE_NO_CREDENTIAL,
                     "Invalid response from provider");
         }
     }
@@ -108,29 +112,78 @@ public final class GetRequestSession extends RequestSession<GetCredentialRequest
     }
 
     private void respondToClientWithResponseAndFinish(GetCredentialResponse response) {
-        Log.i(TAG, "respondToClientWithResponseAndFinish");
+        if (mRequestSessionStatus == RequestSessionStatus.COMPLETE) {
+            Log.i(TAG, "Request has already been completed. This is strange.");
+            return;
+        }
+        if (isSessionCancelled()) {
+            // TODO: Differentiate btw cancelled and false
+            logApiCalled(RequestType.GET_CREDENTIALS, /* isSuccessful */ false);
+            finishSession(/*propagateCancellation=*/true);
+            return;
+        }
         try {
             mClientCallback.onResponse(response);
+            logApiCalled(RequestType.GET_CREDENTIALS, /* isSuccessful */ true);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.i(TAG, "Issue while responding to client with a response : " + e.getMessage());
+            logApiCalled(RequestType.GET_CREDENTIALS, /* isSuccessful */ false);
         }
-        finishSession();
+        finishSession(/*propagateCancellation=*/false);
     }
 
     private void respondToClientWithErrorAndFinish(String errorType, String errorMsg) {
-        Log.i(TAG, "respondToClientWithErrorAndFinish");
+        if (mRequestSessionStatus == RequestSessionStatus.COMPLETE) {
+            Log.i(TAG, "Request has already been completed. This is strange.");
+            return;
+        }
+        if (isSessionCancelled()) {
+            logApiCalled(RequestType.GET_CREDENTIALS, /* isSuccessful */ false);
+            finishSession(/*propagateCancellation=*/true);
+            return;
+        }
+
         try {
             mClientCallback.onError(errorType, errorMsg);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.i(TAG, "Issue while responding to client with error : " + e.getMessage());
         }
-        finishSession();
+        logApiCalled(RequestType.GET_CREDENTIALS, /* isSuccessful */ false);
+        finishSession(/*propagateCancellation=*/false);
     }
 
     @Override
-    public void onUiCancellation() {
-        // TODO("Replace with properly defined error type")
-        respondToClientWithErrorAndFinish("user_canceled",
-                "User cancelled the selector");
+    public void onUiCancellation(boolean isUserCancellation) {
+        if (isUserCancellation) {
+            respondToClientWithErrorAndFinish(GetCredentialException.TYPE_USER_CANCELED,
+                    "User cancelled the selector");
+        } else {
+            respondToClientWithErrorAndFinish(GetCredentialException.TYPE_INTERRUPTED,
+                    "The UI was interrupted - please try again.");
+        }
+    }
+
+    @Override
+    public void onUiSelectorInvocationFailure() {
+        respondToClientWithErrorAndFinish(GetCredentialException.TYPE_NO_CREDENTIAL,
+                    "No credentials available.");
+    }
+
+    @Override
+    public void onProviderStatusChanged(ProviderSession.Status status,
+            ComponentName componentName) {
+        Log.i(TAG, "in onStatusChanged with status: " + status);
+        if (!isAnyProviderPending()) {
+            // If all provider responses have been received, we can either need the UI,
+            // or we need to respond with error. The only other case is the entry being
+            // selected after the UI has been invoked which has a separate code path.
+            if (isUiInvocationNeeded()) {
+                Log.i(TAG, "in onProviderStatusChanged - isUiInvocationNeeded");
+                getProviderDataAndInitiateUi();
+            } else {
+                respondToClientWithErrorAndFinish(GetCredentialException.TYPE_NO_CREDENTIAL,
+                        "No credentials available");
+            }
+        }
     }
 }

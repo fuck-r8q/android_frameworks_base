@@ -283,7 +283,7 @@ public class AppsFilterImplTest {
         assertFalse(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
                         SYSTEM_USER));
-        watcher.verifyNoChangeReported("shouldFilterAplication");
+        watcher.verifyNoChangeReported("shouldFilterApplication");
     }
 
     @Test
@@ -865,7 +865,7 @@ public class AppsFilterImplTest {
                 .addOverlayable("overlayableName", actorName)
                 .hideAsParsed();
         var overlay = pkg("com.some.package.overlay")
-                .setOverlay(true)
+                .setResourceOverlay(true)
                 .setOverlayTarget(target.getPackageName())
                 .setOverlayTargetOverlayableName("overlayableName")
                 .hideAsParsed();
@@ -952,7 +952,7 @@ public class AppsFilterImplTest {
                 .addOverlayable("overlayableName", actorName)
                 .hideAsParsed();
         var overlay = pkg("com.some.package.overlay")
-                .setOverlay(true)
+                .setResourceOverlay(true)
                 .setOverlayTarget(target.getPackageName())
                 .setOverlayTargetOverlayableName("overlayableName")
                 .hideAsParsed();
@@ -1024,7 +1024,10 @@ public class AppsFilterImplTest {
                 DUMMY_TARGET_APPID);
         PackageSetting calling = simulateAddPackage(appsFilter, pkg("com.some.other.package"),
                 DUMMY_CALLING_APPID,
-                withInstallSource(target.getPackageName(), null, null, INVALID_UID, null, false));
+                withInstallSource(target.getPackageName(), null /* originatingPackageName */,
+                        null /* installerPackageName */, INVALID_UID,
+                        null /* updateOwnerPackageName */, null /* installerAttributionTag */,
+                        false /* isInitiatingPackageUninstalled */));
 
         assertFalse(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
@@ -1043,7 +1046,10 @@ public class AppsFilterImplTest {
                 DUMMY_TARGET_APPID);
         PackageSetting calling = simulateAddPackage(appsFilter, pkg("com.some.other.package"),
                 DUMMY_CALLING_APPID,
-                withInstallSource(target.getPackageName(), null, null, INVALID_UID, null, true));
+                withInstallSource(target.getPackageName(), null /* originatingPackageName */,
+                        null /* installerPackageName */, INVALID_UID,
+                        null /* updateOwnerPackageName */, null /* installerAttributionTag */,
+                        true /* isInitiatingPackageUninstalled */));
 
         assertTrue(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
@@ -1066,14 +1072,16 @@ public class AppsFilterImplTest {
                 DUMMY_TARGET_APPID);
         watcher.verifyChangeReported("add package");
         PackageSetting calling = simulateAddPackage(appsFilter, pkg("com.some.other.package"),
-                DUMMY_CALLING_APPID, withInstallSource(null, target.getPackageName(), null,
-                        INVALID_UID, null, false));
+                DUMMY_CALLING_APPID, withInstallSource(null /* initiatingPackageName */,
+                        target.getPackageName(), null /* installerPackageName */, INVALID_UID,
+                        null /* updateOwnerPackageName */, null /* installerAttributionTag */,
+                        false /* isInitiatingPackageUninstalled */));
         watcher.verifyChangeReported("add package");
 
         assertTrue(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
                         SYSTEM_USER));
-        watcher.verifyNoChangeReported("shouldFilterAplication");
+        watcher.verifyNoChangeReported("shouldFilterApplication");
     }
 
     @Test
@@ -1092,14 +1100,46 @@ public class AppsFilterImplTest {
                 DUMMY_TARGET_APPID);
         watcher.verifyChangeReported("add package");
         PackageSetting calling = simulateAddPackage(appsFilter, pkg("com.some.other.package"),
-                DUMMY_CALLING_APPID, withInstallSource(null, null, target.getPackageName(),
-                        DUMMY_TARGET_APPID, null, false));
+                DUMMY_CALLING_APPID, withInstallSource(null /* initiatingPackageName */,
+                        null /* originatingPackageName */, target.getPackageName(),
+                        DUMMY_TARGET_APPID, null /* updateOwnerPackageName */,
+                        null /* installerAttributionTag */,
+                        false /* isInitiatingPackageUninstalled */));
         watcher.verifyChangeReported("add package");
 
         assertFalse(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
                         SYSTEM_USER));
-        watcher.verifyNoChangeReported("shouldFilterAplication");
+        watcher.verifyNoChangeReported("shouldFilterApplication");
+    }
+
+    @Test
+    public void testUpdateOwner_DoesntFilter() throws Exception {
+        final AppsFilterImpl appsFilter =
+                new AppsFilterImpl(mFeatureConfigMock, new String[]{}, /* systemAppsQueryable */
+                        false, /* overlayProvider */ null, mMockHandler);
+        final WatchableTester watcher = new WatchableTester(appsFilter, "onChange");
+        watcher.register();
+        simulateAddBasicAndroid(appsFilter);
+        watcher.verifyChangeReported("addBasicAndroid");
+        appsFilter.onSystemReady(mPmInternal);
+        watcher.verifyChangeReported("systemReady");
+
+        PackageSetting target = simulateAddPackage(appsFilter, pkg("com.some.package"),
+                DUMMY_TARGET_APPID);
+        watcher.verifyChangeReported("add package");
+        PackageSetting calling = simulateAddPackage(appsFilter, pkg("com.some.other.package"),
+                DUMMY_CALLING_APPID, withInstallSource(null /* initiatingPackageName */,
+                        null /* originatingPackageName */, null /* installerPackageName */,
+                        INVALID_UID, target.getPackageName(),
+                        null /* installerAttributionTag */,
+                        false /* isInitiatingPackageUninstalled */));
+        watcher.verifyChangeReported("add package");
+
+        assertFalse(
+                appsFilter.shouldFilterApplication(mSnapshot, DUMMY_CALLING_APPID, calling, target,
+                        SYSTEM_USER));
+        watcher.verifyNoChangeReported("shouldFilterApplication");
     }
 
     @Test
@@ -1128,7 +1168,7 @@ public class AppsFilterImplTest {
         assertFalse(
                 appsFilter.shouldFilterApplication(mSnapshot, DUMMY_TARGET_APPID, target,
                         instrumentation, SYSTEM_USER));
-        watcher.verifyNoChangeReported("shouldFilterAplication");
+        watcher.verifyNoChangeReported("shouldFilterApplication");
     }
 
     @Test
@@ -1679,10 +1719,12 @@ public class AppsFilterImplTest {
 
     private WithSettingBuilder withInstallSource(String initiatingPackageName,
             String originatingPackageName, String installerPackageName, int installerPackageUid,
-            String installerAttributionTag, boolean isInitiatingPackageUninstalled) {
+            String updateOwnerPackageName, String installerAttributionTag,
+            boolean isInitiatingPackageUninstalled) {
         final InstallSource installSource = InstallSource.create(initiatingPackageName,
                 originatingPackageName, installerPackageName, installerPackageUid,
-                installerAttributionTag, /* isOrphaned= */ false, isInitiatingPackageUninstalled);
+                updateOwnerPackageName, installerAttributionTag, /* isOrphaned= */ false,
+                isInitiatingPackageUninstalled);
         return setting -> setting.setInstallSource(installSource);
     }
 }

@@ -147,7 +147,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private boolean mShadeNeedsToClose = false;
 
     @VisibleForTesting
-    static final float RUBBER_BAND_FACTOR_NORMAL = 0.35f;
+    static final float RUBBER_BAND_FACTOR_NORMAL = 0.1f;
     private static final float RUBBER_BAND_FACTOR_AFTER_EXPAND = 0.15f;
     private static final float RUBBER_BAND_FACTOR_ON_PANEL_EXPAND = 0.21f;
     /**
@@ -538,6 +538,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private NotificationStackScrollLayoutController.TouchHandler mTouchHandler;
     private final ScreenOffAnimationController mScreenOffAnimationController;
     private boolean mShouldUseSplitNotificationShade;
+    private boolean mHasFilteredOutSeenNotifications;
 
     private final ExpandableView.OnHeightChangedListener mOnChildHeightChangedListener =
             new ExpandableView.OnHeightChangedListener() {
@@ -682,6 +683,10 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     public void setIsRemoteInputActive(boolean isActive) {
         mIsRemoteInputActive = isActive;
         updateFooter();
+    }
+
+    void setHasFilteredOutSeenNotifications(boolean hasFilteredOutSeenNotifications) {
+        mHasFilteredOutSeenNotifications = hasFilteredOutSeenNotifications;
     }
 
     @VisibleForTesting
@@ -1811,9 +1816,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     @Override
     @ShadeViewRefactor(RefactorComponent.COORDINATOR)
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
-        mBottomInset = insets.getSystemWindowInsetBottom()
-                + insets.getInsets(WindowInsets.Type.ime()).bottom;
-
+        mBottomInset = insets.getInsets(WindowInsets.Type.ime()).bottom;
         mWaterfallTopInset = 0;
         final DisplayCutout cutout = insets.getDisplayCutout();
         if (cutout != null) {
@@ -2262,7 +2265,11 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @ShadeViewRefactor(RefactorComponent.COORDINATOR)
     private int getImeInset() {
-        return Math.max(0, mBottomInset - (getRootView().getHeight() - getHeight()));
+        // The NotificationStackScrollLayout does not extend all the way to the bottom of the
+        // display. Therefore, subtract that space from the mBottomInset, in order to only include
+        // the portion of the bottom inset that actually overlaps the NotificationStackScrollLayout.
+        return Math.max(0, mBottomInset
+                - (getRootView().getHeight() - getHeight() - getLocationOnScreen()[1]));
     }
 
     /**
@@ -2970,12 +2977,19 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             childInGroup = (ExpandableNotificationRow) requestedView;
             requestedView = requestedRow = childInGroup.getNotificationParent();
         }
-        int position = 0;
+        final float scrimTopPadding = mAmbientState.isOnKeyguard() ? 0 : mMinimumPaddings;
+        int position = (int) scrimTopPadding;
+        int visibleIndex = -1;
+        ExpandableView lastVisibleChild = null;
         for (int i = 0; i < getChildCount(); i++) {
             ExpandableView child = getChildAtIndex(i);
             boolean notGone = child.getVisibility() != View.GONE;
+            if (notGone) visibleIndex++;
             if (notGone && !child.hasNoContentHeight()) {
-                if (position != 0) {
+                if (position != scrimTopPadding) {
+                    if (lastVisibleChild != null) {
+                        position += calculateGapHeight(lastVisibleChild, child, visibleIndex);
+                    }
                     position += mPaddingBetweenElements;
                 }
             }
@@ -2987,6 +3001,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             }
             if (notGone) {
                 position += getIntrinsicHeight(child);
+                lastVisibleChild = child;
             }
         }
         return 0;
@@ -3122,7 +3137,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private void updateAnimationState(boolean running, View child) {
         if (child instanceof ExpandableNotificationRow) {
             ExpandableNotificationRow row = (ExpandableNotificationRow) child;
-            row.setIconAnimationRunning(running);
+            row.setAnimationRunning(running);
         }
     }
 
@@ -4602,13 +4617,12 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     }
 
     @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
-    void updateEmptyShadeView(
-            boolean visible, boolean areNotificationsHiddenInShade, boolean areSeenNotifsFiltered) {
+    void updateEmptyShadeView(boolean visible, boolean areNotificationsHiddenInShade) {
         mEmptyShadeView.setVisible(visible, mIsExpanded && mAnimationsEnabled);
 
         if (areNotificationsHiddenInShade) {
             updateEmptyShadeView(R.string.dnd_suppressing_shade_text, 0, 0);
-        } else if (areSeenNotifsFiltered) {
+        } else if (mHasFilteredOutSeenNotifications) {
             updateEmptyShadeView(
                     R.string.no_unseen_notif_text,
                     R.string.unlock_to_see_notif_text,
@@ -4647,13 +4661,20 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)
     public void updateFooterView(boolean visible, boolean showDismissView, boolean showHistory) {
-        if (mFooterView == null) {
+        if (mFooterView == null || mNotificationStackSizeCalculator == null) {
             return;
         }
         boolean animate = mIsExpanded && mAnimationsEnabled;
         mFooterView.setVisible(visible, animate);
         mFooterView.setSecondaryVisible(showDismissView, animate);
         mFooterView.showHistory(showHistory);
+        if (mHasFilteredOutSeenNotifications) {
+            mFooterView.setFooterLabelTextAndIcon(
+                    R.string.unlock_to_see_notif_text,
+                    R.drawable.ic_friction_lock_closed);
+        } else {
+            mFooterView.setFooterLabelTextAndIcon(0, 0);
+        }
     }
 
     @ShadeViewRefactor(RefactorComponent.SHADE_VIEW)

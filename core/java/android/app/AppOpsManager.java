@@ -42,7 +42,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
 import android.database.DatabaseUtils;
-import android.healthconnect.HealthConnectManager;
+import android.health.connect.HealthConnectManager;
 import android.media.AudioAttributes.AttributeUsage;
 import android.os.Binder;
 import android.os.Build;
@@ -1355,11 +1355,12 @@ public class AppOpsManager {
             AppProtoEnums.APP_OP_RECEIVE_EXPLICIT_USER_INTERACTION_AUDIO;
 
     /**
-     * App can schedule long running jobs.
+     * App can schedule user-initiated jobs.
      *
      * @hide
      */
-    public static final int OP_RUN_LONG_JOBS = AppProtoEnums.APP_OP_RUN_LONG_JOBS;
+    public static final int OP_RUN_USER_INITIATED_JOBS =
+            AppProtoEnums.APP_OP_RUN_USER_INITIATED_JOBS;
 
     /**
      * Notify apps that they have been granted URI permission photos
@@ -1370,26 +1371,26 @@ public class AppOpsManager {
             AppProtoEnums.APP_OP_READ_MEDIA_VISUAL_USER_SELECTED;
 
     /**
-     * Prevent an app from being placed into app standby buckets.
+     * Prevent an app from being suspended.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final int OP_SYSTEM_EXEMPT_FROM_APP_STANDBY =
-            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_APP_STANDBY;
+    public static final int OP_SYSTEM_EXEMPT_FROM_SUSPENSION =
+            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_SUSPENSION;
 
     /**
-     * Prevent an app from being placed into forced app standby.
-     * {@link ActivityManager#isBackgroundRestricted()}
-     * {@link #OP_RUN_ANY_IN_BACKGROUND}
+     * Prevent an app from dismissible notifications. Starting from Android U, notifications with
+     * the ongoing parameter can be dismissed by a user on an unlocked device. An app with
+     * this appop will be exempt and cannot be dismissed by a user.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final int OP_SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY =
-            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY;
+    public static final int OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS =
+            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS;
 
     /**
      * An app op for reading/writing health connect data.
@@ -1408,40 +1409,60 @@ public class AppOpsManager {
             AppProtoEnums.APP_OP_FOREGROUND_SERVICE_SPECIAL_USE;
 
     /**
-     * Exempt from start foreground service from background restriction.
+     * Exempt an app from all power-related restrictions, including app standby and doze.
+     * In addition, the app will be able to start foreground services from the background, and the
+     * user will not be able to stop foreground services run by the app.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final int OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION =
-            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION;
+    public static final int OP_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS =
+            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS;
 
     /**
-     * Exempt from start foreground service from background with while in user permission
-     * restriction.
+     * Prevent an app from being placed into hibernation.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final int OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION =
-            AppProtoEnums
-                    .APP_OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION;
+    public static final int OP_SYSTEM_EXEMPT_FROM_HIBERNATION =
+            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_HIBERNATION;
 
     /**
-     * Hide foreground service stop button in quick settings.
+     * Allows an application to start an activity while running in the background.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final int OP_SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON =
-            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON;
+    public static final int OP_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION =
+            AppProtoEnums.APP_OP_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION;
+
+    /**
+     * Allows an application to capture bugreport directly without consent dialog when using the
+     * bugreporting API on userdebug/eng build.
+     *
+     * @hide
+     */
+    public static final int OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD =
+            AppProtoEnums.APP_OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD;
+
+    /** @hide Access to wrist temperature sensors. */
+    public static final int OP_BODY_SENSORS_WRIST_TEMPERATURE =
+            AppProtoEnums.APP_OP_BODY_SENSORS_WRIST_TEMPERATURE;
+
+    /**
+     * Send an intent to launch instead of posting the notification to the status bar.
+     *
+     * @hide
+     */
+    public static final int OP_USE_FULL_SCREEN_INTENT = AppProtoEnums.APP_OP_USE_FULL_SCREEN_INTENT;
 
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
-    public static final int _NUM_OP = 131;
+    public static final int _NUM_OP = 134;
 
     /** Access to coarse location information. */
     public static final String OPSTR_COARSE_LOCATION = "android:coarse_location";
@@ -1943,33 +1964,34 @@ public class AppOpsManager {
             "android:receive_explicit_user_interaction_audio";
 
     /**
-     * App can schedule long running jobs.
+     * App can schedule user-initiated jobs.
      *
      * @hide
      */
-    public static final String OPSTR_RUN_LONG_JOBS = "android:run_long_jobs";
+    public static final String OPSTR_RUN_USER_INITIATED_JOBS = "android:run_user_initiated_jobs";
 
     /**
-     * Prevent an app from being placed into app standby buckets.
+     * Prevent an app from being suspended.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final String OPSTR_SYSTEM_EXEMPT_FROM_APP_STANDBY =
-            "android:system_exempt_from_app_standby";
+    public static final String OPSTR_SYSTEM_EXEMPT_FROM_SUSPENSION =
+            "android:system_exempt_from_suspension";
 
     /**
-     * Prevent an app from being placed into forced app standby.
-     * {@link ActivityManager#isBackgroundRestricted()}
-     * {@link #OP_RUN_ANY_IN_BACKGROUND}
+     * Allow an application to create non-dismissible notifications. Starting from Android U,
+     * notifications with the ongoing parameter can be dismissed by a user on an unlocked device
+     * unless the application that created the notification is exempt.
+     * An application with this appop will be made exempt.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final String OPSTR_SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY =
-            "android:system_exempt_from_forced_app_standby";
+    public static final String OPSTR_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS =
+            "android:system_exempt_from_dismissible_notifications";
 
     /**
      * Start a foreground service with the type "specialUse".
@@ -1980,36 +2002,58 @@ public class AppOpsManager {
             "android:foreground_service_special_use";
 
     /**
-     * Exempt from start foreground service from background restriction.
+     * Exempt an app from all power-related restrictions, including app standby and doze.
+     * In addition, the app will be able to start foreground services from the background, and the
+     * user will not be able to stop foreground services run by the app.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final String OPSTR_SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION =
-            "android:system_exempt_from_fgs_bg_start_restriction";
+    public static final String OPSTR_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS =
+            "android:system_exempt_from_power_restrictions";
 
     /**
-     * Exempt from start foreground service from background with while in user permission
-     * restriction.
+     * Prevent an app from being placed into hibernation.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final String
-            OPSTR_SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION =
-            "android:system_exempt_from_fgs_bg_start_while_in_use_permission_restriction";
+    @SystemApi
+    public static final String OPSTR_SYSTEM_EXEMPT_FROM_HIBERNATION =
+            "android:system_exempt_from_hibernation";
 
     /**
-     * Hide foreground service stop button in quick settings.
+     * Allows an application to start an activity while running in the background.
      *
      * Only to be used by the system.
      *
      * @hide
      */
-    public static final String OPSTR_SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON =
-            "android:system_exempt_from_fgs_stop_button";
+    public static final String OPSTR_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION =
+            "android:system_exempt_from_activity_bg_start_restriction";
+
+    /**
+     * Allows an application to capture bugreport directly without consent dialog when using the
+     * bugreporting API on userdebug/eng build.
+     *
+     * @hide
+     */
+    @SystemApi
+    public static final String OPSTR_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD =
+            "android:capture_consentless_bugreport_on_userdebug_build";
+
+    /** Access to wrist temperature body sensors. */
+    public static final String OPSTR_BODY_SENSORS_WRIST_TEMPERATURE =
+            "android:body_sensors_wrist_temperature";
+
+    /**
+     * Send an intent to launch instead of posting the notification to the status bar.
+     *
+     * @hide
+     */
+    public static final String OPSTR_USE_FULL_SCREEN_INTENT = "android:use_full_screen_intent";
 
     /** {@link #sAppOpsToNote} not initialized yet for this op */
     private static final byte SHOULD_COLLECT_NOTE_OP_NOT_INITIALIZED = 0;
@@ -2105,9 +2149,12 @@ public class AppOpsManager {
             OP_SCHEDULE_EXACT_ALARM,
             OP_MANAGE_MEDIA,
             OP_TURN_SCREEN_ON,
-            OP_RUN_LONG_JOBS,
+            OP_RUN_USER_INITIATED_JOBS,
             OP_READ_MEDIA_VISUAL_USER_SELECTED,
             OP_FOREGROUND_SERVICE_SPECIAL_USE,
+            OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD,
+            OP_BODY_SENSORS_WRIST_TEMPERATURE,
+            OP_USE_FULL_SCREEN_INTENT
     };
 
     static final AppOpInfo[] sAppOpInfos = new AppOpInfo[]{
@@ -2488,34 +2535,52 @@ public class AppOpsManager {
                 OPSTR_RECEIVE_EXPLICIT_USER_INTERACTION_AUDIO,
                 "RECEIVE_EXPLICIT_USER_INTERACTION_AUDIO").setDefaultMode(
                 AppOpsManager.MODE_ALLOWED).build(),
-        new AppOpInfo.Builder(OP_RUN_LONG_JOBS, OPSTR_RUN_LONG_JOBS, "RUN_LONG_JOBS")
-                .setPermission(Manifest.permission.RUN_LONG_JOBS).build(),
+        new AppOpInfo.Builder(OP_RUN_USER_INITIATED_JOBS, OPSTR_RUN_USER_INITIATED_JOBS,
+                "RUN_USER_INITIATED_JOBS").setDefaultMode(AppOpsManager.MODE_ALLOWED)
+                .build(),
             new AppOpInfo.Builder(OP_READ_MEDIA_VISUAL_USER_SELECTED,
                     OPSTR_READ_MEDIA_VISUAL_USER_SELECTED, "READ_MEDIA_VISUAL_USER_SELECTED")
                     .setPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
                     .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
-        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_APP_STANDBY,
-                OPSTR_SYSTEM_EXEMPT_FROM_APP_STANDBY,
-                "SYSTEM_EXEMPT_FROM_APP_STANDBY").build(),
-        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY,
-                OPSTR_SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY,
-                "SYSTEM_EXEMPT_FROM_FORCED_APP_STANDBY").build(),
+        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_SUSPENSION,
+                OPSTR_SYSTEM_EXEMPT_FROM_SUSPENSION,
+                "SYSTEM_EXEMPT_FROM_SUSPENSION")
+                .setDisableReset(true).build(),
+        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS,
+                OPSTR_SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS,
+                "SYSTEM_EXEMPT_FROM_DISMISSIBLE_NOTIFICATIONS")
+                .setDisableReset(true).build(),
         new AppOpInfo.Builder(OP_READ_WRITE_HEALTH_DATA, OPSTR_READ_WRITE_HEALTH_DATA,
                 "READ_WRITE_HEALTH_DATA").setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
         new AppOpInfo.Builder(OP_FOREGROUND_SERVICE_SPECIAL_USE,
                 OPSTR_FOREGROUND_SERVICE_SPECIAL_USE, "FOREGROUND_SERVICE_SPECIAL_USE")
                 .setPermission(Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE).build(),
-        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION,
-                OPSTR_SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION,
-                "SYSTEM_EXEMPT_FROM_FGS_BG_START_RESTRICTION").build(),
+        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS,
+                OPSTR_SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS,
+                "SYSTEM_EXEMPT_FROM_POWER_RESTRICTIONS")
+                .setDisableReset(true).build(),
+        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_HIBERNATION,
+                OPSTR_SYSTEM_EXEMPT_FROM_HIBERNATION,
+                "SYSTEM_EXEMPT_FROM_HIBERNATION")
+                .setDisableReset(true).build(),
+        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION,
+                OPSTR_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION,
+                "SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION")
+                .setDisableReset(true).build(),
         new AppOpInfo.Builder(
-                OP_SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION,
-                OPSTR_SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION,
-                "SYSTEM_EXEMPT_FROM_FGS_BG_START_WHILE_IN_USE_PERMISSION_RESTRICTION")
+                OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD,
+                OPSTR_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD,
+                "CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD")
+                .setPermission(Manifest.permission.CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD)
                 .build(),
-        new AppOpInfo.Builder(OP_SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON,
-                OPSTR_SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON,
-                "SYSTEM_EXEMPT_FROM_FGS_STOP_BUTTON").build()
+        new AppOpInfo.Builder(OP_BODY_SENSORS_WRIST_TEMPERATURE,
+                OPSTR_BODY_SENSORS_WRIST_TEMPERATURE,
+                "BODY_SENSORS_WRIST_TEMPERATURE")
+                .setPermission(Manifest.permission.BODY_SENSORS_WRIST_TEMPERATURE)
+                .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
+        new AppOpInfo.Builder(OP_USE_FULL_SCREEN_INTENT, OPSTR_USE_FULL_SCREEN_INTENT,
+                "USE_FULL_SCREEN_INTENT").setPermission(Manifest.permission.USE_FULL_SCREEN_INTENT)
+                .build()
     };
 
     // The number of longs needed to form a full bitmask of app ops
@@ -4499,10 +4564,9 @@ public class AppOpsManager {
      * Flag for querying app op history: assemble attribution chains, and attach the last visible
      * node in the chain to the start as a proxy info. This only applies to discrete accesses.
      *
-     * TODO 191512294: Add to @SystemApi
-     *
      * @hide
      */
+    @SystemApi
     public static final int HISTORY_FLAG_GET_ATTRIBUTION_CHAINS = 1 << 2;
 
     /**

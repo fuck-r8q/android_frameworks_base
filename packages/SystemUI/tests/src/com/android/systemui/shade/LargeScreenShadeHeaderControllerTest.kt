@@ -1,5 +1,6 @@
 package com.android.systemui.shade
 
+import android.animation.Animator
 import android.app.StatusBarManager
 import android.content.Context
 import android.testing.AndroidTestingRunner
@@ -30,6 +31,7 @@ import com.android.systemui.statusbar.policy.VariableDateViewController
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.argumentCaptor
 import com.android.systemui.util.mockito.capture
+import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -37,13 +39,15 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Answers
+import org.mockito.ArgumentMatchers.anyFloat
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.reset
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyZeroInteractions
-import org.mockito.Mockito.`when` as whenever
 import org.mockito.junit.MockitoJUnit
+import org.mockito.Mockito.`when` as whenever
 
 @SmallTest
 @RunWith(AndroidTestingRunner::class)
@@ -72,9 +76,11 @@ class LargeScreenShadeHeaderControllerTest : SysuiTestCase() {
 
     @Mock private lateinit var mockedContext: Context
     @Mock private lateinit var demoModeController: DemoModeController
+    @Mock private lateinit var qsBatteryModeController: QsBatteryModeController
 
     @JvmField @Rule val mockitoRule = MockitoJUnit.rule()
     var viewVisibility = View.GONE
+    var viewAlpha = 1f
 
     private lateinit var mLargeScreenShadeHeaderController: LargeScreenShadeHeaderController
     private lateinit var carrierIconSlots: List<String>
@@ -101,6 +107,13 @@ class LargeScreenShadeHeaderControllerTest : SysuiTestCase() {
             null
         }
         whenever(view.visibility).thenAnswer { _ -> viewVisibility }
+
+        whenever(view.setAlpha(anyFloat())).then {
+            viewAlpha = it.arguments[0] as Float
+            null
+        }
+        whenever(view.alpha).thenAnswer { _ -> viewAlpha }
+
         whenever(variableDateViewControllerFactory.create(any()))
             .thenReturn(variableDateViewController)
         whenever(iconManagerFactory.create(any(), any())).thenReturn(iconManager)
@@ -118,8 +131,9 @@ class LargeScreenShadeHeaderControllerTest : SysuiTestCase() {
                 featureFlags,
                 qsCarrierGroupControllerBuilder,
                 combinedShadeHeadersConstraintManager,
-                demoModeController
-                )
+                demoModeController,
+                qsBatteryModeController,
+        )
         whenever(view.isAttachedToWindow).thenReturn(true)
         mLargeScreenShadeHeaderController.init()
         carrierIconSlots = listOf(
@@ -144,7 +158,17 @@ class LargeScreenShadeHeaderControllerTest : SysuiTestCase() {
     fun updateListeners_registersWhenVisible() {
         makeShadeVisible()
         verify(qsCarrierGroupController).setListening(true)
+    }
+
+    @Test
+    fun statusIconsAddedWhenAttached() {
         verify(statusBarIconController).addIconGroup(any())
+    }
+
+    @Test
+    fun statusIconsRemovedWhenDettached() {
+        mLargeScreenShadeHeaderController.simulateViewDetached()
+        verify(statusBarIconController).removeIconGroup(any())
     }
 
     @Test
@@ -236,6 +260,44 @@ class LargeScreenShadeHeaderControllerTest : SysuiTestCase() {
         verify(animator).alpha(1f)
         verify(animator).setInterpolator(Interpolators.ALPHA_IN)
         verify(animator).start()
+    }
+
+    @Test
+    fun customizerAnimatorChangesViewVisibility() {
+        makeShadeVisible()
+
+        val animator = mock(ViewPropertyAnimator::class.java, Answers.RETURNS_SELF)
+        val duration = 1000L
+        whenever(view.animate()).thenReturn(animator)
+        val listenerCaptor = argumentCaptor<Animator.AnimatorListener>()
+
+        mLargeScreenShadeHeaderController.startCustomizingAnimation(show = true, duration)
+        verify(animator).setListener(capture(listenerCaptor))
+        // Start and end the animation
+        listenerCaptor.value.onAnimationStart(mock())
+        listenerCaptor.value.onAnimationEnd(mock())
+        assertThat(viewVisibility).isEqualTo(View.INVISIBLE)
+
+        reset(animator)
+        mLargeScreenShadeHeaderController.startCustomizingAnimation(show = false, duration)
+        verify(animator).setListener(capture(listenerCaptor))
+        // Start and end the animation
+        listenerCaptor.value.onAnimationStart(mock())
+        listenerCaptor.value.onAnimationEnd(mock())
+        assertThat(viewVisibility).isEqualTo(View.VISIBLE)
+    }
+
+    @Test
+    fun animatorListenerClearedAtEnd() {
+        val animator = mock(ViewPropertyAnimator::class.java, Answers.RETURNS_SELF)
+        whenever(view.animate()).thenReturn(animator)
+
+        mLargeScreenShadeHeaderController.startCustomizingAnimation(show = true, 0L)
+        val listenerCaptor = argumentCaptor<Animator.AnimatorListener>()
+        verify(animator).setListener(capture(listenerCaptor))
+
+        listenerCaptor.value.onAnimationEnd(mock())
+        verify(animator).setListener(null)
     }
 
     @Test

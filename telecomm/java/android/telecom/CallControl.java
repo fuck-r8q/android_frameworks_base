@@ -21,16 +21,20 @@ import static android.telecom.CallException.TRANSACTION_EXCEPTION_KEY;
 import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.OutcomeReceiver;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
+import android.text.TextUtils;
 
 import com.android.internal.telecom.ClientTransactionalServiceRepository;
 import com.android.internal.telecom.ICallControl;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 /**
@@ -43,7 +47,8 @@ import java.util.concurrent.Executor;
  * {@link OutcomeReceiver#onError} is called and provides a {@link CallException} that details why
  * the operation failed.
  */
-public final class CallControl implements AutoCloseable {
+@SuppressLint("NotCloseable")
+public final class CallControl {
     private static final String TAG = CallControl.class.getSimpleName();
     private static final String INTERFACE_ERROR_MSG = "Call Control is not available";
     private final String mCallId;
@@ -63,7 +68,7 @@ public final class CallControl implements AutoCloseable {
 
     /**
      * @return the callId Telecom assigned to this CallControl object which should be attached to
-     *  an individual call.
+     * an individual call.
      */
     @NonNull
     public ParcelUuid getCallId() {
@@ -74,9 +79,9 @@ public final class CallControl implements AutoCloseable {
      * Request Telecom set the call state to active.
      *
      * @param executor The {@link Executor} on which the {@link OutcomeReceiver} callback
-     *                will be called on.
+     *                 will be called on.
      * @param callback that will be completed on the Telecom side that details success or failure
-     *                of the requested operation.
+     *                 of the requested operation.
      *
      *                 {@link OutcomeReceiver#onResult} will be called if Telecom has successfully
      *                 switched the call state to active
@@ -105,9 +110,9 @@ public final class CallControl implements AutoCloseable {
      * but can be extended to setting a meeting to inactive.
      *
      * @param executor The {@link Executor} on which the {@link OutcomeReceiver} callback
-     *                will be called on.
+     *                 will be called on.
      * @param callback that will be completed on the Telecom side that details success or failure
-     *                of the requested operation.
+     *                 of the requested operation.
      *
      *                 {@link OutcomeReceiver#onResult} will be called if Telecom has successfully
      *                 switched the call state to inactive
@@ -132,56 +137,46 @@ public final class CallControl implements AutoCloseable {
     }
 
     /**
-     * Request Telecom set the call state to disconnect.
+     * Request Telecom disconnect the call and remove the call from telecom tracking.
      *
-     * @param executor The {@link Executor} on which the {@link OutcomeReceiver} callback
-     *                will be called on.
-     * @param callback that will be completed on the Telecom side that details success or failure
-     *                of the requested operation.
+     * @param disconnectCause represents the cause for disconnecting the call.  The only valid
+     *                        codes for the {@link  android.telecom.DisconnectCause} passed in are:
+     *                        <ul>
+     *                        <li>{@link DisconnectCause#LOCAL}</li>
+     *                        <li>{@link DisconnectCause#REMOTE}</li>
+     *                        <li>{@link DisconnectCause#REJECTED}</li>
+     *                        <li>{@link DisconnectCause#MISSED}</li>
+     *                        </ul>
      *
-     *                 {@link OutcomeReceiver#onResult} will be called if Telecom has successfully
-     *                 disconnected the call.
+     * @param executor        The {@link Executor} on which the {@link OutcomeReceiver} callback
+     *                        will be called on.
      *
-     *                 {@link OutcomeReceiver#onError} will be called if Telecom has failed to
-     *                 disconnect the call.  A {@link CallException} will be passed
-     *                 that details why the operation failed.
+     * @param callback        That will be completed on the Telecom side that details success or
+     *                        failure of the requested operation.
+     *
+     *                        {@link OutcomeReceiver#onResult} will be called if Telecom has
+     *                        successfully disconnected the call.
+     *
+     *                        {@link OutcomeReceiver#onError} will be called if Telecom has failed
+     *                        to disconnect the call.  A {@link CallException} will be passed
+     *                        that details why the operation failed.
+     *
+     * <p>
+     * Note: After the call has been successfully disconnected, calling any CallControl API will
+     * result in the {@link OutcomeReceiver#onError} with
+     * {@link CallException#CODE_CALL_IS_NOT_BEING_TRACKED}.
      */
     public void disconnect(@NonNull DisconnectCause disconnectCause,
             @CallbackExecutor @NonNull Executor executor,
             @NonNull OutcomeReceiver<Void, CallException> callback) {
+        Objects.requireNonNull(disconnectCause);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        validateDisconnectCause(disconnectCause);
         if (mServerInterface != null) {
             try {
                 mServerInterface.disconnect(mCallId, disconnectCause,
                         new CallControlResultReceiver("disconnect", executor, callback));
-            } catch (RemoteException e) {
-                throw e.rethrowAsRuntimeException();
-            }
-        } else {
-            throw new IllegalStateException(INTERFACE_ERROR_MSG);
-        }
-    }
-
-    /**
-     * Request Telecom reject the incoming call.
-     *
-     * @param executor The {@link Executor} on which the {@link OutcomeReceiver} callback
-     *                will be called on.
-     * @param callback that will be completed on the Telecom side that details success or failure
-     *                of the requested operation.
-     *
-     *                 {@link OutcomeReceiver#onResult} will be called if Telecom has successfully
-     *                 rejected the incoming call.
-     *
-     *                 {@link OutcomeReceiver#onError} will be called if Telecom has failed to
-     *                 reject the incoming call.  A {@link CallException} will be passed
-     *                 that details why the operation failed.
-     */
-    public void rejectCall(@CallbackExecutor @NonNull Executor executor,
-            @NonNull OutcomeReceiver<Void, CallException> callback) {
-        if (mServerInterface != null) {
-            try {
-                mServerInterface.rejectCall(mCallId,
-                        new CallControlResultReceiver("rejectCall", executor, callback));
             } catch (RemoteException e) {
                 throw e.rethrowAsRuntimeException();
             }
@@ -202,10 +197,10 @@ public final class CallControl implements AutoCloseable {
      *                 of the requested operation.
      *
      *                 {@link OutcomeReceiver#onResult} will be called if Telecom has successfully
-     *                 rejected the incoming call.
+     *                 started the call streaming.
      *
      *                 {@link OutcomeReceiver#onError} will be called if Telecom has failed to
-     *                 reject the incoming call.  A {@link CallException} will be passed that
+     *                 start the call streaming. A {@link CallException} will be passed that
      *                 details why the operation failed.
      */
     public void startCallStreaming(@CallbackExecutor @NonNull Executor executor,
@@ -223,21 +218,48 @@ public final class CallControl implements AutoCloseable {
     }
 
     /**
-     * This method should be called after
-     * {@link CallControl#disconnect(DisconnectCause, Executor, OutcomeReceiver)} or
-     * {@link CallControl#rejectCall(Executor, OutcomeReceiver)}
-     * to destroy all references of this object and avoid memory leaks.
+     * Request a CallEndpoint change. Clients should not define their own CallEndpoint when
+     * requesting a change. Instead, the new endpoint should be one of the valid endpoints provided
+     * by {@link CallEventCallback#onAvailableCallEndpointsChanged(List)}.
+     *
+     * @param callEndpoint The {@link CallEndpoint} to change to.
+     * @param executor     The {@link Executor} on which the {@link OutcomeReceiver} callback
+     *                     will be called on.
+     * @param callback     The {@link OutcomeReceiver} that will be completed on the Telecom side
+     *                     that details success or failure of the requested operation.
+     *
+     *                     {@link OutcomeReceiver#onResult} will be called if Telecom has
+     *                     successfully changed the CallEndpoint that was requested.
+     *
+     *                     {@link OutcomeReceiver#onError} will be called if Telecom has failed to
+     *                     switch to the requested CallEndpoint.  A {@link CallException} will be
+     *                     passed that details why the operation failed.
      */
-    @Override
-    public void close() {
-        mRepository.removeCallFromServiceWrapper(mPhoneAccountHandle, mCallId);
+    public void requestCallEndpointChange(@NonNull CallEndpoint callEndpoint,
+            @CallbackExecutor @NonNull Executor executor,
+            @NonNull OutcomeReceiver<Void, CallException> callback) {
+        Objects.requireNonNull(callEndpoint);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        if (mServerInterface != null) {
+            try {
+                mServerInterface.requestCallEndpointChange(callEndpoint,
+                        new CallControlResultReceiver("endpointChange", executor, callback));
+            } catch (RemoteException e) {
+                throw e.rethrowAsRuntimeException();
+            }
+        } else {
+            throw new IllegalStateException(INTERFACE_ERROR_MSG);
+        }
     }
 
     /**
      * Since {@link OutcomeReceiver}s cannot be passed via AIDL, a ResultReceiver (which can) must
      * wrap the Clients {@link OutcomeReceiver} passed in and await for the Telecom Server side
      * response in {@link ResultReceiver#onReceiveResult(int, Bundle)}.
-     * @hide */
+     *
+     * @hide
+     */
     private class CallControlResultReceiver extends ResultReceiver {
         private final String mCallingMethod;
         private final Executor mExecutor;
@@ -279,4 +301,18 @@ public final class CallControl implements AutoCloseable {
         }
         return new CallException(message, CallException.CODE_ERROR_UNKNOWN);
     }
+
+    /** @hide */
+    private void validateDisconnectCause(DisconnectCause disconnectCause) {
+        final int code = disconnectCause.getCode();
+        if (code != DisconnectCause.LOCAL && code != DisconnectCause.REMOTE
+                && code != DisconnectCause.MISSED && code != DisconnectCause.REJECTED) {
+            throw new IllegalArgumentException(TextUtils.formatSimple(
+                    "The DisconnectCause code provided, %d , is not a valid Disconnect code. Valid "
+                            + "DisconnectCause codes are limited to [DisconnectCause.LOCAL, "
+                            + "DisconnectCause.REMOTE, DisconnectCause.MISSED, or "
+                            + "DisconnectCause.REJECTED]", disconnectCause.getCode()));
+        }
+    }
+
 }

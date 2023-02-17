@@ -29,15 +29,14 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.settingslib.spa.framework.compose.toState
-import com.android.settingslib.spa.framework.util.StateFlowBridge
 import com.android.settingslib.spa.widget.ui.SpinnerOption
 import com.android.settingslib.spaprivileged.R
 import com.android.settingslib.spaprivileged.model.app.AppEntry
-import com.android.settingslib.spaprivileged.model.app.AppListConfig
 import com.android.settingslib.spaprivileged.model.app.AppListData
 import com.android.settingslib.spaprivileged.model.app.IAppListViewModel
 import com.android.settingslib.spaprivileged.tests.testutils.TestAppListModel
 import com.android.settingslib.spaprivileged.tests.testutils.TestAppRecord
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Rule
 import org.junit.Test
@@ -115,7 +114,7 @@ class AppListTest {
     ) {
         composeTestRule.setContent {
             AppListInput(
-                config = AppListConfig(userId = USER_ID, showInstantApps = false),
+                config = AppListConfig(userIds = listOf(USER_ID), showInstantApps = false),
                 listModel = TestAppListModel(enableGrouping = enableGrouping),
                 state = AppListState(
                     showSystem = false.toState(),
@@ -125,7 +124,7 @@ class AppListTest {
                 bottomPadding = 0.dp,
             ).AppListImpl {
                 object : IAppListViewModel<TestAppRecord> {
-                    override val option: StateFlowBridge<Int?> = StateFlowBridge()
+                    override val optionFlow: MutableStateFlow<Int?> = MutableStateFlow(null)
                     override val spinnerOptionsFlow = flowOf(options.mapIndexed { index, option ->
                         SpinnerOption(id = index, text = option)
                     })

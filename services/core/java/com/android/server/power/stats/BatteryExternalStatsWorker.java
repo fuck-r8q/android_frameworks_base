@@ -79,7 +79,12 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
     private static final long MAX_WIFI_STATS_SAMPLE_ERROR_MILLIS = 750;
 
     // Delay for clearing out battery stats for UIDs corresponding to a removed user
-    public static final int UID_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS = 10_000;
+    public static final int UID_QUICK_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS = 2_000;
+
+    // Delay for the _final_ clean-up of battery stats after a user removal - just in case
+    // some UIDs took longer than UID_QUICK_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS to
+    // stop running.
+    public static final int UID_FINAL_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS = 10_000;
 
     private final ScheduledExecutorService mExecutorService =
             Executors.newSingleThreadScheduledExecutor(
@@ -336,11 +341,20 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
     @Override
     public Future<?> scheduleCleanupDueToRemovedUser(int userId) {
         synchronized (BatteryExternalStatsWorker.this) {
+            // Initial quick clean-up after a user removal
+            mExecutorService.schedule(() -> {
+                synchronized (mStats) {
+                    mStats.clearRemovedUserUidsLocked(userId);
+                }
+            }, UID_QUICK_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS, TimeUnit.MILLISECONDS);
+
+            // Final clean-up after a user removal, to take care of UIDs that were running longer
+            // than expected
             return mExecutorService.schedule(() -> {
                 synchronized (mStats) {
                     mStats.clearRemovedUserUidsLocked(userId);
                 }
-            }, UID_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS, TimeUnit.MILLISECONDS);
+            }, UID_FINAL_REMOVAL_AFTER_USER_REMOVAL_DELAY_MILLIS, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -710,6 +724,11 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
                 if (gnssChargeUC != EnergyConsumerSnapshot.UNAVAILABLE) {
                     mStats.updateGnssEnergyConsumerStatsLocked(gnssChargeUC, elapsedRealtime);
                 }
+
+                final long cameraChargeUC = energyConsumerDeltas.cameraChargeUC;
+                if (cameraChargeUC != EnergyConsumerSnapshot.UNAVAILABLE) {
+                    mStats.updateCameraEnergyConsumerStatsLocked(cameraChargeUC, elapsedRealtime);
+                }
             }
             // Inform mStats about each applicable custom energy bucket.
             if (energyConsumerDeltas != null
@@ -895,6 +914,7 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
                     break;
                 case EnergyConsumerType.MOBILE_RADIO:
                     buckets[EnergyConsumerStats.POWER_BUCKET_MOBILE_RADIO] = true;
+                    buckets[EnergyConsumerStats.POWER_BUCKET_PHONE] = true;
                     break;
                 case EnergyConsumerType.DISPLAY:
                     buckets[EnergyConsumerStats.POWER_BUCKET_SCREEN_ON] = true;
@@ -903,6 +923,9 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
                     break;
                 case EnergyConsumerType.WIFI:
                     buckets[EnergyConsumerStats.POWER_BUCKET_WIFI] = true;
+                    break;
+                case EnergyConsumerType.CAMERA:
+                    buckets[EnergyConsumerStats.POWER_BUCKET_CAMERA] = true;
                     break;
             }
         }
@@ -954,6 +977,9 @@ public class BatteryExternalStatsWorker implements BatteryStatsImpl.ExternalStat
         }
         if ((flags & UPDATE_WIFI) != 0) {
             addEnergyConsumerIdLocked(energyConsumerIds, EnergyConsumerType.WIFI);
+        }
+        if ((flags & UPDATE_CAMERA) != 0) {
+            addEnergyConsumerIdLocked(energyConsumerIds, EnergyConsumerType.CAMERA);
         }
 
         if (energyConsumerIds.size() == 0) {

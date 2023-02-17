@@ -108,6 +108,7 @@ import android.text.Highlights;
 import android.text.InputFilter;
 import android.text.InputType;
 import android.text.Layout;
+import android.text.NoCopySpan;
 import android.text.ParcelableSpan;
 import android.text.PrecomputedText;
 import android.text.SegmentFinder;
@@ -135,6 +136,7 @@ import android.text.method.KeyListener;
 import android.text.method.LinkMovementMethod;
 import android.text.method.MetaKeyKeyListener;
 import android.text.method.MovementMethod;
+import android.text.method.OffsetMapping;
 import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TextKeyListener;
@@ -194,6 +196,7 @@ import android.view.inputmethod.CorrectionInfo;
 import android.view.inputmethod.CursorAnchorInfo;
 import android.view.inputmethod.DeleteGesture;
 import android.view.inputmethod.DeleteRangeGesture;
+import android.view.inputmethod.EditorBoundsInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
@@ -201,11 +204,13 @@ import android.view.inputmethod.HandwritingGesture;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InsertGesture;
+import android.view.inputmethod.InsertModeGesture;
 import android.view.inputmethod.JoinOrSplitGesture;
 import android.view.inputmethod.PreviewableHandwritingGesture;
 import android.view.inputmethod.RemoveSpaceGesture;
 import android.view.inputmethod.SelectGesture;
 import android.view.inputmethod.SelectRangeGesture;
+import android.view.inputmethod.TextAppearanceInfo;
 import android.view.inputmethod.TextBoundsInfo;
 import android.view.inspector.InspectableProperty;
 import android.view.inspector.InspectableProperty.EnumEntry;
@@ -455,6 +460,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private static final Spanned EMPTY_SPANNED = new SpannedString("");
 
     private static final int CHANGE_WATCHER_PRIORITY = 100;
+
+    /**
+     * The span priority of the {@link TransformationMethod} that is set on the text. It must be
+     * higher than the {@link DynamicLayout}'s {@link TextWatcher}, so that the transformed text is
+     * updated before {@link DynamicLayout#reflow(CharSequence, int, int, int)} being triggered
+     * by {@link TextWatcher#onTextChanged(CharSequence, int, int, int)}.
+     */
+    private static final int TRANSFORMATION_SPAN_PRIORITY = 200;
 
     // New state used to change background based on whether this TextView is multiline.
     private static final int[] MULTILINE_STATE_SET = { R.attr.state_multiline };
@@ -895,6 +908,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private Scroller mScroller;
     private TextPaint mTempTextPaint;
 
+    private Object mTempCursor;
+
     @UnsupportedAppUsage
     private BoringLayout.Metrics mBoring;
     @UnsupportedAppUsage
@@ -937,6 +952,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     private List<Path> mHighlightPaths;
     private List<Paint> mHighlightPaints;
     private Highlights mHighlights;
+    private int[] mSearchResultHighlights = null;
+    private Paint mSearchResultHighlightPaint = null;
+    private Paint mFocusedSearchResultHighlightPaint = null;
+    private int mFocusedSearchResultHighlightColor = 0xFFFF9632;
+    private int mSearchResultHighlightColor = 0xFFFFFF00;
+
+    private int mFocusedSearchResultIndex = -1;
     private int mGesturePreviewHighlightStart = -1;
     private int mGesturePreviewHighlightEnd = -1;
     private Paint mGesturePreviewHighlightPaint;
@@ -2518,7 +2540,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     /**
      * @hide
      */
-    @VisibleForTesting
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public CharSequence getTransformed() {
         return mTransformed;
     }
@@ -2747,6 +2769,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * @attr ref android.R.styleable#TextView_singleLine
      */
     public final void setTransformationMethod(TransformationMethod method) {
+        if (mEditor != null) {
+            mEditor.setTransformationMethod(method);
+        } else {
+            setTransformationMethodInternal(method);
+        }
+    }
+
+    void setTransformationMethodInternal(@Nullable TransformationMethod method) {
         if (method == mTransformation) {
             // Avoid the setText() below if the transformation is
             // the same.
@@ -4030,6 +4060,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      */
     private static class TextAppearanceAttributes {
         int mTextColorHighlight = 0;
+        int mSearchResultHighlightColor = 0;
+        int mFocusedSearchResultHighlightColor = 0;
         ColorStateList mTextColor = null;
         ColorStateList mTextColorHint = null;
         ColorStateList mTextColorLink = null;
@@ -4062,6 +4094,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         public String toString() {
             return "TextAppearanceAttributes {\n"
                     + "    mTextColorHighlight:" + mTextColorHighlight + "\n"
+                    + "    mSearchResultHighlightColor: " + mSearchResultHighlightColor + "\n"
+                    + "    mFocusedSearchResultHighlightColor: "
+                    + mFocusedSearchResultHighlightColor + "\n"
                     + "    mTextColor:" + mTextColor + "\n"
                     + "    mTextColorHint:" + mTextColorHint + "\n"
                     + "    mTextColorLink:" + mTextColorLink + "\n"
@@ -4100,6 +4135,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     static {
         sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColorHighlight,
                 com.android.internal.R.styleable.TextAppearance_textColorHighlight);
+        sAppearanceValues.put(com.android.internal.R.styleable.TextView_searchResultHighlightColor,
+                com.android.internal.R.styleable.TextAppearance_searchResultHighlightColor);
+        sAppearanceValues.put(
+                com.android.internal.R.styleable.TextView_focusedSearchResultHighlightColor,
+                com.android.internal.R.styleable.TextAppearance_focusedSearchResultHighlightColor);
         sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColor,
                 com.android.internal.R.styleable.TextAppearance_textColor);
         sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColorHint,
@@ -4173,6 +4213,16 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 case com.android.internal.R.styleable.TextAppearance_textColorHighlight:
                     attributes.mTextColorHighlight =
                             appearance.getColor(attr, attributes.mTextColorHighlight);
+                    break;
+                case com.android.internal.R.styleable.TextAppearance_searchResultHighlightColor:
+                    attributes.mSearchResultHighlightColor =
+                            appearance.getColor(attr, attributes.mSearchResultHighlightColor);
+                    break;
+                case com.android.internal.R.styleable
+                        .TextAppearance_focusedSearchResultHighlightColor:
+                    attributes.mFocusedSearchResultHighlightColor =
+                            appearance.getColor(attr,
+                                    attributes.mFocusedSearchResultHighlightColor);
                     break;
                 case com.android.internal.R.styleable.TextAppearance_textColor:
                     attributes.mTextColor = appearance.getColorStateList(attr);
@@ -4288,6 +4338,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         if (attributes.mTextColorHighlight != 0) {
             setHighlightColor(attributes.mTextColorHighlight);
+        }
+
+        if (attributes.mSearchResultHighlightColor != 0) {
+            setSearchResultHighlightColor(attributes.mSearchResultHighlightColor);
+        }
+
+        if (attributes.mFocusedSearchResultHighlightColor != 0) {
+            setFocusedSearchResultHighlightColor(attributes.mFocusedSearchResultHighlightColor);
         }
 
         if (attributes.mTextSize != -1) {
@@ -6176,6 +6234,238 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Sets the search result ranges with flatten range representation.
+     *
+     * Ranges are represented of flattened inclusive start and exclusive end integers array. The
+     * inclusive start offset of the {@code i}-th range is stored in {@code 2 * i}-th of the array.
+     * The exclusive end offset of the {@code i}-th range is stored in {@code 2* i + 1}-th of the
+     * array. For example, the two ranges: (1, 2) and (3, 4) are flattened into single int array
+     * [1, 2, 3, 4].
+     *
+     * TextView will render the search result with the highlights with specified color in the theme.
+     * If there is a focused search result, it is rendered with focused color. By calling this
+     * method, the focused search index will be cleared.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+     *
+     * @param ranges the flatten ranges of the search result. null for clear.
+     */
+    public void setSearchResultHighlights(@Nullable int... ranges) {
+        if (ranges == null) {
+            mSearchResultHighlights = null;
+            mHighlightPathsBogus = true;
+            return;
+        }
+        if (ranges.length % 2 == 1) {
+            throw new IllegalArgumentException(
+                    "Flatten ranges must have even numbered elements");
+        }
+        for (int j = 0; j < ranges.length / 2; ++j) {
+            int start = ranges[j * 2];
+            int end = ranges[j * 2 + 1];
+            if (start > end) {
+                throw new IllegalArgumentException(
+                        "Reverse range found in the flatten range: " + start + ", " + end + ""
+                                + " at " + j + "-th range");
+            }
+        }
+        mHighlightPathsBogus = true;
+        mSearchResultHighlights = ranges;
+        mFocusedSearchResultIndex = FOCUSED_SEARCH_RESULT_INDEX_NONE;
+        invalidate();
+    }
+
+    /**
+     * Gets the current search result ranges.
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+     *
+     * @return a flatten search result ranges. null if not available.
+     */
+    @Nullable
+    public int[] getSearchResultHighlights() {
+        return mSearchResultHighlights;
+    }
+
+    /**
+     * A special index used for {@link #setFocusedSearchResultIndex(int)} and
+     * {@link #getFocusedSearchResultIndex()} inidicating there is no focused search result.
+     */
+    public static final int FOCUSED_SEARCH_RESULT_INDEX_NONE = -1;
+
+    /**
+     * Sets the focused search result index.
+     *
+     * The focused search result is drawn in a focused color.
+     * Calling {@link #FOCUSED_SEARCH_RESULT_INDEX_NONE} for clearing focused search result.
+     *
+     * This method must be called after setting search result ranges by
+     * {@link #setSearchResultHighlights(int[])}.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+     *
+     * @param index a focused search index or {@link #FOCUSED_SEARCH_RESULT_INDEX_NONE}
+     */
+    public void setFocusedSearchResultIndex(int index) {
+        if (mSearchResultHighlights == null) {
+            throw new IllegalArgumentException("Search result range must be set beforehand.");
+        }
+        if (index < -1 || index >= mSearchResultHighlights.length / 2) {
+            throw new IllegalArgumentException("Focused index(" + index + ") must be larger than "
+                    + "-1 and less than range count(" + (mSearchResultHighlights.length / 2) + ")");
+        }
+        mFocusedSearchResultIndex = index;
+        mHighlightPathsBogus = true;
+        invalidate();
+    }
+
+    /**
+     * Gets the focused search result index.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+
+     * @return a focused search index or {@link #FOCUSED_SEARCH_RESULT_INDEX_NONE}
+     */
+    public int getFocusedSearchResultIndex() {
+        return mFocusedSearchResultIndex;
+    }
+
+    /**
+     * Sets the search result highlight color.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+
+     * @param color a search result highlight color.
+     */
+    public void setSearchResultHighlightColor(@ColorInt int color) {
+        mSearchResultHighlightColor = color;
+    }
+
+    /**
+     * Gets the search result highlight color.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+
+     * @return a search result highlight color.
+     */
+    @ColorInt
+    public int getSearchResultHighlightColor() {
+        return mSearchResultHighlightColor;
+    }
+
+    /**
+     * Sets focused search result highlight color.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+
+     * @param color a focused search result highlight color.
+     */
+    public void setFocusedSearchResultHighlightColor(@ColorInt int color) {
+        mFocusedSearchResultHighlightColor = color;
+    }
+
+    /**
+     * Gets focused search result highlight color.
+     *
+     * @attr ref android.R.styleable#TextView_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_searchResultHighlightColor
+     * @attr ref android.R.styleable#TextView_focusedSearchResultHighlightColor
+     * @attr ref android.R.styleable#TextAppearance_focusedSearchResultHighlightColor
+     *
+     * @see #setSearchResultHighlights(int[])
+     * @see #getSearchResultHighlights()
+     * @see #setFocusedSearchResultIndex(int)
+     * @see #getFocusedSearchResultIndex()
+     * @see #setSearchResultHighlightColor(int)
+     * @see #getSearchResultHighlightColor()
+     * @see #setFocusedSearchResultHighlightColor(int)
+     * @see #getFocusedSearchResultHighlightColor()
+
+     * @return a focused search result highlight color.
+     */
+    @ColorInt
+    public int getFocusedSearchResultHighlightColor() {
+        return mFocusedSearchResultHighlightColor;
+    }
+
+    /**
      * Highlights the text range (from inclusive start offset to exclusive end offset) to show what
      * will be selected by the ongoing select handwriting gesture. While the gesture preview
      * highlight is shown, the selection or cursor is hidden. If the text or selection is changed,
@@ -6225,7 +6515,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     boolean hasGesturePreviewHighlight() {
-        return mGesturePreviewHighlightStart > 0;
+        return mGesturePreviewHighlightStart >= 0;
     }
 
     /**
@@ -6742,7 +7032,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         final int textLength = text.length();
 
-        if (text instanceof Spannable && !mAllowTransformationLengthChange) {
+        if (text instanceof Spannable && (!mAllowTransformationLengthChange
+                || text instanceof OffsetMapping)) {
             Spannable sp = (Spannable) text;
 
             // Remove any ChangeWatchers that might have come from other TextViews.
@@ -6760,7 +7051,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             if (mEditor != null) mEditor.addSpanWatchers(sp);
 
             if (mTransformation != null) {
-                sp.setSpan(mTransformation, 0, textLength, Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+                sp.setSpan(mTransformation, 0, textLength, Spanned.SPAN_INCLUSIVE_INCLUSIVE
+                        | (TRANSFORMATION_SPAN_PRIORITY << Spanned.SPAN_PRIORITY_SHIFT));
             }
 
             if (mMovement != null) {
@@ -7959,6 +8251,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (mLayout == null) {
             invalidate();
         } else {
+            start = originalToTransformed(start, OffsetMapping.MAP_STRATEGY_CURSOR);
+            end = originalToTransformed(end, OffsetMapping.MAP_STRATEGY_CURSOR);
             int lineStart = mLayout.getLineForOffset(start);
             int top = mLayout.getLineTop(lineStart);
 
@@ -8335,7 +8629,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             for (int i = 0; i < mHighlights.getSize(); ++i) {
                 final int[] ranges = mHighlights.getRanges(i);
                 final Paint paint = mHighlights.getPaint(i);
-
                 final Path path;
                 if (mPathRecyclePool.isEmpty()) {
                     path = new Path();
@@ -8363,6 +8656,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
         }
 
+        addSearchHighlightPaths();
+
         if (hasGesturePreviewHighlight()) {
             final Path path;
             if (mPathRecyclePool.isEmpty()) {
@@ -8381,13 +8676,74 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         mHighlightPathsBogus = false;
     }
 
+    private void addSearchHighlightPaths() {
+        if (mSearchResultHighlights != null) {
+            final Path searchResultPath;
+            if (mPathRecyclePool.isEmpty()) {
+                searchResultPath = new Path();
+            } else {
+                searchResultPath = mPathRecyclePool.get(mPathRecyclePool.size() - 1);
+                mPathRecyclePool.remove(mPathRecyclePool.size() - 1);
+                searchResultPath.reset();
+            }
+            final Path focusedSearchResultPath;
+            if (mFocusedSearchResultIndex == FOCUSED_SEARCH_RESULT_INDEX_NONE) {
+                focusedSearchResultPath = null;
+            } else if (mPathRecyclePool.isEmpty()) {
+                focusedSearchResultPath = new Path();
+            } else {
+                focusedSearchResultPath = mPathRecyclePool.get(mPathRecyclePool.size() - 1);
+                mPathRecyclePool.remove(mPathRecyclePool.size() - 1);
+                focusedSearchResultPath.reset();
+            }
+
+            boolean atLeastOnePathAdded = false;
+            for (int j = 0; j < mSearchResultHighlights.length / 2; ++j) {
+                final int start = mSearchResultHighlights[2 * j];
+                final int end = mSearchResultHighlights[2 * j + 1];
+                if (start < end) {
+                    if (j == mFocusedSearchResultIndex) {
+                        mLayout.getSelection(start, end, (left, top, right, bottom, layout) ->
+                                focusedSearchResultPath.addRect(left, top, right, bottom,
+                                        Path.Direction.CW)
+                        );
+                    } else {
+                        mLayout.getSelection(start, end, (left, top, right, bottom, layout) ->
+                                searchResultPath.addRect(left, top, right, bottom,
+                                        Path.Direction.CW)
+                        );
+                        atLeastOnePathAdded = true;
+                    }
+                }
+            }
+            if (atLeastOnePathAdded) {
+                if (mSearchResultHighlightPaint == null) {
+                    mSearchResultHighlightPaint = new Paint();
+                }
+                mSearchResultHighlightPaint.setColor(mSearchResultHighlightColor);
+                mSearchResultHighlightPaint.setStyle(Paint.Style.FILL);
+                mHighlightPaths.add(searchResultPath);
+                mHighlightPaints.add(mSearchResultHighlightPaint);
+            }
+            if (focusedSearchResultPath != null) {
+                if (mFocusedSearchResultHighlightPaint == null) {
+                    mFocusedSearchResultHighlightPaint = new Paint();
+                }
+                mFocusedSearchResultHighlightPaint.setColor(mFocusedSearchResultHighlightColor);
+                mFocusedSearchResultHighlightPaint.setStyle(Paint.Style.FILL);
+                mHighlightPaths.add(focusedSearchResultPath);
+                mHighlightPaints.add(mFocusedSearchResultHighlightPaint);
+            }
+        }
+    }
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     private Path getUpdatedHighlightPath() {
         Path highlight = null;
         Paint highlightPaint = mHighlightPaint;
 
-        final int selStart = getSelectionStart();
-        final int selEnd = getSelectionEnd();
+        final int selStart = getSelectionStartTransformed();
+        final int selEnd = getSelectionEndTransformed();
         if (mMovement != null && (isFocused() || isPressed()) && selStart >= 0) {
             if (selStart == selEnd) {
                 if (mEditor != null && mEditor.shouldRenderCursor()) {
@@ -8608,13 +8964,13 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             return;
         }
 
-        int selEnd = getSelectionEnd();
+        int selEnd = getSelectionEndTransformed();
         if (selEnd < 0) {
             super.getFocusedRect(r);
             return;
         }
 
-        int selStart = getSelectionStart();
+        int selStart = getSelectionStartTransformed();
         if (selStart < 0 || selStart >= selEnd) {
             int line = mLayout.getLineForOffset(selEnd);
             r.top = mLayout.getLineTop(line);
@@ -9278,6 +9634,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 gestures.add(InsertGesture.class);
                 gestures.add(RemoveSpaceGesture.class);
                 gestures.add(JoinOrSplitGesture.class);
+                gestures.add(InsertModeGesture.class);
                 outAttrs.setSupportedHandwritingGestures(gestures);
 
                 Set<Class<? extends PreviewableHandwritingGesture>> previews = new ArraySet<>();
@@ -9497,6 +9854,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         return false;
     }
 
+    /**
+     * Return whether the text is transformed and has {@link OffsetMapping}.
+     * @hide
+     */
+    public boolean isOffsetMappingAvailable() {
+        return mTransformation != null && mTransformed instanceof OffsetMapping;
+    }
+
     /** @hide */
     public boolean previewHandwritingGesture(
             @NonNull PreviewableHandwritingGesture gesture,
@@ -9526,6 +9891,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     private int performHandwritingSelectGesture(@NonNull SelectGesture gesture, boolean isPreview) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         int[] range = getRangeForRect(
                 convertFromScreenToContentCoordinates(gesture.getSelectionArea()),
                 gesture.getGranularity());
@@ -9552,6 +9920,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     private int performHandwritingSelectRangeGesture(
             @NonNull SelectRangeGesture gesture, boolean isPreview) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         int[] startRange = getRangeForRect(
                 convertFromScreenToContentCoordinates(gesture.getSelectionStartArea()),
                 gesture.getGranularity());
@@ -9576,6 +9947,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     private int performHandwritingDeleteGesture(@NonNull DeleteGesture gesture, boolean isPreview) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         int[] range = getRangeForRect(
                 convertFromScreenToContentCoordinates(gesture.getDeletionArea()),
                 gesture.getGranularity());
@@ -9593,8 +9967,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 range = adjustHandwritingDeleteGestureRange(range);
             }
 
-            getEditableText().delete(range[0], range[1]);
             Selection.setSelection(getEditableText(), range[0]);
+            getEditableText().delete(range[0], range[1]);
         }
         return InputConnection.HANDWRITING_GESTURE_RESULT_SUCCESS;
     }
@@ -9606,6 +9980,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     private int performHandwritingDeleteRangeGesture(
             @NonNull DeleteRangeGesture gesture, boolean isPreview) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         int[] startRange = getRangeForRect(
                 convertFromScreenToContentCoordinates(gesture.getDeletionStartArea()),
                 gesture.getGranularity());
@@ -9686,6 +10063,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /** @hide */
     public int performHandwritingInsertGesture(@NonNull InsertGesture gesture) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         PointF point = convertFromScreenToContentCoordinates(gesture.getInsertionPoint());
         int line = getLineForHandwritingGesture(point);
         if (line == -1) {
@@ -9693,14 +10073,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
         int offset = mLayout.getOffsetForHorizontal(line, point.x);
         String textToInsert = gesture.getTextToInsert();
-        getEditableText().insert(offset, textToInsert);
-        Selection.setSelection(getEditableText(), offset + textToInsert.length());
+        return tryInsertTextForHandwritingGesture(offset, textToInsert, gesture);
         // TODO(b/243980426): Insert extra spaces if necessary.
-        return InputConnection.HANDWRITING_GESTURE_RESULT_SUCCESS;
     }
 
     /** @hide */
     public int performHandwritingRemoveSpaceGesture(@NonNull RemoveSpaceGesture gesture) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         PointF startPoint = convertFromScreenToContentCoordinates(gesture.getStartPoint());
         PointF endPoint = convertFromScreenToContentCoordinates(gesture.getEndPoint());
 
@@ -9759,6 +10140,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     /** @hide */
     public int performHandwritingJoinOrSplitGesture(@NonNull JoinOrSplitGesture gesture) {
+        if (isOffsetMappingAvailable()) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
         PointF point = convertFromScreenToContentCoordinates(gesture.getJoinOrSplitPoint());
 
         int line = getLineForHandwritingGesture(point);
@@ -9788,13 +10172,33 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             endOffset += Character.charCount(codePointAtEnd);
         }
         if (startOffset < endOffset) {
-            getEditableText().delete(startOffset, endOffset);
             Selection.setSelection(getEditableText(), startOffset);
+            getEditableText().delete(startOffset, endOffset);
+            return InputConnection.HANDWRITING_GESTURE_RESULT_SUCCESS;
         } else {
             // No whitespace found, so insert a space.
-            getEditableText().insert(startOffset, " ");
-            Selection.setSelection(getEditableText(), startOffset + 1);
+            return tryInsertTextForHandwritingGesture(startOffset, " ", gesture);
         }
+    }
+
+    /** @hide */
+    public int performHandwritingInsertModeGesture(@NonNull InsertModeGesture gesture) {
+        final PointF insertPoint =
+                convertFromScreenToContentCoordinates(gesture.getInsertionPoint());
+        final int line = getLineForHandwritingGesture(insertPoint);
+        final CancellationSignal cancellationSignal = gesture.getCancellationSignal();
+
+        // If no cancellationSignal is provided, don't enter the insert mode.
+        if (line == -1 || cancellationSignal == null) {
+            return handleGestureFailure(gesture);
+        }
+
+        final int offset = mLayout.getOffsetForHorizontal(line, insertPoint.x);
+
+        if (!mEditor.enterInsertMode(offset)) {
+            return InputConnection.HANDWRITING_GESTURE_RESULT_FAILED;
+        }
+        cancellationSignal.setOnCancelListener(() -> mEditor.exitInsertMode());
         return InputConnection.HANDWRITING_GESTURE_RESULT_SUCCESS;
     }
 
@@ -9835,8 +10239,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             // The point is not within lineMargin of a line.
             return -1;
         }
-        if (point.x < mLayout.getLineLeft(line) - lineMargin
-                || point.x > mLayout.getLineRight(line) + lineMargin) {
+        if (point.x < -lineMargin || point.x > mLayout.getWidth() + lineMargin) {
             // The point is not within lineMargin of a line.
             return -1;
         }
@@ -9856,6 +10259,32 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
         return mLayout.getRangeForRect(
                 area, segmentFinder, Layout.INCLUSION_STRATEGY_CONTAINS_CENTER);
+    }
+
+    private int tryInsertTextForHandwritingGesture(
+            int offset, String textToInsert, HandwritingGesture gesture) {
+        // A temporary cursor span is placed at the insertion offset. The span will be pushed
+        // forward when text is inserted, then the real cursor can be placed after the inserted
+        // text. A temporary cursor span is used in order to avoid modifying the real selection span
+        // in the case that the text is filtered out.
+        Editable editableText = getEditableText();
+        if (mTempCursor == null) {
+            mTempCursor = new NoCopySpan.Concrete();
+        }
+        editableText.setSpan(mTempCursor, offset, offset, Spanned.SPAN_POINT_POINT);
+
+        editableText.insert(offset, textToInsert);
+
+        int newOffset = editableText.getSpanStart(mTempCursor);
+        editableText.removeSpan(mTempCursor);
+        if (newOffset == offset) {
+            // The inserted text was filtered out.
+            return handleGestureFailure(gesture);
+        } else {
+            // Place the cursor after the inserted text.
+            Selection.setSelection(editableText, newOffset);
+            return InputConnection.HANDWRITING_GESTURE_RESULT_SUCCESS;
+        }
     }
 
     private Pattern getWhitespacePattern() {
@@ -10826,17 +11255,39 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
      * This has to be called after layout. Returns true if anything changed.
      */
     public boolean bringPointIntoView(int offset) {
+        return bringPointIntoView(offset, false);
+    }
+
+    /**
+     * Move the insertion position of the given offset into visible area of the View.
+     *
+     * If the View is focused or {@code requestRectWithoutFocus} is set to true, this API may call
+     * {@link View#requestRectangleOnScreen(Rect)} to bring the point to the visible area if
+     * necessary.
+     *
+     * @param offset an offset of the character.
+     * @param requestRectWithoutFocus True for calling {@link View#requestRectangleOnScreen(Rect)}
+     *                                in the unfocused state. False for calling it only the View has
+     *                                the focus.
+     * @return true if anything changed, otherwise false.
+     *
+     * @see #bringPointIntoView(int)
+     */
+    public boolean bringPointIntoView(@IntRange(from = 0) int offset,
+            boolean requestRectWithoutFocus) {
         if (isLayoutRequested()) {
             mDeferScroll = offset;
             return false;
         }
+        final int offsetTransformed =
+                originalToTransformed(offset, OffsetMapping.MAP_STRATEGY_CURSOR);
         boolean changed = false;
 
         Layout layout = isShowingHint() ? mHintLayout : mLayout;
 
         if (layout == null) return changed;
 
-        int line = layout.getLineForOffset(offset);
+        int line = layout.getLineForOffset(offsetTransformed);
 
         int grav;
 
@@ -10871,7 +11322,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         // right where it is most likely to be annoying.
         final boolean clamped = grav > 0;
         // FIXME: Is it okay to truncate this, or should we round?
-        final int x = (int) layout.getPrimaryHorizontal(offset, clamped);
+        final int x = (int) layout.getPrimaryHorizontal(offsetTransformed, clamped);
         final int top = layout.getLineTop(line);
         final int bottom = layout.getLineTop(line + 1);
 
@@ -11002,7 +11453,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             changed = true;
         }
 
-        if (isFocused()) {
+        if (requestRectWithoutFocus && isFocused()) {
             // This offsets because getInterestingRect() is in terms of viewport coordinates, but
             // requestRectangleOnScreen() is in terms of content coordinates.
 
@@ -11035,8 +11486,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (!(mText instanceof Spannable)) {
             return false;
         }
-        int start = getSelectionStart();
-        int end = getSelectionEnd();
+        int start = getSelectionStartTransformed();
+        int end = getSelectionEndTransformed();
         if (start != end) {
             return false;
         }
@@ -11079,7 +11530,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         if (newStart != start) {
-            Selection.setSelection(mSpannable, newStart);
+            Selection.setSelection(mSpannable,
+                    transformedToOriginal(newStart, OffsetMapping.MAP_STRATEGY_CURSOR));
             return true;
         }
 
@@ -11185,6 +11637,35 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     @ViewDebug.ExportedProperty(category = "text")
     public int getSelectionEnd() {
         return Selection.getSelectionEnd(getText());
+    }
+
+    /**
+     * Calculates the rectangles which should be highlighted to indicate a selection between start
+     * and end and feeds them into the given {@link Layout.SelectionRectangleConsumer}.
+     *
+     * @param start    the starting index of the selection
+     * @param end      the ending index of the selection
+     * @param consumer the {@link Layout.SelectionRectangleConsumer} which will receive the
+     *                 generated rectangles. It will be called every time a rectangle is generated.
+     * @hide
+     */
+    public void getSelection(int start, int end, final Layout.SelectionRectangleConsumer consumer) {
+        final int transformedStart =
+                originalToTransformed(start, OffsetMapping.MAP_STRATEGY_CURSOR);
+        final int transformedEnd = originalToTransformed(end, OffsetMapping.MAP_STRATEGY_CURSOR);
+        mLayout.getSelection(transformedStart, transformedEnd, consumer);
+    }
+
+    int getSelectionStartTransformed() {
+        final int start = getSelectionStart();
+        if (start < 0) return start;
+        return originalToTransformed(start, OffsetMapping.MAP_STRATEGY_CURSOR);
+    }
+
+    int getSelectionEndTransformed() {
+        final int end = getSelectionEnd();
+        if (end < 0) return end;
+        return originalToTransformed(end, OffsetMapping.MAP_STRATEGY_CURSOR);
     }
 
     /**
@@ -12837,8 +13318,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                 }
 
                 // Convert lines into character offsets.
-                int expandedTopChar = layout.getLineStart(expandedTopLine);
-                int expandedBottomChar = layout.getLineEnd(expandedBottomLine);
+                int expandedTopChar = transformedToOriginal(
+                        layout.getLineStart(expandedTopLine),
+                        OffsetMapping.MAP_STRATEGY_CHARACTER);
+                int expandedBottomChar = transformedToOriginal(
+                        layout.getLineEnd(expandedBottomLine),
+                        OffsetMapping.MAP_STRATEGY_CHARACTER);
 
                 // Take into account selection -- if there is a selection, we need to expand
                 // the text we are returning to include that selection.
@@ -12881,8 +13366,10 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         final int[] lineBaselines = new int[bottomLine - topLine + 1];
                         final int baselineOffset = getBaselineOffset();
                         for (int i = topLine; i <= bottomLine; i++) {
-                            lineOffsets[i - topLine] = layout.getLineStart(i);
-                            lineBaselines[i - topLine] = layout.getLineBaseline(i) + baselineOffset;
+                            lineOffsets[i - topLine] = transformedToOriginal(layout.getLineStart(i),
+                                    OffsetMapping.MAP_STRATEGY_CHARACTER);
+                            lineBaselines[i - topLine] =
+                                    layout.getLineBaseline(i) + baselineOffset;
                         }
                         structure.setTextLines(lineOffsets, lineBaselines);
                     }
@@ -13175,6 +13662,27 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Helper method to set {@code rect} to the text content's non-clipped area in the view's
+     * coordinates.
+     *
+     * @return true if at least part of the text content is visible; false if the text content is
+     * completely clipped or translated out of the visible area.
+     */
+    private boolean getContentVisibleRect(Rect rect) {
+        if (!getLocalVisibleRect(rect)) {
+            return false;
+        }
+        // getLocalVisibleRect returns a rect relative to the unscrolled left top corner of the
+        // view. In other words, the returned rectangle's origin point is (-scrollX, -scrollY) in
+        // view's coordinates. So we need to offset it with the negative scrolled amount to convert
+        // it to view's coordinate.
+        rect.offset(-getScrollX(), -getScrollY());
+        // Clip the view's visible rect with the text layout's visible rect.
+        return rect.intersect(getCompoundPaddingLeft(), getCompoundPaddingTop(),
+                getWidth() - getCompoundPaddingRight(), getHeight() - getCompoundPaddingBottom());
+    }
+
+    /**
      * Populate requested character bounds in a {@link CursorAnchorInfo.Builder}
      *
      * @param builder The builder to populate
@@ -13188,10 +13696,14 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     public void populateCharacterBounds(CursorAnchorInfo.Builder builder,
             int startIndex, int endIndex, float viewportToContentHorizontalOffset,
             float viewportToContentVerticalOffset) {
+        if (isOffsetMappingAvailable()) {
+            // The text is transformed, and has different length, we don't support
+            // character bounds in this case yet.
+            return;
+        }
         final Rect rect = new Rect();
-        getLocalVisibleRect(rect);
+        getContentVisibleRect(rect);
         final RectF visibleRect = new RectF(rect);
-
 
         final float[] characterBounds = getCharacterBounds(startIndex, endIndex,
                 viewportToContentHorizontalOffset, viewportToContentVerticalOffset);
@@ -13242,18 +13754,188 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
+     * Compute {@link CursorAnchorInfo} from this {@link TextView}.
+     *
+     * @param filter the {@link CursorAnchorInfo} update filter which specified the needed
+     *               information from IME.
+     * @param cursorAnchorInfoBuilder a cached {@link CursorAnchorInfo.Builder} object used to build
+     *                                the result {@link CursorAnchorInfo}.
+     * @param viewToScreenMatrix a cached {@link Matrix} object used to compute the view to screen
+     *                           matrix.
+     * @return the result {@link CursorAnchorInfo} to be passed to IME.
+     * @hide
+     */
+    @VisibleForTesting
+    @Nullable
+    public CursorAnchorInfo getCursorAnchorInfo(@InputConnection.CursorUpdateFilter int filter,
+            @NonNull CursorAnchorInfo.Builder cursorAnchorInfoBuilder,
+            @NonNull Matrix viewToScreenMatrix) {
+        Layout layout = getLayout();
+        if (layout == null) {
+            return null;
+        }
+        boolean includeEditorBounds =
+                (filter & InputConnection.CURSOR_UPDATE_FILTER_EDITOR_BOUNDS) != 0;
+        boolean includeCharacterBounds =
+                (filter & InputConnection.CURSOR_UPDATE_FILTER_CHARACTER_BOUNDS) != 0;
+        boolean includeInsertionMarker =
+                (filter & InputConnection.CURSOR_UPDATE_FILTER_INSERTION_MARKER) != 0;
+        boolean includeVisibleLineBounds =
+                (filter & InputConnection.CURSOR_UPDATE_FILTER_VISIBLE_LINE_BOUNDS) != 0;
+        boolean includeTextAppearance =
+                (filter & InputConnection.CURSOR_UPDATE_FILTER_TEXT_APPEARANCE) != 0;
+        boolean includeAll =
+                (!includeEditorBounds && !includeCharacterBounds && !includeInsertionMarker
+                        && !includeVisibleLineBounds && !includeTextAppearance);
+
+        includeEditorBounds |= includeAll;
+        includeCharacterBounds |= includeAll;
+        includeInsertionMarker |= includeAll;
+        includeVisibleLineBounds |= includeAll;
+        includeTextAppearance |= includeAll;
+
+        final CursorAnchorInfo.Builder builder = cursorAnchorInfoBuilder;
+        builder.reset();
+
+        final int selectionStart = getSelectionStart();
+        builder.setSelectionRange(selectionStart, getSelectionEnd());
+
+        // Construct transformation matrix from view local coordinates to screen coordinates.
+        viewToScreenMatrix.reset();
+        transformMatrixToGlobal(viewToScreenMatrix);
+        builder.setMatrix(viewToScreenMatrix);
+
+        if (includeEditorBounds) {
+            final RectF editorBounds = new RectF();
+            editorBounds.set(0 /* left */, 0 /* top */,
+                    getWidth(), getHeight());
+            final RectF handwritingBounds = new RectF(
+                    -getHandwritingBoundsOffsetLeft(),
+                    -getHandwritingBoundsOffsetTop(),
+                    getWidth() + getHandwritingBoundsOffsetRight(),
+                    getHeight() + getHandwritingBoundsOffsetBottom());
+            EditorBoundsInfo.Builder boundsBuilder = new EditorBoundsInfo.Builder();
+            EditorBoundsInfo editorBoundsInfo = boundsBuilder.setEditorBounds(editorBounds)
+                    .setHandwritingBounds(handwritingBounds).build();
+            builder.setEditorBoundsInfo(editorBoundsInfo);
+        }
+
+        if (includeCharacterBounds || includeInsertionMarker || includeVisibleLineBounds) {
+            final float viewportToContentHorizontalOffset =
+                    viewportToContentHorizontalOffset();
+            final float viewportToContentVerticalOffset =
+                    viewportToContentVerticalOffset();
+            final boolean isTextTransformed = (getTransformationMethod() != null
+                    && getTransformed() instanceof OffsetMapping);
+            if (includeCharacterBounds && !isTextTransformed) {
+                final CharSequence text = getText();
+                if (text instanceof Spannable) {
+                    final Spannable sp = (Spannable) text;
+                    int composingTextStart = EditableInputConnection.getComposingSpanStart(sp);
+                    int composingTextEnd = EditableInputConnection.getComposingSpanEnd(sp);
+                    if (composingTextEnd < composingTextStart) {
+                        final int temp = composingTextEnd;
+                        composingTextEnd = composingTextStart;
+                        composingTextStart = temp;
+                    }
+                    final boolean hasComposingText =
+                            (0 <= composingTextStart) && (composingTextStart
+                                    < composingTextEnd);
+                    if (hasComposingText) {
+                        final CharSequence composingText = text.subSequence(composingTextStart,
+                                composingTextEnd);
+                        builder.setComposingText(composingTextStart, composingText);
+                        populateCharacterBounds(builder, composingTextStart,
+                                composingTextEnd, viewportToContentHorizontalOffset,
+                                viewportToContentVerticalOffset);
+                    }
+                }
+            }
+
+            if (includeInsertionMarker) {
+                // Treat selectionStart as the insertion point.
+                if (0 <= selectionStart) {
+                    final int offsetTransformed = originalToTransformed(
+                            selectionStart, OffsetMapping.MAP_STRATEGY_CURSOR);
+                    final int line = layout.getLineForOffset(offsetTransformed);
+                    final float insertionMarkerX =
+                            layout.getPrimaryHorizontal(offsetTransformed)
+                                    + viewportToContentHorizontalOffset;
+                    final float insertionMarkerTop = layout.getLineTop(line)
+                            + viewportToContentVerticalOffset;
+                    final float insertionMarkerBaseline = layout.getLineBaseline(line)
+                            + viewportToContentVerticalOffset;
+                    final float insertionMarkerBottom =
+                            layout.getLineBottom(line, /* includeLineSpacing= */ false)
+                                    + viewportToContentVerticalOffset;
+                    final boolean isTopVisible =
+                            isPositionVisible(insertionMarkerX, insertionMarkerTop);
+                    final boolean isBottomVisible =
+                            isPositionVisible(insertionMarkerX, insertionMarkerBottom);
+                    int insertionMarkerFlags = 0;
+                    if (isTopVisible || isBottomVisible) {
+                        insertionMarkerFlags |= CursorAnchorInfo.FLAG_HAS_VISIBLE_REGION;
+                    }
+                    if (!isTopVisible || !isBottomVisible) {
+                        insertionMarkerFlags |= CursorAnchorInfo.FLAG_HAS_INVISIBLE_REGION;
+                    }
+                    if (layout.isRtlCharAt(offsetTransformed)) {
+                        insertionMarkerFlags |= CursorAnchorInfo.FLAG_IS_RTL;
+                    }
+                    builder.setInsertionMarkerLocation(insertionMarkerX, insertionMarkerTop,
+                            insertionMarkerBaseline, insertionMarkerBottom,
+                            insertionMarkerFlags);
+                }
+            }
+
+            if (includeVisibleLineBounds) {
+                final Rect visibleRect = new Rect();
+                if (getContentVisibleRect(visibleRect)) {
+                    // Subtract the viewportToContentVerticalOffset to convert the view
+                    // coordinates to layout coordinates.
+                    final float visibleTop =
+                            visibleRect.top - viewportToContentVerticalOffset;
+                    final float visibleBottom =
+                            visibleRect.bottom - viewportToContentVerticalOffset;
+                    final int firstLine =
+                            layout.getLineForVertical((int) Math.floor(visibleTop));
+                    final int lastLine =
+                            layout.getLineForVertical((int) Math.ceil(visibleBottom));
+
+                    for (int line = firstLine; line <= lastLine; ++line) {
+                        final float left = layout.getLineLeft(line)
+                                + viewportToContentHorizontalOffset;
+                        final float top = layout.getLineTop(line)
+                                + viewportToContentVerticalOffset;
+                        final float right = layout.getLineRight(line)
+                                + viewportToContentHorizontalOffset;
+                        final float bottom = layout.getLineBottom(line, false)
+                                + viewportToContentVerticalOffset;
+                        builder.addVisibleLineBounds(left, top, right, bottom);
+                    }
+                }
+            }
+        }
+
+        if (includeTextAppearance) {
+            builder.setTextAppearanceInfo(TextAppearanceInfo.createFromTextView(this));
+        }
+        return builder.build();
+    }
+
+    /**
      * Creates the {@link TextBoundsInfo} for the text lines that intersects with the {@code rectF}.
      * @hide
      */
-    public TextBoundsInfo getTextBoundsInfo(@NonNull RectF rectF) {
+    public TextBoundsInfo getTextBoundsInfo(@NonNull RectF bounds) {
         final Layout layout = getLayout();
         if (layout == null) {
             // No valid text layout, return null.
             return null;
         }
         final CharSequence text = layout.getText();
-        if (text == null) {
-            // It's impossible that a layout has no text. Check here to avoid NPE.
+        if (text == null || isOffsetMappingAvailable()) {
+            // The text is Null or the text has been transformed. Can't provide TextBoundsInfo.
             return null;
         }
 
@@ -13268,19 +13950,18 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         final float layoutLeft = viewportToContentHorizontalOffset();
         final float layoutTop = viewportToContentVerticalOffset();
 
-        final RectF localRectF = new RectF(rectF);
-        globalToLocalMatrix.mapRect(localRectF);
-        localRectF.offset(-layoutLeft, -layoutTop);
+        final RectF localBounds = new RectF(bounds);
+        globalToLocalMatrix.mapRect(localBounds);
+        localBounds.offset(-layoutLeft, -layoutTop);
 
         // Text length is 0. There is no character bounds, return empty TextBoundsInfo.
         // rectF doesn't intersect with the layout, return empty TextBoundsInfo.
-        if (!localRectF.intersects(0f, 0f, layout.getWidth(), layout.getHeight())
+        if (!localBounds.intersects(0f, 0f, layout.getWidth(), layout.getHeight())
                 || text.length() == 0) {
-            final TextBoundsInfo.Builder builder = new TextBoundsInfo.Builder();
+            final TextBoundsInfo.Builder builder = new TextBoundsInfo.Builder(0, 0);
             final SegmentFinder emptySegmentFinder =
-                    new SegmentFinder.DefaultSegmentFinder(new int[0]);
-            builder.setStartAndEnd(0, 0)
-                    .setMatrix(localToGlobalMatrix)
+                    new SegmentFinder.PrescribedSegmentFinder(new int[0]);
+            builder.setMatrix(localToGlobalMatrix)
                     .setCharacterBounds(new float[0])
                     .setCharacterBidiLevel(new int[0])
                     .setCharacterFlags(new int[0])
@@ -13290,8 +13971,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             return  builder.build();
         }
 
-        final int startLine = layout.getLineForVertical((int) Math.floor(localRectF.top));
-        final int endLine = layout.getLineForVertical((int) Math.floor(localRectF.bottom));
+        final int startLine = layout.getLineForVertical((int) Math.floor(localBounds.top));
+        final int endLine = layout.getLineForVertical((int) Math.floor(localBounds.bottom));
         final int start = layout.getLineStart(startLine);
         final int end = layout.getLineEnd(endLine);
 
@@ -13349,18 +14030,18 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             lineRanges[2 * offset] = layout.getLineStart(line);
             lineRanges[2 * offset + 1] = layout.getLineEnd(line);
         }
-        final SegmentFinder lineSegmentFinder = new SegmentFinder.DefaultSegmentFinder(lineRanges);
+        final SegmentFinder lineSegmentFinder =
+                new SegmentFinder.PrescribedSegmentFinder(lineRanges);
 
-        final TextBoundsInfo.Builder builder = new TextBoundsInfo.Builder();
-        builder.setStartAndEnd(start, end)
+        return new TextBoundsInfo.Builder(start, end)
                 .setMatrix(localToGlobalMatrix)
                 .setCharacterBounds(characterBounds)
                 .setCharacterBidiLevel(characterBidiLevels)
                 .setCharacterFlags(characterFlags)
                 .setGraphemeSegmentFinder(graphemeSegmentFinder)
                 .setLineSegmentFinder(lineSegmentFinder)
-                .setWordSegmentFinder(wordSegmentFinder);
-        return  builder.build();
+                .setWordSegmentFinder(wordSegmentFinder)
+                .build();
     }
 
     /**
@@ -14276,9 +14957,39 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     int getOffsetAtCoordinate(int line, float x) {
         x = convertToLocalHorizontalCoordinate(x);
-        return getLayout().getOffsetForHorizontal(line, x);
+        final int offset = getLayout().getOffsetForHorizontal(line, x);
+        return transformedToOriginal(offset, OffsetMapping.MAP_STRATEGY_CURSOR);
     }
 
+    /**
+     * Convenient method to convert an offset on the transformed text to the original text.
+     * @hide
+     */
+    public int transformedToOriginal(int offset, @OffsetMapping.MapStrategy int strategy) {
+        if (getTransformationMethod() == null) {
+            return offset;
+        }
+        if (mTransformed instanceof OffsetMapping) {
+            final OffsetMapping transformedText = (OffsetMapping) mTransformed;
+            return transformedText.transformedToOriginal(offset, strategy);
+        }
+        return offset;
+    }
+
+    /**
+     * Convenient method to convert an offset on the original text to the transformed text.
+     * @hide
+     */
+    public int originalToTransformed(int offset, @OffsetMapping.MapStrategy int strategy) {
+        if (getTransformationMethod() == null) {
+            return offset;
+        }
+        if (mTransformed instanceof OffsetMapping) {
+            final OffsetMapping transformedText = (OffsetMapping) mTransformed;
+            return transformedText.originalToTransformed(offset, strategy);
+        }
+        return offset;
+    }
     /**
      * Handles drag events sent by the system following a call to
      * {@link android.view.View#startDragAndDrop(ClipData,DragShadowBuilder,Object,int)

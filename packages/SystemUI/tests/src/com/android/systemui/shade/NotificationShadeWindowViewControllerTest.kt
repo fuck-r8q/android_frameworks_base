@@ -21,7 +21,7 @@ import android.testing.TestableLooper.RunWithLooper
 import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.test.filters.SmallTest
-import com.android.keyguard.KeyguardHostViewController
+import com.android.keyguard.KeyguardSecurityContainerController
 import com.android.keyguard.LockIconViewController
 import com.android.keyguard.dagger.KeyguardBouncerComponent
 import com.android.systemui.R
@@ -31,6 +31,7 @@ import com.android.systemui.dock.DockManager
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardBouncerViewModel
 import com.android.systemui.shade.NotificationShadeWindowView.InteractionEventHandler
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
@@ -44,13 +45,16 @@ import com.android.systemui.statusbar.phone.CentralSurfaces
 import com.android.systemui.statusbar.phone.PhoneStatusBarViewController
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
+import com.android.systemui.util.mockito.any
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.Mockito.anyFloat
+import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when` as whenever
@@ -101,9 +105,9 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
     @Mock
     private lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
     @Mock lateinit var keyguardBouncerComponentFactory: KeyguardBouncerComponent.Factory
-    @Mock lateinit var keyguardBouncerContainer: ViewGroup
     @Mock lateinit var keyguardBouncerComponent: KeyguardBouncerComponent
-    @Mock lateinit var keyguardHostViewController: KeyguardHostViewController
+    @Mock lateinit var keyguardSecurityContainerController: KeyguardSecurityContainerController
+    @Mock lateinit var keyguardTransitionInteractor: KeyguardTransitionInteractor
 
     private lateinit var interactionEventHandlerCaptor: ArgumentCaptor<InteractionEventHandler>
     private lateinit var interactionEventHandler: InteractionEventHandler
@@ -114,6 +118,12 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
     fun setUp() {
         MockitoAnnotations.initMocks(this)
         whenever(view.bottom).thenReturn(VIEW_BOTTOM)
+        whenever(view.findViewById<ViewGroup>(R.id.keyguard_bouncer_container))
+                .thenReturn(mock(ViewGroup::class.java))
+        whenever(keyguardBouncerComponentFactory.create(any(ViewGroup::class.java)))
+                .thenReturn(keyguardBouncerComponent)
+        whenever(keyguardBouncerComponent.securityContainerController)
+                .thenReturn(keyguardSecurityContainerController)
         underTest = NotificationShadeWindowViewController(
             lockscreenShadeTransitionController,
             FalsingCollectorFake(),
@@ -136,7 +146,8 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
             featureFlags,
             keyguardBouncerViewModel,
             keyguardBouncerComponentFactory,
-            alternateBouncerInteractor
+            alternateBouncerInteractor,
+            keyguardTransitionInteractor,
         )
         underTest.setupExpandedStatusBar()
 
@@ -272,6 +283,7 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
 
     @Test
     fun testGetBouncerContainer() {
+        Mockito.clearInvocations(view)
         underTest.bouncerContainer
         verify(view).findViewById<ViewGroup>(R.id.keyguard_bouncer_container)
     }

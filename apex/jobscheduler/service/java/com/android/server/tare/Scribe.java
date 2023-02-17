@@ -16,6 +16,7 @@
 
 package com.android.server.tare;
 
+import static android.app.tare.EconomyManager.ENABLED_MODE_OFF;
 import static android.text.format.DateUtils.HOUR_IN_MILLIS;
 
 import static com.android.server.tare.TareUtils.appToString;
@@ -662,7 +663,7 @@ public class Scribe {
             // Remove mCleanRunnable callbacks since we're going to clean up the ledgers before
             // writing anyway.
             TareHandlerThread.getHandler().removeCallbacks(mCleanRunnable);
-            if (!mIrs.isEnabled()) {
+            if (mIrs.getEnabledMode() == ENABLED_MODE_OFF) {
                 // If it's no longer enabled, we would have cleared all the data in memory and would
                 // accidentally write an empty file, thus deleting all the history.
                 return;
@@ -717,8 +718,8 @@ public class Scribe {
         out.startTag(null, XML_TAG_USER);
         out.attributeInt(null, XML_ATTR_USER_ID, userId);
         out.attributeLong(null, XML_ATTR_TIME_SINCE_FIRST_SETUP_MS,
-                mRealtimeSinceUsersAddedOffsets.get(userId,
-                        mLoadedTimeSinceFirstSetup + SystemClock.elapsedRealtime()));
+                mRealtimeSinceUsersAddedOffsets.get(userId, mLoadedTimeSinceFirstSetup)
+                        + SystemClock.elapsedRealtime());
         for (int pIdx = mLedgers.numElementsForKey(userId) - 1; pIdx >= 0; --pIdx) {
             final String pkgName = mLedgers.keyAt(uIdx, pIdx);
             final Ledger ledger = mLedgers.get(userId, pkgName);

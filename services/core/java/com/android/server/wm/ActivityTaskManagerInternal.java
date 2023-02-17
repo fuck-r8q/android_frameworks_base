@@ -21,8 +21,10 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.AppProtoEnums;
+import android.app.BackgroundStartPrivileges;
 import android.app.IActivityManager;
 import android.app.IApplicationThread;
+import android.app.ITaskStackListener;
 import android.app.ProfilerInfo;
 import android.content.ComponentName;
 import android.content.IIntentSender;
@@ -209,14 +211,14 @@ public abstract class ActivityTaskManagerInternal {
             String callingPackage, @Nullable String callingFeatureId, Intent[] intents,
             String[] resolvedTypes, IBinder resultTo, SafeActivityOptions options, int userId,
             boolean validateIncomingUser, PendingIntentRecord originatingPendingIntent,
-            boolean allowBackgroundActivityStart);
+            BackgroundStartPrivileges backgroundStartPrivileges);
 
     public abstract int startActivityInPackage(int uid, int realCallingPid, int realCallingUid,
             String callingPackage, @Nullable String callingFeaturId, Intent intent,
             String resolvedType, IBinder resultTo, String resultWho, int requestCode,
             int startFlags, SafeActivityOptions options, int userId, Task inTask, String reason,
             boolean validateIncomingUser, PendingIntentRecord originatingPendingIntent,
-            boolean allowBackgroundActivityStart);
+            BackgroundStartPrivileges backgroundStartPrivileges);
 
     /**
      * Callback to be called on certain activity start scenarios.
@@ -437,8 +439,6 @@ public abstract class ActivityTaskManagerInternal {
             boolean allowInstrumenting, boolean fromHomeKey);
     /** Start home activities on all displays that support system decorations. */
     public abstract boolean startHomeOnAllDisplays(int userId, String reason);
-    /** @return true if the given process is the factory test process. */
-    public abstract boolean isFactoryTestProcess(WindowProcessController wpc);
     public abstract void updateTopComponentForFactoryTest();
     public abstract void handleAppDied(WindowProcessController wpc, boolean restarting,
             Runnable finishInstrumentationCallback);
@@ -741,4 +741,10 @@ public abstract class ActivityTaskManagerInternal {
      */
     public abstract void restartTaskActivityProcessIfVisible(
             int taskId, @NonNull String packageName);
+
+    /** Sets the task stack listener that gets callbacks when a task stack changes. */
+    public abstract void registerTaskStackListener(ITaskStackListener listener);
+
+    /** Unregister a task stack listener so that it stops receiving callbacks. */;
+    public abstract void unregisterTaskStackListener(ITaskStackListener listener);
 }

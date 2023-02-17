@@ -16,7 +16,6 @@
 
 package com.android.server.wm.flicker.launch
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.Presubmit
 import android.view.WindowInsets
@@ -36,7 +35,7 @@ import com.android.server.wm.flicker.navBarLayerPositionAtEnd
 import com.android.server.wm.flicker.navBarWindowIsVisibleAtEnd
 import com.android.server.wm.flicker.taskBarLayerIsVisibleAtEnd
 import com.android.server.wm.flicker.taskBarWindowIsVisibleAtEnd
-import com.android.server.wm.traces.common.ComponentNameMatcher
+import com.android.server.wm.traces.common.component.matchers.ComponentNameMatcher
 import org.junit.Assume
 import org.junit.FixMethodOrder
 import org.junit.Ignore
@@ -112,9 +111,9 @@ open class OpenAppFromNotificationWarm(flicker: FlickerTest) : OpenAppTransition
             teardown { testApp.exit(wmHelper) }
         }
 
-    @FlakyTest @Test override fun appWindowBecomesVisible() = appWindowBecomesVisible_warmStart()
+    @Presubmit @Test override fun appWindowBecomesVisible() = appWindowBecomesVisible_warmStart()
 
-    @Postsubmit @Test override fun appLayerBecomesVisible() = appLayerBecomesVisible_warmStart()
+    @Presubmit @Test override fun appLayerBecomesVisible() = appLayerBecomesVisible_warmStart()
 
     @Presubmit
     @Test

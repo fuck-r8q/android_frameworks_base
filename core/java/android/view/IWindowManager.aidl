@@ -22,6 +22,7 @@ import com.android.internal.policy.IKeyguardLockedStateListener;
 import com.android.internal.policy.IShortcutService;
 
 import android.app.IAssistDataReceiver;
+import android.content.ComponentName;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -65,6 +66,8 @@ import android.view.WindowManager;
 import android.view.SurfaceControl;
 import android.view.displayhash.DisplayHash;
 import android.view.displayhash.VerifiedDisplayHash;
+import android.window.AddToSurfaceSyncGroupResult;
+import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
 import android.window.ScreenCapture;
 
@@ -280,6 +283,9 @@ interface IWindowManager
      */
     @UnsupportedAppUsage
     void removeRotationWatcher(IRotationWatcher watcher);
+
+    /** Registers the listener to the context token and returns the current proposed rotation. */
+    int registerProposedRotationListener(IBinder contextToken, IRotationWatcher listener);
 
     /**
      * Determine the preferred edge of the screen to pin the compact options menu against.
@@ -984,4 +990,28 @@ interface IWindowManager
      * @return {@code true} if the key will be handled globally.
      */
     boolean isGlobalKey(int keyCode);
+
+    /**
+     * Create or add to a SurfaceSyncGroup in WindowManager. WindowManager maintains some
+     * SurfaceSyncGroups to ensure multiple processes can sync with each other without sharing
+     * SurfaceControls
+     */
+    boolean addToSurfaceSyncGroup(in IBinder syncGroupToken, boolean parentSyncGroupMerge,
+                in @nullable ISurfaceSyncGroupCompletedListener completedListener,
+                out AddToSurfaceSyncGroupResult addToSurfaceSyncGroupResult);
+
+    /**
+     * Mark a SurfaceSyncGroup stored in WindowManager as ready.
+     */
+    oneway void markSurfaceSyncGroupReady(in IBinder syncGroupToken);
+
+    /**
+     * Invoked when a screenshot is taken of the default display to notify registered listeners.
+     *
+     * Should be invoked only by SysUI.
+     *
+     * @param displayId id of the display screenshot.
+     * @return List of ComponentNames corresponding to the activities that were notified.
+    */
+    List<ComponentName> notifyScreenshotListeners(int displayId);
 }

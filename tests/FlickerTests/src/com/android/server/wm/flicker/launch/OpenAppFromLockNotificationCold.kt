@@ -24,7 +24,7 @@ import com.android.server.wm.flicker.FlickerBuilder
 import com.android.server.wm.flicker.FlickerTest
 import com.android.server.wm.flicker.FlickerTestFactory
 import com.android.server.wm.flicker.junit.FlickerParametersRunnerFactory
-import com.android.server.wm.traces.common.ComponentNameMatcher
+import com.android.server.wm.traces.common.component.matchers.ComponentNameMatcher
 import org.junit.FixMethodOrder
 import org.junit.Ignore
 import org.junit.Test
@@ -111,9 +111,6 @@ open class OpenAppFromLockNotificationCold(flicker: FlickerTest) :
     @Test
     @Ignore("Not applicable to this CUJ. Display starts locked and app is full screen at the end")
     override fun navBarWindowIsAlwaysVisible() {}
-
-    /** {@inheritDoc} */
-    @Postsubmit @Test override fun appWindowBecomesVisible() = super.appWindowBecomesVisible()
 
     /** {@inheritDoc} */
     @Postsubmit

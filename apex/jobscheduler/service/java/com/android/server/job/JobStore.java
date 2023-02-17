@@ -70,6 +70,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -131,7 +132,7 @@ public final class JobStore {
     private JobStorePersistStats mPersistInfo = new JobStorePersistStats();
 
     /** Used by the {@link JobSchedulerService} to instantiate the JobStore. */
-    static JobStore initAndGet(JobSchedulerService jobManagerService) {
+    static JobStore get(JobSchedulerService jobManagerService) {
         synchronized (sSingletonLock) {
             if (sSingleton == null) {
                 sSingleton = new JobStore(jobManagerService.getContext(),
@@ -147,6 +148,7 @@ public final class JobStore {
     @VisibleForTesting
     public static JobStore initAndGetForTesting(Context context, File dataDir) {
         JobStore jobStoreUnderTest = new JobStore(context, new Object(), dataDir);
+        jobStoreUnderTest.init();
         jobStoreUnderTest.clearForTesting();
         return jobStoreUnderTest;
     }
@@ -181,8 +183,14 @@ public final class JobStore {
         mXmlTimestamp = mJobsFile.exists()
                 ? mJobsFile.getLastModifiedTime() : mJobFileDirectory.lastModified();
         mRtcGood = (sSystemClock.millis() > mXmlTimestamp);
+    }
 
+    private void init() {
         readJobMapFromDisk(mJobSet, mRtcGood);
+    }
+
+    void initAsync(CountDownLatch completionLatch) {
+        mIoHandler.post(new ReadJobMapFromDiskRunnable(mJobSet, mRtcGood, completionLatch));
     }
 
     private AtomicFile createJobFile(String baseName) {
@@ -199,6 +207,15 @@ public final class JobStore {
 
     public boolean clockNowValidToInflate(long now) {
         return now >= mXmlTimestamp;
+    }
+
+    /**
+     * Runs any necessary work asynchronously. If this is called after
+     * {@link #initAsync(CountDownLatch)}, this ensures the given work runs after
+     * the JobStore is initialized.
+     */
+    void runWorkAsync(@NonNull Runnable r) {
+        mIoHandler.post(r);
     }
 
     /**
@@ -998,14 +1015,21 @@ public final class JobStore {
     private final class ReadJobMapFromDiskRunnable implements Runnable {
         private final JobSet jobSet;
         private final boolean rtcGood;
+        private final CountDownLatch mCompletionLatch;
 
         /**
          * @param jobSet Reference to the (empty) set of JobStatus objects that back the JobStore,
          *               so that after disk read we can populate it directly.
          */
         ReadJobMapFromDiskRunnable(JobSet jobSet, boolean rtcIsGood) {
+            this(jobSet, rtcIsGood, null);
+        }
+
+        ReadJobMapFromDiskRunnable(JobSet jobSet, boolean rtcIsGood,
+                @Nullable CountDownLatch completionLatch) {
             this.jobSet = jobSet;
             this.rtcGood = rtcIsGood;
+            this.mCompletionLatch = completionLatch;
         }
 
         @Override
@@ -1033,10 +1057,10 @@ public final class JobStore {
             }
             boolean needFileMigration = false;
             long nowElapsed = sElapsedRealtimeClock.millis();
-            for (File file : files) {
-                final AtomicFile aFile = createJobFile(file);
-                try (FileInputStream fis = aFile.openRead()) {
-                    synchronized (mLock) {
+            synchronized (mLock) {
+                for (File file : files) {
+                    final AtomicFile aFile = createJobFile(file);
+                    try (FileInputStream fis = aFile.openRead()) {
                         jobs = readJobMapImpl(fis, rtcGood, nowElapsed);
                         if (jobs != null) {
                             for (int i = 0; i < jobs.size(); i++) {
@@ -1054,37 +1078,42 @@ public final class JobStore {
                                 }
                             }
                         }
+                    } catch (FileNotFoundException e) {
+                        // mJobFileDirectory.listFiles() gave us this file...why can't we find it???
+                        Slog.e(TAG, "Could not find jobs file: " + file.getName());
+                    } catch (XmlPullParserException | IOException e) {
+                        Slog.wtf(TAG, "Error in " + file.getName(), e);
+                    } catch (Exception e) {
+                        // Crashing at this point would result in a boot loop, so live with a
+                        // generic Exception for system stability's sake.
+                        Slog.wtf(TAG, "Unexpected exception", e);
                     }
-                } catch (FileNotFoundException e) {
-                    // mJobFileDirectory.listFiles() gave us this file...why can't we find it???
-                    Slog.e(TAG, "Could not find jobs file: " + file.getName());
-                } catch (XmlPullParserException | IOException e) {
-                    Slog.wtf(TAG, "Error in " + file.getName(), e);
-                } catch (Exception e) {
-                    // Crashing at this point would result in a boot loop, so live with a general
-                    // Exception for system stability's sake.
-                    Slog.wtf(TAG, "Unexpected exception", e);
-                }
-                if (mUseSplitFiles) {
-                    if (!file.getName().startsWith(JOB_FILE_SPLIT_PREFIX)) {
-                        // We're supposed to be using the split file architecture, but we still have
-                        // the old job file around. Fully migrate and remove the old file.
+                    if (mUseSplitFiles) {
+                        if (!file.getName().startsWith(JOB_FILE_SPLIT_PREFIX)) {
+                            // We're supposed to be using the split file architecture,
+                            // but we still have
+                            // the old job file around. Fully migrate and remove the old file.
+                            needFileMigration = true;
+                        }
+                    } else if (file.getName().startsWith(JOB_FILE_SPLIT_PREFIX)) {
+                        // We're supposed to be using the legacy single file architecture,
+                        // but we still have some job split files around. Fully migrate
+                        // and remove the split files.
                         needFileMigration = true;
                     }
-                } else if (file.getName().startsWith(JOB_FILE_SPLIT_PREFIX)) {
-                    // We're supposed to be using the legacy single file architecture, but we still
-                    // have some job split files around. Fully migrate and remove the split files.
-                    needFileMigration = true;
                 }
-            }
-            if (mPersistInfo.countAllJobsLoaded < 0) { // Only set them once.
-                mPersistInfo.countAllJobsLoaded = numJobs;
-                mPersistInfo.countSystemServerJobsLoaded = numSystemJobs;
-                mPersistInfo.countSystemSyncManagerJobsLoaded = numSyncJobs;
+                if (mPersistInfo.countAllJobsLoaded < 0) { // Only set them once.
+                    mPersistInfo.countAllJobsLoaded = numJobs;
+                    mPersistInfo.countSystemServerJobsLoaded = numSystemJobs;
+                    mPersistInfo.countSystemSyncManagerJobsLoaded = numSyncJobs;
+                }
             }
             Slog.i(TAG, "Read " + numJobs + " jobs");
             if (needFileMigration) {
                 migrateJobFilesAsync();
+            }
+            if (mCompletionLatch != null) {
+                mCompletionLatch.countDown();
             }
         }
 

@@ -27,6 +27,7 @@ import android.view.Gravity;
 
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.pip.PipSnapAlgorithm;
+import com.android.wm.shell.pip.phone.PipSizeSpecHandler;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -45,13 +46,18 @@ public class TvPipGravityTest extends ShellTestCase {
 
     private TvPipBoundsState mTvPipBoundsState;
     private TvPipBoundsAlgorithm mTvPipBoundsAlgorithm;
+    private PipSizeSpecHandler mPipSizeSpecHandler;
 
     @Before
     public void setUp() {
+        if (!isTelevision()) {
+            return;
+        }
         MockitoAnnotations.initMocks(this);
-        mTvPipBoundsState = new TvPipBoundsState(mContext);
+        mPipSizeSpecHandler = new PipSizeSpecHandler(mContext);
+        mTvPipBoundsState = new TvPipBoundsState(mContext, mPipSizeSpecHandler);
         mTvPipBoundsAlgorithm = new TvPipBoundsAlgorithm(mContext, mTvPipBoundsState,
-                mMockPipSnapAlgorithm);
+                mMockPipSnapAlgorithm, mPipSizeSpecHandler);
 
         setRTL(false);
     }
@@ -90,17 +96,20 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void regularPip_defaultGravity() {
+        assumeTelevision();
         checkGravity(mTvPipBoundsState.getDefaultGravity(), Gravity.RIGHT | Gravity.BOTTOM);
     }
 
     @Test
     public void regularPip_defaultGravity_RTL() {
+        assumeTelevision();
         setRTL(true);
         checkGravity(mTvPipBoundsState.getDefaultGravity(), Gravity.LEFT | Gravity.BOTTOM);
     }
 
     @Test
     public void updateGravity_expand_vertical() {
+        assumeTelevision();
         // Vertical expanded PiP.
         mTvPipBoundsState.setDesiredTvExpandedAspectRatio(VERTICAL_EXPANDED_ASPECT_RATIO, true);
 
@@ -116,6 +125,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_expand_horizontal() {
+        assumeTelevision();
         // Horizontal expanded PiP.
         mTvPipBoundsState.setDesiredTvExpandedAspectRatio(HORIZONTAL_EXPANDED_ASPECT_RATIO, true);
 
@@ -131,6 +141,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_collapse() {
+        assumeTelevision();
         // Vertical expansion
         mTvPipBoundsState.setDesiredTvExpandedAspectRatio(VERTICAL_EXPANDED_ASPECT_RATIO, true);
         assertGravityAfterCollapse(Gravity.CENTER_VERTICAL | Gravity.RIGHT,
@@ -148,6 +159,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_collapse_RTL() {
+        assumeTelevision();
         setRTL(true);
 
         // Horizontal expansion
@@ -160,6 +172,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_expand_collapse() {
+        assumeTelevision();
         // Vertical expanded PiP.
         mTvPipBoundsState.setDesiredTvExpandedAspectRatio(VERTICAL_EXPANDED_ASPECT_RATIO, true);
 
@@ -179,6 +192,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_expand_move_collapse() {
+        assumeTelevision();
         // Vertical expanded PiP.
         mTvPipBoundsState.setDesiredTvExpandedAspectRatio(VERTICAL_EXPANDED_ASPECT_RATIO, true);
         expandMoveCollapseCheck(Gravity.TOP | Gravity.RIGHT, KEYCODE_DPAD_LEFT,
@@ -211,6 +225,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_move_regular_valid() {
+        assumeTelevision();
         mTvPipBoundsState.setTvPipGravity(Gravity.BOTTOM | Gravity.RIGHT);
         // clockwise
         moveAndCheckGravity(KEYCODE_DPAD_LEFT, Gravity.BOTTOM | Gravity.LEFT, true);
@@ -226,6 +241,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_move_expanded_valid() {
+        assumeTelevision();
         mTvPipBoundsState.setTvPipExpanded(true);
 
         // Vertical expanded PiP.
@@ -243,6 +259,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_move_regular_invalid() {
+        assumeTelevision();
         int gravity = Gravity.BOTTOM | Gravity.RIGHT;
         mTvPipBoundsState.setTvPipGravity(gravity);
         moveAndCheckGravity(KEYCODE_DPAD_DOWN, gravity, false);
@@ -266,6 +283,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void updateGravity_move_expanded_invalid() {
+        assumeTelevision();
         mTvPipBoundsState.setTvPipExpanded(true);
 
         // Vertical expanded PiP.
@@ -295,6 +313,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void previousCollapsedGravity_defaultValue() {
+        assumeTelevision();
         assertEquals(mTvPipBoundsState.getTvPipPreviousCollapsedGravity(),
                 mTvPipBoundsState.getDefaultGravity());
         setRTL(true);
@@ -304,6 +323,7 @@ public class TvPipGravityTest extends ShellTestCase {
 
     @Test
     public void previousCollapsedGravity_changes_on_RTL() {
+        assumeTelevision();
         mTvPipBoundsState.setTvPipPreviousCollapsedGravity(Gravity.TOP | Gravity.LEFT);
         setRTL(true);
         assertEquals(mTvPipBoundsState.getTvPipPreviousCollapsedGravity(),

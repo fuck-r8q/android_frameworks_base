@@ -22,16 +22,20 @@ import android.app.usage.UsageStatsManagerInternal;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IBackgroundInstallControlService;
+import android.content.pm.InstallSourceInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ParceledListSlice;
+import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.Slog;
@@ -50,6 +54,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
@@ -121,7 +126,18 @@ public class BackgroundInstallControlService extends SystemService {
         @Override
         public ParceledListSlice<PackageInfo> getBackgroundInstalledPackages(
                 @PackageManager.PackageInfoFlagsBits long flags, int userId) {
-            return mService.getBackgroundInstalledPackages(flags, userId);
+            if (!Build.IS_DEBUGGABLE) {
+                return mService.getBackgroundInstalledPackages(flags, userId);
+            }
+            // The debug.transparency.bg-install-apps (only works for debuggable builds)
+            // is used to set mock list of background installed apps for testing.
+            // The list of apps' names is delimited by ",".
+            String propertyString = SystemProperties.get("debug.transparency.bg-install-apps");
+            if (TextUtils.isEmpty(propertyString)) {
+                return mService.getBackgroundInstalledPackages(flags, userId);
+            } else {
+                return mService.getMockBackgroundInstalledPackages(propertyString);
+            }
         }
     }
 
@@ -142,6 +158,27 @@ public class BackgroundInstallControlService extends SystemService {
         }
 
         return new ParceledListSlice<>(packages);
+    }
+
+    /**
+     * Mock a list of background installed packages based on the property string.
+     */
+    @NonNull
+    ParceledListSlice<PackageInfo> getMockBackgroundInstalledPackages(
+            @NonNull String propertyString) {
+        String[] mockPackageNames = propertyString.split(",");
+        List<PackageInfo> mockPackages = new ArrayList<>();
+        for (String name : mockPackageNames) {
+            try {
+                PackageInfo packageInfo = mPackageManager.getPackageInfo(name,
+                        PackageManager.PackageInfoFlags.of(PackageManager.MATCH_ALL));
+                mockPackages.add(packageInfo);
+            } catch (PackageManager.NameNotFoundException e) {
+                Slog.w(TAG, "Package's PackageInfo not found " + name);
+                continue;
+            }
+        }
+        return new ParceledListSlice<>(mockPackages);
     }
 
     private static class EventHandler extends Handler {
@@ -183,10 +220,12 @@ public class BackgroundInstallControlService extends SystemService {
             return;
         }
 
-        String installerPackageName = null;
+        String installerPackageName;
+        String initiatingPackageName;
         try {
-            installerPackageName = mPackageManager
-                    .getInstallSourceInfo(packageName).getInstallingPackageName();
+            final InstallSourceInfo installInfo = mPackageManager.getInstallSourceInfo(packageName);
+            installerPackageName = installInfo.getInstallingPackageName();
+            initiatingPackageName = installInfo.getInitiatingPackageName();
         } catch (PackageManager.NameNotFoundException e) {
             Slog.w(TAG, "Package's installer not found " + packageName);
             return;
@@ -196,13 +235,20 @@ public class BackgroundInstallControlService extends SystemService {
         final long installTimestamp = System.currentTimeMillis()
                 - (SystemClock.uptimeMillis() - appInfo.createTimestamp);
 
-        if (wasForegroundInstallation(installerPackageName, userId, installTimestamp)) {
+        if (installedByAdb(initiatingPackageName)
+                || wasForegroundInstallation(installerPackageName, userId, installTimestamp)) {
             return;
         }
 
         initBackgroundInstalledPackages();
         mBackgroundInstalledPackages.add(userId, packageName);
         writeBackgroundInstalledPackagesToDisk();
+    }
+
+    // ADB sets installerPackageName to null, this creates a loophole to bypass BIC which will be
+    // addressed with b/265203007
+    private boolean installedByAdb(String initiatingPackageName) {
+        return initiatingPackageName == null;
     }
 
     private boolean wasForegroundInstallation(String installerPackageName,

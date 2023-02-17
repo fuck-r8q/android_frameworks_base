@@ -40,14 +40,22 @@ oneway interface ITvInteractiveAppSessionCallback {
     void onTeletextAppStateChanged(int state);
     void onAdBuffer(in AdBuffer buffer);
     void onCommandRequest(in String cmdType, in Bundle parameters);
+    void onTimeShiftCommandRequest(in String cmdType, in Bundle parameters);
     void onSetVideoBounds(in Rect rect);
+    void onRequestCurrentVideoBounds();
     void onRequestCurrentChannelUri();
     void onRequestCurrentChannelLcn();
     void onRequestStreamVolume();
     void onRequestTrackInfoList();
     void onRequestCurrentTvInputId();
-    void onRequestStartRecording(in Uri programUri);
+    void onRequestTimeShiftMode();
+    void onRequestAvailableSpeeds();
+    void onRequestStartRecording(in String requestId, in Uri programUri);
     void onRequestStopRecording(in String recordingId);
+    void onRequestScheduleRecording(in String requestId, in String inputId, in Uri channelUri,
+            in Uri programUri, in Bundle params);
+    void onRequestScheduleRecording2(in String requestId, in String inputId, in Uri channelUri,
+            long start, long duration, int repeat, in Bundle params);
     void onSetTvRecordingInfo(in String recordingId, in TvRecordingInfo recordingInfo);
     void onRequestTvRecordingInfo(in String recordingId);
     void onRequestTvRecordingInfoList(in int type);

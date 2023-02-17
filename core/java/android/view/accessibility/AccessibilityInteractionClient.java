@@ -275,7 +275,8 @@ public final class AccessibilityInteractionClient
      *
      * @param connection The ViewRootImpl's {@link IAccessibilityInteractionConnection}.
      */
-    public static int addDirectConnection(IAccessibilityInteractionConnection connection) {
+    public static int addDirectConnection(IAccessibilityInteractionConnection connection,
+            AccessibilityManager accessibilityManager) {
         synchronized (sConnectionCache) {
             int connectionId = sDirectConnectionIdCounter++;
             if (getConnection(connectionId) != null) {
@@ -283,7 +284,7 @@ public final class AccessibilityInteractionClient
                         "Cannot add direct connection with existing id " + connectionId);
             }
             DirectAccessibilityConnection directAccessibilityConnection =
-                    new DirectAccessibilityConnection(connection);
+                    new DirectAccessibilityConnection(connection, accessibilityManager);
             sConnectionCache.put(connectionId, directAccessibilityConnection);
             sDirectConnectionCount++;
             // Do not use AccessibilityCache for this connection, since there is no corresponding
@@ -921,8 +922,6 @@ public final class AccessibilityInteractionClient
      *
      * @param connectionId The id of a connection for interacting with the system.
      * @param accessibilityWindowId A unique window id. Use
-     *     {@link AccessibilityWindowInfo#ACTIVE_WINDOW_ID}
-     *     to query the currently active window. Use
      *     {@link AccessibilityWindowInfo#ANY_WINDOW_ID} to query all
      *     windows
      * @param accessibilityNodeId A unique view id or virtual descendant id from
@@ -1640,7 +1639,7 @@ public final class AccessibilityInteractionClient
                 }
                 connection.attachAccessibilityOverlayToWindow(accessibilityWindowId, sc);
             } catch (RemoteException re) {
-                Log.e(LOG_TAG, "Error while calling remote attachAccessibilityOverlayToWindow", re);
+                re.rethrowFromSystemServer();
             }
         }
     }

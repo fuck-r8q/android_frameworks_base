@@ -25,10 +25,9 @@ import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.annotation.UiContext;
-import android.companion.virtual.VirtualDevice;
 import android.companion.virtual.VirtualDeviceManager;
-import android.companion.virtual.VirtualDeviceParams;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.AttributionSource;
 import android.content.AutofillOptions;
@@ -1360,7 +1359,13 @@ class ContextImpl extends Context {
     }
 
     @Override
+    @SuppressLint("AndroidFrameworkRequiresPermission")
     public void sendOrderedBroadcast(Intent intent, String receiverPermission) {
+        sendOrderedBroadcast(intent, receiverPermission, /*options=*/ null);
+    }
+
+    @Override
+    public void sendOrderedBroadcast(Intent intent, String receiverPermission, Bundle options) {
         warnIfCallingFromSystemProcess();
         String resolvedType = intent.resolveTypeIfNeeded(getContentResolver());
         String[] receiverPermissions = receiverPermission == null ? null
@@ -1370,8 +1375,8 @@ class ContextImpl extends Context {
             ActivityManager.getService().broadcastIntentWithFeature(
                     mMainThread.getApplicationThread(), getAttributionTag(), intent, resolvedType,
                     null, Activity.RESULT_OK, null, null, receiverPermissions,
-                    null /*excludedPermissions=*/, null, AppOpsManager.OP_NONE, null, true, false,
-                    getUserId());
+                    null /*excludedPermissions=*/, null, AppOpsManager.OP_NONE, options, true,
+                    false, getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1978,14 +1983,30 @@ class ContextImpl extends Context {
     @Override
     public boolean bindService(Intent service, ServiceConnection conn, int flags) {
         warnIfCallingFromSystemProcess();
-        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), null,
-                getUser());
+        return bindServiceCommon(service, conn, Integer.toUnsignedLong(flags), null,
+                mMainThread.getHandler(), null, getUser());
+    }
+
+    @Override
+    public boolean bindService(Intent service, ServiceConnection conn,
+            @NonNull BindServiceFlags flags) {
+        warnIfCallingFromSystemProcess();
+        return bindServiceCommon(service, conn, flags.getValue(), null, mMainThread.getHandler(),
+                null, getUser());
     }
 
     @Override
     public boolean bindService(
             Intent service, int flags, Executor executor, ServiceConnection conn) {
-        return bindServiceCommon(service, conn, flags, null, null, executor, getUser());
+        return bindServiceCommon(service, conn, Integer.toUnsignedLong(flags), null, null, executor,
+                getUser());
+    }
+
+    @Override
+    public boolean bindService(Intent service, @NonNull BindServiceFlags flags, Executor executor,
+            ServiceConnection conn) {
+        return bindServiceCommon(service, conn, flags.getValue(), null, null, executor,
+                getUser());
     }
 
     @Override
@@ -1995,13 +2016,33 @@ class ContextImpl extends Context {
         if (instanceName == null) {
             throw new NullPointerException("null instanceName");
         }
-        return bindServiceCommon(service, conn, flags, instanceName, null, executor, getUser());
+        return bindServiceCommon(service, conn, Integer.toUnsignedLong(flags), instanceName, null, executor,
+                getUser());
+    }
+
+    @Override
+    public boolean bindIsolatedService(Intent service, @NonNull BindServiceFlags flags,
+            String instanceName, Executor executor, ServiceConnection conn) {
+        warnIfCallingFromSystemProcess();
+        if (instanceName == null) {
+            throw new NullPointerException("null instanceName");
+        }
+        return bindServiceCommon(service, conn, flags.getValue(), instanceName, null, executor,
+                getUser());
     }
 
     @Override
     public boolean bindServiceAsUser(Intent service, ServiceConnection conn, int flags,
             UserHandle user) {
-        return bindServiceCommon(service, conn, flags, null, mMainThread.getHandler(), null, user);
+        return bindServiceCommon(service, conn, Integer.toUnsignedLong(flags), null,
+                mMainThread.getHandler(), null, user);
+    }
+
+    @Override
+    public boolean bindServiceAsUser(Intent service, ServiceConnection conn,
+            @NonNull BindServiceFlags flags, UserHandle user) {
+        return bindServiceCommon(service, conn, flags.getValue(), null,
+                mMainThread.getHandler(), null, user);
     }
 
     /** @hide */
@@ -2011,13 +2052,24 @@ class ContextImpl extends Context {
         if (handler == null) {
             throw new IllegalArgumentException("handler must not be null.");
         }
-        return bindServiceCommon(service, conn, flags, null, handler, null, user);
+        return bindServiceCommon(service, conn, Integer.toUnsignedLong(flags), null, handler,
+                null, user);
+    }
+
+    @Override
+    public boolean bindServiceAsUser(Intent service, ServiceConnection conn,
+            @NonNull BindServiceFlags flags, Handler handler, UserHandle user) {
+        if (handler == null) {
+            throw new IllegalArgumentException("handler must not be null.");
+        }
+        return bindServiceCommon(service, conn, flags.getValue(), null, handler,
+                null, user);
     }
 
     /** @hide */
     @Override
     public IServiceConnection getServiceDispatcher(ServiceConnection conn, Handler handler,
-            int flags) {
+            long flags) {
         return mPackageInfo.getServiceDispatcher(conn, getOuterContext(), handler, flags);
     }
 
@@ -2030,7 +2082,7 @@ class ContextImpl extends Context {
     /** @hide */
     @NonNull
     @Override
-    public IBinder getIApplicationThreadBinder() {
+    public IBinder getProcessToken() {
         return getIApplicationThread().asBinder();
     }
 
@@ -2040,7 +2092,7 @@ class ContextImpl extends Context {
         return mMainThread.getHandler();
     }
 
-    private boolean bindServiceCommon(Intent service, ServiceConnection conn, int flags,
+    private boolean bindServiceCommon(Intent service, ServiceConnection conn, long flags,
             String instanceName, Handler handler, Executor executor, UserHandle user) {
         // Keep this in sync with DevicePolicyManager.bindDeviceAdminServiceAsUser and
         // ActivityManagerLocal.bindSdkSandboxService
@@ -2584,6 +2636,22 @@ class ContextImpl extends Context {
     }
 
     @Override
+    public Context createContextForSdkInSandbox(ApplicationInfo sdkInfo, int flags)
+            throws NameNotFoundException {
+        if (!Process.isSdkSandbox()) {
+            throw new SecurityException("API can only be called from SdkSandbox process");
+        }
+
+        ContextImpl ctx = (ContextImpl) createApplicationContext(sdkInfo, flags);
+
+        // Set sandbox app's context as the application context for sdk context
+        ctx.mPackageInfo.makeApplicationInner(/*forceDefaultAppClass=*/false,
+                /*instrumentation=*/null);
+
+        return ctx;
+    }
+
+    @Override
     public Context createPackageContext(String packageName, int flags)
             throws NameNotFoundException {
         return createPackageContextAsUser(packageName, flags, mUser);
@@ -2742,9 +2810,12 @@ class ContextImpl extends Context {
 
     @Override
     public @NonNull Context createDeviceContext(int deviceId) {
-        if (!isValidDeviceId(deviceId)) {
-            throw new IllegalArgumentException(
-                    "Not a valid ID of the default device or any virtual device: " + deviceId);
+        if (deviceId != VirtualDeviceManager.DEVICE_ID_DEFAULT) {
+            VirtualDeviceManager vdm = getSystemService(VirtualDeviceManager.class);
+            if (!vdm.isValidVirtualDeviceId(deviceId)) {
+                throw new IllegalArgumentException(
+                        "Not a valid ID of the default device or any virtual device: " + deviceId);
+            }
         }
 
         ContextImpl context = new ContextImpl(this, mMainThread, mPackageInfo, mParams,
@@ -2755,31 +2826,6 @@ class ContextImpl extends Context {
         context.mDeviceId = deviceId;
         context.mIsExplicitDeviceId = true;
         return context;
-    }
-
-    /**
-     * Checks whether the passed {@code deviceId} is valid or not.
-     * {@link VirtualDeviceManager#DEVICE_ID_DEFAULT} is valid as it is the ID of the default
-     * device when no additional virtual devices exist. If {@code deviceId} is the id of
-     * a virtual device, it should correspond to a virtual device created by
-     * {@link VirtualDeviceManager#createVirtualDevice(int, VirtualDeviceParams)}.
-     */
-    private boolean isValidDeviceId(int deviceId) {
-        if (deviceId == VirtualDeviceManager.DEVICE_ID_DEFAULT) {
-            return true;
-        }
-        if (deviceId > VirtualDeviceManager.DEVICE_ID_DEFAULT) {
-            VirtualDeviceManager vdm = getSystemService(VirtualDeviceManager.class);
-            if (vdm != null) {
-                List<VirtualDevice> virtualDevices = vdm.getVirtualDevices();
-                for (int i = 0; i < virtualDevices.size(); i++) {
-                    if (virtualDevices.get(i).getDeviceId() == deviceId) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     @NonNull
@@ -3044,27 +3090,28 @@ class ContextImpl extends Context {
 
     @Override
     public void updateDeviceId(int updatedDeviceId) {
-        if (!isValidDeviceId(updatedDeviceId)) {
-            throw new IllegalArgumentException(
-                    "Not a valid ID of the default device or any virtual device: "
-                            + updatedDeviceId);
+        if (updatedDeviceId != VirtualDeviceManager.DEVICE_ID_DEFAULT) {
+            VirtualDeviceManager vdm = getSystemService(VirtualDeviceManager.class);
+            if (!vdm.isValidVirtualDeviceId(updatedDeviceId)) {
+                throw new IllegalArgumentException(
+                        "Not a valid ID of the default device or any virtual device: "
+                                + updatedDeviceId);
+            }
         }
         if (mIsExplicitDeviceId) {
             throw new UnsupportedOperationException(
                     "Cannot update device ID on a Context created with createDeviceContext()");
         }
-        mDeviceId = updatedDeviceId;
-        notifyOnDeviceChangedListeners(updatedDeviceId);
+
+        if (mDeviceId != updatedDeviceId) {
+            mDeviceId = updatedDeviceId;
+            notifyOnDeviceChangedListeners(updatedDeviceId);
+        }
     }
 
     @Override
     public int getDeviceId() {
         return mDeviceId;
-    }
-
-    @Override
-    public boolean isDeviceContext() {
-        return mIsExplicitDeviceId || isAssociatedWithDisplay();
     }
 
     @Override

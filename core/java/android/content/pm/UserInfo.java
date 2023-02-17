@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import android.annotation.TestApi;
 import android.annotation.UserIdInt;
 import android.compat.annotation.UnsupportedAppUsage;
+import android.content.res.Resources;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.UserHandle;
@@ -171,6 +172,16 @@ public class UserInfo implements Parcelable {
     public static final int FLAG_MAIN = 0x00004000;
 
     /**
+     * Indicates that this user was created for the purposes of testing.
+     *
+     * <p>These users are subject to removal during tests and should not be used on actual devices
+     * used by humans.
+     *
+     * @hide
+     */
+    public static final int FLAG_FOR_TESTING = 0x00008000;
+
+    /**
      * @hide
      */
     @IntDef(flag = true, prefix = "FLAG_", value = {
@@ -188,7 +199,8 @@ public class UserInfo implements Parcelable {
             FLAG_SYSTEM,
             FLAG_PROFILE,
             FLAG_EPHEMERAL_ON_CREATE,
-            FLAG_MAIN
+            FLAG_MAIN,
+            FLAG_FOR_TESTING
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserInfoFlag {
@@ -369,6 +381,12 @@ public class UserInfo implements Parcelable {
         return (flags & FLAG_EPHEMERAL) == FLAG_EPHEMERAL;
     }
 
+    /** @hide */
+    @TestApi
+    public boolean isForTesting() {
+        return (flags & FLAG_FOR_TESTING) == FLAG_FOR_TESTING;
+    }
+
     public boolean isInitialized() {
         return (flags & FLAG_INITIALIZED) == FLAG_INITIALIZED;
     }
@@ -389,24 +407,6 @@ public class UserInfo implements Parcelable {
     }
 
     /**
-     * Returns true if the user is a split system user.
-     * <p>If {@link UserManager#isSplitSystemUser split system user mode} is not enabled,
-     * the method always returns false.
-     */
-    public boolean isSystemOnly() {
-        return isSystemOnly(id);
-    }
-
-    /**
-     * Returns true if the given user is a split system user.
-     * <p>If {@link UserManager#isSplitSystemUser split system user mode} is not enabled,
-     * the method always returns false.
-     */
-    public static boolean isSystemOnly(int userId) {
-        return userId == UserHandle.USER_SYSTEM && UserManager.isSplitSystemUser();
-    }
-
-    /**
      * @return true if this user can be switched to.
      **/
     public boolean supportsSwitchTo() {
@@ -419,16 +419,25 @@ public class UserInfo implements Parcelable {
             // Don't support switching to pre-created users until they become "real" users.
             return false;
         }
-        return !isProfile();
+        return isFull() || canSwitchToHeadlessSystemUser();
+    }
+
+    /**
+     * @return true if user is of type {@link UserManager#USER_TYPE_SYSTEM_HEADLESS} and
+     * {@link com.android.internal.R.bool.config_canSwitchToHeadlessSystemUser} is true.
+     */
+    private boolean canSwitchToHeadlessSystemUser() {
+        return UserManager.USER_TYPE_SYSTEM_HEADLESS.equals(userType) && Resources.getSystem()
+                .getBoolean(com.android.internal.R.bool.config_canSwitchToHeadlessSystemUser);
     }
 
     /**
      * @return true if this user can be switched to by end user through UI.
+     * @deprecated Use {@link UserInfo#supportsSwitchTo} instead.
      */
+    @Deprecated
     public boolean supportsSwitchToByUser() {
-        // Hide the system user when it does not represent a human user.
-        boolean hideSystemUser = UserManager.isHeadlessSystemUserMode();
-        return (!hideSystemUser || id != UserHandle.USER_SYSTEM) && supportsSwitchTo();
+        return supportsSwitchTo();
     }
 
     // TODO(b/142482943): Make this logic more specific and customizable. (canHaveProfile(userType))
@@ -437,11 +446,7 @@ public class UserInfo implements Parcelable {
         if (isProfile() || isGuest() || isRestricted()) {
             return false;
         }
-        if (UserManager.isSplitSystemUser() || UserManager.isHeadlessSystemUserMode()) {
-            return id != UserHandle.USER_SYSTEM;
-        } else {
-            return id == UserHandle.USER_SYSTEM;
-        }
+        return isMain();
     }
 
     // TODO(b/142482943): Get rid of this (after removing it from all tests) if feasible.

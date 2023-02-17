@@ -176,7 +176,7 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
         }
 
         Surface postviewSurface = null;
-        if (burstCaptureSurface != null) {
+        if (burstCaptureSurface != null && config.getPostviewOutputConfiguration() != null) {
             CameraExtensionUtils.SurfaceInfo burstCaptureSurfaceInfo =
                     CameraExtensionUtils.querySurface(burstCaptureSurface);
             Size burstCaptureSurfaceSize =
@@ -193,8 +193,7 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
             postviewSurface = CameraExtensionUtils.getPostviewSurface(
                         config.getPostviewOutputConfiguration(), supportedPostviewSizes,
                         burstCaptureSurfaceInfo.mFormat);
-
-            if ((config.getPostviewOutputConfiguration() != null) && (postviewSurface == null)) {
+            if (postviewSurface == null) {
                 throw new IllegalArgumentException("Unsupported output surface for postview!");
             }
         }
@@ -362,7 +361,7 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
     }
 
     @Override
-    public Pair<Long, Long> getRealtimeStillCaptureLatency() throws CameraAccessException {
+    public StillCaptureLatency getRealtimeStillCaptureLatency() throws CameraAccessException {
         synchronized (mInterfaceLock) {
             if (!mInitialized) {
                 throw new IllegalStateException("Uninitialized component");
@@ -371,7 +370,7 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
             try {
                 LatencyPair latency = mSessionProcessor.getRealtimeCaptureLatency();
                 if (latency != null) {
-                    return new Pair<>(latency.first, latency.second);
+                    return new StillCaptureLatency(latency.first, latency.second);
                 }
 
                 return null;
@@ -456,11 +455,17 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
     }
 
     private void validateCaptureRequestTargets(@NonNull CaptureRequest request) {
-        if ((request.getTargets().size() == 1) &&
-                (!request.containsTarget(mClientRepeatingRequestSurface) ||
-                !request.containsTarget(mClientCaptureSurface))) {
-            throw new IllegalArgumentException("Target output combination requested is " +
-                    "not supported!");
+        if (request.getTargets().size() == 1) {
+            boolean containsCaptureTarget =
+                    mClientCaptureSurface != null && request.containsTarget(mClientCaptureSurface);
+            boolean containsRepeatingTarget =
+                    mClientRepeatingRequestSurface != null &&
+                    request.containsTarget(mClientRepeatingRequestSurface);
+
+            if (!containsCaptureTarget && !containsRepeatingTarget) {
+                throw new IllegalArgumentException("Target output combination requested is " +
+                        "not supported!");
+            }
         }
 
         if ((request.getTargets().size() == 2) &&
@@ -609,8 +614,15 @@ public final class CameraAdvancedExtensionSessionImpl extends CameraExtensionSes
             boolean status = true;
             synchronized (mInterfaceLock) {
                 try {
-                    mSessionProcessor.onCaptureSessionStart(mRequestProcessor);
-                    mInitialized = true;
+                    if (mSessionProcessor != null) {
+                        mSessionProcessor.onCaptureSessionStart(mRequestProcessor);
+                        mInitialized = true;
+                    } else {
+                        Log.v(TAG, "Failed to start capture session, session released before " +
+                                "extension start!");
+                        status = false;
+                        mCaptureSession.close();
+                    }
                 } catch (RemoteException e) {
                     Log.e(TAG, "Failed to start capture session,"
                             + " extension service does not respond!");

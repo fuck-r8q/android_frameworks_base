@@ -16,6 +16,13 @@
 
 package com.android.server.credentials;
 
+import static com.android.server.credentials.MetricUtilities.METRICS_API_NAME_CLEAR_CREDENTIAL;
+import static com.android.server.credentials.MetricUtilities.METRICS_API_NAME_CREATE_CREDENTIAL;
+import static com.android.server.credentials.MetricUtilities.METRICS_API_NAME_GET_CREDENTIAL;
+import static com.android.server.credentials.MetricUtilities.METRICS_API_NAME_UNKNOWN;
+import static com.android.server.credentials.MetricUtilities.METRICS_API_STATUS_FAILURE;
+import static com.android.server.credentials.MetricUtilities.METRICS_API_STATUS_SUCCESS;
+
 import android.annotation.NonNull;
 import android.annotation.UserIdInt;
 import android.content.ComponentName;
@@ -23,11 +30,18 @@ import android.content.Context;
 import android.credentials.ui.ProviderData;
 import android.credentials.ui.UserSelectionDialogResult;
 import android.os.Binder;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.service.credentials.CallingAppInfo;
 import android.service.credentials.CredentialProviderInfo;
 import android.util.Log;
+
+import com.android.internal.R;
+import com.android.internal.util.FrameworkStatsLog;
+import com.android.server.credentials.metrics.CandidateProviderMetric;
+import com.android.server.credentials.metrics.ChosenProviderMetric;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,37 +51,69 @@ import java.util.Map;
  * Base class of a request session, that listens to UI events. This class must be extended
  * every time a new response type is expected from the providers.
  */
-abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialManagerUiCallback{
+abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialManagerUiCallback {
     private static final String TAG = "RequestSession";
 
     // TODO: Revise access levels of attributes
-    @NonNull protected final T mClientRequest;
-    @NonNull protected final U mClientCallback;
-    @NonNull protected final IBinder mRequestId;
-    @NonNull protected final Context mContext;
-    @NonNull protected final CredentialManagerUi mCredentialManagerUi;
-    @NonNull protected final String mRequestType;
-    @NonNull protected final Handler mHandler;
-    @NonNull protected boolean mIsFirstUiTurn = true;
-    @UserIdInt protected final int mUserId;
-    @NonNull protected final String mClientCallingPackage;
+    @NonNull
+    protected final T mClientRequest;
+    @NonNull
+    protected final U mClientCallback;
+    @NonNull
+    protected final IBinder mRequestId;
+    @NonNull
+    protected final Context mContext;
+    @NonNull
+    protected final CredentialManagerUi mCredentialManagerUi;
+    @NonNull
+    protected final String mRequestType;
+    @NonNull
+    protected final Handler mHandler;
+    @UserIdInt
+    protected final int mUserId;
+    private final int mCallingUid;
+    @NonNull
+    protected final CallingAppInfo mClientAppInfo;
+    @NonNull
+    protected final CancellationSignal mCancellationSignal;
 
     protected final Map<String, ProviderSession> mProviders = new HashMap<>();
+    protected ChosenProviderMetric mChosenProviderMetric = new ChosenProviderMetric();
+    //TODO improve design to allow grouped metrics per request
+    protected final String mHybridService;
+
+    @NonNull protected RequestSessionStatus mRequestSessionStatus =
+            RequestSessionStatus.IN_PROGRESS;
+
+    /** The status in which a given request session is. */
+    enum RequestSessionStatus {
+        /** Request is in progress. This is the status a request session is instantiated with. */
+        IN_PROGRESS,
+        /** Request has been cancelled by the developer. */
+        CANCELLED,
+        /** Request is complete. */
+        COMPLETE
+    }
 
     protected RequestSession(@NonNull Context context,
-            @UserIdInt int userId, @NonNull T clientRequest, U clientCallback,
+            @UserIdInt int userId, int callingUid, @NonNull T clientRequest, U clientCallback,
             @NonNull String requestType,
-            String clientCallingPackage) {
+            CallingAppInfo callingAppInfo,
+            CancellationSignal cancellationSignal) {
         mContext = context;
         mUserId = userId;
+        mCallingUid = callingUid;
         mClientRequest = clientRequest;
         mClientCallback = clientCallback;
         mRequestType = requestType;
-        mClientCallingPackage = clientCallingPackage;
+        mClientAppInfo = callingAppInfo;
+        mCancellationSignal = cancellationSignal;
         mHandler = new Handler(Looper.getMainLooper(), null, true);
         mRequestId = new Binder();
         mCredentialManagerUi = new CredentialManagerUi(mContext,
                 mUserId, this);
+        mHybridService = context.getResources().getString(
+                R.string.config_defaultCredentialManagerHybridService);
     }
 
     public abstract ProviderSession initiateProviderSession(CredentialProviderInfo providerInfo,
@@ -79,6 +125,14 @@ abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialMan
 
     @Override // from CredentialManagerUiCallbacks
     public void onUiSelection(UserSelectionDialogResult selection) {
+        if (mRequestSessionStatus == RequestSessionStatus.COMPLETE) {
+            Log.i(TAG, "Request has already been completed. This is strange.");
+            return;
+        }
+        if (isSessionCancelled()) {
+            finishSession(/*propagateCancellation=*/true);
+            return;
+        }
         String providerId = selection.getProviderId();
         Log.i(TAG, "onUiSelection, providerId: " + providerId);
         ProviderSession providerSession = mProviders.get(providerId);
@@ -91,60 +145,16 @@ abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialMan
                 selection.getEntrySubkey(), selection.getPendingIntentProviderResponse());
     }
 
-    @Override // from CredentialManagerUiCallbacks
-    public void onUiCancellation() {
-        Log.i(TAG, "Ui canceled");
-        // User canceled the activity
-        finishSession();
-    }
-
-    protected void onProviderStatusChanged(ProviderSession.Status status,
-            ComponentName componentName) {
-        Log.i(TAG, "in onStatusChanged with status: " + status);
-        if (ProviderSession.isTerminatingStatus(status)) {
-            Log.i(TAG, "in onStatusChanged terminating status");
-            onProviderTerminated(componentName);
-            //TODO: Check if this was the provider we were waiting for and can invoke the UI now
-        } else if (ProviderSession.isCompletionStatus(status)) {
-            Log.i(TAG, "in onStatusChanged isCompletionStatus status");
-            onProviderResponseComplete(componentName);
-        } else if (ProviderSession.isUiInvokingStatus(status)) {
-            Log.i(TAG, "in onStatusChanged isUiInvokingStatus status");
-            onProviderResponseRequiresUi();
-        }
-    }
-
-    protected void onProviderTerminated(ComponentName componentName) {
-        //TODO: Implement
-    }
-
-    protected void onProviderResponseComplete(ComponentName componentName) {
-        //TODO: Implement
-    }
-
-    protected void onProviderResponseRequiresUi() {
-        Log.i(TAG, "in onProviderResponseComplete");
-        // TODO: Determine whether UI has already been invoked, and deal accordingly
-        if (!isAnyProviderPending()) {
-            Log.i(TAG, "in onProviderResponseComplete - isResponseCompleteAcrossProviders");
-            getProviderDataAndInitiateUi();
-        } else {
-            Log.i(TAG, "Can't invoke UI - waiting on some providers");
-        }
-    }
-
-    protected void finishSession() {
+    protected void finishSession(boolean propagateCancellation) {
         Log.i(TAG, "finishing session");
-        clearProviderSessions();
-    }
-
-    protected void clearProviderSessions() {
-        Log.i(TAG, "Clearing sessions");
-        //TODO: Implement
+        if (propagateCancellation) {
+            mProviders.values().forEach(ProviderSession::cancelProviderRemoteSession);
+        }
+        mRequestSessionStatus = RequestSessionStatus.COMPLETE;
         mProviders.clear();
     }
 
-    boolean isAnyProviderPending() {
+    protected boolean isAnyProviderPending() {
         for (ProviderSession session : mProviders.values()) {
             if (ProviderSession.isStatusWaitingForRemoteResponse(session.getStatus())) {
                 return true;
@@ -152,10 +162,79 @@ abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialMan
         }
         return false;
     }
+    // TODO: move these definitions to a separate logging focused class.
+    enum RequestType {
+        GET_CREDENTIALS,
+        CREATE_CREDENTIALS,
+        CLEAR_CREDENTIALS,
+    }
 
-    private void getProviderDataAndInitiateUi() {
+    private static int getApiNameFromRequestType(RequestType requestType) {
+        switch (requestType) {
+            case GET_CREDENTIALS:
+                return METRICS_API_NAME_GET_CREDENTIAL;
+            case CREATE_CREDENTIALS:
+                return METRICS_API_NAME_CREATE_CREDENTIAL;
+            case CLEAR_CREDENTIALS:
+                return METRICS_API_NAME_CLEAR_CREDENTIAL;
+            default:
+                return METRICS_API_NAME_UNKNOWN;
+        }
+    }
+
+    protected void logApiCalled(RequestType requestType, boolean isSuccessfulOverall) {
+        var providerSessions = mProviders.values();
+        int providerSize = providerSessions.size();
+        int[] candidateUidList = new int[providerSize];
+        int[] candidateQueryRoundTripTimeList = new int[providerSize];
+        int[] candidateStatusList = new int[providerSize];
+        int index = 0;
+        for (var session : providerSessions) {
+            CandidateProviderMetric metric = session.mCandidateProviderMetric;
+            candidateUidList[index] = metric.getCandidateUid();
+            candidateQueryRoundTripTimeList[index] = metric.getQueryLatencyMs();
+            candidateStatusList[index] = metric.getProviderQueryStatus();
+            index++;
+        }
+        FrameworkStatsLog.write(FrameworkStatsLog.CREDENTIAL_MANAGER_API_CALLED,
+                /* api_name */getApiNameFromRequestType(requestType), /* caller_uid */
+                mCallingUid, /* api_status */
+                isSuccessfulOverall ? METRICS_API_STATUS_SUCCESS : METRICS_API_STATUS_FAILURE,
+                candidateUidList,
+                candidateQueryRoundTripTimeList,
+                candidateStatusList, mChosenProviderMetric.getChosenUid(),
+                mChosenProviderMetric.getEntireProviderLatencyMs(),
+                mChosenProviderMetric.getFinalPhaseLatencyMs(),
+                mChosenProviderMetric.getChosenProviderStatus());
+    }
+
+    protected boolean isSessionCancelled() {
+        return mCancellationSignal.isCanceled();
+    }
+
+    /**
+     * Returns true if at least one provider is ready for UI invocation, and no
+     * provider is pending a response.
+     */
+    boolean isUiInvocationNeeded() {
+        for (ProviderSession session : mProviders.values()) {
+            if (ProviderSession.isUiInvokingStatus(session.getStatus())) {
+                return true;
+            } else if (ProviderSession.isStatusWaitingForRemoteResponse(session.getStatus())) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    void getProviderDataAndInitiateUi() {
         Log.i(TAG, "In getProviderDataAndInitiateUi");
         Log.i(TAG, "In getProviderDataAndInitiateUi providers size: " + mProviders.size());
+
+        if (isSessionCancelled()) {
+            finishSession(/*propagateCancellation=*/true);
+            return;
+        }
 
         ArrayList<ProviderData> providerDataList = new ArrayList<>();
         for (ProviderSession session : mProviders.values()) {
@@ -168,7 +247,25 @@ abstract class RequestSession<T, U> implements CredentialManagerUi.CredentialMan
         }
         if (!providerDataList.isEmpty()) {
             Log.i(TAG, "provider list not empty about to initiate ui");
-            launchUiWithProviderData(providerDataList);
+            if (isSessionCancelled()) {
+                Log.i(TAG, "In getProviderDataAndInitiateUi but session has been cancelled");
+            } else {
+                launchUiWithProviderData(providerDataList);
+            }
         }
+    }
+
+    /**
+     * Called by RequestSession's upon chosen metric determination.
+     * @param componentName the componentName to associate with a provider
+     */
+    protected void setChosenMetric(ComponentName componentName) {
+        CandidateProviderMetric metric = this.mProviders.get(componentName.flattenToString())
+                .mCandidateProviderMetric;
+        mChosenProviderMetric.setChosenUid(metric.getCandidateUid());
+        mChosenProviderMetric.setFinalFinishTimeNanoseconds(System.nanoTime());
+        mChosenProviderMetric.setQueryFinishTimeNanoseconds(
+                metric.getQueryFinishTimeNanoseconds());
+        mChosenProviderMetric.setStartTimeNanoseconds(metric.getStartTimeNanoseconds());
     }
 }

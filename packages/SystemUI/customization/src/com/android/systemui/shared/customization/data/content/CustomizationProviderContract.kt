@@ -113,6 +113,11 @@ object CustomizationProviderContract {
                  * opens a destination where the user can re-enable the disabled affordance.
                  */
                 const val ENABLEMENT_COMPONENT_NAME = "enablement_action_intent"
+                /**
+                 * Byte array. Optional parcelled `Intent` to use to start an activity that can be
+                 * used to configure the affordance.
+                 */
+                const val CONFIGURE_INTENT = "configure_intent"
             }
         }
 
@@ -172,6 +177,12 @@ object CustomizationProviderContract {
 
         /** Flag denoting whether the customizable clocks feature is enabled. */
         const val FLAG_NAME_CUSTOM_CLOCKS_ENABLED = "is_custom_clocks_feature_enabled"
+
+        /** Flag denoting whether the Wallpaper preview should use the full screen UI. */
+        const val FLAG_NAME_WALLPAPER_FULLSCREEN_PREVIEW = "wallpaper_fullscreen_preview"
+
+        /** Flag denoting whether the Monochromatic Theme is enabled. */
+        const val FLAG_NAME_MONOCHROMATIC_THEME = "is_monochromatic_theme_enabled"
 
         object Columns {
             /** String. Unique ID for the flag. */

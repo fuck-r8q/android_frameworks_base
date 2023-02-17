@@ -158,6 +158,7 @@ public class HardwareRenderer {
     private boolean mOpaque = true;
     private boolean mForceDark = false;
     private @ActivityInfo.ColorMode int mColorMode = ActivityInfo.COLOR_MODE_DEFAULT;
+    private float mDesiredSdrHdrRatio = 1f;
 
     /**
      * Creates a new instance of a HardwareRenderer. The HardwareRenderer will default
@@ -319,7 +320,8 @@ public class HardwareRenderer {
      * @param surfaceControl The surface control to pass to render thread in hwui.
      *        If null, any previous references held in render thread will be discarded.
     */
-    public void setSurfaceControl(@Nullable SurfaceControl surfaceControl) {
+    public void setSurfaceControl(@Nullable SurfaceControl surfaceControl,
+            @Nullable BLASTBufferQueue blastBufferQueue) {
         nSetSurfaceControl(mNativeProxy, surfaceControl != null ? surfaceControl.mNativeObject : 0);
     }
 
@@ -643,11 +645,12 @@ public class HardwareRenderer {
      * @param colorMode The @{@link ActivityInfo.ColorMode} to request
      * @hide
      */
-    public void setColorMode(@ActivityInfo.ColorMode int colorMode) {
+    public float setColorMode(@ActivityInfo.ColorMode int colorMode) {
         if (mColorMode != colorMode) {
             mColorMode = colorMode;
-            nSetColorMode(mNativeProxy, colorMode);
+            mDesiredSdrHdrRatio = nSetColorMode(mNativeProxy, colorMode);
         }
+        return mDesiredSdrHdrRatio;
     }
 
     /**
@@ -661,6 +664,12 @@ public class HardwareRenderer {
         nSetSdrWhitePoint(mNativeProxy, whitePoint);
         mColorMode = colorMode;
         nSetColorMode(mNativeProxy, colorMode);
+    }
+
+    /** @hide */
+    public void setTargetHdrSdrRatio(float ratio) {
+        if (ratio < 1.f || !Float.isFinite(ratio)) ratio = 1.f;
+        nSetTargetSdrHdrRatio(mNativeProxy, ratio);
     }
 
     /**
@@ -989,6 +998,15 @@ public class HardwareRenderer {
      */
     public void notifyCallbackPending() {
         nNotifyCallbackPending(mNativeProxy);
+    }
+
+    /**
+     * Notifies the hardware renderer about upcoming expensive frames.
+     *
+     * @hide
+     */
+    public void notifyExpensiveFrame() {
+        nNotifyExpensiveFrame(mNativeProxy);
     }
 
     /**
@@ -1334,6 +1352,8 @@ public class HardwareRenderer {
             final OverlayProperties overlayProperties = defaultDisplay.getOverlaySupport();
             boolean supportFp16ForHdr = overlayProperties != null
                     ? overlayProperties.supportFp16ForHdr() : false;
+            boolean supportMixedColorSpaces = overlayProperties != null
+                    ? overlayProperties.supportMixedColorSpaces() : false;
 
             for (int i = 0; i < allDisplays.length; i++) {
                 final Display display = allDisplays[i];
@@ -1361,7 +1381,7 @@ public class HardwareRenderer {
             nInitDisplayInfo(largestWidth, largestHeight, defaultDisplay.getRefreshRate(),
                     wideColorDataspace, defaultDisplay.getAppVsyncOffsetNanos(),
                     defaultDisplay.getPresentationDeadlineNanos(),
-                    supportFp16ForHdr);
+                    supportFp16ForHdr, supportMixedColorSpaces);
 
             mDisplayInitialized = true;
         }
@@ -1440,7 +1460,9 @@ public class HardwareRenderer {
 
     private static native void nSetOpaque(long nativeProxy, boolean opaque);
 
-    private static native void nSetColorMode(long nativeProxy, int colorMode);
+    private static native float nSetColorMode(long nativeProxy, int colorMode);
+
+    private static native void nSetTargetSdrHdrRatio(long nativeProxy, float ratio);
 
     private static native void nSetSdrWhitePoint(long nativeProxy, float whitePoint);
 
@@ -1542,7 +1564,7 @@ public class HardwareRenderer {
 
     private static native void nInitDisplayInfo(int width, int height, float refreshRate,
             int wideColorDataspace, long appVsyncOffsetNanos, long presentationDeadlineNanos,
-            boolean supportsFp16ForHdr);
+            boolean supportsFp16ForHdr, boolean nInitDisplayInfo);
 
     private static native void nSetDrawingEnabled(boolean drawingEnabled);
 
@@ -1551,4 +1573,6 @@ public class HardwareRenderer {
     private static native void nSetRtAnimationsEnabled(boolean rtAnimationsEnabled);
 
     private static native void nNotifyCallbackPending(long nativeProxy);
+
+    private static native void nNotifyExpensiveFrame(long nativeProxy);
 }

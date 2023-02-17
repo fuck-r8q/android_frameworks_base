@@ -22,6 +22,8 @@ import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.PermissionMethod;
+import android.annotation.PermissionName;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -48,7 +50,6 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PermissionName;
 import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -593,7 +594,7 @@ public final class Settings {
 
     /**
      * Activity Action: Show settings to allow configuration of
-     * {@link Manifest.permission#RUN_LONG_JOBS} permission
+     * {@link Manifest.permission#RUN_USER_INITIATED_JOBS} permission
      *
      * Input: Optionally, the Intent's data URI can specify the application package name to
      * directly invoke the management GUI specific to the package name. For example
@@ -602,6 +603,8 @@ public final class Settings {
      * Output: When a package data uri is passed as input, the activity result is set to
      * {@link android.app.Activity#RESULT_OK} if the permission was granted to the app. Otherwise,
      * the result is set to {@link android.app.Activity#RESULT_CANCELED}.
+     *
+     * @hide
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_APP_LONG_RUNNING_JOBS =
@@ -1057,13 +1060,30 @@ public final class Settings {
      * In some cases, a matching Activity may not exist, so ensure you
      * safeguard against this.
      * <p>
-     * Input: Nothing.
-     * <p>
+     * Input: The optional {@code #EXTRA_EXPLICIT_LOCALES} with language tags that contains locales
+     * to limit available locales. This is only supported when device is under demo mode.
+     * If intent does not contain this extra, it will show system supported locale list.
+     * <br/>
+     * If {@code #EXTRA_EXPLICIT_LOCALES} contain a unsupported locale, it will still show this
+     * locale on list, but may not be supported by the devcie.
+     *
      * Output: Nothing.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_LOCALE_SETTINGS =
             "android.settings.LOCALE_SETTINGS";
+
+    /**
+     * Activity Extra: Show explicit locales in launched locale picker activity.
+     *
+     * This can be passed as an extra field in an Activity Intent with one or more language tags
+     * as a {@link LocaleList}. This must be passed as an extra field to the
+     * {@link #ACTION_LOCALE_SETTINGS}.
+     *
+     * @hide
+     */
+    public static final String EXTRA_EXPLICIT_LOCALES =
+            "android.provider.extra.EXPLICIT_LOCALES";
 
     /**
      * Activity Action: Show settings to allow configuration of per application locale.
@@ -1077,6 +1097,17 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APP_LOCALE_SETTINGS =
             "android.settings.APP_LOCALE_SETTINGS";
+
+    /**
+     * Activity Action: Show settings to allow configuration of regional preferences
+     * <p>
+     * Input: Nothing
+     * <p>
+     * Output: Nothing.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REGIONAL_PREFERENCES_SETTINGS =
+            "android.settings.REGIONAL_PREFERENCES_SETTINGS";
 
     /**
      * Activity Action: Show settings to allow configuration of lockscreen.
@@ -1680,7 +1711,6 @@ public final class Settings {
      * Input: Nothing.
      * <p>
      * Output: Nothing
-     * @see android.nfc.NfcAdapter#isNdefPushEnabled()
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_NFCSHARING_SETTINGS =
@@ -2501,6 +2531,7 @@ public final class Settings {
      *
      * @hide
      */
+    @SystemApi
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_SHOW_RESTRICTED_SETTING_DIALOG =
             "android.settings.SHOW_RESTRICTED_SETTING_DIALOG";
@@ -5545,6 +5576,44 @@ public final class Settings {
         public static final String POINTER_SPEED = "pointer_speed";
 
         /**
+         * Touchpad pointer speed setting.
+         * This is an integer value in a range between -7 and +7, so there are 15 possible values.
+         *   -7 = slowest
+         *    0 = default speed
+         *   +7 = fastest
+         * @hide
+         */
+        public static final String TOUCHPAD_POINTER_SPEED = "touchpad_pointer_speed";
+
+        /**
+         * Whether to invert the touchpad scrolling direction.
+         *
+         * If set to 1 (the default), moving two fingers downwards on the touchpad will scroll
+         * upwards, consistent with normal touchscreen scrolling. If set to 0, moving two fingers
+         * downwards will scroll downwards.
+         *
+         * @hide
+         */
+        public static final String TOUCHPAD_NATURAL_SCROLLING = "touchpad_natural_scrolling";
+
+        /**
+         * Whether to enable tap-to-click on touchpads.
+         *
+         * @hide
+         */
+        public static final String TOUCHPAD_TAP_TO_CLICK = "touchpad_tap_to_click";
+
+        /**
+         * Whether to enable a right-click zone on touchpads.
+         *
+         * When set to 1, pressing to click in a section on the right-hand side of the touchpad will
+         * result in a context click (a.k.a. right click).
+         *
+         * @hide
+         */
+        public static final String TOUCHPAD_RIGHT_CLICK_ZONE = "touchpad_right_click_zone";
+
+        /**
          * Whether lock-to-app will be triggered by long-press on recents.
          * @hide
          */
@@ -5730,6 +5799,10 @@ public final class Settings {
             PRIVATE_SETTINGS.add(DISPLAY_COLOR_MODE_VENDOR_HINT);
             PRIVATE_SETTINGS.add(DESKTOP_MODE);
             PRIVATE_SETTINGS.add(LOCALE_PREFERENCES);
+            PRIVATE_SETTINGS.add(TOUCHPAD_POINTER_SPEED);
+            PRIVATE_SETTINGS.add(TOUCHPAD_NATURAL_SCROLLING);
+            PRIVATE_SETTINGS.add(TOUCHPAD_TAP_TO_CLICK);
+            PRIVATE_SETTINGS.add(TOUCHPAD_RIGHT_CLICK_ZONE);
         }
 
         /**
@@ -6128,7 +6201,6 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.ADB_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.ASSISTED_GPS_ENABLED);
             MOVED_TO_GLOBAL.add(Settings.Global.BLUETOOTH_ON);
-            MOVED_TO_GLOBAL.add(Settings.Global.BUGREPORT_IN_POWER_MENU);
             MOVED_TO_GLOBAL.add(Settings.Global.CDMA_CELL_BROADCAST_SMS);
             MOVED_TO_GLOBAL.add(Settings.Global.CDMA_ROAMING_MODE);
             MOVED_TO_GLOBAL.add(Settings.Global.CDMA_SUBSCRIPTION_MODE);
@@ -6749,12 +6821,24 @@ public final class Settings {
         /**
          * When the user has enable the option to have a "bug report" command
          * in the power menu.
-         * @deprecated Use {@link android.provider.Settings.Global#BUGREPORT_IN_POWER_MENU} instead
          * @hide
          */
-        @Deprecated
         @Readable
         public static final String BUGREPORT_IN_POWER_MENU = "bugreport_in_power_menu";
+
+        /**
+         * The package name for the custom bugreport handler app. This app must be bugreport
+         * allow-listed. This is currently used only by Power Menu short press.
+         * @hide
+         */
+        public static final String CUSTOM_BUGREPORT_HANDLER_APP = "custom_bugreport_handler_app";
+
+        /**
+         * The user id for the custom bugreport handler app. This is currently used only by Power
+         * Menu short press.
+         * @hide
+         */
+        public static final String CUSTOM_BUGREPORT_HANDLER_USER = "custom_bugreport_handler_user";
 
         /**
          * @deprecated Use {@link android.provider.Settings.Global#ADB_ENABLED} instead
@@ -6820,6 +6904,58 @@ public final class Settings {
          */
         public static final String BLUETOOTH_LE_BROADCAST_APP_SOURCE_NAME =
                 "bluetooth_le_broadcast_app_source_name";
+
+        /**
+         * Ringtone routing value for hearing aid. It routes ringtone to hearing aid or device
+         * speaker.
+         * <ul>
+         *     <li> 0 = Default
+         *     <li> 1 = Route to hearing aid
+         *     <li> 2 = Route to device speaker
+         * </ul>
+         * @hide
+         */
+        public static final String HEARING_AID_RINGTONE_ROUTING =
+                "hearing_aid_ringtone_routing";
+
+        /**
+         * Phone call routing value for hearing aid. It routes phone call to hearing aid or
+         * device speaker.
+         * <ul>
+         *     <li> 0 = Default
+         *     <li> 1 = Route to hearing aid
+         *     <li> 2 = Route to device speaker
+         * </ul>
+         * @hide
+         */
+        public static final String HEARING_AID_CALL_ROUTING =
+                "hearing_aid_call_routing";
+
+        /**
+         * Media routing value for hearing aid. It routes media to hearing aid or device
+         * speaker.
+         * <ul>
+         *     <li> 0 = Default
+         *     <li> 1 = Route to hearing aid
+         *     <li> 2 = Route to device speaker
+         * </ul>
+         * @hide
+         */
+        public static final String HEARING_AID_MEDIA_ROUTING =
+                "hearing_aid_media_routing";
+
+        /**
+         * System sounds routing value for hearing aid. It routes system sounds to hearing aid
+         * or device speaker.
+         * <ul>
+         *     <li> 0 = Default
+         *     <li> 1 = Route to hearing aid
+         *     <li> 2 = Route to device speaker
+         * </ul>
+         * @hide
+         */
+        public static final String HEARING_AID_SYSTEM_SOUNDS_ROUTING =
+                "hearing_aid_system_sounds_routing";
 
         /**
          * Setting to indicate that on device captions are enabled.
@@ -7214,6 +7350,9 @@ public final class Settings {
          *
          * Format like "ime0;subtype0;subtype1;subtype2:ime1:ime2;subtype0"
          * where imeId is ComponentName and subtype is int32.
+         *
+         * <p>Note: This setting is not readable to the app targeting API level 34 or higher. use
+         * {@link android.view.inputmethod.InputMethodManager#getEnabledInputMethodList()} instead.
          */
         @Readable(maxTargetSdk = Build.VERSION_CODES.TIRAMISU)
         public static final String ENABLED_INPUT_METHODS = "enabled_input_methods";
@@ -7244,7 +7383,7 @@ public final class Settings {
          * @hide
          */
         @SuppressLint("NoSettingsProvider")
-        public static final String STYLUS_BUTTONS_DISABLED = "stylus_buttons_disabled";
+        public static final String STYLUS_BUTTONS_ENABLED = "stylus_buttons_enabled";
 
         /**
          * Host name and port for global http proxy. Uses ':' seperator for
@@ -8646,6 +8785,12 @@ public final class Settings {
         public static final String BACKUP_AUTO_RESTORE = "backup_auto_restore";
 
         /**
+         * Controls whether framework backup scheduling is enabled.
+         * @hide
+         */
+        public static final String BACKUP_SCHEDULING_ENABLED = "backup_scheduling_enabled";
+
+        /**
          * Indicates whether settings backup has been fully provisioned.
          * Type: int ( 0 = unprovisioned, 1 = fully provisioned )
          * @hide
@@ -9388,12 +9533,28 @@ public final class Settings {
         public static final int DOCK_SETUP_PROMPTED = 3;
 
         /**
+         * Indicates that the user has started dock setup but never finished it.
+         * One of the possible states for {@link #DOCK_SETUP_STATE}.
+         *
+         * @hide
+         */
+        public static final int DOCK_SETUP_INCOMPLETE = 4;
+
+        /**
          * Indicates that the user has completed dock setup.
          * One of the possible states for {@link #DOCK_SETUP_STATE}.
          *
          * @hide
          */
         public static final int DOCK_SETUP_COMPLETED = 10;
+
+        /**
+         * Indicates that dock setup timed out before the user could complete it.
+         * One of the possible states for {@link #DOCK_SETUP_STATE}.
+         *
+         * @hide
+         */
+        public static final int DOCK_SETUP_TIMED_OUT = 11;
 
         /** @hide */
         @Retention(RetentionPolicy.SOURCE)
@@ -9402,7 +9563,9 @@ public final class Settings {
                 DOCK_SETUP_STARTED,
                 DOCK_SETUP_PAUSED,
                 DOCK_SETUP_PROMPTED,
-                DOCK_SETUP_COMPLETED
+                DOCK_SETUP_INCOMPLETE,
+                DOCK_SETUP_COMPLETED,
+                DOCK_SETUP_TIMED_OUT
         })
         public @interface DockSetupState {
         }
@@ -9671,7 +9834,7 @@ public final class Settings {
         /**
          * Indicates whether "seen" notifications should be suppressed from the lockscreen.
          * <p>
-         * Type: int (0 for false, 1 for true)
+         * Type: int (0 for unset, 1 for true, 2 for false)
          *
          * @hide
          */
@@ -9974,11 +10137,12 @@ public final class Settings {
                 "fingerprint_side_fps_auth_downtime";
 
         /**
-         * Whether or not a SFPS device is required to be interactive for auth to unlock the device.
+         * Whether or not a SFPS device is enabling the performant auth setting.
+         * The "_V2" suffix was added to re-introduce the default behavior for
+         * users. See b/265264294 fore more details.
          * @hide
          */
-        public static final String SFPS_REQUIRE_SCREEN_ON_TO_AUTH_ENABLED =
-                "sfps_require_screen_on_to_auth_enabled";
+        public static final String SFPS_PERFORMANT_AUTH_ENABLED = "sfps_performant_auth_enabled_v2";
 
         /**
          * Whether or not debugging is enabled.
@@ -10063,6 +10227,28 @@ public final class Settings {
          */
         public static final String ACTIVE_UNLOCK_ON_UNLOCK_INTENT_WHEN_BIOMETRIC_ENROLLED =
                 "active_unlock_on_unlock_intent_when_biometric_enrolled";
+
+        /**
+         * If active unlock triggers on unlock intents, then also request active unlock on
+         * these wake-up reasons. See {@link PowerManager.WakeReason} for value mappings.
+         * WakeReasons should be separated by a pipe. For example: "0|3" or "0". If this
+         * setting should be disabled, then this should be set to an empty string. A null value
+         * will use the system default value (WAKE_REASON_UNFOLD_DEVICE).
+         * @hide
+         */
+        public static final String ACTIVE_UNLOCK_WAKEUPS_CONSIDERED_UNLOCK_INTENTS =
+                "active_unlock_wakeups_considered_unlock_intents";
+
+        /**
+         * If active unlock triggers and succeeds on these wakeups, force dismiss keyguard on
+         * these wake reasons. See {@link PowerManager#WakeReason} for value mappings.
+         * WakeReasons should be separated by a pipe. For example: "0|3" or "0". If this
+         * setting should be disabled, then this should be set to an empty string. A null value
+         * will use the system default value (WAKE_REASON_UNFOLD_DEVICE).
+         * @hide
+         */
+        public static final String ACTIVE_UNLOCK_WAKEUPS_TO_FORCE_DISMISS_KEYGUARD =
+                "active_unlock_wakeups_to_force_dismiss_keyguard";
 
         /**
          * Whether the assist gesture should be enabled.
@@ -10944,11 +11130,27 @@ public final class Settings {
         public static final int ACCESSIBILITY_MAGNIFICATION_MODE_ALL = 0x3;
 
         /**
+         * Whether the magnification always on feature is enabled. If true, the magnifier will not
+         * deactivate on Activity transitions; it will only zoom out to 100%.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MAGNIFICATION_ALWAYS_ON_ENABLED =
+                "accessibility_magnification_always_on_enabled";
+
+        /**
          * Whether the following typing focus feature for magnification is enabled.
          * @hide
          */
         public static final String ACCESSIBILITY_MAGNIFICATION_FOLLOW_TYPING_ENABLED =
                 "accessibility_magnification_follow_typing_enabled";
+
+        /**
+         * Whether the magnification joystick controller feature is enabled.
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED =
+                "accessibility_magnification_joystick_enabled";
 
         /**
          * Controls magnification capability. Accessibility magnification is capable of at least one
@@ -11249,6 +11451,13 @@ public final class Settings {
          */
         public static final String EXTRA_AUTOMATIC_POWER_SAVE_MODE =
                 "extra_automatic_power_save_mode";
+
+        /**
+         * Whether lockscreen weather is enabled.
+         *
+         * @hide
+         */
+        public static final String LOCK_SCREEN_WEATHER_ENABLED = "lockscreen_weather_enabled";
 
         /**
          * These entries are considered common between the personal and the managed profile,
@@ -11682,26 +11891,32 @@ public final class Settings {
         /**
          * When the user has enable the option to have a "bug report" command
          * in the power menu.
+         * @deprecated Use {@link android.provider.Settings.Secure#BUGREPORT_IN_POWER_MENU} instead
          * @hide
          */
+        @Deprecated
         @Readable
         public static final String BUGREPORT_IN_POWER_MENU = "bugreport_in_power_menu";
 
         /**
          * The package name for the custom bugreport handler app. This app must be whitelisted.
          * This is currently used only by Power Menu short press.
-         *
+         * @deprecated Use {@link android.provider.Settings.Secure#CUSTOM_BUGREPORT_HANDLER_APP}
+         * instead
          * @hide
          */
+        @Deprecated
         @Readable
         public static final String CUSTOM_BUGREPORT_HANDLER_APP = "custom_bugreport_handler_app";
 
         /**
          * The user id for the custom bugreport handler app. This is currently used only by Power
          * Menu short press.
-         *
+         * @deprecated Use {@link android.provider.Settings.Secure#CUSTOM_BUGREPORT_HANDLER_USER}
+         * instead
          * @hide
          */
+        @Deprecated
         @Readable
         public static final String CUSTOM_BUGREPORT_HANDLER_USER = "custom_bugreport_handler_user";
 
@@ -14494,15 +14709,6 @@ public final class Settings {
                 "app_auto_restriction_enabled";
 
         /**
-         * Feature flag to enable or disable the Forced App Standby feature.
-         * Type: int (0 for false, 1 for true)
-         * Default: 1
-         * @hide
-         */
-        @Readable
-        public static final String FORCED_APP_STANDBY_ENABLED = "forced_app_standby_enabled";
-
-        /**
          * Whether or not to enable Forced App Standby on small battery devices.
          * Type: int (0 for false, 1 for true)
          * Default: 0
@@ -14513,34 +14719,13 @@ public final class Settings {
                 = "forced_app_standby_for_small_battery_enabled";
 
         /**
-         * Whether to enable the TARE subsystem as a whole or not.
-         * 1 means enable, 0 means disable.
+         * Whether to enable the TARE subsystem or not.
+         * Valid values are
+         * {@link android.app.tare.EconomyManager#ENABLE_TARE_ON EconomyManager.ENABLE_TARE_*}.
          *
          * @hide
          */
         public static final String ENABLE_TARE = "enable_tare";
-
-        /**
-         * Default value for {@link #ENABLE_TARE}.
-         *
-         * @hide
-         */
-        public static final int DEFAULT_ENABLE_TARE = 1;
-
-        /**
-         * Whether to enable the TARE AlarmManager economic policy or not.
-         * 1 means enable, 0 means disable.
-         *
-         * @hide
-         */
-        public static final String ENABLE_TARE_ALARM_MANAGER = "enable_tare_alarm_manager";
-
-        /**
-         * Default value for {@link #ENABLE_TARE_ALARM_MANAGER}.
-         *
-         * @hide
-         */
-        public static final int DEFAULT_ENABLE_TARE_ALARM_MANAGER = 0;
 
         /**
          * Settings for AlarmManager's TARE EconomicPolicy (list of its economic factors).
@@ -14550,21 +14735,6 @@ public final class Settings {
          * @hide
          */
         public static final String TARE_ALARM_MANAGER_CONSTANTS = "tare_alarm_manager_constants";
-
-        /**
-         * Whether to enable the TARE JobScheduler economic policy or not.
-         * 1 means enable, 0 means disable.
-         *
-         * @hide
-         */
-        public static final String ENABLE_TARE_JOB_SCHEDULER = "enable_tare_job_scheduler";
-
-        /**
-         * Default value for {@link #ENABLE_TARE_JOB_SCHEDULER}.
-         *
-         * @hide
-         */
-        public static final int DEFAULT_ENABLE_TARE_JOB_SCHEDULER = 0;
 
         /**
          * Settings for JobScheduler's TARE EconomicPolicy (list of its economic factors).
@@ -15174,6 +15344,15 @@ public final class Settings {
                 "low_power_mode_suggestion_params";
 
         /**
+         * Whether low power mode reminder is enabled. If this value is 0, the device will not
+         * receive low power notification.
+         *
+         * @hide
+         */
+        public static final String LOW_POWER_MODE_REMINDER_ENABLED =
+                "low_power_mode_reminder_enabled";
+
+        /**
          * If not 0, the activity manager will aggressively finish activities and
          * processes as soon as they are no longer needed.  If 0, the normal
          * extended lifetime is used.
@@ -15285,6 +15464,25 @@ public final class Settings {
          */
         @Readable
         public static final String AUDIO_SAFE_VOLUME_STATE = "audio_safe_volume_state";
+
+        /**
+         * Persisted safe hearding current CSD value. Values are stored as float percentages where
+         * 1.f represents 100% sound dose has been reached.
+         * @hide
+         */
+        public static final String AUDIO_SAFE_CSD_CURRENT_VALUE = "audio_safe_csd_current_value";
+
+        /**
+         * Persisted safe hearding next CSD warning value. Values are stored as float percentages.
+         * @hide
+         */
+        public static final String AUDIO_SAFE_CSD_NEXT_WARNING = "audio_safe_csd_next_warning";
+
+        /**
+         * Persisted safe hearding dose records (see {@link android.media.SoundDoseRecord})
+         * @hide
+         */
+        public static final String AUDIO_SAFE_CSD_DOSE_RECORDS = "audio_safe_csd_dose_records";
 
         /**
          * URL for tzinfo (time zone) updates
@@ -15668,6 +15866,36 @@ public final class Settings {
                 "user_preferred_resolution_width";
 
         /**
+         * The HDR output mode chosen by the user. This is one of:
+         * {@link android.hardware.display.HdrConversionMode#HDR_CONVERSION_PASSTHROUGH},
+         * {@link android.hardware.display.HdrConversionMode#HDR_CONVERSION_SYSTEM},
+         * {@link android.hardware.display.HdrConversionMode#HDR_CONVERSION_FORCE}.
+         *
+         * @hide
+         */
+        @TestApi
+        @Readable
+        public static final String HDR_CONVERSION_MODE = "hdr_conversion_mode";
+
+        /**
+         * The output HDR type chosen by the user in case when {@link #HDR_CONVERSION_MODE} is
+         * {@link #HDR_CONVERSION_FORCE}. This is one of:
+         * {@link android.view.Display.HdrCapabilities#HDR_TYPE_INVALID},
+         * {@link android.view.Display.HdrCapabilities#HDR_TYPE_DOLBY_VISION},
+         * {@link android.view.Display.HdrCapabilities#HDR_TYPE_HDR10},
+         * {@link android.view.Display.HdrCapabilities#HDR_TYPE_HLG},
+         * {@link android.view.Display.HdrCapabilities#HDR_TYPE_HDR10_PLUS}
+         * <p>
+         * The value is {@link android.view.Display.HdrCapabilities#HDR_TYPE_INVALID} when user
+         * chooses SDR output type. </p>
+         *
+         * @hide
+         */
+        @TestApi
+        @Readable
+        public static final String HDR_FORCE_CONVERSION_TYPE = "hdr_force_conversion_type";
+
+        /**
          * The name of the device
          */
         @Readable
@@ -15683,8 +15911,13 @@ public final class Settings {
         public static final String NETWORK_SCORING_PROVISIONED = "network_scoring_provisioned";
 
         /**
-         * Indicates whether the user wants to be prompted for password to decrypt the device on
-         * boot. This only matters if the storage is encrypted.
+         * On devices that use full-disk encryption, indicates whether the primary user's lockscreen
+         * credential is required to decrypt the device on boot.
+         * <p>
+         * This setting does not do anything on devices that use file-based encryption.  With
+         * file-based encryption, the device boots without a credential being needed, but the
+         * lockscreen credential is required to unlock credential-encrypted storage.  All devices
+         * that launched with Android 10 or higher use file-based encryption.
          * <p>
          * Type: int (0 for false, 1 for true)
          *
@@ -16311,6 +16544,9 @@ public final class Settings {
             MOVED_TO_SECURE.add(Global.CHARGING_SOUNDS_ENABLED);
             MOVED_TO_SECURE.add(Global.CHARGING_VIBRATION_ENABLED);
             MOVED_TO_SECURE.add(Global.NOTIFICATION_BUBBLES);
+            MOVED_TO_SECURE.add(Global.BUGREPORT_IN_POWER_MENU);
+            MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_APP);
+            MOVED_TO_SECURE.add(Global.CUSTOM_BUGREPORT_HANDLER_USER);
         }
 
         // Certain settings have been moved from global to the per-user system namespace
@@ -17801,6 +18037,12 @@ public final class Settings {
                     "gesture_touch_and_hold_watchface_enabled";
 
             /**
+             * Whether screenshot is enabled.
+             * @hide
+             */
+            public static final String SCREENSHOT_ENABLED = "screenshot_enabled";
+
+            /**
              * Whether bedtime mode is enabled.
              * @hide
              */
@@ -17911,6 +18153,28 @@ public final class Settings {
             public static final String OEM_SETUP_VERSION = "oem_setup_version";
 
             /**
+             * The key to indicate to Setup Wizard if OEM setup is completed in Wear Services.
+             * @hide
+             */
+            public static final String OEM_SETUP_COMPLETED_STATUS = "oem_setup_completed_status";
+
+             /**
+              * Constant provided to Setup Wizard to inform about failure of OEM setup in Wear
+              * Services. The value should be provided with setting name {@link
+              * #OEM_SETUP_COMPLETED_STATUS}.
+              * @hide
+              */
+            public static final int OEM_SETUP_COMPLETED_FAILURE = 0;
+
+            /**
+             * Constant provided to Setup Wizard to inform about successful completion of OEM setup
+             * in Wear Services. The value should be provided with setting name {@link
+             * #OEM_SETUP_COMPLETED_STATUS}.
+             * @hide
+             */
+            public static final int OEM_SETUP_COMPLETED_SUCCESS = 1;
+
+            /**
              * Controls the gestures feature.
              * @hide
              */
@@ -17996,6 +18260,37 @@ public final class Settings {
             public static final String WRIST_ORIENTATION_MODE = "wear_wrist_orientation_mode";
 
             /**
+             * Current lock screen state of the device
+             * (null = default value of this setting (lockscreen is never set),
+             * 0 = {@link #LOCK_SCREEN_STATE_NONE},
+             * 1 = {@link #LOCK_SCREEN_STATE_PIN},
+             * 2 = {@link #LOCK_SCREEN_STATE_PATTERN})
+             * @hide
+             */
+            public static final String LOCK_SCREEN_STATE = "lock_screen_state";
+
+            /**
+             * No lock screen set
+             * One of the possible states for {@link #LOCK_SCREEN_STATE}.
+             * @hide
+             */
+            public static final int LOCK_SCREEN_STATE_NONE = 0;
+
+            /**
+             * Lock screen set as a pin
+             * One of the possible states for {@link #LOCK_SCREEN_STATE}.
+             * @hide
+             */
+            public static final int LOCK_SCREEN_STATE_PIN = 1;
+
+            /**
+             * Lock screen set as a pattern
+             * One of the possible states for {@link #LOCK_SCREEN_STATE}.
+             * @hide
+             */
+            public static final int LOCK_SCREEN_STATE_PATTERN = 2;
+
+            /**
              * Setting indicating the name of the Wear OS app package containing the device's sysui.
              *
              * @hide
@@ -18079,6 +18374,133 @@ public final class Settings {
              * @hide
              */
             public static final int EARLY_UPDATES_STATUS_ABORTED = 4;
+
+            /**
+             * Whether dynamic color theming (e.g. Material You) is enabled for apps which support
+             * it.
+             *
+             * @hide
+             */
+            public static final String DYNAMIC_COLOR_THEME_ENABLED = "dynamic_color_theme_enabled";
+
+            /**
+             * Current state of accessibility vibration watch feature
+             * (0 = false, 1 = true)
+             *
+             * @hide
+             */
+            public static final String ACCESSIBILITY_VIBRATION_WATCH_ENABLED =
+                    "a11y_vibration_watch_enabled";
+
+            /**
+             * Stores current type of accessibility vibration
+             * (0 = {@link #ACCESSIBILITY_VIBRATION_WATCH_TYPE_DIGIT},
+             * 1 = {@link #ACCESSIBILITY_VIBRATION_WATCH_TYPE_TERSE)
+             *
+             * @hide
+             */
+            public static final String ACCESSIBILITY_VIBRATION_WATCH_TYPE =
+                    "a11y_vibration_watch_type";
+
+            /**
+             * Vibration watch type digit
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_TYPE}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_TYPE_DIGIT = 0;
+
+            /**
+             * Vibration watch type terse
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_TYPE}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_TYPE_TERSE = 1;
+
+            /**
+             * Stores current accessibility vibration watch speed
+             * (0 = {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED_VERY_SLOW},
+             * 1 = {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED_SLOW},
+             * 2 = {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED_MEDIUM},
+             * 3 = {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED_FAST},
+             * 4 = {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED_VERY_FAST})
+             */
+            public static final String ACCESSIBILITY_VIBRATION_WATCH_SPEED = "vibration_speed";
+
+            /**
+             * Vibration watch speed type very slow
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_SPEED_VERY_SLOW = 0;
+
+            /**
+             * Vibration watch speed type slow
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_SPEED_SLOW = 1;
+
+            /**
+             * Vibration watch speed type medium
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_SPEED_MEDIUM = 2;
+
+            /**
+             * Vibration watch speed type fast
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_SPEED_FAST = 3;
+
+            /**
+             * Vibration watch speed type very fast
+             * One of the possible states for {@link #ACCESSIBILITY_VIBRATION_WATCH_SPEED}.
+             *
+             * @hide
+             */
+            public static final int ACCESSIBILITY_VIBRATION_WATCH_SPEED_VERY_FAST = 4;
+
+            /**
+             * The key to indicate the data migration status on device upgrade in Wear Services.
+             * @hide
+             */
+            public static final String UPGRADE_DATA_MIGRATION_STATUS =
+                    "upgrade_data_migration_status";
+
+            /**
+             * Constant indicating that the data migration is not needed.
+             *
+             * The value should be provided with setting name {@link
+             * #UPGRADE_DATA_MIGRATION_STATUS}.
+             * @hide
+             */
+            public static final int UPGRADE_DATA_MIGRATION_NOT_NEEDED = 0;
+
+            /**
+             * Constant indicating that the data migration is not yet finished.
+             *
+             * The value should be provided with setting name {@link
+             * #UPGRADE_DATA_MIGRATION_STATUS}.
+             * @hide
+             */
+            public static final int UPGRADE_DATA_MIGRATION_PENDING = 1;
+
+            /**
+             * Constant indicating that the data migration is finished.
+             *
+             * The value should be provided with setting name {@link
+             * #UPGRADE_DATA_MIGRATION_STATUS}.
+             * @hide
+             */
+            public static final int UPGRADE_DATA_MIGRATION_DONE = 2;
         }
     }
 
@@ -18474,6 +18896,8 @@ public final class Settings {
          * @see #checkCallingPermission
          * @hide
          */
+        @PermissionMethod(orSelf = true)
+        @PackageManager.PermissionResult
         public static int checkCallingOrSelfPermission(@NonNull @PermissionName String permission) {
             return ActivityThread.currentApplication()
                .getApplicationContext().checkCallingOrSelfPermission(permission);
@@ -18990,6 +19414,18 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION =
             "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION";
+
+    /**
+     * Activity Action: Show screen for controlling whether an app can send full screen intents.
+     * <p>
+     *     Input: the intent's data URI must specify the application package name for which you want
+     *     to manage full screen intents.
+     * <p>
+     * Output: Nothing.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT =
+            "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT";
 
     /**
      * Activity Action: For system or preinstalled apps to show their {@link Activity} embedded

@@ -240,6 +240,8 @@ public class Notifier {
         options.setDeliveryGroupMatchingKey(
                 UUID.randomUUID().toString(),
                 Intent.ACTION_SCREEN_ON);
+        // This allows the broadcast delivery to be delayed to apps in the Cached state.
+        options.setDeferUntilActive(true);
         return options.toBundle();
     }
 
@@ -737,6 +739,7 @@ public class Notifier {
         }
         TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
         tm.notifyUserActivity();
+        mInputManagerInternal.notifyUserActivity();
         mPolicy.userActivity(displayGroupId, event);
         mFaceDownDetector.userActivity(event);
         mScreenUndimDetector.userActivity(displayGroupId);

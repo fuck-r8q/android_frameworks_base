@@ -32,6 +32,7 @@ import android.annotation.Nullable;
 import android.annotation.UptimeMillisLong;
 import android.app.ActivityManagerInternal;
 import android.app.AppOpsManager;
+import android.app.BackgroundStartPrivileges;
 import android.app.BroadcastOptions;
 import android.app.compat.CompatChanges;
 import android.content.ComponentName;
@@ -42,7 +43,6 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ResolveInfo;
 import android.os.Binder;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.PrintWriterPrinter;
@@ -88,6 +88,8 @@ final class BroadcastRecord extends Binder {
     final boolean interactive; // originated from user interaction?
     final boolean initialSticky; // initial broadcast from register to sticky?
     final boolean prioritized; // contains more than one priority tranche
+    final boolean deferUntilActive; // infinitely deferrable broadcast
+    final boolean shareIdentity;  // whether the broadcaster's identity should be shared
     final int userId;       // user id this broadcast was for
     final @Nullable String resolvedType; // the resolved data type
     final @Nullable String[] requiredPermissions; // permissions the caller has required
@@ -97,6 +99,7 @@ final class BroadcastRecord extends Binder {
     final @Nullable BroadcastOptions options; // BroadcastOptions supplied by caller
     final @NonNull List<Object> receivers;   // contains BroadcastFilter and ResolveInfo
     final @DeliveryState int[] delivery;   // delivery state of each receiver
+    final boolean[] deferredUntilActive; // whether each receiver is infinitely deferred
     final int[] blockedUntilTerminalCount; // blocked until count of each receiver
     @Nullable ProcessRecord resultToApp; // who receives final result if non-null
     @Nullable IIntentReceiver resultTo; // who receives final result if non-null
@@ -117,8 +120,6 @@ final class BroadcastRecord extends Binder {
     @UptimeMillisLong       long finishTime;         // when broadcast finished
     final @UptimeMillisLong long[] scheduledTime;    // when each receiver was scheduled
     final @UptimeMillisLong long[] terminalTime;     // when each receiver was terminal
-    final                   int[] transmitGroup;     // the batch group for each receiver
-    final                   int[] transmitOrder;     // the position of the receiver in the group
     final boolean timeoutExempt;  // true if this broadcast is not subject to receiver timeouts
     int resultCode;         // current result code value.
     @Nullable String resultData;      // current result data value.
@@ -130,14 +131,11 @@ final class BroadcastRecord extends Binder {
     int manifestCount;      // number of manifest receivers dispatched.
     int manifestSkipCount;  // number of manifest receivers skipped.
     int terminalCount;      // number of receivers in terminal state.
+    int deferredCount;      // number of receivers in deferred state.
     @Nullable BroadcastQueue queue;   // the outbound queue handling this broadcast
 
-    // if set to true, app's process will be temporarily allowed to start activities from background
-    // for the duration of the broadcast dispatch
-    final boolean allowBackgroundActivityStarts;
-    // token used to trace back the grant for activity starts, optional
-    @Nullable
-    final IBinder mBackgroundActivityStartsToken;
+    // Determines the privileges the app's process has in regard to background starts.
+    final BackgroundStartPrivileges mBackgroundStartPrivileges;
 
     // Filter the intent extras by using the rules of the package visibility before broadcasting
     // the intent to the receiver.
@@ -168,6 +166,8 @@ final class BroadcastRecord extends Binder {
     static final int DELIVERY_SCHEDULED = 4;
     /** Terminal state: failure to dispatch */
     static final int DELIVERY_FAILURE = 5;
+    /** Intermediate state: currently deferred while app is cached */
+    static final int DELIVERY_DEFERRED = 6;
 
     @IntDef(flag = false, prefix = { "DELIVERY_" }, value = {
             DELIVERY_PENDING,
@@ -176,6 +176,7 @@ final class BroadcastRecord extends Binder {
             DELIVERY_TIMEOUT,
             DELIVERY_SCHEDULED,
             DELIVERY_FAILURE,
+            DELIVERY_DEFERRED,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface DeliveryState {}
@@ -188,6 +189,7 @@ final class BroadcastRecord extends Binder {
             case DELIVERY_TIMEOUT: return "TIMEOUT";
             case DELIVERY_SCHEDULED: return "SCHEDULED";
             case DELIVERY_FAILURE: return "FAILURE";
+            case DELIVERY_DEFERRED: return "DEFERRED";
             default: return Integer.toString(deliveryState);
         }
     }
@@ -215,6 +217,8 @@ final class BroadcastRecord extends Binder {
     Bundle curFilteredExtras;   // the bundle that has been filtered by the package visibility rules
 
     boolean mIsReceiverAppRunning; // Was the receiver's app already running.
+
+    boolean mWasReceiverAppStopped; // Was the receiver app stopped prior to starting
 
     // Private refcount-management bookkeeping; start > 0
     static AtomicInteger sNextToken = new AtomicInteger(1);
@@ -364,8 +368,9 @@ final class BroadcastRecord extends Binder {
             BroadcastOptions _options, List _receivers,
             ProcessRecord _resultToApp, IIntentReceiver _resultTo, int _resultCode,
             String _resultData, Bundle _resultExtras, boolean _serialized, boolean _sticky,
-            boolean _initialSticky, int _userId, boolean allowBackgroundActivityStarts,
-            @Nullable IBinder backgroundActivityStartsToken, boolean timeoutExempt,
+            boolean _initialSticky, int _userId,
+            @NonNull BackgroundStartPrivileges backgroundStartPrivileges,
+            boolean timeoutExempt,
             @Nullable BiFunction<Integer, Bundle, Bundle> filterExtrasForReceiver) {
         if (_intent == null) {
             throw new NullPointerException("Can't construct with a null intent");
@@ -388,11 +393,11 @@ final class BroadcastRecord extends Binder {
         options = _options;
         receivers = (_receivers != null) ? _receivers : EMPTY_RECEIVERS;
         delivery = new int[_receivers != null ? _receivers.size() : 0];
+        deferUntilActive = options != null ? options.isDeferUntilActive() : false;
+        deferredUntilActive = new boolean[deferUntilActive ? delivery.length : 0];
         blockedUntilTerminalCount = calculateBlockedUntilTerminalCount(receivers, _serialized);
         scheduledTime = new long[delivery.length];
         terminalTime = new long[delivery.length];
-        transmitGroup = new int[delivery.length];
-        transmitOrder = new int[delivery.length];
         resultToApp = _resultToApp;
         resultTo = _resultTo;
         resultCode = _resultCode;
@@ -405,13 +410,13 @@ final class BroadcastRecord extends Binder {
         userId = _userId;
         nextReceiver = 0;
         state = IDLE;
-        this.allowBackgroundActivityStarts = allowBackgroundActivityStarts;
-        mBackgroundActivityStartsToken = backgroundActivityStartsToken;
+        mBackgroundStartPrivileges = backgroundStartPrivileges;
         this.timeoutExempt = timeoutExempt;
         alarm = options != null && options.isAlarmBroadcast();
         pushMessage = options != null && options.isPushMessagingBroadcast();
         pushMessageOverQuota = options != null && options.isPushMessagingOverQuotaBroadcast();
         interactive = options != null && options.isInteractive();
+        shareIdentity = options != null && options.isShareIdentityEnabled();
         this.filterExtrasForReceiver = filterExtrasForReceiver;
     }
 
@@ -443,11 +448,11 @@ final class BroadcastRecord extends Binder {
         options = from.options;
         receivers = from.receivers;
         delivery = from.delivery;
+        deferUntilActive = from.deferUntilActive;
+        deferredUntilActive = from.deferredUntilActive;
         blockedUntilTerminalCount = from.blockedUntilTerminalCount;
         scheduledTime = from.scheduledTime;
         terminalTime = from.terminalTime;
-        transmitGroup = from.transmitGroup;
-        transmitOrder = from.transmitOrder;
         resultToApp = from.resultToApp;
         resultTo = from.resultTo;
         enqueueTime = from.enqueueTime;
@@ -468,13 +473,13 @@ final class BroadcastRecord extends Binder {
         manifestCount = from.manifestCount;
         manifestSkipCount = from.manifestSkipCount;
         queue = from.queue;
-        allowBackgroundActivityStarts = from.allowBackgroundActivityStarts;
-        mBackgroundActivityStartsToken = from.mBackgroundActivityStartsToken;
+        mBackgroundStartPrivileges = from.mBackgroundStartPrivileges;
         timeoutExempt = from.timeoutExempt;
         alarm = from.alarm;
         pushMessage = from.pushMessage;
         pushMessageOverQuota = from.pushMessageOverQuota;
         interactive = from.interactive;
+        shareIdentity = from.shareIdentity;
         filterExtrasForReceiver = from.filterExtrasForReceiver;
     }
 
@@ -510,8 +515,8 @@ final class BroadcastRecord extends Binder {
                 callerFeatureId, callingPid, callingUid, callerInstantApp, resolvedType,
                 requiredPermissions, excludedPermissions, excludedPackages, appOp, options,
                 splitReceivers, resultToApp, resultTo, resultCode, resultData, resultExtras,
-                ordered, sticky, initialSticky, userId, allowBackgroundActivityStarts,
-                mBackgroundActivityStartsToken, timeoutExempt, filterExtrasForReceiver);
+                ordered, sticky, initialSticky, userId,
+                mBackgroundStartPrivileges, timeoutExempt, filterExtrasForReceiver);
         split.enqueueTime = this.enqueueTime;
         split.enqueueRealTime = this.enqueueRealTime;
         split.enqueueClockTime = this.enqueueClockTime;
@@ -590,7 +595,7 @@ final class BroadcastRecord extends Binder {
                     requiredPermissions, excludedPermissions, excludedPackages, appOp, options,
                     uid2receiverList.valueAt(i), null /* _resultToApp */, null /* _resultTo */,
                     resultCode, resultData, resultExtras, ordered, sticky, initialSticky, userId,
-                    allowBackgroundActivityStarts, mBackgroundActivityStartsToken, timeoutExempt,
+                    mBackgroundStartPrivileges, timeoutExempt,
                     filterExtrasForReceiver);
             br.enqueueTime = this.enqueueTime;
             br.enqueueRealTime = this.enqueueRealTime;
@@ -606,7 +611,7 @@ final class BroadcastRecord extends Binder {
      */
     void setDeliveryState(int index, @DeliveryState int deliveryState) {
         delivery[index] = deliveryState;
-
+        if (deferUntilActive) deferredUntilActive[index] = false;
         switch (deliveryState) {
             case DELIVERY_DELIVERED:
             case DELIVERY_SKIPPED:
@@ -616,6 +621,9 @@ final class BroadcastRecord extends Binder {
                 break;
             case DELIVERY_SCHEDULED:
                 scheduledTime[index] = SystemClock.uptimeMillis();
+                break;
+            case DELIVERY_DEFERRED:
+                if (deferUntilActive) deferredUntilActive[index] = true;
                 break;
         }
     }
@@ -645,6 +653,10 @@ final class BroadcastRecord extends Binder {
 
     boolean isOffload() {
         return (intent.getFlags() & Intent.FLAG_RECEIVER_OFFLOAD) != 0;
+    }
+
+    boolean isDeferUntilActive() {
+        return deferUntilActive;
     }
 
     /**

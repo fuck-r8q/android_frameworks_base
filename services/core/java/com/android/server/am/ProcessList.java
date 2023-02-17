@@ -485,6 +485,12 @@ public final class ProcessList {
     final ProcessMap<AppZygote> mAppZygotes = new ProcessMap<AppZygote>();
 
     /**
+     * The currently running SDK sandbox processes for a uid.
+     */
+    @GuardedBy("mService")
+    final SparseArray<ArrayList<ProcessRecord>> mSdkSandboxes = new SparseArray<>();
+
+    /**
      * Managees the {@link android.app.ApplicationExitInfo} records.
      */
     @GuardedBy("mAppExitInfoTracker")
@@ -1723,7 +1729,7 @@ public final class ProcessList {
             }
             app.setMountMode(mountExternal);
             checkSlow(startUptime, "startProcess: building args");
-            if (mService.mAtmInternal.isFactoryTestProcess(app.getWindowProcessController())) {
+            if (app.getWindowProcessController().isFactoryTestProcess()) {
                 uid = 0;
             }
             int runtimeFlags = 0;
@@ -2508,7 +2514,7 @@ public final class ProcessList {
     }
 
     @GuardedBy("mService")
-    private String isProcStartValidLocked(ProcessRecord app, long expectedStartSeq) {
+    String isProcStartValidLocked(ProcessRecord app, long expectedStartSeq) {
         StringBuilder sb = null;
         if (app.isKilledByAm()) {
             if (sb == null) sb = new StringBuilder();
@@ -2990,6 +2996,14 @@ public final class ProcessList {
         if (proc.isolated) {
             mIsolatedProcesses.put(proc.uid, proc);
         }
+        if (proc.isSdkSandbox) {
+            ArrayList<ProcessRecord> sdkSandboxes = mSdkSandboxes.get(proc.uid);
+            if (sdkSandboxes == null) {
+                sdkSandboxes = new ArrayList<>();
+            }
+            sdkSandboxes.add(proc);
+            mSdkSandboxes.put(Process.getAppUidForSdkSandboxUid(proc.uid), sdkSandboxes);
+        }
     }
 
     @GuardedBy("mService")
@@ -3028,6 +3042,19 @@ public final class ProcessList {
             }
         }
         return ret;
+    }
+
+    /**
+     * Returns the associated SDK sandbox processes for a UID. Note that this does
+     * NOT return a copy, so callers should not modify the result, or use it outside
+     * of the lock scope.
+     *
+     * @param uid UID to return sansdbox processes for
+     */
+    @Nullable
+    @GuardedBy("mService")
+    List<ProcessRecord> getSdkSandboxProcessesForAppLocked(int uid) {
+        return mSdkSandboxes.get(uid);
     }
 
     @GuardedBy("mService")
@@ -3134,6 +3161,16 @@ public final class ProcessList {
         // Remove the (expected) ProcessRecord from the app zygote
         if (record != null && record.appZygote) {
             removeProcessFromAppZygoteLocked(record);
+        }
+        if (record != null && record.isSdkSandbox) {
+            final int appUid = Process.getAppUidForSdkSandboxUid(uid);
+            final ArrayList<ProcessRecord> sdkSandboxesForUid = mSdkSandboxes.get(appUid);
+            if (sdkSandboxesForUid != null) {
+                sdkSandboxesForUid.remove(record);
+                if (sdkSandboxesForUid.size() == 0) {
+                    mSdkSandboxes.remove(appUid);
+                }
+            }
         }
         mAppsInBackgroundRestricted.remove(record);
 
@@ -3696,7 +3733,7 @@ public final class ProcessList {
             if (cr.binding != null && !cr.serviceDead && cr.binding.service != null
                     && cr.binding.service.app != null
                     && cr.binding.service.app.getLruSeq() != mLruSeq
-                    && (cr.flags & Context.BIND_REDUCTION_FLAGS) == 0
+                    && cr.notHasFlag(Context.BIND_REDUCTION_FLAGS)
                     && !cr.binding.service.app.isPersistent()) {
                 if (cr.binding.service.app.mServices.hasClientActivities()) {
                     if (nextActivityIndex >= 0) {
@@ -3851,7 +3888,7 @@ public final class ProcessList {
         return runList;
     }
 
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     int getLruSizeLOSP() {
         return mLruProcesses.size();
     }
@@ -3859,7 +3896,7 @@ public final class ProcessList {
     /**
      * Return the reference to the LRU list, call this function for read-only access
      */
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     ArrayList<ProcessRecord> getLruProcessesLOSP() {
         return mLruProcesses;
     }
@@ -3867,7 +3904,7 @@ public final class ProcessList {
     /**
      * Return the reference to the LRU list, call this function for read/write access
      */
-    @GuardedBy({"mService", "mProfileLock"})
+    @GuardedBy({"mService", "mProcLock"})
     ArrayList<ProcessRecord> getLruProcessesLSP() {
         return mLruProcesses;
     }
@@ -3876,12 +3913,12 @@ public final class ProcessList {
      * For test only
      */
     @VisibleForTesting
-    @GuardedBy({"mService", "mProfileLock"})
+    @GuardedBy({"mService", "mProcLock"})
     void setLruProcessServiceStartLSP(int pos) {
         mLruProcessServiceStart = pos;
     }
 
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     int getLruProcessServiceStartLOSP() {
         return mLruProcessServiceStart;
     }
@@ -3894,7 +3931,7 @@ public final class ProcessList {
      *                       to most recent used ProcessRecord.
      * @param callback The callback interface to accept the current ProcessRecord.
      */
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     void forEachLruProcessesLOSP(boolean iterateForward,
             @NonNull Consumer<ProcessRecord> callback) {
         if (iterateForward) {
@@ -3919,7 +3956,7 @@ public final class ProcessList {
      *                 a non-null object, the search will be halted and this object will be used
      *                 as the return value of this search function.
      */
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     <R> R searchEachLruProcessesLOSP(boolean iterateForward,
             @NonNull Function<ProcessRecord, R> callback) {
         if (iterateForward) {
@@ -3940,17 +3977,17 @@ public final class ProcessList {
         return null;
     }
 
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     boolean isInLruListLOSP(ProcessRecord app) {
         return mLruProcesses.contains(app);
     }
 
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     int getLruSeqLOSP() {
         return mLruSeq;
     }
 
-    @GuardedBy(anyOf = {"mService", "mProfileLock"})
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
     MyProcessMap getProcessNamesLOSP() {
         return mProcessNames;
     }

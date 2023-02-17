@@ -113,6 +113,9 @@ class TextInterpolator(layout: Layout) {
             shapeText(value)
         }
 
+    var shapedText: String = ""
+        private set
+
     init {
         // shapeText needs to be called after all members are initialized.
         shapeText(layout)
@@ -159,6 +162,7 @@ class TextInterpolator(layout: Layout) {
      * animate weight from 200 to 400, then if you want to move back to 200 at the half of the
      * animation, it will look like
      *
+     * <pre> <code>
      * ```
      *     val interp = TextInterpolator(layout)
      *
@@ -190,6 +194,7 @@ class TextInterpolator(layout: Layout) {
      *         animator.start()
      *     }
      * ```
+     * </code> </pre>
      */
     fun rebase() {
         if (progress == 0f) {
@@ -293,8 +298,7 @@ class TextInterpolator(layout: Layout) {
 
                                 if (baseFont !== nextBaseFont) {
                                     require(targetFont !== nextTargetFont) {
-                                        "Base font has changed at $i but target font has not " +
-                                            "changed."
+                                        "Base font has changed at $i but target font is unchanged."
                                     }
                                     // Font transition point. push run and reset context.
                                     fontRun.add(FontRun(start, i, baseFont, targetFont))
@@ -303,13 +307,12 @@ class TextInterpolator(layout: Layout) {
                                     targetFont = nextTargetFont
                                     start = i
                                     require(FontInterpolator.canInterpolate(baseFont, targetFont)) {
-                                        "Cannot interpolate font at $start ($baseFont vs " +
-                                            "$targetFont)"
+                                        "Cannot interpolate font at $start" +
+                                            " ($baseFont vs $targetFont)"
                                     }
                                 } else { // baseFont === nextBaseFont
                                     require(targetFont === nextTargetFont) {
-                                        "Base font has not changed at $i but target font has " +
-                                            "changed."
+                                        "Base font is unchanged at $i but target font has changed."
                                     }
                                 }
                             }
@@ -475,10 +478,12 @@ class TextInterpolator(layout: Layout) {
 
     // Shape the text and stores the result to out argument.
     private fun shapeText(layout: Layout, paint: TextPaint): List<List<PositionedGlyphs>> {
+        var text = StringBuilder()
         val out = mutableListOf<List<PositionedGlyphs>>()
         for (lineNo in 0 until layout.lineCount) { // Shape all lines.
             val lineStart = layout.getLineStart(lineNo)
-            var count = layout.getLineEnd(lineNo) - lineStart
+            val lineEnd = layout.getLineEnd(lineNo)
+            var count = lineEnd - lineStart
             // Do not render the last character in the line if it's a newline and unprintable
             val last = lineStart + count - 1
             if (last > lineStart && last < layout.text.length && layout.text[last] == '\n') {
@@ -494,7 +499,13 @@ class TextInterpolator(layout: Layout) {
                 paint
             ) { _, _, glyphs, _ -> runs.add(glyphs) }
             out.add(runs)
+
+            if (lineNo > 0) {
+                text.append("\n")
+            }
+            text.append(layout.text.substring(lineStart, lineEnd))
         }
+        shapedText = text.toString()
         return out
     }
 }

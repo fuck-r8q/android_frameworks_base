@@ -94,6 +94,7 @@ import android.app.KeyguardManager;
 import android.app.Presentation;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ClipData;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
@@ -128,6 +129,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 /**
  * The interface that apps use to talk to the window manager.
@@ -814,8 +816,8 @@ public interface WindowManager extends ViewManager {
     }
 
     /**
-     * Activity level {@link android.content.pm.PackageManager.Property PackageManager
-     * .Property} for an app to inform the system that the activity can be opted-in or opted-out
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the app can be opted-in or opted-out
      * from the compatibility treatment that avoids {@link
      * android.app.Activity#setRequestedOrientation} loops. The loop can be trigerred by
      * ignoreRequestedOrientation display setting enabled on the device or by the landscape natural
@@ -833,17 +835,17 @@ public interface WindowManager extends ViewManager {
      *     <li>Camera compatibility force rotation treatment is active for the package.
      * </ul>
      *
-     * <p>Setting this property to {@code false} informs the system that the activity must be
+     * <p>Setting this property to {@code false} informs the system that the app must be
      * opted-out from the compatibility treatment even if the device manufacturer has opted the app
      * into the treatment.
      *
      * <p><b>Syntax:</b>
      * <pre>
-     * &lt;activity&gt;
+     * &lt;application&gt;
      *   &lt;property
      *     android:name="android.window.PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION"
      *     android:value="true|false"/&gt;
-     * &lt;/activity&gt;
+     * &lt;/application&gt;
      * </pre>
      *
      * @hide
@@ -851,6 +853,251 @@ public interface WindowManager extends ViewManager {
     // TODO(b/263984287): Make this public API.
     String PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION =
             "android.window.PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the application can be opted-in or opted-out
+     * from the compatibility treatment that enables sending a fake focus event for unfocused
+     * resumed split screen activities. This is needed because some game engines wait to get
+     * focus before drawing the content of the app which isn't guaranteed by default in multi-window
+     * modes.
+     *
+     * <p>Device manufacturers can enable this treatment using their discretion on a per-device
+     * basis to improve display compatibility. The treatment also needs to be specifically enabled
+     * on a per-app basis afterwards. This can either be done by device manufacturers or developers.
+     *
+     * <p>With this property set to {@code true}, the system will apply the treatment only if the
+     * device manufacturer had previously enabled it on the device. A fake focus event will be sent
+     * to the app after it is resumed only if the app is in split-screen.
+     *
+     * <p>Setting this property to {@code false} informs the system that the activity must be
+     * opted-out from the compatibility treatment even if the device manufacturer has opted the app
+     * into the treatment.
+     *
+     * <p>If the property remains unset the system will apply the treatment only if it had
+     * previously been enabled both at the device and app level by the device manufacturer.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the app should be excluded from the
+     * camera compatibility force rotation treatment.
+     *
+     * <p>The camera compatibility treatment aligns orientations of portrait app window and natural
+     * orientation of the device and set opposite to natural orientation for a landscape app
+     * window. Mismatch between them can lead to camera issues like sideways or stretched
+     * viewfinder since this is one of the strongest assumptions that apps make when they implement
+     * camera previews. Since app and natural display orientations aren't guaranteed to match, the
+     * rotation can cause letterboxing. The forced rotation is triggered as soon as app opens to
+     * camera and is removed once camera is closed.
+     *
+     * <p>The camera compatibility can be enabled by device manufacturers on the displays that have
+     * ignoreOrientationRequest display setting enabled (enables compatibility mode for fixed
+     * orientation, see <a href="https://developer.android.com/guide/practices/enhanced-letterboxing">Enhanced letterboxing</a>
+     * for more details).
+     *
+     * <p>With this property set to {@code true} or unset, the system may apply the force rotation
+     * treatment to fixed orientation activities. Device manufacturers can exclude packages from the
+     * treatment using their discretion to improve display compatibility.
+     *
+     * <p>With this property set to {@code false}, the system will not apply the force rotation
+     * treatment.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION =
+            "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the app should be excluded
+     * from the activity "refresh" after the camera compatibility force rotation treatment.
+     *
+     * <p>The camera compatibility treatment aligns orientations of portrait app window and natural
+     * orientation of the device and set opposite to natural orientation for a landscape app
+     * window. Mismatch between them can lead to camera issues like sideways or stretched
+     * viewfinder since this is one of the strongest assumptions that apps make when they implement
+     * camera previews. Since app and natural display orientations aren't guaranteed to match, the
+     * rotation can cause letterboxing. The forced rotation is triggered as soon as app opens to
+     * camera and is removed once camera is closed.
+     *
+     * <p>Force rotation is followed by the "Refresh" of the activity by going through "resumed ->
+     * ... -> stopped -> ... -> resumed" cycle (by default) or "resumed -> paused -> resumed" cycle
+     * (if overridden, see {@link #PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE} for context).
+     * This allows to clear cached values in apps (e.g. display or camera rotation) that influence
+     * camera preview and can lead to sideways or stretching issues persisting even after force
+     * rotation.
+     *
+     * <p>The camera compatibility can be enabled by device manufacturers on the displays that have
+     * ignoreOrientationRequest display setting enabled (enables compatibility mode for fixed
+     * orientation, see <a href="https://developer.android.com/guide/practices/enhanced-letterboxing">Enhanced letterboxing</a>
+     * for more details).
+     *
+     * <p>With this property set to {@code true} or unset, the system may "refresh" activity after
+     * the force rotation treatment. Device manufacturers can exclude packages from the "refresh"
+     * using their discretion to improve display compatibility.
+     *
+     * <p>With this property set to {@code false}, the system will not "refresh" activity after the
+     * force rotation treatment.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH =
+            "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the activity should be or shouldn't be
+     * "refreshed" after the camera compatibility force rotation treatment using "paused ->
+     * resumed" cycle rather than "stopped -> resumed".
+     *
+     * <p>The camera compatibility treatment aligns orientations of portrait app window and natural
+     * orientation of the device and set opposite to natural orientation for a landscape app
+     * window. Mismatch between them can lead to camera issues like sideways or stretched
+     * viewfinder since this is one of the strongest assumptions that apps make when they implement
+     * camera previews. Since app and natural display orientations aren't guaranteed to match, the
+     * rotation can cause letterboxing. The forced rotation is triggered as soon as app opens to
+     * camera and is removed once camera is closed.
+     *
+     * <p>Force rotation is followed by the "Refresh" of the activity by going through "resumed ->
+     * ... -> stopped -> ... -> resumed" cycle (by default) or "resumed -> paused -> resumed" cycle
+     * (if overridden by device manufacturers or using this property). This allows to clear cached
+     * values in apps (e.g., display or camera rotation) that influence camera preview and can lead
+     * to sideways or stretching issues persisting even after force rotation.
+     *
+     * <p>The camera compatibility can be enabled by device manufacturers on the displays that have
+     * ignoreOrientationRequest display setting enabled (enables compatibility mode for fixed
+     * orientation, see <a href="https://developer.android.com/guide/practices/enhanced-letterboxing">Enhanced letterboxing</a>
+     * for more details).
+     *
+     * <p>Device manufacturers can override packages to "refresh" via "resumed -> paused -> resumed"
+     * cycle using their discretion to improve display compatibility.
+     *
+     * <p>With this property set to {@code true}, the system will "refresh" activity after the
+     * force rotation treatment using "resumed -> paused -> resumed" cycle.
+     *
+     * <p>With this property set to {@code false}, the system will not "refresh" activity after the
+     * force rotation treatment using "resumed -> paused -> resumed" cycle even if the device
+     * manufacturer adds the corresponding override.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE =
+            "android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the app should be excluded from the
+     * compatibility override for orientation set by the device manufacturer.
+     *
+     * <p>With this property set to {@code true} or unset, device manufacturers can override
+     * orientation for the app using their discretion to improve display compatibility.
+     *
+     * <p>With this property set to {@code false}, device manufactured per-app override for
+     * orientation won't be applied.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE =
+            "android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for an app to inform the system that the app should be opted-out from the
+     * compatibility override that fixes display orientation to landscape natural orientation when
+     * an activity is fullscreen.
+     *
+     * <p>When this compat override is enabled and while display is fixed to the landscape natural
+     * orientation, the orientation requested by the activity will be still respected by bounds
+     * resolution logic. For instance, if an activity requests portrait orientation, then activity
+     * will appear in the letterbox mode for fixed orientation with the display rotated to the
+     * lanscape natural orientation.
+     *
+     * <p>The treatment is disabled by default but device manufacturers can enable the treatment
+     * using their discretion to improve display compatibility on the displays that have
+     * ignoreOrientationRequest display setting enabled (enables compatibility mode for fixed
+     * orientation, see <a href="https://developer.android.com/guide/practices/enhanced-letterboxing">Enhanced letterboxing</a>
+     * for more details).
+     *
+     * <p>With this property set to {@code true} or unset, the system wiil use landscape display
+     * orientation when the following conditions are met:
+     * <ul>
+     *     <li>Natural orientation of the display is landscape
+     *     <li>ignoreOrientationRequest display setting is enabled
+     *     <li>Activity is fullscreen.
+     *     <li>Device manufacturer enabled the treatment.
+     * </ul>
+     *
+     * <p>With this property set to {@code false}, device manufactured per-app override for
+     * display orientation won't be applied.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE"
+     *     android:value="true|false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     *
+     * @hide
+     */
+    // TODO(b/263984287): Make this public API.
+    String PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE =
+            "android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE";
 
     /**
      * @hide
@@ -1109,6 +1356,38 @@ public interface WindowManager extends ViewManager {
      * @see #addCrossWindowBlurEnabledListener
      */
     default void removeCrossWindowBlurEnabledListener(@NonNull Consumer<Boolean> listener) {
+    }
+
+    /**
+     * Adds a listener to start monitoring the proposed rotation of the current associated context.
+     * It reports the current recommendation for the rotation that takes various factors (e.g.
+     * sensor, context, device state, etc) into account. The proposed rotation might not be applied
+     * by the system automatically due to the application's active preference to lock the
+     * orientation (e.g. with {@link android.app.Activity#setRequestedOrientation(int)}). This
+     * listener gives application an opportunity to selectively react to device orientation changes.
+     * The newly added listener will be called with current proposed rotation. Note that the context
+     * of this window manager instance must be a {@link android.annotation.UiContext}.
+     *
+     * @param executor The executor on which callback method will be invoked.
+     * @param listener Called when the proposed rotation for the context is being delivered.
+     *                 The reported rotation can be {@link Surface#ROTATION_0},
+     *                 {@link Surface#ROTATION_90}, {@link Surface#ROTATION_180} and
+     *                 {@link Surface#ROTATION_270}.
+     * @throws UnsupportedOperationException if this method is called on an instance that is not
+     *         associated with a {@link android.annotation.UiContext}.
+     */
+    default void addProposedRotationListener(@NonNull @CallbackExecutor Executor executor,
+            @NonNull IntConsumer listener) {
+    }
+
+    /**
+     * Removes a listener, previously added with {@link #addProposedRotationListener}. It is
+     * recommended to call when the associated context no longer has visible components. No-op if
+     * the provided listener is not registered.
+     *
+     * @param listener The listener to be removed.
+     */
+    default void removeProposedRotationListener(@NonNull IntConsumer listener) {
     }
 
     /**
@@ -2506,10 +2785,10 @@ public interface WindowManager extends ViewManager {
         /**
          * Never animate position changes of the window.
          *
+         * @see android.R.attr#Window_windowNoMoveAnimation
          * {@hide}
          */
         @UnsupportedAppUsage
-        @TestApi
         public static final int PRIVATE_FLAG_NO_MOVE_ANIMATION = 0x00000040;
 
         /** Window flag: special flag to limit the size of the window to be
@@ -2524,6 +2803,15 @@ public interface WindowManager extends ViewManager {
          * it is created.
          * {@hide} */
         public static final int PRIVATE_FLAG_SYSTEM_ERROR = 0x00000100;
+
+        /**
+         * Flag to indicate that the view hierarchy of the window can only be measured when
+         * necessary. If a window size can be known by the LayoutParams, we can use the size to
+         * relayout window, and we don't have to measure the view hierarchy before laying out the
+         * views. This reduces the chances to perform measure.
+         * {@hide}
+         */
+        public static final int PRIVATE_FLAG_OPTIMIZE_MEASURE = 0x00000200;
 
         /**
          * Flag that prevents the wallpaper behind the current window from receiving touch events.
@@ -2727,6 +3015,7 @@ public interface WindowManager extends ViewManager {
                 PRIVATE_FLAG_NO_MOVE_ANIMATION,
                 PRIVATE_FLAG_COMPATIBLE_WINDOW,
                 PRIVATE_FLAG_SYSTEM_ERROR,
+                PRIVATE_FLAG_OPTIMIZE_MEASURE,
                 PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
                 PRIVATE_FLAG_FORCE_SHOW_STATUS_BAR,
                 PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT,
@@ -2786,6 +3075,10 @@ public interface WindowManager extends ViewManager {
                         mask = PRIVATE_FLAG_SYSTEM_ERROR,
                         equals = PRIVATE_FLAG_SYSTEM_ERROR,
                         name = "SYSTEM_ERROR"),
+                @ViewDebug.FlagToString(
+                        mask = PRIVATE_FLAG_OPTIMIZE_MEASURE,
+                        equals = PRIVATE_FLAG_OPTIMIZE_MEASURE,
+                        name = "OPTIMIZE_MEASURE"),
                 @ViewDebug.FlagToString(
                         mask = PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
                         equals = PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
@@ -3308,6 +3601,22 @@ public interface WindowManager extends ViewManager {
          * @hide
          */
         public float preferredMaxDisplayRefreshRate;
+
+        /** Indicates whether this window wants the HDR conversion is disabled. */
+        public static final int DISPLAY_FLAG_DISABLE_HDR_CONVERSION =  1 << 0;
+
+        /**
+         * Flags that can be used to set display properties.
+         *
+         * @hide
+         */
+        @IntDef(flag = true, prefix = "DISPLAY_FLAG_", value = {
+                DISPLAY_FLAG_DISABLE_HDR_CONVERSION,
+        })
+        public @interface DisplayFlags {}
+
+        @DisplayFlags
+        private int mDisplayFlags;
 
         /**
          * An internal annotation for flags that can be specified to {@link #systemUiVisibility}
@@ -3902,6 +4211,31 @@ public interface WindowManager extends ViewManager {
         }
 
         /**
+         * Set whether animations can be played for position changes on this window. If disabled,
+         * the window will move to its new position instantly without animating.
+         *
+         * @attr ref android.R.attr#Window_windowNoMoveAnimation
+         */
+        public void setCanPlayMoveAnimation(boolean enable) {
+            if (enable) {
+                privateFlags &= ~PRIVATE_FLAG_NO_MOVE_ANIMATION;
+            } else {
+                privateFlags |= PRIVATE_FLAG_NO_MOVE_ANIMATION;
+            }
+        }
+
+        /**
+         * @return whether playing an animation during a position change is allowed on this window.
+         * This does not guarantee that an animation will be played in all such situations. For
+         * example, drag-resizing may move the window but not play an animation.
+         *
+         * @attr ref android.R.attr#Window_windowNoMoveAnimation
+         */
+        public boolean canPlayMoveAnimation() {
+            return (privateFlags & PRIVATE_FLAG_NO_MOVE_ANIMATION) == 0;
+        }
+
+        /**
          * @return the {@link WindowInsets.Type}s that this window is avoiding overlapping.
          */
         public @InsetsType int getFitInsetsTypes() {
@@ -4024,6 +4358,24 @@ public interface WindowManager extends ViewManager {
             }
             hasManualSurfaceInsets = manual;
             preservePreviousSurfaceInsets = preservePrevious;
+        }
+
+        /** Returns whether the HDR conversion is enabled for the window */
+        public boolean isHdrConversionEnabled() {
+            return ((mDisplayFlags & DISPLAY_FLAG_DISABLE_HDR_CONVERSION) == 0);
+        }
+
+        /**
+         * Enables/disables the HDR conversion for the window.
+         *
+         * By default, the HDR conversion is enabled for the window.
+         */
+        public void setHdrConversionEnabled(boolean enabled) {
+            if (!enabled) {
+                mDisplayFlags |= DISPLAY_FLAG_DISABLE_HDR_CONVERSION;
+            } else {
+                mDisplayFlags &= ~DISPLAY_FLAG_DISABLE_HDR_CONVERSION;
+            }
         }
 
         /**
@@ -4200,6 +4552,7 @@ public interface WindowManager extends ViewManager {
             out.writeTypedArray(providedInsets, 0 /* parcelableFlags */);
             checkNonRecursiveParams();
             out.writeTypedArray(paramsForRotation, 0 /* parcelableFlags */);
+            out.writeInt(mDisplayFlags);
         }
 
         public static final @android.annotation.NonNull Parcelable.Creator<LayoutParams> CREATOR
@@ -4270,6 +4623,7 @@ public interface WindowManager extends ViewManager {
             mWallpaperTouchEventsEnabled = in.readBoolean();
             providedInsets = in.createTypedArray(InsetsFrameProvider.CREATOR);
             paramsForRotation = in.createTypedArray(LayoutParams.CREATOR);
+            mDisplayFlags = in.readInt();
         }
 
         @SuppressWarnings({"PointlessBitwiseExpression"})
@@ -4304,6 +4658,8 @@ public interface WindowManager extends ViewManager {
         public static final int SURFACE_INSETS_CHANGED = 1<<20;
         /** {@hide} */
         public static final int PREFERRED_REFRESH_RATE_CHANGED = 1 << 21;
+        /** {@hide} */
+        public static final int DISPLAY_FLAGS_CHANGED = 1 << 22;
         /** {@hide} */
         public static final int PREFERRED_DISPLAY_MODE_ID = 1 << 23;
         /** {@hide} */
@@ -4462,6 +4818,11 @@ public interface WindowManager extends ViewManager {
             if (preferredMaxDisplayRefreshRate != o.preferredMaxDisplayRefreshRate) {
                 preferredMaxDisplayRefreshRate = o.preferredMaxDisplayRefreshRate;
                 changes |= PREFERRED_MAX_DISPLAY_REFRESH_RATE;
+            }
+
+            if (mDisplayFlags != o.mDisplayFlags) {
+                mDisplayFlags = o.mDisplayFlags;
+                changes |= DISPLAY_FLAGS_CHANGED;
             }
 
             if (systemUiVisibility != o.systemUiVisibility
@@ -4719,6 +5080,10 @@ public interface WindowManager extends ViewManager {
                 sb.append(" preferredMaxDisplayRefreshRate=");
                 sb.append(preferredMaxDisplayRefreshRate);
             }
+            if (mDisplayFlags != 0) {
+                sb.append(" displayFlags=0x");
+                sb.append(Integer.toHexString(mDisplayFlags));
+            }
             if (hasSystemUiListeners) {
                 sb.append(" sysuil=");
                 sb.append(hasSystemUiListeners);
@@ -4798,10 +5163,10 @@ public interface WindowManager extends ViewManager {
             }
             if (providedInsets != null) {
                 sb.append(System.lineSeparator());
-                sb.append(" providedInsets=");
+                sb.append(prefix).append("  providedInsets:");
                 for (int i = 0; i < providedInsets.length; ++i) {
-                    if (i > 0) sb.append(' ');
-                    sb.append((providedInsets[i]));
+                    sb.append(System.lineSeparator());
+                    sb.append(prefix).append("    ").append(providedInsets[i]);
                 }
             }
             if (insetsRoundedCornerFrame) {
@@ -4810,10 +5175,12 @@ public interface WindowManager extends ViewManager {
             }
             if (paramsForRotation != null && paramsForRotation.length != 0) {
                 sb.append(System.lineSeparator());
-                sb.append(prefix).append("  paramsForRotation=");
+                sb.append(prefix).append("  paramsForRotation:");
                 for (int i = 0; i < paramsForRotation.length; ++i) {
-                    if (i > 0) sb.append(' ');
-                    sb.append(paramsForRotation[i].toString());
+                    // Additional prefix needed for the beginning of the params of the new rotation.
+                    sb.append(System.lineSeparator()).append(prefix).append("    ");
+                    sb.append(Surface.rotationToString(i)).append("=");
+                    sb.append(paramsForRotation[i].toString(prefix + "    "));
                 }
             }
 
@@ -5115,5 +5482,19 @@ public interface WindowManager extends ViewManager {
     @Nullable
     default Bitmap snapshotTaskForRecents(@IntRange(from = 0) int taskId) {
         return null;
+    }
+
+    /**
+     * Invoked when a screenshot is taken of the default display to notify registered listeners.
+     *
+     * Should be invoked only by SysUI.
+     *
+     * @param displayId id of the display screenshot.
+     * @return List of ComponentNames corresponding to the activities that were notified.
+     * @hide
+     */
+    @SystemApi
+    default @NonNull List<ComponentName> notifyScreenshotListeners(int displayId) {
+        throw new UnsupportedOperationException();
     }
 }

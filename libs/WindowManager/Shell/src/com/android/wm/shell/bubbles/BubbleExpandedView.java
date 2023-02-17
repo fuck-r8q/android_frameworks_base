@@ -67,6 +67,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.wm.shell.R;
 import com.android.wm.shell.TaskView;
+import com.android.wm.shell.TaskViewTaskController;
 import com.android.wm.shell.common.AlphaOptimizedButton;
 import com.android.wm.shell.common.TriangleShape;
 
@@ -140,6 +141,7 @@ public class BubbleExpandedView extends LinearLayout {
 
     private AlphaOptimizedButton mManageButton;
     private TaskView mTaskView;
+    private TaskViewTaskController mTaskViewTaskController;
     private BubbleOverflowContainerView mOverflowView;
 
     private int mTaskId = INVALID_TASK_ID;
@@ -232,10 +234,13 @@ public class BubbleExpandedView extends LinearLayout {
 
                     if (mBubble.isAppBubble()) {
                         PendingIntent pi = PendingIntent.getActivity(mContext, 0,
-                                mBubble.getAppBubbleIntent(),
-                                PendingIntent.FLAG_MUTABLE,
+                                mBubble.getAppBubbleIntent()
+                                        .addFlags(FLAG_ACTIVITY_NEW_DOCUMENT)
+                                        .addFlags(FLAG_ACTIVITY_MULTIPLE_TASK),
+                                PendingIntent.FLAG_IMMUTABLE,
                                 null);
-                        mTaskView.startActivity(pi, fillInIntent, options, launchBounds);
+                        mTaskView.startActivity(pi, /* fillInIntent= */ null, options,
+                                launchBounds);
                     } else if (!mIsOverflow && mBubble.hasMetadataShortcutId()) {
                         options.setApplyActivityFlagsForBubbles(true);
                         mTaskView.startShortcutActivity(mBubble.getShortcutInfo(),
@@ -272,6 +277,11 @@ public class BubbleExpandedView extends LinearLayout {
             }
             // The taskId is saved to use for removeTask, preventing appearance in recent tasks.
             mTaskId = taskId;
+
+            if (Bubble.KEY_APP_BUBBLE.equals(getBubbleKey())) {
+                // Let the controller know sooner what the taskId is.
+                mController.setAppBubbleTaskId(mTaskId);
+            }
 
             // With the task org, the taskAppeared callback will only happen once the task has
             // already drawn
@@ -406,8 +416,10 @@ public class BubbleExpandedView extends LinearLayout {
             bringChildToFront(mOverflowView);
             mManageButton.setVisibility(GONE);
         } else {
-            mTaskView = new TaskView(mContext, mController.getTaskOrganizer(),
+            mTaskViewTaskController = new TaskViewTaskController(mContext,
+                    mController.getTaskOrganizer(),
                     mController.getTaskViewTransitions(), mController.getSyncTransactionQueue());
+            mTaskView = new TaskView(mContext, mTaskViewTaskController);
             mTaskView.setListener(mController.getMainExecutor(), mTaskViewListener);
             mExpandedViewContainer.addView(mTaskView);
             bringChildToFront(mTaskView);

@@ -187,6 +187,7 @@ extern int register_android_view_InputQueue(JNIEnv* env);
 extern int register_android_view_KeyCharacterMap(JNIEnv *env);
 extern int register_android_view_KeyEvent(JNIEnv* env);
 extern int register_android_view_MotionEvent(JNIEnv* env);
+extern int register_android_view_MotionPredictor(JNIEnv* env);
 extern int register_android_view_PointerIcon(JNIEnv* env);
 extern int register_android_view_VelocityTracker(JNIEnv* env);
 extern int register_android_view_VerifiedKeyEvent(JNIEnv* env);
@@ -199,7 +200,7 @@ extern int register_com_android_internal_content_F2fsUtils(JNIEnv* env);
 extern int register_com_android_internal_content_NativeLibraryHelper(JNIEnv *env);
 extern int register_com_android_internal_content_om_OverlayConfig(JNIEnv *env);
 extern int register_com_android_internal_content_om_OverlayManagerImpl(JNIEnv* env);
-extern int register_com_android_internal_expresslog_Counter(JNIEnv* env);
+extern int register_com_android_internal_expresslog_Utils(JNIEnv* env);
 extern int register_com_android_internal_net_NetworkUtilsInternal(JNIEnv* env);
 extern int register_com_android_internal_os_ClassLoaderFactory(JNIEnv* env);
 extern int register_com_android_internal_os_FuseAppLoop(JNIEnv* env);
@@ -1585,7 +1586,7 @@ static const RegJNIRec gRegJNI[] = {
         REG_JNI(register_android_os_incremental_IncrementalManager),
         REG_JNI(register_com_android_internal_content_om_OverlayConfig),
         REG_JNI(register_com_android_internal_content_om_OverlayManagerImpl),
-        REG_JNI(register_com_android_internal_expresslog_Counter),
+        REG_JNI(register_com_android_internal_expresslog_Utils),
         REG_JNI(register_com_android_internal_net_NetworkUtilsInternal),
         REG_JNI(register_com_android_internal_os_ClassLoaderFactory),
         REG_JNI(register_com_android_internal_os_LongArrayMultiStateCounter),
@@ -1643,6 +1644,7 @@ static const RegJNIRec gRegJNI[] = {
         REG_JNI(register_android_view_InputQueue),
         REG_JNI(register_android_view_KeyEvent),
         REG_JNI(register_android_view_MotionEvent),
+        REG_JNI(register_android_view_MotionPredictor),
         REG_JNI(register_android_view_PointerIcon),
         REG_JNI(register_android_view_VelocityTracker),
         REG_JNI(register_android_view_VerifiedKeyEvent),

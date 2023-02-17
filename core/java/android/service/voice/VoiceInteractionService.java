@@ -17,6 +17,7 @@
 package android.service.voice;
 
 import android.Manifest;
+import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -58,6 +59,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Top-level service of the current global voice interactor, which is providing
@@ -160,9 +162,25 @@ public class VoiceInteractionService extends Service {
                             voiceActions,
                             callback));
         }
+
+        @Override
+        public void prepareToShowSession(Bundle args, int flags) {
+            Handler.getMain().executeOrSendMessage(PooledLambda.obtainMessage(
+                    VoiceInteractionService::onPrepareToShowSession,
+                    VoiceInteractionService.this, args, flags));
+        }
+
+        @Override
+        public void showSessionFailed(@NonNull Bundle args) {
+            Handler.getMain().executeOrSendMessage(PooledLambda.obtainMessage(
+                    VoiceInteractionService::onShowSessionFailed,
+                    VoiceInteractionService.this, args));
+        }
     };
 
     IVoiceInteractionManagerService mSystemService;
+
+    private VisualQueryDetector mActiveVisualQueryDetector;
 
     private final Object mLock = new Object();
 
@@ -181,6 +199,34 @@ public class VoiceInteractionService extends Service {
      * on top of the lock screen.</p>
      */
     public void onLaunchVoiceAssistFromKeyguard() {
+    }
+
+    /**
+     * Notify the interactor when the system prepares to show session. The system is going to
+     * bind the session service.
+     *
+     * @param args  The arguments that were supplied to {@link #showSession(Bundle, int)}.
+     *              It always includes {@link VoiceInteractionSession#KEY_SHOW_SESSION_ID}.
+     * @param flags The show flags originally provided to {@link #showSession(Bundle, int)}.
+     * @see #showSession(Bundle, int)
+     * @see #onShowSessionFailed(Bundle)
+     * @see VoiceInteractionSession#onShow(Bundle, int)
+     * @see VoiceInteractionSession#show(Bundle, int)
+     */
+    public void onPrepareToShowSession(@NonNull Bundle args, int flags) {
+    }
+
+    /**
+     * Called when the show session failed. E.g. When the system bound the session service failed.
+     *
+     * @param args Additional info about the show session attempt that failed. For now, includes
+     *             {@link VoiceInteractionSession#KEY_SHOW_SESSION_ID}.
+     * @see #showSession(Bundle, int)
+     * @see #onPrepareToShowSession(Bundle, int)
+     * @see VoiceInteractionSession#onShow(Bundle, int)
+     * @see VoiceInteractionSession#show(Bundle, int)
+     */
+    public void onShowSessionFailed(@NonNull Bundle args) {
     }
 
     /**
@@ -347,12 +393,55 @@ public class VoiceInteractionService extends Service {
      *
      * <p>Note: If there are any active detectors that are created by using
      * {@link #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
-     * AlwaysOnHotwordDetector.Callback)} or {@link #createHotwordDetector(PersistableBundle,
-     * SharedMemory, HotwordDetector.Callback)}, call this will throw an
-     * {@link IllegalStateException}.
+     * AlwaysOnHotwordDetector.Callback)} or {@link #createAlwaysOnHotwordDetector(String, Locale,
+     * PersistableBundle, SharedMemory, Executor, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createHotwordDetector(PersistableBundle, SharedMemory, HotwordDetector.Callback)} or
+     * {@link #createHotwordDetector(PersistableBundle, SharedMemory, Executor,
+     * HotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * <p>Note that the callback will be executed on the current thread. If the current thread
+     * doesn't have a looper, it will throw a {@link RuntimeException}. To specify the execution
+     * thread, use {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     * AlwaysOnHotwordDetector.Callback)}.
      *
      * @param keyphrase The keyphrase that's being used, for example "Hello Android".
      * @param locale The locale for which the enrollment needs to be performed.
+     * @param callback The callback to notify of detection events.
+     * @return An always-on hotword detector for the given keyphrase and locale.
+     *
+     * @deprecated Use {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     *             AlwaysOnHotwordDetector.Callback)} instead.
+     * @hide
+     */
+    @SystemApi
+    @Deprecated
+    @NonNull
+    public final AlwaysOnHotwordDetector createAlwaysOnHotwordDetector(
+            @SuppressLint("MissingNullability") String keyphrase,  // TODO: nullability properly
+            @SuppressLint({"MissingNullability", "UseIcu"}) Locale locale,
+            @SuppressLint("MissingNullability") AlwaysOnHotwordDetector.Callback callback) {
+        return createAlwaysOnHotwordDetectorInternal(keyphrase, locale,
+                /* supportHotwordDetectionService= */ false, /* options= */ null,
+                /* sharedMemory= */ null, /* executor= */ null, callback);
+    }
+
+    /**
+     * Creates an {@link AlwaysOnHotwordDetector} for the given keyphrase and locale.
+     * This instance must be retained and used by the client.
+     * Calling this a second time invalidates the previously created hotword detector
+     * which can no longer be used to manage recognition.
+     *
+     * <p>Note: If there are any active detectors that are created by using
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
+     * AlwaysOnHotwordDetector.Callback)} or {@link #createAlwaysOnHotwordDetector(String, Locale,
+     * PersistableBundle, SharedMemory, Executor, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createHotwordDetector(PersistableBundle, SharedMemory, HotwordDetector.Callback)} or
+     * {@link #createHotwordDetector(PersistableBundle, SharedMemory, Executor,
+     * HotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * @param keyphrase The keyphrase that's being used, for example "Hello Android".
+     * @param locale The locale for which the enrollment needs to be performed.
+     * @param executor The executor on which to run the callback.
      * @param callback The callback to notify of detection events.
      * @return An always-on hotword detector for the given keyphrase and locale.
      *
@@ -361,19 +450,25 @@ public class VoiceInteractionService extends Service {
     @SystemApi
     @NonNull
     public final AlwaysOnHotwordDetector createAlwaysOnHotwordDetector(
-            @SuppressLint("MissingNullability") String keyphrase,  // TODO: nullability properly
-            @SuppressLint({"MissingNullability", "UseIcu"}) Locale locale,
-            @SuppressLint("MissingNullability") AlwaysOnHotwordDetector.Callback callback) {
+            @NonNull String keyphrase, @SuppressLint("UseIcu") @NonNull Locale locale,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AlwaysOnHotwordDetector.Callback callback) {
+        // TODO (b/269080850): Resolve AndroidFrameworkRequiresPermission lint warning
+
+        Objects.requireNonNull(keyphrase);
+        Objects.requireNonNull(locale);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
         return createAlwaysOnHotwordDetectorInternal(keyphrase, locale,
                 /* supportHotwordDetectionService= */ false, /* options= */ null,
-                /* sharedMemory= */ null, callback);
+                /* sharedMemory= */ null, executor, callback);
     }
 
     /**
      * Create an {@link AlwaysOnHotwordDetector} and trigger a {@link HotwordDetectionService}
      * service, then it will also pass the read-only data to hotword detection service.
      *
-     * Like {@see #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)
+     * Like {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)
      * }. Before calling this function, you should set a valid hotword detection service with
      * android:hotwordDetectionService in an android.voice_interaction metadata file and set
      * android:isolatedProcess="true" in the AndroidManifest.xml of hotword detection service.
@@ -384,8 +479,14 @@ public class VoiceInteractionService extends Service {
      * all conditions meet the requirements.
      *
      * <p>Note: If there are any active detectors that are created by using
-     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)},
-     * call this will throw an {@link IllegalStateException}.
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     * AlwaysOnHotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * <p>Note that the callback will be executed on the current thread. If the current thread
+     * doesn't have a looper, it will throw a {@link RuntimeException}. To specify the execution
+     * thread, use {@link #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle,
+     * SharedMemory, Executor, AlwaysOnHotwordDetector.Callback)}.
      *
      * @param keyphrase The keyphrase that's being used, for example "Hello Android".
      * @param locale The locale for which the enrollment needs to be performed.
@@ -398,10 +499,13 @@ public class VoiceInteractionService extends Service {
      * @param callback The callback to notify of detection events.
      * @return An always-on hotword detector for the given keyphrase and locale.
      *
+     * @deprecated Use {@link #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle,
+     *             SharedMemory, Executor, AlwaysOnHotwordDetector.Callback)} instead.
      * @hide
      */
     @SystemApi
     @RequiresPermission(Manifest.permission.MANAGE_HOTWORD_DETECTION)
+    @Deprecated
     @NonNull
     public final AlwaysOnHotwordDetector createAlwaysOnHotwordDetector(
             @SuppressLint("MissingNullability") String keyphrase,  // TODO: nullability properly
@@ -410,8 +514,60 @@ public class VoiceInteractionService extends Service {
             @Nullable SharedMemory sharedMemory,
             @SuppressLint("MissingNullability") AlwaysOnHotwordDetector.Callback callback) {
         return createAlwaysOnHotwordDetectorInternal(keyphrase, locale,
-                /* supportHotwordDetectionService= */ true, options,
-                sharedMemory, callback);
+                /* supportHotwordDetectionService= */ true, options, sharedMemory,
+                /* executor= */ null, callback);
+    }
+
+    /**
+     * Create an {@link AlwaysOnHotwordDetector} and trigger a {@link HotwordDetectionService}
+     * service, then it will also pass the read-only data to hotword detection service.
+     *
+     * Like {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)
+     * }. Before calling this function, you should set a valid hotword detection service with
+     * android:hotwordDetectionService in an android.voice_interaction metadata file and set
+     * android:isolatedProcess="true" in the AndroidManifest.xml of hotword detection service.
+     * Otherwise it will throw IllegalStateException. After calling this function, the system will
+     * also trigger a hotword detection service and pass the read-only data back to it.
+     *
+     * <p>Note: The system will trigger hotword detection service after calling this function when
+     * all conditions meet the requirements.
+     *
+     * <p>Note: If there are any active detectors that are created by using
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     * AlwaysOnHotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * @param keyphrase The keyphrase that's being used, for example "Hello Android".
+     * @param locale The locale for which the enrollment needs to be performed.
+     * @param options Application configuration data provided by the
+     * {@link VoiceInteractionService}. PersistableBundle does not allow any remotable objects or
+     * other contents that can be used to communicate with other processes.
+     * @param sharedMemory The unrestricted data blob provided by the
+     * {@link VoiceInteractionService}. Use this to provide the hotword models data or other
+     * such data to the trusted process.
+     * @param executor The executor on which to run the callback.
+     * @param callback The callback to notify of detection events.
+     * @return An always-on hotword detector for the given keyphrase and locale.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.MANAGE_HOTWORD_DETECTION)
+    @NonNull
+    public final AlwaysOnHotwordDetector createAlwaysOnHotwordDetector(
+            @NonNull String keyphrase, @SuppressLint("UseIcu") @NonNull Locale locale,
+            @Nullable PersistableBundle options, @Nullable SharedMemory sharedMemory,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AlwaysOnHotwordDetector.Callback callback) {
+        // TODO (b/269080850): Resolve AndroidFrameworkRequiresPermission lint warning
+
+        Objects.requireNonNull(keyphrase);
+        Objects.requireNonNull(locale);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        return createAlwaysOnHotwordDetectorInternal(keyphrase, locale,
+                /* supportHotwordDetectionService= */ true, options, sharedMemory, executor,
+                callback);
     }
 
     private AlwaysOnHotwordDetector createAlwaysOnHotwordDetectorInternal(
@@ -420,7 +576,9 @@ public class VoiceInteractionService extends Service {
             boolean supportHotwordDetectionService,
             @Nullable PersistableBundle options,
             @Nullable SharedMemory sharedMemory,
+            @Nullable @CallbackExecutor Executor executor,
             @SuppressLint("MissingNullability") AlwaysOnHotwordDetector.Callback callback) {
+
         if (mSystemService == null) {
             throw new IllegalStateException("Not available until onReady() is called");
         }
@@ -444,7 +602,7 @@ public class VoiceInteractionService extends Service {
             }
 
             AlwaysOnHotwordDetector dspDetector = new AlwaysOnHotwordDetector(keyphrase, locale,
-                    callback, mKeyphraseEnrollmentInfo, mSystemService,
+                    executor, callback, mKeyphraseEnrollmentInfo, mSystemService,
                     getApplicationContext().getApplicationInfo().targetSdkVersion,
                     supportHotwordDetectionService);
             mActiveDetectors.add(dspDetector);
@@ -480,8 +638,13 @@ public class VoiceInteractionService extends Service {
      * recommended to use {@link #createAlwaysOnHotwordDetector} instead.
      *
      * <p>Note: If there are any active detectors that are created by using
-     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)},
-     * call this will throw an {@link IllegalStateException}.
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     * AlwaysOnHotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * <p>Note that the callback will be executed on the main thread. To specify the execution
+     * thread, use {@link #createHotwordDetector(PersistableBundle, SharedMemory, Executor,
+     * HotwordDetector.Callback)}.
      *
      * @param options Application configuration data to be provided to the
      * {@link HotwordDetectionService}. PersistableBundle does not allow any remotable objects or
@@ -495,6 +658,63 @@ public class VoiceInteractionService extends Service {
      * @see #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
      * AlwaysOnHotwordDetector.Callback)
      *
+     * @see #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
+     * Executor, AlwaysOnHotwordDetector.Callback)
+     *
+     * @deprecated Use {@link #createHotwordDetector(PersistableBundle, SharedMemory, Executor,
+     *             HotwordDetector.Callback)} instead.
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.MANAGE_HOTWORD_DETECTION)
+    @Deprecated
+    @NonNull
+    public final HotwordDetector createHotwordDetector(
+            @Nullable PersistableBundle options,
+            @Nullable SharedMemory sharedMemory,
+            @NonNull HotwordDetector.Callback callback) {
+        return createHotwordDetectorInternal(options, sharedMemory, /* executor= */ null, callback);
+    }
+
+    /**
+     * Creates a {@link HotwordDetector} and initializes the application's
+     * {@link HotwordDetectionService} using {@code options} and {code sharedMemory}.
+     *
+     * <p>To be able to call this, you need to set android:hotwordDetectionService in the
+     * android.voice_interaction metadata file to a valid hotword detection service, and set
+     * android:isolatedProcess="true" in the hotword detection service's declaration. Otherwise,
+     * this throws an {@link IllegalStateException}.
+     *
+     * <p>This instance must be retained and used by the client.
+     * Calling this a second time invalidates the previously created hotword detector
+     * which can no longer be used to manage recognition.
+     *
+     * <p>Using this has a noticeable impact on battery, since the microphone is kept open
+     * for the lifetime of the recognition {@link HotwordDetector#startRecognition() session}. On
+     * devices where hardware filtering is available (such as through a DSP), it's highly
+     * recommended to use {@link #createAlwaysOnHotwordDetector} instead.
+     *
+     * <p>Note: If there are any active detectors that are created by using
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, AlwaysOnHotwordDetector.Callback)} or
+     * {@link #createAlwaysOnHotwordDetector(String, Locale, Executor,
+     * AlwaysOnHotwordDetector.Callback)}, call this will throw an {@link IllegalStateException}.
+     *
+     * @param options Application configuration data to be provided to the
+     * {@link HotwordDetectionService}. PersistableBundle does not allow any remotable objects or
+     * other contents that can be used to communicate with other processes.
+     * @param sharedMemory The unrestricted data blob to be provided to the
+     * {@link HotwordDetectionService}. Use this to provide hotword models or other such data to the
+     * sandboxed process.
+     * @param executor The executor on which to run the callback.
+     * @param callback The callback to notify of detection events.
+     * @return A hotword detector for the given audio format.
+     *
+     * @see #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
+     * AlwaysOnHotwordDetector.Callback)
+     *
+     * @see #createAlwaysOnHotwordDetector(String, Locale, PersistableBundle, SharedMemory,
+     * Executor, AlwaysOnHotwordDetector.Callback)
+     *
      * @hide
      */
     @SystemApi
@@ -503,6 +723,19 @@ public class VoiceInteractionService extends Service {
     public final HotwordDetector createHotwordDetector(
             @Nullable PersistableBundle options,
             @Nullable SharedMemory sharedMemory,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull HotwordDetector.Callback callback) {
+        // TODO (b/269080850): Resolve AndroidFrameworkRequiresPermission lint warning
+
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        return createHotwordDetectorInternal(options, sharedMemory, executor, callback);
+    }
+
+    private HotwordDetector createHotwordDetectorInternal(
+            @Nullable PersistableBundle options,
+            @Nullable SharedMemory sharedMemory,
+            @Nullable @CallbackExecutor Executor executor,
             @NonNull HotwordDetector.Callback callback) {
         if (mSystemService == null) {
             throw new IllegalStateException("Not available until onReady() is called");
@@ -526,8 +759,8 @@ public class VoiceInteractionService extends Service {
             }
 
             SoftwareHotwordDetector softwareHotwordDetector =
-                    new SoftwareHotwordDetector(
-                            mSystemService, null, callback);
+                    new SoftwareHotwordDetector(mSystemService, /* audioFormat= */ null,
+                            executor, callback);
             mActiveDetectors.add(softwareHotwordDetector);
 
             try {
@@ -540,6 +773,85 @@ public class VoiceInteractionService extends Service {
                 throw e;
             }
             return softwareHotwordDetector;
+        }
+    }
+
+    /**
+     * Creates a {@link VisualQueryDetector} and initializes the application's
+     * {@link VisualQueryDetectionService} using {@code options} and {@code sharedMemory}.
+     *
+     * <p>To be able to call this, you need to set android:visualQueryDetectionService in the
+     * android.voice_interaction metadata file to a valid visual query detection service, and set
+     * android:isolatedProcess="true" in the service's declaration. Otherwise, this throws an
+     * {@link IllegalStateException}.
+     *
+     * <p>Using this has a noticeable impact on battery, since the microphone is kept open
+     * for the lifetime of the recognition {@link VisualQueryDetector#startRecognition() session}.
+     *
+     * @param options Application configuration data to be provided to the
+     * {@link VisualQueryDetectionService}. PersistableBundle does not allow any remotable objects
+     * or other contents that can be used to communicate with other processes.
+     * @param sharedMemory The unrestricted data blob to be provided to the
+     * {@link VisualQueryDetectionService}. Use this to provide models or other such data to the
+     * sandboxed process.
+     * @param callback The callback to notify of detection events.
+     * @return An instanece of {@link VisualQueryDetector}.
+     * @throws UnsupportedOperationException if only single detector is supported. Multiple detector
+     * is only available for apps targeting {@link Build.VERSION_CODES#TIRAMISU} and above.
+     * @throws IllegalStateException when there is an existing {@link VisualQueryDetector}, or when
+     * there is a non-trusted hotword detector running.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(Manifest.permission.MANAGE_HOTWORD_DETECTION)
+    @NonNull
+    public final VisualQueryDetector createVisualQueryDetector(
+            @Nullable PersistableBundle options,
+            @Nullable SharedMemory sharedMemory,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull VisualQueryDetector.Callback callback) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        if (mSystemService == null) {
+            throw new IllegalStateException("Not available until onReady() is called");
+        }
+        synchronized (mLock) {
+            if (!CompatChanges.isChangeEnabled(MULTIPLE_ACTIVE_HOTWORD_DETECTORS)) {
+                throw new UnsupportedOperationException("VisualQueryDetector is only available if "
+                        + "multiple detectors are allowed");
+            } else {
+                if (mActiveVisualQueryDetector != null) {
+                    throw new IllegalStateException(
+                                "There is already an active VisualQueryDetector. "
+                                        + "It must be destroyed to create a new one.");
+                }
+                for (HotwordDetector detector : mActiveDetectors) {
+                    if (!detector.isUsingSandboxedDetectionService()) {
+                        throw new IllegalStateException(
+                                "It disallows to create trusted and non-trusted detectors "
+                                        + "at the same time.");
+                    }
+                }
+            }
+
+            VisualQueryDetector visualQueryDetector =
+                    new VisualQueryDetector(mSystemService, executor, callback);
+            HotwordDetector visualQueryDetectorInitializationDelegate =
+                    visualQueryDetector.getInitializationDelegate();
+            mActiveDetectors.add(visualQueryDetectorInitializationDelegate);
+
+            try {
+                visualQueryDetector.registerOnDestroyListener(this::onHotwordDetectorDestroyed);
+                visualQueryDetector.initialize(options, sharedMemory);
+            } catch (Exception e) {
+                mActiveDetectors.remove(visualQueryDetectorInitializationDelegate);
+                visualQueryDetector.destroy();
+                throw e;
+            }
+            mActiveVisualQueryDetector = visualQueryDetector;
+            return visualQueryDetector;
         }
     }
 
@@ -598,6 +910,10 @@ public class VoiceInteractionService extends Service {
 
     private void onHotwordDetectorDestroyed(@NonNull HotwordDetector detector) {
         synchronized (mLock) {
+            if (mActiveVisualQueryDetector != null
+                    && detector == mActiveVisualQueryDetector.getInitializationDelegate()) {
+                mActiveVisualQueryDetector = null;
+            }
             mActiveDetectors.remove(detector);
             shutdownHotwordDetectionServiceIfRequiredLocked();
         }
@@ -638,11 +954,13 @@ public class VoiceInteractionService extends Service {
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("VOICE INTERACTION");
         synchronized (mLock) {
-            pw.println("  Sandboxed Detector(s)");
+            pw.println("  Sandboxed Detector(s):");
             if (mActiveDetectors.size() == 0) {
-                pw.println("    NULL");
+                pw.println("    No detector.");
             } else {
                 mActiveDetectors.forEach(detector -> {
+                    pw.print("  Using sandboxed detection service=");
+                    pw.println(detector.isUsingSandboxedDetectionService());
                     detector.dump("    ", pw);
                     pw.println();
                 });

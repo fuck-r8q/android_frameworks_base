@@ -85,11 +85,17 @@
     <string name="screenshot_share_description" msgid="2861628935812656612">"Dijeljenje snimka ekrana"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Snimi više"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Odbacite snimak ekrana"</string>
+    <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"Odbacite poruku radnog profila"</string>
     <string name="screenshot_preview_description" msgid="7606510140714080474">"Pregled snimka ekrana"</string>
     <string name="screenshot_top_boundary_pct" msgid="2520148599096479332">"Gornja granica <xliff:g id="PERCENT">%1$d</xliff:g> posto"</string>
     <string name="screenshot_bottom_boundary_pct" msgid="3880821519814946478">"Donja granica <xliff:g id="PERCENT">%1$d</xliff:g> posto"</string>
     <string name="screenshot_left_boundary_pct" msgid="8502323556112287469">"Lijeva granica <xliff:g id="PERCENT">%1$d</xliff:g> posto"</string>
     <string name="screenshot_right_boundary_pct" msgid="1201150713021779321">"Desna granica <xliff:g id="PERCENT">%1$d</xliff:g> posto"</string>
+    <string name="screenshot_work_profile_notification" msgid="203041724052970693">"Sačuvano je u aplikaciji <xliff:g id="APP">%1$s</xliff:g> na radnom profilu"</string>
+    <string name="screenshot_default_files_app_name" msgid="8721579578575161912">"Fajlovi"</string>
+    <string name="screenshot_detected_template" msgid="7940376642921719915">"Aplikacija <xliff:g id="APPNAME">%1$s</xliff:g> je otkrila ovaj snimak ekrana."</string>
+    <string name="screenshot_detected_multiple_template" msgid="7644827792093819241">"Aplikacija <xliff:g id="APPNAME">%1$s</xliff:g> i druge otvorene aplikacije su otkrile ovaj snimak ekrana."</string>
+    <string name="app_clips_save_add_to_note" msgid="3460200751278069445">"Dodaj u bilješku"</string>
     <string name="screenrecord_name" msgid="2596401223859996572">"Snimač ekrana"</string>
     <string name="screenrecord_background_processing_label" msgid="7244617554884238898">"Obrađivanje snimka ekrana"</string>
     <string name="screenrecord_channel_description" msgid="4147077128486138351">"Obavještenje za sesiju snimanja ekrana je u toku"</string>
@@ -317,7 +323,7 @@
     <string name="sensor_privacy_camera_unblocked_dialog_content" msgid="7847190103011782278">"Kamera je omogućena za sve aplikacije i usluge."</string>
     <string name="sensor_privacy_camera_blocked_dialog_content" msgid="3182428709314874616">"Pristup kamere je onemogućen za sve aplikacije i usluge."</string>
     <string name="sensor_privacy_htt_blocked_dialog_content" msgid="3333321592997666441">"Da koristite dugme za mikrofon, omogućite pristup mikrofonu u Postavkama."</string>
-    <string name="sensor_privacy_dialog_open_settings" msgid="5635865896053011859">"Otvori postavke"</string>
+    <string name="sensor_privacy_dialog_open_settings" msgid="5635865896053011859">"Otvori Postavke"</string>
     <string name="media_seamless_other_device" msgid="4654849800789196737">"Drugi uređaj"</string>
     <string name="quick_step_accessibility_toggle_overview" msgid="7908949976727578403">"Pregled uključivanja/isključivanja"</string>
     <string name="zen_priority_introduction" msgid="3159291973383796646">"Neće vas ometati zvukovi i vibracije, osim alarma, podsjetnika, događaja i pozivalaca koje odredite. I dalje ćete čuti sve što ste odabrali za reprodukciju, uključujući muziku, videozapise i igre."</string>
@@ -336,12 +342,6 @@
     <string name="keyguard_face_successful_unlock_press_alt_3" msgid="7219030481255573962">"Lice prepoznato. Pritisnite ikonu za otklj. da otvorite."</string>
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"Otključano je licem"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"Lice je prepoznato"</string>
-  <string-array name="udfps_accessibility_touch_hints">
-    <item msgid="1901953991150295169">"Pomjeranje ulijevo"</item>
-    <item msgid="5558598599408514296">"Pomjeranje nadolje"</item>
-    <item msgid="4844142668312841831">"Pomjeranje udesno"</item>
-    <item msgid="5640521437931460125">"Pomjeranje nagore"</item>
-  </string-array>
     <string name="keyguard_retry" msgid="886802522584053523">"Prevucite prema gore da pokušate ponovo"</string>
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"Otključajte da koristite NFC"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"Ovaj uređaj pripada vašoj organizaciji"</string>
@@ -387,7 +387,7 @@
     <string name="media_projection_permission_dialog_warning_entire_screen" msgid="3989078820637452717">"Kada dijelite, snimate ili emitirate, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> ima pristup svemu što se vidi na ekranu ili što se reproducira na uređaju. Zato budite oprezni s lozinkama, detaljima o plaćanju, porukama i drugim osjetljivim informacijama."</string>
     <string name="media_projection_permission_dialog_warning_single_app" msgid="1659532781536753059">"Kada aplikaciju dijelite, snimate ili emitirate, <xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g> ima pristup svemu što se prikazuje ili reproducira u toj aplikaciji. Zato budite oprezni s lozinkama, detaljima o plaćanju, porukama i drugim osjetljivim informacijama."</string>
     <string name="media_projection_permission_dialog_continue" msgid="1827799658916736006">"Nastavi"</string>
-    <string name="media_projection_permission_app_selector_title" msgid="894251621057480704">"Dijelite ili snimite aplikaciju"</string>
+    <string name="media_projection_permission_app_selector_title" msgid="894251621057480704">"Dijelite ili snimajte aplikaciju"</string>
     <string name="media_projection_permission_dialog_system_service_title" msgid="6827129613741303726">"Dozvoliti aplikaciji da dijeli ili snima?"</string>
     <string name="media_projection_permission_dialog_system_service_warning_entire_screen" msgid="8801616203805837575">"Kada dijelite, snimate ili emitirate, aplikacija ima pristup svemu što je vidljivo na ekranu ili što se reproducira na uređaju. Zato budite oprezni s lozinkama, detaljima o plaćanju, porukama i drugim osjetljivim informacijama."</string>
     <string name="media_projection_permission_dialog_system_service_warning_single_app" msgid="543310680568419338">"Kada dijelite, snimate ili emitirate aplikaciju, ona ima pristup svemu što se prikazuje ili reproducira u toj aplikaciji. Zato budite oprezni s lozinkama, detaljima o plaćanju, porukama i drugim osjetljivim informacijama."</string>
@@ -540,8 +540,8 @@
     <string name="notification_automatic_title" msgid="3745465364578762652">"Automatski"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"Bez zvuka ili vibracije"</string>
     <string name="notification_conversation_summary_low" msgid="1734433426085468009">"Bez zvuka ili vibracije i pojavljuje se pri dnu odjeljka razgovora"</string>
-    <string name="notification_channel_summary_default" msgid="3282930979307248890">"Može zvoniti ili vibrirati na osnovu postavki telefona"</string>
-    <string name="notification_channel_summary_default_with_bubbles" msgid="1782419896613644568">"Može zvoniti ili vibrirati na osnovu postavki telefona. Razgovori iz oblačića u aplikaciji <xliff:g id="APP_NAME">%1$s</xliff:g> kao zadana opcija."</string>
+    <string name="notification_channel_summary_default" msgid="777294388712200605">"Može zvoniti ili vibrirati na osnovu postavki uređaja"</string>
+    <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"Može zvoniti ili vibrirati na osnovu postavki uređaja. Razgovori iz aplikacije <xliff:g id="APP_NAME">%1$s</xliff:g> prikazuju se u oblačićima prema zadanim postavkama."</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"Neka sistem odluči treba li se ovo obavještenje oglasiti zvukom ili vibracijom"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;Status:&lt;/b&gt; je unaprijeđen u Zadano"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;Status:&lt;/b&gt; je unazađen u Nečujno"</string>
@@ -742,6 +742,7 @@
     <string name="wifi_is_off" msgid="5389597396308001471">"WiFi je isključen"</string>
     <string name="bt_is_off" msgid="7436344904889461591">"Bluetooth je isključen"</string>
     <string name="dnd_is_off" msgid="3185706903793094463">"Način rada Ne ometaj je isključen"</string>
+    <string name="dnd_is_on" msgid="7009368176361546279">"Funkcija Ne ometaj je uključena"</string>
     <string name="qs_dnd_prompt_auto_rule" msgid="3535469468310002616">"Opciju Ne ometaju uključilo je automatsko pravilo (<xliff:g id="ID_1">%s</xliff:g>)."</string>
     <string name="qs_dnd_prompt_app" msgid="4027984447935396820">"Način rada Ne ometaj uključila je aplikacija <xliff:g id="ID_1">%s</xliff:g>."</string>
     <string name="qs_dnd_prompt_auto_rule_app" msgid="1841469944118486580">"Način rada Ne ometaj uključilo je automatsko pravilo ili aplikacija."</string>
@@ -808,13 +809,14 @@
     <string name="accessibility_magnification_medium" msgid="6994632616884562625">"Srednje"</string>
     <string name="accessibility_magnification_small" msgid="8144502090651099970">"Malo"</string>
     <string name="accessibility_magnification_large" msgid="6602944330021308774">"Veliko"</string>
-    <string name="accessibility_magnification_close" msgid="1099965835844673375">"Zatvori"</string>
+    <string name="accessibility_magnification_done" msgid="263349129937348512">"Gotovo"</string>
     <string name="accessibility_magnifier_edit" msgid="1522877239671820636">"Uredi"</string>
     <string name="accessibility_magnification_magnifier_window_settings" msgid="2834685072221468434">"Postavke prozora povećala"</string>
     <string name="accessibility_floating_button_migration_tooltip" msgid="5217151214439341902">"Dodirnite da otvorite funkcije pristupačnosti. Prilagodite ili zamijenite dugme u Postavkama.\n\n"<annotation id="link">"Postavke"</annotation></string>
     <string name="accessibility_floating_button_docking_tooltip" msgid="6814897496767461517">"Premjestite dugme do ivice da ga privremeno sakrijete"</string>
-    <string name="accessibility_floating_button_undo" msgid="511112888715708241">"Poništavanje"</string>
-    <string name="accessibility_floating_button_undo_message_text" msgid="3044079592757099698">"{count,plural, =1{{label} prečica je uklonjena}one{# prečica je uklonjena}few{# prečice su uklonjene}other{# prečica je uklonjenao}}"</string>
+    <string name="accessibility_floating_button_undo" msgid="511112888715708241">"Opozovi"</string>
+    <string name="accessibility_floating_button_undo_message_label_text" msgid="9017658016426242640">"Prečica <xliff:g id="FEATURE_NAME">%s</xliff:g> je uklonjena"</string>
+    <string name="accessibility_floating_button_undo_message_number_text" msgid="4909270290725226075">"{count,plural, =1{# prečica je uklonjena}one{# prečica je uklonjena}few{# prečice su uklonjene}other{# prečica je uklonjeno}}"</string>
     <string name="accessibility_floating_button_action_move_top_left" msgid="6253520703618545705">"Pomjeranje gore lijevo"</string>
     <string name="accessibility_floating_button_action_move_top_right" msgid="6106225581993479711">"Pomjeranje gore desno"</string>
     <string name="accessibility_floating_button_action_move_bottom_left" msgid="8063394111137429725">"Pomjeranje dolje lijevo"</string>
@@ -827,6 +829,8 @@
     <string name="controls_providers_title" msgid="6879775889857085056">"Odaberite aplikaciju da dodate kontrole"</string>
     <string name="controls_number_of_favorites" msgid="4481806788981836355">"{count,plural, =1{Dodana je # kontrola.}one{Dodana je # kontrola.}few{Dodane su # kontrole.}other{Dodano je # kontrola.}}"</string>
     <string name="controls_removed" msgid="3731789252222856959">"Uklonjeno"</string>
+    <string name="controls_panel_authorization_title" msgid="267429338785864842">"Dodati aplikaciju <xliff:g id="APPNAME">%s</xliff:g>?"</string>
+    <string name="controls_panel_authorization" msgid="4540047176861801815">"Kada dodate aplikaciju <xliff:g id="APPNAME">%s</xliff:g>, ona može dodavati kontrole i sadržaj na ovu ploču. U nekim aplikacijama možete odabrati koje kontrole se prikazuju ovdje."</string>
     <string name="accessibility_control_favorite" msgid="8694362691985545985">"Dodano u omiljeno"</string>
     <string name="accessibility_control_favorite_position" msgid="54220258048929221">"Dodano u omiljeno, pozicija <xliff:g id="NUMBER">%d</xliff:g>"</string>
     <string name="accessibility_control_not_favorite" msgid="1291760269563092359">"Uklonjeno iz omiljenog"</string>
@@ -877,11 +881,16 @@
     <string name="controls_media_smartspace_rec_description" msgid="4136242327044070732">"Otvorite aplikaciju <xliff:g id="APP_LABEL">%1$s</xliff:g>"</string>
     <string name="controls_media_smartspace_rec_item_description" msgid="2189271793070870883">"Reproducirajte pjesmu <xliff:g id="SONG_NAME">%1$s</xliff:g> izvođača <xliff:g id="ARTIST_NAME">%2$s</xliff:g> pomoću aplikacije <xliff:g id="APP_LABEL">%3$s</xliff:g>"</string>
     <string name="controls_media_smartspace_rec_item_no_artist_description" msgid="8703614798636591077">"Reproducirajte pjesmu <xliff:g id="SONG_NAME">%1$s</xliff:g> pomoću aplikacije <xliff:g id="APP_LABEL">%2$s</xliff:g>"</string>
+    <string name="controls_media_smartspace_rec_header" msgid="5053461390357112834">"Za vas"</string>
     <string name="media_transfer_undo" msgid="1895606387620728736">"Poništi"</string>
-    <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"Približite se da reproducirate na uređaju <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
-    <string name="media_move_closer_to_end_cast" msgid="6495907340926563656">"Približite se uređaju <xliff:g id="DEVICENAME">%1$s</xliff:g> da na njemu reproducirate"</string>
+    <string name="media_move_closer_to_start_cast" msgid="2673104707465013176">"Približite da reproducirate na uređaju <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
+    <string name="media_move_closer_to_end_cast" msgid="7302555909119374738">"Da reproducirate ovdje, približite se uređaju <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
     <string name="media_transfer_playing_different_device" msgid="7186806382609785610">"Reproducira se na uređaju <xliff:g id="DEVICENAME">%1$s</xliff:g>"</string>
     <string name="media_transfer_failed" msgid="7955354964610603723">"Nešto nije uredu. Pokušajte ponovo."</string>
+    <string name="media_transfer_loading" msgid="5544017127027152422">"Učitavanje"</string>
+    <string name="media_ttt_default_device_type" msgid="4457646436153370169">"tablet"</string>
+    <string name="media_transfer_receiver_content_description_unknown_app" msgid="7381771464846263667">"Emitiranje medijskih sadržaja"</string>
+    <string name="media_transfer_receiver_content_description_with_app_name" msgid="8555975056850659389">"Emitiranje aplikacije <xliff:g id="APP_LABEL">%1$s</xliff:g>"</string>
     <string name="controls_error_timeout" msgid="794197289772728958">"Neaktivno, vidite aplikaciju"</string>
     <string name="controls_error_removed" msgid="6675638069846014366">"Nije pronađeno"</string>
     <string name="controls_error_removed_title" msgid="1207794911208047818">"Kontrola nije dostupna"</string>
@@ -891,6 +900,7 @@
     <string name="controls_error_failed" msgid="960228639198558525">"Greška, pokušajte ponovo"</string>
     <string name="controls_menu_add" msgid="4447246119229920050">"Dodaj kontrole"</string>
     <string name="controls_menu_edit" msgid="890623986951347062">"Uredi kontrole"</string>
+    <string name="controls_menu_add_another_app" msgid="8661172304650786705">"Dodaj aplikaciju"</string>
     <string name="media_output_dialog_add_output" msgid="5642703238877329518">"Dodajte izlaze"</string>
     <string name="media_output_dialog_group" msgid="5571251347877452212">"Grupa"</string>
     <string name="media_output_dialog_single_device" msgid="3102758980643351058">"Odabran je 1 uređaj"</string>
@@ -904,6 +914,8 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Dostupni uređaji za audio izlaz."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Jačina zvuka"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Zvučnici i ekrani"</string>
+    <string name="media_output_group_title_suggested_device" msgid="4157186235837903826">"Predloženi uređaji"</string>
     <string name="media_output_first_broadcast_title" msgid="6292237789860753022">"Kako funkcionira emitiranje"</string>
     <string name="media_output_broadcast" msgid="3555580945878071543">"Emitirajte"</string>
     <string name="media_output_first_notify_broadcast_message" msgid="6353857724136398494">"Osobe u vašoj blizini s kompatibilnim Bluetooth uređajima mogu slušati medijske sadržaje koje emitirate"</string>
@@ -915,6 +927,10 @@
     <string name="media_output_broadcast_start_failed" msgid="3670835946856129775">"Nije moguće emitirati"</string>
     <string name="media_output_broadcast_update_error" msgid="1420868236079122521">"Nije moguće sačuvati. Pokušajte ponovo."</string>
     <string name="media_output_broadcast_last_update_error" msgid="5484328807296895491">"Nije moguće sačuvati."</string>
+    <!-- no translation found for media_output_broadcast_code_hint_no_less_than_min (4663836092607696185) -->
+    <skip />
+    <!-- no translation found for media_output_broadcast_code_hint_no_more_than_max (9181869364856175638) -->
+    <skip />
     <string name="build_number_clip_data_label" msgid="3623176728412560914">"Broj verzije"</string>
     <string name="build_number_copy_toast" msgid="877720921605503046">"Broj verzije je kopiran u međumemoriju."</string>
     <string name="basic_status" msgid="2315371112182658176">"Otvoreni razgovor"</string>
@@ -1015,6 +1031,7 @@
     <string name="dream_overlay_status_bar_camera_off" msgid="5273073778969890823">"Kamera je isključena"</string>
     <string name="dream_overlay_status_bar_mic_off" msgid="8366534415013819396">"Mikrofon je isključen"</string>
     <string name="dream_overlay_status_bar_camera_mic_off" msgid="3199425257833773569">"Kamera i mikrofon su isključeni"</string>
+    <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"Asistent sluša"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# obavještenje}one{# obavještenje}few{# obavještenja}other{# obavještenja}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
     <string name="note_task_button_label" msgid="8718616095800343136">"Pisanje bilješki"</string>
@@ -1030,19 +1047,30 @@
     <string name="log_access_confirmation_allow" msgid="752147861593202968">"Dozvoli jednokratan pristup"</string>
     <string name="log_access_confirmation_deny" msgid="2389461495803585795">"Nemoj dozvoliti"</string>
     <string name="log_access_confirmation_body" msgid="6883031912003112634">"Zapisnici uređaja bilježe šta se dešava na uređaju. Aplikacije mogu koristiti te zapisnike da pronađu i isprave probleme.\n\nNeki zapisnici mogu sadržavati osjetljive podatke, zato pristup svim zapisnicima uređaja dozvolite samo aplikacijama kojima vjerujete. \n\nAko ne dozvolite ovoj aplikaciji da pristupa svim zapisnicima uređaja, ona i dalje može pristupati svojim zapisnicima. Proizvođač uređaja će možda i dalje biti u stanju pristupiti nekim zapisnicima ili podacima na uređaju."</string>
+    <string name="log_access_confirmation_learn_more" msgid="3134565480986328004">"Saznajte više"</string>
+    <string name="log_access_confirmation_learn_more_at" msgid="5635666259505215905">"Saznajte više na <xliff:g id="URL">%s</xliff:g>"</string>
     <string name="keyguard_affordance_enablement_dialog_action_template" msgid="8164857863036314664">"Otvori aplikaciju <xliff:g id="APPNAME">%1$s</xliff:g>"</string>
-    <string name="keyguard_affordance_enablement_dialog_message" msgid="2790910660524887941">"Da dodate aplikaciju <xliff:g id="APPNAME">%1$s</xliff:g> kao prečicu, pobrinite se za sljedeće"</string>
     <string name="keyguard_affordance_enablement_dialog_wallet_instruction_1" msgid="8439655049139819278">"• Aplikacija je postavljena"</string>
     <string name="keyguard_affordance_enablement_dialog_wallet_instruction_2" msgid="4321089250629477835">"• Najmanje jedna kartica je dodana u Novčanik"</string>
     <string name="keyguard_affordance_enablement_dialog_qr_scanner_instruction" msgid="5355839079232119791">"• Instalirajte aplikaciju kamere"</string>
     <string name="keyguard_affordance_enablement_dialog_home_instruction_1" msgid="8438311171750568633">"• Aplikacija je postavljena"</string>
     <string name="keyguard_affordance_enablement_dialog_home_instruction_2" msgid="8308525385889021652">"• Dostupan je najmanje jedan uređaj"</string>
+    <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"Dodirnite i zadržite prečicu"</string>
     <string name="rear_display_bottom_sheet_cancel" msgid="3461468855493357248">"Otkaži"</string>
     <string name="rear_display_bottom_sheet_confirm" msgid="4383356544661421206">"Obrni sada"</string>
     <string name="rear_display_fold_bottom_sheet_title" msgid="6081542277622721548">"Raširite telefon za bolji selfi"</string>
     <string name="rear_display_unfold_bottom_sheet_title" msgid="2137403802960396357">"Obrnuti na prednji ekran radi boljeg selfija?"</string>
-    <string name="rear_display_bottom_sheet_description" msgid="1852662982816810352">"Koristite stražnju kameru za širu fotografiju veće rezolucije."</string>
+    <string name="rear_display_bottom_sheet_description" msgid="1852662982816810352">"Koristite zadnju kameru za širu fotografiju veće rezolucije."</string>
     <string name="rear_display_bottom_sheet_warning" msgid="800995919558238930"><b>"✱ Ekran će se isključiti"</b></string>
-    <string name="rear_display_accessibility_folded_animation" msgid="1538121649587978179">"Rasklopljen sklopivi uređaj"</string>
-    <string name="rear_display_accessibility_unfolded_animation" msgid="1946153682258289040">"Okretanje sklopivog uređaja sa svih strana"</string>
+    <string name="rear_display_accessibility_folded_animation" msgid="1538121649587978179">"Sklopivi uređaj se rasklapa"</string>
+    <string name="rear_display_accessibility_unfolded_animation" msgid="1946153682258289040">"Sklopivi uređaj se obrće"</string>
+    <string name="stylus_battery_low_percentage" msgid="1620068112350141558">"Preostalo baterije: <xliff:g id="PERCENTAGE">%s</xliff:g>"</string>
+    <string name="stylus_battery_low_subtitle" msgid="3583843128908823273">"Priključite pisaljku na punjač"</string>
+    <string name="stylus_battery_low" msgid="7134370101603167096">"Baterija pisaljke je slaba"</string>
+    <string name="video_camera" msgid="7654002575156149298">"Video kamera"</string>
+    <string name="call_from_work_profile_title" msgid="6991157106804289643">"Nije moguće pozvati s ovog profila"</string>
+    <string name="call_from_work_profile_text" msgid="3458704745640229638">"Radna pravila vam dozvoljavaju upućivanje telefonskih poziva samo s radnog profila"</string>
+    <string name="call_from_work_profile_action" msgid="2937701298133010724">"Pređite na radni profil"</string>
+    <string name="call_from_work_profile_close" msgid="7927067108901068098">"Zatvori"</string>
+    <string name="lock_screen_settings" msgid="9197175446592718435">"Postavke zaključavanja ekrana"</string>
 </resources>
