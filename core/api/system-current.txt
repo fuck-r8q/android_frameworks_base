@@ -842,6 +842,7 @@ package android.app {
     method public int getPendingIntentBackgroundActivityStartMode();
     method public boolean isDeferUntilActive();
     method @Deprecated public boolean isPendingIntentBackgroundActivityLaunchAllowed();
+    method @Deprecated @NonNull public static android.app.BroadcastOptions makeBasic();
     method @RequiresPermission(android.Manifest.permission.ACCESS_BROADCAST_RESPONSE_STATS) public void recordResponseEventWhileInBackground(@IntRange(from=0) long);
     method @RequiresPermission(android.Manifest.permission.START_ACTIVITIES_FROM_BACKGROUND) public void setBackgroundActivityStartsAllowed(boolean);
     method @NonNull public android.app.BroadcastOptions setDeferUntilActive(boolean);
@@ -5117,7 +5118,7 @@ package android.hardware.input {
     method @NonNull public android.hardware.input.VirtualTouchEvent build();
     method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setAction(int);
     method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setMajorAxisSize(@FloatRange(from=0.0f) float);
-    method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setPointerId(int);
+    method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setPointerId(@IntRange(from=0, to=0x10 - 1) int);
     method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setPressure(@FloatRange(from=0.0f) float);
     method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setToolType(int);
     method @NonNull public android.hardware.input.VirtualTouchEvent.Builder setX(float);
@@ -10152,7 +10153,6 @@ package android.net.wifi.sharedconnectivity.service {
 
   public abstract class SharedConnectivityService extends android.app.Service {
     ctor public SharedConnectivityService();
-    ctor public SharedConnectivityService(@NonNull android.os.Handler);
     method @Nullable public final android.os.IBinder onBind(@NonNull android.content.Intent);
     method public abstract void onConnectKnownNetwork(@NonNull android.net.wifi.sharedconnectivity.app.KnownNetwork);
     method public abstract void onConnectTetherNetwork(@NonNull android.net.wifi.sharedconnectivity.app.TetherNetwork);
@@ -10720,15 +10720,15 @@ package android.os {
 
   public static final class PowerManager.LowPowerStandbyPortDescription {
     ctor public PowerManager.LowPowerStandbyPortDescription(int, int, int);
-    ctor public PowerManager.LowPowerStandbyPortDescription(int, int, int, @Nullable android.net.LinkAddress);
-    method @Nullable public android.net.LinkAddress getBindAddress();
+    ctor public PowerManager.LowPowerStandbyPortDescription(int, int, int, @Nullable java.net.InetAddress);
+    method @Nullable public java.net.InetAddress getLocalAddress();
     method public int getPortMatcher();
     method public int getPortNumber();
     method public int getProtocol();
     field public static final int MATCH_PORT_LOCAL = 1; // 0x1
     field public static final int MATCH_PORT_REMOTE = 2; // 0x2
-    field public static final int PROTOCOL_TCP = 1; // 0x1
-    field public static final int PROTOCOL_UDP = 2; // 0x2
+    field public static final int PROTOCOL_TCP = 6; // 0x6
+    field public static final int PROTOCOL_UDP = 17; // 0x11
   }
 
   public final class PowerManager.LowPowerStandbyPortsLock {
