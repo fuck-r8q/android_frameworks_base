@@ -20,6 +20,7 @@ import static android.Manifest.permission.CAPTURE_AUDIO_HOTWORD;
 import static android.Manifest.permission.RECORD_AUDIO;
 import static android.service.voice.VoiceInteractionService.MULTIPLE_ACTIVE_HOTWORD_DETECTORS;
 
+import android.annotation.ElapsedRealtimeLong;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -54,6 +55,7 @@ import android.os.ParcelFileDescriptor;
 import android.os.PersistableBundle;
 import android.os.RemoteException;
 import android.os.SharedMemory;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Slog;
@@ -401,6 +403,9 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
         private final ParcelFileDescriptor mAudioStream;
         private final List<KeyphraseRecognitionExtra> mKephraseExtras;
 
+        @ElapsedRealtimeLong
+        private final long mHalEventReceivedMillis;
+
         private EventPayload(boolean captureAvailable,
                 @Nullable AudioFormat audioFormat,
                 int captureSession,
@@ -408,7 +413,8 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
                 @Nullable byte[] data,
                 @Nullable HotwordDetectedResult hotwordDetectedResult,
                 @Nullable ParcelFileDescriptor audioStream,
-                @NonNull List<KeyphraseRecognitionExtra> keyphraseExtras) {
+                @NonNull List<KeyphraseRecognitionExtra> keyphraseExtras,
+                @ElapsedRealtimeLong long halEventReceivedMillis) {
             mCaptureAvailable = captureAvailable;
             mCaptureSession = captureSession;
             mAudioFormat = audioFormat;
@@ -417,6 +423,7 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
             mHotwordDetectedResult = hotwordDetectedResult;
             mAudioStream = audioStream;
             mKephraseExtras = keyphraseExtras;
+            mHalEventReceivedMillis = halEventReceivedMillis;
         }
 
         /**
@@ -546,6 +553,21 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
         }
 
         /**
+         * Timestamp of when the trigger event from SoundTriggerHal was received by the system
+         * server.
+         *
+         * Clock monotonic including suspend time or its equivalent on the system,
+         * in the same units and timebase as {@link SystemClock#elapsedRealtime()}.
+         *
+         * @return Elapsed realtime in milliseconds when the event was received from the HAL.
+         *      Returns -1 if the event was not generated from the HAL.
+         */
+        @ElapsedRealtimeLong
+        public long getHalEventReceivedMillis() {
+            return mHalEventReceivedMillis;
+        }
+
+        /**
          * Builder class for {@link EventPayload} objects
          *
          * @hide
@@ -561,6 +583,8 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
             private HotwordDetectedResult mHotwordDetectedResult = null;
             private ParcelFileDescriptor mAudioStream = null;
             private List<KeyphraseRecognitionExtra> mKeyphraseExtras = Collections.emptyList();
+            @ElapsedRealtimeLong
+            private long mHalEventReceivedMillis = -1;
 
             public Builder() {}
 
@@ -579,6 +603,7 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
                     setKeyphraseRecognitionExtras(
                             Arrays.asList(keyphraseRecognitionEvent.keyphraseExtras));
                 }
+                setHalEventReceivedMillis(keyphraseRecognitionEvent.getHalEventReceivedMillis());
             }
 
             /**
@@ -682,13 +707,27 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
             }
 
             /**
+             * Timestamp of when the trigger event from SoundTriggerHal was received by the
+             * framework.
+             *
+             * Clock monotonic including suspend time or its equivalent on the system,
+             * in the same units and timebase as {@link SystemClock#elapsedRealtime()}.
+             */
+            @NonNull
+            public Builder setHalEventReceivedMillis(
+                    @ElapsedRealtimeLong long halEventReceivedMillis) {
+                mHalEventReceivedMillis = halEventReceivedMillis;
+                return this;
+            }
+
+            /**
              * Builds an {@link EventPayload} instance
              */
             @NonNull
             public EventPayload build() {
                 return new EventPayload(mCaptureAvailable, mAudioFormat, mCaptureSession,
                         mDataFormat, mData, mHotwordDetectedResult, mAudioStream,
-                        mKeyphraseExtras);
+                        mKeyphraseExtras, mHalEventReceivedMillis);
             }
         }
     }
@@ -732,7 +771,13 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
          */
         public abstract void onDetected(@NonNull EventPayload eventPayload);
 
-        /** {@inheritDoc} */
+        /**
+         * {@inheritDoc}
+         *
+         * @deprecated Use {@link HotwordDetector.Callback#onError(DetectorFailure)} instead.
+         */
+        @Deprecated
+        @Override
         public abstract void onError();
 
         /** {@inheritDoc} */
@@ -899,8 +944,9 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
     @TestApi
     @RequiresPermission(allOf = {RECORD_AUDIO, CAPTURE_AUDIO_HOTWORD})
     public void triggerHardwareRecognitionEventForTest(int status, int soundModelHandle,
-            boolean captureAvailable, int captureSession, int captureDelayMs, int capturePreambleMs,
-            boolean triggerInData, @NonNull AudioFormat captureFormat, @Nullable byte[] data,
+            @ElapsedRealtimeLong long halEventReceivedMillis, boolean captureAvailable,
+            int captureSession, int captureDelayMs, int capturePreambleMs, boolean triggerInData,
+            @NonNull AudioFormat captureFormat, @Nullable byte[] data,
             @NonNull List<KeyphraseRecognitionExtra> keyphraseRecognitionExtras) {
         Log.d(TAG, "triggerHardwareRecognitionEventForTest()");
         synchronized (mLock) {
@@ -913,7 +959,7 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
                         new KeyphraseRecognitionEvent(status, soundModelHandle, captureAvailable,
                                 captureSession, captureDelayMs, capturePreambleMs, triggerInData,
                                 captureFormat, data, keyphraseRecognitionExtras.toArray(
-                                new KeyphraseRecognitionExtra[0])),
+                                new KeyphraseRecognitionExtra[0]), halEventReceivedMillis),
                         mInternalCallback);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
@@ -1658,9 +1704,18 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
         @Override
         public void onError(int status) {
             Slog.i(TAG, "onError: " + status);
-            mHandler.sendEmptyMessage(MSG_DETECTION_ERROR);
+            // This is a workaround before the sound trigger uses the onDetectionFailure method.
+            Message.obtain(mHandler, MSG_DETECTION_ERROR,
+                    new SoundTriggerFailure(status, "Sound trigger error")).sendToTarget();
         }
 
+        @Override
+        public void onDetectionFailure(DetectorFailure detectorFailure) {
+            Slog.v(TAG, "onDetectionFailure detectorFailure: " + detectorFailure);
+            Message.obtain(mHandler, MSG_DETECTION_ERROR,
+                    detectorFailure != null ? detectorFailure
+                            : new UnknownFailure("Error data is null")).sendToTarget();
+        }
         @Override
         public void onRecognitionPaused() {
             Slog.i(TAG, "onRecognitionPaused");
@@ -1716,7 +1771,7 @@ public class AlwaysOnHotwordDetector extends AbstractDetector {
                         mExternalCallback.onDetected((EventPayload) message.obj);
                         break;
                     case MSG_DETECTION_ERROR:
-                        mExternalCallback.onError();
+                        mExternalCallback.onFailure((DetectorFailure) msg.obj);
                         break;
                     case MSG_DETECTION_PAUSE:
                         mExternalCallback.onRecognitionPaused();
