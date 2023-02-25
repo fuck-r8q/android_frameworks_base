@@ -15629,16 +15629,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             return false;
         }
 
-        final ApplicationInfo sdkSandboxInfo;
-        try {
-            final PackageManager pm = mContext.getPackageManager();
-            sdkSandboxInfo = pm.getApplicationInfoAsUser(pm.getSdkSandboxPackageName(), 0, userId);
-        } catch (NameNotFoundException e) {
-            reportStartInstrumentationFailureLocked(
-                    watcher, className, "Can't find SdkSandbox package");
-            return false;
-        }
-
         final SdkSandboxManagerLocal sandboxManagerLocal =
                 LocalManagerRegistry.getManager(SdkSandboxManagerLocal.class);
         if (sandboxManagerLocal == null) {
@@ -15647,12 +15637,20 @@ public class ActivityManagerService extends IActivityManager.Stub
             return false;
         }
 
-        final String processName = sandboxManagerLocal.getSdkSandboxProcessNameForInstrumentation(
-                sdkSandboxClientAppInfo);
+        final ApplicationInfo sdkSandboxInfo;
+        try {
+            sdkSandboxInfo =
+                    sandboxManagerLocal.getSdkSandboxApplicationInfoForInstrumentation(
+                            sdkSandboxClientAppInfo, userId);
+        } catch (NameNotFoundException e) {
+            reportStartInstrumentationFailureLocked(
+                    watcher, className, "Can't find SdkSandbox package");
+            return false;
+        }
 
         ActiveInstrumentation activeInstr = new ActiveInstrumentation(this);
         activeInstr.mClass = className;
-        activeInstr.mTargetProcesses = new String[]{processName};
+        activeInstr.mTargetProcesses = new String[]{sdkSandboxInfo.processName};
         activeInstr.mTargetInfo = sdkSandboxInfo;
         activeInstr.mProfileFile = profileFile;
         activeInstr.mArguments = arguments;
@@ -15686,7 +15684,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 ProcessRecord app = addAppLocked(
                         sdkSandboxInfo,
-                        processName,
+                        sdkSandboxInfo.processName,
                         /* isolated= */ false,
                         /* isSdkSandbox= */ true,
                         sdkSandboxUid,
@@ -16353,6 +16351,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     // TODO(b/111541062): This method is only used for updating OOM adjustments. We need to update
     // the logic there and in mBatteryStatsService to make them aware of multiple resumed activities
+    @Nullable
     ProcessRecord getTopApp() {
         final WindowProcessController wpc = mAtmInternal != null ? mAtmInternal.getTopApp() : null;
         final ProcessRecord r = wpc != null ? (ProcessRecord) wpc.mOwner : null;
