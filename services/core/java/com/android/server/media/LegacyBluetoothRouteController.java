@@ -52,7 +52,7 @@ import java.util.Map;
 import java.util.Set;
 
 class LegacyBluetoothRouteController implements BluetoothRouteController {
-    private static final String TAG = "BTRouteProvider";
+    private static final String TAG = "LBtRouteProvider";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private static final String HEARING_AID_ROUTE_ID_PREFIX = "HEARING_AID_";
