@@ -64,9 +64,6 @@ object Flags {
     // TODO(b/259130119): Tracking Bug
     val FSI_ON_DND_UPDATE = releasedFlag(259130119, "fsi_on_dnd_update")
 
-    // TODO(b/265804648): Tracking Bug
-    @JvmField val DISABLE_FSI = unreleasedFlag(265804648, "disable_fsi")
-
     // TODO(b/254512538): Tracking Bug
     val INSTANT_VOICE_REPLY = releasedFlag(111, "instant_voice_reply")
 
@@ -86,9 +83,6 @@ object Flags {
     @JvmField
     val NOTIFICATION_GROUP_DISMISSAL_ANIMATION =
         releasedFlag(259217907, "notification_group_dismissal_animation")
-
-    // TODO(b/257506350): Tracking Bug
-    @JvmField val FSI_CHROME = unreleasedFlag(117, "fsi_chrome")
 
     @JvmField
     val SIMPLIFIED_APPEAR_FRACTION =
@@ -378,6 +372,9 @@ object Flags {
     // TODO(b/265045965): Tracking Bug
     val SHOW_LOWLIGHT_ON_DIRECT_BOOT = releasedFlag(1003, "show_lowlight_on_direct_boot")
 
+    @JvmField
+    val ENABLE_LOW_LIGHT_CLOCK_UNDOCKED = unreleasedFlag(1004, "enable_low_light_clock_undocked")
+
     // 1100 - windowing
     @Keep
     @JvmField
@@ -486,9 +483,9 @@ object Flags {
     val WM_ENABLE_PREDICTIVE_BACK_SYSUI =
         unreleasedFlag(1204, "persist.wm.debug.predictive_back_sysui_enable", teamfood = true)
 
-    // TODO(b/255697805): Tracking Bug
+    // TODO(b/270987164): Tracking Bug
     @JvmField
-    val TRACKPAD_GESTURE_BACK = unreleasedFlag(1205, "trackpad_gesture_back", teamfood = false)
+    val TRACKPAD_GESTURE_BACK = unreleasedFlag(1205, "trackpad_gesture_back", teamfood = true)
 
     // TODO(b/263826204): Tracking Bug
     @JvmField

@@ -3537,7 +3537,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         // We'll take the stack crawls of just the top apps using CPU.
         final int workingStatsNumber = processCpuTracker.countWorkingStats();
-        for (int i = 0; i < workingStatsNumber && extraPids.size() < 5; i++) {
+        for (int i = 0; i < workingStatsNumber && extraPids.size() < 2; i++) {
             ProcessCpuTracker.Stats stats = processCpuTracker.getWorkingStats(i);
             if (lastPids.indexOfKey(stats.pid) >= 0) {
                 if (DEBUG_ANR) {
@@ -7012,36 +7012,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public void appNotRespondingViaProvider(IBinder connection) {
         mCpHelper.appNotRespondingViaProvider(connection);
-    }
-
-    /**
-     * Allows apps to retrieve the MIME type of a URI.
-     * If an app is in the same user as the ContentProvider, or if it is allowed to interact across
-     * users, then it does not need permission to access the ContentProvider.
-     * Either, it needs cross-user uri grants.
-     *
-     * CTS tests for this functionality can be run with "runtest cts-appsecurity".
-     *
-     * Test cases are at cts/tests/appsecurity-tests/test-apps/UsePermissionDiffCert/
-     *     src/com/android/cts/usespermissiondiffcertapp/AccessPermissionWithDiffSigTest.java
-     *
-     * @deprecated -- use getProviderMimeTypeAsync.
-     */
-    @Deprecated
-    @Override
-    public String getProviderMimeType(Uri uri, int userId) {
-        return mCpHelper.getProviderMimeType(uri, userId);
-    }
-
-    /**
-     * Allows apps to retrieve the MIME type of a URI.
-     * If an app is in the same user as the ContentProvider, or if it is allowed to interact across
-     * users, then it does not need permission to access the ContentProvider.
-     * Either way, it needs cross-user uri grants.
-     */
-    @Override
-    public void getProviderMimeTypeAsync(Uri uri, int userId, RemoteCallback resultCallback) {
-        mCpHelper.getProviderMimeTypeAsync(uri, userId, resultCallback);
     }
 
     /**
@@ -18207,8 +18177,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     bOptions.setTemporaryAppAllowlist(mInternal.getBootTimeTempAllowListDuration(),
                             TEMPORARY_ALLOW_LIST_TYPE_FOREGROUND_SERVICE_ALLOWED,
                             PowerExemptionManager.REASON_LOCALE_CHANGED, "");
-                    bOptions.setRemoveMatchingFilter(
-                            new IntentFilter(Intent.ACTION_LOCALE_CHANGED));
+                    bOptions.setDeliveryGroupPolicy(
+                            BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT);
+                    bOptions.setDeferUntilActive(true);
                     broadcastIntentLocked(null, null, null, intent, null, null, 0, null, null, null,
                             null, null, OP_NONE, bOptions.toBundle(), false, false, MY_PID,
                             SYSTEM_UID, Binder.getCallingUid(), Binder.getCallingPid(),
