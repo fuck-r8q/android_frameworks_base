@@ -54,7 +54,7 @@ import java.util.Objects;
  */
 /* package */ final class LegacyDeviceRouteController implements DeviceRouteController {
 
-    private static final String TAG = "WiredRoutesController";
+    private static final String TAG = "LDeviceRouteController";
 
     private static final String DEVICE_ROUTE_ID = "DEVICE_ROUTE";
 
