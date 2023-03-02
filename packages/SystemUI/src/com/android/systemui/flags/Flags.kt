@@ -151,12 +151,6 @@ object Flags {
     val CUSTOMIZABLE_LOCK_SCREEN_QUICK_AFFORDANCES =
         releasedFlag(216, "customizable_lock_screen_quick_affordances")
 
-    /** Shows chipbar UI whenever the device is unlocked by ActiveUnlock (watch). */
-    // TODO(b/256513609): Tracking Bug
-    @JvmField
-    val ACTIVE_UNLOCK_CHIPBAR =
-        resourceBooleanFlag(217, R.bool.flag_active_unlock_chipbar, "active_unlock_chipbar")
-
     /**
      * Migrates control of the LightRevealScrim's reveal effect and amount from legacy code to the
      * new KeyguardTransitionRepository.
@@ -224,6 +218,10 @@ object Flags {
     val SMARTSPACE_DATE_WEATHER_DECOUPLED =
         sysPropBooleanFlag(403, "persist.sysui.ss.dw_decoupled", default = true)
 
+    // TODO(b/270223352): Tracking Bug
+    @JvmField
+    val HIDE_SMARTSPACE_ON_DREAM_OVERLAY = unreleasedFlag(404, "hide_smartspace_on_dream_overlay")
+
     // 500 - quick settings
 
     val PEOPLE_TILE = resourceBooleanFlag(502, R.bool.flag_conversations, "people_tile")
@@ -259,8 +257,7 @@ object Flags {
     /** Enables new QS Edit Mode visual refresh */
     // TODO(b/269787742): Tracking Bug
     @JvmField
-    val ENABLE_NEW_QS_EDIT_MODE =
-        unreleasedFlag(510, "enable_new_qs_edit_mode", teamfood = false)
+    val ENABLE_NEW_QS_EDIT_MODE = unreleasedFlag(510, "enable_new_qs_edit_mode", teamfood = false)
 
     // 600- status bar
 
@@ -363,11 +360,17 @@ object Flags {
     // TODO(b/267166152) : Tracking Bug
     val MEDIA_RETAIN_RECOMMENDATIONS = releasedFlag(916, "media_retain_recommendations")
 
+    // TODO(b/270437894): Tracking Bug
+    val MEDIA_REMOTE_RESUME = unreleasedFlag(917, "media_remote_resume")
+
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag(1000, "simulate_dock_through_charging")
 
     // TODO(b/254512758): Tracking Bug
     @JvmField val ROUNDED_BOX_RIPPLE = releasedFlag(1002, "rounded_box_ripple")
+
+    // TODO(b/270882464): Tracking Bug
+    val ENABLE_DOCK_SETUP_V2 = unreleasedFlag(1005, "enable_dock_setup_v2")
 
     // TODO(b/265045965): Tracking Bug
     val SHOW_LOWLIGHT_ON_DIRECT_BOOT = releasedFlag(1003, "show_lowlight_on_direct_boot")
@@ -613,11 +616,6 @@ object Flags {
     val OUTPUT_SWITCHER_ROUTES_PROCESSING = releasedFlag(2501, "output_switcher_routes_processing")
     @JvmField
     val OUTPUT_SWITCHER_DEVICE_STATUS = releasedFlag(2502, "output_switcher_device_status")
-
-    // TODO(b/20911786): Tracking Bug
-    @JvmField
-    val OUTPUT_SWITCHER_SHOW_API_ENABLED =
-        releasedFlag(2503, "output_switcher_show_api_enabled", teamfood = true)
 
     // 2700 - unfold transitions
     // TODO(b/265764985): Tracking Bug
