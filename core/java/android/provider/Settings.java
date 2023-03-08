@@ -5688,6 +5688,36 @@ public final class Settings {
         public static final String LOCALE_PREFERENCES = "locale_preferences";
 
         /**
+         * Setting to enable camera flash notification feature.
+         * <ul>
+         *     <li> 0 = Off
+         *     <li> 1 = On
+         * </ul>
+         * @hide
+         */
+        public static final String CAMERA_FLASH_NOTIFICATION = "camera_flash_notification";
+
+        /**
+         * Setting to enable screen flash notification feature.
+         * <ul>
+         *     <li> 0 = Off
+         *     <li> 1 = On
+         * </ul>
+         *  @hide
+         */
+        public static final String SCREEN_FLASH_NOTIFICATION = "screen_flash_notification";
+
+        /**
+         * Integer property that specifes the color for screen flash notification as a
+         * packed 32-bit color.
+         *
+         * @see android.graphics.Color#argb
+         * @hide
+         */
+        public static final String SCREEN_FLASH_NOTIFICATION_COLOR =
+                "screen_flash_notification_color_global";
+
+        /**
          * IMPORTANT: If you add a new public settings you also have to add it to
          * PUBLIC_SETTINGS below. If the new setting is hidden you have to add
          * it to PRIVATE_SETTINGS below. Also add a validator that can validate
@@ -5821,6 +5851,9 @@ public final class Settings {
             PRIVATE_SETTINGS.add(TOUCHPAD_NATURAL_SCROLLING);
             PRIVATE_SETTINGS.add(TOUCHPAD_TAP_TO_CLICK);
             PRIVATE_SETTINGS.add(TOUCHPAD_RIGHT_CLICK_ZONE);
+            PRIVATE_SETTINGS.add(CAMERA_FLASH_NOTIFICATION);
+            PRIVATE_SETTINGS.add(SCREEN_FLASH_NOTIFICATION);
+            PRIVATE_SETTINGS.add(SCREEN_FLASH_NOTIFICATION_COLOR);
         }
 
         /**
@@ -9985,6 +10018,21 @@ public final class Settings {
          */
         public static final String EMERGENCY_GESTURE_SOUND_ENABLED =
                 "emergency_gesture_sound_enabled";
+
+        /**
+         * Whether the emergency gesture UI is currently showing.
+         *
+         * @hide
+         */
+        public static final String EMERGENCY_GESTURE_UI_SHOWING = "emergency_gesture_ui_showing";
+
+        /**
+         * The last time the emergency gesture UI was started.
+         *
+         * @hide
+         */
+        public static final String EMERGENCY_GESTURE_UI_LAST_STARTED_MILLIS =
+                "emergency_gesture_ui_last_started_millis";
 
         /**
          * Whether the camera launch gesture to double tap the power button when the screen is off
@@ -14993,6 +15041,16 @@ public final class Settings {
          */
         public static final String EMERGENCY_GESTURE_TAP_DETECTION_MIN_TIME_MS =
                 "emergency_gesture_tap_detection_min_time_ms";
+
+        /**
+         * The maximum duration in milliseconds for which the emergency gesture UI can stay
+         * "sticky", where the notification pull-down shade and navigation gestures/buttons are
+         *  temporarily disabled. The feature is disabled completely if the value is set to zero.
+         *
+         * @hide
+         */
+        public static final String EMERGENCY_GESTURE_STICKY_UI_MAX_DURATION_MILLIS =
+                "emergency_gesture_sticky_ui_max_duration_millis";
 
         /**
          * Whether to enable automatic system server heap dumps. This only works on userdebug or

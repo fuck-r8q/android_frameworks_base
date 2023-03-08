@@ -192,6 +192,11 @@ public class ActivityManager {
      * @hide
      */
     public static final int INSTR_FLAG_INSTRUMENT_SDK_SANDBOX = 1 << 5;
+    /**
+     * Instrument an Sdk Sandbox process corresponding to an Sdk running inside the sandbox.
+     * @hide
+     */
+    public static final int INSTR_FLAG_INSTRUMENT_SDK_IN_SANDBOX = 1 << 6;
 
     static final class UidObserver extends IUidObserver.Stub {
         final OnUidImportanceListener mListener;
@@ -4208,8 +4213,8 @@ public class ActivityManager {
      * processes to reclaim memory; the system will take care of restarting
      * these processes in the future as needed.
      *
-     * <p class="note">On devices with a {@link Build.VERSION#SECURITY_PATCH} of 2022-12-01 or
-     * greater, third party applications can only use this API to kill their own processes.
+     * <p class="note">On devices that run Android 14 or higher,
+     * third party applications can only use this API to kill their own processes.
      * </p>
      *
      * @param packageName The name of the package whose processes are to
