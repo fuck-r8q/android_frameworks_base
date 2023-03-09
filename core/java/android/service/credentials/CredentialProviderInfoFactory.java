@@ -33,15 +33,28 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.content.res.XmlResourceParser;
 import android.credentials.CredentialManager;
 import android.credentials.CredentialProviderInfo;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.text.TextUtils;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Slog;
+import android.util.Xml;
 
+import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.R;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +68,11 @@ import java.util.Set;
  */
 public final class CredentialProviderInfoFactory {
     private static final String TAG = "CredentialProviderInfoFactory";
+
+    private static final String TAG_CREDENTIAL_PROVIDER = "credential-provider";
+    private static final String TAG_CAPABILITIES = "capabilities";
+    private static final String TAG_CAPABILITY = "capability";
+    private static final String ATTR_NAME = "name";
 
     /**
      * Constructs an information instance of the credential provider.
@@ -115,6 +133,26 @@ public final class CredentialProviderInfoFactory {
                 .build();
     }
 
+    /**
+     * Constructs an information instance of the credential provider for testing purposes. Does
+     * not run any verifications and passes parameters as is.
+     */
+    @VisibleForTesting
+    public static CredentialProviderInfo createForTests(
+            @NonNull ServiceInfo serviceInfo,
+            @NonNull CharSequence overrideLabel,
+            boolean isSystemProvider,
+            boolean isEnabled,
+            @NonNull List<String> capabilities) {
+        return new CredentialProviderInfo.Builder(serviceInfo)
+                .setEnabled(isEnabled)
+                .setOverrideLabel(overrideLabel)
+                .setSystemProvider(isSystemProvider)
+                .addCapabilities(capabilities)
+                .build();
+
+    }
+
     private static void verifyProviderPermission(ServiceInfo serviceInfo) throws SecurityException {
         final String permission = Manifest.permission.BIND_CREDENTIAL_PROVIDER_SERVICE;
         if (permission.equals(serviceInfo.permission)) {
@@ -172,10 +210,8 @@ public final class CredentialProviderInfoFactory {
     private static CredentialProviderInfo.Builder populateMetadata(
             @NonNull Context context, ServiceInfo serviceInfo) {
         requireNonNull(context, "context must not be null");
-
-        final CredentialProviderInfo.Builder builder =
-                new CredentialProviderInfo.Builder(serviceInfo);
         final PackageManager pm = context.getPackageManager();
+        CredentialProviderInfo.Builder builder = new CredentialProviderInfo.Builder(serviceInfo);
 
         // 1. Get the metadata for the service.
         final Bundle metadata = serviceInfo.metaData;
@@ -184,46 +220,166 @@ public final class CredentialProviderInfoFactory {
             return builder;
         }
 
-        // 2. Extract the capabilities from the bundle.
+        // 2. Get the resources for the application.
+        Resources resources = null;
         try {
-            Resources resources = pm.getResourcesForApplication(serviceInfo.applicationInfo);
-            if (metadata == null || resources == null) {
-                Log.i(TAG, "populateMetadata - resources is null");
-                return builder;
-            }
-
-            builder.addCapabilities(populateProviderCapabilities(resources, metadata, serviceInfo));
+            resources = pm.getResourcesForApplication(serviceInfo.applicationInfo);
         } catch (PackageManager.NameNotFoundException e) {
-            Slog.e(TAG, e.getMessage());
+            Log.e(TAG, "Failed to get app resources", e);
+        }
+
+        // 3. Stop if we are missing data.
+        if (metadata == null || resources == null) {
+            Log.i(TAG, "populateMetadata - resources is null");
+            return builder;
+        }
+
+        // 4. Extract the XML metadata.
+        try {
+            builder = extractXmlMetadata(context, serviceInfo, pm, resources);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get XML metadata", e);
+        }
+
+        // 5. Extract the legacy metadata.
+        try {
+            builder.addCapabilities(
+                    populateLegacyProviderCapabilities(resources, metadata, serviceInfo));
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get legacy metadata ", e);
         }
 
         return builder;
     }
 
-    private static List<String> populateProviderCapabilities(
-            Resources resources, Bundle metadata, ServiceInfo serviceInfo) {
-        List<String> output = new ArrayList<>();
-        String[] capabilities = new String[0];
-
-        try {
-            capabilities =
-                    resources.getStringArray(
-                            metadata.getInt(CredentialProviderService.CAPABILITY_META_DATA_KEY));
-        } catch (Resources.NotFoundException e) {
-            Slog.e(TAG, "Failed to get capabilities: " + e.getMessage());
+    private static CredentialProviderInfo.Builder extractXmlMetadata(
+            @NonNull Context context,
+            @NonNull ServiceInfo serviceInfo,
+            @NonNull PackageManager pm,
+            @NonNull Resources resources) {
+        final CredentialProviderInfo.Builder builder =
+                new CredentialProviderInfo.Builder(serviceInfo);
+        final XmlResourceParser parser =
+                serviceInfo.loadXmlMetaData(pm, CredentialProviderService.SERVICE_META_DATA);
+        if (parser == null) {
+            return builder;
         }
 
-        if (capabilities == null || capabilities.length == 0) {
-            Slog.e(TAG, "No capabilities found for provider:" + serviceInfo.packageName);
+        try {
+            int type = 0;
+            while (type != XmlPullParser.END_DOCUMENT && type != XmlPullParser.START_TAG) {
+                type = parser.next();
+            }
+
+            // This is matching a <credential-provider /> tag in the XML.
+            if (TAG_CREDENTIAL_PROVIDER.equals(parser.getName())) {
+                final AttributeSet allAttributes = Xml.asAttributeSet(parser);
+                TypedArray afsAttributes = null;
+                try {
+                    afsAttributes =
+                            resources.obtainAttributes(
+                                    allAttributes,
+                                    com.android.internal.R.styleable.CredentialProvider);
+                    builder.setSettingsSubtitle(
+                            afsAttributes.getString(
+                                    R.styleable.CredentialProvider_settingsSubtitle));
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to get XML attr", e);
+                } finally {
+                    if (afsAttributes != null) {
+                        afsAttributes.recycle();
+                    }
+                }
+                builder.addCapabilities(parseXmlProviderOuterCapabilities(parser, resources));
+            } else {
+                Log.e(TAG, "Meta-data does not start with credential-provider-service tag");
+            }
+        } catch (IOException | XmlPullParserException e) {
+            Log.e(TAG, "Error parsing credential provider service meta-data", e);
+        }
+
+        return builder;
+    }
+
+    private static List<String> parseXmlProviderOuterCapabilities(
+            XmlPullParser parser, Resources resources) throws IOException, XmlPullParserException {
+        final List<String> capabilities = new ArrayList<>();
+        final int outerDepth = parser.getDepth();
+        int type;
+        while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
+                && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
+            if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
+                continue;
+            }
+
+            if (TAG_CAPABILITIES.equals(parser.getName())) {
+                capabilities.addAll(parseXmlProviderInnerCapabilities(parser, resources));
+            }
+        }
+
+        return capabilities;
+    }
+
+    private static List<String> parseXmlProviderInnerCapabilities(
+            XmlPullParser parser, Resources resources) throws IOException, XmlPullParserException {
+        List<String> capabilities = new ArrayList<>();
+
+        final int outerDepth = parser.getDepth();
+        int type;
+        while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
+                && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
+            if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
+                continue;
+            }
+
+            if (TAG_CAPABILITY.equals(parser.getName())) {
+                String name = parser.getAttributeValue(null, ATTR_NAME);
+                if (name != null && !TextUtils.isEmpty(name)) {
+                    capabilities.add(name);
+                }
+            }
+        }
+
+        return capabilities;
+    }
+
+    private static List<String> populateLegacyProviderCapabilities(
+            Resources resources, Bundle metadata, ServiceInfo serviceInfo) {
+        List<String> output = new ArrayList<>();
+        List<String> capabilities = new ArrayList<>();
+
+        try {
+            String[] discovered =
+                    resources.getStringArray(
+                            metadata.getInt(CredentialProviderService.CAPABILITY_META_DATA_KEY));
+            if (discovered != null) {
+                capabilities.addAll(Arrays.asList(discovered));
+            }
+        } catch (Resources.NotFoundException | NullPointerException e) {
+            Log.e(TAG, "Failed to get capabilities: ", e);
+        }
+
+        try {
+            String[] discovered =
+                    metadata.getStringArray(CredentialProviderService.CAPABILITY_META_DATA_KEY);
+            if (discovered != null) {
+                capabilities.addAll(Arrays.asList(discovered));
+            }
+        } catch (Resources.NotFoundException | NullPointerException e) {
+            Log.e(TAG, "Failed to get capabilities: ", e);
+        }
+
+        if (capabilities.size() == 0) {
+            Log.e(TAG, "No capabilities found for provider:" + serviceInfo);
             return output;
         }
 
         for (String capability : capabilities) {
-            if (capability.isEmpty()) {
-                Slog.e(TAG, "Skipping empty capability");
+            if (capability == null || capability.isEmpty()) {
+                Log.w(TAG, "Skipping empty/null capability");
                 continue;
             }
-            Slog.e(TAG, "Capabilities found for provider: " + capability);
+            Log.i(TAG, "Capabilities found for provider: " + capability);
             output.add(capability);
         }
         return output;
@@ -339,12 +495,38 @@ public final class CredentialProviderInfoFactory {
 
         try {
             DevicePolicyManager dpm = newContext.getSystemService(DevicePolicyManager.class);
-            return dpm.getCredentialManagerPolicy();
+            PackagePolicy pp = dpm.getCredentialManagerPolicy();
+            return pp;
         } catch (SecurityException e) {
             // If the current user is not enrolled in DPM then this can throw a security error.
             Log.e(TAG, "Failed to get device policy: " + e);
         }
 
+        return null;
+    }
+
+    /**
+     * Returns a valid credential provider that has the given package name. Returns null if no
+     * match is found.
+     */
+    @Nullable
+    public static CredentialProviderInfo getCredentialProviderFromPackageName(
+            @NonNull Context context,
+            int userId,
+            @NonNull String packageName,
+            int providerFilter,
+            @NonNull Set<ServiceInfo> enabledServices) {
+        requireNonNull(context, "context must not be null");
+        requireNonNull(packageName, "package name must not be null");
+        requireNonNull(enabledServices, "enabledServices must not be null");
+
+        for (CredentialProviderInfo credentialProviderInfo : getCredentialProviderServices(context,
+                userId, providerFilter, enabledServices)) {
+            if (credentialProviderInfo.getServiceInfo()
+                    .packageName.equals(packageName)) {
+                return credentialProviderInfo;
+            }
+        }
         return null;
     }
 

@@ -296,6 +296,12 @@ public final class CredentialManagerService
                             mContext,
                             UserHandle.getCallingUserId(),
                             session,
+                            CredentialProviderInfoFactory.getCredentialProviderFromPackageName(
+                                    mContext, UserHandle.getCallingUserId() ,
+                                            result.second.mPackageName,
+                                            CredentialManager.PROVIDER_FILTER_ALL_PROVIDERS,
+                                    new HashSet<>()),
+                            session.mClientAppInfo,
                             result.second.mPackageName,
                             result.first));
         }
@@ -356,6 +362,14 @@ public final class CredentialManagerService
                     }
                 });
         return providerSessions;
+    }
+
+    private List<CredentialProviderInfo> getServicesForCredentialDescription(int userId) {
+        return CredentialProviderInfoFactory.getCredentialProviderServices(
+                mContext,
+                userId,
+                CredentialManager.PROVIDER_FILTER_ALL_PROVIDERS,
+                new HashSet<>());
     }
 
     @Override
@@ -631,7 +645,7 @@ public final class CredentialManagerService
                             // The component name and the package name do not match.
                             MetricUtilities.logApiCalled(
                                     ApiName.IS_ENABLED_CREDENTIAL_PROVIDER_SERVICE,
-                                    ApiStatus.METRICS_API_STATUS_FAILURE, callingUid);
+                                    ApiStatus.FAILURE, callingUid);
                             Log.w(
                                     TAG,
                                     "isEnabledCredentialProviderService: Component name does not"
@@ -639,7 +653,7 @@ public final class CredentialManagerService
                             return false;
                         }
                         MetricUtilities.logApiCalled(ApiName.IS_ENABLED_CREDENTIAL_PROVIDER_SERVICE,
-                                ApiStatus.METRICS_API_STATUS_SUCCESS, callingUid);
+                                ApiStatus.SUCCESS, callingUid);
                         return true;
                     }
                 }
@@ -812,14 +826,6 @@ public final class CredentialManagerService
                     CredentialDescriptionRegistry.forUser(UserHandle.getCallingUserId());
 
             session.executeUnregisterRequest(request, callingPackage);
-        }
-
-        private List<CredentialProviderInfo> getServicesForCredentialDescription(int userId) {
-            return CredentialProviderInfoFactory.getCredentialProviderServices(
-                    mContext,
-                    userId,
-                    CredentialManager.PROVIDER_FILTER_ALL_PROVIDERS,
-                    new HashSet<>());
         }
     }
 
