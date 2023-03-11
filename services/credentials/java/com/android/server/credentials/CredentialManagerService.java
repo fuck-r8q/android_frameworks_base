@@ -29,7 +29,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ServiceInfo;
 import android.credentials.ClearCredentialStateRequest;
 import android.credentials.CreateCredentialException;
 import android.credentials.CreateCredentialRequest;
@@ -292,14 +291,15 @@ public final class CredentialManagerService
         List<ProviderSession> providerSessions = new ArrayList<>();
         for (Pair<CredentialOption, CredentialDescriptionRegistry.FilterResult> result :
                 activeCredentialContainers) {
-            providerSessions.add(
-                    ProviderRegistryGetSession.createNewSession(
-                            mContext,
-                            UserHandle.getCallingUserId(),
-                            session,
-                            session.mClientAppInfo,
-                            result.second.mPackageName,
-                            result.first));
+            ProviderSession providerSession = ProviderRegistryGetSession.createNewSession(
+                    mContext,
+                    UserHandle.getCallingUserId(),
+                    session,
+                    session.mClientAppInfo,
+                    result.second.mPackageName,
+                    result.first);
+            providerSessions.add(providerSession);
+            session.addProviderSession(providerSession.getComponentName(), providerSession);
         }
         return providerSessions;
     }
@@ -329,10 +329,15 @@ public final class CredentialManagerService
                 new HashSet<>();
 
         for (CredentialDescriptionRegistry.FilterResult filterResult : filterResults) {
+            Set<String> registeredUnflattenedStrings = CredentialDescriptionRegistry
+                    .flatStringToSet(filterResult.mFlattenedRequest);
             for (CredentialOption credentialOption : options) {
-                if (filterResult.mFlattenedRequest.equals(credentialOption
-                        .getCredentialRetrievalData()
-                        .getString(CredentialOption.FLATTENED_REQUEST))) {
+                Set<String> requestedUnflattenedStrings = CredentialDescriptionRegistry
+                        .flatStringToSet(credentialOption
+                                .getCredentialRetrievalData()
+                                .getString(CredentialOption.FLATTENED_REQUEST));
+                if (CredentialDescriptionRegistry.checkForMatch(registeredUnflattenedStrings,
+                        requestedUnflattenedStrings)) {
                     result.add(new Pair<>(credentialOption, filterResult));
                 }
             }
@@ -696,13 +701,20 @@ public final class CredentialManagerService
 
         @SuppressWarnings("GuardedBy") // ErrorProne requires service.mLock which is the same
         // this.mLock
-        private Set<ServiceInfo> getEnabledProviders() {
-            Set<ServiceInfo> enabledProviders = new HashSet<>();
+        private Set<ComponentName> getEnabledProviders() {
+            Set<ComponentName> enabledProviders = new HashSet<>();
             synchronized (mLock) {
                 runForUser(
                         (service) -> {
-                            enabledProviders.add(
-                                    service.getCredentialProviderInfo().getServiceInfo());
+                            try {
+                                enabledProviders.add(
+                                        service.getCredentialProviderInfo()
+                                                .getServiceInfo().getComponentName());
+                            } catch (NullPointerException e) {
+                                // Safe check
+                                Log.i(TAG, "Skipping provider as either the providerInfo"
+                                        + "or serviceInfo is null - weird");
+                            }
                         });
             }
             return enabledProviders;
