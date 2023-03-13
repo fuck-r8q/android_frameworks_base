@@ -63,7 +63,6 @@ import android.view.WindowManager.LayoutParams;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodSubtype;
 
-import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.annotation.Retention;
@@ -104,13 +103,6 @@ public final class InputManager {
     @Nullable
     private Boolean mIsStylusPointerIconEnabled = null;
 
-    private final Object mKeyboardBacklightListenerLock = new Object();
-    @GuardedBy("mKeyboardBacklightListenerLock")
-    private ArrayList<KeyboardBacklightListenerDelegate> mKeyboardBacklightListeners;
-    @GuardedBy("mKeyboardBacklightListenerLock")
-    private IKeyboardBacklightListener mKeyboardBacklightListener;
-
-    private InputDeviceSensorManager mInputDeviceSensorManager;
     /**
      * Broadcast Action: Query available keyboard layouts.
      * <p>
@@ -1231,11 +1223,7 @@ public final class InputManager {
      * @hide
      */
     public InputSensorInfo[] getSensorList(int deviceId) {
-        try {
-            return mIm.getSensorList(deviceId);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        return mGlobal.getSensorList(deviceId);
     }
 
     /**
@@ -1245,12 +1233,8 @@ public final class InputManager {
      */
     public boolean enableSensor(int deviceId, int sensorType, int samplingPeriodUs,
             int maxBatchReportLatencyUs) {
-        try {
-            return mIm.enableSensor(deviceId, sensorType, samplingPeriodUs,
-                    maxBatchReportLatencyUs);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        return mGlobal.enableSensor(deviceId, sensorType, samplingPeriodUs,
+                maxBatchReportLatencyUs);
     }
 
     /**
@@ -1259,11 +1243,7 @@ public final class InputManager {
      * @hide
      */
     public void disableSensor(int deviceId, int sensorType) {
-        try {
-            mIm.disableSensor(deviceId, sensorType);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        mGlobal.disableSensor(deviceId, sensorType);
     }
 
     /**
@@ -1272,11 +1252,7 @@ public final class InputManager {
      * @hide
      */
     public boolean flushSensor(int deviceId, int sensorType) {
-        try {
-            return mIm.flushSensor(deviceId, sensorType);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        return mGlobal.flushSensor(deviceId, sensorType);
     }
 
     /**
@@ -1285,11 +1261,7 @@ public final class InputManager {
      * @hide
      */
     public boolean registerSensorListener(IInputSensorEventListener listener) {
-        try {
-            return mIm.registerSensorListener(listener);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        return mGlobal.registerSensorListener(listener);
     }
 
     /**
@@ -1298,11 +1270,7 @@ public final class InputManager {
      * @hide
      */
     public void unregisterSensorListener(IInputSensorEventListener listener) {
-        try {
-            mIm.unregisterSensorListener(listener);
-        } catch (RemoteException ex) {
-            throw ex.rethrowFromSystemServer();
-        }
+        mGlobal.unregisterSensorListener(listener);
     }
 
     /**
@@ -1511,10 +1479,7 @@ public final class InputManager {
      */
     @NonNull
     public SensorManager getInputDeviceSensorManager(int deviceId) {
-        if (mInputDeviceSensorManager == null) {
-            mInputDeviceSensorManager = new InputDeviceSensorManager(this);
-        }
-        return mInputDeviceSensorManager.getSensorManager(deviceId);
+        return mGlobal.getInputDeviceSensorManager(deviceId);
     }
 
     /**
@@ -1696,30 +1661,7 @@ public final class InputManager {
     @RequiresPermission(Manifest.permission.MONITOR_KEYBOARD_BACKLIGHT)
     public void registerKeyboardBacklightListener(@NonNull Executor executor,
             @NonNull KeyboardBacklightListener listener) throws IllegalArgumentException {
-        Objects.requireNonNull(executor, "executor should not be null");
-        Objects.requireNonNull(listener, "listener should not be null");
-
-        synchronized (mKeyboardBacklightListenerLock) {
-            if (mKeyboardBacklightListener == null) {
-                mKeyboardBacklightListeners = new ArrayList<>();
-                mKeyboardBacklightListener = new LocalKeyboardBacklightListener();
-
-                try {
-                    mIm.registerKeyboardBacklightListener(mKeyboardBacklightListener);
-                } catch (RemoteException e) {
-                    throw e.rethrowFromSystemServer();
-                }
-            }
-            final int numListeners = mKeyboardBacklightListeners.size();
-            for (int i = 0; i < numListeners; i++) {
-                if (mKeyboardBacklightListeners.get(i).mListener == listener) {
-                    throw new IllegalArgumentException("Listener has already been registered!");
-                }
-            }
-            KeyboardBacklightListenerDelegate delegate =
-                    new KeyboardBacklightListenerDelegate(listener, executor);
-            mKeyboardBacklightListeners.add(delegate);
-        }
+        mGlobal.registerKeyboardBacklightListener(executor, listener);
     }
 
     /**
@@ -1732,23 +1674,7 @@ public final class InputManager {
     @RequiresPermission(Manifest.permission.MONITOR_KEYBOARD_BACKLIGHT)
     public void unregisterKeyboardBacklightListener(
             @NonNull KeyboardBacklightListener listener) {
-        Objects.requireNonNull(listener, "listener should not be null");
-
-        synchronized (mKeyboardBacklightListenerLock) {
-            if (mKeyboardBacklightListeners == null) {
-                return;
-            }
-            mKeyboardBacklightListeners.removeIf((delegate) -> delegate.mListener == listener);
-            if (mKeyboardBacklightListeners.isEmpty()) {
-                try {
-                    mIm.unregisterKeyboardBacklightListener(mKeyboardBacklightListener);
-                } catch (RemoteException e) {
-                    throw e.rethrowFromSystemServer();
-                }
-                mKeyboardBacklightListeners = null;
-                mKeyboardBacklightListener = null;
-            }
-        }
+        mGlobal.unregisterKeyboardBacklightListener(listener);
     }
 
     /**
@@ -1832,62 +1758,5 @@ public final class InputManager {
          */
         void onKeyboardBacklightChanged(
                 int deviceId, @NonNull KeyboardBacklightState state, boolean isTriggeredByKeyPress);
-    }
-
-    // Implementation of the android.hardware.input.KeyboardBacklightState interface used to report
-    // the keyboard backlight state via the KeyboardBacklightListener interfaces.
-    private static final class LocalKeyboardBacklightState extends KeyboardBacklightState {
-
-        private final int mBrightnessLevel;
-        private final int mMaxBrightnessLevel;
-
-        LocalKeyboardBacklightState(int brightnessLevel, int maxBrightnessLevel) {
-            mBrightnessLevel = brightnessLevel;
-            mMaxBrightnessLevel = maxBrightnessLevel;
-        }
-
-        @Override
-        public int getBrightnessLevel() {
-            return mBrightnessLevel;
-        }
-
-        @Override
-        public int getMaxBrightnessLevel() {
-            return mMaxBrightnessLevel;
-        }
-    }
-
-    private static final class KeyboardBacklightListenerDelegate {
-        final KeyboardBacklightListener mListener;
-        final Executor mExecutor;
-
-        KeyboardBacklightListenerDelegate(KeyboardBacklightListener listener, Executor executor) {
-            mListener = listener;
-            mExecutor = executor;
-        }
-
-        void notifyKeyboardBacklightChange(int deviceId, IKeyboardBacklightState state,
-                boolean isTriggeredByKeyPress) {
-            mExecutor.execute(() ->
-                    mListener.onKeyboardBacklightChanged(deviceId,
-                            new LocalKeyboardBacklightState(state.brightnessLevel,
-                                    state.maxBrightnessLevel), isTriggeredByKeyPress));
-        }
-    }
-
-    private class LocalKeyboardBacklightListener extends IKeyboardBacklightListener.Stub {
-
-        @Override
-        public void onBrightnessChanged(int deviceId, IKeyboardBacklightState state,
-                boolean isTriggeredByKeyPress) {
-            synchronized (mKeyboardBacklightListenerLock) {
-                if (mKeyboardBacklightListeners == null) return;
-                final int numListeners = mKeyboardBacklightListeners.size();
-                for (int i = 0; i < numListeners; i++) {
-                    mKeyboardBacklightListeners.get(i)
-                            .notifyKeyboardBacklightChange(deviceId, state, isTriggeredByKeyPress);
-                }
-            }
-        }
     }
 }
