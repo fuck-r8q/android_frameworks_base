@@ -1219,6 +1219,12 @@ public final class NotificationPanelViewController implements Dumpable {
 
     private void onSplitShadeEnabledChanged() {
         mShadeLog.logSplitShadeChanged(mSplitShadeEnabled);
+        // Reset any left over overscroll state. It is a rare corner case but can happen.
+        mQsController.setOverScrollAmount(0);
+        mScrimController.setNotificationsOverScrollAmount(0);
+        mNotificationStackScrollLayoutController.setOverExpansion(0);
+        mNotificationStackScrollLayoutController.setOverScrollAmount(0);
+
         // when we switch between split shade and regular shade we want to enforce setting qs to
         // the default state: expanded for split shade and collapsed otherwise
         if (!isOnKeyguard() && mPanelExpanded) {
@@ -3575,12 +3581,15 @@ public final class NotificationPanelViewController implements Dumpable {
     }
 
     private void endMotionEvent(MotionEvent event, float x, float y, boolean forceCancel) {
+        // don't fling while in keyguard to avoid jump in shade expand animation
+        boolean fullyExpandedInKeyguard = mBarState == KEYGUARD && mExpandedFraction >= 1.0;
         mTrackingPointer = -1;
         mAmbientState.setSwipingUp(false);
-        if ((mTracking && mTouchSlopExceeded) || Math.abs(x - mInitialExpandX) > mTouchSlop
+        if (!fullyExpandedInKeyguard && ((mTracking && mTouchSlopExceeded)
+                || Math.abs(x - mInitialExpandX) > mTouchSlop
                 || Math.abs(y - mInitialExpandY) > mTouchSlop
                 || (!isFullyExpanded() && !isFullyCollapsed())
-                || event.getActionMasked() == MotionEvent.ACTION_CANCEL || forceCancel) {
+                || event.getActionMasked() == MotionEvent.ACTION_CANCEL || forceCancel)) {
             mVelocityTracker.computeCurrentVelocity(1000);
             float vel = mVelocityTracker.getYVelocity();
             float vectorVel = (float) Math.hypot(
@@ -3628,9 +3637,9 @@ public final class NotificationPanelViewController implements Dumpable {
             if (mUpdateFlingOnLayout) {
                 mUpdateFlingVelocity = vel;
             }
-        } else if (!mCentralSurfaces.isBouncerShowing()
+        } else if (fullyExpandedInKeyguard || (!mCentralSurfaces.isBouncerShowing()
                 && !mAlternateBouncerInteractor.isVisibleState()
-                && !mKeyguardStateController.isKeyguardGoingAway()) {
+                && !mKeyguardStateController.isKeyguardGoingAway())) {
             onEmptySpaceClick();
             onTrackingStopped(true);
         }
