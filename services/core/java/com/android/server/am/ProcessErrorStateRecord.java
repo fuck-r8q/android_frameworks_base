@@ -461,7 +461,10 @@ class ProcessErrorStateRecord {
                         // don't dump native PIDs for background ANRs unless
                         // it is the process of interest
                         String[] nativeProcs = null;
-                        if (isSilentAnr || onlyDumpSelf) {
+                        boolean isSystemApp = mApp.info.isSystemApp() || mApp.info.isSystemExt();
+                        // Do not collect system daemons dumps as this is not likely to be useful
+                        // for non-system apps.
+                        if (!isSystemApp || isSilentAnr || onlyDumpSelf) {
                             for (int i = 0; i < NATIVE_STACKS_OF_INTEREST.length; i++) {
                                 if (NATIVE_STACKS_OF_INTEREST[i].equals(mApp.processName)) {
                                     nativeProcs = new String[] { mApp.processName };
@@ -491,7 +494,7 @@ class ProcessErrorStateRecord {
         StringWriter tracesFileException = new StringWriter();
         // To hold the start and end offset to the ANR trace file respectively.
         final AtomicLong firstPidEndOffset = new AtomicLong(-1);
-        File tracesFile = ActivityManagerService.dumpStackTraces(firstPids,
+        File tracesFile = StackTracesDumpHelper.dumpStackTraces(firstPids,
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
                 criticalEventLog, auxiliaryTaskExecutor, latencyTracker);
