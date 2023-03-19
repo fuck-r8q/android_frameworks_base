@@ -2035,6 +2035,7 @@ package android.net.wifi.sharedconnectivity.service {
 
   public abstract class SharedConnectivityService extends android.app.Service {
     method public void onBind();
+    method public final void setCountdownLatch(@Nullable java.util.concurrent.CountDownLatch);
   }
 
 }
@@ -2898,23 +2899,19 @@ package android.service.voice {
     field public static final boolean ENABLE_PROXIMITY_RESULT = true;
   }
 
-  public final class HotwordDetectionServiceFailure extends android.service.voice.DetectorFailure {
+  public final class HotwordDetectionServiceFailure implements android.os.Parcelable {
     ctor public HotwordDetectionServiceFailure(int, @NonNull String);
   }
 
-  public final class SoundTriggerFailure extends android.service.voice.DetectorFailure {
+  public final class SoundTriggerFailure implements android.os.Parcelable {
     ctor public SoundTriggerFailure(int, @NonNull String);
-  }
-
-  public final class UnknownFailure extends android.service.voice.DetectorFailure {
-    ctor public UnknownFailure(@NonNull String);
   }
 
   public final class VisibleActivityInfo implements android.os.Parcelable {
     ctor public VisibleActivityInfo(int, @NonNull android.os.IBinder);
   }
 
-  public final class VisualQueryDetectionServiceFailure extends android.service.voice.DetectorFailure {
+  public final class VisualQueryDetectionServiceFailure implements android.os.Parcelable {
     ctor public VisualQueryDetectionServiceFailure(int, @NonNull String);
   }
 
@@ -3603,6 +3600,11 @@ package android.view.displayhash {
 }
 
 package android.view.inputmethod {
+
+  public abstract class CancellableHandwritingGesture extends android.view.inputmethod.HandwritingGesture {
+    ctor public CancellableHandwritingGesture();
+    method public void setCancellationSignal(@NonNull android.os.CancellationSignal);
+  }
 
   public abstract class HandwritingGesture {
     method @NonNull public static android.view.inputmethod.HandwritingGesture fromByteArray(@NonNull byte[]);

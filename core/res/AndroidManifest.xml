@@ -5423,6 +5423,15 @@
     <permission android:name="android.permission.INSTALL_DPC_PACKAGES"
                 android:protectionLevel="signature|role" />
 
+    <!-- @SystemApi Allows an application to read resolved paths to the APKs (Base and any splits)
+         of a session based install.
+         <p>Not for use by third-party applications.
+         @hide
+    -->
+    <permission android:name="android.permission.READ_INSTALLED_SESSION_PATHS"
+                android:protectionLevel="signature|installer" />
+    <uses-permission android:name="android.permission.READ_INSTALLED_SESSION_PATHS" />
+
     <!-- Allows an application to use System Data Loaders.
          <p>Not for use by third-party applications.
          @hide
@@ -7433,6 +7442,13 @@
          <p>Protection level: internal|role
     -->
     <permission android:name="android.permission.EXECUTE_APP_ACTION"
+                android:protectionLevel="internal|role" />
+
+    <!-- Allows an application to display its suggestions using the autofill framework.
+         <p>For now, this permission is only granted to the Browser application.
+         <p>Protection level: internal|role
+    -->
+    <permission android:name="android.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS"
                 android:protectionLevel="internal|role" />
 
     <!-- @SystemApi Allows an application to create virtual devices in VirtualDeviceManager.
