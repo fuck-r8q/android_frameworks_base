@@ -2897,15 +2897,7 @@ public final class NotificationPanelViewController implements Dumpable {
         mHeadsUpManager.addListener(mOnHeadsUpChangedListener);
         mHeadsUpTouchHelper = new HeadsUpTouchHelper(headsUpManager,
                 mNotificationStackScrollLayoutController.getHeadsUpCallback(),
-                NotificationPanelViewController.this);
-    }
-
-    public void setTrackedHeadsUp(ExpandableNotificationRow pickedChild) {
-        if (pickedChild != null) {
-            updateTrackingHeadsUp(pickedChild);
-            mExpandingFromHeadsUp = true;
-        }
-        // otherwise we update the state when the expansion is finished
+                new HeadsUpNotificationViewControllerImpl());
     }
 
     private void onClosingFinished() {
@@ -2953,7 +2945,8 @@ public final class NotificationPanelViewController implements Dumpable {
     }
 
     /** Called when a HUN is dragged up or down to indicate the starting height for shade motion. */
-    public void setHeadsUpDraggingStartingHeight(int startHeight) {
+    @VisibleForTesting
+    void setHeadsUpDraggingStartingHeight(int startHeight) {
         mHeadsUpStartHeight = startHeight;
         float scrimMinFraction;
         if (mSplitShadeEnabled) {
@@ -2985,10 +2978,6 @@ public final class NotificationPanelViewController implements Dumpable {
         mMinFraction = minFraction;
         mDepthController.setPanelPullDownMinFraction(mMinFraction);
         mScrimController.setPanelScrimMinFraction(mMinFraction);
-    }
-
-    public void clearNotificationEffects() {
-        mCentralSurfaces.clearNotificationEffects();
     }
 
     private boolean isPanelVisibleBecauseOfHeadsUp() {
@@ -3629,7 +3618,13 @@ public final class NotificationPanelViewController implements Dumpable {
                             : (mKeyguardStateController.canDismissLockScreen()
                                     ? UNLOCK : BOUNCER_UNLOCK);
 
-            fling(vel, expand, isFalseTouch(x, y, interactionType));
+            // don't fling while in keyguard to avoid jump in shade expand animation;
+            // touch has been intercepted already so flinging here is redundant
+            if (mBarState == KEYGUARD && mExpandedFraction >= 1.0) {
+                mShadeLog.d("NPVC endMotionEvent - skipping fling on keyguard");
+            } else {
+                fling(vel, expand, isFalseTouch(x, y, interactionType));
+            }
             onTrackingStopped(expand);
             mUpdateFlingOnLayout = expand && mPanelClosedOnDown && !mHasLayoutedSinceDown;
             if (mUpdateFlingOnLayout) {
@@ -5112,9 +5107,13 @@ public final class NotificationPanelViewController implements Dumpable {
             captureValues(transitionValues);
         }
 
+        @Nullable
         @Override
-        public Animator createAnimator(ViewGroup sceneRoot, TransitionValues startValues,
-                TransitionValues endValues) {
+        public Animator createAnimator(ViewGroup sceneRoot, @Nullable TransitionValues startValues,
+                @Nullable TransitionValues endValues) {
+            if (startValues == null || endValues == null) {
+                return null;
+            }
             ValueAnimator anim = ValueAnimator.ofFloat(0, 1);
 
             Rect from = (Rect) startValues.values.get(PROP_BOUNDS);
@@ -5130,6 +5129,33 @@ public final class NotificationPanelViewController implements Dumpable {
         @Override
         public String[] getTransitionProperties() {
             return TRANSITION_PROPERTIES;
+        }
+    }
+
+    private final class HeadsUpNotificationViewControllerImpl implements
+            HeadsUpTouchHelper.HeadsUpNotificationViewController {
+        @Override
+        public void setHeadsUpDraggingStartingHeight(int startHeight) {
+            NotificationPanelViewController.this.setHeadsUpDraggingStartingHeight(startHeight);
+        }
+
+        @Override
+        public void setTrackedHeadsUp(ExpandableNotificationRow pickedChild) {
+            if (pickedChild != null) {
+                updateTrackingHeadsUp(pickedChild);
+                mExpandingFromHeadsUp = true;
+            }
+            // otherwise we update the state when the expansion is finished
+        }
+
+        @Override
+        public void startExpand(float x, float y, boolean startTracking, float expandedHeight) {
+            startExpandMotion(x, y, startTracking, expandedHeight);
+        }
+
+        @Override
+        public void clearNotificationEffects() {
+            mCentralSurfaces.clearNotificationEffects();
         }
     }
 
