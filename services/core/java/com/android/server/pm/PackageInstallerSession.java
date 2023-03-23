@@ -49,9 +49,9 @@ import static com.android.internal.util.XmlUtils.writeBooleanAttribute;
 import static com.android.internal.util.XmlUtils.writeByteArrayAttribute;
 import static com.android.internal.util.XmlUtils.writeStringAttribute;
 import static com.android.internal.util.XmlUtils.writeUriAttribute;
-import static com.android.server.pm.DexOptHelper.useArtService;
 import static com.android.server.pm.PackageInstallerService.prepareStageDir;
 import static com.android.server.pm.PackageManagerService.APP_METADATA_FILE_NAME;
+import static com.android.server.pm.PackageManagerServiceUtils.isInstalledByAdb;
 
 import android.Manifest;
 import android.annotation.AnyThread;
@@ -173,7 +173,6 @@ import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.LocalServices;
 import com.android.server.pm.Installer.InstallerException;
-import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.dex.DexManager;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
@@ -1402,9 +1401,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             return;
         }
 
+        final String initiatingPackageName = getInstallSource().mInitiatingPackageName;
         final String installerPackageName;
-        if (!TextUtils.isEmpty(getInstallSource().mInitiatingPackageName)) {
-            installerPackageName = getInstallSource().mInitiatingPackageName;
+        if (!isInstalledByAdb(initiatingPackageName)) {
+            installerPackageName = initiatingPackageName;
         } else {
             installerPackageName = getInstallSource().mInstallerPackageName;
         }
@@ -2565,15 +2565,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 }
 
                 if (isLinkPossible(fromFiles, toDir)) {
-                    if (!useArtService()) { // ART Service creates oat dirs on demand instead.
-                        if (!mResolvedInstructionSets.isEmpty()) {
-                            final File oatDir = new File(toDir, "oat");
-                            try {
-                                createOatDirs(tempPackageName, mResolvedInstructionSets, oatDir);
-                            } catch (LegacyDexoptDisabledException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }
+                    if (!mResolvedInstructionSets.isEmpty()) {
+                        final File oatDir = new File(toDir, "oat");
+                        createOatDirs(tempPackageName, mResolvedInstructionSets, oatDir);
                     }
                     // pre-create lib dirs for linking if necessary
                     if (!mResolvedNativeLibPaths.isEmpty()) {
@@ -3829,7 +3823,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     private void createOatDirs(String packageName, List<String> instructionSets, File fromDir)
-            throws PackageManagerException, LegacyDexoptDisabledException {
+            throws PackageManagerException {
         for (String instructionSet : instructionSets) {
             try {
                 mInstaller.createOatDir(packageName, fromDir.getAbsolutePath(), instructionSet);
@@ -4093,16 +4087,18 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         return params.installFlags;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public DataLoaderParamsParcel getDataLoaderParams() {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        getDataLoaderParams_enforcePermission();
         return params.dataLoaderParams != null ? params.dataLoaderParams.getData() : null;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public void addFile(int location, String name, long lengthBytes, byte[] metadata,
             byte[] signature) {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        addFile_enforcePermission();
         if (!isDataLoaderInstallation()) {
             throw new IllegalStateException(
                     "Cannot add files to non-data loader installation session.");
@@ -4133,9 +4129,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public void removeFile(int location, String name) {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        removeFile_enforcePermission();
         if (!isDataLoaderInstallation()) {
             throw new IllegalStateException(
                     "Cannot add files to non-data loader installation session.");

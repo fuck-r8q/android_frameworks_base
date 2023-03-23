@@ -43,6 +43,7 @@ import static com.android.server.pm.DexOptHelper.useArtService;
 import static com.android.server.pm.InstructionSets.getDexCodeInstructionSet;
 import static com.android.server.pm.InstructionSets.getPreferredInstructionSet;
 import static com.android.server.pm.PackageManagerServiceUtils.compareSignatures;
+import static com.android.server.pm.PackageManagerServiceUtils.isInstalledByAdb;
 import static com.android.server.pm.PackageManagerServiceUtils.logCriticalInfo;
 
 import android.Manifest;
@@ -188,6 +189,7 @@ import com.android.internal.util.Preconditions;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.permission.persistence.RuntimePermissionsPersistence;
+import com.android.permission.persistence.RuntimePermissionsState;
 import com.android.server.EventLogTags;
 import com.android.server.FgThread;
 import com.android.server.LocalManagerRegistry;
@@ -351,6 +353,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     static final boolean DEBUG_ABI_SELECTION = false;
     public static final boolean DEBUG_INSTANT = Build.IS_DEBUGGABLE;
+
+    static final String SHELL_PACKAGE_NAME = "com.android.shell";
 
     static final boolean HIDE_EPHEMERAL_APIS = false;
 
@@ -1331,10 +1335,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         final InstallSourceInfo installSourceInfo = snapshot.getInstallSourceInfo(packageName,
                 userId);
+        final String initiatingPackageName = installSourceInfo.getInitiatingPackageName();
         final String installerPackageName;
         if (installSourceInfo != null) {
-            if (!TextUtils.isEmpty(installSourceInfo.getInitiatingPackageName())) {
-                installerPackageName = installSourceInfo.getInitiatingPackageName();
+            if (!isInstalledByAdb(initiatingPackageName)) {
+                installerPackageName = initiatingPackageName;
             } else {
                 installerPackageName = installSourceInfo.getInstallingPackageName();
             }
@@ -4657,11 +4662,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CLEAR_APP_USER_DATA)
         @Override
         public void clearApplicationUserData(final String packageName,
                 final IPackageDataObserver observer, final int userId) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.CLEAR_APP_USER_DATA, null);
+            clearApplicationUserData_enforcePermission();
 
             final int callingUid = Binder.getCallingUid();
             final Computer snapshot = snapshotComputer();
@@ -4733,10 +4738,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             });
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
         @Override
         public void clearCrossProfileIntentFilters(int sourceUserId, String ownerPackage) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, null);
+            clearCrossProfileIntentFilters_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             final Computer snapshot = snapshotComputer();
             enforceOwnerRights(snapshot, ownerPackage, callingUid);
@@ -4748,13 +4753,13 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             scheduleWritePackageRestrictions(sourceUserId);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.INTERACT_ACROSS_USERS_FULL)
         @Override
         public boolean removeCrossProfileIntentFilter(IntentFilter intentFilter,
                 String ownerPackage,
                 int sourceUserId,
                 int targetUserId, int flags) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, null);
+            removeCrossProfileIntentFilter_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             enforceOwnerRights(snapshotComputer(), ownerPackage, callingUid);
             mUserManager.enforceCrossProfileIntentFilterAccess(sourceUserId, targetUserId,
@@ -4879,13 +4884,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mHandler.post(() -> {
                 final int id = verificationId >= 0 ? verificationId : -verificationId;
                 final PackageVerificationState state = mPendingVerification.get(id);
-                if (state == null || state.timeoutExtended() || !state.checkRequiredVerifierUid(
-                        callingUid)) {
-                    // Only allow calls from required verifiers.
+                if (state == null || !state.extendTimeout(callingUid)) {
+                    // Invalid uid or already extended.
                     return;
                 }
-
-                state.extendTimeout();
 
                 final PackageVerificationResponse response = new PackageVerificationResponse(
                         verificationCodeAtTimeout, callingUid);
@@ -4925,11 +4927,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CLEAR_APP_CACHE)
         @Override
         public void freeStorage(final String volumeUuid, final long freeStorageSize,
                 final @StorageManager.AllocateFlags int flags, final IntentSender pi) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.CLEAR_APP_CACHE, TAG);
+            freeStorage_enforcePermission();
             mHandler.post(() -> {
                 boolean success = false;
                 try {
@@ -4952,11 +4954,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             });
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CLEAR_APP_CACHE)
         @Override
         public void freeStorageAndNotify(final String volumeUuid, final long freeStorageSize,
                 final @StorageManager.AllocateFlags int flags, final IPackageDataObserver observer) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.CLEAR_APP_CACHE, null);
+            freeStorageAndNotify_enforcePermission();
             mHandler.post(() -> {
                 boolean success = false;
                 try {
@@ -5041,10 +5043,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return token;
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_INSTANT_APPS)
         @Override
         public String getInstantAppAndroidId(String packageName, int userId) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.ACCESS_INSTANT_APPS, "getInstantAppAndroidId");
+            getInstantAppAndroidId_enforcePermission();
             final Computer snapshot = snapshotComputer();
             snapshot.enforceCrossUserPermission(Binder.getCallingUid(), userId,
                     true /* requireFullPermission */, false /* checkShell */,
@@ -5136,16 +5138,17 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return getMimeGroupInternal(snapshot, packageName, mimeGroup);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS)
         @Override
         public int getMoveStatus(int moveId) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS, null);
+            getMoveStatus_enforcePermission();
             return mMoveCallbacks.mLastStatus.get(moveId);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.GET_APP_METADATA)
         @Override
         public ParcelFileDescriptor getAppMetadataFd(String packageName, int userId) {
-            mContext.enforceCallingOrSelfPermission(GET_APP_METADATA, "getAppMetadataFd");
+            getAppMetadataFd_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             final Computer snapshot = snapshotComputer();
             final PackageStateInternal ps = snapshot.getPackageStateForInstalledAndFiltered(
@@ -5242,11 +5245,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     packageNames, userId, callingUid);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.PACKAGE_VERIFICATION_AGENT)
         @Override
         public VerifierDeviceIdentity getVerifierDeviceIdentity() throws RemoteException {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.PACKAGE_VERIFICATION_AGENT,
-                    "Only package verification agents can read the verifier device identity");
+            getVerifierDeviceIdentity_enforcePermission();
 
             synchronized (mLock) {
                 return mSettings.getVerifierDeviceIdentityLPw(mLiveComputer);
@@ -5268,10 +5270,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     false /*direct*/, false /* retainOnUpdate */);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MAKE_UID_VISIBLE)
         @Override
         public void makeUidVisible(int recipientUid, int visibleUid) {
-            mContext.enforceCallingOrSelfPermission(
-                    android.Manifest.permission.MAKE_UID_VISIBLE, "makeUidVisible");
+            makeUidVisible_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             final int recipientUserId = UserHandle.getUserId(recipientUid);
             final int visibleUserId = UserHandle.getUserId(visibleUid);
@@ -5370,9 +5372,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     processName, uid, seinfo, pid);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MOVE_PACKAGE)
         @Override
         public int movePackage(final String packageName, final String volumeUuid) {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.MOVE_PACKAGE, null);
+            movePackage_enforcePermission();
 
             final int callingUid = Binder.getCallingUid();
             final UserHandle user = new UserHandle(UserHandle.getUserId(callingUid));
@@ -5391,9 +5394,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return moveId;
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MOVE_PACKAGE)
         @Override
         public int movePrimaryStorage(String volumeUuid) throws RemoteException {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.MOVE_PACKAGE, null);
+            movePrimaryStorage_enforcePermission();
 
             final int realMoveId = mNextMoveId.getAndIncrement();
             final Bundle extras = new Bundle();
@@ -5555,32 +5559,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         public void registerDexModule(String packageName, String dexModulePath,
                 boolean isSharedModule,
                 IDexModuleRegisterCallback callback) {
-            if (useArtService()) {
-                // ART Service currently doesn't support this explicit dexopting and instead relies
-                // on background dexopt for secondary dex files. This API is problematic since it
-                // doesn't provide the correct classloader context.
-                Slog.i(TAG,
-                        "Ignored unsupported registerDexModule call for " + dexModulePath + " in "
-                                + packageName);
-                return;
-            }
-
-            int userId = UserHandle.getCallingUserId();
-            ApplicationInfo ai = snapshot().getApplicationInfo(packageName, /*flags*/ 0, userId);
-            DexManager.RegisterDexModuleResult result;
-            if (ai == null) {
-                Slog.w(PackageManagerService.TAG,
-                        "Registering a dex module for a package that does not exist for the" +
-                                " calling user. package=" + packageName + ", user=" + userId);
-                result = new DexManager.RegisterDexModuleResult(false, "Package not installed");
-            } else {
-                try {
-                    result = mDexManager.registerDexModule(
-                            ai, dexModulePath, isSharedModule, userId);
-                } catch (LegacyDexoptDisabledException e) {
-                    throw new RuntimeException(e);
-                }
-            }
+            // ART Service doesn't support this explicit dexopting and instead relies on background
+            // dexopt for secondary dex files. For compat parity between ART Service and the legacy
+            // code it's disabled for both.
+            //
+            // Also, this API is problematic anyway since it doesn't provide the correct classloader
+            // context, so it is hard to produce dexopt artifacts that the runtime can load
+            // successfully.
+            Slog.i(TAG,
+                    "Ignored unsupported registerDexModule call for " + dexModulePath + " in "
+                            + packageName);
+            DexManager.RegisterDexModuleResult result = new DexManager.RegisterDexModuleResult(
+                    false, "registerDexModule call not supported since Android U");
 
             if (callback != null) {
                 mHandler.post(() -> {
@@ -5595,10 +5585,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS)
         @Override
         public void registerMoveCallback(IPackageMoveObserver callback) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS, null);
+            registerMoveCallback_enforcePermission();
             mMoveCallbacks.register(callback);
         }
 
@@ -5700,10 +5690,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     userId, callingPackage);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_USERS)
         @Override
         public boolean setApplicationHiddenSettingAsUser(String packageName, boolean hidden,
                 int userId) {
-            mContext.enforceCallingOrSelfPermission(android.Manifest.permission.MANAGE_USERS, null);
+            setApplicationHiddenSettingAsUser_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             final Computer snapshot = snapshotComputer();
             snapshot.enforceCrossUserPermission(callingUid, userId, true /* requireFullPermission */,
@@ -5787,11 +5778,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.DELETE_PACKAGES)
         @Override
         public boolean setBlockUninstallForUser(String packageName, boolean blockUninstall,
                 int userId) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.DELETE_PACKAGES, null);
+            setBlockUninstallForUser_enforcePermission();
             final Computer snapshot = snapshotComputer();
             PackageStateInternal packageState = snapshot.getPackageStateInternal(packageName);
             if (packageState != null && packageState.getPkg() != null) {
@@ -5876,10 +5867,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             scheduleWritePackageRestrictions(userId);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
         @Override
         public boolean setInstallLocation(int loc) {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS,
-                    null);
+            setInstallLocation_enforcePermission();
             if (getInstallLocation() == loc) {
                 return true;
             }
@@ -6190,17 +6181,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     state.userState(userId).setSplashScreenTheme(themeId));
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.INSTALL_PACKAGES)
         @Override
         public void setUpdateAvailable(String packageName, boolean updateAvailable) {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.INSTALL_PACKAGES, null);
+            setUpdateAvailable_enforcePermission();
             commitPackageStateMutation(null, packageName, state ->
                     state.setUpdateAvailable(updateAvailable));
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS)
         @Override
         public void unregisterMoveCallback(IPackageMoveObserver callback) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.MOUNT_UNMOUNT_FILESYSTEMS, null);
+            unregisterMoveCallback_enforcePermission();
             mMoveCallbacks.unregister(callback);
         }
 
@@ -6744,6 +6736,16 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         public LegacyPermissionSettings getLegacyPermissions() {
             synchronized (mLock) {
                 return mSettings.mPermissions;
+            }
+        }
+
+        /**
+         * Read legacy permission states for permissions migration to new permission subsystem.
+         */
+        @Override
+        public RuntimePermissionsState getLegacyPermissionsState(int userId) {
+            synchronized (mLock) {
+                return mSettings.getLegacyPermissionsState(userId);
             }
         }
 
