@@ -199,10 +199,29 @@ public class AccessibilityNodeInfo implements Parcelable {
      */
     public static final int FLAG_PREFETCH_UNINTERRUPTIBLE = 1 << 5;
 
-    /** @hide */
-    public static final int FLAG_PREFETCH_MASK = 0x0000003f;
+    /**
+     * Mask for {@link PrefetchingStrategy} all types.
+     *
+     * @see #FLAG_PREFETCH_ANCESTORS
+     * @see #FLAG_PREFETCH_SIBLINGS
+     * @see #FLAG_PREFETCH_DESCENDANTS_HYBRID
+     * @see #FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST
+     * @see #FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST
+     * @see #FLAG_PREFETCH_UNINTERRUPTIBLE
+     *
+     * @hide
+     */
+    public static final int FLAG_PREFETCH_MASK = 0x0000003F;
 
-    /** @hide */
+    /**
+     * Mask for {@link PrefetchingStrategy} that includes only descendants-related strategies.
+     *
+     * @see #FLAG_PREFETCH_DESCENDANTS_HYBRID
+     * @see #FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST
+     * @see #FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST
+     *
+     * @hide
+     */
     public static final int FLAG_PREFETCH_DESCENDANTS_MASK = 0x0000001C;
 
     /**
@@ -243,7 +262,11 @@ public class AccessibilityNodeInfo implements Parcelable {
      */
     public static final int FLAG_SERVICE_IS_ACCESSIBILITY_TOOL = 1 << 9;
 
-    /** @hide */
+    /**
+     * Mask for all types of additional view data exposed to services.
+     *
+     * @hide
+     */
     public static final int FLAG_REPORT_MASK =
             FLAG_SERVICE_REQUESTS_INCLUDE_NOT_IMPORTANT_VIEWS
                     | FLAG_SERVICE_REQUESTS_REPORT_VIEW_IDS
@@ -472,9 +495,22 @@ public class AccessibilityNodeInfo implements Parcelable {
     public static final int LAST_LEGACY_STANDARD_ACTION = ACTION_SET_TEXT;
 
     /**
-     * Mask to see if the value is larger than the largest ACTION_ constant
+     * Mask to verify if a given value is a combination of the existing ACTION_ constants.
+     *
+     * The smallest possible action is 1, and the largest is 1 << 21, or {@link ACTION_SET_TEXT}. A
+     * node can have any combination of actions present, so a node's max action int is:
+     *
+     *   0000 0000 0011 1111 1111 1111 1111 1111
+     *
+     * Therefore, if an action has any of the following bits flipped, it will be invalid:
+     *
+     *   1111 1111 11-- ---- ---- ---- ---- ----
+     *
+     * This can be represented in hexadecimal as 0xFFC00000.
+     *
+     * @see AccessibilityNodeInfo#addAction(int)
      */
-    private static final int ACTION_TYPE_MASK = 0xFF000000;
+    private static final int INVALID_ACTIONS_MASK = 0xFFC00000;
 
     // Action arguments.
 
@@ -752,7 +788,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 
     /**
      * Integer argument specifying the end index of the requested text location data. Must be
-     * positive and no larger than {@link #EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_LENGTH}.
+     * positive and no larger than {@link #EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_MAX_LENGTH}.
      *
      * @see #EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY
      */
@@ -838,9 +874,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 
     private static final int BOOLEAN_PROPERTY_REQUEST_INITIAL_ACCESSIBILITY_FOCUS = 1 << 24;
 
-    private static final int BOOLEAN_PROPERTY_REQUEST_TOUCH_PASSTHROUGH = 1 << 25;
-
-    private static final int BOOLEAN_PROPERTY_ACCESSIBILITY_DATA_SENSITIVE = 1 << 26;
+    private static final int BOOLEAN_PROPERTY_ACCESSIBILITY_DATA_SENSITIVE = 1 << 25;
 
     /**
      * Bits that provide the id of a virtual descendant of a view.
@@ -1536,7 +1570,7 @@ public class AccessibilityNodeInfo implements Parcelable {
     public void addAction(int action) {
         enforceNotSealed();
 
-        if ((action & ACTION_TYPE_MASK) != 0) {
+        if ((action & INVALID_ACTIONS_MASK) != 0) {
             throw new IllegalArgumentException("Action is not a combination of the standard " +
                     "actions: " + action);
         }
@@ -2602,53 +2636,6 @@ public class AccessibilityNodeInfo implements Parcelable {
      */
     public void setEditable(boolean editable) {
         setBooleanProperty(BOOLEAN_PROPERTY_EDITABLE, editable);
-    }
-
-    /**
-     * Gets whether this node is one of the candidates that wants touch interaction within its
-     * screen bounds to bypass the touch exploration and go straight to the underlying view
-     * hierarchy.
-     *
-     * <p>
-     * {@link android.accessibilityservice.AccessibilityService} could aggregate the {@link
-     * #getBoundsInScreen()} that has request touch passthrough, and/or doing complex calculation
-     * with other views that doesn't request touch passthrough, and call {@link
-     * AccessibilityService#setTouchExplorationPassthroughRegion(int, Region)} to bypass the touch
-     * interactions to the underlying views within the region.
-     * </p>
-     *
-     * @return True if the node wants touch interaction within its screen bounds to bypass touch
-     * exploration and go straight to the underlying view hierarchy; false otherwise.
-     */
-    public boolean hasRequestTouchPassthrough() {
-        return getBooleanProperty(BOOLEAN_PROPERTY_REQUEST_TOUCH_PASSTHROUGH);
-    }
-
-    /**
-     * Sets whether this node wants touch interaction within its screen bounds to bypass touch
-     * exploration and go straight to the underlying view hierarchy.
-     * <p>
-     *   <strong>Note:</strong> This property allows the
-     *   {@link android.accessibilityservice.AccessibilityService} to calculate the
-     *   aggregated touch passthrough region. App developers need to ensure that the
-     *   {@link #getBoundsInScreen()} of
-     *   the node align with the region they want touchable, and that child nodes overlapping these
-     *   bounds may cause that region to be reduced.
-     * </p>
-     *
-     * <p>
-     *   <strong>Note:</strong> Cannot be called from an
-     *   {@link android.accessibilityservice.AccessibilityService}.
-     *   This class is made immutable before being delivered to an AccessibilityService.
-     * </p>
-     *
-     * @param touchPassthrough True if the node wants touch interaction within its screen bounds
-     *                         to bypass touch exploration and go straight to the underlying view
-     *                         hierarchy.
-     * @throws IllegalStateException If called from an AccessibilityService.
-     */
-    public void setRequestTouchPassthrough(boolean touchPassthrough) {
-        setBooleanProperty(BOOLEAN_PROPERTY_REQUEST_TOUCH_PASSTHROUGH, touchPassthrough);
     }
 
     /**
@@ -6521,7 +6508,7 @@ public class AccessibilityNodeInfo implements Parcelable {
         /**
          * @see android.os.Parcelable.Creator
          */
-        public static final @android.annotation.NonNull Parcelable.Creator<TouchDelegateInfo> CREATOR =
+        public static final @NonNull Parcelable.Creator<TouchDelegateInfo> CREATOR =
                 new Parcelable.Creator<TouchDelegateInfo>() {
             @Override
             public TouchDelegateInfo createFromParcel(Parcel parcel) {
@@ -6693,7 +6680,7 @@ public class AccessibilityNodeInfo implements Parcelable {
     /**
      * @see android.os.Parcelable.Creator
      */
-    public static final @android.annotation.NonNull Parcelable.Creator<AccessibilityNodeInfo> CREATOR =
+    public static final @NonNull Parcelable.Creator<AccessibilityNodeInfo> CREATOR =
             new Parcelable.Creator<AccessibilityNodeInfo>() {
         @Override
         public AccessibilityNodeInfo createFromParcel(Parcel parcel) {
