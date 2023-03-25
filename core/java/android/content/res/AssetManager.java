@@ -528,6 +528,10 @@ public final class AssetManager implements AutoCloseable {
         if (!mOpen) {
             throw new RuntimeException("AssetManager has been closed");
         }
+        // Let's still check if the native object exists, given all the memory corruptions.
+        if (mObject == 0) {
+            throw new RuntimeException("AssetManager is open but the native object is gone");
+        }
     }
 
     /**
@@ -1153,6 +1157,7 @@ public final class AssetManager implements AutoCloseable {
     int[] getAttributeResolutionStack(long themePtr, @AttrRes int defStyleAttr,
             @StyleRes int defStyleRes, @StyleRes int xmlStyle) {
         synchronized (this) {
+            ensureValidLocked();
             return nativeAttributeResolutionStack(
                     mObject, themePtr, xmlStyle, defStyleAttr, defStyleRes);
         }
@@ -1453,6 +1458,16 @@ public final class AssetManager implements AutoCloseable {
     }
 
     /**
+     * @hide
+     */
+    Configuration[] getSizeAndUiModeConfigurations() {
+        synchronized (this) {
+            ensureValidLocked();
+            return nativeGetSizeAndUiModeConfigurations(mObject);
+        }
+    }
+
+    /**
      * Change the configuration used when retrieving resources.  Not for use by
      * applications.
      * @hide
@@ -1604,6 +1619,7 @@ public final class AssetManager implements AutoCloseable {
     private static native @Nullable String nativeGetResourceEntryName(long ptr, @AnyRes int resid);
     private static native @Nullable String[] nativeGetLocales(long ptr, boolean excludeSystem);
     private static native @Nullable Configuration[] nativeGetSizeConfigurations(long ptr);
+    private static native @Nullable Configuration[] nativeGetSizeAndUiModeConfigurations(long ptr);
     private static native void nativeSetResourceResolutionLoggingEnabled(long ptr, boolean enabled);
     private static native @Nullable String nativeGetLastResourceResolution(long ptr);
 
