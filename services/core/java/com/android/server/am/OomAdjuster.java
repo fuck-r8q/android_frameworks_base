@@ -349,6 +349,7 @@ public class OomAdjuster {
     private final ArrayList<UidRecord> mTmpBecameIdle = new ArrayList<UidRecord>();
     private final ActiveUids mTmpUidRecords;
     private final ArrayDeque<ProcessRecord> mTmpQueue;
+    private final ArraySet<ProcessRecord> mTmpProcessSet = new ArraySet<>();
     private final ArraySet<ProcessRecord> mPendingProcessSet = new ArraySet<>();
     private final ArraySet<ProcessRecord> mProcessesInCycle = new ArraySet<>();
 
@@ -3457,7 +3458,8 @@ public class OomAdjuster {
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
         // if an app is already frozen and shouldNotFreeze becomes true, immediately unfreeze
         if (opt.isFrozen() && opt.shouldNotFreeze()) {
-            mCachedAppOptimizer.unfreezeAppLSP(app, oomAdjReason);
+            mCachedAppOptimizer.unfreezeAppLSP(app,
+                    CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(oomAdjReason));
             return;
         }
 
@@ -3467,7 +3469,33 @@ public class OomAdjuster {
                 && !opt.shouldNotFreeze()) {
             mCachedAppOptimizer.freezeAppAsyncLSP(app);
         } else if (state.getSetAdj() < CACHED_APP_MIN_ADJ) {
-            mCachedAppOptimizer.unfreezeAppLSP(app, oomAdjReason);
+            mCachedAppOptimizer.unfreezeAppLSP(app,
+                    CachedAppOptimizer.getUnfreezeReasonCodeFromOomAdjReason(oomAdjReason));
         }
+    }
+
+    @GuardedBy("mService")
+    void unfreezeTemporarily(ProcessRecord app, @OomAdjuster.OomAdjReason int reason) {
+        if (!mCachedAppOptimizer.useFreezer()) {
+            return;
+        }
+
+        final ProcessCachedOptimizerRecord opt = app.mOptRecord;
+        if (!opt.isFrozen() && !opt.isPendingFreeze()) {
+            return;
+        }
+
+        final ArrayList<ProcessRecord> processes = mTmpProcessList;
+        final ActiveUids uids = mTmpUidRecords;
+        mTmpProcessSet.add(app);
+        collectReachableProcessesLocked(mTmpProcessSet, processes, uids);
+        mTmpProcessSet.clear();
+        // Now processes contains app's downstream and app
+        final int size = processes.size();
+        for (int i = 0; i < size; i++) {
+            ProcessRecord proc = processes.get(i);
+            mCachedAppOptimizer.unfreezeTemporarily(proc, reason);
+        }
+        processes.clear();
     }
 }

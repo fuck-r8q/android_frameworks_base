@@ -929,7 +929,7 @@ public class AudioService extends IAudioService.Stub
 
     // Defines the format for the connection "address" for ALSA devices
     public static String makeAlsaAddressString(int card, int device) {
-        return "card=" + card + ";device=" + device + ";";
+        return "card=" + card + ";device=" + device;
     }
 
     public static final class Lifecycle extends SystemService {
@@ -4422,13 +4422,14 @@ public class AudioService extends IAudioService.Stub
                 return;
         }
 
-        // Forcefully set LE audio volume as a workaround, since in some cases
-        // (like the outgoing call) the value of 'device' is not DEVICE_OUT_BLE_*
-        // even when BLE is connected.
+        // In some cases (like the outgoing or rejected call) the value of 'device' is not
+        // DEVICE_OUT_BLE_* even when BLE is connected. Changing the volume level in such case
+        // may cuase the other devices volume level leaking into the LeAudio device settings.
         if (!AudioSystem.isLeAudioDeviceType(device)) {
-            Log.w(TAG, "setLeAudioVolumeOnModeUpdate got unexpected device=" + device
-                    + ", forcing to device=" + AudioSystem.DEVICE_OUT_BLE_HEADSET);
-            device = AudioSystem.DEVICE_OUT_BLE_HEADSET;
+            Log.w(TAG, "setLeAudioVolumeOnModeUpdate ignoring invalid device="
+                    + device + ", mode=" + mode + ", index=" + index + " maxIndex=" + maxIndex
+                    + " streamType=" + streamType);
+            return;
         }
 
         if (DEBUG_VOL) {

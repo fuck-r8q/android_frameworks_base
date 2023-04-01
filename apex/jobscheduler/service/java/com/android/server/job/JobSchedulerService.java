@@ -233,7 +233,7 @@ public class JobSchedulerService extends com.android.server.SystemService
         }
     }
 
-    @VisibleForTesting
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public static Clock sUptimeMillisClock = new MySimpleClock(ZoneOffset.UTC) {
         @Override
         public long millis() {
@@ -241,7 +241,6 @@ public class JobSchedulerService extends com.android.server.SystemService
         }
     };
 
-    @VisibleForTesting
     public static Clock sElapsedRealtimeClock = new MySimpleClock(ZoneOffset.UTC) {
         @Override
         public long millis() {
@@ -4024,6 +4023,18 @@ public class JobSchedulerService extends com.android.server.SystemService
             return JobScheduler.RESULT_SUCCESS;
         }
 
+        /** Returns a sanitized namespace if valid, or throws an exception if not. */
+        private String validateNamespace(@Nullable String namespace) {
+            namespace = JobScheduler.sanitizeNamespace(namespace);
+            if (namespace != null) {
+                if (namespace.isEmpty()) {
+                    throw new IllegalArgumentException("namespace cannot be empty");
+                }
+                namespace = namespace.intern();
+            }
+            return namespace;
+        }
+
         private int validateRunUserInitiatedJobsPermission(int uid, String packageName) {
             final int state = getRunUserInitiatedJobsPermissionState(uid, packageName);
             if (state == PermissionChecker.PERMISSION_HARD_DENIED) {
@@ -4071,9 +4082,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 return result;
             }
 
-            if (namespace != null) {
-                namespace = namespace.intern();
-            }
+            namespace = validateNamespace(namespace);
 
             final long ident = Binder.clearCallingIdentity();
             try {
@@ -4104,9 +4113,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 return result;
             }
 
-            if (namespace != null) {
-                namespace = namespace.intern();
-            }
+            namespace = validateNamespace(namespace);
 
             final long ident = Binder.clearCallingIdentity();
             try {
@@ -4145,9 +4152,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 return result;
             }
 
-            if (namespace != null) {
-                namespace = namespace.intern();
-            }
+            namespace = validateNamespace(namespace);
 
             final long ident = Binder.clearCallingIdentity();
             try {
@@ -4184,7 +4189,8 @@ public class JobSchedulerService extends com.android.server.SystemService
             final long ident = Binder.clearCallingIdentity();
             try {
                 return new ParceledListSlice<>(
-                        JobSchedulerService.this.getPendingJobsInNamespace(uid, namespace));
+                        JobSchedulerService.this.getPendingJobsInNamespace(uid,
+                                validateNamespace(namespace)));
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -4196,7 +4202,8 @@ public class JobSchedulerService extends com.android.server.SystemService
 
             final long ident = Binder.clearCallingIdentity();
             try {
-                return JobSchedulerService.this.getPendingJob(uid, namespace, jobId);
+                return JobSchedulerService.this.getPendingJob(
+                        uid, validateNamespace(namespace), jobId);
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -4208,7 +4215,8 @@ public class JobSchedulerService extends com.android.server.SystemService
 
             final long ident = Binder.clearCallingIdentity();
             try {
-                return JobSchedulerService.this.getPendingJobReason(uid, namespace, jobId);
+                return JobSchedulerService.this.getPendingJobReason(
+                        uid, validateNamespace(namespace), jobId);
             } finally {
                 Binder.restoreCallingIdentity(ident);
             }
@@ -4238,7 +4246,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 JobSchedulerService.this.cancelJobsForUid(uid,
                         // Documentation says only jobs scheduled BY the app will be cancelled
                         /* includeSourceApp */ false,
-                        /* namespaceOnly */ true, namespace,
+                        /* namespaceOnly */ true, validateNamespace(namespace),
                         JobParameters.STOP_REASON_CANCELLED_BY_APP,
                         JobParameters.INTERNAL_STOP_REASON_CANCELED,
                         "cancelAllInNamespace() called by app, callingUid=" + uid);
@@ -4253,7 +4261,7 @@ public class JobSchedulerService extends com.android.server.SystemService
 
             final long ident = Binder.clearCallingIdentity();
             try {
-                JobSchedulerService.this.cancelJob(uid, namespace, jobId, uid,
+                JobSchedulerService.this.cancelJob(uid, validateNamespace(namespace), jobId, uid,
                         JobParameters.STOP_REASON_CANCELLED_BY_APP);
             } finally {
                 Binder.restoreCallingIdentity(ident);

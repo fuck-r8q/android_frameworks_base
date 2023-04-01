@@ -324,6 +324,10 @@ public class Transitions implements RemoteCallable<Transitions> {
         mRemoteTransitionHandler.removeFiltered(remoteTransition);
     }
 
+    RemoteTransitionHandler getRemoteTransitionHandler() {
+        return mRemoteTransitionHandler;
+    }
+
     /** Registers an observer on the lifecycle of transitions. */
     public void registerObserver(@NonNull TransitionObserver observer) {
         mObservers.add(observer);
@@ -510,6 +514,16 @@ public class Transitions implements RemoteCallable<Transitions> {
             }
         }
         return hasNoAnimation;
+    }
+
+    /**
+     * Check if all changes in this transition are only ordering changes. If so, we won't animate.
+     */
+    static boolean isAllOrderOnly(TransitionInfo info) {
+        for (int i = info.getChanges().size() - 1; i >= 0; --i) {
+            if (!TransitionUtil.isOrderOnly(info.getChanges().get(i))) return false;
+        }
+        return true;
     }
 
     @VisibleForTesting

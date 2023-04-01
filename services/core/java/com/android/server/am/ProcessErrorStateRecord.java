@@ -22,7 +22,9 @@ import static com.android.server.Watchdog.NATIVE_STACKS_OF_INTEREST;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_ANR;
 import static com.android.server.am.ActivityManagerService.MY_PID;
 import static com.android.server.am.ProcessRecord.TAG;
+import static com.android.server.stats.pull.ProcfsMemoryUtil.readMemorySnapshotFromProcfs;
 
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.AnrController;
 import android.app.ApplicationErrorReport;
@@ -56,6 +58,7 @@ import com.android.internal.os.anr.AnrLatencyTracker;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.ResourcePressureUtil;
 import com.android.server.criticalevents.CriticalEventLog;
+import com.android.server.stats.pull.ProcfsMemoryUtil.MemorySnapshot;
 import com.android.server.wm.WindowProcessController;
 
 import java.io.File;
@@ -287,7 +290,7 @@ class ProcessErrorStateRecord {
             String parentShortComponentName, WindowProcessController parentProcess,
             boolean aboveSystem, TimeoutRecord timeoutRecord,
             ExecutorService auxiliaryTaskExecutor, boolean onlyDumpSelf,
-            boolean isContinuousAnr) {
+            boolean isContinuousAnr, Future<File> firstPidFilePromise) {
         String annotation = timeoutRecord.mReason;
         AnrLatencyTracker latencyTracker = timeoutRecord.mLatencyTracker;
         Future<?> updateCpuStatsNowFirstCall = null;
@@ -334,7 +337,6 @@ class ProcessErrorStateRecord {
                 Counter.logIncrement("stability_anr.value_skipped_anrs");
                 return;
             }
-
             // In case we come through here for the same app before completing
             // this one, mark as anring now so we will bail out.
             latencyTracker.waitingOnProcLockStarted();
@@ -368,6 +370,9 @@ class ProcessErrorStateRecord {
             firstPids.add(pid);
 
             // Don't dump other PIDs if it's a background ANR or is requested to only dump self.
+            // Note that the primary pid is added here just in case, as it should normally be
+            // dumped on the early dump thread, and would only be dumped on the Anr consumer thread
+            // as a fallback.
             isSilentAnr = isSilentAnr();
             if (!isSilentAnr && !onlyDumpSelf) {
                 int parentPid = pid;
@@ -398,6 +403,8 @@ class ProcessErrorStateRecord {
                 });
             }
         }
+        // Build memory headers for the ANRing process.
+        String memoryHeaders = buildMemoryHeadersFor(pid);
 
         // Get critical event log before logging the ANR so that it doesn't occur in the log.
         latencyTracker.criticalEventLogStarted();
@@ -498,7 +505,8 @@ class ProcessErrorStateRecord {
         File tracesFile = StackTracesDumpHelper.dumpStackTraces(firstPids,
                 isSilentAnr ? null : processCpuTracker, isSilentAnr ? null : lastPids,
                 nativePidsFuture, tracesFileException, firstPidEndOffset, annotation,
-                criticalEventLog, auxiliaryTaskExecutor, latencyTracker);
+                criticalEventLog, memoryHeaders, auxiliaryTaskExecutor, firstPidFilePromise,
+                latencyTracker);
 
         if (isMonitorCpuUsage()) {
             // Wait for the first call to finish
@@ -712,6 +720,26 @@ class ProcessErrorStateRecord {
             resolver.getUserId()) != 0;
     }
 
+    private @Nullable String buildMemoryHeadersFor(int pid) {
+        if (pid <= 0) {
+            Slog.i(TAG, "Memory header requested with invalid pid: " + pid);
+            return null;
+        }
+        MemorySnapshot snapshot = readMemorySnapshotFromProcfs(pid);
+        if (snapshot == null) {
+            Slog.i(TAG, "Failed to get memory snapshot for pid:" + pid);
+            return null;
+        }
+
+        StringBuilder memoryHeaders = new StringBuilder();
+        memoryHeaders.append("RssHwmKb: ")
+            .append(snapshot.rssHighWaterMarkInKilobytes)
+            .append("\n");
+        memoryHeaders.append("RssKb: ").append(snapshot.rssInKilobytes).append("\n");
+        memoryHeaders.append("RssAnonKb: ").append(snapshot.anonRssInKilobytes).append("\n");
+        memoryHeaders.append("VmSwapKb: ").append(snapshot.swapInKilobytes).append("\n");
+        return memoryHeaders.toString();
+    }
     /**
      * Unless configured otherwise, swallow ANRs in background processes & kill the process.
      * Non-private access is for tests only.
