@@ -16,7 +16,9 @@
 
 package com.android.server.permission.access.util
 
+import android.util.Log
 import com.android.server.LocalServices
+import com.android.server.appop.AppOpMigrationHelper
 import com.android.server.permission.access.AccessPolicy
 import com.android.server.pm.permission.PermissionMigrationHelper
 
@@ -31,8 +33,8 @@ object PackageVersionMigration {
             LocalServices.getService(PermissionMigrationHelper::class.java)
         val permissionVersion = permissionMigrationHelper.getLegacyPermissionsVersion(userId)
 
-        // TODO appops version would be fixed in appops cl
-        val appOpVersion = 1
+        val appOpMigrationHelper = LocalServices.getService(AppOpMigrationHelper::class.java)
+        val appOpVersion = appOpMigrationHelper.legacyAppOpVersion
 
         return when {
             // Both files don't exist.
@@ -57,10 +59,13 @@ object PackageVersionMigration {
             permissionVersion == 9 && appOpVersion == 1 -> 12
             permissionVersion == 10 && appOpVersion == 1 -> 13
             permissionVersion == 10 && appOpVersion == 3 -> AccessPolicy.VERSION_LATEST
-            else -> throw IllegalArgumentException(
-                "Version combination not recognized, permission" +
-                    "version: $permissionVersion, app-op version: $appOpVersion"
-            )
+            else -> {
+                Log.w(
+                    "PackageVersionMigration", "Version combination not recognized, permission" +
+                        "version: $permissionVersion, app-op version: $appOpVersion"
+                )
+                AccessPolicy.VERSION_LATEST
+            }
         }
     }
 }

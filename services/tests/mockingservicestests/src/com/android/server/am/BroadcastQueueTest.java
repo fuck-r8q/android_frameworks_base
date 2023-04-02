@@ -16,8 +16,11 @@
 
 package com.android.server.am;
 
+import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_FROZEN;
+import static android.app.ActivityManager.UidFrozenStateChangedCallback.UID_FROZEN_STATE_UNFROZEN;
 import static android.os.UserHandle.USER_SYSTEM;
 
+import static com.android.server.am.ActivityManagerDebugConfig.LOG_WRITER_INFO;
 import static com.android.server.am.BroadcastProcessQueue.reasonToString;
 import static com.android.server.am.BroadcastRecord.deliveryStateToString;
 import static com.android.server.am.BroadcastRecord.isReceiverEquals;
@@ -53,7 +56,7 @@ import android.app.AppOpsManager;
 import android.app.BackgroundStartPrivileges;
 import android.app.BroadcastOptions;
 import android.app.IApplicationThread;
-import android.app.UidObserver;
+import android.app.IUidFrozenStateChangedCallback;
 import android.app.usage.UsageEvents.Event;
 import android.app.usage.UsageStatsManagerInternal;
 import android.content.ComponentName;
@@ -162,7 +165,7 @@ public class BroadcastQueueTest {
     private BroadcastQueue mQueue;
     BroadcastConstants mConstants;
     private BroadcastSkipPolicy mSkipPolicy;
-    private UidObserver mUidObserver;
+    private IUidFrozenStateChangedCallback mUidFrozenStateChangedCallback;
 
     /**
      * Desired behavior of the next
@@ -289,9 +292,9 @@ public class BroadcastQueueTest {
         doNothing().when(mAms).appNotResponding(any(), any());
 
         doAnswer((invocation) -> {
-            mUidObserver = invocation.getArgument(0);
+            mUidFrozenStateChangedCallback = invocation.getArgument(0);
             return null;
-        }).when(mAms).registerUidObserver(any(), anyInt(), anyInt(), any());
+        }).when(mAms).registerUidFrozenStateChangedCallback(any());
 
         mConstants = new BroadcastConstants(Settings.Global.BROADCAST_FG_CONSTANTS);
         mConstants.TIMEOUT = 100;
@@ -397,6 +400,18 @@ public class BroadcastQueueTest {
         ABORT,
         /** Appear to behave completely dead */
         DEAD,
+    }
+
+    private void freezeUid(int uid) throws Exception {
+        mUidFrozenStateChangedCallback.onUidFrozenStateChanged(
+                new int[] { uid },
+                new int[] { UID_FROZEN_STATE_FROZEN });
+    }
+
+    private void thawUid(int uid) throws Exception {
+        mUidFrozenStateChangedCallback.onUidFrozenStateChanged(
+                new int[] { uid },
+                new int[] { UID_FROZEN_STATE_UNFROZEN });
     }
 
     private ProcessRecord makeActiveProcessRecord(String packageName) throws Exception {
@@ -659,7 +674,7 @@ public class BroadcastQueueTest {
     }
 
     private void waitForIdle() throws Exception {
-        mQueue.waitForIdle(null);
+        mQueue.waitForIdle(LOG_WRITER_INFO);
     }
 
     private void verifyScheduleReceiver(ProcessRecord app, Intent intent) throws Exception {
@@ -773,9 +788,6 @@ public class BroadcastQueueTest {
         mQueue.dumpToDropBoxLocked(TAG);
 
         BroadcastQueue.logv(TAG);
-        BroadcastQueue.logv(TAG, null);
-        BroadcastQueue.logv(TAG, new PrintWriter(new ByteArrayOutputStream()));
-
         BroadcastQueue.logw(TAG);
 
         assertNotNull(mQueue.toString());
@@ -1661,8 +1673,8 @@ public class BroadcastQueueTest {
         final ProcessRecord receiverYellowApp = makeActiveProcessRecord(PACKAGE_YELLOW);
         final ProcessRecord receiverOrangeApp = makeActiveProcessRecord(PACKAGE_ORANGE);
 
-        receiverGreenApp.setCached(true);
-        receiverBlueApp.setCached(true);
+        freezeUid(getUidForPackage(PACKAGE_GREEN));
+        freezeUid(getUidForPackage(PACKAGE_BLUE));
 
         final Intent timeTick = new Intent(Intent.ACTION_TIME_TICK);
         final BroadcastOptions opts = BroadcastOptions.makeBasic()
@@ -1706,14 +1718,12 @@ public class BroadcastQueueTest {
                 eq(UserHandle.USER_SYSTEM), anyInt(), anyInt(), any());
 
         // Shift blue to be active and confirm that deferred broadcast is delivered
-        receiverBlueApp.setCached(false);
-        mUidObserver.onUidCachedChanged(getUidForPackage(PACKAGE_BLUE), false);
+        thawUid(getUidForPackage(PACKAGE_BLUE));
         waitForIdle();
         verifyScheduleRegisteredReceiver(times(1), receiverBlueApp, timeTick);
 
         // Shift green to be active and confirm that deferred broadcast is delivered
-        receiverGreenApp.setCached(false);
-        mUidObserver.onUidCachedChanged(getUidForPackage(PACKAGE_GREEN), false);
+        thawUid(getUidForPackage(PACKAGE_GREEN));
         waitForIdle();
         verifyScheduleRegisteredReceiver(times(1), receiverGreenApp, timeTick);
     }
@@ -1891,10 +1901,10 @@ public class BroadcastQueueTest {
             assertFalse(mQueue.isBeyondBarrierLocked(afterSecond));
         }
 
-        mQueue.waitForBarrier(null);
+        mQueue.waitForBarrier(LOG_WRITER_INFO);
         assertTrue(mQueue.isBeyondBarrierLocked(afterFirst));
 
-        mQueue.waitForIdle(null);
+        mQueue.waitForIdle(LOG_WRITER_INFO);
         assertTrue(mQueue.isIdleLocked());
         assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
         assertTrue(mQueue.isBeyondBarrierLocked(afterFirst));
@@ -2046,9 +2056,9 @@ public class BroadcastQueueTest {
         final ProcessRecord receiverBlueApp = makeActiveProcessRecord(PACKAGE_BLUE);
         final ProcessRecord receiverYellowApp = makeActiveProcessRecord(PACKAGE_YELLOW);
 
-        receiverGreenApp.setCached(true);
-        receiverBlueApp.setCached(true);
-        receiverYellowApp.setCached(false);
+        freezeUid(getUidForPackage(PACKAGE_GREEN));
+        freezeUid(getUidForPackage(PACKAGE_BLUE));
+        thawUid(getUidForPackage(PACKAGE_YELLOW));
 
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
         final BroadcastOptions opts = BroadcastOptions.makeBasic()
@@ -2071,8 +2081,7 @@ public class BroadcastQueueTest {
         verifyScheduleRegisteredReceiver(times(1), receiverYellowApp, airplane);
 
         // Shift green to be active and confirm that deferred broadcast is delivered
-        receiverGreenApp.setCached(false);
-        mUidObserver.onUidCachedChanged(getUidForPackage(PACKAGE_GREEN), false);
+        thawUid(getUidForPackage(PACKAGE_GREEN));
         waitForIdle();
         verifyScheduleRegisteredReceiver(times(1), receiverGreenApp, airplane);
     }
