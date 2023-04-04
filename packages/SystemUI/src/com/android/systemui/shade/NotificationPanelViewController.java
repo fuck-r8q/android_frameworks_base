@@ -18,6 +18,7 @@ package com.android.systemui.shade;
 
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.view.MotionEvent.CLASSIFICATION_MULTI_FINGER_SWIPE;
+import static android.view.MotionEvent.CLASSIFICATION_TWO_FINGER_SWIPE;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
@@ -157,6 +158,7 @@ import com.android.systemui.media.controls.pipeline.MediaDataManager;
 import com.android.systemui.media.controls.ui.KeyguardMediaController;
 import com.android.systemui.media.controls.ui.MediaHierarchyManager;
 import com.android.systemui.model.SysUiState;
+import com.android.systemui.multishade.domain.interactor.MultiShadeInteractor;
 import com.android.systemui.navigationbar.NavigationBarController;
 import com.android.systemui.navigationbar.NavigationBarView;
 import com.android.systemui.navigationbar.NavigationModeController;
@@ -310,7 +312,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
      */
 
     public final boolean mAnimateBack;
-    private final boolean mTrackpadGestureBack;
+    private final boolean mTrackpadGestureFeaturesEnabled;
     /**
      * The minimum scale to "squish" the Shade and associated elements down to, for Back gesture
      */
@@ -391,6 +393,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private KeyguardBottomAreaView mKeyguardBottomArea;
     private boolean mExpanding;
     private boolean mSplitShadeEnabled;
+    private boolean mDualShadeEnabled;
     /** The bottom padding reserved for elements of the keyguard measuring notifications. */
     private float mKeyguardNotificationBottomPadding;
     /**
@@ -622,7 +625,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     private final KeyguardTransitionInteractor mKeyguardTransitionInteractor;
     private final KeyguardInteractor mKeyguardInteractor;
+    private final @Nullable MultiShadeInteractor mMultiShadeInteractor;
     private final CoroutineDispatcher mMainDispatcher;
+    private boolean mIsAnyMultiShadeExpanded;
     private boolean mIsOcclusionTransitionRunning = false;
     private int mDreamingToLockscreenTransitionTranslationY;
     private int mOccludedToLockscreenTransitionTranslationY;
@@ -643,6 +648,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             postToView(mHideExpandedRunnable);
         }
     };
+
+    private final Consumer<Boolean> mMultiShadeExpansionConsumer =
+            (Boolean expanded) -> mIsAnyMultiShadeExpanded = expanded;
 
     private final Consumer<TransitionStep> mDreamingToLockscreenTransition =
             (TransitionStep step) -> {
@@ -760,6 +768,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             LockscreenToOccludedTransitionViewModel lockscreenToOccludedTransitionViewModel,
             @Main CoroutineDispatcher mainDispatcher,
             KeyguardTransitionInteractor keyguardTransitionInteractor,
+            Provider<MultiShadeInteractor> multiShadeInteractorProvider,
             DumpManager dumpManager,
             KeyguardLongPressViewModel keyguardLongPressViewModel,
             KeyguardInteractor keyguardInteractor) {
@@ -859,7 +868,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mLayoutInflater = layoutInflater;
         mFeatureFlags = featureFlags;
         mAnimateBack = mFeatureFlags.isEnabled(Flags.WM_SHADE_ANIMATE_BACK_GESTURE);
-        mTrackpadGestureBack = mFeatureFlags.isEnabled(Flags.TRACKPAD_GESTURE_FEATURES);
+        mTrackpadGestureFeaturesEnabled = mFeatureFlags.isEnabled(Flags.TRACKPAD_GESTURE_FEATURES);
+        mDualShadeEnabled = mFeatureFlags.isEnabled(Flags.DUAL_SHADE);
+        mMultiShadeInteractor = mDualShadeEnabled ? multiShadeInteractorProvider.get() : null;
         mFalsingCollector = falsingCollector;
         mPowerManager = powerManager;
         mWakeUpCoordinator = coordinator;
@@ -1095,6 +1106,11 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mKeyguardUnfoldTransition.ifPresent(u -> u.setup(mView));
         mNotificationPanelUnfoldAnimationController.ifPresent(controller ->
                 controller.setup(mNotificationContainerParent));
+
+        if (mDualShadeEnabled) {
+            collectFlow(mView, mMultiShadeInteractor.isAnyShadeExpanded(),
+                    mMultiShadeExpansionConsumer, mMainDispatcher);
+        }
 
         // Dreaming->Lockscreen
         collectFlow(mView, mKeyguardTransitionInteractor.getDreamingToLockscreenTransition(),
@@ -4616,7 +4632,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             mQsController.setExpandImmediate(false);
             // Close the status bar in the next frame so we can show the end of the
             // animation.
-            mView.post(mMaybeHideExpandedRunnable);
+            if (!mIsAnyMultiShadeExpanded) {
+                mView.post(mMaybeHideExpandedRunnable);
+            }
         }
         mCurrentPanelState = state;
     }
@@ -4937,7 +4955,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             }
 
             // On expanding, single mouse click expands the panel instead of dragging.
-            if (isFullyCollapsed() && event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            if (isFullyCollapsed() && (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && !isTrackpadMotionEvent(event))) {
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     expand(true /* animate */);
                 }
@@ -5092,8 +5111,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         }
 
         private boolean isTrackpadMotionEvent(MotionEvent ev) {
-            return mTrackpadGestureBack
-                    && ev.getClassification() == CLASSIFICATION_MULTI_FINGER_SWIPE;
+            return mTrackpadGestureFeaturesEnabled && (
+                    ev.getClassification() == CLASSIFICATION_MULTI_FINGER_SWIPE
+                            || ev.getClassification() == CLASSIFICATION_TWO_FINGER_SWIPE);
         }
     }
 
