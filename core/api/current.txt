@@ -83,6 +83,8 @@ package android {
     field public static final String CLEAR_APP_CACHE = "android.permission.CLEAR_APP_CACHE";
     field public static final String CONFIGURE_WIFI_DISPLAY = "android.permission.CONFIGURE_WIFI_DISPLAY";
     field public static final String CONTROL_LOCATION_UPDATES = "android.permission.CONTROL_LOCATION_UPDATES";
+    field public static final String CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS = "android.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS";
+    field public static final String CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS = "android.permission.CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS";
     field public static final String CREDENTIAL_MANAGER_SET_ORIGIN = "android.permission.CREDENTIAL_MANAGER_SET_ORIGIN";
     field public static final String DELETE_CACHE_FILES = "android.permission.DELETE_CACHE_FILES";
     field public static final String DELETE_PACKAGES = "android.permission.DELETE_PACKAGES";
@@ -224,6 +226,8 @@ package android {
     field @Deprecated public static final String PERSISTENT_ACTIVITY = "android.permission.PERSISTENT_ACTIVITY";
     field public static final String POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS";
     field @Deprecated public static final String PROCESS_OUTGOING_CALLS = "android.permission.PROCESS_OUTGOING_CALLS";
+    field public static final String PROVIDE_OWN_AUTOFILL_SUGGESTIONS = "android.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS";
+    field public static final String PROVIDE_REMOTE_CREDENTIALS = "android.permission.PROVIDE_REMOTE_CREDENTIALS";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
     field public static final String READ_ASSISTANT_APP_SEARCH_DATA = "android.permission.READ_ASSISTANT_APP_SEARCH_DATA";
     field public static final String READ_BASIC_PHONE_STATE = "android.permission.READ_BASIC_PHONE_STATE";
@@ -554,6 +558,7 @@ package android {
     field public static final int canTakeScreenshot = 16844303; // 0x101060f
     field public static final int candidatesTextStyleSpans = 16843312; // 0x1010230
     field public static final int cantSaveState = 16844142; // 0x101056e
+    field public static final int capability;
     field @Deprecated public static final int capitalize = 16843113; // 0x1010169
     field public static final int category = 16843752; // 0x10103e8
     field public static final int centerBright = 16842956; // 0x10100cc
@@ -1446,6 +1451,7 @@ package android {
     field public static final int sessionService = 16843837; // 0x101043d
     field public static final int settingsActivity = 16843301; // 0x1010225
     field public static final int settingsSliceUri = 16844179; // 0x1010593
+    field public static final int settingsSubtitle;
     field public static final int setupActivity = 16843766; // 0x10103f6
     field public static final int shadowColor = 16843105; // 0x1010161
     field public static final int shadowDx = 16843106; // 0x1010162
@@ -2009,18 +2015,14 @@ package android {
     field public static final int system_on_primary_container_dark;
     field public static final int system_on_primary_container_light;
     field public static final int system_on_primary_dark;
-    field public static final int system_on_primary_fixed_dark;
-    field public static final int system_on_primary_fixed_light;
-    field public static final int system_on_primary_fixed_variant_dark;
-    field public static final int system_on_primary_fixed_variant_light;
+    field public static final int system_on_primary_fixed;
+    field public static final int system_on_primary_fixed_variant;
     field public static final int system_on_primary_light;
     field public static final int system_on_secondary_container_dark;
     field public static final int system_on_secondary_container_light;
     field public static final int system_on_secondary_dark;
-    field public static final int system_on_secondary_fixed_dark;
-    field public static final int system_on_secondary_fixed_light;
-    field public static final int system_on_secondary_fixed_variant_dark;
-    field public static final int system_on_secondary_fixed_variant_light;
+    field public static final int system_on_secondary_fixed;
+    field public static final int system_on_secondary_fixed_variant;
     field public static final int system_on_secondary_light;
     field public static final int system_on_surface_dark;
     field public static final int system_on_surface_light;
@@ -2029,13 +2031,13 @@ package android {
     field public static final int system_on_tertiary_container_dark;
     field public static final int system_on_tertiary_container_light;
     field public static final int system_on_tertiary_dark;
-    field public static final int system_on_tertiary_fixed_dark;
-    field public static final int system_on_tertiary_fixed_light;
-    field public static final int system_on_tertiary_fixed_variant_dark;
-    field public static final int system_on_tertiary_fixed_variant_light;
+    field public static final int system_on_tertiary_fixed;
+    field public static final int system_on_tertiary_fixed_variant;
     field public static final int system_on_tertiary_light;
     field public static final int system_outline_dark;
     field public static final int system_outline_light;
+    field public static final int system_outline_variant_dark;
+    field public static final int system_outline_variant_light;
     field public static final int system_palette_key_color_neutral_dark;
     field public static final int system_palette_key_color_neutral_light;
     field public static final int system_palette_key_color_neutral_variant_dark;
@@ -2049,18 +2051,14 @@ package android {
     field public static final int system_primary_container_dark;
     field public static final int system_primary_container_light;
     field public static final int system_primary_dark;
-    field public static final int system_primary_fixed_dark;
-    field public static final int system_primary_fixed_dim_dark;
-    field public static final int system_primary_fixed_dim_light;
-    field public static final int system_primary_fixed_light;
+    field public static final int system_primary_fixed;
+    field public static final int system_primary_fixed_dim;
     field public static final int system_primary_light;
     field public static final int system_secondary_container_dark;
     field public static final int system_secondary_container_light;
     field public static final int system_secondary_dark;
-    field public static final int system_secondary_fixed_dark;
-    field public static final int system_secondary_fixed_dim_dark;
-    field public static final int system_secondary_fixed_dim_light;
-    field public static final int system_secondary_fixed_light;
+    field public static final int system_secondary_fixed;
+    field public static final int system_secondary_fixed_dim;
     field public static final int system_secondary_light;
     field public static final int system_surface_bright_dark;
     field public static final int system_surface_bright_light;
@@ -2083,10 +2081,8 @@ package android {
     field public static final int system_tertiary_container_dark;
     field public static final int system_tertiary_container_light;
     field public static final int system_tertiary_dark;
-    field public static final int system_tertiary_fixed_dark;
-    field public static final int system_tertiary_fixed_dim_dark;
-    field public static final int system_tertiary_fixed_dim_light;
-    field public static final int system_tertiary_fixed_light;
+    field public static final int system_tertiary_fixed;
+    field public static final int system_tertiary_fixed_dim;
     field public static final int system_tertiary_light;
     field public static final int system_text_hint_inverse_dark;
     field public static final int system_text_hint_inverse_light;
@@ -5280,18 +5276,15 @@ package android.app {
 
   public class BroadcastOptions {
     method public void clearDeferralPolicy();
-    method public void clearDeliveryGroupMatchingFilter();
     method public void clearDeliveryGroupMatchingKey();
     method public void clearDeliveryGroupPolicy();
     method @NonNull public static android.app.BroadcastOptions fromBundle(@NonNull android.os.Bundle);
     method public int getDeferralPolicy();
-    method @Nullable public android.content.IntentFilter getDeliveryGroupMatchingFilter();
     method @Nullable public String getDeliveryGroupMatchingKey();
     method public int getDeliveryGroupPolicy();
     method public boolean isShareIdentityEnabled();
     method @NonNull public static android.app.BroadcastOptions makeBasic();
     method @NonNull public android.app.BroadcastOptions setDeferralPolicy(int);
-    method @NonNull public android.app.BroadcastOptions setDeliveryGroupMatchingFilter(@NonNull android.content.IntentFilter);
     method @NonNull public android.app.BroadcastOptions setDeliveryGroupMatchingKey(@NonNull String, @NonNull String);
     method @NonNull public android.app.BroadcastOptions setDeliveryGroupPolicy(int);
     method @NonNull public android.app.BroadcastOptions setShareIdentityEnabled(boolean);
@@ -6622,6 +6615,7 @@ package android.app {
     ctor public Notification.MediaStyle();
     ctor @Deprecated public Notification.MediaStyle(android.app.Notification.Builder);
     method public android.app.Notification.MediaStyle setMediaSession(android.media.session.MediaSession.Token);
+    method @NonNull @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public android.app.Notification.MediaStyle setRemotePlaybackInfo(@NonNull CharSequence, @DrawableRes int, @Nullable android.app.PendingIntent);
     method public android.app.Notification.MediaStyle setShowActionsInCompactView(int...);
   }
 
@@ -6942,6 +6936,7 @@ package android.app {
     method public void send() throws android.app.PendingIntent.CanceledException;
     method public void send(int) throws android.app.PendingIntent.CanceledException;
     method public void send(android.content.Context, int, @Nullable android.content.Intent) throws android.app.PendingIntent.CanceledException;
+    method public void send(@Nullable android.os.Bundle) throws android.app.PendingIntent.CanceledException;
     method public void send(int, @Nullable android.app.PendingIntent.OnFinished, @Nullable android.os.Handler) throws android.app.PendingIntent.CanceledException;
     method public void send(android.content.Context, int, @Nullable android.content.Intent, @Nullable android.app.PendingIntent.OnFinished, @Nullable android.os.Handler) throws android.app.PendingIntent.CanceledException;
     method public void send(android.content.Context, int, @Nullable android.content.Intent, @Nullable android.app.PendingIntent.OnFinished, @Nullable android.os.Handler, @Nullable String) throws android.app.PendingIntent.CanceledException;
@@ -7574,23 +7569,23 @@ package android.app {
     method public android.content.Intent getCropAndSetWallpaperIntent(android.net.Uri);
     method public int getDesiredMinimumHeight();
     method public int getDesiredMinimumWidth();
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable getDrawable();
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable getDrawable(int);
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable getFastDrawable();
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable getFastDrawable(int);
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable getDrawable();
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable getDrawable(int);
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable getFastDrawable();
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable getFastDrawable(int);
     method public static android.app.WallpaperManager getInstance(android.content.Context);
     method @Nullable public android.app.WallpaperColors getWallpaperColors(int);
-    method @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.os.ParcelFileDescriptor getWallpaperFile(int);
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.os.ParcelFileDescriptor getWallpaperFile(int);
     method public int getWallpaperId(int);
     method public android.app.WallpaperInfo getWallpaperInfo();
     method @Nullable public android.app.WallpaperInfo getWallpaperInfo(int);
     method public boolean hasResourceWallpaper(@RawRes int);
     method public boolean isSetWallpaperAllowed();
     method public boolean isWallpaperSupported();
-    method @Nullable public android.graphics.drawable.Drawable peekDrawable();
-    method @Nullable public android.graphics.drawable.Drawable peekDrawable(int);
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable peekFastDrawable();
-    method @Nullable @RequiresPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) public android.graphics.drawable.Drawable peekFastDrawable(int);
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekDrawable();
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekDrawable(int);
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekFastDrawable();
+    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekFastDrawable(int);
     method public void removeOnColorsChangedListener(@NonNull android.app.WallpaperManager.OnColorsChangedListener);
     method public void sendWallpaperCommand(android.os.IBinder, String, int, int, int, android.os.Bundle);
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public void setBitmap(android.graphics.Bitmap) throws java.io.IOException;
@@ -7893,6 +7888,7 @@ package android.app.admin {
     method @Deprecated public boolean isCallerApplicationRestrictionsManagingPackage();
     method public boolean isCommonCriteriaModeEnabled(@Nullable android.content.ComponentName);
     method public boolean isComplianceAcknowledgementRequired();
+    method public boolean isDeviceFinanced();
     method public boolean isDeviceIdAttestationSupported();
     method public boolean isDeviceOwnerApp(String);
     method public boolean isEphemeralUser(@NonNull android.content.ComponentName);
@@ -8048,6 +8044,7 @@ package android.app.admin {
     field public static final String ACTION_APPLICATION_DELEGATION_SCOPES_CHANGED = "android.app.action.APPLICATION_DELEGATION_SCOPES_CHANGED";
     field public static final String ACTION_CHECK_POLICY_COMPLIANCE = "android.app.action.CHECK_POLICY_COMPLIANCE";
     field public static final String ACTION_DEVICE_ADMIN_SERVICE = "android.app.action.DEVICE_ADMIN_SERVICE";
+    field public static final String ACTION_DEVICE_FINANCING_STATE_CHANGED = "android.app.admin.action.DEVICE_FINANCING_STATE_CHANGED";
     field public static final String ACTION_DEVICE_OWNER_CHANGED = "android.app.action.DEVICE_OWNER_CHANGED";
     field public static final String ACTION_DEVICE_POLICY_RESOURCE_UPDATED = "android.app.action.DEVICE_POLICY_RESOURCE_UPDATED";
     field public static final String ACTION_GET_PROVISIONING_MODE = "android.app.action.GET_PROVISIONING_MODE";
@@ -11184,7 +11181,6 @@ package android.content {
     method public final String getDataScheme(int);
     method public final android.os.PatternMatcher getDataSchemeSpecificPart(int);
     method public final String getDataType(int);
-    method @NonNull public final android.os.PersistableBundle getExtras();
     method public final int getPriority();
     method public final boolean hasAction(String);
     method public final boolean hasCategory(String);
@@ -11203,7 +11199,6 @@ package android.content {
     method public void readFromXml(org.xmlpull.v1.XmlPullParser) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
     method public final java.util.Iterator<android.os.PatternMatcher> schemeSpecificPartsIterator();
     method public final java.util.Iterator<java.lang.String> schemesIterator();
-    method public final void setExtras(@NonNull android.os.PersistableBundle);
     method public final void setPriority(int);
     method public final java.util.Iterator<java.lang.String> typesIterator();
     method public final void writeToParcel(android.os.Parcel, int);
@@ -11403,7 +11398,7 @@ package android.content {
   public class RestrictionsManager {
     method public static android.os.Bundle convertRestrictionsToBundle(java.util.List<android.content.RestrictionEntry>);
     method public android.content.Intent createLocalApprovalIntent();
-    method @Deprecated public android.os.Bundle getApplicationRestrictions();
+    method public android.os.Bundle getApplicationRestrictions();
     method @NonNull @WorkerThread public java.util.List<android.os.Bundle> getApplicationRestrictionsPerAdmin();
     method public java.util.List<android.content.RestrictionEntry> getManifestRestrictions(String);
     method public boolean hasRestrictionsProvider();
@@ -13663,14 +13658,17 @@ package android.credentials {
     method public void clearCredentialState(@NonNull android.credentials.ClearCredentialStateRequest, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.credentials.ClearCredentialStateException>);
     method public void createCredential(@NonNull android.credentials.CreateCredentialRequest, @NonNull android.app.Activity, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.credentials.CreateCredentialResponse,android.credentials.CreateCredentialException>);
     method public void getCredential(@NonNull android.credentials.GetCredentialRequest, @NonNull android.app.Activity, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
+    method public void getCredential(@NonNull android.credentials.PrepareGetCredentialResponse.PendingGetCredentialHandle, @NonNull android.app.Activity, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.credentials.GetCredentialResponse,android.credentials.GetCredentialException>);
     method public boolean isEnabledCredentialProviderService(@NonNull android.content.ComponentName);
+    method public void prepareGetCredential(@NonNull android.credentials.GetCredentialRequest, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<android.credentials.PrepareGetCredentialResponse,android.credentials.GetCredentialException>);
     method public void registerCredentialDescription(@NonNull android.credentials.RegisterCredentialDescriptionRequest);
     method public void unregisterCredentialDescription(@NonNull android.credentials.UnregisterCredentialDescriptionRequest);
   }
 
   public final class CredentialOption implements android.os.Parcelable {
-    ctor public CredentialOption(@NonNull String, @NonNull android.os.Bundle, @NonNull android.os.Bundle, boolean);
+    ctor @Deprecated public CredentialOption(@NonNull String, @NonNull android.os.Bundle, @NonNull android.os.Bundle, boolean);
     method public int describeContents();
+    method @NonNull public java.util.Set<android.content.ComponentName> getAllowedProviders();
     method @NonNull public android.os.Bundle getCandidateQueryData();
     method @NonNull public android.os.Bundle getCredentialRetrievalData();
     method @NonNull public String getType();
@@ -13678,6 +13676,14 @@ package android.credentials {
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.credentials.CredentialOption> CREATOR;
     field public static final String FLATTENED_REQUEST = "android.credentials.GetCredentialOption.FLATTENED_REQUEST_STRING";
+  }
+
+  public static final class CredentialOption.Builder {
+    ctor public CredentialOption.Builder(@NonNull String, @NonNull android.os.Bundle, @NonNull android.os.Bundle);
+    method @NonNull public android.credentials.CredentialOption.Builder addAllowedProvider(@NonNull android.content.ComponentName);
+    method @NonNull public android.credentials.CredentialOption build();
+    method @NonNull public android.credentials.CredentialOption.Builder setAllowedProviders(@NonNull java.util.Set<android.content.ComponentName>);
+    method @NonNull public android.credentials.CredentialOption.Builder setIsSystemProviderRequired(boolean);
   }
 
   public class GetCredentialException extends java.lang.Exception {
@@ -13717,6 +13723,16 @@ package android.credentials {
     method @NonNull public android.credentials.Credential getCredential();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.credentials.GetCredentialResponse> CREATOR;
+  }
+
+  public final class PrepareGetCredentialResponse {
+    method @NonNull public android.credentials.PrepareGetCredentialResponse.PendingGetCredentialHandle getPendingGetCredentialHandle();
+    method @RequiresPermission(android.Manifest.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS) public boolean hasAuthenticationResults();
+    method @RequiresPermission(android.Manifest.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS) public boolean hasCredentialResults(@NonNull String);
+    method @RequiresPermission(android.Manifest.permission.CREDENTIAL_MANAGER_QUERY_CANDIDATE_CREDENTIALS) public boolean hasRemoteResults();
+  }
+
+  public static final class PrepareGetCredentialResponse.PendingGetCredentialHandle {
   }
 
   public final class RegisterCredentialDescriptionRequest implements android.os.Parcelable {
@@ -18765,7 +18781,6 @@ package android.hardware.camera2 {
     field public static final int CONTROL_AF_TRIGGER_CANCEL = 2; // 0x2
     field public static final int CONTROL_AF_TRIGGER_IDLE = 0; // 0x0
     field public static final int CONTROL_AF_TRIGGER_START = 1; // 0x1
-    field public static final int CONTROL_AUTOFRAMING_AUTO = 2; // 0x2
     field public static final int CONTROL_AUTOFRAMING_OFF = 0; // 0x0
     field public static final int CONTROL_AUTOFRAMING_ON = 1; // 0x1
     field public static final int CONTROL_AUTOFRAMING_STATE_CONVERGED = 2; // 0x2
@@ -27346,9 +27361,13 @@ package android.media.tv {
     field public static final int TIME_SHIFT_STATUS_UNAVAILABLE = 2; // 0x2
     field public static final int TIME_SHIFT_STATUS_UNKNOWN = 0; // 0x0
     field public static final int TIME_SHIFT_STATUS_UNSUPPORTED = 1; // 0x1
+    field public static final long TV_MESSAGE_GROUP_ID_NONE = -1L; // 0xffffffffffffffffL
+    field public static final String TV_MESSAGE_KEY_GROUP_ID = "android.media.tv.TvInputManager.group_id";
     field public static final String TV_MESSAGE_KEY_RAW_DATA = "android.media.tv.TvInputManager.raw_data";
     field public static final String TV_MESSAGE_KEY_STREAM_ID = "android.media.tv.TvInputManager.stream_id";
     field public static final String TV_MESSAGE_KEY_SUBTYPE = "android.media.tv.TvInputManager.subtype";
+    field public static final String TV_MESSAGE_SUBTYPE_CC_608E = "CTA 608-E";
+    field public static final String TV_MESSAGE_SUBTYPE_WATERMARKING_A335 = "ATSC A/335";
     field public static final int TV_MESSAGE_TYPE_CLOSED_CAPTION = 2; // 0x2
     field public static final int TV_MESSAGE_TYPE_OTHER = 1000; // 0x3e8
     field public static final int TV_MESSAGE_TYPE_WATERMARK = 1; // 0x1
@@ -27478,7 +27497,7 @@ package android.media.tv {
     method public boolean onTrackballEvent(android.view.MotionEvent);
     method public abstract boolean onTune(android.net.Uri);
     method public boolean onTune(android.net.Uri, android.os.Bundle);
-    method public void onTvMessage(@NonNull String, @NonNull android.os.Bundle);
+    method public void onTvMessage(int, @NonNull android.os.Bundle);
     method public void onUnblockContent(android.media.tv.TvContentRating);
     method public void setOverlayViewEnabled(boolean);
   }
@@ -33867,7 +33886,7 @@ package android.os {
 
   public class UserManager {
     method public static android.content.Intent createUserCreationIntent(@Nullable String, @Nullable String, @Nullable String, @Nullable android.os.PersistableBundle);
-    method @Deprecated @WorkerThread public android.os.Bundle getApplicationRestrictions(String);
+    method @WorkerThread public android.os.Bundle getApplicationRestrictions(String);
     method public long getSerialNumberForUser(android.os.UserHandle);
     method @RequiresPermission(anyOf={"android.permission.MANAGE_USERS", "android.permission.CREATE_USERS"}) public int getUserCount();
     method public long getUserCreationTime(android.os.UserHandle);
@@ -40594,7 +40613,7 @@ package android.service.credentials {
     method @NonNull public android.service.credentials.BeginCreateCredentialResponse.Builder addCreateEntry(@NonNull android.service.credentials.CreateEntry);
     method @NonNull public android.service.credentials.BeginCreateCredentialResponse build();
     method @NonNull public android.service.credentials.BeginCreateCredentialResponse.Builder setCreateEntries(@NonNull java.util.List<android.service.credentials.CreateEntry>);
-    method @NonNull @RequiresPermission("android.permission.PROVIDE_REMOTE_CREDENTIALS") public android.service.credentials.BeginCreateCredentialResponse.Builder setRemoteCreateEntry(@Nullable android.service.credentials.RemoteEntry);
+    method @NonNull @RequiresPermission(android.Manifest.permission.PROVIDE_REMOTE_CREDENTIALS) public android.service.credentials.BeginCreateCredentialResponse.Builder setRemoteCreateEntry(@Nullable android.service.credentials.RemoteEntry);
   }
 
   public class BeginGetCredentialOption implements android.os.Parcelable {
@@ -40643,7 +40662,7 @@ package android.service.credentials {
     method @NonNull public android.service.credentials.BeginGetCredentialResponse.Builder setActions(@NonNull java.util.List<android.service.credentials.Action>);
     method @NonNull public android.service.credentials.BeginGetCredentialResponse.Builder setAuthenticationActions(@NonNull java.util.List<android.service.credentials.Action>);
     method @NonNull public android.service.credentials.BeginGetCredentialResponse.Builder setCredentialEntries(@NonNull java.util.List<android.service.credentials.CredentialEntry>);
-    method @NonNull @RequiresPermission("android.permission.PROVIDE_REMOTE_CREDENTIALS") public android.service.credentials.BeginGetCredentialResponse.Builder setRemoteCredentialEntry(@Nullable android.service.credentials.RemoteEntry);
+    method @NonNull @RequiresPermission(android.Manifest.permission.PROVIDE_REMOTE_CREDENTIALS) public android.service.credentials.BeginGetCredentialResponse.Builder setRemoteCredentialEntry(@Nullable android.service.credentials.RemoteEntry);
   }
 
   public final class CallingAppInfo implements android.os.Parcelable {
@@ -40702,7 +40721,7 @@ package android.service.credentials {
     method public abstract void onBeginGetCredential(@NonNull android.service.credentials.BeginGetCredentialRequest, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.service.credentials.BeginGetCredentialResponse,android.credentials.GetCredentialException>);
     method @NonNull public final android.os.IBinder onBind(@NonNull android.content.Intent);
     method public abstract void onClearCredentialState(@NonNull android.service.credentials.ClearCredentialStateRequest, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.credentials.ClearCredentialStateException>);
-    field public static final String CAPABILITY_META_DATA_KEY = "android.credentials.capabilities";
+    field @Deprecated public static final String CAPABILITY_META_DATA_KEY = "android.credentials.capabilities";
     field public static final String EXTRA_BEGIN_GET_CREDENTIAL_REQUEST = "android.service.credentials.extra.BEGIN_GET_CREDENTIAL_REQUEST";
     field public static final String EXTRA_BEGIN_GET_CREDENTIAL_RESPONSE = "android.service.credentials.extra.BEGIN_GET_CREDENTIAL_RESPONSE";
     field public static final String EXTRA_CREATE_CREDENTIAL_EXCEPTION = "android.service.credentials.extra.CREATE_CREDENTIAL_EXCEPTION";
@@ -40712,6 +40731,7 @@ package android.service.credentials {
     field public static final String EXTRA_GET_CREDENTIAL_REQUEST = "android.service.credentials.extra.GET_CREDENTIAL_REQUEST";
     field public static final String EXTRA_GET_CREDENTIAL_RESPONSE = "android.service.credentials.extra.GET_CREDENTIAL_RESPONSE";
     field public static final String SERVICE_INTERFACE = "android.service.credentials.CredentialProviderService";
+    field public static final String SERVICE_META_DATA = "android.credentials.provider";
   }
 
   public final class GetCredentialRequest implements android.os.Parcelable {
@@ -51286,10 +51306,12 @@ package android.view {
     method public long getDownTime();
     method public int getEdgeFlags();
     method public long getEventTime();
+    method public long getEventTimeNanos();
     method public int getFlags();
     method public float getHistoricalAxisValue(int, int);
     method public float getHistoricalAxisValue(int, int, int);
     method public long getHistoricalEventTime(int);
+    method public long getHistoricalEventTimeNanos(int);
     method public float getHistoricalOrientation(int);
     method public float getHistoricalOrientation(int, int);
     method public void getHistoricalPointerCoords(int, int, android.view.MotionEvent.PointerCoords);
@@ -53907,6 +53929,14 @@ package android.view {
     method public void removeViewImmediate(android.view.View);
     field public static final String PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM_OVERRIDE = "android.window.PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM_OVERRIDE";
     field public static final String PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED = "android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED";
+    field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_FORCE_ROTATION";
+    field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH";
+    field public static final String PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE = "android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE";
+    field public static final String PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE";
+    field public static final String PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE";
+    field public static final String PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS = "android.window.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS";
+    field public static final String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";
+    field public static final String PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION = "android.window.PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION";
   }
 
   public static class WindowManager.BadTokenException extends java.lang.RuntimeException {
@@ -55062,7 +55092,7 @@ package android.view.autofill {
     method public void registerCallback(@Nullable android.view.autofill.AutofillManager.AutofillCallback);
     method public void requestAutofill(@NonNull android.view.View);
     method public void requestAutofill(@NonNull android.view.View, int, @NonNull android.graphics.Rect);
-    method public void setAutofillRequestCallback(@NonNull java.util.concurrent.Executor, @NonNull android.view.autofill.AutofillRequestCallback);
+    method @RequiresPermission(android.Manifest.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS) public void setAutofillRequestCallback(@NonNull java.util.concurrent.Executor, @NonNull android.view.autofill.AutofillRequestCallback);
     method public void setUserData(@Nullable android.service.autofill.UserData);
     method public boolean showAutofillDialog(@NonNull android.view.View);
     method public boolean showAutofillDialog(@NonNull android.view.View, int);
