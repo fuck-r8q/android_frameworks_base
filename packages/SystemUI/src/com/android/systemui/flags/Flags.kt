@@ -132,6 +132,11 @@ object Flags {
     // TODO(b/254512676): Tracking Bug
     @JvmField val LOCKSCREEN_CUSTOM_CLOCKS = releasedFlag(207, "lockscreen_custom_clocks")
 
+    // TODO(b/275694445): Tracking Bug
+    @JvmField
+    val LOCKSCREEN_WITHOUT_SECURE_LOCK_WHEN_DREAMING = unreleasedFlag(208,
+        "lockscreen_without_secure_lock_when_dreaming")
+
     /**
      * Whether the clock on a wide lock screen should use the new "stepping" animation for moving
      * the digits when the clock moves.
@@ -224,7 +229,7 @@ object Flags {
     /** Whether to inflate the bouncer view on a background thread. */
     // TODO(b/273341787): Tracking Bug
     @JvmField
-    val PREVENT_BYPASS_KEYGUARD = releasedFlag(230, "prevent_bypass_keyguard")
+    val PREVENT_BYPASS_KEYGUARD = unreleasedFlag(230, "prevent_bypass_keyguard", teamfood = true)
 
     /** Whether to use a new data source for intents to run on keyguard dismissal. */
     @JvmField
@@ -610,8 +615,6 @@ object Flags {
 
     // 1700 - clipboard
     @JvmField val CLIPBOARD_REMOTE_BEHAVIOR = releasedFlag(1701, "clipboard_remote_behavior")
-    // TODO(b/267162944): Tracking bug
-    @JvmField val CLIPBOARD_MINIMIZED_LAYOUT = releasedFlag(1702, "clipboard_data_model")
 
     // 1800 - shade container
     @JvmField

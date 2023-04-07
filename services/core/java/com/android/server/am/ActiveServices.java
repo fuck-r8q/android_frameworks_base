@@ -88,6 +88,7 @@ import static com.android.internal.messages.nano.SystemMessageProto.SystemMessag
 import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__STATE__DENIED;
 import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__STATE__ENTER;
 import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT;
+import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__STATE__TIMED_OUT;
 import static com.android.internal.util.FrameworkStatsLog.SERVICE_REQUEST_EVENT_REPORTED;
 import static com.android.internal.util.FrameworkStatsLog.SERVICE_REQUEST_EVENT_REPORTED__PACKAGE_STOPPED_STATE__PACKAGE_STATE_NORMAL;
 import static com.android.internal.util.FrameworkStatsLog.SERVICE_REQUEST_EVENT_REPORTED__PACKAGE_STOPPED_STATE__PACKAGE_STATE_STOPPED;
@@ -3240,6 +3241,12 @@ public final class ActiveServices {
                 return;
             }
             Slog.e(TAG_SERVICE, "Short FGS timed out: " + sr);
+            final long now = SystemClock.uptimeMillis();
+            logFGSStateChangeLocked(sr,
+                    FOREGROUND_SERVICE_STATE_CHANGED__STATE__TIMED_OUT,
+                    now > sr.mFgsEnterTime ? (int) (now - sr.mFgsEnterTime) : 0,
+                    FGS_STOP_REASON_UNKNOWN,
+                    FGS_TYPE_POLICY_CHECK_UNKNOWN);
             try {
                 sr.app.getThread().scheduleTimeoutService(sr, sr.getShortFgsInfo().getStartId());
             } catch (RemoteException e) {
@@ -7216,47 +7223,52 @@ public final class ActiveServices {
      */
     protected boolean dumpService(FileDescriptor fd, PrintWriter pw, String name, int[] users,
             String[] args, int opti, boolean dumpAll) {
-        final ArrayList<ServiceRecord> services = new ArrayList<>();
+        try {
+            mAm.mOomAdjuster.mCachedAppOptimizer.enableFreezer(false);
+            final ArrayList<ServiceRecord> services = new ArrayList<>();
 
-        final Predicate<ServiceRecord> filter = DumpUtils.filterRecord(name);
+            final Predicate<ServiceRecord> filter = DumpUtils.filterRecord(name);
 
-        synchronized (mAm) {
-            if (users == null) {
-                users = mAm.mUserController.getUsers();
-            }
-
-            for (int user : users) {
-                ServiceMap smap = mServiceMap.get(user);
-                if (smap == null) {
-                    continue;
+            synchronized (mAm) {
+                if (users == null) {
+                    users = mAm.mUserController.getUsers();
                 }
-                ArrayMap<ComponentName, ServiceRecord> alls = smap.mServicesByInstanceName;
-                for (int i=0; i<alls.size(); i++) {
-                    ServiceRecord r1 = alls.valueAt(i);
 
-                    if (filter.test(r1)) {
-                        services.add(r1);
+                for (int user : users) {
+                    ServiceMap smap = mServiceMap.get(user);
+                    if (smap == null) {
+                        continue;
+                    }
+                    ArrayMap<ComponentName, ServiceRecord> alls = smap.mServicesByInstanceName;
+                    for (int i=0; i<alls.size(); i++) {
+                        ServiceRecord r1 = alls.valueAt(i);
+
+                        if (filter.test(r1)) {
+                            services.add(r1);
+                        }
                     }
                 }
             }
-        }
 
-        if (services.size() <= 0) {
-            return false;
-        }
-
-        // Sort by component name.
-        services.sort(Comparator.comparing(WithComponentName::getComponentName));
-
-        boolean needSep = false;
-        for (int i=0; i<services.size(); i++) {
-            if (needSep) {
-                pw.println();
+            if (services.size() <= 0) {
+                return false;
             }
-            needSep = true;
-            dumpService("", fd, pw, services.get(i), args, dumpAll);
+
+            // Sort by component name.
+            services.sort(Comparator.comparing(WithComponentName::getComponentName));
+
+            boolean needSep = false;
+            for (int i=0; i<services.size(); i++) {
+                if (needSep) {
+                    pw.println();
+                }
+                needSep = true;
+                dumpService("", fd, pw, services.get(i), args, dumpAll);
+            }
+            return true;
+        } finally {
+            mAm.mOomAdjuster.mCachedAppOptimizer.enableFreezer(true);
         }
-        return true;
     }
 
     /**
@@ -7898,7 +7910,8 @@ public final class ActiveServices {
         boolean allowWhileInUsePermissionInFgs;
         @PowerExemptionManager.ReasonCode int fgsStartReasonCode;
         if (state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__ENTER
-                || state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT) {
+                || state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__EXIT
+                || state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__TIMED_OUT) {
             allowWhileInUsePermissionInFgs = r.mAllowWhileInUsePermissionInFgsAtEntering;
             fgsStartReasonCode = r.mAllowStartForegroundAtEntering;
         } else {
@@ -7932,9 +7945,9 @@ public final class ActiveServices {
                 r.mFgsDelegation != null ? r.mFgsDelegation.mOptions.mClientUid : INVALID_UID,
                 r.mFgsDelegation != null ? r.mFgsDelegation.mOptions.mDelegationService
                         : ForegroundServiceDelegationOptions.DELEGATION_SERVICE_DEFAULT,
-                0,
-                null,
-                null);
+                0 /* api_sate */,
+                null /* api_type */,
+                null /* api_timestamp */);
 
         int event = 0;
         if (state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__ENTER) {
@@ -7943,7 +7956,9 @@ public final class ActiveServices {
             event = EventLogTags.AM_FOREGROUND_SERVICE_STOP;
         } else if (state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__DENIED) {
             event = EventLogTags.AM_FOREGROUND_SERVICE_DENIED;
-        } else {
+        } else if (state == FOREGROUND_SERVICE_STATE_CHANGED__STATE__TIMED_OUT) {
+            event = EventLogTags.AM_FOREGROUND_SERVICE_TIMED_OUT;
+        }else {
             // Unknown event.
             return;
         }
