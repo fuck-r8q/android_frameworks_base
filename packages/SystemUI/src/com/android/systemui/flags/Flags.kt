@@ -65,7 +65,7 @@ object Flags {
     val FSI_ON_DND_UPDATE = releasedFlag(259130119, "fsi_on_dnd_update")
 
     // TODO(b/254512538): Tracking Bug
-    val INSTANT_VOICE_REPLY = releasedFlag(111, "instant_voice_reply")
+    val INSTANT_VOICE_REPLY = unreleasedFlag(111, "instant_voice_reply")
 
     // TODO(b/254512425): Tracking Bug
     val NOTIFICATION_MEMORY_MONITOR_ENABLED =
@@ -620,9 +620,6 @@ object Flags {
     // TODO(b/267355521) Tracking Bug
     val SHARESHEET_SCROLLABLE_IMAGE_PREVIEW =
         releasedFlag(1504, "sharesheet_scrollable_image_preview")
-
-    // TODO(b/274137694) Tracking Bug
-    val CHOOSER_MIGRATION_ENABLED = unreleasedFlag(1505, "chooser_migration_enabled")
 
     // 1700 - clipboard
     @JvmField val CLIPBOARD_REMOTE_BEHAVIOR = releasedFlag(1701, "clipboard_remote_behavior")
