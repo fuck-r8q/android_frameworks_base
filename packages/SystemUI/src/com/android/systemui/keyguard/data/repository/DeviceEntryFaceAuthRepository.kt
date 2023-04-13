@@ -34,6 +34,7 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.AcquiredAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.AuthenticationStatus
 import com.android.systemui.keyguard.shared.model.DetectionStatus
@@ -44,6 +45,8 @@ import com.android.systemui.keyguard.shared.model.SuccessAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.log.FaceAuthenticationLogger
 import com.android.systemui.log.SessionTracker
+import com.android.systemui.log.table.TableLogBuffer
+import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.phone.KeyguardBypassController
 import com.android.systemui.user.data.repository.UserRepository
 import java.io.PrintWriter
@@ -78,7 +81,7 @@ interface DeviceEntryFaceAuthRepository {
     val isAuthenticated: Flow<Boolean>
 
     /** Whether face auth can run at this point. */
-    val canRunFaceAuth: Flow<Boolean>
+    val canRunFaceAuth: StateFlow<Boolean>
 
     /** Provide the current status of face authentication. */
     val authenticationStatus: Flow<AuthenticationStatus>
@@ -87,10 +90,10 @@ interface DeviceEntryFaceAuthRepository {
     val detectionStatus: Flow<DetectionStatus>
 
     /** Current state of whether face authentication is locked out or not. */
-    val isLockedOut: Flow<Boolean>
+    val isLockedOut: StateFlow<Boolean>
 
     /** Current state of whether face authentication is running. */
-    val isAuthRunning: Flow<Boolean>
+    val isAuthRunning: StateFlow<Boolean>
 
     /** Whether bypass is currently enabled */
     val isBypassEnabled: Flow<Boolean>
@@ -129,6 +132,9 @@ constructor(
     private val keyguardRepository: KeyguardRepository,
     private val keyguardInteractor: KeyguardInteractor,
     private val alternateBouncerInteractor: AlternateBouncerInteractor,
+    @FaceDetectTableLog private val faceDetectLog: TableLogBuffer,
+    @FaceAuthTableLog private val faceAuthLog: TableLogBuffer,
+    private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     dumpManager: DumpManager,
 ) : DeviceEntryFaceAuthRepository, Dumpable {
     private var authCancellationSignal: CancellationSignal? = null
@@ -207,6 +213,13 @@ constructor(
         observeFaceAuthGatingChecks()
         observeFaceDetectGatingChecks()
         observeFaceAuthResettingConditions()
+        listenForSchedulingWatchdog()
+    }
+
+    private fun listenForSchedulingWatchdog() {
+        keyguardTransitionInteractor.anyStateToGoneTransition
+            .onEach { faceManager?.scheduleWatchdog() }
+            .launchIn(applicationScope)
     }
 
     private fun observeFaceAuthResettingConditions() {
@@ -224,17 +237,19 @@ constructor(
         // Face detection can run only when lockscreen bypass is enabled
         // & detection is supported & biometric unlock is not allowed.
         listOf(
-                canFaceAuthOrDetectRun(),
-                logAndObserve(isBypassEnabled, "isBypassEnabled"),
+                canFaceAuthOrDetectRun(faceDetectLog),
+                logAndObserve(isBypassEnabled, "isBypassEnabled", faceDetectLog),
                 logAndObserve(
                     biometricSettingsRepository.isNonStrongBiometricAllowed.isFalse(),
-                    "nonStrongBiometricIsNotAllowed"
+                    "nonStrongBiometricIsNotAllowed",
+                    faceDetectLog
                 ),
                 // We don't want to run face detect if it's not possible to authenticate with FP
                 // from the bouncer. UDFPS is the only fp sensor type that won't support this.
                 logAndObserve(
                     and(isUdfps(), deviceEntryFingerprintAuthRepository.isRunning).isFalse(),
-                    "udfpsAuthIsNotPossibleAnymore"
+                    "udfpsAuthIsNotPossibleAnymore",
+                    faceDetectLog
                 )
             )
             .reduce(::and)
@@ -246,6 +261,7 @@ constructor(
                     cancelDetection()
                 }
             }
+            .logDiffsForTable(faceDetectLog, "", "canFaceDetectRun", false)
             .launchIn(applicationScope)
     }
 
@@ -254,26 +270,34 @@ constructor(
             it == BiometricType.UNDER_DISPLAY_FINGERPRINT
         }
 
-    private fun canFaceAuthOrDetectRun(): Flow<Boolean> {
+    private fun canFaceAuthOrDetectRun(tableLogBuffer: TableLogBuffer): Flow<Boolean> {
         return listOf(
-                logAndObserve(biometricSettingsRepository.isFaceEnrolled, "isFaceEnrolled"),
+                logAndObserve(
+                    biometricSettingsRepository.isFaceEnrolled,
+                    "isFaceEnrolled",
+                    tableLogBuffer
+                ),
                 logAndObserve(
                     biometricSettingsRepository.isFaceAuthenticationEnabled,
-                    "isFaceAuthenticationEnabled"
+                    "isFaceAuthenticationEnabled",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     userRepository.userSwitchingInProgress.isFalse(),
-                    "userSwitchingNotInProgress"
+                    "userSwitchingNotInProgress",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     keyguardRepository.isKeyguardGoingAway.isFalse(),
-                    "keyguardNotGoingAway"
+                    "keyguardNotGoingAway",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     keyguardRepository.wakefulness
                         .map { WakefulnessModel.isSleepingOrStartingToSleep(it) }
                         .isFalse(),
-                    "deviceNotSleepingOrNotStartingToSleep"
+                    "deviceNotSleepingOrNotStartingToSleep",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     combine(
@@ -282,15 +306,18 @@ constructor(
                     ) { a, b ->
                         !a || b
                     },
-                    "secureCameraNotActiveOrAltBouncerIsShowing"
+                    "secureCameraNotActiveOrAltBouncerIsShowing",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     biometricSettingsRepository.isFaceAuthSupportedInCurrentPosture,
-                    "isFaceAuthSupportedInCurrentPosture"
+                    "isFaceAuthSupportedInCurrentPosture",
+                    tableLogBuffer
                 ),
                 logAndObserve(
                     biometricSettingsRepository.isCurrentUserInLockdown.isFalse(),
-                    "userHasNotLockedDownDevice"
+                    "userHasNotLockedDownDevice",
+                    tableLogBuffer
                 )
             )
             .reduce(::and)
@@ -299,20 +326,27 @@ constructor(
     private fun observeFaceAuthGatingChecks() {
         // Face auth can run only if all of the gating conditions are true.
         listOf(
-                canFaceAuthOrDetectRun(),
-                logAndObserve(isLockedOut.isFalse(), "isNotLocked"),
+                canFaceAuthOrDetectRun(faceAuthLog),
+                logAndObserve(isLockedOut.isFalse(), "isNotInLockOutState", faceAuthLog),
                 logAndObserve(
                     deviceEntryFingerprintAuthRepository.isLockedOut.isFalse(),
-                    "fpLockedOut"
+                    "fpLockedOut",
+                    faceAuthLog
                 ),
-                logAndObserve(trustRepository.isCurrentUserTrusted.isFalse(), "currentUserTrusted"),
+                logAndObserve(
+                    trustRepository.isCurrentUserTrusted.isFalse(),
+                    "currentUserTrusted",
+                    faceAuthLog
+                ),
                 logAndObserve(
                     biometricSettingsRepository.isNonStrongBiometricAllowed,
-                    "nonStrongBiometricIsAllowed"
+                    "nonStrongBiometricIsAllowed",
+                    faceAuthLog
                 ),
                 logAndObserve(
                     userRepository.selectedUserInfo.map { it.isPrimary },
-                    "userIsPrimaryUser"
+                    "userIsPrimaryUser",
+                    faceAuthLog
                 ),
             )
             .reduce(::and)
@@ -326,6 +360,7 @@ constructor(
                     cancel()
                 }
             }
+            .logDiffsForTable(faceAuthLog, "", "canFaceAuthRun", false)
             .launchIn(applicationScope)
     }
 
@@ -340,7 +375,6 @@ constructor(
 
             override fun onAuthenticationAcquired(acquireInfo: Int) {
                 _authenticationStatus.value = AcquiredAuthenticationStatus(acquireInfo)
-                faceAuthLogger.authenticationAcquired(acquireInfo)
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
@@ -401,7 +435,7 @@ constructor(
 
     override suspend fun authenticate(uiEvent: FaceAuthUiEvent, fallbackToDetection: Boolean) {
         if (_isAuthRunning.value) {
-            faceAuthLogger.ignoredFaceAuthTrigger(uiEvent)
+            faceAuthLogger.ignoredFaceAuthTrigger(uiEvent, "face auth is currently running")
             return
         }
 
@@ -438,7 +472,16 @@ constructor(
                 )
             }
         } else if (fallbackToDetection && canRunDetection.value) {
+            faceAuthLogger.ignoredFaceAuthTrigger(
+                uiEvent,
+                "face auth gating check is false, falling back to detection."
+            )
             detect()
+        } else {
+            faceAuthLogger.ignoredFaceAuthTrigger(
+                uiEvent,
+                "face auth & detect gating check is false"
+            )
         }
     }
 
@@ -467,7 +510,7 @@ constructor(
     private val currentUserId: Int
         get() = userRepository.getSelectedUserInfo().id
 
-    fun cancelDetection() {
+    private fun cancelDetection() {
         detectCancellationSignal?.cancel()
         detectCancellationSignal = null
     }
@@ -491,10 +534,20 @@ constructor(
         _isAuthRunning.value = false
     }
 
-    private fun logAndObserve(cond: Flow<Boolean>, loggingContext: String): Flow<Boolean> {
-        return cond.distinctUntilChanged().onEach {
-            faceAuthLogger.observedConditionChanged(it, loggingContext)
-        }
+    private fun logAndObserve(
+        cond: Flow<Boolean>,
+        conditionName: String,
+        logBuffer: TableLogBuffer
+    ): Flow<Boolean> {
+        return cond
+            .distinctUntilChanged()
+            .logDiffsForTable(
+                logBuffer,
+                columnName = conditionName,
+                columnPrefix = "",
+                initialValue = false
+            )
+            .onEach { faceAuthLogger.observedConditionChanged(it, conditionName) }
     }
 
     companion object {

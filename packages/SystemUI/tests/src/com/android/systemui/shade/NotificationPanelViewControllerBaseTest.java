@@ -93,6 +93,7 @@ import com.android.systemui.keyguard.data.repository.FakeKeyguardBouncerReposito
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardBottomAreaInteractor;
+import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
@@ -302,6 +303,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected ArgumentCaptor<NotificationStackScrollLayout.OnEmptySpaceClickListener>
             mEmptySpaceClickListenerCaptor;
     @Mock protected ActivityStarter mActivityStarter;
+    @Mock protected KeyguardFaceAuthInteractor mKeyguardFaceAuthInteractor;
 
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
     protected KeyguardInteractor mKeyguardInteractor;
@@ -599,7 +601,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mDumpManager,
                 mKeyuardLongPressViewModel,
                 mKeyguardInteractor,
-                mActivityStarter);
+                mActivityStarter,
+                mKeyguardFaceAuthInteractor);
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,
@@ -665,7 +668,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mMetricsLogger,
                 mFeatureFlags,
                 mInteractionJankMonitor,
-                mShadeLog
+                mShadeLog,
+                mKeyguardFaceAuthInteractor
         );
     }
 

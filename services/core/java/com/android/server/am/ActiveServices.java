@@ -1019,6 +1019,24 @@ public final class ActiveServices {
         r.pendingStarts.add(new ServiceRecord.StartItem(r, false, r.makeNextStartId(),
                 service, neededGrants, callingUid, callingProcessName, callingPackage));
 
+        // We want to allow scheduling user-initiated jobs when the app is running a
+        // foreground service that was started in the same conditions that allows for scheduling
+        // UI jobs. More explicitly, we want to allow scheduling UI jobs when the app is running
+        // an FGS that started when the app was in the TOP or a BAL-approved state.
+        final boolean isFgs = r.isForeground || r.fgRequired;
+        if (isFgs) {
+            // As of Android UDC, the conditions required for the while-in-use permissions
+            // are the same conditions that we want, so we piggyback on that logic.
+            // Use that as a shortcut if possible to avoid having to recheck all the conditions.
+            final boolean whileInUseAllowsUiJobScheduling =
+                    ActivityManagerService.doesReasonCodeAllowSchedulingUserInitiatedJobs(
+                            r.mAllowWhileInUsePermissionInFgsReason);
+            r.updateAllowUiJobScheduling(whileInUseAllowsUiJobScheduling
+                    || mAm.canScheduleUserInitiatedJobs(callingUid, callingPid, callingPackage));
+        } else {
+            r.updateAllowUiJobScheduling(false);
+        }
+
         if (fgRequired) {
             // We are now effectively running a foreground service.
             synchronized (mAm.mProcessStats.mLock) {
@@ -7368,26 +7386,12 @@ public final class ActiveServices {
         } else {
             allowWhileInUse = REASON_UNKNOWN;
         }
-        // We want to allow scheduling user-initiated jobs when the app is running a
-        // foreground service that was started in the same conditions that allows for scheduling
-        // UI jobs. More explicitly, we want to allow scheduling UI jobs when the app is running
-        // an FGS that started when the app was in the TOP or a BAL-approved state.
-        // As of Android UDC, the conditions required for the while-in-use permissions
-        // are the same conditions that we want, so we piggyback on that logic.
-        // We use that as a shortcut if possible so we don't have to recheck all the conditions.
-        final boolean isFgs = r.isForeground || r.fgRequired;
-        if (isFgs) {
-            r.updateAllowUiJobScheduling(ActivityManagerService
-                    .doesReasonCodeAllowSchedulingUserInitiatedJobs(allowWhileInUse)
-                    || mAm.canScheduleUserInitiatedJobs(
-                            callingUid, callingPid, callingPackage, true));
-        } else {
-            r.updateAllowUiJobScheduling(false);
-        }
+        r.mAllowWhileInUsePermissionInFgsReason = allowWhileInUse;
     }
 
     void resetFgsRestrictionLocked(ServiceRecord r) {
         r.mAllowWhileInUsePermissionInFgs = false;
+        r.mAllowWhileInUsePermissionInFgsReason = REASON_DENIED;
         r.mAllowStartForeground = REASON_DENIED;
         r.mInfoAllowStartForeground = null;
         r.mInfoTempFgsAllowListReason = null;
@@ -7431,14 +7435,17 @@ public final class ActiveServices {
 
         final int uidState = mAm.getUidStateLocked(callingUid);
         if (ret == REASON_DENIED) {
-            // Is the calling UID at PROCESS_STATE_TOP or above?
+            // Allow FGS while-in-use if the caller's process state is PROCESS_STATE_PERSISTENT,
+            // PROCESS_STATE_PERSISTENT_UI or PROCESS_STATE_TOP.
             if (uidState <= PROCESS_STATE_TOP) {
                 ret = getReasonCodeFromProcState(uidState);
             }
         }
 
         if (ret == REASON_DENIED) {
-            // Does the calling UID have any visible activity?
+            // Allow FGS while-in-use if the caller has visible activity.
+            // Here we directly check ActivityTaskManagerService, instead of checking
+            // PendingStartActivityUids in ActivityManagerService, which gives the same result.
             final boolean isCallingUidVisible = mAm.mAtmInternal.isUidForeground(callingUid);
             if (isCallingUidVisible) {
                 ret = REASON_UID_VISIBLE;
@@ -7446,7 +7453,8 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
-            // Is the allow activity background start flag on?
+            // Allow FGS while-in-use if the background activity start flag is on. Because
+            // activity start can lead to FGS start in TOP state and obtain while-in-use.
             if (backgroundStartPrivileges.allowsBackgroundActivityStarts()) {
                 ret = REASON_START_ACTIVITY_FLAG;
             }
@@ -7455,6 +7463,7 @@ public final class ActiveServices {
         if (ret == REASON_DENIED) {
             boolean isCallerSystem = false;
             final int callingAppId = UserHandle.getAppId(callingUid);
+            // Allow FGS while-in-use for a list of special UIDs.
             switch (callingAppId) {
                 case ROOT_UID:
                 case SYSTEM_UID:
@@ -7473,6 +7482,10 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
+            // Allow FGS while-in-use if the WindowManager allows background activity start.
+            // This is mainly to get the 10 seconds grace period if any activity in the caller has
+            // either started or finished very recently. The binding flag
+            // BIND_ALLOW_BACKGROUND_ACTIVITY_STARTS is also allowed by the check here.
             final Integer allowedType = mAm.mProcessList.searchEachLruProcessesLOSP(false, pr -> {
                 if (pr.uid == callingUid) {
                     if (pr.getWindowProcessController().areBackgroundFgsStartsAllowed()) {
@@ -7487,6 +7500,12 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
+            // Allow FGS while-in-use if the caller UID is in ActivityManagerService's
+            // mFgsWhileInUseTempAllowList. This is a temp allowlist to allow FGS while-in-use. It
+            // is used when MediaSessionService's bluetooth button or play/resume/stop commands are
+            // issued. The typical temp allowlist duration is 10 seconds.
+            // This temp allowlist mechanism can also be called by other system_server internal
+            // components such as Telephone/VOIP if they want to start a FGS and get while-in-use.
             if (mAm.mInternal.isTempAllowlistedForFgsWhileInUse(callingUid)) {
                 return REASON_TEMP_ALLOWED_WHILE_IN_USE;
             }
@@ -7494,6 +7513,8 @@ public final class ActiveServices {
 
         if (ret == REASON_DENIED) {
             if (targetProcess != null) {
+                // Allow FGS while-in-use if the caller of the instrumentation has
+                // START_ACTIVITIES_FROM_BACKGROUND permission.
                 ActiveInstrumentation instr = targetProcess.getActiveInstrumentation();
                 if (instr != null && instr.mHasBackgroundActivityStartsPermission) {
                     ret = REASON_INSTR_BACKGROUND_ACTIVITY_PERMISSION;
@@ -7502,6 +7523,9 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
+            // Allow FGS while-in-use if the caller has START_ACTIVITIES_FROM_BACKGROUND
+            // permission, because starting an activity can lead to starting FGS from the TOP state
+            // and obtain while-in-use.
             if (mAm.checkPermission(START_ACTIVITIES_FROM_BACKGROUND, callingPid, callingUid)
                     == PERMISSION_GRANTED) {
                 ret = REASON_BACKGROUND_ACTIVITY_PERMISSION;
@@ -7509,6 +7533,8 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
+            // Allow FGS while-in-use if the caller is in the while-in-use allowlist. Right now
+            // AttentionService and SystemCaptionsService packageName are in this allowlist.
             if (verifyPackage(callingPackage, callingUid)) {
                 final boolean isAllowedPackage =
                         mAllowListWhileInUsePermissionInFgs.contains(callingPackage);
@@ -7523,7 +7549,7 @@ public final class ActiveServices {
         }
 
         if (ret == REASON_DENIED) {
-            // Is the calling UID a device owner app?
+            // Allow FGS while-in-use if the caller is the device owner.
             final boolean isDeviceOwner = mAm.mInternal.isDeviceOwner(callingUid);
             if (isDeviceOwner) {
                 ret = REASON_DEVICE_OWNER;

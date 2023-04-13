@@ -14,8 +14,12 @@
  * limitations under the License.
  */
 
-package com.android.internal.expresslog;
+package com.android.systemui.keyguard.data.repository
 
-final class Utils {
-    static native long hashString(String stringToHash);
-}
+import javax.inject.Qualifier
+
+/** Face detect logs in table format. */
+@Qualifier
+@MustBeDocumented
+@Retention(AnnotationRetention.RUNTIME)
+annotation class FaceDetectTableLog

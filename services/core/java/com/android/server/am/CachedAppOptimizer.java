@@ -342,7 +342,7 @@ public final class CachedAppOptimizer {
 
     private final ActivityManagerGlobalLock mProcLock;
 
-    private final Object mFreezerLock = new Object();
+    public final Object mFreezerLock = new Object();
 
     private final OnPropertiesChangedListener mOnFlagsChangedListener =
             new OnPropertiesChangedListener() {
@@ -763,8 +763,9 @@ public final class CachedAppOptimizer {
                 pw.println("  Apps frozen: " + size);
                 for (int i = 0; i < size; i++) {
                     ProcessRecord app = mFrozenProcesses.valueAt(i);
-                    pw.println("    " + app.mOptRecord.getFreezeUnfreezeTime()
-                            + ": " + app.getPid() + " " + app.processName);
+                    pw.println("    " + app.mOptRecord.getFreezeUnfreezeTime() + ": " + app.getPid()
+                            + " " + app.processName
+                            + (app.mOptRecord.isFreezeSticky() ? " (sticky)" : ""));
                 }
 
                 if (!mPendingCompactionProcesses.isEmpty()) {
@@ -1283,9 +1284,23 @@ public final class CachedAppOptimizer {
 
     @GuardedBy({"mAm", "mProcLock"})
     void freezeAppAsyncLSP(ProcessRecord app) {
+        freezeAppAsyncInternalLSP(app, mFreezerDebounceTimeout, false);
+    }
+
+    @GuardedBy({"mAm", "mProcLock"})
+    void freezeAppAsyncInternalLSP(ProcessRecord app, long delayMillis, boolean force) {
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
         if (opt.isPendingFreeze()) {
             // Skip redundant DO_FREEZE message
+            return;
+        }
+
+        if (opt.isFreezeSticky() && !force) {
+            if (DEBUG_FREEZER) {
+                Slog.d(TAG_AM,
+                        "Skip freezing because unfrozen state is sticky pid=" + app.getPid() + " "
+                                + app.processName);
+            }
             return;
         }
 
@@ -1301,9 +1316,8 @@ public final class CachedAppOptimizer {
             }
         }
         mFreezeHandler.sendMessageDelayed(
-                mFreezeHandler.obtainMessage(
-                    SET_FROZEN_PROCESS_MSG, DO_FREEZE, 0, app),
-                mFreezerDebounceTimeout);
+                mFreezeHandler.obtainMessage(SET_FROZEN_PROCESS_MSG, DO_FREEZE, 0, app),
+                delayMillis);
         opt.setPendingFreeze(true);
         if (DEBUG_FREEZER) {
             Slog.d(TAG_AM, "Async freezing " + app.getPid() + " " + app.processName);
@@ -1311,9 +1325,19 @@ public final class CachedAppOptimizer {
     }
 
     @GuardedBy({"mAm", "mProcLock", "mFreezerLock"})
-    void unfreezeAppInternalLSP(ProcessRecord app, @UnfreezeReason int reason) {
+    void unfreezeAppInternalLSP(ProcessRecord app, @UnfreezeReason int reason, boolean force) {
         final int pid = app.getPid();
         final ProcessCachedOptimizerRecord opt = app.mOptRecord;
+        boolean sticky = opt.isFreezeSticky();
+        if (sticky && !force) {
+            // Sticky freezes will not change their state unless forced out of it.
+            if (DEBUG_FREEZER) {
+                Slog.d(TAG_AM,
+                        "Skip unfreezing because frozen state is sticky pid=" + pid + " "
+                                + app.processName);
+            }
+            return;
+        }
         if (opt.isPendingFreeze()) {
             // Remove pending DO_FREEZE message
             mFreezeHandler.removeMessages(SET_FROZEN_PROCESS_MSG, app);
@@ -1326,8 +1350,7 @@ public final class CachedAppOptimizer {
         UidRecord uidRec = app.getUidRecord();
         if (uidRec != null && uidRec.isFrozen()) {
             uidRec.setFrozen(false);
-            mFreezeHandler.removeMessages(UID_FROZEN_STATE_CHANGED_MSG, app);
-            reportOneUidFrozenStateChanged(app.uid, false);
+            postUidFrozenMessage(uidRec.getUid(), false);
         }
 
         opt.setFreezerOverride(false);
@@ -1407,7 +1430,7 @@ public final class CachedAppOptimizer {
     @GuardedBy({"mAm", "mProcLock"})
     void unfreezeAppLSP(ProcessRecord app, @UnfreezeReason int reason) {
         synchronized (mFreezerLock) {
-            unfreezeAppInternalLSP(app, reason);
+            unfreezeAppInternalLSP(app, reason, false);
         }
     }
 
@@ -1468,8 +1491,7 @@ public final class CachedAppOptimizer {
             UidRecord uidRec = app.getUidRecord();
             if (uidRec != null && uidRec.isFrozen()) {
                 uidRec.setFrozen(false);
-                mFreezeHandler.removeMessages(UID_FROZEN_STATE_CHANGED_MSG, app);
-                reportOneUidFrozenStateChanged(app.uid, false);
+                postUidFrozenMessage(uidRec.getUid(), false);
             }
 
             mFrozenProcesses.delete(app.getPid());
@@ -1998,6 +2020,15 @@ public final class CachedAppOptimizer {
         mAm.reportUidFrozenStateChanged(uids, frozenStates);
     }
 
+    private void postUidFrozenMessage(int uid, boolean frozen) {
+        final Integer uidObj = Integer.valueOf(uid);
+        mFreezeHandler.removeEqualMessages(UID_FROZEN_STATE_CHANGED_MSG, uidObj);
+
+        final int op = frozen ? 1 : 0;
+        mFreezeHandler.sendMessage(mFreezeHandler.obtainMessage(UID_FROZEN_STATE_CHANGED_MSG, op,
+                0, uidObj));
+    }
+
     private final class FreezeHandler extends Handler implements
             ProcLocksReader.ProcLocksReaderCallback {
         private FreezeHandler() {
@@ -2028,7 +2059,9 @@ public final class CachedAppOptimizer {
                     reportUnfreeze(pid, frozenDuration, processName, reason);
                     break;
                 case UID_FROZEN_STATE_CHANGED_MSG:
-                    reportOneUidFrozenStateChanged(((ProcessRecord) msg.obj).uid, true);
+                    final boolean frozen = (msg.arg1 == 1);
+                    final int uid = (int) msg.obj;
+                    reportOneUidFrozenStateChanged(uid, frozen);
                     break;
                 case DEADLOCK_WATCHDOG_MSG:
                     try {
@@ -2071,15 +2104,6 @@ public final class CachedAppOptimizer {
 
             synchronized (mProcLock) {
                 pid = proc.getPid();
-                if (proc.mState.getCurAdj() < ProcessList.CACHED_APP_MIN_ADJ
-                        || opt.shouldNotFreeze()) {
-                    if (DEBUG_FREEZER) {
-                        Slog.d(TAG_AM, "Skipping freeze for process " + pid
-                                + " " + name + " curAdj = " + proc.mState.getCurAdj()
-                                + ", shouldNotFreeze = " + opt.shouldNotFreeze());
-                    }
-                    return;
-                }
 
                 if (mFreezerOverride) {
                     opt.setFreezerOverride(true);
@@ -2139,8 +2163,8 @@ public final class CachedAppOptimizer {
                 final UidRecord uidRec = proc.getUidRecord();
                 if (frozen && uidRec != null && uidRec.areAllProcessesFrozen()) {
                     uidRec.setFrozen(true);
-                    mFreezeHandler.sendMessage(mFreezeHandler.obtainMessage(
-                            UID_FROZEN_STATE_CHANGED_MSG, proc));
+
+                    postUidFrozenMessage(uidRec.getUid(), true);
                 }
             }
 

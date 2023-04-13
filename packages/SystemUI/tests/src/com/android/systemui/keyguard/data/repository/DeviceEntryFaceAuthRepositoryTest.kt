@@ -44,16 +44,20 @@ import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags.FACE_AUTH_REFACTOR
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.AuthenticationStatus
 import com.android.systemui.keyguard.shared.model.DetectionStatus
 import com.android.systemui.keyguard.shared.model.ErrorAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.HelpAuthenticationStatus
+import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.SuccessAuthenticationStatus
+import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.keyguard.shared.model.WakeSleepReason
 import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.log.FaceAuthenticationLogger
 import com.android.systemui.log.SessionTracker
+import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.statusbar.phone.FakeKeyguardStateController
 import com.android.systemui.statusbar.phone.KeyguardBypassController
@@ -61,8 +65,11 @@ import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.util.mockito.KotlinArgumentCaptor
 import com.android.systemui.util.mockito.captureMany
 import com.android.systemui.util.mockito.whenever
+import com.android.systemui.util.time.FakeSystemClock
 import com.android.systemui.util.time.SystemClock
 import com.google.common.truth.Truth.assertThat
+import java.io.PrintWriter
+import java.io.StringWriter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -88,8 +95,6 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.MockitoAnnotations
-import java.io.PrintWriter
-import java.io.StringWriter
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -117,6 +122,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
     private lateinit var faceLockoutResetCallback: ArgumentCaptor<FaceManager.LockoutResetCallback>
     private lateinit var testDispatcher: TestDispatcher
 
+    private lateinit var keyguardTransitionRepository: FakeKeyguardTransitionRepository
     private lateinit var testScope: TestScope
     private lateinit var fakeUserRepository: FakeUserRepository
     private lateinit var authStatus: FlowValue<AuthenticationStatus?>
@@ -183,8 +189,14 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
     private fun createDeviceEntryFaceAuthRepositoryImpl(
         fmOverride: FaceManager? = faceManager,
         bypassControllerOverride: KeyguardBypassController? = bypassController
-    ) =
-        DeviceEntryFaceAuthRepositoryImpl(
+    ): DeviceEntryFaceAuthRepositoryImpl {
+        val systemClock = FakeSystemClock()
+        val faceAuthBuffer = TableLogBuffer(10, "face auth", systemClock)
+        val faceDetectBuffer = TableLogBuffer(10, "face detect", systemClock)
+        keyguardTransitionRepository = FakeKeyguardTransitionRepository()
+        val keyguardTransitionInteractor =
+            KeyguardTransitionInteractor(keyguardTransitionRepository)
+        return DeviceEntryFaceAuthRepositoryImpl(
             mContext,
             fmOverride,
             fakeUserRepository,
@@ -200,8 +212,12 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             keyguardRepository,
             keyguardInteractor,
             alternateBouncerInteractor,
+            faceDetectBuffer,
+            faceAuthBuffer,
+            keyguardTransitionInteractor,
             dumpManager,
         )
+    }
 
     @Test
     fun faceAuthRunsAndProvidesAuthStatusUpdates() =
@@ -762,6 +778,50 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
                 )
                 deviceEntryFingerprintAuthRepository.setIsRunning(true)
             }
+        }
+
+    @Test
+    fun schedulesFaceManagerWatchdogWhenKeyguardIsGoneFromDozing() =
+        testScope.runTest {
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(from = KeyguardState.DOZING, to = KeyguardState.GONE)
+            )
+
+            runCurrent()
+            verify(faceManager).scheduleWatchdog()
+        }
+
+    @Test
+    fun schedulesFaceManagerWatchdogWhenKeyguardIsGoneFromAod() =
+        testScope.runTest {
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(from = KeyguardState.AOD, to = KeyguardState.GONE)
+            )
+
+            runCurrent()
+            verify(faceManager).scheduleWatchdog()
+        }
+
+    @Test
+    fun schedulesFaceManagerWatchdogWhenKeyguardIsGoneFromLockscreen() =
+        testScope.runTest {
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(from = KeyguardState.LOCKSCREEN, to = KeyguardState.GONE)
+            )
+
+            runCurrent()
+            verify(faceManager).scheduleWatchdog()
+        }
+
+    @Test
+    fun schedulesFaceManagerWatchdogWhenKeyguardIsGoneFromBouncer() =
+        testScope.runTest {
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(from = KeyguardState.PRIMARY_BOUNCER, to = KeyguardState.GONE)
+            )
+
+            runCurrent()
+            verify(faceManager).scheduleWatchdog()
         }
 
     private suspend fun TestScope.testGatingCheckForFaceAuth(gatingCheckModifier: () -> Unit) {
