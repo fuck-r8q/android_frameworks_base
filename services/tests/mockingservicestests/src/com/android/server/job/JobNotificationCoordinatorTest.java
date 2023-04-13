@@ -149,8 +149,7 @@ public class JobNotificationCoordinatorTest {
                 .enqueueNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(notification), eq(UserHandle.getUserId(uid)));
 
-        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_UNDEFINED,
-                jsc.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_UNDEFINED);
         verify(mNotificationManagerInternal, never())
                 .cancelNotification(anyString(), anyString(), anyInt(), anyInt(), any(),
                         anyInt(), anyInt());
@@ -171,8 +170,7 @@ public class JobNotificationCoordinatorTest {
                 .enqueueNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(notification), eq(UserHandle.getUserId(uid)));
 
-        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_UNDEFINED,
-                jsc.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_UNDEFINED);
         verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));
@@ -294,8 +292,7 @@ public class JobNotificationCoordinatorTest {
                         eq(notificationId2), eq(notification2), eq(UserHandle.getUserId(uid)));
 
         // Remove the first job. Only the first notification should be removed.
-        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED,
-                jsc1.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId1), eq(UserHandle.getUserId(uid)));
@@ -303,8 +300,7 @@ public class JobNotificationCoordinatorTest {
                 .cancelNotification(anyString(), anyString(), anyInt(), anyInt(), any(),
                         eq(notificationId2), anyInt());
 
-        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED,
-                jsc2.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId2), eq(UserHandle.getUserId(uid)));
@@ -339,14 +335,12 @@ public class JobNotificationCoordinatorTest {
                         eq(notificationId), eq(notification2), eq(UserHandle.getUserId(uid)));
 
         // Remove the first job. The notification shouldn't be touched because of the 2nd job.
-        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED,
-                jsc1.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal, never())
                 .cancelNotification(anyString(), anyString(), anyInt(), anyInt(), any(),
                         anyInt(), anyInt());
 
-        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED,
-                jsc2.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));
@@ -382,8 +376,7 @@ public class JobNotificationCoordinatorTest {
                         eq(notificationId), eq(notification2), eq(UserHandle.getUserId(uid2)));
 
         // Remove the first job. Only the first notification should be removed.
-        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED,
-                jsc1.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid1), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid1)));
@@ -391,8 +384,7 @@ public class JobNotificationCoordinatorTest {
                 .cancelNotification(anyString(), anyString(), eq(uid2), anyInt(), any(),
                         anyInt(), anyInt());
 
-        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED,
-                jsc2.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid2), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid2)));
@@ -429,8 +421,7 @@ public class JobNotificationCoordinatorTest {
                         eq(notificationId), eq(notification2), eq(UserHandle.getUserId(uid)));
 
         // Remove the first job. Only the first notification should be removed.
-        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED,
-                jsc1.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(pkg1), eq(pkg1), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));
@@ -438,8 +429,7 @@ public class JobNotificationCoordinatorTest {
                 .cancelNotification(anyString(), anyString(), eq(uid), anyInt(), any(),
                         anyInt(), anyInt());
 
-        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED,
-                jsc2.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_UNDEFINED);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(pkg2), eq(pkg2), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));
@@ -460,8 +450,7 @@ public class JobNotificationCoordinatorTest {
                 .enqueueNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(notification), eq(UserHandle.getUserId(uid)));
 
-        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_USER,
-                jsc.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc, JobParameters.STOP_REASON_USER);
         verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));
@@ -496,14 +485,12 @@ public class JobNotificationCoordinatorTest {
                         eq(notificationId), eq(notification2), eq(UserHandle.getUserId(uid)));
 
         // Remove the first job. The notification shouldn't be touched because of the 2nd job.
-        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_USER,
-                jsc1.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc1, JobParameters.STOP_REASON_USER);
         inOrder.verify(mNotificationManagerInternal, never())
                 .cancelNotification(anyString(), anyString(), anyInt(), anyInt(), any(),
                         anyInt(), anyInt());
 
-        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_USER,
-                jsc2.getRunningJobLocked());
+        coordinator.removeNotificationAssociation(jsc2, JobParameters.STOP_REASON_USER);
         inOrder.verify(mNotificationManagerInternal)
                 .cancelNotification(eq(TEST_PACKAGE), eq(TEST_PACKAGE), eq(uid), eq(pid), any(),
                         eq(notificationId), eq(UserHandle.getUserId(uid)));

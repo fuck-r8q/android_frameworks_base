@@ -667,15 +667,15 @@ public final class PowerManagerService extends SystemService
     // but the DreamService has not yet been told to start (it's an async process).
     private boolean mDozeStartInProgress;
 
-    // Whether to keep dreaming when the device is unplugging.
-    private boolean mKeepDreamingWhenUnplugging;
+    // Whether to keep dreaming when the device is undocked.
+    private boolean mKeepDreamingWhenUndocked;
 
     private final class DreamManagerStateListener implements
             DreamManagerInternal.DreamManagerStateListener {
         @Override
-        public void onKeepDreamingWhenUnpluggingChanged(boolean keepDreaming) {
+        public void onKeepDreamingWhenUndockedChanged(boolean keepDreaming) {
             synchronized (mLock) {
-                mKeepDreamingWhenUnplugging = keepDreaming;
+                mKeepDreamingWhenUndocked = keepDreaming;
             }
         }
     }
@@ -2504,12 +2504,14 @@ public final class PowerManagerService extends SystemService
             return false;
         }
 
-        // Don't wake when unplugging while dreaming if configured not to.
-        if (mKeepDreamingWhenUnplugging
+        // Don't wake when undocking while dreaming if configured not to.
+        if (mKeepDreamingWhenUndocked
                 && getGlobalWakefulnessLocked() == WAKEFULNESS_DREAMING
-                && wasPowered && !mIsPowered) {
+                && wasPowered && !mIsPowered
+                && oldPlugType == BatteryManager.BATTERY_PLUGGED_DOCK) {
             return false;
         }
+
         // Don't wake when undocked from wireless charger.
         // See WirelessChargerDetector for justification.
         if (wasPowered && !mIsPowered
@@ -4475,7 +4477,7 @@ public final class PowerManagerService extends SystemService
                     + mWakeUpWhenPluggedOrUnpluggedInTheaterModeConfig);
             pw.println("  mTheaterModeEnabled="
                     + mTheaterModeEnabled);
-            pw.println("  mKeepDreamingWhenUnplugging=" + mKeepDreamingWhenUnplugging);
+            pw.println("  mKeepDreamingWhenUndocked=" + mKeepDreamingWhenUndocked);
             pw.println("  mSuspendWhenScreenOffDueToProximityConfig="
                     + mSuspendWhenScreenOffDueToProximityConfig);
             pw.println("  mDreamsSupportedConfig=" + mDreamsSupportedConfig);

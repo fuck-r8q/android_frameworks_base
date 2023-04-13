@@ -16,7 +16,6 @@
 
 package com.android.systemui.recents;
 
-import static android.content.Intent.ACTION_PACKAGE_ADDED;
 import static android.content.Intent.EXTRA_CHANGED_COMPONENT_NAME_LIST;
 import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 import static android.view.MotionEvent.ACTION_CANCEL;
@@ -49,7 +48,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.content.pm.ResolveInfo;
 import android.graphics.Region;
 import android.hardware.input.InputManager;
 import android.hardware.input.InputManagerGlobal;
@@ -116,7 +114,6 @@ import dagger.Lazy;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
@@ -396,29 +393,20 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private final BroadcastReceiver mLauncherStateChangedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // If adding, bind immediately
-            if (Objects.equals(intent.getAction(), ACTION_PACKAGE_ADDED)) {
-                updateEnabledAndBinding();
-                return;
-            }
-
-            // ACTION_PACKAGE_CHANGED
-            String[] compsList = intent.getStringArrayExtra(EXTRA_CHANGED_COMPONENT_NAME_LIST);
-            if (compsList == null) {
-                return;
-            }
-
-            // Only rebind for TouchInteractionService component from launcher
-            ResolveInfo ri = context.getPackageManager()
-                    .resolveService(new Intent(ACTION_QUICKSTEP), 0);
-            String interestingComponent = ri.serviceInfo.name;
-            for (String component : compsList) {
-                if (interestingComponent.equals(component)) {
-                    Log.i(TAG_OPS, "Rebinding for component [" + component + "] change");
-                    updateEnabledAndBinding();
-                    return;
+            StringBuilder extraComponentList = new StringBuilder(" components: ");
+            if (intent.hasExtra(EXTRA_CHANGED_COMPONENT_NAME_LIST)) {
+                String[] comps = intent.getStringArrayExtra(EXTRA_CHANGED_COMPONENT_NAME_LIST);
+                if (comps != null) {
+                    for (String c : comps) {
+                        extraComponentList.append(c).append(", ");
+                    }
                 }
             }
+            Log.d(TAG_OPS, "launcherStateChanged intent: " + intent + extraComponentList);
+            updateEnabledState();
+
+            // Reconnect immediately, instead of waiting for resume to arrive.
+            startConnectionToCurrentUser();
         }
     };
 
@@ -633,7 +621,8 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         screenLifecycle.addObserver(mScreenLifecycleObserver);
         wakefulnessLifecycle.addObserver(mWakefulnessLifecycleObserver);
         // Connect to the service
-        updateEnabledAndBinding();
+        updateEnabledState();
+        startConnectionToCurrentUser();
 
         // Listen for assistant changes
         assistUtils.registerVoiceInteractionSessionListener(mVoiceInteractionSessionListener);
@@ -655,20 +644,11 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private void dispatchNavigationBarSurface() {
         try {
             if (mOverviewProxy != null) {
-                // Catch all for cases where the surface is no longer valid
-                if (mNavigationBarSurface != null && !mNavigationBarSurface.isValid()) {
-                    mNavigationBarSurface = null;
-                }
                 mOverviewProxy.onNavigationBarSurface(mNavigationBarSurface);
             }
         } catch (RemoteException e) {
             Log.e(TAG_OPS, "Failed to notify back action", e);
         }
-    }
-
-    private void updateEnabledAndBinding() {
-        updateEnabledState();
-        startConnectionToCurrentUser();
     }
 
     private void updateSystemUiStateFlags() {

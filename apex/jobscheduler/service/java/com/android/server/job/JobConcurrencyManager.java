@@ -1925,14 +1925,16 @@ class JobConcurrencyManager {
         return null;
     }
 
+    @GuardedBy("mLock")
     boolean isNotificationAssociatedWithAnyUserInitiatedJobs(int notificationId, int userId,
-            @NonNull String packageName) {
+            String packageName) {
         return mNotificationCoordinator.isNotificationAssociatedWithAnyUserInitiatedJobs(
                 notificationId, userId, packageName);
     }
 
-    boolean isNotificationChannelAssociatedWithAnyUserInitiatedJobs(
-            @NonNull String notificationChannel, int userId, @NonNull String packageName) {
+    @GuardedBy("mLock")
+    boolean isNotificationChannelAssociatedWithAnyUserInitiatedJobs(String notificationChannel,
+            int userId, String packageName) {
         return mNotificationCoordinator.isNotificationChannelAssociatedWithAnyUserInitiatedJobs(
                 notificationChannel, userId, packageName);
     }

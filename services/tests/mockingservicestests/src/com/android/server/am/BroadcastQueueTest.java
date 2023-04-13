@@ -77,7 +77,6 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.PowerExemptionManager;
 import android.os.SystemClock;
-import android.os.TestLooperManager;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.Log;
@@ -147,7 +146,6 @@ public class BroadcastQueueTest {
 
     private Context mContext;
     private HandlerThread mHandlerThread;
-    private TestLooperManager mLooper;
     private AtomicInteger mNextPid;
 
     @Mock
@@ -208,11 +206,6 @@ public class BroadcastQueueTest {
 
         mHandlerThread = new HandlerThread(TAG);
         mHandlerThread.start();
-
-        // Pause all event processing until a test chooses to resume
-        mLooper = Objects.requireNonNull(InstrumentationRegistry.getInstrumentation()
-                .acquireLooperManager(mHandlerThread.getLooper()));
-
         mNextPid = new AtomicInteger(100);
 
         LocalServices.removeServiceForTest(DropBoxManagerInternal.class);
@@ -364,6 +357,25 @@ public class BroadcastQueueTest {
         @Override
         public ProcessList getProcessList(ActivityManagerService service) {
             return mProcessList;
+        }
+    }
+
+    /**
+     * Helper that leverages try-with-resources to pause dispatch of
+     * {@link #mHandlerThread} until released.
+     */
+    static class SyncBarrier implements AutoCloseable {
+        private final int mToken;
+        private HandlerThread mThread;
+
+        SyncBarrier(HandlerThread thread) {
+            mThread = thread;
+            mToken = mThread.getLooper().getQueue().postSyncBarrier();
+        }
+
+        @Override
+        public void close() throws Exception {
+            mThread.getLooper().getQueue().removeSyncBarrier(mToken);
         }
     }
 
@@ -659,15 +671,8 @@ public class BroadcastQueueTest {
         }
     }
 
-    /**
-     * Un-pause our handler to process pending events, wait for our queue to go
-     * idle, and then re-pause the handler.
-     */
     private void waitForIdle() throws Exception {
-        mLooper.release();
         mQueue.waitForIdle(LOG_WRITER_INFO);
-        mLooper = Objects.requireNonNull(InstrumentationRegistry.getInstrumentation()
-                .acquireLooperManager(mHandlerThread.getLooper()));
     }
 
     private void verifyScheduleReceiver(ProcessRecord app, Intent intent) throws Exception {
@@ -1151,21 +1156,23 @@ public class BroadcastQueueTest {
         final ProcessRecord receiverApp = makeActiveProcessRecord(PACKAGE_GREEN);
 
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, new ArrayList<>(
-                List.of(makeRegisteredReceiver(receiverApp),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_RED),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_GREEN),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_BLUE)))));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, new ArrayList<>(
+                    List.of(makeRegisteredReceiver(receiverApp),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_RED),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_GREEN),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_BLUE)))));
 
-        synchronized (mAms) {
-            mQueue.cleanupDisabledPackageReceiversLocked(PACKAGE_GREEN, Set.of(CLASS_GREEN),
-                    UserHandle.USER_SYSTEM);
+            synchronized (mAms) {
+                mQueue.cleanupDisabledPackageReceiversLocked(PACKAGE_GREEN, Set.of(CLASS_GREEN),
+                        UserHandle.USER_SYSTEM);
 
-            // Also try clearing out other unrelated things that should leave
-            // the final receiver intact
-            mQueue.cleanupDisabledPackageReceiversLocked(PACKAGE_RED, null,
-                    UserHandle.USER_SYSTEM);
-            mQueue.cleanupDisabledPackageReceiversLocked(null, null, USER_GUEST);
+                // Also try clearing out other unrelated things that should leave
+                // the final receiver intact
+                mQueue.cleanupDisabledPackageReceiversLocked(PACKAGE_RED, null,
+                        UserHandle.USER_SYSTEM);
+                mQueue.cleanupDisabledPackageReceiversLocked(null, null, USER_GUEST);
+            }
 
             // To maximize test coverage, dump current state; we're not worried
             // about the actual output, just that we don't crash
@@ -1193,19 +1200,21 @@ public class BroadcastQueueTest {
 
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
         final Intent timeZone = new Intent(Intent.ACTION_TIMEZONE_CHANGED);
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, USER_GUEST, new ArrayList<>(
-                List.of(makeRegisteredReceiver(callerApp),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_RED, USER_GUEST),
-                        makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN, USER_GUEST),
-                        makeManifestReceiver(PACKAGE_YELLOW, CLASS_BLUE, USER_GUEST)))));
-        enqueueBroadcast(makeBroadcastRecord(timeZone, callerApp, USER_GUEST, new ArrayList<>(
-                List.of(makeRegisteredReceiver(callerApp),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_RED, USER_GUEST),
-                        makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN, USER_GUEST),
-                        makeManifestReceiver(PACKAGE_YELLOW, CLASS_BLUE, USER_GUEST)))));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, USER_GUEST, new ArrayList<>(
+                    List.of(makeRegisteredReceiver(callerApp),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_RED, USER_GUEST),
+                            makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN, USER_GUEST),
+                            makeManifestReceiver(PACKAGE_YELLOW, CLASS_BLUE, USER_GUEST)))));
+            enqueueBroadcast(makeBroadcastRecord(timeZone, callerApp, USER_GUEST, new ArrayList<>(
+                    List.of(makeRegisteredReceiver(callerApp),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_RED, USER_GUEST),
+                            makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN, USER_GUEST),
+                            makeManifestReceiver(PACKAGE_YELLOW, CLASS_BLUE, USER_GUEST)))));
 
-        synchronized (mAms) {
-            mQueue.cleanupDisabledPackageReceiversLocked(null, null, USER_GUEST);
+            synchronized (mAms) {
+                mQueue.cleanupDisabledPackageReceiversLocked(null, null, USER_GUEST);
+            }
         }
 
         waitForIdle();
@@ -1231,12 +1240,15 @@ public class BroadcastQueueTest {
         final ProcessRecord oldApp = makeActiveProcessRecord(PACKAGE_GREEN);
 
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, new ArrayList<>(
-                List.of(makeRegisteredReceiver(oldApp),
-                        makeManifestReceiver(PACKAGE_GREEN, CLASS_GREEN)))));
-        synchronized (mAms) {
-            oldApp.killLocked(TAG, 42, false);
-            mQueue.onApplicationCleanupLocked(oldApp);
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp, new ArrayList<>(
+                    List.of(makeRegisteredReceiver(oldApp),
+                            makeManifestReceiver(PACKAGE_GREEN, CLASS_GREEN)))));
+
+            synchronized (mAms) {
+                oldApp.killLocked(TAG, 42, false);
+                mQueue.onApplicationCleanupLocked(oldApp);
+            }
         }
         waitForIdle();
 
@@ -1609,14 +1621,17 @@ public class BroadcastQueueTest {
         final Intent timezone = new Intent(Intent.ACTION_TIMEZONE_CHANGED);
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
         airplane.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
-        enqueueBroadcast(makeBroadcastRecord(timezone, callerApp,
-                List.of(makeRegisteredReceiver(receiverBlueApp, 10),
-                        makeRegisteredReceiver(receiverGreenApp, 10),
-                        makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE),
-                        makeManifestReceiver(PACKAGE_YELLOW, CLASS_YELLOW),
-                        makeRegisteredReceiver(receiverYellowApp, -10))));
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
-                List.of(makeRegisteredReceiver(receiverBlueApp))));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeBroadcastRecord(timezone, callerApp,
+                    List.of(makeRegisteredReceiver(receiverBlueApp, 10),
+                            makeRegisteredReceiver(receiverGreenApp, 10),
+                            makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE),
+                            makeManifestReceiver(PACKAGE_YELLOW, CLASS_YELLOW),
+                            makeRegisteredReceiver(receiverYellowApp, -10))));
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
+                    List.of(makeRegisteredReceiver(receiverBlueApp))));
+        }
+
         waitForIdle();
 
         // Ignore the final foreground broadcast
@@ -1730,15 +1745,17 @@ public class BroadcastQueueTest {
         final IIntentReceiver resultToFirst = mock(IIntentReceiver.class);
         final IIntentReceiver resultToSecond = mock(IIntentReceiver.class);
 
-        enqueueBroadcast(makeOrderedBroadcastRecord(timezoneFirst, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE),
-                        makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN)),
-                resultToFirst, null));
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_RED))));
-        enqueueBroadcast(makeOrderedBroadcastRecord(timezoneSecond, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN)),
-                resultToSecond, null));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeOrderedBroadcastRecord(timezoneFirst, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE),
+                            makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN)),
+                    resultToFirst, null));
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_RED))));
+            enqueueBroadcast(makeOrderedBroadcastRecord(timezoneSecond, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_GREEN)),
+                    resultToSecond, null));
+        }
 
         waitForIdle();
         final IApplicationThread blueThread = mAms.getProcessRecordLocked(PACKAGE_BLUE,
@@ -1819,12 +1836,14 @@ public class BroadcastQueueTest {
         timeTickFirst.putExtra(Intent.EXTRA_INDEX, "third");
         timeTickThird.addFlags(Intent.FLAG_RECEIVER_REPLACE_PENDING);
 
-        enqueueBroadcast(makeBroadcastRecord(timeTickFirst, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
-        enqueueBroadcast(makeBroadcastRecord(timeTickSecond, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
-        enqueueBroadcast(makeBroadcastRecord(timeTickThird, callerApp,
-                List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            enqueueBroadcast(makeBroadcastRecord(timeTickFirst, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
+            enqueueBroadcast(makeBroadcastRecord(timeTickSecond, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
+            enqueueBroadcast(makeBroadcastRecord(timeTickThird, callerApp,
+                    List.of(makeManifestReceiver(PACKAGE_BLUE, CLASS_BLUE))));
+        }
 
         waitForIdle();
         final IApplicationThread blueThread = mAms.getProcessRecordLocked(PACKAGE_BLUE,
@@ -1859,26 +1878,26 @@ public class BroadcastQueueTest {
         assertTrue(mQueue.isIdleLocked());
         assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
 
-        final Intent timezone = new Intent(Intent.ACTION_TIMEZONE_CHANGED);
-        enqueueBroadcast(makeBroadcastRecord(timezone, callerApp,
-                List.of(makeRegisteredReceiver(receiverApp))));
-        afterFirst = SystemClock.uptimeMillis();
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            final Intent timezone = new Intent(Intent.ACTION_TIMEZONE_CHANGED);
+            enqueueBroadcast(makeBroadcastRecord(timezone, callerApp,
+                    List.of(makeRegisteredReceiver(receiverApp))));
+            afterFirst = SystemClock.uptimeMillis();
 
-        assertFalse(mQueue.isIdleLocked());
-        assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
-        assertFalse(mQueue.isBeyondBarrierLocked(afterFirst));
+            assertFalse(mQueue.isIdleLocked());
+            assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
+            assertFalse(mQueue.isBeyondBarrierLocked(afterFirst));
 
-        final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
-                List.of(makeRegisteredReceiver(receiverApp))));
-        afterSecond = SystemClock.uptimeMillis() + 10;
+            final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
+                    List.of(makeRegisteredReceiver(receiverApp))));
+            afterSecond = SystemClock.uptimeMillis() + 10;
 
-        assertFalse(mQueue.isIdleLocked());
-        assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
-        assertFalse(mQueue.isBeyondBarrierLocked(afterFirst));
-        assertFalse(mQueue.isBeyondBarrierLocked(afterSecond));
-
-        mLooper.release();
+            assertFalse(mQueue.isIdleLocked());
+            assertTrue(mQueue.isBeyondBarrierLocked(beforeFirst));
+            assertFalse(mQueue.isBeyondBarrierLocked(afterFirst));
+            assertFalse(mQueue.isBeyondBarrierLocked(afterSecond));
+        }
 
         mQueue.waitForBarrier(LOG_WRITER_INFO);
         assertTrue(mQueue.isBeyondBarrierLocked(afterFirst));
@@ -2029,23 +2048,25 @@ public class BroadcastQueueTest {
         final ProcessRecord receiverBlueApp = makeActiveProcessRecord(PACKAGE_BLUE);
 
         final Intent airplane = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        final Object greenReceiver = makeRegisteredReceiver(receiverGreenApp);
-        final Object blueReceiver = makeRegisteredReceiver(receiverBlueApp);
-        final Object yellowReceiver = makeManifestReceiver(PACKAGE_YELLOW, CLASS_YELLOW);
-        final Object orangeReceiver = makeManifestReceiver(PACKAGE_ORANGE, CLASS_ORANGE);
-        enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
-                List.of(greenReceiver, blueReceiver, yellowReceiver, orangeReceiver)));
+        try (SyncBarrier b = new SyncBarrier(mHandlerThread)) {
+            final Object greenReceiver = makeRegisteredReceiver(receiverGreenApp);
+            final Object blueReceiver = makeRegisteredReceiver(receiverBlueApp);
+            final Object yellowReceiver = makeManifestReceiver(PACKAGE_YELLOW, CLASS_YELLOW);
+            final Object orangeReceiver = makeManifestReceiver(PACKAGE_ORANGE, CLASS_ORANGE);
+            enqueueBroadcast(makeBroadcastRecord(airplane, callerApp,
+                    List.of(greenReceiver, blueReceiver, yellowReceiver, orangeReceiver)));
 
-        doAnswer(invocation -> {
-            final BroadcastRecord r = invocation.getArgument(0);
-            final Object o = invocation.getArgument(1);
-            if (airplane.getAction().equals(r.intent.getAction())
-                    && (isReceiverEquals(o, greenReceiver)
-                            || isReceiverEquals(o, orangeReceiver))) {
-                return "test skipped receiver";
-            }
-            return null;
-        }).when(mSkipPolicy).shouldSkipMessage(any(BroadcastRecord.class), any());
+            doAnswer(invocation -> {
+                final BroadcastRecord r = invocation.getArgument(0);
+                final Object o = invocation.getArgument(1);
+                if (airplane.getAction().equals(r.intent.getAction())
+                        && (isReceiverEquals(o, greenReceiver)
+                                || isReceiverEquals(o, orangeReceiver))) {
+                    return "test skipped receiver";
+                }
+                return null;
+            }).when(mSkipPolicy).shouldSkipMessage(any(BroadcastRecord.class), any());
+        }
 
         waitForIdle();
         // Verify that only blue and yellow receiver apps received the broadcast.

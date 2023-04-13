@@ -1259,9 +1259,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      * for bridging the gap while the migration is active.
      */
     private void handleFaceHelp(int msgId, String helpString) {
-        if (mFaceAcquiredInfoIgnoreList.contains(msgId)) {
-            return;
-        }
         Assert.isMainThread();
         mLogger.logFaceAuthHelpMsg(msgId, helpString);
         for (int i = 0; i < mCallbacks.size(); i++) {
@@ -4373,7 +4370,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      * Cancels all operations in the scheduler if it is hung for 10 seconds.
      */
     public void startBiometricWatchdog() {
-        if (mFaceManager != null && !isFaceAuthInteractorEnabled()) {
+        if (mFaceManager != null) {
             mFaceManager.scheduleWatchdog();
         }
         if (mFpm != null) {

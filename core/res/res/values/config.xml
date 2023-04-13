@@ -538,10 +538,8 @@
     <!-- If this is true, long press on power button will be available from the non-interactive state -->
     <bool name="config_supportLongPressPowerWhenNonInteractive">false</bool>
 
-    <!-- If this is true, then keep dreaming when unplugging.
-         This config was formerly known as config_keepDreamingWhenUndocking.
-         It has been updated to affect other plug types. -->
-    <bool name="config_keepDreamingWhenUnplugging">false</bool>
+    <!-- If this is true, then keep dreaming when undocking. -->
+    <bool name="config_keepDreamingWhenUndocking">false</bool>
 
     <!-- The timeout (in ms) to wait before attempting to reconnect to the dream overlay service if
          it becomes disconnected -->
@@ -4310,12 +4308,8 @@
          This package must be trusted, as it has the permissions to control other applications
          on the device.
          Example: "com.android.wellbeing"
-
-         Note: This config is deprecated, please use config_systemWellbeing instead.
      -->
-    <string name="config_defaultWellbeingPackage" translatable="false">
-        @string/config_systemWellbeing
-    </string>
+    <string name="config_defaultWellbeingPackage" translatable="false"></string>
 
     <!-- The component name for the default system attention service.
          This service must be trusted, as it can be activated without explicit consent of the user.

@@ -30,7 +30,6 @@ import android.os.Handler;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.ViewRootImpl;
-import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.window.SurfaceSyncGroup;
 
@@ -203,10 +202,8 @@ public class TvPipMenuController implements PipMenuController, TvPipMenuView.Lis
     }
 
     private void addPipMenuViewToSystemWindows(View v, String title) {
-        final WindowManager.LayoutParams layoutParams =
-                getPipMenuLayoutParams(mContext, title, 0 /* width */, 0 /* height */);
-        layoutParams.alpha = 0f;
-        mSystemWindows.addView(v, layoutParams, 0 /* displayId */, SHELL_ROOT_LAYER_PIP);
+        mSystemWindows.addView(v, getPipMenuLayoutParams(mContext, title, 0 /* width */,
+                0 /* height */), 0 /* displayId */, SHELL_ROOT_LAYER_PIP);
     }
 
     void onPipTransitionFinished(boolean enterTransition) {
@@ -312,9 +309,9 @@ public class TvPipMenuController implements PipMenuController, TvPipMenuView.Lis
 
     @Override
     public void movePipMenu(SurfaceControl pipLeash, SurfaceControl.Transaction pipTx,
-            Rect pipBounds, float alpha) {
+            Rect pipBounds) {
         ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
-                "%s: movePipMenu: %s, alpha %s", TAG, pipBounds.toShortString(), alpha);
+                "%s: movePipMenu: %s", TAG, pipBounds.toShortString());
 
         if (pipBounds.isEmpty()) {
             if (pipTx == null) {
@@ -335,11 +332,6 @@ public class TvPipMenuController implements PipMenuController, TvPipMenuView.Lis
         }
         pipTx.setPosition(frontSurface, menuDestBounds.left, menuDestBounds.top);
         pipTx.setPosition(backSurface, menuDestBounds.left, menuDestBounds.top);
-
-        if (alpha != ALPHA_NO_CHANGE) {
-            pipTx.setAlpha(frontSurface, alpha);
-            pipTx.setAlpha(backSurface, alpha);
-        }
 
         // Synchronize drawing the content in the front and back surfaces together with the pip
         // transaction and the position change for the front and back surfaces

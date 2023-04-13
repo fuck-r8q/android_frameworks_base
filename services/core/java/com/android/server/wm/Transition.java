@@ -2835,7 +2835,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final String name = isDisplayRotation ? "RotationLayer" : "transition snapshot: " + wc;
             SurfaceControl snapshotSurface = wc.makeAnimationLeash()
                     .setName(name)
-                    .setOpaque(wc.fillsParent())
+                    .setOpaque(true)
                     .setParent(wc.getSurfaceControl())
                     .setSecure(screenshotBuffer.containsSecureLayers())
                     .setCallsite("Transition.ScreenshotSync")

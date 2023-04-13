@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.server.power.stats.wakeups;
+package com.android.server.power.stats;
 
 import android.annotation.XmlRes;
 import android.content.Context;

@@ -120,8 +120,6 @@ public class SurfaceControlViewHost {
 
     private ISurfaceControlViewHost mRemoteInterface = new ISurfaceControlViewHostImpl();
 
-    private ViewRootImpl.ConfigChangedCallback mConfigChangedCallback;
-
     /**
      * Package encapsulating a Surface hierarchy which contains interactive view
      * elements. It's expected to get this object from
@@ -309,7 +307,7 @@ public class SurfaceControlViewHost {
         mWm = wwm;
         mViewRoot = new ViewRootImpl(c, d, mWm, new WindowlessWindowLayout());
         mCloseGuard.openWithCallSite("release", callsite);
-        setConfigCallback(c, d);
+        addConfigCallback(c, d);
 
         WindowManagerGlobal.getInstance().addWindowlessRoot(mViewRoot);
 
@@ -359,23 +357,21 @@ public class SurfaceControlViewHost {
 
         mViewRoot = new ViewRootImpl(context, display, mWm, new WindowlessWindowLayout());
         mCloseGuard.openWithCallSite("release", callsite);
-        setConfigCallback(context, display);
+        addConfigCallback(context, display);
 
         WindowManagerGlobal.getInstance().addWindowlessRoot(mViewRoot);
 
         mAccessibilityEmbeddedConnection = mViewRoot.getAccessibilityEmbeddedConnection();
     }
 
-    private void setConfigCallback(Context c, Display d) {
+    private void addConfigCallback(Context c, Display d) {
         final IBinder token = c.getWindowContextToken();
-        mConfigChangedCallback = conf -> {
+        mViewRoot.addConfigCallback((conf) -> {
             if (token instanceof WindowTokenClient) {
                 final WindowTokenClient w = (WindowTokenClient)  token;
                 w.onConfigurationChanged(conf, d.getDisplayId(), true);
             }
-        };
-
-        ViewRootImpl.addConfigCallback(mConfigChangedCallback);
+        });
     }
 
     /**
@@ -390,7 +386,8 @@ public class SurfaceControlViewHost {
             mCloseGuard.warnIfOpen();
         }
         // We aren't on the UI thread here so we need to pass false to doDie
-        doRelease(false /* immediate */);
+        mViewRoot.die(false /* immediate */);
+        WindowManagerGlobal.getInstance().removeWindowlessRoot(mViewRoot);
     }
 
     /**
@@ -499,16 +496,7 @@ public class SurfaceControlViewHost {
      */
     public void release() {
         // ViewRoot will release mSurfaceControl for us.
-        doRelease(true /* immediate */);
-    }
-
-    private void doRelease(boolean immediate) {
-        if (mConfigChangedCallback != null) {
-            ViewRootImpl.removeConfigCallback(mConfigChangedCallback);
-            mConfigChangedCallback = null;
-        }
-
-        mViewRoot.die(immediate);
+        mViewRoot.die(true /* immediate */);
         WindowManagerGlobal.getInstance().removeWindowlessRoot(mViewRoot);
         mReleased = true;
         mCloseGuard.close();

@@ -2,4 +2,11 @@
 
 set noparent
 
-include platform/frameworks/base:/services/backup/BACKUP_OWNERS
+jstemmer@google.com
+martinoh@google.com
+millmore@google.com
+niamhfw@google.com
+piee@google.com
+philippov@google.com
+rthakohov@google.com
+sarpm@google.com

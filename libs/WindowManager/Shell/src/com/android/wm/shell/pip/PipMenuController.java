@@ -45,13 +45,6 @@ public interface PipMenuController {
     String MENU_WINDOW_TITLE = "PipMenuView";
 
     /**
-     * Used with
-     * {@link PipMenuController#movePipMenu(SurfaceControl, SurfaceControl.Transaction, Rect,
-     * float)} to indicate that we don't want to affect the alpha value of the menu surfaces.
-     */
-    float ALPHA_NO_CHANGE = -1f;
-
-    /**
      * Called when
      * {@link PipTaskOrganizer#onTaskAppeared(RunningTaskInfo, SurfaceControl)}
      * is called.
@@ -92,8 +85,8 @@ public interface PipMenuController {
      * need to synchronize the movements on the same frame as PiP.
      */
     default void movePipMenu(@Nullable SurfaceControl pipLeash,
-            @Nullable SurfaceControl.Transaction t, Rect destinationBounds, float alpha) {
-    }
+            @Nullable SurfaceControl.Transaction t,
+            Rect destinationBounds) {}
 
     /**
      * Update the PiP menu with the given bounds for re-layout purposes.

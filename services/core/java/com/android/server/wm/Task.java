@@ -3252,10 +3252,9 @@ class Task extends TaskFragment {
 
     @Override
     void prepareSurfaces() {
-        mDimmer.resetDimStates();
+        final Rect dimBounds = mDimmer.resetDimStates();
         super.prepareSurfaces();
 
-        final Rect dimBounds = mDimmer.getDimBounds();
         if (dimBounds != null) {
             getDimBounds(dimBounds);
 
