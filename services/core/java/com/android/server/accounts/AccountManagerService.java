@@ -482,14 +482,13 @@ public class AccountManagerService
         Bundle.setDefusable(extras, true);
         int callingUid = Binder.getCallingUid();
         int userId = UserHandle.getCallingUserId();
-        if (Log.isLoggable(TAG, Log.VERBOSE)) {
-            Log.v(TAG, "addAccountExplicitly: " + account + ", caller's uid " + callingUid
-                    + ", pid " + Binder.getCallingPid());
-        }
         Objects.requireNonNull(account, "account cannot be null");
+        Log.v(TAG, "addAccountExplicitly: caller's uid=" + callingUid + ", pid="
+                + Binder.getCallingPid() + ", packageName=" + opPackageName + ", accountType="
+                + account.type);
         if (!isAccountManagedByCaller(account.type, callingUid, userId)) {
-            String msg = String.format("uid %s cannot explicitly add accounts of type: %s",
-                    callingUid, account.type);
+            String msg = String.format("uid=%s, package=%s cannot explicitly add "
+                    + "accounts of type: %s", callingUid, opPackageName, account.type);
             throw new SecurityException(msg);
         }
         /*
@@ -3019,7 +3018,7 @@ public class AccountManagerService
         final long identityToken = clearCallingIdentity();
         try {
             // Distill the caller's package signatures into a single digest.
-            final byte[] callerPkgSigDigest = calculatePackageSignatureDigest(callerPkg);
+            final byte[] callerPkgSigDigest = calculatePackageSignatureDigest(callerPkg, userId);
 
             // if the caller has permission, do the peek. otherwise go the more expensive
             // route of starting a Session
@@ -3183,12 +3182,12 @@ public class AccountManagerService
                 .write();
     }
 
-    private byte[] calculatePackageSignatureDigest(String callerPkg) {
+    private byte[] calculatePackageSignatureDigest(String callerPkg, int userId) {
         MessageDigest digester;
         try {
             digester = MessageDigest.getInstance("SHA-256");
-            PackageInfo pkgInfo = mPackageManager.getPackageInfo(
-                    callerPkg, PackageManager.GET_SIGNATURES);
+            PackageInfo pkgInfo = mPackageManager.getPackageInfoAsUser(
+                    callerPkg, PackageManager.GET_SIGNATURES, userId);
             for (Signature sig : pkgInfo.signatures) {
                 digester.update(sig.toByteArray());
             }

@@ -194,7 +194,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         AccessibilityUserState.ServiceInfoChangeListener,
         AccessibilityWindowManager.AccessibilityEventSender,
         AccessibilitySecurityPolicy.AccessibilityUserManager,
-        SystemActionPerformer.SystemActionsChangedListener, ProxyManager.SystemSupport{
+        SystemActionPerformer.SystemActionsChangedListener,
+        SystemActionPerformer.DisplayUpdateCallBack, ProxyManager.SystemSupport {
 
     private static final boolean DEBUG = false;
 
@@ -1233,7 +1234,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     private SystemActionPerformer getSystemActionPerformer() {
         if (mSystemActionPerformer == null) {
             mSystemActionPerformer =
-                    new SystemActionPerformer(mContext, mWindowManagerService, null, this);
+                    new SystemActionPerformer(mContext, mWindowManagerService, null, this, this);
         }
         return mSystemActionPerformer;
     }
@@ -1457,17 +1458,19 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             return;
         }
         if (!mVisibleBgUserIds.get(userId)) {
-            Slogf.wtf(LOG_TAG, "Cannot change current user to %d as it's not visible "
-                    + "(mVisibleUsers=%s)", userId, mVisibleBgUserIds);
+            Slogf.wtf(LOG_TAG, "changeCurrentUserForTestAutomationIfNeededLocked(): cannot change "
+                    + "current user to %d as it's not visible (mVisibleUsers=%s)",
+                    userId, mVisibleBgUserIds);
             return;
         }
         if (mCurrentUserId == userId) {
-            Slogf.w(LOG_TAG, "NOT changing current user for test automation purposes as it is "
-                    + "already %d", mCurrentUserId);
+            Slogf.d(LOG_TAG, "changeCurrentUserForTestAutomationIfNeededLocked(): NOT changing "
+                    + "current user for test automation purposes as it is already %d",
+                    mCurrentUserId);
             return;
         }
-        Slogf.i(LOG_TAG, "Changing current user from %d to %d for test automation purposes",
-                mCurrentUserId, userId);
+        Slogf.i(LOG_TAG, "changeCurrentUserForTestAutomationIfNeededLocked(): changing current user"
+                + " from %d to %d for test automation purposes", mCurrentUserId, userId);
         mRealCurrentUserId = mCurrentUserId;
         switchUser(userId);
     }
@@ -1480,7 +1483,13 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     + "because device doesn't support visible background users");
             return;
         }
-        Slogf.i(LOG_TAG, "Restoring current user to %d after using %d for test automation purposes",
+        if (mRealCurrentUserId == UserHandle.USER_CURRENT) {
+            Slogf.d(LOG_TAG, "restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring "
+                    + "because mRealCurrentUserId is already USER_CURRENT");
+            return;
+        }
+        Slogf.i(LOG_TAG, "restoreCurrentUserForTestAutomationIfNeededLocked(): restoring current "
+                + "user to %d after using %d for test automation purposes",
                 mRealCurrentUserId, mCurrentUserId);
         int currentUserId = mRealCurrentUserId;
         mRealCurrentUserId = UserHandle.USER_CURRENT;
@@ -1623,6 +1632,18 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             AccessibilityUserState state = getCurrentUserStateLocked();
             notifySystemActionsChangedLocked(state);
         }
+    }
+
+    @Override
+    // TODO(b/276459590): Remove when this is resolved at the virtual device/input level.
+    public void moveNonProxyTopFocusedDisplayToTopIfNeeded() {
+        mA11yWindowManager.moveNonProxyTopFocusedDisplayToTopIfNeeded();
+    }
+
+    @Override
+    // TODO(b/276459590): Remove when this is resolved at the virtual device/input level.
+    public int getLastNonProxyTopFocusedDisplayId() {
+        return mA11yWindowManager.getLastNonProxyTopFocusedDisplayId();
     }
 
     @VisibleForTesting
