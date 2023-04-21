@@ -3519,6 +3519,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     interceptScreenshotChord(SCREENSHOT_KEY_OTHER, 0 /*pressDelay*/);
                 }
                 return true;
+            case KeyEvent.KEYCODE_ESCAPE:
+                if (down && repeatCount == 0) {
+                    mContext.closeSystemDialogs();
+                }
+                return true;
         }
 
         return false;
@@ -4606,6 +4611,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             case KeyEvent.KEYCODE_BACK:
                 return mWakeOnBackKeyPress;
+
+            case KeyEvent.KEYCODE_STYLUS_BUTTON_PRIMARY:
+            case KeyEvent.KEYCODE_STYLUS_BUTTON_SECONDARY:
+            case KeyEvent.KEYCODE_STYLUS_BUTTON_TERTIARY:
+            case KeyEvent.KEYCODE_STYLUS_BUTTON_TAIL:
+                return mStylusButtonsEnabled;
         }
 
         return true;

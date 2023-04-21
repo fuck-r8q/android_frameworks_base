@@ -29,7 +29,6 @@ import com.android.keyguard.LockIconView;
 import com.android.systemui.R;
 import com.android.systemui.battery.BatteryMeterView;
 import com.android.systemui.battery.BatteryMeterViewController;
-import com.android.systemui.biometrics.AuthRippleView;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
@@ -55,6 +54,7 @@ import com.android.systemui.statusbar.notification.row.dagger.NotificationShelfC
 import com.android.systemui.statusbar.notification.row.ui.viewmodel.ActivatableNotificationViewModelModule;
 import com.android.systemui.statusbar.notification.shelf.ui.viewbinder.NotificationShelfViewBinderWrapperControllerImpl;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModelModule;
 import com.android.systemui.statusbar.phone.KeyguardBottomAreaView;
 import com.android.systemui.statusbar.phone.NotificationIconAreaController;
 import com.android.systemui.statusbar.phone.StatusBarBoundsProvider;
@@ -87,7 +87,10 @@ import javax.inject.Named;
 import javax.inject.Provider;
 
 @Module(subcomponents = StatusBarFragmentComponent.class,
-        includes = { ActivatableNotificationViewModelModule.class })
+        includes = {
+                ActivatableNotificationViewModelModule.class,
+                NotificationListViewModelModule.class,
+        })
 public abstract class StatusBarViewModule {
 
     public static final String SHADE_HEADER = "large_screen_shade_header";
@@ -117,9 +120,7 @@ public abstract class StatusBarViewModule {
             NotificationShelfComponent.Builder notificationShelfComponentBuilder,
             NotificationShelf notificationShelf) {
         if (featureFlags.isEnabled(Flags.NOTIFICATION_SHELF_REFACTOR)) {
-            NotificationShelfViewBinderWrapperControllerImpl impl = newImpl.get();
-            impl.init();
-            return impl;
+            return newImpl.get();
         } else {
             NotificationShelfComponent component = notificationShelfComponentBuilder
                     .notificationShelf(notificationShelf)
@@ -144,15 +145,6 @@ public abstract class StatusBarViewModule {
     public static LockIconView getLockIconView(
             NotificationShadeWindowView notificationShadeWindowView) {
         return notificationShadeWindowView.findViewById(R.id.lock_icon_view);
-    }
-
-    /** */
-    @Provides
-    @CentralSurfacesComponent.CentralSurfacesScope
-    @Nullable
-    public static AuthRippleView getAuthRippleView(
-            NotificationShadeWindowView notificationShadeWindowView) {
-        return notificationShadeWindowView.findViewById(R.id.auth_ripple);
     }
 
     /** */
