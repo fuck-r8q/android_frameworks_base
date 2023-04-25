@@ -126,6 +126,7 @@ package android {
     field public static final String LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK = "android.permission.LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK";
     field public static final String LOADER_USAGE_STATS = "android.permission.LOADER_USAGE_STATS";
     field public static final String LOCATION_HARDWARE = "android.permission.LOCATION_HARDWARE";
+    field public static final String MANAGE_CROSS_DEVICE = "deviceintegration.permission.MANAGE_CROSS_DEVICE";
     field public static final String MANAGE_DEVICE_LOCK_STATE = "android.permission.MANAGE_DEVICE_LOCK_STATE";
     field public static final String MANAGE_DEVICE_POLICY_ACCESSIBILITY = "android.permission.MANAGE_DEVICE_POLICY_ACCESSIBILITY";
     field public static final String MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT = "android.permission.MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT";
@@ -5292,6 +5293,19 @@ package android.app {
     field public static final int DELIVERY_GROUP_POLICY_MOST_RECENT = 1; // 0x1
   }
 
+  public class CrossDeviceManager {
+    method public static int getCrossDeviceVersion();
+    method public static int getMaxFps(int);
+    method public static boolean isCallerAllowed(@NonNull android.content.Context);
+    method public static boolean isFeatureSupported(@NonNull String);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_CROSS_DEVICE) public static void notifyConnectionStateChange(boolean);
+    field public static final int APP_FEATURE_TYPE_MULTIPLE_APPS = 2; // 0x2
+    field public static final int APP_FEATURE_TYPE_PHONE_SCREEN_ONLY = 1; // 0x1
+    field public static final int APP_FEATURE_TYPE_UNKNOWN = 0; // 0x0
+    field public static final String FEATURE_BASIC = "feature_basic";
+    field public static final String FEATURE_REMOTE_APPS = "feature_remote_apps";
+  }
+
   public class DatePickerDialog extends android.app.AlertDialog implements android.widget.DatePicker.OnDateChangedListener android.content.DialogInterface.OnClickListener {
     ctor public DatePickerDialog(@NonNull android.content.Context);
     ctor public DatePickerDialog(@NonNull android.content.Context, @StyleRes int);
@@ -7121,6 +7135,47 @@ package android.app {
     method @NonNull public android.app.RemoteInput.Builder setLabel(@Nullable CharSequence);
   }
 
+  public final class RemoteTaskConstants {
+    ctor public RemoteTaskConstants();
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_ATOA = 102; // 0x66
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_CLIENT = 100; // 0x64
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_COMMON = 0; // 0x0
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_DUP = 2; // 0x2
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_EDGE = 103; // 0x67
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_MDTOVD = 101; // 0x65
+    field public static final int FLAG_TASK_LAUNCH_SCENARIO_VDTOMD = 1; // 0x1
+    field public static final int REMOTE_TASK_FLAG_DEFAULT = 0; // 0x0
+    field public static final int REMOTE_TASK_FLAG_LAUNCH = 32; // 0x20
+  }
+
+  public final class RemoteTaskInfo implements android.os.Parcelable {
+    method @NonNull public static android.app.RemoteTaskInfo create(@Nullable String, @Nullable String, int, int);
+    method public int describeContents();
+    method public int getDisplayId();
+    method @Nullable public String getPackageName();
+    method public int getTaskId();
+    method @Nullable public String getUuid();
+    method public void setDisplayId(int);
+    method public void setPackageName(@Nullable String);
+    method public void setTaskId(int);
+    method public void setUuid(@Nullable String);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.RemoteTaskInfo> CREATOR;
+  }
+
+  public final class RemoteTaskParams implements android.os.Parcelable {
+    method @NonNull public static android.app.RemoteTaskParams create(@Nullable String, int, int);
+    method public int describeContents();
+    method public int getDisplayId();
+    method public int getLaunchScenario();
+    method @Nullable public String getUuid();
+    method public void setDisplayId(int);
+    method public void setLaunchScenario(int);
+    method public void setUuid(@Nullable String);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.RemoteTaskParams> CREATOR;
+  }
+
   public class SearchManager implements android.content.DialogInterface.OnCancelListener android.content.DialogInterface.OnDismissListener {
     method public android.content.ComponentName getGlobalSearchActivity();
     method public android.app.SearchableInfo getSearchableInfo(android.content.ComponentName);
@@ -7306,6 +7361,31 @@ package android.app {
     method @NonNull public String getOp();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.SyncNotedAppOp> CREATOR;
+  }
+
+  public final class SystemTaskContext implements android.os.Parcelable {
+    method @Nullable public static android.app.SystemTaskContext create(@Nullable String, @Nullable String, int, @Nullable String, int, int, int, boolean, boolean);
+    method public int describeContents();
+    method public int getDisplayId();
+    method public int getLaunchFlag();
+    method @Nullable public String getLaunchFromPackage();
+    method public int getReuseDisplayId();
+    method @Nullable public String getSecurityToken();
+    method public int getSourceDisplayId();
+    method @Nullable public String getUuid();
+    method public boolean isEdgeCase();
+    method public boolean isHomeIntent();
+    method public void setDisplayId(int);
+    method public void setEdgeCase(boolean);
+    method public void setHomeIntent(boolean);
+    method public void setLaunchFlag(int);
+    method public void setLaunchFromPackage(@Nullable String);
+    method public void setResueDisplayId(int);
+    method public void setSecurityToken(@Nullable String);
+    method public void setSourceDisplayId(int);
+    method public void setUuid(@Nullable String);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.SystemTaskContext> CREATOR;
   }
 
   @Deprecated public class TabActivity extends android.app.ActivityGroup {
