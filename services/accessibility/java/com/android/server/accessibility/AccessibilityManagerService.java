@@ -490,7 +490,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 mMainHandler, context,
                 new PolicyWarningUIController.NotificationController(context));
         mSecurityPolicy = new AccessibilitySecurityPolicy(policyWarningUIController, mContext,
-                this, LocalServices.getService(PackageManagerInternal.class));
+                this);
         mA11yWindowManager = new AccessibilityWindowManager(mLock, mMainHandler,
                 mWindowManagerService, this, mSecurityPolicy, this, mTraceManager);
         mA11yDisplayListener = new AccessibilityDisplayListener(mContext, mMainHandler);
@@ -1026,8 +1026,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                                 + Binder.getCallingPid() + " for device id " + deviceId
                                 + " with package names " + Arrays.toString(client.mPackageNames));
                     }
-                    return IntPair.of(mProxyManager.getStateLocked(deviceId,
-                                    mUiAutomationManager.isUiAutomationRunningLocked()),
+                    return IntPair.of(mProxyManager.getStateLocked(deviceId),
                             client.mLastSentRelevantEventTypes);
                 }
                 mGlobalClients.register(callback, client);
@@ -1042,8 +1041,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                                 + Binder.getCallingPid() + " for device id " + deviceId
                                 + " with package names " + Arrays.toString(client.mPackageNames));
                     }
-                    return IntPair.of(mProxyManager.getStateLocked(deviceId,
-                                    mUiAutomationManager.isUiAutomationRunningLocked()),
+                    return IntPair.of(mProxyManager.getStateLocked(deviceId),
                             client.mLastSentRelevantEventTypes);
                 }
                 userState.mUserClients.register(callback, client);
@@ -4038,9 +4036,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         final long identity = Binder.clearCallingIdentity();
         try {
-            mProxyManager.registerProxy(client, displayId, mContext,
-                    sIdCounter++, mMainHandler, mSecurityPolicy, this, getTraceManager(),
-                    mWindowManagerService);
+            mProxyManager.registerProxy(client, displayId, sIdCounter++, mSecurityPolicy,
+                    this, getTraceManager(), mWindowManagerService);
 
             synchronized (mLock) {
                 notifyClearAccessibilityCacheLocked();
