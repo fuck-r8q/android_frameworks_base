@@ -61,6 +61,9 @@ object Flags {
     // TODO(b/254512538): Tracking Bug
     val INSTANT_VOICE_REPLY = unreleasedFlag(111, "instant_voice_reply")
 
+    // TODO(b/279735475): Tracking Bug
+    @JvmField val NEW_LIGHT_BAR_LOGIC = unreleasedFlag(279735475, "new_light_bar_logic")
+
     /**
      * This flag is server-controlled and should stay as [unreleasedFlag] since we never want to
      * enable it on release builds.
@@ -222,6 +225,11 @@ object Flags {
     val LOCK_SCREEN_LONG_PRESS_DIRECT_TO_WPP =
         unreleasedFlag(232, "lock_screen_long_press_directly_opens_wallpaper_picker")
 
+    /** Whether to run the new udfps keyguard refactor code. */
+    // TODO(b/279440316): Tracking bug.
+    @JvmField
+    val REFACTOR_UDFPS_KEYGUARD_VIEWS = unreleasedFlag(233, "refactor_udfps_keyguard_views")
+
     /** Provide new auth messages on the bouncer. */
     // TODO(b/277961132): Tracking bug.
     @JvmField
@@ -266,7 +274,7 @@ object Flags {
         )
 
     @JvmField
-    val QS_PIPELINE_NEW_HOST = unreleasedFlag(504, "qs_pipeline_new_host", teamfood = false)
+    val QS_PIPELINE_NEW_HOST = unreleasedFlag(504, "qs_pipeline_new_host", teamfood = true)
 
     // TODO(b/278068252): Tracking Bug
     @JvmField
@@ -617,10 +625,12 @@ object Flags {
     val APP_PANELS_REMOVE_APPS_ALLOWED =
         unreleasedFlag(2003, "app_panels_remove_apps_allowed", teamfood = true)
 
-    // 2200 - udfps
+    // 2200 - biometrics (udfps, sfps, BiometricPrompt, etc.)
     // TODO(b/259264861): Tracking Bug
     @JvmField val UDFPS_NEW_TOUCH_DETECTION = releasedFlag(2200, "udfps_new_touch_detection")
     @JvmField val UDFPS_ELLIPSE_DETECTION = releasedFlag(2201, "udfps_ellipse_detection")
+    // TODO(b/278622168): Tracking Bug
+    @JvmField val BIOMETRIC_BP_STRONG = unreleasedFlag(2202, "biometric_bp_strong")
 
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag(2300, "track_stylus_ever_used")
