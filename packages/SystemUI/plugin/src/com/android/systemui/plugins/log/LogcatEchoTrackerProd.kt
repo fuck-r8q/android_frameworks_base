@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package com.android.server.companion.datatransfer.contextsync;
+package com.android.systemui.plugins.log
 
-/** Callback for call metadata syncing. */
-public abstract class CallMetadataSyncCallback {
+/** Production version of [LogcatEchoTracker] that isn't configurable. */
+class LogcatEchoTrackerProd : LogcatEchoTracker {
+    override val logInBackgroundThread = false
 
-    abstract void processCallControlAction(int crossDeviceCallId, int callControlAction);
+    override fun isBufferLoggable(bufferName: String, level: LogLevel): Boolean {
+        return level >= LogLevel.WARNING
+    }
 
-    abstract void requestCrossDeviceSync(int userId);
-
-    abstract void updateStatus(int userId, boolean shouldSyncCallMetadata);
+    override fun isTagLoggable(tagName: String, level: LogLevel): Boolean {
+        return level >= LogLevel.WARNING
+    }
 }

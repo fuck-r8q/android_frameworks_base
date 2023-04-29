@@ -206,11 +206,6 @@ object Flags {
             )
 
     /** Whether to inflate the bouncer view on a background thread. */
-    // TODO(b/272091103): Tracking Bug
-    @JvmField
-    val ASYNC_INFLATE_BOUNCER = releasedFlag(229, "async_inflate_bouncer")
-
-    /** Whether to inflate the bouncer view on a background thread. */
     // TODO(b/273341787): Tracking Bug
     @JvmField
     val PREVENT_BYPASS_KEYGUARD = releasedFlag(230, "prevent_bypass_keyguard")
@@ -235,6 +230,11 @@ object Flags {
     @JvmField
     val REVAMPED_BOUNCER_MESSAGES =
         unreleasedFlag(234, "revamped_bouncer_messages")
+
+    /** Whether to delay showing bouncer UI when face auth or active unlock are enrolled. */
+    // TODO(b/279794160): Tracking bug.
+    @JvmField
+    val DELAY_BOUNCER = unreleasedFlag(235, "delay_bouncer")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -391,7 +391,7 @@ object Flags {
     val MEDIA_TAP_TO_TRANSFER_DISMISS_GESTURE = releasedFlag(912, "media_ttt_dismiss_gesture")
 
     // TODO(b/266157412): Tracking Bug
-    val MEDIA_RETAIN_SESSIONS = releasedFlag(913, "media_retain_sessions")
+    val MEDIA_RETAIN_SESSIONS = unreleasedFlag(913, "media_retain_sessions")
 
     // TODO(b/266739309): Tracking Bug
     @JvmField
@@ -401,10 +401,10 @@ object Flags {
     val MEDIA_RESUME_PROGRESS = releasedFlag(915, "media_resume_progress")
 
     // TODO(b/267166152) : Tracking Bug
-    val MEDIA_RETAIN_RECOMMENDATIONS = releasedFlag(916, "media_retain_recommendations")
+    val MEDIA_RETAIN_RECOMMENDATIONS = unreleasedFlag(916, "media_retain_recommendations")
 
     // TODO(b/270437894): Tracking Bug
-    val MEDIA_REMOTE_RESUME = releasedFlag(917, "media_remote_resume")
+    val MEDIA_REMOTE_RESUME = unreleasedFlag(917, "media_remote_resume")
 
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag(1000, "simulate_dock_through_charging")
@@ -600,6 +600,8 @@ object Flags {
 
     // 1700 - clipboard
     @JvmField val CLIPBOARD_REMOTE_BEHAVIOR = releasedFlag(1701, "clipboard_remote_behavior")
+    // TODO(b/278714186) Tracking Bug
+    @JvmField val CLIPBOARD_IMAGE_TIMEOUT = unreleasedFlag(1702, "clipboard_image_timeout")
 
     // 1800 - shade container
     // TODO(b/265944639): Tracking Bug
@@ -623,7 +625,7 @@ object Flags {
     // TODO(b/269132640): Tracking Bug
     @JvmField
     val APP_PANELS_REMOVE_APPS_ALLOWED =
-        unreleasedFlag(2003, "app_panels_remove_apps_allowed", teamfood = true)
+        releasedFlag(2003, "app_panels_remove_apps_allowed")
 
     // 2200 - biometrics (udfps, sfps, BiometricPrompt, etc.)
     // TODO(b/259264861): Tracking Bug

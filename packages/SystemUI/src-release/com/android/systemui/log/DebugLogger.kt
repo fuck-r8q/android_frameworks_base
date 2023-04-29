@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,20 @@
 
 package com.android.systemui.log
 
-/** Keeps track of which [LogBuffer] messages should also appear in logcat. */
-interface LogcatEchoTracker {
-    /** Whether [bufferName] should echo messages of [level] or higher to logcat. */
-    fun isBufferLoggable(bufferName: String, level: LogLevel): Boolean
+import android.os.Build
+import android.util.Log
 
-    /** Whether [tagName] should echo messages of [level] or higher to logcat. */
-    fun isTagLoggable(tagName: String, level: LogLevel): Boolean
+/** An empty logger for release builds. */
+object DebugLogger {
 
-    /** Whether to log messages in a background thread. */
-    val logInBackgroundThread: Boolean
+    @JvmName("logcatMessage")
+    inline fun Any.debugLog(
+        enabled: Boolean = Build.IS_DEBUGGABLE,
+        priority: Int = Log.DEBUG,
+        tag: String = this::class.simpleName.orEmpty(),
+        error: Throwable? = null,
+        message: () -> String,
+    ) {
+        // no-op.
+    }
 }
