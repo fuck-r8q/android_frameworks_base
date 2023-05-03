@@ -933,7 +933,7 @@ public class DisplayPolicy {
             float maxOpacity = mService.mMaximumObscuringOpacityForTouch;
             if (attrs.alpha > maxOpacity
                     && (attrs.flags & FLAG_NOT_TOUCHABLE) != 0
-                    && (attrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) == 0) {
+                    && !win.isTrustedOverlay()) {
                 // The app is posting a SAW with the intent of letting touches pass through, but
                 // they are going to be deemed untrusted and will be blocked. Try to honor the
                 // intent of letting touches pass through at the cost of 0.2 opacity for app
@@ -1095,11 +1095,9 @@ public class DisplayPolicy {
                 } else {
                     overrideProviders = null;
                 }
-                final @InsetsType int type = provider.getType();
-                final int id = InsetsSource.createId(
-                        provider.getOwner(), provider.getIndex(), type);
-                mDisplayContent.getInsetsStateController().getOrCreateSourceProvider(id, type)
-                        .setWindowContainer(win, frameProvider, overrideProviders);
+                mDisplayContent.getInsetsStateController().getOrCreateSourceProvider(
+                        provider.getId(), provider.getType()).setWindowContainer(
+                                win, frameProvider, overrideProviders);
                 mInsetsSourceWindowsExceptIme.add(win);
             }
         }
