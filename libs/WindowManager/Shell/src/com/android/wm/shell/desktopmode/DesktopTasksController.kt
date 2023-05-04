@@ -16,7 +16,6 @@
 
 package com.android.wm.shell.desktopmode
 
-import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.WindowConfiguration.ACTIVITY_TYPE_HOME
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
@@ -78,6 +77,11 @@ class DesktopTasksController(
 
     private val desktopMode: DesktopModeImpl
     private var visualIndicator: DesktopModeVisualIndicator? = null
+    private val mOnAnimationFinishedCallback = Consumer<SurfaceControl.Transaction> {
+        t: SurfaceControl.Transaction ->
+        visualIndicator?.releaseVisualIndicator(t)
+        visualIndicator = null
+    }
 
     init {
         desktopMode = DesktopModeImpl()
@@ -154,14 +158,14 @@ class DesktopTasksController(
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             enterDesktopTaskTransitionHandler.startTransition(
-                    Transitions.TRANSIT_ENTER_FREEFORM, wct)
+                    Transitions.TRANSIT_ENTER_FREEFORM, wct, mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
     }
 
     /** Brings apps to front and sets freeform task bounds */
-    fun moveToDesktopWithAnimation(
+    private fun moveToDesktopWithAnimation(
             taskInfo: RunningTaskInfo,
             freeformBounds: Rect
     ) {
@@ -172,9 +176,10 @@ class DesktopTasksController(
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             enterDesktopTaskTransitionHandler.startTransition(
-                Transitions.TRANSIT_ENTER_DESKTOP_MODE, wct)
+                Transitions.TRANSIT_ENTER_DESKTOP_MODE, wct, mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
+            releaseVisualIndicator()
         }
     }
 
@@ -196,30 +201,32 @@ class DesktopTasksController(
         }
     }
 
-
     /**
      * Move a task to fullscreen after being dragged from fullscreen and released back into
      * status bar area
      */
-    fun cancelMoveToFreeform(task: RunningTaskInfo, startPosition: Point) {
+    fun cancelMoveToFreeform(task: RunningTaskInfo, position: Point) {
         val wct = WindowContainerTransaction()
         addMoveToFullscreenChanges(wct, task.token)
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct, startPosition)
+            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct, position,
+                    mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
+            releaseVisualIndicator()
         }
     }
 
-    fun moveToFullscreenWithAnimation(task: ActivityManager.RunningTaskInfo) {
+    private fun moveToFullscreenWithAnimation(task: RunningTaskInfo, position: Point) {
         val wct = WindowContainerTransaction()
         addMoveToFullscreenChanges(wct, task.token)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             exitDesktopTaskTransitionHandler.startTransition(
-            Transitions.TRANSIT_EXIT_DESKTOP_MODE, wct)
+            Transitions.TRANSIT_EXIT_DESKTOP_MODE, wct, position, mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
+            releaseVisualIndicator()
         }
     }
 
@@ -328,6 +335,16 @@ class DesktopTasksController(
             .getRunningTasks(context.displayId)
             .firstOrNull { task -> task.activityType == ACTIVITY_TYPE_HOME }
             ?.let { homeTask -> wct.reorder(homeTask.getToken(), true /* onTop */) }
+    }
+
+    private fun releaseVisualIndicator() {
+        val t = SurfaceControl.Transaction()
+        visualIndicator?.releaseVisualIndicator(t)
+        visualIndicator = null
+        syncQueue.runInSync { transaction ->
+            transaction.merge(t)
+            t.close()
+        }
     }
 
     override fun getContext(): Context {
@@ -471,8 +488,7 @@ class DesktopTasksController(
                         rootTaskDisplayAreaOrganizer)
                 visualIndicator?.createFullscreenIndicatorWithAnimatedBounds()
             } else if (y > statusBarHeight && visualIndicator != null) {
-                visualIndicator?.releaseVisualIndicator()
-                visualIndicator = null
+                releaseVisualIndicator()
             }
         }
     }
@@ -481,17 +497,15 @@ class DesktopTasksController(
      * Perform checks required on drag end. Move to fullscreen if drag ends in status bar area.
      *
      * @param taskInfo the task being dragged.
-     * @param y height of drag, to be checked against status bar height.
+     * @param position position of surface when drag ends
      */
     fun onDragPositioningEnd(
             taskInfo: RunningTaskInfo,
-            y: Float
+            position: Point
     ) {
         val statusBarHeight = getStatusBarHeight(taskInfo)
-        if (y <= statusBarHeight && taskInfo.windowingMode == WINDOWING_MODE_FREEFORM) {
-            visualIndicator?.releaseVisualIndicator()
-            visualIndicator = null
-            moveToFullscreenWithAnimation(taskInfo)
+        if (position.y <= statusBarHeight && taskInfo.windowingMode == WINDOWING_MODE_FREEFORM) {
+            moveToFullscreenWithAnimation(taskInfo, position)
         }
     }
 
@@ -508,6 +522,11 @@ class DesktopTasksController(
             taskSurface: SurfaceControl,
             y: Float
     ) {
+        // If the motion event is above the status bar, return since we do not need to show the
+        // visual indicator at this point.
+        if (y < getStatusBarHeight(taskInfo)) {
+            return
+        }
         if (visualIndicator == null) {
             visualIndicator = DesktopModeVisualIndicator(syncQueue, taskInfo,
                     displayController, context, taskSurface, shellTaskOrganizer,
@@ -535,10 +554,7 @@ class DesktopTasksController(
             freeformBounds: Rect
     ) {
         moveToDesktopWithAnimation(taskInfo, freeformBounds)
-        visualIndicator?.releaseVisualIndicator()
-        visualIndicator = null
     }
-
 
     private fun getStatusBarHeight(taskInfo: RunningTaskInfo): Int {
         return displayController.getDisplayLayout(taskInfo.displayId)?.stableInsets()?.top ?: 0
@@ -565,7 +581,6 @@ class DesktopTasksController(
     fun removeCornersForTask(taskId: Int) {
         desktopModeTaskRepository.removeTaskCorners(taskId)
     }
-
 
     /**
      * Adds a listener to find out about changes in the visibility of freeform tasks.
