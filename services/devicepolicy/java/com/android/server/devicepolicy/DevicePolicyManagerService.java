@@ -3439,7 +3439,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             // Given that the parent user has just started, profile should be locked.
             updatePersonalAppsSuspension(profileUserHandle, false /* unlocked */);
         } else {
-            suspendPersonalAppsInternal(userHandle, false);
+            suspendPersonalAppsInternal(userHandle, profileUserHandle, false);
         }
     }
 
@@ -7718,7 +7718,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         // Unsuspend personal apps if needed.
-        suspendPersonalAppsInternal(parentId, false);
+        suspendPersonalAppsInternal(parentId, getManagedUserId(parentId), false);
 
         // Notify FRP agent, LSS and WindowManager to ensure they don't hold on to stale policies.
         final int frpAgentUid = getFrpManagementAgentUid();
@@ -8646,7 +8646,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         CallerIdentity caller;
-        if (isPermissionCheckFlagEnabled()) {
+        if (isPolicyEngineForFinanceFlagEnabled()) {
             caller = getCallerIdentity(who, callerPackage);
         } else {
             Objects.requireNonNull(who, "ComponentName is null");
@@ -8660,23 +8660,47 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
         }
 
-        synchronized (getLockObject()) {
-            ActiveAdmin ap;
-            if (isPermissionCheckFlagEnabled()) {
-                int callerUserId = Binder.getCallingUserHandle().getIdentifier();
-                int targetUserId = parent ? getProfileParentId(callerUserId) : callerUserId;
-                ap = enforcePermissionAndGetEnforcingAdmin(
-                        who, MANAGE_DEVICE_POLICY_SCREEN_CAPTURE, caller.getPackageName(),
-                        targetUserId).getActiveAdmin();
+        if (isPolicyEngineForFinanceFlagEnabled()) {
+            int callerUserId = Binder.getCallingUserHandle().getIdentifier();
+            int targetUserId = parent ? getProfileParentId(callerUserId) : callerUserId;
+            EnforcingAdmin admin = enforcePermissionAndGetEnforcingAdmin(
+                    who, MANAGE_DEVICE_POLICY_SCREEN_CAPTURE, caller.getPackageName(),
+                    targetUserId);
+            if ((parent && isProfileOwnerOfOrganizationOwnedDevice(caller))
+                    || isDefaultDeviceOwner(caller)) {
+                if (disabled) {
+                    mDevicePolicyEngine.setGlobalPolicy(
+                            PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                            admin,
+                            new BooleanPolicyValue(disabled));
+                } else {
+                    mDevicePolicyEngine.removeGlobalPolicy(
+                            PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                            admin);
+                }
             } else {
-                ap = getParentOfAdminIfRequired(
-                        getProfileOwnerOrDefaultDeviceOwnerLocked(caller.getUserId()), parent);
+                if (disabled) {
+                    mDevicePolicyEngine.setLocalPolicy(
+                            PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                            admin,
+                            new BooleanPolicyValue(disabled),
+                            callerUserId);
+                } else {
+                    mDevicePolicyEngine.removeLocalPolicy(
+                            PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                            admin,
+                            callerUserId);
+                }
             }
-
-            if (ap.disableScreenCapture != disabled) {
-                ap.disableScreenCapture = disabled;
-                saveSettingsLocked(caller.getUserId());
-                pushScreenCapturePolicy(caller.getUserId());
+        } else {
+            synchronized (getLockObject()) {
+                ActiveAdmin ap = getParentOfAdminIfRequired(
+                        getProfileOwnerOrDefaultDeviceOwnerLocked(caller.getUserId()), parent);
+                if (ap.disableScreenCapture != disabled) {
+                    ap.disableScreenCapture = disabled;
+                    saveSettingsLocked(caller.getUserId());
+                    pushScreenCapturePolicy(caller.getUserId());
+                }
             }
         }
         DevicePolicyEventLogger
@@ -8690,6 +8714,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     // DO or COPE PO on the parent profile, then this takes precedence as screen capture will
     // be disabled device-wide.
     private void pushScreenCapturePolicy(int adminUserId) {
+        if (isPolicyEngineForFinanceFlagEnabled()) {
+            return;
+        }
         // Update screen capture device-wide if disabled by the DO or COPE PO on the parent profile.
         // TODO(b/261999445): remove
         ActiveAdmin admin;
@@ -8731,8 +8758,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     /**
-     * Returns whether or not screen capture is disabled for a given admin, or disabled for any
-     * active admin (if given admin is null).
+     * Returns whether or not screen capture is disabled for  any active admin.
      */
     @Override
     public boolean getScreenCaptureDisabled(ComponentName who, int userHandle, boolean parent) {
@@ -8746,7 +8772,14 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             Preconditions.checkCallAuthorization(
                     isProfileOwnerOfOrganizationOwnedDevice(getCallerIdentity().getUserId()));
         }
-        return !mPolicyCache.isScreenCaptureAllowed(userHandle);
+        if (isPolicyEngineForFinanceFlagEnabled()) {
+            Boolean disallowed = mDevicePolicyEngine.getResolvedPolicy(
+                    PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                    userHandle);
+            return disallowed != null && disallowed;
+        } else {
+            return !mPolicyCache.isScreenCaptureAllowed(userHandle);
+        }
     }
 
     private void updateScreenCaptureDisabled() {
@@ -16310,17 +16343,27 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 return result;
             }
         } else if (DevicePolicyManager.POLICY_DISABLE_SCREEN_CAPTURE.equals(restriction)) {
-            synchronized (getLockObject()) {
-                final DevicePolicyData policy = getUserData(userId);
-                final int N = policy.mAdminList.size();
-                for (int i = 0; i < N; i++) {
-                    final ActiveAdmin admin = policy.mAdminList.get(i);
-                    if (admin.disableScreenCapture) {
-                        result = new Bundle();
-                        result.putInt(Intent.EXTRA_USER_ID, userId);
-                        result.putParcelable(DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                                admin.info.getComponent());
-                        return result;
+            if (isPolicyEngineForFinanceFlagEnabled()) {
+                Boolean value = mDevicePolicyEngine.getResolvedPolicy(
+                        PolicyDefinition.SCREEN_CAPTURE_DISABLED, userId);
+                if (value != null && value) {
+                    result = new Bundle();
+                    result.putInt(Intent.EXTRA_USER_ID, userId);
+                    return result;
+                }
+            } else {
+                synchronized (getLockObject()) {
+                    final DevicePolicyData policy = getUserData(userId);
+                    final int N = policy.mAdminList.size();
+                    for (int i = 0; i < N; i++) {
+                        final ActiveAdmin admin = policy.mAdminList.get(i);
+                        if (admin.disableScreenCapture) {
+                            result = new Bundle();
+                            result.putInt(Intent.EXTRA_USER_ID, userId);
+                            result.putParcelable(DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                                    admin.info.getComponent());
+                            return result;
+                        }
                     }
                 }
             }
@@ -20811,7 +20854,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         final int parentUserId = getProfileParentId(profileUserId);
-        suspendPersonalAppsInternal(parentUserId, shouldSuspend);
+        suspendPersonalAppsInternal(parentUserId, profileUserId, shouldSuspend);
         return shouldSuspend;
     }
 
@@ -20895,23 +20938,40 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         return notificationState;
     }
 
-    private void suspendPersonalAppsInternal(int userId, boolean suspended) {
-        if (getUserData(userId).mAppsSuspended == suspended) {
+    private void suspendPersonalAppsInternal(
+            int parentUserId, int profileUserId, boolean suspended) {
+        if (getUserData(parentUserId).mAppsSuspended == suspended) {
             return;
         }
         Slogf.i(LOG_TAG, "%s personal apps for user %d", suspended ? "Suspending" : "Unsuspending",
-                userId);
+                parentUserId);
 
-        if (suspended) {
-            suspendPersonalAppsInPackageManager(userId);
+        if (isPolicyEngineForFinanceFlagEnabled()) {
+            // TODO(b/280602237): migrate properly
+            ActiveAdmin profileOwner = getProfileOwnerAdminLocked(profileUserId);
+            if (profileOwner != null) {
+                EnforcingAdmin admin = EnforcingAdmin.createEnterpriseEnforcingAdmin(
+                        profileOwner.info.getComponent(),
+                        profileUserId,
+                        profileOwner);
+                mDevicePolicyEngine.setLocalPolicy(
+                        PolicyDefinition.PERSONAL_APPS_SUSPENDED,
+                        admin,
+                        new BooleanPolicyValue(suspended),
+                        parentUserId);
+            }
         } else {
-            mInjector.getPackageManagerInternal().unsuspendForSuspendingPackage(
-                    PLATFORM_PACKAGE_NAME, userId);
+            if (suspended) {
+                suspendPersonalAppsInPackageManager(parentUserId);
+            } else {
+                mInjector.getPackageManagerInternal().unsuspendForSuspendingPackage(
+                        PLATFORM_PACKAGE_NAME, parentUserId);
+            }
         }
 
         synchronized (getLockObject()) {
-            getUserData(userId).mAppsSuspended = suspended;
-            saveSettingsLocked(userId);
+            getUserData(parentUserId).mAppsSuspended = suspended;
+            saveSettingsLocked(parentUserId);
         }
     }
 
@@ -21763,10 +21823,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         final AccountManager accountManager = mContext.createContextAsUser(
                         UserHandle.of(sourceUserId), /* flags= */ 0)
                 .getSystemService(AccountManager.class);
-        final AccountManagerFuture<Bundle> bundle = accountManager.removeAccount(account,
-                null, null /* callback */, null /* handler */);
         try {
-            final Bundle result = bundle.getResult();
+            final Bundle result = accountManager.removeAccount(account,
+                    null, null /* callback */, null /* handler */).getResult(60, TimeUnit.SECONDS);
             if (result.getBoolean(AccountManager.KEY_BOOLEAN_RESULT, /* default */ false)) {
                 Slogf.i(LOG_TAG, "Account removed from the primary user.");
             } else {
@@ -23655,7 +23714,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 DEFAULT_VALUE_PERMISSION_BASED_ACCESS_FLAG);
     }
 
-    private boolean isPolicyEngineForFinanceFlagEnabled() {
+    static boolean isPolicyEngineForFinanceFlagEnabled() {
         return DeviceConfig.getBoolean(
                 NAMESPACE_DEVICE_POLICY_MANAGER,
                 ENABLE_DEVICE_POLICY_ENGINE_FOR_FINANCE_FLAG,

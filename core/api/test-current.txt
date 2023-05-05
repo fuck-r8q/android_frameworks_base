@@ -2038,6 +2038,7 @@ package android.media.metrics {
 package android.media.soundtrigger {
 
   public final class SoundTriggerInstrumentation {
+    method public void setInPhoneCallState(boolean);
     method public void setResourceContention(boolean);
     method public void triggerOnResourcesAvailable();
     method public void triggerRestart();
@@ -2625,6 +2626,21 @@ package android.os.vibrator {
     method @FloatRange(from=0, to=1) @NonNull public float[] getMaxAmplitudeMeasurements();
     method public float getMaxFrequency();
     method public float getMinFrequency();
+  }
+
+}
+
+package android.os.vibrator.persistence {
+
+  public final class VibrationXmlParser {
+    method @Nullable public static android.os.VibrationEffect parse(@NonNull java.io.Reader) throws java.io.IOException;
+  }
+
+  public final class VibrationXmlSerializer {
+    method public static void serialize(@NonNull android.os.VibrationEffect, @NonNull java.io.Writer) throws java.io.IOException, android.os.vibrator.persistence.VibrationXmlSerializer.SerializationFailedException;
+  }
+
+  public static final class VibrationXmlSerializer.SerializationFailedException extends java.lang.IllegalStateException {
   }
 
 }

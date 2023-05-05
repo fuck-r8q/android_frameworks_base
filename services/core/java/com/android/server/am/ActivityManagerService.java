@@ -2497,13 +2497,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         final File systemDir = SystemServiceManager.ensureSystemDir();
 
         // TODO: Move creation of battery stats service outside of activity manager service.
-        mBatteryStatsService = new BatteryStatsService(systemContext, systemDir,
-                BackgroundThread.get().getHandler());
-        mBatteryStatsService.getActiveStatistics().readLocked();
-        mBatteryStatsService.scheduleWriteToDisk();
+        mBatteryStatsService = BatteryStatsService.create(systemContext, systemDir,
+                BackgroundThread.getHandler(), this);
         mOnBattery = DEBUG_POWER ? true
                 : mBatteryStatsService.getActiveStatistics().getIsOnBattery();
-        mBatteryStatsService.getActiveStatistics().setCallback(this);
         mOomAdjProfiler.batteryPowerChanged(mOnBattery);
 
         mProcessStats = new ProcessStatsService(this, new File(systemDir, "procstats"));
@@ -9504,11 +9501,20 @@ public class ActivityManagerService extends IActivityManager.Stub
      * Check if the calling process has the permission to dump given package,
      * throw SecurityException if it doesn't have the permission.
      *
-     * @return The UID of the given package, or {@link android.os.Process#INVALID_UID}
+     * @return The real UID of process that can be dumped, or {@link android.os.Process#INVALID_UID}
      *         if the package is not found.
      */
     int enforceDumpPermissionForPackage(String packageName, int userId, int callingUid,
             String function) {
+        // Allow SDK sandbox process to dump for its own process (under SDK sandbox package)
+        try {
+            if (Process.isSdkSandboxUid(callingUid)
+                    && getPackageManager().getSdkSandboxPackageName().equals(packageName)) {
+                return callingUid;
+            }
+        } catch (RemoteException e) {
+            Log.e(TAG, "Could not get SDK sandbox package name");
+        }
         final long identity = Binder.clearCallingIdentity();
         int uid = INVALID_UID;
         try {
@@ -19113,8 +19119,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     @Override
-    public int restartUserInBackground(final int userId) {
-        return mUserController.restartUser(userId, USER_START_MODE_BACKGROUND);
+    public int restartUserInBackground(int userId, int userStartMode) {
+        return mUserController.restartUser(userId, userStartMode);
     }
 
     @Override
