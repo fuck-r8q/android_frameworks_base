@@ -1711,6 +1711,12 @@
       with Near Field Communication (NFC) tags, cards, and readers.</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permlab_nfcTransactionEvent">Secure Element transaction event</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permdesc_nfcTransactionEvent">Allows the app to receive information about
+      transactions happening on a Secure Element.</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_disableKeyguard">disable your screen lock</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permdesc_disableKeyguard">Allows the app to disable the
@@ -5912,11 +5918,12 @@
 
     <!-- Error message. This text lets the user know that their current personal apps don't support the specific content. [CHAR LIMIT=NONE] -->
     <string name="resolver_no_personal_apps_available">No personal apps</string>
-
+    <!-- Dialog title. User must choose to open content in a cross-profile app or cancel. [CHAR LIMIT=NONE] -->
+    <string name="miniresolver_open_work">Open work <xliff:g id="app" example="YouTube">%s</xliff:g>?</string>
     <!-- Dialog title. User must choose between opening content in a cross-profile app or same-profile browser. [CHAR LIMIT=NONE] -->
-    <string name="miniresolver_open_in_personal">Open personal <xliff:g id="app" example="YouTube">%s</xliff:g></string>
+    <string name="miniresolver_open_in_personal">Open in personal <xliff:g id="app" example="YouTube">%s</xliff:g>?</string>
     <!-- Dialog title. User must choose between opening content in a cross-profile app or same-profile browser. [CHAR LIMIT=NONE] -->
-    <string name="miniresolver_open_in_work">Open work <xliff:g id="app" example="YouTube">%s</xliff:g></string>
+    <string name="miniresolver_open_in_work">Open in work <xliff:g id="app" example="YouTube">%s</xliff:g>?</string>
     <!-- Button option. Open the link in the personal browser. [CHAR LIMIT=NONE] -->
     <string name="miniresolver_use_personal_browser">Use personal browser</string>
     <!-- Button option. Open the link in the work browser. [CHAR LIMIT=NONE] -->
