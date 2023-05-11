@@ -2961,8 +2961,13 @@
     <!-- Whether safe headphone volume is enabled or not (country specific). -->
     <bool name="config_safe_media_volume_enabled">true</bool>
 
-    <!-- Whether safe headphone sound dosage warning is enabled or not (country specific). -->
-    <bool name="config_safe_sound_dosage_enabled">true</bool>
+    <!-- Whether safe headphone sound dosage warning is enabled or not
+         (country specific). This value should only be overlaid to true
+         when a vendor supports offload and has the HAL sound dose
+         interfaces implemented. Otherwise, this can lead to a compliance
+         issue with the safe hearing standards EN50332-3 and IEC62368-1.
+    -->
+    <bool name="config_safe_sound_dosage_enabled">false</bool>
 
     <!-- Whether safe headphone volume warning dialog is disabled on Vol+ (operator specific). -->
     <bool name="config_safe_media_disable_on_volume_up">true</bool>
@@ -4759,6 +4764,9 @@
 
     <!-- Whether or not we should show the option to show battery percentage -->
     <bool name="config_battery_percentage_setting_available">true</bool>
+
+    <!-- Default value set for battery percentage in status bar false = disabled, true = enabled -->
+    <bool name="config_defaultBatteryPercentageSetting">false</bool>
 
     <!-- Whether or not battery saver should be "sticky" when manually enabled. -->
     <bool name="config_batterySaverStickyBehaviourDisabled">false</bool>
