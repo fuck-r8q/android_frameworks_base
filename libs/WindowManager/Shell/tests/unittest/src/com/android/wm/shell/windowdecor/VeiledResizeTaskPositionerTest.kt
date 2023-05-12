@@ -123,7 +123,7 @@ class VeiledResizeTaskPositionerTest : ShellTestCase() {
             STARTING_BOUNDS.left.toFloat(),
             STARTING_BOUNDS.top.toFloat()
         )
-        verify(mockDesktopWindowDecoration).showResizeVeil()
+        verify(mockDesktopWindowDecoration).showResizeVeil(STARTING_BOUNDS)
 
         taskPositioner.onDragPositioningEnd(
             STARTING_BOUNDS.left.toFloat(),
@@ -180,7 +180,7 @@ class VeiledResizeTaskPositionerTest : ShellTestCase() {
             STARTING_BOUNDS.right.toFloat(),
             STARTING_BOUNDS.top.toFloat()
         )
-        verify(mockDesktopWindowDecoration).showResizeVeil()
+        verify(mockDesktopWindowDecoration).showResizeVeil(STARTING_BOUNDS)
 
         taskPositioner.onDragPositioningMove(
             STARTING_BOUNDS.right.toFloat() + 10,
@@ -224,7 +224,7 @@ class VeiledResizeTaskPositionerTest : ShellTestCase() {
             STARTING_BOUNDS.left.toFloat(),
             STARTING_BOUNDS.top.toFloat()
         )
-        verify(mockDesktopWindowDecoration).showResizeVeil()
+        verify(mockDesktopWindowDecoration).showResizeVeil(STARTING_BOUNDS)
 
         taskPositioner.onDragPositioningMove(
             STARTING_BOUNDS.left.toFloat(),
@@ -268,6 +268,55 @@ class VeiledResizeTaskPositionerTest : ShellTestCase() {
                 token == taskBinder &&
                         ((change.windowSetMask and WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0)
             }
+        })
+    }
+
+    @Test
+    fun testDragResize_resize_resizingTaskReorderedToTopWhenNotFocused() {
+        mockDesktopWindowDecoration.mTaskInfo.isFocused = false
+        taskPositioner.onDragPositioningStart(
+                CTRL_TYPE_RIGHT, // Resize right
+                STARTING_BOUNDS.left.toFloat(),
+                STARTING_BOUNDS.top.toFloat()
+        )
+
+        // Verify task is reordered to top
+        verify(mockShellTaskOrganizer).applyTransaction(argThat { wct ->
+            return@argThat wct.hierarchyOps.any { hierarchyOps ->
+                hierarchyOps.container == taskBinder && hierarchyOps.toTop }
+        })
+    }
+
+    @Test
+    fun testDragResize_resize_resizingTaskNotReorderedToTopWhenFocused() {
+        mockDesktopWindowDecoration.mTaskInfo.isFocused = true
+        taskPositioner.onDragPositioningStart(
+                CTRL_TYPE_RIGHT, // Resize right
+                STARTING_BOUNDS.left.toFloat(),
+                STARTING_BOUNDS.top.toFloat()
+        )
+
+        // Verify task is not reordered to top
+        verify(mockShellTaskOrganizer, never()).applyTransaction(argThat { wct ->
+            return@argThat wct.hierarchyOps.any { hierarchyOps ->
+                hierarchyOps.container == taskBinder && hierarchyOps.toTop }
+        })
+    }
+
+    @Test
+    fun testDragResize_drag_draggedTaskNotReorderedToTop() {
+        mockDesktopWindowDecoration.mTaskInfo.isFocused = false
+        taskPositioner.onDragPositioningStart(
+                CTRL_TYPE_UNDEFINED, // drag
+                STARTING_BOUNDS.left.toFloat(),
+                STARTING_BOUNDS.top.toFloat()
+        )
+
+        // Verify task is not reordered to top since task is already brought to top before dragging
+        // begins
+        verify(mockShellTaskOrganizer, never()).applyTransaction(argThat { wct ->
+            return@argThat wct.hierarchyOps.any { hierarchyOps ->
+                hierarchyOps.container == taskBinder && hierarchyOps.toTop }
         })
     }
 
