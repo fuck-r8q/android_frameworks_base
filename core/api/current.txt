@@ -7137,6 +7137,9 @@ package android.app {
 
   public final class RemoteTaskConstants {
     ctor public RemoteTaskConstants();
+    field public static final int DEVICE_AVAILABILITY_STATE_CONSTRAINED = 4; // 0x4
+    field public static final int DEVICE_AVAILABILITY_STATE_CRITICAL = 16; // 0x10
+    field public static final int DEVICE_AVAILABILITY_STATE_FREE = 8; // 0x8
     field public static final int FLAG_TASK_LAUNCH_SCENARIO_ATOA = 102; // 0x66
     field public static final int FLAG_TASK_LAUNCH_SCENARIO_CLIENT = 100; // 0x64
     field public static final int FLAG_TASK_LAUNCH_SCENARIO_COMMON = 0; // 0x0
