@@ -21,15 +21,22 @@ import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 
+import dagger.hilt.android.qualifiers.ApplicationContext;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 /**
  * A factory class used to create {@link Ringtone}.
  */
+@Singleton
 public class RingtoneFactory {
 
     private final Context mApplicationContext;
 
-    RingtoneFactory(Context context) {
-        mApplicationContext = context.getApplicationContext();
+    @Inject
+    RingtoneFactory(@ApplicationContext Context applicationContext) {
+        mApplicationContext = applicationContext;
     }
 
     /**
