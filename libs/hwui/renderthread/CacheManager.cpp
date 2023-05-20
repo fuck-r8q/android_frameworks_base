@@ -139,6 +139,25 @@ void CacheManager::trimMemory(TrimLevel mode) {
     }
 }
 
+void CacheManager::trimCaches(CacheTrimLevel mode) {
+    switch (mode) {
+        case CacheTrimLevel::FONT_CACHE:
+            SkGraphics::PurgeFontCache();
+            break;
+        case CacheTrimLevel::RESOURCE_CACHE:
+            SkGraphics::PurgeResourceCache();
+            break;
+        case CacheTrimLevel::ALL_CACHES:
+            SkGraphics::PurgeAllCaches();
+            if (mGrContext) {
+                mGrContext->purgeUnlockedResources(false);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void CacheManager::trimStaleResources() {
     if (!mGrContext) {
         return;
@@ -258,12 +277,13 @@ void CacheManager::onThreadIdle() {
 
     const nsecs_t now = systemTime(CLOCK_MONOTONIC);
     // Rate limiting
-    if ((now - mLastDeferredCleanup) < 25_ms) {
+    if ((now - mLastDeferredCleanup) > 25_ms) {
         mLastDeferredCleanup = now;
         const nsecs_t frameCompleteNanos = mFrameCompletions[0];
         const nsecs_t frameDiffNanos = now - frameCompleteNanos;
         const nsecs_t cleanupMillis =
-                ns2ms(std::max(frameDiffNanos, mMemoryPolicy.minimumResourceRetention));
+                ns2ms(std::clamp(frameDiffNanos, mMemoryPolicy.minimumResourceRetention,
+                                 mMemoryPolicy.maximumResourceRetention));
         mGrContext->performDeferredCleanup(std::chrono::milliseconds(cleanupMillis),
                                            mMemoryPolicy.purgeScratchOnly);
     }

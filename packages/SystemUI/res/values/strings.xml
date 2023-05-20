@@ -353,7 +353,7 @@
     <!-- Message shown when a biometric is authenticated, waiting for the user to confirm authentication [CHAR LIMIT=40]-->
     <string name="biometric_dialog_tap_confirm">Tap Confirm to complete</string>
     <!-- Message shown when a biometric has authenticated with a user's face and is waiting for the user to confirm authentication [CHAR LIMIT=60]-->
-    <string name="biometric_dialog_tap_confirm_with_face">Unlocked by face. Press the unlock icon to continue.</string>
+    <string name="biometric_dialog_tap_confirm_with_face">Unlocked by face.</string>
     <!-- Message shown when a biometric has authenticated with a user's face and is waiting for the user to confirm authentication [CHAR LIMIT=60]-->
     <string name="biometric_dialog_tap_confirm_with_face_alt_1">Unlocked by face. Press to continue.</string>
     <!-- Message shown when a biometric has authenticated with a user's face and is waiting for the user to confirm authentication [CHAR LIMIT=60]-->
@@ -2390,6 +2390,8 @@
     <string name="magnification_mode_switch_state_window">Magnify part of screen</string>
     <!-- Click action label for magnification settings panel. [CHAR LIMIT=NONE] -->
     <string name="magnification_open_settings_click_label">Open magnification settings</string>
+    <!-- Click action label for magnification settings panel. [CHAR LIMIT=NONE] -->
+    <string name="magnification_close_settings_click_label">Close magnification settings</string>
     <!-- Label of the corner of a rectangle that you can tap and drag to resize the magnification area. [CHAR LIMIT=NONE] -->
     <string name="magnification_drag_corner_to_resize">Drag corner to resize</string>
 

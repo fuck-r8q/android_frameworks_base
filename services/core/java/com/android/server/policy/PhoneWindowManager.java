@@ -1428,6 +1428,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         /** log stem triple press telemetry if it's a talkback enabled event */
                         logStemTriplePressAccessibilityTelemetry(componentName);
                     }
+                    performHapticFeedback(HapticFeedbackConstants.CONFIRM, /* always = */ false,
+                        /* reason = */ "Stem primary - Triple Press - Toggle Accessibility");
                     /** Toggle talkback end */
                 }
                 break;
@@ -2202,6 +2204,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 com.android.internal.R.integer.config_shortPressOnSleepBehavior);
         mAllowStartActivityForLongPressOnPowerDuringSetup = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_allowStartActivityForLongPressOnPowerInSetup);
+        mShortPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_shortPressOnStemPrimaryBehavior);
+        mLongPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_longPressOnStemPrimaryBehavior);
+        mDoublePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_doublePressOnStemPrimaryBehavior);
+        mTriplePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_triplePressOnStemPrimaryBehavior);
 
         mHapticTextHandleEnabled = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_enableHapticTextHandle);
@@ -2608,14 +2618,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mPackageManager.hasSystemFeature(FEATURE_PICTURE_IN_PICTURE)) {
             mShortPressOnWindowBehavior = SHORT_PRESS_WINDOW_PICTURE_IN_PICTURE;
         }
-        mShortPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_shortPressOnStemPrimaryBehavior);
-        mLongPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_longPressOnStemPrimaryBehavior);
-        mDoublePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_doublePressOnStemPrimaryBehavior);
-        mTriplePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_triplePressOnStemPrimaryBehavior);
     }
 
     public void updateSettings() {

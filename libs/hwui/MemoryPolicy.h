@@ -31,6 +31,12 @@ enum class TrimLevel {
     RUNNING_MODERATE = 5,
 };
 
+enum class CacheTrimLevel {
+    ALL_CACHES = 0,
+    FONT_CACHE = 1,
+    RESOURCE_CACHE = 2,
+};
+
 struct MemoryPolicy {
     // The initial scale factor applied to the display resolution. The default is 1, but
     // lower values may be used to start with a smaller initial cache size. The cache will
@@ -47,6 +53,8 @@ struct MemoryPolicy {
     // The minimum amount of time to hold onto items in the resource cache
     // The actual time used will be the max of this & when frames were actually rendered
     nsecs_t minimumResourceRetention = 10_s;
+    // The maximum amount of time to hold onto items in the resource cache
+    nsecs_t maximumResourceRetention = 100000_s;
     // If false, use only TRIM_UI_HIDDEN to drive background cache limits;
     // If true, use all signals (such as all contexts are stopped) to drive the limits
     bool useAlternativeUiHidden = true;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.systemui.biometrics.data.model
+package com.android.systemui.notetask;
 
-import com.android.systemui.biometrics.Utils
+import android.content.Intent;
+import android.graphics.drawable.Icon;
+import android.os.UserHandle;
 
-// TODO(b/251476085): this should eventually replace Utils.CredentialType
-/** Credential options for biometric prompt. Shadows [Utils.CredentialType]. */
-enum class PromptKind {
-    ANY_BIOMETRIC,
-    PIN,
-    PATTERN,
-    PASSWORD,
+/** A service to help with controlling the state of notes app bubble through the system user. */
+interface INoteTaskBubblesService {
+
+    boolean areBubblesAvailable();
+
+    void showOrHideAppBubble(in Intent intent, in UserHandle userHandle, in Icon icon);
 }
