@@ -76,7 +76,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     private static final long MAX_HOGP_DELAY_FOR_AUTO_CONNECT = 30000;
     private static final long MAX_LEAUDIO_DELAY_FOR_AUTO_CONNECT = 30000;
     private static final long MAX_MEDIA_PROFILE_CONNECT_DELAY = 60000;
-    private static final boolean mIsTwsConnectEnabled = false;
 
     private final Context mContext;
     private final BluetoothAdapter mLocalAdapter;
@@ -196,8 +195,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mDevice = cachedDevice.mDevice;
         fillData();
         initDrawableCache();
-        mTwspBatteryState = -1;
-        mTwspBatteryLevel = -1;
         mUnpairing = false;
     }
 
@@ -216,22 +213,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 return bitmap.getBitmap().getByteCount() / 1024;
             }
         };
-    }
-
-    /* Gets Device for seondary TWS device
-     * @param mDevice Primary TWS device  to get secondary
-     * @return Description of the device
-     */
-
-    private BluetoothDevice getTwsPeerDevice() {
-      BluetoothAdapter bluetoothAdapter;
-      BluetoothDevice peerDevice = null;
-      if (mDevice.isTwsPlusDevice()) {
-        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        String peerAddress = mDevice.getTwsPlusPeerAddress();
-        peerDevice = bluetoothAdapter.getRemoteDevice(peerAddress);
-      }
-      return peerDevice;
     }
 
     /**
@@ -329,10 +310,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 mProfiles.remove(profile);
                 mRemovedProfiles.add(profile);
                 mLocalNapRoleConnected = false;
-            } else if (profile instanceof HeadsetProfile
-                    && newProfileState == BluetoothProfile.STATE_DISCONNECTED) {
-                mTwspBatteryState = -1;
-                mTwspBatteryLevel = -1;
             }
 
             if (!HearingAidStatsLogUtils.isUserCategorized(mContext)) {
@@ -538,13 +515,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 Log.d(TAG, "No profiles. Maybe we will connect later for device " + mDevice);
                 return;
             }
-            // BondingInitiatedLocally flag should be reset in onBondingStateChanged
-            // But Settings executing onBondingStateChanged twice and its lead to auto connection
-            // failure. this flag will be moved from here once settings issue fixed.
-            if (mDevice.isBondingInitiatedLocally()) {
-                Log.w(TAG, "reset BondingInitiatedLocally flag");
-                mDevice.setBondingInitiatedLocally(false);
-            }
 
             Log.d(TAG, "connect " + this);
             mDevice.connect();
@@ -613,17 +583,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
         if (state != BluetoothDevice.BOND_NONE) {
             final BluetoothDevice dev = mDevice;
-            if (mDevice.isTwsPlusDevice()) {
-               BluetoothDevice peerDevice = getTwsPeerDevice();
-               if (peerDevice != null) {
-                   final boolean peersuccessful = peerDevice.removeBond();
-                   if (peersuccessful) {
-                       if (BluetoothUtils.D) {
-                           Log.d(TAG, "Command sent successfully:REMOVE_BOND " + peerDevice.getName());
-                       }
-                   }
-                }
-            }
             if (dev != null) {
                 mUnpairing = true;
                 final boolean successful = dev.removeBond();
@@ -1037,12 +996,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             mBondTimestamp = new Timestamp(System.currentTimeMillis());
             boolean mIsBondingInitiatedLocally = mDevice.isBondingInitiatedLocally();
             Log.w(TAG, "mIsBondingInitiatedLocally" + mIsBondingInitiatedLocally);
-            if (mIsTwsConnectEnabled) {
-                Log.d(TAG, "Initiating connection to" + mDevice);
-                if (mIsBondingInitiatedLocally || mDevice.isTwsPlusDevice()) {
-                    connect();
-                }
-            } else if (mIsBondingInitiatedLocally) {
+            if (mIsBondingInitiatedLocally) {
                  connect();
             }
 
@@ -1328,27 +1282,11 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         // any other value should be a framework bug. Thus assume here that if value is greater
         // than BluetoothDevice.BATTERY_LEVEL_UNKNOWN, it must be valid
 
-        if (mDevice.isTwsPlusDevice() && mTwspBatteryState != -1 &&
-           mTwspBatteryLevel != -1) {
-            String s = "TWSP: ";
-            String chargingState;
-            if (mTwspBatteryState == 1) {
-                chargingState = "Charging, ";
-            } else {
-                chargingState = "Discharging, ";
-            }
-            s = s.concat (chargingState);
-            s = s.concat(
-                 com.android.settingslib.Utils.formatPercentage(mTwspBatteryLevel));
-            batteryLevelPercentageString = s;
-            Log.i(TAG, "UI string" + batteryLevelPercentageString);
-        } else {
-            final int batteryLevel = getMinBatteryLevelWithMemberDevices();
-            if (batteryLevel > BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
-                // TODO: name com.android.settingslib.bluetooth.Utils something different
-                batteryLevelPercentageString =
-                    com.android.settingslib.Utils.formatPercentage(batteryLevel);
-            }
+        final int batteryLevel = getMinBatteryLevelWithMemberDevices();
+        if (batteryLevel > BluetoothDevice.BATTERY_LEVEL_UNKNOWN) {
+            // TODO: name com.android.settingslib.bluetooth.Utils something different
+            batteryLevelPercentageString =
+                com.android.settingslib.Utils.formatPercentage(batteryLevel);
         }
 
         int stringRes = R.string.bluetooth_pairing;
@@ -1782,50 +1720,6 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     void releaseLruCache() {
         mDrawableCache.evictAll();
-    }
-
-    public boolean isGroupDevice() {
-        return mIsGroupDevice;
-    }
-
-    public boolean isPrivateAddr() {
-        return mIsIgnore;
-    }
-
-    public void setDeviceType(int deviceType) {
-        if (deviceType!= mType) {
-            mType = deviceType;
-            if (mType == UNKNOWN || mType == BREDR) {
-                mIsGroupDevice = false;
-                mQGroupId = UNKNOWN;
-                mIsIgnore = false;
-            } else if (mType == PRIVATE_ADDR) {
-                mIsGroupDevice = false;
-                mQGroupId = UNKNOWN;
-                mIsIgnore = true;
-            } else if (mType >= GROUPID_START && mType <= GROUPID_END ) {
-                mQGroupId = mType;
-                mIsIgnore = false;
-                mIsGroupDevice = true;
-            } else {
-                Log.e(TAG, "setDeviceType error type " + mType);
-            }
-        }
-        /* Log.d(TAG, "setDeviceType mType " + mType + " mIsGroupDevice " + mIsGroupDevice
-                + " mQGroupId " + mQGroupId + " mIsIgnore " + mIsIgnore
-                + " name " + getName() + " addr " + getAddress()); */
-    }
-
-    public boolean isTypeUnKnown() {
-        if (mType == UNKNOWN) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    public int getmType() {
-        return mType;
     }
 
     boolean getUnpairing() {

@@ -184,21 +184,10 @@ public class BtHelper {
                                                                  String address) {
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         BluetoothDevice connDevice = adapter.getRemoteDevice(address);
-        if (device == null || connDevice == null ||
-            device.getTwsPlusPeerAddress() == null) {
+        if (device == null || connDevice == null) {
             return false;
         }
-        if (device.isTwsPlusDevice() &&
-            connDevice.isTwsPlusDevice() &&
-            device.getTwsPlusPeerAddress().equals(address)) {
-            if (mBluetoothA2dpActiveDevice == null) {
-                Log.w(TAG,"Not a TwsPlusSwitch as previous active device was null");
-                return false;
-            }
-            Log.i(TAG,"isTwsPlusSwitch true");
-            return true;
-         }
-         return false;
+        return false;
     }
     //----------------------------------------------------------------------
     // Interface for AudioDeviceBroker
@@ -342,33 +331,11 @@ public class BtHelper {
            return ret;
         }
 
-        if (device.isTwsPlusDevice()) {
-            if (state == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
-                //if adding new Device
-                //check if there is no device already connected
-                if (isAudioPathUp()) {
-                    Log.i(TAG, "No need to bringup audio-path");
-                    ret = false;
-                }
-                //Update the States now
-                updateTwsPlusScoState(device, state);
-            } else {
-                //For disconnect cases, update the state first
-                updateTwsPlusScoState(device, state);
-                //if deleting new Device
-                //check if all devices are disconnected
-                if (isAudioPathUp()) {
-                    Log.i(TAG, "not good to tear down audio-path");
-                    ret = false;
-                }
-            }
-        }
-        Log.i(TAG, "checkAndUpdatTwsPlusScoState returns " + ret);
         return ret;
     }
 
     private boolean isGroupDevice(BluetoothDevice device) {
-        int type = device.getDeviceType();
+        int type = 0;
         boolean ret = false;
         Log.i(TAG, "Bluetooth device type: " + type);
         if (type >= GROUP_ID_START && type <= GROUP_ID_END)
@@ -468,24 +435,6 @@ public class BtHelper {
        //non-twsplus device case returns true
        boolean ret = true;
 
-       if (mBluetoothHeadsetDevice != null
-              && mBluetoothHeadsetDevice.isTwsPlusDevice()) {
-           //If It is TWSplus Device, check for TWS pair device
-           //Sco state
-           String pDevAddr = mBluetoothHeadsetDevice.getTwsPlusPeerAddress();
-           if (pDevAddr != null) {
-               BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-               BluetoothDevice peerDev = adapter.getRemoteDevice(pDevAddr);
-               Log.d(TAG, "peer device audio State: " + mBluetoothHeadset.getAudioState(peerDev));
-               if (mBluetoothHeadset.getAudioState(peerDev)
-                     == BluetoothHeadset.STATE_AUDIO_CONNECTED ||
-                     mBluetoothHeadset.getAudioState(mBluetoothHeadsetDevice)
-                       == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
-                           Log.w(TAG, "TwsPLus Case: one of eb SCO is connected");
-                   ret = false;
-               }
-           }
-       }
        Log.d(TAG, "isBluetoothAudioConnectedToEarbud returns: " + ret);
        return ret;
     }
@@ -881,14 +830,6 @@ public class BtHelper {
         Log.i(TAG, "onSetBtScoActiveDevice: " + getAnonymizedAddress(mBluetoothHeadsetDevice)
                 + " -> " + getAnonymizedAddress(btDevice));
         final BluetoothDevice previousActiveDevice = mBluetoothHeadsetDevice;
-        if (mBluetoothHeadsetDevice != null && mBluetoothHeadsetDevice.isTwsPlusDevice()
-           && btDevice != null
-           && Objects.equals(mBluetoothHeadsetDevice.getTwsPlusPeerAddress(), btDevice.getAddress())) {
-            Log.i(TAG, "setBtScoActiveDevice: Active device switch between twsplus devices");
-            //Keep the same mBluetoothHeadsetDevice as current Active so
-            //that It tears down when active becomes null
-            return;
-        }
         if (Objects.equals(btDevice, previousActiveDevice)) {
             return;
         }
