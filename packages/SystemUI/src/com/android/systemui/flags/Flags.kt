@@ -628,6 +628,9 @@ object Flags {
     // TODO(b/265944639): Tracking Bug
     @JvmField val DUAL_SHADE = unreleasedFlag(1801, "dual_shade")
 
+    // TODO(b/283300105): Tracking Bug
+    @JvmField val SCENE_CONTAINER = unreleasedFlag(1802, "scene_container")
+
     // 1900
     @JvmField val NOTE_TASKS = releasedFlag(1900, "keycode_flag")
 
@@ -727,4 +730,9 @@ object Flags {
     // TODO(b/283084712): Tracking Bug
     @JvmField
     val IMPROVED_HUN_ANIMATIONS = unreleasedFlag(283084712, "improved_hun_animations")
+
+    // TODO(b/283447257): Tracking bug
+    @JvmField
+    val BIGPICTURE_NOTIFICATION_LAZY_LOADING =
+            unreleasedFlag(283447257, "bigpicture_notification_lazy_loading")
 }
