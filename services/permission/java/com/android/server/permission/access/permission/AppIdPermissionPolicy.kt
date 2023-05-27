@@ -155,19 +155,13 @@ class AppIdPermissionPolicy : SchemePolicy() {
             evaluatePermissionStateForAllPackages(permissionName, null)
         }
 
-        newState.externalState.packageStates.forEach { (_, packageState) ->
-            val androidPackage = packageState.androidPackage
-            if (androidPackage == null || androidPackage.volumeUuid != volumeUuid) {
-                return@forEach
-            }
+        packageNames.forEachIndexed { _, packageName ->
+            val packageState = newState.externalState.packageStates[packageName]!!
             val installedPackageState = if (isSystemUpdated) packageState else null
             evaluateAllPermissionStatesForPackage(packageState, installedPackageState)
         }
-        newState.externalState.packageStates.forEach { (_, packageState) ->
-            val androidPackage = packageState.androidPackage
-            if (androidPackage == null || androidPackage.volumeUuid != volumeUuid) {
-                return@forEach
-            }
+        packageNames.forEachIndexed { _, packageName ->
+            val packageState = newState.externalState.packageStates[packageName]!!
             newState.externalState.userIds.forEachIndexed { _, userId ->
                 inheritImplicitPermissionStates(packageState.appId, userId)
             }
@@ -831,7 +825,13 @@ class AppIdPermissionPolicy : SchemePolicy() {
                 }
             } else {
                 val wasGrantedByLegacy = newFlags.hasBits(PermissionFlags.LEGACY_GRANTED)
-                newFlags = newFlags andInv PermissionFlags.LEGACY_GRANTED
+                val hasImplicitFlag = newFlags.hasBits(PermissionFlags.IMPLICIT)
+                if (wasGrantedByLegacy) {
+                    newFlags = newFlags andInv PermissionFlags.LEGACY_GRANTED
+                    if (!hasImplicitFlag) {
+                        newFlags = newFlags or PermissionFlags.RUNTIME_GRANTED
+                    }
+                }
                 val wasGrantedByImplicit = newFlags.hasBits(PermissionFlags.IMPLICIT_GRANTED)
                 val isLeanbackNotificationsPermission = newState.externalState.isLeanback &&
                     permissionName in NOTIFICATIONS_PERMISSIONS
@@ -870,7 +870,6 @@ class AppIdPermissionPolicy : SchemePolicy() {
                         )
                     }
                 }
-                val hasImplicitFlag = newFlags.hasBits(PermissionFlags.IMPLICIT)
                 if (!isImplicitPermission && hasImplicitFlag) {
                     newFlags = newFlags andInv PermissionFlags.IMPLICIT
                     var shouldRetainAsNearbyDevices = false
