@@ -76,6 +76,7 @@ import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
+import android.os.UserManager;
 import android.os.storage.IStorageManager;
 import android.provider.DeviceConfig;
 import android.provider.Settings;
@@ -106,7 +107,6 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.ILockSettings;
 import com.android.internal.widget.LockSettingsInternal;
 import com.android.server.am.ActivityManagerService;
-import com.android.server.ambientcontext.AmbientContextManagerService;
 import com.android.server.appbinding.AppBindingService;
 import com.android.server.appop.AppOpMigrationHelper;
 import com.android.server.appop.AppOpMigrationHelperImpl;
@@ -328,10 +328,10 @@ public final class SystemServer implements Dumpable {
             "com.android.clockwork.healthservices.HealthService";
     private static final String SYSTEM_STATE_DISPLAY_SERVICE_CLASS =
             "com.android.clockwork.systemstatedisplay.SystemStateDisplayService";
-    private static final String WEAR_SIDEKICK_SERVICE_CLASS =
-            "com.google.android.clockwork.sidekick.SidekickService";
     private static final String WEAR_DISPLAYOFFLOAD_SERVICE_CLASS =
             "com.android.clockwork.displayoffload.DisplayOffloadService";
+    private static final String WEAR_MODE_SERVICE_CLASS =
+            "com.android.clockwork.modes.ModeManagerService";
     private static final String WEAR_DISPLAY_SERVICE_CLASS =
             "com.android.clockwork.display.WearDisplayService";
     private static final String WEAR_TIME_SERVICE_CLASS =
@@ -356,6 +356,8 @@ public final class SystemServer implements Dumpable {
             "com.android.server.selectiontoolbar.SelectionToolbarManagerService";
     private static final String MUSIC_RECOGNITION_MANAGER_SERVICE_CLASS =
             "com.android.server.musicrecognition.MusicRecognitionManagerService";
+    private static final String AMBIENT_CONTEXT_MANAGER_SERVICE_CLASS =
+            "com.android.server.ambientcontext.AmbientContextManagerService";
     private static final String SYSTEM_CAPTIONS_MANAGER_SERVICE_CLASS =
             "com.android.server.systemcaptions.SystemCaptionsManagerService";
     private static final String TEXT_TO_SPEECH_MANAGER_SERVICE_CLASS =
@@ -1214,13 +1216,6 @@ public final class SystemServer implements Dumpable {
         }
         t.traceEnd();
 
-        t.traceBegin("StartSidekickService");
-        // Package manager isn't started yet; need to use SysProp not hardware feature
-        if (SystemProperties.getBoolean("config.enable_sidekick_graphics", false)) {
-            mSystemServiceManager.startService(WEAR_SIDEKICK_SERVICE_CLASS);
-        }
-        t.traceEnd();
-
         // Display manager is needed to provide display metrics before package manager
         // starts up.
         t.traceBegin("StartDisplayManager");
@@ -1908,8 +1903,16 @@ public final class SystemServer implements Dumpable {
             startRotationResolverService(context, t);
             startSystemCaptionsManagerService(context, t);
             startTextToSpeechManagerService(context, t);
-            startAmbientContextService(t);
             startWearableSensingService(t);
+
+            if (deviceHasConfigString(
+                    context, R.string.config_defaultAmbientContextDetectionService)) {
+                t.traceBegin("StartAmbientContextService");
+                mSystemServiceManager.startService(AMBIENT_CONTEXT_MANAGER_SERVICE_CLASS);
+                t.traceEnd();
+            } else {
+                Slog.d(TAG, "AmbientContextManagerService not defined by OEM or disabled by flag");
+            }
 
             // System Speech Recognition Service
             t.traceBegin("StartSpeechRecognitionManagerService");
@@ -2608,6 +2611,10 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartWearSettingsService");
             mSystemServiceManager.startService(WEAR_SETTINGS_SERVICE_CLASS);
             t.traceEnd();
+
+            t.traceBegin("StartWearModeService");
+            mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
+            t.traceEnd();
         }
 
         if (!mPackageManager.hasSystemFeature(PackageManager.FEATURE_SLICES_DISABLED)) {
@@ -2748,7 +2755,8 @@ public final class SystemServer implements Dumpable {
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(
                         mActivityManagerService, mPackageManagerService, mContentResolver,
-                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin));
+                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin),
+                        UserManager.isCommunalProfileEnabled());
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
@@ -3166,6 +3174,12 @@ public final class SystemServer implements Dumpable {
             t.traceEnd();
         }, t);
 
+        if (hsumBootUserInitializer != null) {
+            t.traceBegin("HsumBootUserInitializer.postSystemReady");
+            hsumBootUserInitializer.postSystemReady(t);
+            t.traceEnd();
+        }
+
         t.traceBegin("LockSettingsThirdPartyAppsStarted");
         LockSettingsInternal lockSettingsInternal =
             LocalServices.getService(LockSettingsInternal.class);
@@ -3309,12 +3323,6 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(RotationResolverManagerService.class);
         t.traceEnd();
 
-    }
-
-    private void startAmbientContextService(@NonNull TimingsTraceAndSlog t) {
-        t.traceBegin("StartAmbientContextService");
-        mSystemServiceManager.startService(AmbientContextManagerService.class);
-        t.traceEnd();
     }
 
     private void startWearableSensingService(@NonNull TimingsTraceAndSlog t) {
