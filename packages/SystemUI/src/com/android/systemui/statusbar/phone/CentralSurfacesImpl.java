@@ -173,7 +173,6 @@ import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.qs.QS;
-import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper.SnoozeOption;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.qs.QSFragment;
 import com.android.systemui.qs.QSPanelController;
@@ -465,8 +464,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     DozeServiceHost mDozeServiceHost;
     private final LightRevealScrim mLightRevealScrim;
     private PowerButtonReveal mPowerButtonReveal;
-
-    private boolean mWakeUpComingFromTouch;
 
     /**
      * Whether we should delay the wakeup animation (which shows the notifications and moves the
@@ -1625,7 +1622,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         if (mDozing && mScreenOffAnimationController.allowWakeUpIfDozing()) {
             mPowerManager.wakeUp(
                     time, wakeReason, "com.android.systemui:" + why);
-            mWakeUpComingFromTouch = true;
             mFalsingCollector.onScreenOnFromTouch();
         }
     }
@@ -1802,11 +1798,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         return mIsLaunchingActivityOverLockscreen;
     }
 
-    @Override
-    public boolean isWakeUpComingFromTouch() {
-        return mWakeUpComingFromTouch;
-    }
-
     /**
      * To be called when there's a state change in StatusBarKeyguardViewManager.
      */
@@ -1935,7 +1926,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     SystemClock.uptimeMillis(),
                     PowerManager.WAKE_REASON_APPLICATION,
                     "com.android.systemui:full_screen_intent");
-            mWakeUpComingFromTouch = false;
         }
     }
 
@@ -2323,7 +2313,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     mNotificationShadeWindowController.setNotTouchable(false);
                 }
                 finishBarAnimations();
-                resetUserExpandedStates();
+                mNotificationsController.resetUserExpandedStates();
             }
             Trace.endSection();
         }
@@ -2341,11 +2331,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             }
         }
     };
-
-    @Override
-    public void resetUserExpandedStates() {
-        mNotificationsController.resetUserExpandedStates();
-    }
 
     /**
      * Notify the shade controller that the current user changed
@@ -3116,7 +3101,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             releaseGestureWakeLock();
             mLaunchCameraWhenFinishedWaking = false;
             mDeviceInteractive = false;
-            mWakeUpComingFromTouch = false;
             updateVisibleToUser();
 
             updateNotificationPanelTouchState();
@@ -3585,12 +3569,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             }
         }
     };
-
-    @Override
-    public void setNotificationSnoozed(StatusBarNotification sbn, SnoozeOption snoozeOption) {
-        mNotificationsController.setNotificationSnoozed(sbn, snoozeOption);
-    }
-
 
     @Override
     public void awakenDreams() {
