@@ -2833,9 +2833,7 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                             } else if (!permissionPolicyInitialized
                                     || (!hardRestricted || restrictionExempt)) {
                                 if ((origPermState != null && origPermState.isGranted())) {
-                                    if (!uidState.grantPermission(bp)) {
-                                        wasChanged = true;
-                                    }
+                                    uidState.grantPermission(bp);
                                 }
                             }
                             if (mIsLeanback && NOTIFICATION_PERMISSIONS.contains(permName)) {
@@ -4597,6 +4595,19 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                 legacyPermissionSettings.replacePermissionTrees(legacyPermissions);
             }
         }
+    }
+
+    @Nullable
+    @Override
+    public String getDefaultPermissionGrantFingerprint(@UserIdInt int userId) {
+        return mPackageManagerInt.isPermissionUpgradeNeeded(userId) ? null : Build.FINGERPRINT;
+    }
+
+    @Override
+    public void setDefaultPermissionGrantFingerprint(@NonNull String fingerprint,
+            @UserIdInt int userId) {
+        // Ignored - default permission grant here shares the same version with runtime permission
+        // upgrade, and the new version is set by that later.
     }
 
     private void onPackageAddedInternal(@NonNull PackageState packageState,
