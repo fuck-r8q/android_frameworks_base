@@ -133,7 +133,7 @@ public class StageCoordinatorTests extends ShellTestCase {
         mStageCoordinator = spy(new StageCoordinator(mContext, DEFAULT_DISPLAY, mSyncQueue,
                 mTaskOrganizer, mMainStage, mSideStage, mDisplayController, mDisplayImeController,
                 mDisplayInsetsController, mSplitLayout, mTransitions, mTransactionPool,
-                mMainExecutor, Optional.empty(), mLaunchAdjacentController));
+                mMainExecutor, Optional.empty(), mLaunchAdjacentController, Optional.empty()));
         mDividerLeash = new SurfaceControl.Builder(mSurfaceSession).setName("fakeDivider").build();
 
         when(mSplitLayout.getBounds1()).thenReturn(mBounds1);
@@ -162,7 +162,7 @@ public class StageCoordinatorTests extends ShellTestCase {
 
         mStageCoordinator.moveToStage(task, SPLIT_POSITION_BOTTOM_OR_RIGHT, wct);
         verify(mStageCoordinator).prepareEnterSplitScreen(eq(wct), eq(task),
-                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT));
+                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT), eq(false));
         verify(mMainStage).reparentTopTask(eq(wct));
         assertEquals(SPLIT_POSITION_BOTTOM_OR_RIGHT, mStageCoordinator.getSideStagePosition());
         assertEquals(SPLIT_POSITION_TOP_OR_LEFT, mStageCoordinator.getMainStagePosition());
@@ -180,7 +180,7 @@ public class StageCoordinatorTests extends ShellTestCase {
 
         mStageCoordinator.moveToStage(task, SPLIT_POSITION_BOTTOM_OR_RIGHT, wct);
         verify(mStageCoordinator).prepareEnterSplitScreen(eq(wct), eq(task),
-                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT));
+                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT), eq(false));
         assertEquals(SPLIT_POSITION_BOTTOM_OR_RIGHT, mStageCoordinator.getMainStagePosition());
         assertEquals(SPLIT_POSITION_TOP_OR_LEFT, mStageCoordinator.getSideStagePosition());
     }
@@ -192,7 +192,7 @@ public class StageCoordinatorTests extends ShellTestCase {
 
         mStageCoordinator.moveToStage(task, SPLIT_POSITION_BOTTOM_OR_RIGHT, wct);
         verify(mStageCoordinator).prepareEnterSplitScreen(eq(wct), eq(task),
-                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT));
+                eq(SPLIT_POSITION_BOTTOM_OR_RIGHT), eq(false));
         assertEquals(SPLIT_POSITION_BOTTOM_OR_RIGHT, mStageCoordinator.getSideStagePosition());
     }
 

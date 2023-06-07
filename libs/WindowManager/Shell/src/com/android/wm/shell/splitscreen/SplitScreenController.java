@@ -89,11 +89,13 @@ import com.android.wm.shell.draganddrop.DragAndDropController;
 import com.android.wm.shell.draganddrop.DragAndDropPolicy;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.recents.RecentTasksController;
+import com.android.wm.shell.splitscreen.SplitScreen.StageType;
 import com.android.wm.shell.sysui.KeyguardChangeListener;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
+import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -172,6 +174,7 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
     private final IconProvider mIconProvider;
     private final Optional<RecentTasksController> mRecentTasksOptional;
     private final LaunchAdjacentController mLaunchAdjacentController;
+    private final Optional<WindowDecorViewModel> mWindowDecorViewModel;
     private final SplitScreenShellCommandHandler mSplitScreenShellCommandHandler;
     private final String[] mAppsSupportMultiInstances;
 
@@ -199,6 +202,7 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             IconProvider iconProvider,
             Optional<RecentTasksController> recentTasks,
             LaunchAdjacentController launchAdjacentController,
+            Optional<WindowDecorViewModel> windowDecorViewModel,
             ShellExecutor mainExecutor) {
         mShellCommandHandler = shellCommandHandler;
         mShellController = shellController;
@@ -216,6 +220,7 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mIconProvider = iconProvider;
         mRecentTasksOptional = recentTasks;
         mLaunchAdjacentController = launchAdjacentController;
+        mWindowDecorViewModel = windowDecorViewModel;
         mSplitScreenShellCommandHandler = new SplitScreenShellCommandHandler(this);
         // TODO(b/238217847): Temporarily add this check here until we can remove the dynamic
         //                    override for this controller from the base module
@@ -246,6 +251,7 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             IconProvider iconProvider,
             RecentTasksController recentTasks,
             LaunchAdjacentController launchAdjacentController,
+            WindowDecorViewModel windowDecorViewModel,
             ShellExecutor mainExecutor,
             StageCoordinator stageCoordinator) {
         mShellCommandHandler = shellCommandHandler;
@@ -264,6 +270,7 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mIconProvider = iconProvider;
         mRecentTasksOptional = Optional.of(recentTasks);
         mLaunchAdjacentController = launchAdjacentController;
+        mWindowDecorViewModel = Optional.of(windowDecorViewModel);
         mStageCoordinator = stageCoordinator;
         mSplitScreenShellCommandHandler = new SplitScreenShellCommandHandler(this);
         shellInit.addInitCallback(this::onInit, this);
@@ -296,13 +303,15 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             mStageCoordinator = createStageCoordinator();
         }
         mDragAndDropController.ifPresent(controller -> controller.setSplitScreenController(this));
+        mWindowDecorViewModel.ifPresent(viewModel -> viewModel.setSplitScreenController(this));
     }
 
     protected StageCoordinator createStageCoordinator() {
         return new StageCoordinator(mContext, DEFAULT_DISPLAY, mSyncQueue,
                 mTaskOrganizer, mDisplayController, mDisplayImeController,
-                mDisplayInsetsController, mTransitions, mTransactionPool,
-                mIconProvider, mMainExecutor, mRecentTasksOptional, mLaunchAdjacentController);
+                mDisplayInsetsController, mTransitions, mTransactionPool, mIconProvider,
+                mMainExecutor, mRecentTasksOptional, mLaunchAdjacentController,
+                mWindowDecorViewModel);
     }
 
     @Override
@@ -336,6 +345,11 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
     /** Check task is under split or not by taskId. */
     public boolean isTaskInSplitScreen(int taskId) {
         return mStageCoordinator.getStageOfTask(taskId) != STAGE_TYPE_UNDEFINED;
+    }
+
+    /** Get the split stage of task is under it. */
+    public @StageType int getStageOfTask(int taskId) {
+        return mStageCoordinator.getStageOfTask(taskId);
     }
 
     /** Check split is foreground and task is under split or not by taskId. */
@@ -384,17 +398,35 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mStageCoordinator.setSideStagePosition(sideStagePosition, null /* wct */);
     }
 
-    public void enterSplitScreen(int taskId, boolean leftOrTop) {
-        enterSplitScreen(taskId, leftOrTop, new WindowContainerTransaction());
-    }
-
+    /**
+     * Doing necessary window transaction for other transition handler need to enter split in
+     * transition.
+     */
     public void prepareEnterSplitScreen(WindowContainerTransaction wct,
             ActivityManager.RunningTaskInfo taskInfo, int startPosition) {
-        mStageCoordinator.prepareEnterSplitScreen(wct, taskInfo, startPosition);
+        mStageCoordinator.prepareEnterSplitScreen(wct, taskInfo, startPosition,
+                false /* resizeAnim */);
     }
 
-    public void finishEnterSplitScreen(SurfaceControl.Transaction t) {
-        mStageCoordinator.finishEnterSplitScreen(t);
+    /**
+     * Doing necessary surface transaction for other transition handler need to enter split in
+     * transition when finished.
+     */
+    public void finishEnterSplitScreen(SurfaceControl.Transaction finishT) {
+        mStageCoordinator.finishEnterSplitScreen(finishT);
+    }
+
+    /**
+     * Doing necessary window transaction for other transition handler need to exit split in
+     * transition.
+     */
+    public void prepareExitSplitScreen(WindowContainerTransaction wct,
+            @StageType int stageToTop) {
+        mStageCoordinator.prepareExitSplitScreen(stageToTop, wct);
+    }
+
+    public void enterSplitScreen(int taskId, boolean leftOrTop) {
+        enterSplitScreen(taskId, leftOrTop, new WindowContainerTransaction());
     }
 
     public void enterSplitScreen(int taskId, boolean leftOrTop, WindowContainerTransaction wct) {
