@@ -1413,7 +1413,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             policy.mAdminList.remove(i);
                             policy.mAdminMap.remove(aa.info.getComponent());
                             pushActiveAdminPackagesLocked(userHandle);
-                            pushMeteredDisabledPackages(userHandle);
                         }
                     }
                 } catch (RemoteException re) {
@@ -1454,6 +1453,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (removedAdmin) {
             // The removed admin might have disabled camera, so update user restrictions.
             pushUserRestrictions(userHandle);
+            pushMeteredDisabledPackages(userHandle);
         }
     }
 
@@ -7844,27 +7844,29 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 throw new SecurityException("Cannot wipe data. " + restriction
                         + " restriction is set for user " + userId);
             }
+        });
 
-            boolean isSystemUser = userId == UserHandle.USER_SYSTEM;
-            boolean wipeDevice;
-            if (factoryReset == null || !mInjector.isChangeEnabled(EXPLICIT_WIPE_BEHAVIOUR,
-                    adminPackage,
-                    userId)) {
-                // Legacy mode
-                wipeDevice = isSystemUser;
+        boolean isSystemUser = userId == UserHandle.USER_SYSTEM;
+        boolean wipeDevice;
+        if (factoryReset == null || !mInjector.isChangeEnabled(EXPLICIT_WIPE_BEHAVIOUR,
+                adminPackage,
+                userId)) {
+            // Legacy mode
+            wipeDevice = isSystemUser;
+        } else {
+            // Explicit behaviour
+            if (factoryReset) {
+                EnforcingAdmin enforcingAdmin = enforcePermissionsAndGetEnforcingAdmin(
+                        /*admin=*/ null,
+                        /*permission=*/ new String[]{MANAGE_DEVICE_POLICY_WIPE_DATA,
+                                MASTER_CLEAR},
+                        USES_POLICY_WIPE_DATA,
+                        adminPackage,
+                        factoryReset ? UserHandle.USER_ALL :
+                                getAffectedUser(calledOnParentInstance));
+                wipeDevice = true;
             } else {
-                // Explicit behaviour
-                if (factoryReset) {
-                    EnforcingAdmin enforcingAdmin = enforcePermissionsAndGetEnforcingAdmin(
-                            /*admin=*/ null,
-                            /*permission=*/ new String[]{MANAGE_DEVICE_POLICY_WIPE_DATA,
-                                    MASTER_CLEAR},
-                            USES_POLICY_WIPE_DATA,
-                            adminPackage,
-                            factoryReset ? UserHandle.USER_ALL :
-                                    getAffectedUser(calledOnParentInstance));
-                    wipeDevice = true;
-                } else {
+                mInjector.binderWithCleanCallingIdentity(() -> {
                     Preconditions.checkCallAuthorization(!isSystemUser,
                             "User %s is a system user and cannot be removed", userId);
                     boolean isLastNonHeadlessUser = getUserInfo(userId).isFull()
@@ -7875,9 +7877,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             "Removing user %s would leave the device without any active users. "
                                     + "Consider factory resetting the device instead.",
                             userId);
-                    wipeDevice = false;
-                }
+                });
+                wipeDevice = false;
             }
+        }
+        mInjector.binderWithCleanCallingIdentity(() -> {
             if (wipeDevice) {
                 forceWipeDeviceNoLock(
                         (flags & WIPE_EXTERNAL_STORAGE) != 0,
@@ -17882,41 +17886,44 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mHasFeature) {
             return packageNames;
         }
-        synchronized (getLockObject()) {
-            final ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
-            return mInjector.binderWithCleanCallingIdentity(() -> {
-                final List<String> excludedPkgs = removeInvalidPkgsForMeteredDataRestriction(
-                        caller.getUserId(), packageNames);
+        return mInjector.binderWithCleanCallingIdentity(() -> {
+            final List<String> excludedPkgs = removeInvalidPkgsForMeteredDataRestriction(
+                    caller.getUserId(), packageNames);
+
+            synchronized (getLockObject()) {
+                final ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
                 admin.meteredDisabledPackages = packageNames;
-                pushMeteredDisabledPackages(caller.getUserId());
                 saveSettingsLocked(caller.getUserId());
-                return excludedPkgs;
-            });
-        }
+            }
+            pushMeteredDisabledPackages(caller.getUserId());
+            return excludedPkgs;
+        });
     }
 
     private List<String> removeInvalidPkgsForMeteredDataRestriction(
             int userId, List<String> pkgNames) {
-        final Set<String> activeAdmins = getActiveAdminPackagesLocked(userId);
-        final List<String> excludedPkgs = new ArrayList<>();
-        for (int i = pkgNames.size() - 1; i >= 0; --i) {
-            final String pkgName = pkgNames.get(i);
-            // If the package is an active admin, don't restrict it.
-            if (activeAdmins.contains(pkgName)) {
-                excludedPkgs.add(pkgName);
-                continue;
-            }
-            // If the package doesn't exist, don't restrict it.
-            try {
-                if (!mInjector.getIPackageManager().isPackageAvailable(pkgName, userId)) {
+        synchronized (getLockObject()) {
+            final Set<String> activeAdmins = getActiveAdminPackagesLocked(userId);
+            final List<String> excludedPkgs = new ArrayList<>();
+            for (int i = pkgNames.size() - 1; i >= 0; --i) {
+                final String pkgName = pkgNames.get(i);
+                // If the package is an active admin, don't restrict it.
+                if (activeAdmins.contains(pkgName)) {
                     excludedPkgs.add(pkgName);
+                    continue;
                 }
-            } catch (RemoteException e) {
-                // Should not happen
+                // If the package doesn't exist, don't restrict it.
+                try {
+                    if (!mInjector.getIPackageManager().isPackageAvailable(pkgName, userId)) {
+                        excludedPkgs.add(pkgName);
+                    }
+                } catch (RemoteException e) {
+                    // Should not happen
+                }
             }
+            pkgNames.removeAll(excludedPkgs);
+            return excludedPkgs;
         }
-        pkgNames.removeAll(excludedPkgs);
-        return excludedPkgs;
     }
 
     @Override
