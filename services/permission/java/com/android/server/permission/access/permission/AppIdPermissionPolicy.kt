@@ -27,7 +27,6 @@ import com.android.internal.os.RoSystemProperties
 import com.android.modules.utils.BinaryXmlPullParser
 import com.android.modules.utils.BinaryXmlSerializer
 import com.android.server.permission.access.AccessState
-import com.android.server.permission.access.AccessUri
 import com.android.server.permission.access.GetStateScope
 import com.android.server.permission.access.MutableAccessState
 import com.android.server.permission.access.MutateStateScope
@@ -66,22 +65,6 @@ class AppIdPermissionPolicy : SchemePolicy() {
 
     override val objectScheme: String
         get() = PermissionUri.SCHEME
-
-    override fun GetStateScope.getDecision(subject: AccessUri, `object`: AccessUri): Int {
-        subject as UidUri
-        `object` as PermissionUri
-        return getPermissionFlags(subject.appId, subject.userId, `object`.permissionName)
-    }
-
-    override fun MutateStateScope.setDecision(
-        subject: AccessUri,
-        `object`: AccessUri,
-        decision: Int
-    ) {
-        subject as UidUri
-        `object` as PermissionUri
-        setPermissionFlags(subject.appId, subject.userId, `object`.permissionName, decision)
-    }
 
     override fun GetStateScope.onStateMutated() {
         onPermissionFlagsChangedListeners.forEachIndexed { _, it -> it.onStateMutated() }
@@ -216,16 +199,16 @@ class AppIdPermissionPolicy : SchemePolicy() {
         }
         val androidPackage = packageState.androidPackage ?: return
         val appId = packageState.appId
-        androidPackage.requestedPermissions.forEachIndexed { _, permissionName ->
+        androidPackage.requestedPermissions.forEach { permissionName ->
             val permission = newState.systemState.permissions[permissionName]
-                ?: return@forEachIndexed
+                ?: return@forEach
             if (!permission.isHardOrSoftRestricted) {
-                return@forEachIndexed
+                return@forEach
             }
             val isRequestedBySystemPackage =
                 anyRequestingPackageInAppId(appId, permissionName) { it.isSystem }
             if (isRequestedBySystemPackage) {
-                return@forEachIndexed
+                return@forEach
             }
             val oldFlags = getPermissionFlags(appId, userId, permissionName)
             var newFlags = oldFlags andInv PermissionFlags.UPGRADE_EXEMPT
@@ -258,21 +241,21 @@ class AppIdPermissionPolicy : SchemePolicy() {
         val packageState = newState.externalState.packageStates[packageName] ?: return
         val androidPackage = packageState.androidPackage ?: return
         val appId = packageState.appId
-        androidPackage.requestedPermissions.forEachIndexed { _, permissionName ->
+        androidPackage.requestedPermissions.forEach { permissionName ->
             val permission = newState.systemState.permissions[permissionName]
-                ?: return@forEachIndexed
+                ?: return@forEach
             if (permission.isRemoved) {
-                return@forEachIndexed
+                return@forEach
             }
             val isRequestedByOtherPackages = anyRequestingPackageInAppId(appId, permissionName) {
                 it.packageName != packageName
             }
             if (isRequestedByOtherPackages) {
-                return@forEachIndexed
+                return@forEach
             }
             val oldFlags = getPermissionFlags(appId, userId, permissionName)
             if (oldFlags.hasAnyBit(SYSTEM_OR_POLICY_FIXED_MASK)) {
-                return@forEachIndexed
+                return@forEach
             }
             var newFlags = oldFlags
             newFlags = if (
@@ -444,7 +427,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
                     // It's a config permission and has no owner, take ownership now.
                     oldPermission.copy(
                         permissionInfo = newPermissionInfo, isReconciled = true,
-                        appId = packageState.appId
+                        type = Permission.TYPE_MANIFEST, appId = packageState.appId
                     )
                 } else if (newState.externalState.packageStates[oldPackageName]?.isSystem != true) {
                     Slog.w(
@@ -478,11 +461,12 @@ class AppIdPermissionPolicy : SchemePolicy() {
                     val isPermissionGroupChanged = newPermissionInfo.isRuntime &&
                         newPermissionInfo.group != null &&
                         newPermissionInfo.group != oldPermission.groupName
-                    val isPermissionTypeChanged = oldPermission.type != Permission.TYPE_CONFIG && (
-                        (newPermissionInfo.isRuntime && !oldPermission.isRuntime) ||
-                            (newPermissionInfo.isInternal && !oldPermission.isInternal)
-                    )
-                    if (isPermissionGroupChanged || isPermissionTypeChanged) {
+                    val isPermissionProtectionChanged =
+                        oldPermission.type != Permission.TYPE_CONFIG && (
+                            (newPermissionInfo.isRuntime && !oldPermission.isRuntime) ||
+                                (newPermissionInfo.isInternal && !oldPermission.isInternal)
+                        )
+                    if (isPermissionGroupChanged || isPermissionProtectionChanged) {
                         newState.externalState.userIds.forEachIndexed { _, userId ->
                             newState.externalState.appIdPackageNames.forEachIndexed { _, appId, _ ->
                                 if (isPermissionGroupChanged) {
@@ -497,11 +481,11 @@ class AppIdPermissionPolicy : SchemePolicy() {
                                             " to ${newPermissionInfo.group}"
                                     )
                                 }
-                                if (isPermissionTypeChanged) {
+                                if (isPermissionProtectionChanged) {
                                     Slog.w(
                                         LOG_TAG, "Revoking permission $permissionName for" +
                                             " appId $appId and userId $userId as the permission" +
-                                            " type changed."
+                                            " protection changed."
                                     )
                                 }
                                 setPermissionFlags(appId, userId, permissionName, 0)
@@ -517,7 +501,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
                 if (oldPermission != null) {
                     oldPermission.copy(
                         permissionInfo = newPermissionInfo, isReconciled = true,
-                        appId = packageState.appId
+                        type = Permission.TYPE_MANIFEST, appId = packageState.appId
                     )
                 } else {
                     Permission(
@@ -530,8 +514,17 @@ class AppIdPermissionPolicy : SchemePolicy() {
                 newState.mutateSystemState().mutatePermissionTrees()[permissionName] = newPermission
             } else {
                 newState.mutateSystemState().mutatePermissions()[permissionName] = newPermission
+                val isPermissionChanged = oldPermission == null ||
+                    newPackageName != oldPermission.packageName ||
+                    newPermission.protectionLevel != oldPermission.protectionLevel || (
+                        oldPermission.isReconciled && newPermission.isRuntime &&
+                            newPermission.groupName != null &&
+                            newPermission.groupName != oldPermission.groupName
+                    )
+                if (isPermissionChanged) {
+                    changedPermissionNames += permissionName
+                }
             }
-            changedPermissionNames += permissionName
         }
     }
 
@@ -695,7 +688,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
         userId: Int,
         installedPackageState: PackageState?
     ) {
-        packageState.androidPackage?.requestedPermissions?.forEachIndexed { _, permissionName ->
+        packageState.androidPackage?.requestedPermissions?.forEach { permissionName ->
             evaluatePermissionState(
                 packageState.appId, userId, permissionName, installedPackageState
             )
