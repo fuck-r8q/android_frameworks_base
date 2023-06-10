@@ -27,6 +27,7 @@ import android.annotation.PluralsRes;
 import android.annotation.RawRes;
 import android.annotation.StyleRes;
 import android.annotation.StyleableRes;
+import android.app.ResourcesManager;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ActivityInfo.Config;
@@ -408,17 +409,24 @@ public class ResourcesImpl {
 
                 if ((configChanges & ActivityInfo.CONFIG_LOCALE) != 0) {
                     if (locales.size() > 1) {
-                        // The LocaleList has changed. We must query the AssetManager's available
-                        // Locales and figure out the best matching Locale in the new LocaleList.
-                        String[] availableLocales = mAssets.getNonSystemLocales();
-                        if (LocaleList.isPseudoLocalesOnly(availableLocales)) {
-                            // No app defined locales, so grab the system locales.
-                            availableLocales = mAssets.getLocales();
+                        String[] availableLocales;
+
+                        LocaleList localeList = ResourcesManager.getInstance().getLocaleList();
+                        if (!localeList.isEmpty()) {
+                            availableLocales = localeList.toLanguageTags().split(",");
+                        } else {
+                            // The LocaleList has changed. We must query the AssetManager's
+                            // available Locales and figure out the best matching Locale in the new
+                            // LocaleList.
+                            availableLocales = mAssets.getNonSystemLocales();
                             if (LocaleList.isPseudoLocalesOnly(availableLocales)) {
-                                availableLocales = null;
+                                // No app defined locales, so grab the system locales.
+                                availableLocales = mAssets.getLocales();
+                                if (LocaleList.isPseudoLocalesOnly(availableLocales)) {
+                                    availableLocales = null;
+                                }
                             }
                         }
-
                         if (availableLocales != null) {
                             final Locale bestLocale = locales.getFirstMatchWithEnglishSupported(
                                     availableLocales);
@@ -650,21 +658,16 @@ public class ResourcesImpl {
                 key = (((long) value.assetCookie) << 32) | value.data;
             }
 
-            int cacheGeneration;
+            int cacheGeneration = caches.getGeneration();
             // First, check whether we have a cached version of this drawable
             // that was inflated against the specified theme. Skip the cache if
             // we're currently preloading or we're not using the cache.
             if (!mPreloading && useCache) {
-                final ThemedResourceCache.Entry<Drawable> cachedDrawable =
-                        caches.getDrawable(key, wrapper, theme);
-                if (cachedDrawable.hasValue()) {
-                    cachedDrawable.getValue().setChangingConfigurations(
-                            value.changingConfigurations);
-                    return cachedDrawable.getValue();
+                Drawable cachedDrawable = caches.getInstance(key, wrapper, theme);
+                if (cachedDrawable != null) {
+                    cachedDrawable.setChangingConfigurations(value.changingConfigurations);
+                    return cachedDrawable;
                 }
-                cacheGeneration = cachedDrawable.getGeneration();
-            } else {
-                cacheGeneration = ThemedResourceCache.UNDEFINED_GENERATION;
             }
 
             // Next, check preloaded drawables. Preloaded drawables may contain
@@ -1009,16 +1012,15 @@ public class ResourcesImpl {
             TypedValue value, int id) {
         final long key = (((long) value.assetCookie) << 32) | value.data;
         final ConfigurationBoundResourceCache<ComplexColor> cache = mComplexColorCache;
-        ThemedResourceCache.Entry<ComplexColor> complexColorEntry =
-                cache.getInstance(key, wrapper, theme);
-        if (complexColorEntry.hasValue()) {
-            return complexColorEntry.getValue();
+        ComplexColor complexColor = cache.getInstance(key, wrapper, theme);
+        if (complexColor != null) {
+            return complexColor;
         }
+        int cacheGeneration = cache.getGeneration();
 
         final android.content.res.ConstantState<ComplexColor> factory =
                 sPreloadedComplexColors.get(key);
 
-        ComplexColor complexColor = null;
         if (factory != null) {
             complexColor = factory.newInstance(wrapper, theme);
         }
@@ -1035,8 +1037,7 @@ public class ResourcesImpl {
                     sPreloadedComplexColors.put(key, complexColor.getConstantState());
                 }
             } else {
-                cache.put(key, theme, complexColor.getConstantState(),
-                        complexColorEntry.getGeneration());
+                cache.put(key, theme, complexColor.getConstantState(), cacheGeneration);
             }
         }
         return complexColor;

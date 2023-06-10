@@ -31,6 +31,7 @@ import android.graphics.Rect
 import android.graphics.Region
 import android.os.IBinder
 import android.os.SystemProperties
+import android.util.DisplayMetrics.DENSITY_DEFAULT
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManager.TRANSIT_NONE
@@ -38,7 +39,6 @@ import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.TransitionInfo
 import android.window.TransitionRequestInfo
-import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import androidx.annotation.BinderThread
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
@@ -79,6 +79,8 @@ class DesktopTasksController(
         private val transitions: Transitions,
         private val enterDesktopTaskTransitionHandler: EnterDesktopTaskTransitionHandler,
         private val exitDesktopTaskTransitionHandler: ExitDesktopTaskTransitionHandler,
+        private val toggleResizeDesktopTaskTransitionHandler:
+        ToggleResizeDesktopTaskTransitionHandler,
         private val desktopModeTaskRepository: DesktopModeTaskRepository,
         private val launchAdjacentController: LaunchAdjacentController,
         @ShellMainThread private val mainExecutor: ShellExecutor
@@ -184,7 +186,7 @@ class DesktopTasksController(
         )
         // Bring other apps to front first
         bringDesktopAppsToFront(task.displayId, wct)
-        addMoveToDesktopChanges(wct, task.token)
+        addMoveToDesktopChanges(wct, task)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
@@ -205,7 +207,7 @@ class DesktopTasksController(
         )
         val wct = WindowContainerTransaction()
         moveHomeTaskToFront(wct)
-        addMoveToDesktopChanges(wct, taskInfo.getToken())
+        addMoveToDesktopChanges(wct, taskInfo)
         wct.setBounds(taskInfo.token, startBounds)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
@@ -225,7 +227,7 @@ class DesktopTasksController(
         )
         val wct = WindowContainerTransaction()
         bringDesktopAppsToFront(taskInfo.displayId, wct)
-        addMoveToDesktopChanges(wct, taskInfo.getToken())
+        addMoveToDesktopChanges(wct, taskInfo)
         wct.setBounds(taskInfo.token, freeformBounds)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
@@ -251,7 +253,7 @@ class DesktopTasksController(
         )
 
         val wct = WindowContainerTransaction()
-        addMoveToFullscreenChanges(wct, task.token)
+        addMoveToFullscreenChanges(wct, task)
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
         } else {
@@ -270,7 +272,7 @@ class DesktopTasksController(
                 task.taskId
         )
         val wct = WindowContainerTransaction()
-        addMoveToFullscreenChanges(wct, task.token)
+        addMoveToFullscreenChanges(wct, task)
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct, position,
                     mOnAnimationFinishedCallback)
@@ -287,7 +289,7 @@ class DesktopTasksController(
                 task.taskId
         )
         val wct = WindowContainerTransaction()
-        addMoveToFullscreenChanges(wct, task.token)
+        addMoveToFullscreenChanges(wct, task)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             exitDesktopTaskTransitionHandler.startTransition(
@@ -381,6 +383,49 @@ class DesktopTasksController(
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
+    }
+
+    /** Quick-resizes a desktop task, toggling between the stable bounds and the default bounds. */
+    fun toggleDesktopTaskSize(taskInfo: RunningTaskInfo, windowDecor: DesktopModeWindowDecoration) {
+        val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
+
+        val stableBounds = Rect()
+        displayLayout.getStableBounds(stableBounds)
+        val destinationBounds = Rect()
+        if (taskInfo.configuration.windowConfiguration.bounds == stableBounds) {
+            // The desktop task is currently occupying the whole stable bounds, toggle to the
+            // default bounds.
+            getDefaultDesktopTaskBounds(
+                density = taskInfo.configuration.densityDpi.toFloat() / DENSITY_DEFAULT,
+                stableBounds = stableBounds,
+                outBounds = destinationBounds
+            )
+        } else {
+            // Toggle to the stable bounds.
+            destinationBounds.set(stableBounds)
+        }
+
+        val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
+        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
+            toggleResizeDesktopTaskTransitionHandler.startTransition(
+                wct,
+                taskInfo.taskId,
+                windowDecor
+            )
+        } else {
+            shellTaskOrganizer.applyTransaction(wct)
+        }
+    }
+
+    private fun getDefaultDesktopTaskBounds(density: Float, stableBounds: Rect, outBounds: Rect) {
+        val width = (DESKTOP_MODE_DEFAULT_WIDTH_DP * density + 0.5f).toInt()
+        val height = (DESKTOP_MODE_DEFAULT_HEIGHT_DP * density + 0.5f).toInt()
+        outBounds.set(0, 0, width, height)
+        // Center the task in stable bounds
+        outBounds.offset(
+            stableBounds.centerX() - outBounds.centerX(),
+            stableBounds.centerY() - outBounds.centerY()
+        )
     }
 
     /**
@@ -516,7 +561,7 @@ class DesktopTasksController(
                     task.taskId
             )
             return WindowContainerTransaction().also { wct ->
-                addMoveToFullscreenChanges(wct, task.token)
+                addMoveToFullscreenChanges(wct, task)
             }
         }
         return null
@@ -532,7 +577,7 @@ class DesktopTasksController(
                     task.taskId
             )
             return WindowContainerTransaction().also { wct ->
-                addMoveToDesktopChanges(wct, task.token)
+                addMoveToDesktopChanges(wct, task)
             }
         }
         return null
@@ -546,30 +591,44 @@ class DesktopTasksController(
         )
         val wct = WindowContainerTransaction()
         bringDesktopAppsToFront(task.displayId, wct)
-        addMoveToDesktopChanges(wct, task.token)
+        addMoveToDesktopChanges(wct, task)
         desktopModeTaskRepository.setStashed(task.displayId, false)
         return wct
     }
 
     private fun addMoveToDesktopChanges(
         wct: WindowContainerTransaction,
-        token: WindowContainerToken
+        taskInfo: RunningTaskInfo
     ) {
-        wct.setWindowingMode(token, WINDOWING_MODE_FREEFORM)
-        wct.reorder(token, true /* onTop */)
+        val displayWindowingMode = taskInfo.configuration.windowConfiguration.displayWindowingMode
+        val targetWindowingMode = if (displayWindowingMode == WINDOWING_MODE_FREEFORM) {
+            // Display windowing is freeform, set to undefined and inherit it
+            WINDOWING_MODE_UNDEFINED
+        } else {
+            WINDOWING_MODE_FREEFORM
+        }
+        wct.setWindowingMode(taskInfo.token, targetWindowingMode)
+        wct.reorder(taskInfo.token, true /* onTop */)
         if (isDesktopDensityOverrideSet()) {
-            wct.setDensityDpi(token, getDesktopDensityDpi())
+            wct.setDensityDpi(taskInfo.token, getDesktopDensityDpi())
         }
     }
 
     private fun addMoveToFullscreenChanges(
         wct: WindowContainerTransaction,
-        token: WindowContainerToken
+        taskInfo: RunningTaskInfo
     ) {
-        wct.setWindowingMode(token, WINDOWING_MODE_FULLSCREEN)
-        wct.setBounds(token, null)
+        val displayWindowingMode = taskInfo.configuration.windowConfiguration.displayWindowingMode
+        val targetWindowingMode = if (displayWindowingMode == WINDOWING_MODE_FULLSCREEN) {
+            // Display windowing is fullscreen, set to undefined and inherit it
+            WINDOWING_MODE_UNDEFINED
+        } else {
+            WINDOWING_MODE_FULLSCREEN
+        }
+        wct.setWindowingMode(taskInfo.token, targetWindowingMode)
+        wct.setBounds(taskInfo.token, null)
         if (isDesktopDensityOverrideSet()) {
-            wct.setDensityDpi(token, getFullscreenDensityDpi())
+            wct.setDensityDpi(taskInfo.token, getFullscreenDensityDpi())
         }
     }
 
@@ -869,6 +928,14 @@ class DesktopTasksController(
         private val DESKTOP_DENSITY_OVERRIDE =
             SystemProperties.getInt("persist.wm.debug.desktop_mode_density", 0)
         private val DESKTOP_DENSITY_ALLOWED_RANGE = (100..1000)
+
+        // Override default freeform task width when desktop mode is enabled. In dips.
+        private val DESKTOP_MODE_DEFAULT_WIDTH_DP =
+            SystemProperties.getInt("persist.wm.debug.desktop_mode.default_width", 840)
+
+        // Override default freeform task height when desktop mode is enabled. In dips.
+        private val DESKTOP_MODE_DEFAULT_HEIGHT_DP =
+            SystemProperties.getInt("persist.wm.debug.desktop_mode.default_height", 630)
 
         /**
          * Check if desktop density override is enabled
