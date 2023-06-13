@@ -1654,7 +1654,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             mLogger.logSideStageAppChange(getSideStagePosition(), mSideStage.getTopChildTaskUid(),
                     mSplitLayout.isLandscape());
         }
-        if (present && visible) {
+        if (present) {
             updateRecentTasksSplitPair();
         }
 
@@ -2522,6 +2522,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             if (mMixedHandler.animatePendingSplitWithDisplayChange(transition, info,
                     startTransaction, finishTransaction, finishCallback)) {
                 mSplitLayout.update(startTransaction);
+                startTransaction.apply();
                 return true;
             }
         }
