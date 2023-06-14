@@ -718,7 +718,7 @@ object Flags {
     // TODO(b/277201412): Tracking Bug
     @JvmField
     val SPLIT_SHADE_SUBPIXEL_OPTIMIZATION =
-            unreleasedFlag(2805, "split_shade_subpixel_optimization", teamfood = true)
+            releasedFlag(2805, "split_shade_subpixel_optimization")
 
     // TODO(b/278761837): Tracking Bug
     @JvmField
@@ -739,4 +739,10 @@ object Flags {
     @JvmField
     val BIGPICTURE_NOTIFICATION_LAZY_LOADING =
             unreleasedFlag(283447257, "bigpicture_notification_lazy_loading")
+
+    // 2900 - CentralSurfaces-related flags
+
+    // TODO(b/285174336): Tracking Bug
+    @JvmField
+    val USE_REPOS_FOR_BOUNCER_SHOWING = unreleasedFlag(2900, "use_repos_for_bouncer_showing")
 }

@@ -61,6 +61,7 @@ import android.service.notification.NotificationListenerService.Ranking;
 import android.service.notification.NotificationListenerService.RankingMap;
 import android.service.notification.StatusBarNotification;
 import android.util.ArrayMap;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
@@ -273,10 +274,6 @@ public class NotifCollection implements Dumpable, PipelineDumpable {
             List<Pair<NotificationEntry, DismissedByUserStats>> entriesToDismiss) {
         Assert.isMainThread();
         checkForReentrantCall();
-
-        // TODO (b/206842750): This method is called from (silent) clear all and non-clear all
-        // contexts and should be checking the NO_CLEAR flag, rather than depending on NSSL
-        // to pass in a properly filtered list of notifications
 
         final List<NotificationEntry> entriesToLocallyDismiss = new ArrayList<>();
         for (int i = 0; i < entriesToDismiss.size(); i++) {
@@ -517,10 +514,16 @@ public class NotifCollection implements Dumpable, PipelineDumpable {
      * @return True if the notification was removed, false otherwise.
      */
     private boolean tryRemoveNotification(NotificationEntry entry) {
-        if (mNotificationSet.get(entry.getKey()) != entry) {
+        final NotificationEntry storedEntry = mNotificationSet.get(entry.getKey());
+        if (storedEntry == null) {
+            Log.wtf(TAG, "TRY REMOVE non-existent notification " + logKey(entry));
+            return false;
+        } else if (storedEntry != entry) {
             throw mEulogizer.record(
-                    new IllegalStateException("No notification to remove with key "
-                            + logKey(entry)));
+                    new IllegalStateException("Mismatched stored and tryRemoved entries"
+                            + " for key " + logKey(entry) + ":"
+                            + " stored=@" + Integer.toHexString(storedEntry.hashCode())
+                            + " tryRemoved=@" + Integer.toHexString(entry.hashCode())));
         }
 
         if (!entry.isCanceled()) {
