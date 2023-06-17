@@ -478,7 +478,7 @@ object Flags {
     @Keep
     @JvmField
     val WM_CAPTION_ON_SHELL =
-        sysPropBooleanFlag(1105, "persist.wm.debug.caption_on_shell", default = false)
+        sysPropBooleanFlag(1105, "persist.wm.debug.caption_on_shell", default = true)
 
     @Keep
     @JvmField
@@ -730,6 +730,12 @@ object Flags {
     @JvmField
     val ZJ_285570694_LOCKSCREEN_TRANSITION_FROM_AOD =
         releasedFlag(2900, "zj_285570694_lockscreen_transition_from_aod")
+
+    // 3000 - dream
+    // TODO(b/285059790) : Tracking Bug
+    @JvmField
+    val LOCKSCREEN_WALLPAPER_DREAM_ENABLED =
+        unreleasedFlag(3000, name = "enable_lockscreen_wallpaper_dream")
 
     // TODO(b/283084712): Tracking Bug
     @JvmField
