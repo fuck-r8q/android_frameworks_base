@@ -18,6 +18,7 @@ package com.android.systemui.mediaprojection.taskswitcher.data.repository
 
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.mediaprojection.taskswitcher.data.model.MediaProjectionState
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -26,7 +27,7 @@ import kotlinx.coroutines.flow.emptyFlow
  * placeholder, while the real implementation is not completed.
  */
 @SysUISingleton
-class NoOpMediaProjectionRepository : MediaProjectionRepository {
+class NoOpMediaProjectionRepository @Inject constructor() : MediaProjectionRepository {
 
     override val mediaProjectionState: Flow<MediaProjectionState> = emptyFlow()
 }
