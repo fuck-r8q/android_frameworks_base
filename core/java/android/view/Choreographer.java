@@ -732,10 +732,21 @@ public final class Choreographer {
      * @throws IllegalStateException if no frame is in progress.
      * @hide
      */
-    @TestApi
-    @UnsupportedAppUsage
     public long getExpectedPresentationTimeNanos() {
         return mFrameData.getPreferredFrameTimeline().getExpectedPresentationTimeNanos();
+    }
+
+
+    /**
+     * Same as {@link #getExpectedPresentationTimeNanos()} but with millisecond precision.
+     *
+     * @return The frame start time, in the {@link SystemClock#uptimeMillis()} time base.
+     *
+     * @throws IllegalStateException if no frame is in progress.
+     * @hide
+     */
+    public long getExpectedPresentationTimeMillis() {
+        return getExpectedPresentationTimeNanos() / TimeUtils.NANOS_PER_MS;
     }
 
     private void scheduleFrameLocked(long now) {
