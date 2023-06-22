@@ -465,9 +465,6 @@ public final class AppsFilterImpl extends AppsFilterLocked implements Watchable,
             changed = retainOnUpdate
                     ? mRetainedImplicitlyQueryable.add(recipientUid, visibleUid)
                     : mImplicitlyQueryable.add(recipientUid, visibleUid);
-            if (!mCacheReady && changed) {
-                mNeedToUpdateCacheForImplicitAccess = true;
-            }
         }
         if (changed && DEBUG_LOGGING) {
             Slog.i(TAG, (retainOnUpdate ? "retained " : "") + "implicit access granted: "
@@ -479,6 +476,8 @@ public final class AppsFilterImpl extends AppsFilterLocked implements Watchable,
                 // Update the cache in a one-off manner since we've got all the information we need.
                 mShouldFilterCache.put(recipientUid, visibleUid, false);
             }
+        } else if (changed) {
+            invalidateCache("grantImplicitAccess: " + recipientUid + " -> " + visibleUid);
         }
         if (changed) {
             onChanged();
@@ -834,12 +833,7 @@ public final class AppsFilterImpl extends AppsFilterLocked implements Watchable,
             }
 
             updateEntireShouldFilterCacheInner(snapshot, settings, usersRef[0], USER_ALL);
-            synchronized (mImplicitlyQueryableLock) {
-                if (mNeedToUpdateCacheForImplicitAccess) {
-                    updateShouldFilterCacheForImplicitAccess();
-                    mNeedToUpdateCacheForImplicitAccess = false;
-                }
-            }
+            onChanged();
             logCacheRebuilt(reason, SystemClock.currentTimeMicro() - currentTimeUs,
                     users.length, settings.size());
 
@@ -851,7 +845,6 @@ public final class AppsFilterImpl extends AppsFilterLocked implements Watchable,
             }
 
             mCacheReady = true;
-            onChanged();
         }, delayMs);
     }
 
@@ -880,25 +873,6 @@ public final class AppsFilterImpl extends AppsFilterLocked implements Watchable,
                 SystemClock.currentTimeMicro() - currentTimeUs,
                 snapshot.getUserInfos().length,
                 snapshot.getPackageStates().size());
-    }
-
-    @GuardedBy("mImplicitlyQueryableLock")
-    private void updateShouldFilterCacheForImplicitAccess() {
-        updateShouldFilterCacheForImplicitAccess(mRetainedImplicitlyQueryable);
-        updateShouldFilterCacheForImplicitAccess(mImplicitlyQueryable);
-    }
-
-    private void updateShouldFilterCacheForImplicitAccess(
-            WatchedSparseSetArray<Integer> queriesMap) {
-        synchronized (mCacheLock) {
-            for (int i = 0; i < queriesMap.size(); i++) {
-                Integer callingUid = queriesMap.keyAt(i);
-                ArraySet<Integer> targetUids = queriesMap.get(callingUid);
-                for (Integer targetUid : targetUids) {
-                    mShouldFilterCache.put(callingUid, targetUid, false);
-                }
-            }
-        }
     }
 
     private void updateShouldFilterCacheForPackage(Computer snapshot,

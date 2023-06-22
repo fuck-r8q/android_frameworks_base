@@ -49,10 +49,10 @@ void setGpuStats_native(JNIEnv* env, jobject clazz, jstring driverPackageName,
                                                     appPackageNameChars.c_str(), vulkanVersion);
 }
 
-void setAngleInfo_native(JNIEnv* env, jobject clazz, jstring path, jstring packageName,
+void setAngleInfo_native(JNIEnv* env, jobject clazz, jstring path, jstring appName,
                          jstring devOptIn, jobjectArray featuresObj) {
     ScopedUtfChars pathChars(env, path);
-    ScopedUtfChars packageNameChars(env, packageName);
+    ScopedUtfChars appNameChars(env, appName);
     ScopedUtfChars devOptInChars(env, devOptIn);
 
     std::vector<std::string> features;
@@ -73,8 +73,13 @@ void setAngleInfo_native(JNIEnv* env, jobject clazz, jstring path, jstring packa
         }
     }
 
-    android::GraphicsEnv::getInstance().setAngleInfo(pathChars.c_str(), packageNameChars.c_str(),
+    android::GraphicsEnv::getInstance().setAngleInfo(pathChars.c_str(), appNameChars.c_str(),
                                                      devOptInChars.c_str(), features);
+}
+
+bool shouldUseAngle_native(JNIEnv* env, jobject clazz, jstring appName) {
+    ScopedUtfChars appNameChars(env, appName);
+    return android::GraphicsEnv::getInstance().shouldUseAngle(appNameChars.c_str());
 }
 
 void setLayerPaths_native(JNIEnv* env, jobject clazz, jobject classLoader, jstring layerPaths) {
@@ -121,6 +126,8 @@ const JNINativeMethod g_methods[] = {
         {"setAngleInfo",
          "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;)V",
          reinterpret_cast<void*>(setAngleInfo_native)},
+        {"getShouldUseAngle", "(Ljava/lang/String;)Z",
+         reinterpret_cast<void*>(shouldUseAngle_native)},
         {"setLayerPaths", "(Ljava/lang/ClassLoader;Ljava/lang/String;)V",
          reinterpret_cast<void*>(setLayerPaths_native)},
         {"setDebugLayers", "(Ljava/lang/String;)V", reinterpret_cast<void*>(setDebugLayers_native)},

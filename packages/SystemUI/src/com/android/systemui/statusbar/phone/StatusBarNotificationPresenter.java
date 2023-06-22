@@ -22,6 +22,7 @@ import android.content.Context;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
 import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
@@ -35,7 +36,6 @@ import com.android.systemui.InitController;
 import com.android.systemui.R;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
-import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.shade.NotificationShadeWindowView;
 import com.android.systemui.shade.QuickSettingsController;
 import com.android.systemui.shade.ShadeViewController;
@@ -53,7 +53,6 @@ import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.render.NotifShadeEventSource;
-import com.android.systemui.statusbar.notification.domain.interactor.NotificationsInteractor;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptSuppressor;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
@@ -84,9 +83,7 @@ class StatusBarNotificationPresenter implements NotificationPresenter, CommandQu
     private final AboveShelfObserver mAboveShelfObserver;
     private final DozeScrimController mDozeScrimController;
     private final CentralSurfaces mCentralSurfaces;
-    private final NotificationsInteractor mNotificationsInteractor;
     private final LockscreenShadeTransitionController mShadeTransitionController;
-    private final PowerInteractor mPowerInteractor;
     private final CommandQueue mCommandQueue;
 
     private final AccessibilityManager mAccessibilityManager;
@@ -114,9 +111,7 @@ class StatusBarNotificationPresenter implements NotificationPresenter, CommandQu
             DynamicPrivacyController dynamicPrivacyController,
             KeyguardStateController keyguardStateController,
             CentralSurfaces centralSurfaces,
-            NotificationsInteractor notificationsInteractor,
             LockscreenShadeTransitionController shadeTransitionController,
-            PowerInteractor powerInteractor,
             CommandQueue commandQueue,
             NotificationLockscreenUserManager lockscreenUserManager,
             SysuiStatusBarStateController sysuiStatusBarStateController,
@@ -138,9 +133,7 @@ class StatusBarNotificationPresenter implements NotificationPresenter, CommandQu
         mDynamicPrivacyController = dynamicPrivacyController;
         // TODO: use KeyguardStateController#isOccluded to remove this dependency
         mCentralSurfaces = centralSurfaces;
-        mNotificationsInteractor = notificationsInteractor;
         mShadeTransitionController = shadeTransitionController;
-        mPowerInteractor = powerInteractor;
         mCommandQueue = commandQueue;
         mLockscreenUserManager = lockscreenUserManager;
         mStatusBarStateController = sysuiStatusBarStateController;
@@ -241,7 +234,9 @@ class StatusBarNotificationPresenter implements NotificationPresenter, CommandQu
     public void onExpandClicked(NotificationEntry clickedEntry, View clickedView,
             boolean nowExpanded) {
         mHeadsUpManager.setExpanded(clickedEntry, nowExpanded);
-        mPowerInteractor.wakeUpIfDozing("NOTIFICATION_CLICK", PowerManager.WAKE_REASON_GESTURE);
+        mCentralSurfaces.wakeUpIfDozing(
+                SystemClock.uptimeMillis(), "NOTIFICATION_CLICK",
+                PowerManager.WAKE_REASON_GESTURE);
         if (nowExpanded) {
             if (mStatusBarStateController.getState() == StatusBarState.KEYGUARD) {
                 mShadeTransitionController.goToLockedShade(clickedEntry.getRow());
@@ -338,7 +333,7 @@ class StatusBarNotificationPresenter implements NotificationPresenter, CommandQu
 
         @Override
         public boolean suppressInterruptions(NotificationEntry entry) {
-            return !mNotificationsInteractor.areNotificationAlertsEnabled();
+            return mCentralSurfaces.areNotificationAlertsDisabled();
         }
     };
 }

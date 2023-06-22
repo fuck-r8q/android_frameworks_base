@@ -48,7 +48,6 @@ public class CrossDeviceCall {
     private final int mUserId;
     @VisibleForTesting boolean mIsEnterprise;
     private final String mCallingAppPackageName;
-    private final String mSerializedPhoneAccountHandle;
     private String mCallingAppName;
     private byte[] mCallingAppIcon;
     private String mCallerDisplayName;
@@ -90,8 +89,6 @@ public class CrossDeviceCall {
                 .equals(handle.getComponentName());
         mCallingAppPackageName = handle != null
                 ? callDetails.getAccountHandle().getComponentName().getPackageName() : "";
-        mSerializedPhoneAccountHandle = handle != null
-                ? handle.getId() + SEPARATOR + handle.getComponentName().flattenToString() : "";
         mIsEnterprise = (callDetails.getCallProperties() & Call.Details.PROPERTY_ENTERPRISE_CALL)
                 == Call.Details.PROPERTY_ENTERPRISE_CALL;
         final PackageManager packageManager = context.getPackageManager();
@@ -248,10 +245,6 @@ public class CrossDeviceCall {
 
     public String getCallingAppPackageName() {
         return mCallingAppPackageName;
-    }
-
-    public String getSerializedPhoneAccountHandle() {
-        return mSerializedPhoneAccountHandle;
     }
 
     /**

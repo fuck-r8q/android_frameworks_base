@@ -19,12 +19,11 @@ package com.android.server.wm.flicker.rotation
 import android.platform.test.annotations.PlatinumTest
 import android.platform.test.annotations.Presubmit
 import android.tools.common.ScenarioBuilder
-import android.tools.common.ScenarioImpl
 import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import android.view.WindowManager
 import androidx.test.filters.RequiresDevice
 import com.android.server.wm.flicker.helpers.SeamlessRotationAppHelper
@@ -92,7 +91,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class SeamlessAppRotationTest(flicker: LegacyFlickerTest) : RotationTransition(flicker) {
+open class SeamlessAppRotationTest(flicker: FlickerTest) : RotationTransition(flicker) {
     override val testApp = SeamlessRotationAppHelper(instrumentation)
 
     /** {@inheritDoc} */
@@ -237,50 +236,43 @@ open class SeamlessAppRotationTest(flicker: LegacyFlickerTest) : RotationTransit
     }
 
     companion object {
-        private val LegacyFlickerTest.starveUiThread
+        private val FlickerTest.starveUiThread
             get() =
-                scenario.getConfigValue<Boolean>(
-                    ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD
-                )
+                getConfigValue<Boolean>(ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD)
                     ?: false
 
         @JvmStatic
         protected fun createConfig(
-            sourceConfig: LegacyFlickerTest,
+            sourceConfig: FlickerTest,
             starveUiThread: Boolean
-        ): LegacyFlickerTest {
-            val originalScenario = sourceConfig.initialize("createConfig") as ScenarioImpl
+        ): FlickerTest {
+            val originalScenario = sourceConfig.initialize("createConfig")
             val nameExt = if (starveUiThread) "_BUSY_UI_THREAD" else ""
             val newConfig =
                 ScenarioBuilder()
-                    .forClass(originalScenario.testClass)
-                    .withStartRotation(originalScenario.startRotation)
-                    .withEndRotation(originalScenario.endRotation)
-                    .withNavBarMode(originalScenario.navBarMode)
-                    .withExtraConfigs(originalScenario.extraConfig)
-                    .withDescriptionOverride(originalScenario.description)
+                    .fromScenario(originalScenario)
                     .withExtraConfig(
                         ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD,
                         starveUiThread
                     )
                     .withDescriptionOverride("${originalScenario.description}$nameExt")
-            return LegacyFlickerTest(newConfig)
+            return FlickerTest(newConfig)
         }
 
         /**
          * Creates the test configurations for seamless rotation based on the default rotation tests
-         * from [LegacyFlickerTestFactory.rotationTests], but adding a flag (
+         * from [FlickerTestFactory.rotationTests], but adding a flag (
          * [ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD]) to indicate if the app should
          * starve the UI thread of not
          */
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() =
-            LegacyFlickerTestFactory.rotationTests().flatMap { sourceCfg ->
-                val legacyCfg = sourceCfg as LegacyFlickerTest
-                val defaultRun = createConfig(legacyCfg, starveUiThread = false)
-                val busyUiRun = createConfig(legacyCfg, starveUiThread = true)
+        fun getParams(): Collection<FlickerTest> {
+            return FlickerTestFactory.rotationTests().flatMap { sourceConfig ->
+                val defaultRun = createConfig(sourceConfig, starveUiThread = false)
+                val busyUiRun = createConfig(sourceConfig, starveUiThread = true)
                 listOf(defaultRun, busyUiRun)
             }
+        }
     }
 }

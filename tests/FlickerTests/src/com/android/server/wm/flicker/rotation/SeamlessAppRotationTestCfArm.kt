@@ -17,8 +17,8 @@
 package com.android.server.wm.flicker.rotation
 
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import com.android.server.wm.flicker.testapp.ActivityOptions
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
@@ -29,23 +29,22 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class SeamlessAppRotationTestCfArm(flicker: LegacyFlickerTest) :
-    SeamlessAppRotationTest(flicker) {
+open class SeamlessAppRotationTestCfArm(flicker: FlickerTest) : SeamlessAppRotationTest(flicker) {
     companion object {
         /**
          * Creates the test configurations for seamless rotation based on the default rotation tests
-         * from [LegacyFlickerTestFactory.rotationTests], but adding a flag (
+         * from [FlickerTestFactory.rotationTests], but adding a flag (
          * [ActivityOptions.SeamlessRotation.EXTRA_STARVE_UI_THREAD]) to indicate if the app should
          * starve the UI thread of not
          */
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() =
-            LegacyFlickerTestFactory.rotationTests().flatMap { sourceCfg ->
-                val legacyCfg = sourceCfg as LegacyFlickerTest
-                val defaultRun = createConfig(legacyCfg, starveUiThread = false)
-                val busyUiRun = createConfig(legacyCfg, starveUiThread = true)
+        fun getParams(): Collection<FlickerTest> {
+            return FlickerTestFactory.rotationTests().flatMap { sourceConfig ->
+                val defaultRun = createConfig(sourceConfig, starveUiThread = false)
+                val busyUiRun = createConfig(sourceConfig, starveUiThread = true)
                 listOf(defaultRun, busyUiRun)
             }
+        }
     }
 }

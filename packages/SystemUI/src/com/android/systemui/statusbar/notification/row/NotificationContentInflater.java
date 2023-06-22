@@ -474,6 +474,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                             parentLayout,
                             remoteViewClickHandler);
                     validateView(v, entry, row.getResources());
+                    v.setIsRootNamespace(true);
                     applyCallback.setResultView(v);
                 } else {
                     newContentView.reapply(
@@ -510,6 +511,7 @@ public class NotificationContentInflater implements NotificationRowContentBinder
                     return;
                 }
                 if (isNewView) {
+                    v.setIsRootNamespace(true);
                     applyCallback.setResultView(v);
                 } else if (existingWrapper != null) {
                     existingWrapper.onReinflated();

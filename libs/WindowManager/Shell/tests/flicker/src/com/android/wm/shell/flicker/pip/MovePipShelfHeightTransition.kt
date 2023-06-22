@@ -19,15 +19,15 @@ package com.android.wm.shell.flicker.pip
 import android.platform.test.annotations.Presubmit
 import android.tools.common.Rotation
 import android.tools.common.flicker.subject.region.RegionSubject
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import com.android.server.wm.flicker.helpers.FixedOrientationAppHelper
 import com.android.wm.shell.flicker.Direction
 import org.junit.Test
 import org.junit.runners.Parameterized
 
 /** Base class for pip tests with Launcher shelf height change */
-abstract class MovePipShelfHeightTransition(flicker: LegacyFlickerTest) : PipTransition(flicker) {
+abstract class MovePipShelfHeightTransition(flicker: FlickerTest) : PipTransition(flicker) {
     protected val testApp = FixedOrientationAppHelper(instrumentation)
 
     /** Checks [pipApp] window remains visible throughout the animation */
@@ -111,14 +111,15 @@ abstract class MovePipShelfHeightTransition(flicker: LegacyFlickerTest) : PipTra
         /**
          * Creates the test configurations.
          *
-         * See [LegacyFlickerTestFactory.nonRotationTests] for configuring screen orientation and
+         * See [FlickerTestFactory.nonRotationTests] for configuring screen orientation and
          * navigation modes.
          */
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() =
-            LegacyFlickerTestFactory.nonRotationTests(
+        fun getParams(): List<FlickerTest> {
+            return FlickerTestFactory.nonRotationTests(
                 supportedRotations = listOf(Rotation.ROTATION_0)
             )
+        }
     }
 }

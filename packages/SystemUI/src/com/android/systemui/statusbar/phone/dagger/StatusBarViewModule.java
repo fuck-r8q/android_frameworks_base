@@ -31,6 +31,8 @@ import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.OperatorNameViewController;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
+import com.android.systemui.statusbar.notification.row.ui.viewmodel.ActivatableNotificationViewModelModule;
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModelModule;
 import com.android.systemui.statusbar.phone.KeyguardBottomAreaView;
 import com.android.systemui.statusbar.phone.NotificationIconAreaController;
 import com.android.systemui.statusbar.phone.StatusBarBoundsProvider;
@@ -58,14 +60,11 @@ import java.util.concurrent.Executor;
 
 import javax.inject.Named;
 
-/**
- * A module for {@link CentralSurfacesComponent.CentralSurfacesScope} components.
- *
- * @deprecated CentralSurfacesScope will be removed shortly (b/277762009). Classes should be
- *   annotated with @SysUISingleton instead.
- */
-@Module(subcomponents = StatusBarFragmentComponent.class)
-@Deprecated
+@Module(subcomponents = StatusBarFragmentComponent.class,
+        includes = {
+                ActivatableNotificationViewModelModule.class,
+                NotificationListViewModelModule.class,
+        })
 public abstract class StatusBarViewModule {
 
     public static final String STATUS_BAR_FRAGMENT = "status_bar_fragment";

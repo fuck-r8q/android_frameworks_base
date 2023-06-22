@@ -36,6 +36,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.companion.utils.FeatureUtils;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -1226,6 +1227,11 @@ public final class CompanionDeviceManager {
     @Nullable
     public IntentSender buildPermissionTransferUserConsentIntent(int associationId)
             throws DeviceNotAssociatedException {
+        if (!FeatureUtils.isPermSyncEnabled()) {
+            throw new UnsupportedOperationException("Calling"
+                    + " buildPermissionTransferUserConsentIntent, but this API is disabled by the"
+                    + " system.");
+        }
         try {
             PendingIntent pendingIntent = mService.buildPermissionTransferUserConsentIntent(
                     mContext.getOpPackageName(),
@@ -1258,6 +1264,10 @@ public final class CompanionDeviceManager {
     @Deprecated
     @UserHandleAware
     public void startSystemDataTransfer(int associationId) throws DeviceNotAssociatedException {
+        if (!FeatureUtils.isPermSyncEnabled()) {
+            throw new UnsupportedOperationException("Calling startSystemDataTransfer, but this API"
+                    + " is disabled by the system.");
+        }
         try {
             mService.startSystemDataTransfer(mContext.getOpPackageName(), mContext.getUserId(),
                     associationId, null);
@@ -1290,6 +1300,10 @@ public final class CompanionDeviceManager {
             @NonNull Executor executor,
             @NonNull OutcomeReceiver<Void, CompanionException> result)
             throws DeviceNotAssociatedException {
+        if (!FeatureUtils.isPermSyncEnabled()) {
+            throw new UnsupportedOperationException("Calling startSystemDataTransfer, but this API"
+                    + " is disabled by the system.");
+        }
         try {
             mService.startSystemDataTransfer(mContext.getOpPackageName(), mContext.getUserId(),
                     associationId, new SystemDataTransferCallbackProxy(executor, result));

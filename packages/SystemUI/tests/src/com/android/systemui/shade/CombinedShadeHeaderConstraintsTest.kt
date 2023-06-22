@@ -62,9 +62,9 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.clock).layout.startToStart).isEqualTo(R.id.begin_guide)
             assertThat(getConstraint(R.id.clock).layout.horizontalBias).isEqualTo(0f)
 
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.endToEnd)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).layout.endToEnd)
                 .isEqualTo(R.id.end_guide)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.horizontalBias)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).layout.horizontalBias)
                 .isEqualTo(1f)
 
             assertThat(getConstraint(R.id.privacy_container).layout.endToEnd)
@@ -95,9 +95,9 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.date).layout.startToStart).isEqualTo(PARENT_ID)
             assertThat(getConstraint(R.id.date).layout.horizontalBias).isEqualTo(0.5f)
 
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.endToEnd)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).layout.endToEnd)
                 .isEqualTo(PARENT_ID)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.horizontalBias)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).layout.horizontalBias)
                 .isEqualTo(0.5f)
 
             assertThat(getConstraint(R.id.privacy_container).layout.endToEnd)
@@ -133,15 +133,18 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
         changes()
 
         with(qqsConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(1f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(1f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(1f)
         }
 
         with(qsConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(1f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(1f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(1f)
         }
 
         with(largeScreenConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(1f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(1f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(1f)
         }
     }
 
@@ -152,15 +155,18 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
         changes()
 
         with(qqsConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(0f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(0f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(0f)
         }
 
         with(qsConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(1f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(1f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(1f)
         }
 
         with(largeScreenConstraint) {
-            assertThat(systemIconsAlphaConstraint).isEqualTo(1f)
+            assertThat(getConstraint(R.id.statusIcons).propertySet.alpha).isEqualTo(1f)
+            assertThat(getConstraint(R.id.batteryRemainingIcon).propertySet.alpha).isEqualTo(1f)
         }
     }
 
@@ -175,13 +181,12 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
 
         with(qqsConstraint) {
             // In this case, the date is constrained on the end by a Barrier determined by either
-            // privacy or clickableIcons
+            // privacy or statusIcons
             assertThat(getConstraint(R.id.date).layout.endToStart).isEqualTo(R.id.barrier)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
-                .isEqualTo(R.id.date)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd).isEqualTo(R.id.date)
             assertThat(getConstraint(R.id.privacy_container).layout.startToEnd).isEqualTo(R.id.date)
             assertThat(getConstraint(R.id.barrier).layout.mReferenceIds).asList().containsExactly(
-                R.id.shade_header_system_icons,
+                R.id.statusIcons,
                 R.id.privacy_container
             )
             assertThat(getConstraint(R.id.barrier).layout.mBarrierDirection).isEqualTo(START)
@@ -267,7 +272,7 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.center_left).layout.guideBegin).isEqualTo(offsetFromEdge)
             assertThat(getConstraint(R.id.center_right).layout.guideEnd).isEqualTo(offsetFromEdge)
             assertThat(getConstraint(R.id.date).layout.endToStart).isEqualTo(R.id.center_left)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isEqualTo(R.id.center_right)
             assertThat(getConstraint(R.id.privacy_container).layout.startToEnd)
                 .isEqualTo(R.id.center_right)
@@ -280,9 +285,9 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.date).layout.endToStart).isNotEqualTo(R.id.center_left)
             assertThat(getConstraint(R.id.date).layout.endToStart).isNotEqualTo(R.id.center_right)
 
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isNotEqualTo(R.id.center_left)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isNotEqualTo(R.id.center_right)
 
             assertThat(getConstraint(R.id.privacy_container).layout.startToEnd)
@@ -306,7 +311,7 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.center_left).layout.guideEnd).isEqualTo(offsetFromEdge)
             assertThat(getConstraint(R.id.center_right).layout.guideBegin).isEqualTo(offsetFromEdge)
             assertThat(getConstraint(R.id.date).layout.endToStart).isEqualTo(R.id.center_right)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isEqualTo(R.id.center_left)
             assertThat(getConstraint(R.id.privacy_container).layout.startToEnd)
                 .isEqualTo(R.id.center_left)
@@ -319,9 +324,9 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
             assertThat(getConstraint(R.id.date).layout.endToStart).isNotEqualTo(R.id.center_left)
             assertThat(getConstraint(R.id.date).layout.endToStart).isNotEqualTo(R.id.center_right)
 
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isNotEqualTo(R.id.center_left)
-            assertThat(getConstraint(R.id.shade_header_system_icons).layout.startToEnd)
+            assertThat(getConstraint(R.id.statusIcons).layout.startToEnd)
                 .isNotEqualTo(R.id.center_right)
 
             assertThat(getConstraint(R.id.privacy_container).layout.startToEnd)
@@ -377,8 +382,7 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
         CombinedShadeHeadersConstraintManagerImpl.emptyCutoutConstraints()()
 
         assertThat(qqsConstraint.getConstraint(R.id.date).layout.constrainedWidth).isTrue()
-        val shadeHeaderConstraint = qqsConstraint.getConstraint(R.id.shade_header_system_icons)
-        assertThat(shadeHeaderConstraint.layout.constrainedWidth).isTrue()
+        assertThat(qqsConstraint.getConstraint(R.id.statusIcons).layout.constrainedWidth).isTrue()
     }
 
     @Test
@@ -386,12 +390,8 @@ class CombinedShadeHeaderConstraintsTest : SysuiTestCase() {
         CombinedShadeHeadersConstraintManagerImpl.centerCutoutConstraints(false, 10)()
 
         assertThat(qqsConstraint.getConstraint(R.id.date).layout.constrainedWidth).isTrue()
-        val shadeHeaderConstraint = qqsConstraint.getConstraint(R.id.shade_header_system_icons)
-        assertThat(shadeHeaderConstraint.layout.constrainedWidth).isTrue()
+        assertThat(qqsConstraint.getConstraint(R.id.statusIcons).layout.constrainedWidth).isTrue()
     }
-
-    private val ConstraintSet.systemIconsAlphaConstraint
-        get() = getConstraint(R.id.shade_header_system_icons).propertySet.alpha
 
     private operator fun ConstraintsChanges.invoke() {
         qqsConstraintsChanges?.invoke(qqsConstraint)

@@ -71,8 +71,7 @@ public abstract class ClockRegistryModule {
                 context.getString(R.string.lockscreen_clock_id_fallback),
                 logBuffer,
                 /* keepAllLoaded = */ false,
-                /* subTag = */ "System",
-                /* isTransitClockEnabled = */ featureFlags.isEnabled(Flags.TRANSIT_CLOCK));
+                /* subTag = */ "System");
         registry.registerListeners();
         return registry;
     }

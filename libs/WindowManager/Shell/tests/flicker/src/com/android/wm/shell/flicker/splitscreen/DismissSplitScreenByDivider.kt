@@ -21,7 +21,7 @@ import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
+import android.tools.device.flicker.legacy.FlickerTest
 import android.tools.device.helpers.WindowUtils
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.ICommonAssertions
@@ -41,13 +41,13 @@ import org.junit.runners.Parameterized
 /**
  * Test dismiss split screen by dragging the divider bar.
  *
- * To run this test: `atest WMShellFlickerTestsSplitScreen:DismissSplitScreenByDivider`
+ * To run this test: `atest WMShellFlickerTests:DismissSplitScreenByDivider`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class DismissSplitScreenByDivider(override val flicker: LegacyFlickerTest) :
+class DismissSplitScreenByDivider(override val flicker: FlickerTest) :
     DismissSplitScreenByDividerBenchmark(flicker), ICommonAssertions {
 
     override val transition: FlickerBuilder.() -> Unit

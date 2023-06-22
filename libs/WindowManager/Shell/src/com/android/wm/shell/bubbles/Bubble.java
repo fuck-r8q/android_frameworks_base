@@ -422,7 +422,6 @@ public class Bubble implements BubbleViewProvider {
         }
         if (mBubbleBarExpandedView != null) {
             mBubbleBarExpandedView.cleanUpExpandedState();
-            mBubbleBarExpandedView = null;
         }
         if (mIntent != null) {
             mIntent.unregisterCancelListener(mIntentCancelListener);
@@ -550,10 +549,10 @@ public class Bubble implements BubbleViewProvider {
     /**
      * Set visibility of bubble in the expanded state.
      *
-     * <p>Note that this contents visibility doesn't affect visibility at {@link android.view.View},
-     * and setting {@code false} actually means rendering the expanded view in transparent.
-     *
      * @param visibility {@code true} if the expanded bubble should be visible on the screen.
+     *
+     * Note that this contents visibility doesn't affect visibility at {@link android.view.View},
+     * and setting {@code false} actually means rendering the expanded view in transparent.
      */
     @Override
     public void setTaskViewVisibility(boolean visibility) {

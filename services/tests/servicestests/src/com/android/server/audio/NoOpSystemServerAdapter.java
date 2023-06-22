@@ -39,9 +39,4 @@ public class NoOpSystemServerAdapter extends SystemServerAdapter {
     public void sendDeviceBecomingNoisyIntent() {
         // no-op
     }
-
-    @Override
-    public void broadcastMasterMuteStatus(boolean muted) {
-        // no-op
-    }
 }

@@ -153,8 +153,9 @@ class PatternBouncerViewModel(
 
     /** Notifies that the user has ended the drag gesture across the dot grid. */
     fun onDragEnd() {
-        val pattern = _selectedDots.value.map { it.toCoordinate() }
-        if (interactor.authenticate(pattern) != true) {
+        val isSuccessfullyAuthenticated =
+            interactor.authenticate(_selectedDots.value.map { it.toCoordinate() })
+        if (!isSuccessfullyAuthenticated) {
             showFailureAnimation()
         }
 

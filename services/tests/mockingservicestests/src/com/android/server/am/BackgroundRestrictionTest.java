@@ -2439,13 +2439,6 @@ public final class BackgroundRestrictionTest {
         doReturn(granted ? PERMISSION_GRANTED : PERMISSION_DENIED)
                 .when(mPermissionManagerServiceInternal)
                 .checkPermission(packageName, perm, UserHandle.getUserId(uid));
-        try {
-            doReturn(granted ? PERMISSION_GRANTED : PERMISSION_DENIED)
-                    .when(mIActivityManager)
-                    .checkPermission(perm, Process.INVALID_PID, uid);
-        } catch (RemoteException e) {
-            // Ignore.
-        }
     }
 
     private void setAppOpState(String packageName, int uid, int op, boolean granted) {

@@ -23,6 +23,7 @@ import com.android.systemui.statusbar.NotificationPresenter
 import com.android.systemui.statusbar.notification.NotificationActivityStarter
 import com.android.systemui.statusbar.notification.collection.render.NotifStackController
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer
+import com.android.systemui.statusbar.phone.CentralSurfaces
 import javax.inject.Inject
 
 /**
@@ -33,6 +34,7 @@ class NotificationsControllerStub @Inject constructor(
 ) : NotificationsController {
 
     override fun initialize(
+        centralSurfaces: CentralSurfaces,
         presenter: NotificationPresenter,
         listContainer: NotificationListContainer,
         stackController: NotifStackController,

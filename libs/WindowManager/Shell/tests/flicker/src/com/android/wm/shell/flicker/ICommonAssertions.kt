@@ -18,7 +18,7 @@ package com.android.wm.shell.flicker
 
 import android.platform.test.annotations.Presubmit
 import android.tools.common.traces.component.ComponentNameMatcher
-import android.tools.device.flicker.legacy.LegacyFlickerTest
+import android.tools.device.flicker.legacy.FlickerTest
 import com.android.server.wm.flicker.entireScreenCovered
 import com.android.server.wm.flicker.navBarLayerIsVisibleAtStartAndEnd
 import com.android.server.wm.flicker.navBarLayerPositionAtStartAndEnd
@@ -32,7 +32,7 @@ import org.junit.Assume
 import org.junit.Test
 
 interface ICommonAssertions {
-    val flicker: LegacyFlickerTest
+    val flicker: FlickerTest
 
     /** Checks that all parts of the screen are covered during the transition */
     @Presubmit @Test fun entireScreenCovered() = flicker.entireScreenCovered()

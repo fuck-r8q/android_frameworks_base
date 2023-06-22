@@ -28,9 +28,9 @@ import android.app.role.RoleManager;
 import android.app.usage.BroadcastResponseStats;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.os.Process;
 import android.os.SystemClock;
 import android.os.UserHandle;
+import android.permission.PermissionManager;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.LongArrayQueue;
@@ -94,12 +94,9 @@ class BroadcastResponseStatsTracker {
     private AppStandbyInternal mAppStandby;
     private BroadcastResponseStatsLogger mLogger;
     private RoleManager mRoleManager;
-    private final Context mContext;
 
-    BroadcastResponseStatsTracker(@NonNull AppStandbyInternal appStandby,
-            @NonNull Context context) {
+    BroadcastResponseStatsTracker(@NonNull AppStandbyInternal appStandby) {
         mAppStandby = appStandby;
-        mContext = context;
         mLogger = new BroadcastResponseStatsLogger();
     }
 
@@ -308,19 +305,12 @@ class BroadcastResponseStatsTracker {
 
     boolean doesPackageHoldExemptedPermission(@NonNull String packageName,
             @NonNull UserHandle user) {
-        int uid;
-        try {
-            uid = mContext.getPackageManager().getPackageUidAsUser(
-                    packageName, user.getIdentifier());
-        } catch (PackageManager.NameNotFoundException e) {
-            return false;
-        }
-        final List<String> exemptedPermissions =
-                mAppStandby.getBroadcastResponseExemptedPermissions();
+        final List<String> exemptedPermissions = mAppStandby
+                .getBroadcastResponseExemptedPermissions();
         for (int i = exemptedPermissions.size() - 1; i >= 0; --i) {
             final String permissionName = exemptedPermissions.get(i);
-            if (mContext.checkPermission(permissionName, Process.INVALID_PID, uid)
-                    == PackageManager.PERMISSION_GRANTED) {
+            if (PermissionManager.checkPackageNamePermission(permissionName, packageName,
+                    user.getIdentifier()) == PackageManager.PERMISSION_GRANTED) {
                 return true;
             }
         }

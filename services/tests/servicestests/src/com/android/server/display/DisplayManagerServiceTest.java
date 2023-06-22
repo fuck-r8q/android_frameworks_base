@@ -32,7 +32,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -61,8 +60,6 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.graphics.Insets;
 import android.graphics.Rect;
-import android.hardware.Sensor;
-import android.hardware.SensorManager;
 import android.hardware.display.BrightnessConfiguration;
 import android.hardware.display.Curve;
 import android.hardware.display.DisplayManager;
@@ -112,6 +109,8 @@ import com.android.server.wm.WindowManagerInternal;
 import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
 
+import com.google.common.collect.ImmutableMap;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -126,7 +125,6 @@ import org.mockito.MockitoAnnotations;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -138,9 +136,6 @@ import java.util.stream.LongStream;
 public class DisplayManagerServiceTest {
     private static final int MSG_REGISTER_DEFAULT_DISPLAY_ADAPTERS = 1;
     private static final long SHORT_DEFAULT_DISPLAY_TIMEOUT_MILLIS = 10;
-
-    private static final float FLOAT_TOLERANCE = 0.01f;
-
     private static final String VIRTUAL_DISPLAY_NAME = "Test Virtual Display";
     private static final String PACKAGE_NAME = "com.android.frameworks.servicestests";
     private static final long STANDARD_DISPLAY_EVENTS = DisplayManager.EVENT_FLAG_DISPLAY_ADDED
@@ -255,10 +250,6 @@ public class DisplayManagerServiceTest {
     @Mock IBinder mMockDisplayToken;
     @Mock SensorManagerInternal mMockSensorManagerInternal;
 
-    @Mock SensorManager mSensorManager;
-
-    @Mock DisplayDeviceConfig mMockDisplayDeviceConfig;
-
     @Captor ArgumentCaptor<ContentRecordingSession> mContentRecordingSessionCaptor;
 
     @Before
@@ -276,7 +267,7 @@ public class DisplayManagerServiceTest {
         LocalServices.removeServiceForTest(VirtualDeviceManagerInternal.class);
         LocalServices.addService(
                 VirtualDeviceManagerInternal.class, mMockVirtualDeviceManagerInternal);
-        // TODO: b/287945043
+
         mContext = spy(new ContextWrapper(ApplicationProvider.getApplicationContext()));
 
         VirtualDeviceManager vdm = new VirtualDeviceManager(mIVirtualDeviceManager, mContext);
@@ -405,7 +396,7 @@ public class DisplayManagerServiceTest {
         final int size = displayIds.length;
         assertTrue(size > 0);
 
-        Map<Integer, Integer> expectedDisplayTypeToViewPortTypeMapping = Map.of(
+        Map<Integer, Integer> expectedDisplayTypeToViewPortTypeMapping = ImmutableMap.of(
                 Display.TYPE_INTERNAL, DisplayViewport.VIEWPORT_INTERNAL,
                 Display.TYPE_EXTERNAL, DisplayViewport.VIEWPORT_EXTERNAL
         );
@@ -1941,74 +1932,6 @@ public class DisplayManagerServiceTest {
                 false /* preferMinimalPostProcessing */, false /* disableHdrConversion */,
                 true /* inTraversal */);
         assertEquals(mode, displayManager.getHdrConversionModeInternal());
-    }
-
-    @Test
-    public void testReturnsRefreshRateForDisplayAndSensor_proximitySensorSet() {
-        DisplayManagerService displayManager = new DisplayManagerService(mContext, mBasicInjector);
-        DisplayManagerInternal localService = displayManager.new LocalService();
-        DisplayManagerService.BinderService displayManagerBinderService =
-                displayManager.new BinderService();
-        displayManager.overrideSensorManager(mSensorManager);
-
-        FakeDisplayDevice displayDevice = createFakeDisplayDevice(displayManager, new float[]{60f});
-        displayDevice.mDisplayDeviceConfig = mMockDisplayDeviceConfig;
-        int displayId = getDisplayIdForDisplayDevice(displayManager, displayManagerBinderService,
-                displayDevice);
-
-        String testSensorName = "testName";
-        String testSensorType = "testType";
-        Sensor testSensor = TestUtils.createSensor(testSensorType, testSensorName);
-
-        DisplayDeviceConfig.SensorData sensorData = new DisplayDeviceConfig.SensorData();
-        sensorData.type = testSensorType;
-        sensorData.name = testSensorName;
-        sensorData.minRefreshRate = 10f;
-        sensorData.maxRefreshRate = 100f;
-
-        when(mMockDisplayDeviceConfig.getProximitySensor()).thenReturn(sensorData);
-        when(mSensorManager.getSensorList(Sensor.TYPE_ALL)).thenReturn(Collections.singletonList(
-                testSensor));
-
-        SurfaceControl.RefreshRateRange result = localService.getRefreshRateForDisplayAndSensor(
-                displayId, testSensorName, testSensorType);
-
-        assertNotNull(result);
-        assertEquals(result.min, sensorData.minRefreshRate, FLOAT_TOLERANCE);
-        assertEquals(result.max, sensorData.maxRefreshRate, FLOAT_TOLERANCE);
-    }
-
-    @Test
-    public void testReturnsRefreshRateForDisplayAndSensor_proximitySensorNotSet() {
-        DisplayManagerService displayManager = new DisplayManagerService(mContext, mBasicInjector);
-        DisplayManagerInternal localService = displayManager.new LocalService();
-        DisplayManagerService.BinderService displayManagerBinderService =
-                displayManager.new BinderService();
-        displayManager.overrideSensorManager(mSensorManager);
-
-        FakeDisplayDevice displayDevice = createFakeDisplayDevice(displayManager, new float[]{60f});
-        displayDevice.mDisplayDeviceConfig = mMockDisplayDeviceConfig;
-        int displayId = getDisplayIdForDisplayDevice(displayManager, displayManagerBinderService,
-                displayDevice);
-
-        String testSensorName = "testName";
-        String testSensorType = "testType";
-        Sensor testSensor = TestUtils.createSensor(testSensorType, testSensorName);
-
-        DisplayDeviceConfig.SensorData sensorData = new DisplayDeviceConfig.SensorData();
-        sensorData.type = testSensorType;
-        sensorData.name = testSensorName;
-        sensorData.minRefreshRate = 10f;
-        sensorData.maxRefreshRate = 100f;
-
-        when(mMockDisplayDeviceConfig.getProximitySensor()).thenReturn(null);
-        when(mSensorManager.getSensorList(Sensor.TYPE_ALL)).thenReturn(Collections.singletonList(
-                testSensor));
-
-        SurfaceControl.RefreshRateRange result = localService.getRefreshRateForDisplayAndSensor(
-                displayId, testSensorName, testSensorType);
-
-        assertNull(result);
     }
 
     private void testDisplayInfoFrameRateOverrideModeCompat(boolean compatChangeEnabled)

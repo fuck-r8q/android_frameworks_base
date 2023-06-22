@@ -711,7 +711,6 @@ public final class NfcAdapter {
                 /* Stale sService pointer */
                 if (sIsInitialized) sIsInitialized = false;
             }
-            return null;
         }
         /* Try to initialize the service */
         NfcManager manager = (NfcManager) context.getSystemService(Context.NFC_SERVICE);

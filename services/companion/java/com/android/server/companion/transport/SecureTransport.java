@@ -21,6 +21,7 @@ import android.content.Context;
 import android.os.ParcelFileDescriptor;
 import android.util.Slog;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.server.companion.securechannel.AttestationVerifier;
 import com.android.server.companion.securechannel.SecureChannel;
 
@@ -34,6 +35,7 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
 
     private volatile boolean mShouldProcessRequests = false;
 
+    @GuardedBy("mRequestQueue")
     private final BlockingQueue<byte[]> mRequestQueue = new ArrayBlockingQueue<>(100);
 
     SecureTransport(int associationId, ParcelFileDescriptor fd, Context context) {
@@ -62,8 +64,6 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
     void close() {
         mSecureChannel.close();
         mShouldProcessRequests = false;
-
-        super.close();
     }
 
     @Override
@@ -81,19 +81,13 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
         }
 
         // Queue up a message to send
-        try {
+        synchronized (mRequestQueue) {
             mRequestQueue.add(ByteBuffer.allocate(HEADER_LENGTH + data.length)
                     .putInt(message)
                     .putInt(sequence)
                     .putInt(data.length)
                     .put(data)
                     .array());
-        } catch (IllegalStateException e) {
-            // Request buffer can only be full if too many requests are being added or
-            // the request processing thread is dead. Assume latter and detach the transport.
-            Slog.w(TAG, "Failed to queue message 0x" + Integer.toHexString(message)
-                    + " . Request buffer is full; detaching transport.", e);
-            close();
         }
     }
 
@@ -102,8 +96,8 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
         try {
             mSecureChannel.establishSecureConnection();
         } catch (Exception e) {
-            Slog.e(TAG, "Failed to initiate secure channel handshake.", e);
-            close();
+            Slog.w(TAG, "Failed to initiate secure channel handshake.", e);
+            onError(e);
         }
     }
 
@@ -114,14 +108,17 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
 
         // TODO: find a better way to handle incoming requests than a dedicated thread.
         new Thread(() -> {
-            while (mShouldProcessRequests) {
-                try {
-                    byte[] request = mRequestQueue.take();
-                    mSecureChannel.sendSecureMessage(request);
-                } catch (Exception e) {
-                    Slog.e(TAG, "Failed to send secure message.", e);
-                    close();
+            try {
+                while (mShouldProcessRequests) {
+                    synchronized (mRequestQueue) {
+                        byte[] request = mRequestQueue.poll();
+                        if (request != null) {
+                            mSecureChannel.sendSecureMessage(request);
+                        }
+                    }
                 }
+            } catch (IOException e) {
+                onError(e);
             }
         }).start();
     }
@@ -138,18 +135,13 @@ class SecureTransport extends Transport implements SecureChannel.Callback {
         try {
             handleMessage(message, sequence, content);
         } catch (IOException error) {
-            // IOException won't be thrown here because a separate thread is handling
-            // the write operations inside onSecureConnection().
+            onError(error);
         }
     }
 
     @Override
     public void onError(Throwable error) {
-        Slog.e(TAG, "Secure transport encountered an error.", error);
-
-        // If the channel was stopped as a result of the error, then detach itself.
-        if (mSecureChannel.isStopped()) {
-            close();
-        }
+        mShouldProcessRequests = false;
+        Slog.e(TAG, error.getMessage(), error);
     }
 }

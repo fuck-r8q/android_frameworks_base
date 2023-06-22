@@ -35,4 +35,6 @@ interface IBubbles {
 
     oneway void collapseBubbles() = 5;
 
+    oneway void onTaskbarStateChanged(in int newState) = 6;
+
 }

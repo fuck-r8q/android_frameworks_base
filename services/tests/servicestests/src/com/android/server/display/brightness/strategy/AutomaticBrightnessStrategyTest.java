@@ -96,101 +96,32 @@ public class AutomaticBrightnessStrategyTest {
     }
 
     @Test
-    public void testAutoBrightnessState_AutoBrightnessDisabled() {
+    public void setAutoBrightnessWhenDisabled() {
         mAutomaticBrightnessStrategy.setUseAutoBrightness(false);
         int targetDisplayState = Display.STATE_ON;
         boolean allowAutoBrightnessWhileDozing = false;
-        int brightnessReason = BrightnessReason.REASON_UNKNOWN;
-        int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_BRIGHT;
-        float lastUserSetBrightness = 0.2f;
-        boolean userSetBrightnessChanged = true;
-        mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(true);
-        mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
-        verify(mAutomaticBrightnessController)
-                .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED,
-                        mBrightnessConfiguration,
-                        lastUserSetBrightness,
-                        userSetBrightnessChanged, 0.5f,
-                        false, policy, true);
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
-    }
-
-    @Test
-    public void testAutoBrightnessState_DisplayIsOff() {
-        mAutomaticBrightnessStrategy.setUseAutoBrightness(true);
-        int targetDisplayState = Display.STATE_OFF;
-        boolean allowAutoBrightnessWhileDozing = false;
-        int brightnessReason = BrightnessReason.REASON_UNKNOWN;
-        int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_OFF;
-        float lastUserSetBrightness = 0.2f;
-        boolean userSetBrightnessChanged = true;
-        mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(true);
-        mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
-        verify(mAutomaticBrightnessController)
-                .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_OFF_DUE_TO_DISPLAY_STATE,
-                        mBrightnessConfiguration,
-                        lastUserSetBrightness,
-                        userSetBrightnessChanged, 0.5f,
-                        false, policy, true);
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertTrue(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
-    }
-
-    @Test
-    public void testAutoBrightnessState_DisplayIsInDoze_ConfigDoesNotAllow() {
-        mAutomaticBrightnessStrategy.setUseAutoBrightness(true);
-        int targetDisplayState = Display.STATE_DOZE;
-        boolean allowAutoBrightnessWhileDozing = false;
-        int brightnessReason = BrightnessReason.REASON_UNKNOWN;
-        int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_DOZE;
-        float lastUserSetBrightness = 0.2f;
-        boolean userSetBrightnessChanged = true;
-        mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(true);
-        mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
-        verify(mAutomaticBrightnessController)
-                .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_OFF_DUE_TO_DISPLAY_STATE,
-                        mBrightnessConfiguration,
-                        lastUserSetBrightness,
-                        userSetBrightnessChanged, 0.5f,
-                        false, policy, true);
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertTrue(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
-    }
-
-    @Test
-    public void testAutoBrightnessState_BrightnessReasonIsOverride() {
-        mAutomaticBrightnessStrategy.setUseAutoBrightness(true);
-        int targetDisplayState = Display.STATE_ON;
-        boolean allowAutoBrightnessWhileDozing = false;
+        float brightnessState = Float.NaN;
         int brightnessReason = BrightnessReason.REASON_OVERRIDE;
         int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_BRIGHT;
         float lastUserSetBrightness = 0.2f;
         boolean userSetBrightnessChanged = true;
         mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(true);
         mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
+                allowAutoBrightnessWhileDozing, brightnessState, brightnessReason, policy,
+                lastUserSetBrightness, userSetBrightnessChanged);
         verify(mAutomaticBrightnessController)
                 .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED,
                         mBrightnessConfiguration,
                         lastUserSetBrightness,
                         userSetBrightnessChanged, 0.5f,
                         false, policy, true);
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
     }
 
     @Test
-    public void testAutoBrightnessState_DisplayIsInDoze_ConfigDoesAllow() {
+    public void setAutoBrightnessWhenEnabledAndDisplayIsDozing() {
         mAutomaticBrightnessStrategy.setUseAutoBrightness(true);
         int targetDisplayState = Display.STATE_DOZE;
+        float brightnessState = Float.NaN;
         boolean allowAutoBrightnessWhileDozing = true;
         int brightnessReason = BrightnessReason.REASON_DOZE;
         int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_DOZE;
@@ -200,24 +131,23 @@ public class AutomaticBrightnessStrategyTest {
                 Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ, 0.4f);
         mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(false);
         mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
+                allowAutoBrightnessWhileDozing, brightnessState, brightnessReason, policy,
+                lastUserSetBrightness, userSetBrightnessChanged);
         verify(mAutomaticBrightnessController)
                 .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED,
                         mBrightnessConfiguration,
                         lastUserSetBrightness,
                         userSetBrightnessChanged, 0.4f,
                         true, policy, true);
-        assertTrue(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
     }
 
     @Test
-    public void testAutoBrightnessState_DisplayIsOn() {
+    public void setAutoBrightnessWhenEnabledAndDisplayIsOn() {
         mAutomaticBrightnessStrategy.setUseAutoBrightness(true);
         int targetDisplayState = Display.STATE_ON;
+        float brightnessState = Float.NaN;
         boolean allowAutoBrightnessWhileDozing = false;
-        int brightnessReason = BrightnessReason.REASON_UNKNOWN;
+        int brightnessReason = BrightnessReason.REASON_OVERRIDE;
         float lastUserSetBrightness = 0.2f;
         boolean userSetBrightnessChanged = true;
         int policy = DisplayManagerInternal.DisplayPowerRequest.POLICY_BRIGHT;
@@ -226,16 +156,14 @@ public class AutomaticBrightnessStrategyTest {
                 Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ, pendingBrightnessAdjustment);
         mAutomaticBrightnessStrategy.updatePendingAutoBrightnessAdjustments(false);
         mAutomaticBrightnessStrategy.setAutoBrightnessState(targetDisplayState,
-                allowAutoBrightnessWhileDozing, brightnessReason, policy, lastUserSetBrightness,
-                userSetBrightnessChanged);
+                allowAutoBrightnessWhileDozing, brightnessState, brightnessReason, policy,
+                lastUserSetBrightness, userSetBrightnessChanged);
         verify(mAutomaticBrightnessController)
                 .configure(AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED,
                         mBrightnessConfiguration,
                         lastUserSetBrightness,
                         userSetBrightnessChanged, pendingBrightnessAdjustment,
                         true, policy, true);
-        assertTrue(mAutomaticBrightnessStrategy.isAutoBrightnessEnabled());
-        assertFalse(mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff());
     }
 
     @Test

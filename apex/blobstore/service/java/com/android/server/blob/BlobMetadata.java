@@ -52,9 +52,9 @@ import android.content.res.ResourceId;
 import android.content.res.Resources;
 import android.os.Binder;
 import android.os.ParcelFileDescriptor;
-import android.os.Process;
 import android.os.RevocableFileDescriptor;
 import android.os.UserHandle;
+import android.permission.PermissionManager;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.util.ArrayMap;
@@ -298,8 +298,8 @@ class BlobMetadata {
                 }
             }
 
-            final boolean canCallerAccessBlobsAcrossUsers =
-                    checkCallerCanAccessBlobsAcrossUsers(callingUid);
+            final boolean canCallerAccessBlobsAcrossUsers = checkCallerCanAccessBlobsAcrossUsers(
+                    callingPackage, callingUserId);
             if (!canCallerAccessBlobsAcrossUsers) {
                 return false;
             }
@@ -325,11 +325,12 @@ class BlobMetadata {
         return false;
     }
 
-    private boolean checkCallerCanAccessBlobsAcrossUsers(int callingUid) {
+    private static boolean checkCallerCanAccessBlobsAcrossUsers(
+            String callingPackage, int callingUserId) {
         final long token = Binder.clearCallingIdentity();
         try {
-            return mContext.checkPermission(ACCESS_BLOBS_ACROSS_USERS,
-                    Process.INVALID_PID, callingUid) == PackageManager.PERMISSION_GRANTED;
+            return PermissionManager.checkPackageNamePermission(ACCESS_BLOBS_ACROSS_USERS,
+                    callingPackage, callingUserId) == PackageManager.PERMISSION_GRANTED;
         } finally {
             Binder.restoreCallingIdentity(token);
         }

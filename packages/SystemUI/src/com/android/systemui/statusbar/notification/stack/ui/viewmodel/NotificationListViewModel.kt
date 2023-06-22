@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
-import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.statusbar.notification.shelf.ui.viewmodel.NotificationShelfViewModel
@@ -34,7 +33,6 @@ class NotificationListViewModel(
 object NotificationListViewModelModule {
     @JvmStatic
     @Provides
-    @SysUISingleton
     fun maybeProvideViewModel(
         featureFlags: FeatureFlags,
         shelfViewModel: Provider<NotificationShelfViewModel>,

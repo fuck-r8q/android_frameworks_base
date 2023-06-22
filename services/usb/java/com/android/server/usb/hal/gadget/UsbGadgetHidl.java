@@ -123,6 +123,10 @@ public final class UsbGadgetHidl implements UsbGadgetHal {
         }
     }
 
+    @Override
+    public void systemReady() {
+    }
+
     static boolean isServicePresent(IndentingPrintWriter pw) {
         try {
             IUsbGadget.getService(true);

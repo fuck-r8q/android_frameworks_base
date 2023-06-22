@@ -1527,14 +1527,9 @@ public class DisplayPolicy {
             }
         } else if (win.isDimming()) {
             if (mStatusBar != null) {
-                // If the dim window is below status bar window, we should update the appearance
-                // region if needed. Otherwise, leave it as it is.
-                final int statusBarLayer = mStatusBar.mToken.getWindowLayerFromType();
-                final int targetWindowLayer = win.mToken.getWindowLayerFromType();
-                if (targetWindowLayer < statusBarLayer
-                        && addStatusBarAppearanceRegionsForDimmingWindow(
-                                win.mAttrs.insetsFlags.appearance & APPEARANCE_LIGHT_STATUS_BARS,
-                                mStatusBar.getFrame(), win.getBounds(), win.getFrame())) {
+                if (addStatusBarAppearanceRegionsForDimmingWindow(
+                        win.mAttrs.insetsFlags.appearance & APPEARANCE_LIGHT_STATUS_BARS,
+                        mStatusBar.getFrame(), win.getBounds(), win.getFrame())) {
                     addSystemBarColorApp(win);
                 }
             }

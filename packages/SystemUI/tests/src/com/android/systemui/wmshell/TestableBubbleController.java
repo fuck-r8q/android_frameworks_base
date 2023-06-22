@@ -31,7 +31,6 @@ import com.android.wm.shell.bubbles.BubbleData;
 import com.android.wm.shell.bubbles.BubbleDataRepository;
 import com.android.wm.shell.bubbles.BubbleLogger;
 import com.android.wm.shell.bubbles.BubblePositioner;
-import com.android.wm.shell.bubbles.properties.BubbleProperties;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.FloatingContentCoordinator;
 import com.android.wm.shell.common.ShellExecutor;
@@ -75,14 +74,13 @@ public class TestableBubbleController extends BubbleController {
             Handler shellMainHandler,
             TaskViewTransitions taskViewTransitions,
             SyncTransactionQueue syncQueue,
-            IWindowManager wmService,
-            BubbleProperties bubbleProperties) {
+            IWindowManager wmService) {
         super(context, shellInit, shellCommandHandler, shellController, data, Runnable::run,
                 floatingContentCoordinator, dataRepository, statusBarService, windowManager,
                 windowManagerShellWrapper, userManager, launcherApps, bubbleLogger,
                 taskStackListener, shellTaskOrganizer, positioner, displayController,
                 oneHandedOptional, dragAndDropController, shellMainExecutor, shellMainHandler,
-                new SyncExecutor(), taskViewTransitions, syncQueue, wmService, bubbleProperties);
+                new SyncExecutor(), taskViewTransitions, syncQueue, wmService);
         setInflateSynchronously(true);
         onInit();
     }

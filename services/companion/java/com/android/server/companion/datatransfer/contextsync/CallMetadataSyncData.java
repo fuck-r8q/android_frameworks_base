@@ -75,15 +75,13 @@ class CallMetadataSyncData {
     public static class CallFacilitator {
         private String mName;
         private String mIdentifier;
-        private String mExtendedIdentifier;
         private boolean mIsTel;
 
         CallFacilitator() {}
 
-        CallFacilitator(String name, String identifier, String extendedIdentifier) {
+        CallFacilitator(String name, String identifier) {
             mName = name;
             mIdentifier = identifier;
-            mExtendedIdentifier = extendedIdentifier;
         }
 
         public String getName() {
@@ -92,10 +90,6 @@ class CallMetadataSyncData {
 
         public String getIdentifier() {
             return mIdentifier;
-        }
-
-        public String getExtendedIdentifier() {
-            return mExtendedIdentifier;
         }
 
         public boolean isTel() {
@@ -108,10 +102,6 @@ class CallMetadataSyncData {
 
         public void setIdentifier(String identifier) {
             mIdentifier = identifier;
-        }
-
-        public void setExtendedIdentifier(String extendedIdentifier) {
-            mExtendedIdentifier = extendedIdentifier;
         }
 
         public void setIsTel(boolean isTel) {
@@ -180,8 +170,6 @@ class CallMetadataSyncData {
                 "com.android.server.companion.datatransfer.contextsync.extra.FACILITATOR_NAME";
         private static final String EXTRA_FACILITATOR_ID =
                 "com.android.server.companion.datatransfer.contextsync.extra.FACILITATOR_ID";
-        private static final String EXTRA_FACILITATOR_EXT_ID =
-                "com.android.server.companion.datatransfer.contextsync.extra.FACILITATOR_EXT_ID";
         private static final String EXTRA_STATUS =
                 "com.android.server.companion.datatransfer.contextsync.extra.STATUS";
         private static final String EXTRA_DIRECTION =
@@ -204,10 +192,7 @@ class CallMetadataSyncData {
                 call.setAppIcon(bundle.getByteArray(EXTRA_APP_ICON));
                 final String facilitatorName = bundle.getString(EXTRA_FACILITATOR_NAME);
                 final String facilitatorIdentifier = bundle.getString(EXTRA_FACILITATOR_ID);
-                final String facilitatorExtendedIdentifier =
-                        bundle.getString(EXTRA_FACILITATOR_EXT_ID);
-                call.setFacilitator(new CallFacilitator(facilitatorName, facilitatorIdentifier,
-                        facilitatorExtendedIdentifier));
+                call.setFacilitator(new CallFacilitator(facilitatorName, facilitatorIdentifier));
                 call.setStatus(bundle.getInt(EXTRA_STATUS));
                 call.setDirection(bundle.getInt(EXTRA_DIRECTION));
                 call.setControls(new HashSet<>(bundle.getIntegerArrayList(EXTRA_CONTROLS)));
@@ -222,7 +207,6 @@ class CallMetadataSyncData {
             bundle.putByteArray(EXTRA_APP_ICON, mAppIcon);
             bundle.putString(EXTRA_FACILITATOR_NAME, mFacilitator.getName());
             bundle.putString(EXTRA_FACILITATOR_ID, mFacilitator.getIdentifier());
-            bundle.putString(EXTRA_FACILITATOR_EXT_ID, mFacilitator.getExtendedIdentifier());
             bundle.putInt(EXTRA_STATUS, mStatus);
             bundle.putInt(EXTRA_DIRECTION, mDirection);
             bundle.putIntegerArrayList(EXTRA_CONTROLS, new ArrayList<>(mControls));

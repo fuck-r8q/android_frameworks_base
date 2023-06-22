@@ -28,6 +28,9 @@ import com.android.systemui.shade.QuickSettingsController;
 import com.android.systemui.shade.ShadeHeaderController;
 import com.android.systemui.statusbar.NotificationPresenter;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
+import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
+import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
+import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutListContainerModule;
 import com.android.systemui.statusbar.phone.CentralSurfacesCommandQueueCallbacks;
 import com.android.systemui.statusbar.phone.CentralSurfacesImpl;
 import com.android.systemui.statusbar.phone.StatusBarHeadsUpChangeListener;
@@ -53,6 +56,7 @@ import javax.inject.Scope;
  * outside the component. Should more items be moved *into* this component to avoid so many getters?
  */
 @Subcomponent(modules = {
+        NotificationStackScrollLayoutListContainerModule.class,
         StatusBarViewModule.class,
         StatusBarNotificationActivityStarterModule.class,
         StatusBarNotificationPresenterModule.class,
@@ -82,6 +86,9 @@ public interface CentralSurfacesComponent {
      * Creates or returns a {@link NotificationShadeWindowView}.
      */
     NotificationShadeWindowView getNotificationShadeWindowView();
+
+    /** */
+    NotificationStackScrollLayoutController getNotificationStackScrollLayoutController();
 
     /**
      * Creates a NotificationShadeWindowViewController.
@@ -121,4 +128,6 @@ public interface CentralSurfacesComponent {
     NotificationActivityStarter getNotificationActivityStarter();
 
     NotificationPresenter getNotificationPresenter();
+
+    NotificationListContainer getNotificationListContainer();
 }

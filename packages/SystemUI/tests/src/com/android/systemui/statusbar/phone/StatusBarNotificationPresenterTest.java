@@ -37,7 +37,6 @@ import com.android.systemui.InitController;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.settings.FakeDisplayTracker;
 import com.android.systemui.shade.NotificationShadeWindowView;
 import com.android.systemui.shade.QuickSettingsController;
@@ -56,7 +55,6 @@ import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder;
 import com.android.systemui.statusbar.notification.collection.render.NotifShadeEventSource;
-import com.android.systemui.statusbar.notification.domain.interactor.NotificationsInteractor;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptSuppressor;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
@@ -82,8 +80,6 @@ public class StatusBarNotificationPresenterTest extends SysuiTestCase {
     private FakeMetricsLogger mMetricsLogger;
     private final ShadeController mShadeController = mock(ShadeController.class);
     private final CentralSurfaces mCentralSurfaces = mock(CentralSurfaces.class);
-    private final NotificationsInteractor mNotificationsInteractor =
-            mock(NotificationsInteractor.class);
     private final KeyguardStateController mKeyguardStateController =
             mock(KeyguardStateController.class);
     private final NotifPipelineFlags mNotifPipelineFlags = mock(NotifPipelineFlags.class);
@@ -126,9 +122,7 @@ public class StatusBarNotificationPresenterTest extends SysuiTestCase {
                 mock(DynamicPrivacyController.class),
                 mKeyguardStateController,
                 mCentralSurfaces,
-                mNotificationsInteractor,
                 mock(LockscreenShadeTransitionController.class),
-                mock(PowerInteractor.class),
                 mCommandQueue,
                 mock(NotificationLockscreenUserManager.class),
                 mock(SysuiStatusBarStateController.class),
@@ -239,9 +233,9 @@ public class StatusBarNotificationPresenterTest extends SysuiTestCase {
                 .setTag("a")
                 .setNotification(n)
                 .build();
-        when(mNotificationsInteractor.areNotificationAlertsEnabled()).thenReturn(false);
+        when(mCentralSurfaces.areNotificationAlertsDisabled()).thenReturn(true);
 
-        assertTrue("When alerts aren't enabled, interruptions are suppressed",
+        assertTrue("CentralSurfaces alerts disabled shouldn't allow interruptions",
                 mInterruptSuppressor.suppressInterruptions(entry));
     }
 }

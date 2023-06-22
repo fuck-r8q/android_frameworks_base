@@ -19,7 +19,7 @@ package com.android.wm.shell.flicker.pip
 import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
+import android.tools.device.flicker.legacy.FlickerTest
 import androidx.test.filters.RequiresDevice
 import org.junit.Assume
 import org.junit.FixMethodOrder
@@ -44,8 +44,10 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class EnterPipOnUserLeaveHintTest(flicker: LegacyFlickerTest) : EnterPipTransition(flicker) {
-    override val thisTransition: FlickerBuilder.() -> Unit = { transitions { tapl.goHome() } }
+open class EnterPipOnUserLeaveHintTest(flicker: FlickerTest) : EnterPipTransition(flicker) {
+    override val thisTransition: FlickerBuilder.() -> Unit = {
+        transitions { tapl.goHome() }
+    }
 
     override val defaultEnterPip: FlickerBuilder.() -> Unit = {
         setup {

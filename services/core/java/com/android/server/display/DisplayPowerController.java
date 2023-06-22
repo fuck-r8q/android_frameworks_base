@@ -1590,12 +1590,12 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 mAllowAutoBrightnessWhileDozingConfig && Display.isDozeState(state);
         final boolean autoBrightnessEnabled = mUseAutoBrightness
                 && (state == Display.STATE_ON || autoBrightnessEnabledInDoze)
-                && mBrightnessReasonTemp.getReason() != BrightnessReason.REASON_OVERRIDE
-                && mAutomaticBrightnessController != null;
+                && Float.isNaN(brightnessState)
+                && mAutomaticBrightnessController != null
+                && mBrightnessReasonTemp.getReason() != BrightnessReason.REASON_FOLLOWER;
         final boolean autoBrightnessDisabledDueToDisplayOff = mUseAutoBrightness
                 && !(state == Display.STATE_ON || autoBrightnessEnabledInDoze);
         final int autoBrightnessState = autoBrightnessEnabled
-                    && mBrightnessReasonTemp.getReason() != BrightnessReason.REASON_FOLLOWER
                 ? AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED
                 : autoBrightnessDisabledDueToDisplayOff
                         ? AutomaticBrightnessController.AUTO_BRIGHTNESS_OFF_DUE_TO_DISPLAY_STATE
@@ -1655,11 +1655,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     mShouldResetShortTermModel);
             mShouldResetShortTermModel = false;
         }
-        mBrightnessRangeController.setAutoBrightnessEnabled(autoBrightnessEnabled
+        mBrightnessRangeController.setAutoBrightnessEnabled(mUseAutoBrightness
                 ? AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED
-                : autoBrightnessDisabledDueToDisplayOff
-                        ? AutomaticBrightnessController.AUTO_BRIGHTNESS_OFF_DUE_TO_DISPLAY_STATE
-                        : AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED);
+                : AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED);
 
         if (mBrightnessTracker != null) {
             mBrightnessTracker.setShouldCollectColorSample(mBrightnessConfiguration != null
@@ -2303,23 +2301,29 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     }
 
     private void loadAmbientLightSensor() {
+        DisplayDeviceConfig.SensorData lightSensor = mDisplayDeviceConfig.getAmbientLightSensor();
         final int fallbackType = mDisplayId == Display.DEFAULT_DISPLAY
                 ? Sensor.TYPE_LIGHT : SensorUtils.NO_FALLBACK;
-        mLightSensor = SensorUtils.findSensor(mSensorManager,
-                mDisplayDeviceConfig.getAmbientLightSensor(), fallbackType);
+        mLightSensor = SensorUtils.findSensor(mSensorManager, lightSensor.type, lightSensor.name,
+                fallbackType);
     }
 
     private void loadScreenOffBrightnessSensor() {
+        DisplayDeviceConfig.SensorData screenOffBrightnessSensor =
+                mDisplayDeviceConfig.getScreenOffBrightnessSensor();
         mScreenOffBrightnessSensor = SensorUtils.findSensor(mSensorManager,
-                mDisplayDeviceConfig.getScreenOffBrightnessSensor(), SensorUtils.NO_FALLBACK);
+                screenOffBrightnessSensor.type, screenOffBrightnessSensor.name,
+                SensorUtils.NO_FALLBACK);
     }
 
     private void loadProximitySensor() {
         if (DEBUG_PRETEND_PROXIMITY_SENSOR_ABSENT || mDisplayId != Display.DEFAULT_DISPLAY) {
             return;
         }
-        mProximitySensor = SensorUtils.findSensor(mSensorManager,
-                mDisplayDeviceConfig.getProximitySensor(), Sensor.TYPE_PROXIMITY);
+        final DisplayDeviceConfig.SensorData proxSensor =
+                mDisplayDeviceConfig.getProximitySensor();
+        mProximitySensor = SensorUtils.findSensor(mSensorManager, proxSensor.type, proxSensor.name,
+                Sensor.TYPE_PROXIMITY);
         if (mProximitySensor != null) {
             mProximityThreshold = Math.min(mProximitySensor.getMaximumRange(),
                     TYPICAL_PROXIMITY_THRESHOLD);

@@ -63,12 +63,8 @@ import com.android.systemui.statusbar.notification.logging.NotificationPanelLogg
 import com.android.systemui.statusbar.notification.logging.NotificationPanelLoggerImpl;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.row.OnUserInteractionCallback;
-import com.android.systemui.statusbar.notification.row.ui.viewmodel.ActivatableNotificationViewModelModule;
-import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
 import com.android.systemui.statusbar.notification.stack.NotificationSectionsManager;
-import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.notification.stack.StackScrollAlgorithm;
-import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModelModule;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 
 import dagger.Binds;
@@ -89,8 +85,6 @@ import javax.inject.Provider;
         ShadeEventsModule.class,
         NotifPipelineChoreographerModule.class,
         NotificationSectionHeadersModule.class,
-        NotificationListViewModelModule.class,
-        ActivatableNotificationViewModelModule.class,
 })
 public interface NotificationsModule {
     @Binds
@@ -163,14 +157,6 @@ public interface NotificationsModule {
         } else {
             return stubController.get();
         }
-    }
-
-    /** Provides the container for the notification list. */
-    @Provides
-    @SysUISingleton
-    static NotificationListContainer provideListContainer(
-            NotificationStackScrollLayoutController nsslController) {
-        return nsslController.getNotificationListContainer();
     }
 
     /**

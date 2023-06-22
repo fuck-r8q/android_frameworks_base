@@ -1034,7 +1034,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 new NsslHeightChangedListener());
         mNotificationStackScrollLayoutController.setOnEmptySpaceClickListener(
                 mOnEmptySpaceClickListener);
-        mQsController.init();
+        mQsController.initNotificationStackScrollLayoutController();
         mShadeExpansionStateManager.addQsExpansionListener(this::onQsExpansionChanged);
         mShadeHeadsUpTracker.addTrackingHeadsUpListener(
                 mNotificationStackScrollLayoutController::setTrackingHeadsUp);

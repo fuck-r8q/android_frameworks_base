@@ -2453,17 +2453,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
             mSplitLayout.setFreezeDividerWindow(false);
             final StageChangeRecord record = new StageChangeRecord();
-            final int transitType = info.getType();
-            boolean hasEnteringPip = false;
             for (int iC = 0; iC < info.getChanges().size(); ++iC) {
                 final TransitionInfo.Change change = info.getChanges().get(iC);
                 if (change.getMode() == TRANSIT_CHANGE
                         && (change.getFlags() & FLAG_IS_DISPLAY) != 0) {
                     mSplitLayout.update(startTransaction);
-                }
-
-                if (mMixedHandler.isEnteringPip(change, transitType)) {
-                    hasEnteringPip = true;
                 }
 
                 final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
@@ -2514,13 +2508,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     }
                 }
             }
-
-            if (hasEnteringPip) {
-                mMixedHandler.animatePendingEnterPipFromSplit(transition, info,
-                        startTransaction, finishTransaction, finishCallback);
-                return true;
-            }
-
             final ArraySet<StageTaskListener> dismissStages = record.getShouldDismissedStage();
             if (mMainStage.getChildCount() == 0 || mSideStage.getChildCount() == 0
                     || dismissStages.size() == 1) {
@@ -2860,9 +2847,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 for (int i = info.getChanges().size() - 1; i >= 0; --i) {
                     final TransitionInfo.Change change = info.getChanges().get(i);
                     final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
-                    if (taskInfo != null && (getStageOfTask(taskInfo) != null
-                            || getSplitItemPosition(change.getLastParent())
-                            != SPLIT_POSITION_UNDEFINED)) {
+                    if (taskInfo != null && getStageOfTask(taskInfo) != null) {
                         recentTasks.removeSplitPair(taskInfo.taskId);
                     }
                 }

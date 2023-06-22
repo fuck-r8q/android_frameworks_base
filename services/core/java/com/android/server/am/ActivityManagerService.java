@@ -8597,7 +8597,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                 t.traceEnd();
             }
 
-            mHandler.post(mAtmInternal::showSystemReadyErrorDialogsIfNeeded);
+            t.traceBegin("showSystemReadyErrorDialogs");
+            mAtmInternal.showSystemReadyErrorDialogsIfNeeded();
+            t.traceEnd();
+
 
             if (isBootingSystemUser) {
                 // Need to send the broadcasts for the system user here because

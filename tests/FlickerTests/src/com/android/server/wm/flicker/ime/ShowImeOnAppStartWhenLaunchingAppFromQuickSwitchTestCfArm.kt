@@ -18,7 +18,7 @@ package com.android.server.wm.flicker.ime
 
 import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
+import android.tools.device.flicker.legacy.FlickerTest
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
@@ -28,5 +28,5 @@ import org.junit.runners.Parameterized
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @Presubmit
-open class ShowImeOnAppStartWhenLaunchingAppFromQuickSwitchTestCfArm(flicker: LegacyFlickerTest) :
+open class ShowImeOnAppStartWhenLaunchingAppFromQuickSwitchTestCfArm(flicker: FlickerTest) :
     ShowImeOnAppStartWhenLaunchingAppFromQuickSwitchTest(flicker)

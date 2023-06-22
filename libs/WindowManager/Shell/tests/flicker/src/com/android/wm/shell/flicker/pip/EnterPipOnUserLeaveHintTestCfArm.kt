@@ -17,7 +17,7 @@
 package com.android.wm.shell.flicker.pip
 
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
+import android.tools.device.flicker.legacy.FlickerTest
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
@@ -27,5 +27,4 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class EnterPipOnUserLeaveHintTestCfArm(flicker: LegacyFlickerTest) :
-    EnterPipOnUserLeaveHintTest(flicker)
+class EnterPipOnUserLeaveHintTestCfArm(flicker: FlickerTest) : EnterPipOnUserLeaveHintTest(flicker)

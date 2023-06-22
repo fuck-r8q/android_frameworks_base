@@ -43,7 +43,6 @@ import android.content.pm.PackageManager.OnPermissionsChangedListener;
 import android.content.pm.PackageManagerInternal;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Process;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -293,8 +292,8 @@ final class AppPermissionTracker extends BaseAppStateTracker<AppPermissionPolicy
                 mPermissionGranted = true;
                 return;
             }
-            mPermissionGranted = mContext.checkPermission(mPermission, Process.INVALID_PID, mUid)
-                    == PERMISSION_GRANTED;
+            mPermissionGranted = mInjector.getPermissionManagerServiceInternal()
+                    .checkUidPermission(mUid, mPermission) == PERMISSION_GRANTED;
         }
 
         void updateAppOps() {

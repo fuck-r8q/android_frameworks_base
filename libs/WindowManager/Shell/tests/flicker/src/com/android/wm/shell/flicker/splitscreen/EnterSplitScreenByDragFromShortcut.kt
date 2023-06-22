@@ -21,8 +21,8 @@ import android.platform.test.annotations.Presubmit
 import android.tools.common.NavBar
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.ICommonAssertions
 import com.android.wm.shell.flicker.appWindowIsVisibleAtEnd
@@ -41,13 +41,13 @@ import org.junit.runners.Parameterized
 /**
  * Test enter split screen by dragging a shortcut. This test is only for large screen devices.
  *
- * To run this test: `atest WMShellFlickerTestsSplitScreen:EnterSplitScreenByDragFromShortcut`
+ * To run this test: `atest WMShellFlickerTests:EnterSplitScreenByDragFromShortcut`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class EnterSplitScreenByDragFromShortcut(override val flicker: LegacyFlickerTest) :
+class EnterSplitScreenByDragFromShortcut(override val flicker: FlickerTest) :
     EnterSplitScreenByDragFromShortcutBenchmark(flicker), ICommonAssertions {
 
     override val transition: FlickerBuilder.() -> Unit
@@ -105,10 +105,11 @@ class EnterSplitScreenByDragFromShortcut(override val flicker: LegacyFlickerTest
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() =
-            LegacyFlickerTestFactory.nonRotationTests(
+        fun getParams(): List<FlickerTest> {
+            return FlickerTestFactory.nonRotationTests(
                 // TODO(b/176061063):The 3 buttons of nav bar do not exist in the hierarchy.
                 supportedNavigationModes = listOf(NavBar.MODE_GESTURAL)
             )
+        }
     }
 }

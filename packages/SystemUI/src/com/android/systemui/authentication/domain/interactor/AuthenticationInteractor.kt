@@ -122,36 +122,14 @@ constructor(
     /**
      * Attempts to authenticate the user and unlock the device.
      *
-     * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
-     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
-     * `null` is returned.
-     *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
-     * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
-     *   request to validate.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
-     *   authentication failed, `null` if the check was not performed.
+     * @return `true` if the authentication succeeded and the device is now unlocked; `false`
+     *   otherwise.
      */
-    fun authenticate(input: List<Any>, tryAutoConfirm: Boolean = false): Boolean? {
-        val authMethod = this.authenticationMethod.value
-        if (tryAutoConfirm) {
-            if ((authMethod as? AuthenticationMethodModel.Pin)?.autoConfirm != true) {
-                // Do not attempt to authenticate unless the PIN lock is set to auto-confirm.
-                return null
-            }
-
-            if (input.size < authMethod.code.size) {
-                // Do not attempt to authenticate if the PIN has not yet the required amount of
-                // digits. This intentionally only skip for shorter PINs; if the PIN is longer, the
-                // layer above might have throttled this check, and the PIN should be rejected via
-                // the auth code below.
-                return null
-            }
-        }
-
+    fun authenticate(input: List<Any>): Boolean {
         val isSuccessful =
-            when (authMethod) {
+            when (val authMethod = this.authenticationMethod.value) {
                 is AuthenticationMethodModel.Pin -> input.asCode() == authMethod.code
                 is AuthenticationMethodModel.Password -> input.asPassword() == authMethod.password
                 is AuthenticationMethodModel.Pattern -> input.asPattern() == authMethod.coordinates
@@ -202,17 +180,21 @@ constructor(
          * Returns a PIN code from the given list. It's assumed the given list elements are all
          * [Int] in the range [0-9].
          */
-        private fun List<Any>.asCode(): List<Int>? {
+        private fun List<Any>.asCode(): Long? {
             if (isEmpty() || size > DevicePolicyManager.MAX_PASSWORD_LENGTH) {
                 return null
             }
 
-            return map {
-                require(it is Int && it in 0..9) {
-                    "Pin is required to be Int in range [0..9], but got $it"
+            var code = 0L
+            map {
+                    require(it is Int && it in 0..9) {
+                        "Pin is required to be Int in range [0..9], but got $it"
+                    }
+                    it
                 }
-                it
-            }
+                .forEach { integer -> code = code * 10 + integer }
+
+            return code
         }
 
         /**

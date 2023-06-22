@@ -39,7 +39,6 @@ import com.android.server.wm.flicker.helpers.NonResizeableAppHelper
 import com.android.server.wm.flicker.helpers.NotificationAppHelper
 import com.android.server.wm.flicker.helpers.SimpleAppHelper
 import com.android.server.wm.flicker.testapp.ActivityOptions
-import com.android.server.wm.flicker.testapp.ActivityOptions.SplitScreen.Primary
 import com.android.wm.shell.flicker.LAUNCHER_UI_PACKAGE_NAME
 import com.android.wm.shell.flicker.SYSTEM_UI_PACKAGE_NAME
 import org.junit.Assert.assertNotNull
@@ -110,17 +109,6 @@ internal object SplitScreenUtils {
         tapl.goHome()
         wmHelper.StateSyncBuilder().withHomeActivityVisible().waitForAndVerify()
         splitFromOverview(tapl, device)
-        waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
-    }
-
-    fun enterSplitViaIntent(
-            wmHelper: WindowManagerStateHelper,
-            primaryApp: StandardAppHelper,
-            secondaryApp: StandardAppHelper
-    ) {
-        val stringExtras = mapOf(Primary.EXTRA_LAUNCH_ADJACENT to "true")
-        primaryApp.launchViaIntent(wmHelper, null, null,
-                stringExtras)
         waitForSplitComplete(wmHelper, primaryApp, secondaryApp)
     }
 

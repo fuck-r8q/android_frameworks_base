@@ -58,21 +58,15 @@ public class LatencyTrackerTest {
     // Fake is used because it tests the real logic of LatencyTracker, and it only fakes the
     // outcomes (PerfettoTrigger and FrameworkStatsLog).
     private FakeLatencyTracker mLatencyTracker;
-    private int mInitialSyncDisabledMode;
 
     @Before
     public void setUp() throws Exception {
-        mInitialSyncDisabledMode = DeviceConfig.getSyncDisabledMode();
-        DeviceConfig.setSyncDisabledMode(DeviceConfig.SYNC_DISABLED_MODE_NONE);
         mLatencyTracker = FakeLatencyTracker.create();
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() {
         mLatencyTracker.stopListeningForLatencyTrackerConfigChanges();
-        DeviceConfig.setProperties(
-                new DeviceConfig.Properties.Builder(NAMESPACE_LATENCY_TRACKER).build());
-        DeviceConfig.setSyncDisabledMode(mInitialSyncDisabledMode);
     }
 
     @Test

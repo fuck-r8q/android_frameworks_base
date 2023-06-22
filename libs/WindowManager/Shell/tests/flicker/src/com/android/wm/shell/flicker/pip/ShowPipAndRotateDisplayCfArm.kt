@@ -16,10 +16,9 @@
 
 package com.android.wm.shell.flicker.pip
 
-import android.tools.common.flicker.assertions.FlickerTest
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
@@ -28,18 +27,18 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class ShowPipAndRotateDisplayCfArm(flicker: LegacyFlickerTest) : ShowPipAndRotateDisplay(flicker) {
+class ShowPipAndRotateDisplayCfArm(flicker: FlickerTest) : ShowPipAndRotateDisplay(flicker) {
     companion object {
         /**
          * Creates the test configurations.
          *
-         * See [LegacyFlickerTestFactory.nonRotationTests] for configuring repetitions, screen
-         * orientation and navigation modes.
+         * See [FlickerTestFactory.nonRotationTests] for configuring repetitions, screen orientation
+         * and navigation modes.
          */
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
         fun getParams(): Collection<FlickerTest> {
-            return LegacyFlickerTestFactory.rotationTests()
+            return FlickerTestFactory.rotationTests()
         }
     }
 }

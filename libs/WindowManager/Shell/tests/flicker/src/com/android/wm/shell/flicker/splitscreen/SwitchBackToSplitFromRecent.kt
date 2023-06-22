@@ -21,8 +21,8 @@ import android.platform.test.annotations.Presubmit
 import android.tools.common.NavBar
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.ICommonAssertions
 import com.android.wm.shell.flicker.appWindowBecomesVisible
@@ -39,13 +39,13 @@ import org.junit.runners.Parameterized
 /**
  * Test switch back to split pair from recent.
  *
- * To run this test: `atest WMShellFlickerTestsSplitScreen:SwitchBackToSplitFromRecent`
+ * To run this test: `atest WMShellFlickerTests:SwitchBackToSplitFromRecent`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class SwitchBackToSplitFromRecent(override val flicker: LegacyFlickerTest) :
+class SwitchBackToSplitFromRecent(override val flicker: FlickerTest) :
     SwitchBackToSplitFromRecentBenchmark(flicker), ICommonAssertions {
     override val transition: FlickerBuilder.() -> Unit
         get() = {
@@ -149,10 +149,11 @@ class SwitchBackToSplitFromRecent(override val flicker: LegacyFlickerTest) :
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() =
-            LegacyFlickerTestFactory.nonRotationTests(
+        fun getParams(): List<FlickerTest> {
+            return FlickerTestFactory.nonRotationTests(
                 // TODO(b/176061063):The 3 buttons of nav bar do not exist in the hierarchy.
                 supportedNavigationModes = listOf(NavBar.MODE_GESTURAL)
             )
+        }
     }
 }

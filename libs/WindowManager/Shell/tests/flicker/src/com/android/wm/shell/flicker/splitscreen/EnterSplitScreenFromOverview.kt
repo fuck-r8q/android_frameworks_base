@@ -20,8 +20,8 @@ import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.ICommonAssertions
 import com.android.wm.shell.flicker.appWindowBecomesVisible
@@ -40,13 +40,13 @@ import org.junit.runners.Parameterized
 /**
  * Test enter split screen from Overview.
  *
- * To run this test: `atest WMShellFlickerTestsSplitScreen:EnterSplitScreenFromOverview`
+ * To run this test: `atest WMShellFlickerTests:EnterSplitScreenFromOverview`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class EnterSplitScreenFromOverview(override val flicker: LegacyFlickerTest) :
+class EnterSplitScreenFromOverview(override val flicker: FlickerTest) :
     EnterSplitScreenFromOverviewBenchmark(flicker), ICommonAssertions {
     override val transition: FlickerBuilder.() -> Unit
         get() = {
@@ -106,6 +106,8 @@ class EnterSplitScreenFromOverview(override val flicker: LegacyFlickerTest) :
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() = LegacyFlickerTestFactory.nonRotationTests()
+        fun getParams(): List<FlickerTest> {
+            return FlickerTestFactory.nonRotationTests()
+        }
     }
 }

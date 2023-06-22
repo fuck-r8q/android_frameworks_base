@@ -23,8 +23,8 @@ import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.common.traces.component.EdgeExtensionComponentMatcher
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.ICommonAssertions
 import com.android.wm.shell.flicker.SPLIT_SCREEN_DIVIDER_COMPONENT
@@ -45,13 +45,13 @@ import org.junit.runners.Parameterized
 /**
  * Test copy content from the left to the right side of the split-screen.
  *
- * To run this test: `atest WMShellFlickerTestsSplitScreen:CopyContentInSplit`
+ * To run this test: `atest WMShellFlickerTests:CopyContentInSplit`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class CopyContentInSplit(override val flicker: LegacyFlickerTest) :
+class CopyContentInSplit(override val flicker: FlickerTest) :
     CopyContentInSplitBenchmark(flicker), ICommonAssertions {
     override val transition: FlickerBuilder.() -> Unit
         get() = {
@@ -136,6 +136,8 @@ class CopyContentInSplit(override val flicker: LegacyFlickerTest) :
     companion object {
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
-        fun getParams() = LegacyFlickerTestFactory.nonRotationTests()
+        fun getParams(): List<FlickerTest> {
+            return FlickerTestFactory.nonRotationTests()
+        }
     }
 }

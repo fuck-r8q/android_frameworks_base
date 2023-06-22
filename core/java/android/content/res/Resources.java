@@ -2003,25 +2003,13 @@ public class Resources {
 
         private int mHashCode = 0;
 
-        private int findValue(int resId, boolean force) {
+        private boolean containsValue(int resId, boolean force) {
             for (int i = 0; i < mCount; ++i) {
                 if (mResId[i] == resId && mForce[i] == force) {
-                    return i;
+                    return true;
                 }
             }
-            return -1;
-        }
-
-        private void moveToLast(int index) {
-            if (index < 0 || index >= mCount - 1) {
-                return;
-            }
-            final int id = mResId[index];
-            final boolean force = mForce[index];
-            System.arraycopy(mResId, index + 1, mResId, index, mCount - index - 1);
-            mResId[mCount - 1] = id;
-            System.arraycopy(mForce, index + 1, mForce, index, mCount - index - 1);
-            mForce[mCount - 1] = force;
+            return false;
         }
 
         public void append(int resId, boolean force) {
@@ -2034,17 +2022,15 @@ public class Resources {
             }
 
             // Some apps tend to keep adding same resources over and over, let's protect from it.
-            // Note: the order still matters, as the values that come later override the earlier
-            //  ones.
-            final int index = findValue(resId, force);
-            if (index >= 0) {
-                moveToLast(index);
-            } else {
-                mResId = GrowingArrayUtils.append(mResId, mCount, resId);
-                mForce = GrowingArrayUtils.append(mForce, mCount, force);
-                mCount++;
-                mHashCode = 31 * (31 * mHashCode + resId) + (force ? 1 : 0);
+            if (containsValue(resId, force)) {
+                return;
             }
+
+            mResId = GrowingArrayUtils.append(mResId, mCount, resId);
+            mForce = GrowingArrayUtils.append(mForce, mCount, force);
+            mCount++;
+
+            mHashCode = 31 * (31 * mHashCode + resId) + (force ? 1 : 0);
         }
 
         /**

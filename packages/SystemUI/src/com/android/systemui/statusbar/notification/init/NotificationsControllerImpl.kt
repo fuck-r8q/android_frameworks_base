@@ -42,6 +42,7 @@ import com.android.systemui.statusbar.notification.logging.NotificationLogger
 import com.android.systemui.statusbar.notification.logging.NotificationMemoryMonitor
 import com.android.systemui.statusbar.notification.row.NotifBindPipelineInitializer
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer
+import com.android.systemui.statusbar.phone.CentralSurfaces
 import com.android.wm.shell.bubbles.Bubbles
 import dagger.Lazy
 import java.util.Optional
@@ -77,6 +78,7 @@ class NotificationsControllerImpl @Inject constructor(
 ) : NotificationsController {
 
     override fun initialize(
+        centralSurfaces: CentralSurfaces,
         presenter: NotificationPresenter,
         listContainer: NotificationListContainer,
         stackController: NotifStackController,
@@ -91,7 +93,9 @@ class NotificationsControllerImpl @Inject constructor(
         })
 
         notificationRowBinder.setNotificationClicker(
-            clickerBuilder.build(bubblesOptional, notificationActivityStarter))
+                clickerBuilder.build(
+                    Optional.ofNullable(centralSurfaces), bubblesOptional,
+                        notificationActivityStarter))
         notificationRowBinder.setUpWithPresenter(presenter, listContainer)
         headsUpViewBinder.setPresenter(presenter)
         notifBindPipelineInitializer.initialize()

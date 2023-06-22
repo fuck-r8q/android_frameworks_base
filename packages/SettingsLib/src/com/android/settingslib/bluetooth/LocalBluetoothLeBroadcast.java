@@ -237,8 +237,7 @@ public class LocalBluetoothLeBroadcast implements LocalBluetoothProfile {
                     "startBroadcast: language = " + language + " ,programInfo = " + programInfo);
         }
         buildContentMetadata(language, programInfo);
-        mService.startBroadcast(mBluetoothLeAudioContentMetadata,
-                (mBroadcastCode != null && mBroadcastCode.length > 0) ? mBroadcastCode : null);
+        mService.startBroadcast(mBluetoothLeAudioContentMetadata, mBroadcastCode);
     }
 
     public String getProgramInfo() {

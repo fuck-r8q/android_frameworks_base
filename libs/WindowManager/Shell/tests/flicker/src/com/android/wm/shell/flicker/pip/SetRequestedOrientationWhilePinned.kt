@@ -21,11 +21,10 @@ import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.Presubmit
 import android.tools.common.Rotation
-import android.tools.common.flicker.assertions.FlickerTest
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import android.tools.device.helpers.WindowUtils
 import androidx.test.filters.RequiresDevice
 import com.android.server.wm.flicker.testapp.ActivityOptions
@@ -47,7 +46,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class SetRequestedOrientationWhilePinned(flicker: LegacyFlickerTest) : PipTransition(flicker) {
+open class SetRequestedOrientationWhilePinned(flicker: FlickerTest) : PipTransition(flicker) {
     private val startingBounds = WindowUtils.getDisplayBounds(Rotation.ROTATION_0)
     private val endingBounds = WindowUtils.getDisplayBounds(Rotation.ROTATION_90)
 
@@ -70,19 +69,20 @@ open class SetRequestedOrientationWhilePinned(flicker: LegacyFlickerTest) : PipT
         setup {
             // Launch the PiP activity fixed as landscape.
             pipApp.launchViaIntent(
-                wmHelper,
-                stringExtras = mapOf(EXTRA_FIXED_ORIENTATION to ORIENTATION_LANDSCAPE.toString())
+                    wmHelper,
+                    stringExtras =
+                    mapOf(EXTRA_FIXED_ORIENTATION to ORIENTATION_LANDSCAPE.toString())
             )
             // Enter PiP.
             broadcastActionTrigger.doAction(ActivityOptions.Pip.ACTION_ENTER_PIP)
             // System bar may fade out during fixed rotation.
             wmHelper
-                .StateSyncBuilder()
-                .withPipShown()
-                .withRotation(Rotation.ROTATION_0)
-                .withNavOrTaskBarVisible()
-                .withStatusBarVisible()
-                .waitForAndVerify()
+                    .StateSyncBuilder()
+                    .withPipShown()
+                    .withRotation(Rotation.ROTATION_0)
+                    .withNavOrTaskBarVisible()
+                    .withStatusBarVisible()
+                    .waitForAndVerify()
         }
     }
 
@@ -150,7 +150,7 @@ open class SetRequestedOrientationWhilePinned(flicker: LegacyFlickerTest) : PipT
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
         fun getParams(): Collection<FlickerTest> {
-            return LegacyFlickerTestFactory.nonRotationTests(
+            return FlickerTestFactory.nonRotationTests(
                 supportedRotations = listOf(Rotation.ROTATION_0)
             )
         }

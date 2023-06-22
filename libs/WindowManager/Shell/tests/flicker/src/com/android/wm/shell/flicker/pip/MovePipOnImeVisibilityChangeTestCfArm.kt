@@ -17,10 +17,9 @@
 package com.android.wm.shell.flicker.pip
 
 import android.tools.common.Rotation
-import android.tools.common.flicker.assertions.FlickerTest
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import android.tools.device.flicker.legacy.FlickerTest
+import android.tools.device.flicker.legacy.FlickerTestFactory
 import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
@@ -29,7 +28,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class MovePipOnImeVisibilityChangeTestCfArm(flicker: LegacyFlickerTest) :
+class MovePipOnImeVisibilityChangeTestCfArm(flicker: FlickerTest) :
     MovePipOnImeVisibilityChangeTest(flicker) {
     companion object {
         private const val TAG_IME_VISIBLE = "imeIsVisible"
@@ -37,7 +36,7 @@ class MovePipOnImeVisibilityChangeTestCfArm(flicker: LegacyFlickerTest) :
         @Parameterized.Parameters(name = "{0}")
         @JvmStatic
         fun getParams(): Collection<FlickerTest> {
-            return LegacyFlickerTestFactory.nonRotationTests(
+            return FlickerTestFactory.nonRotationTests(
                 supportedRotations = listOf(Rotation.ROTATION_0)
             )
         }

@@ -158,6 +158,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private static final String TAG = "AppWidgetServiceImpl";
 
     private static final boolean DEBUG = false;
+    static final boolean DEBUG_PROVIDER_INFO_CACHE = true;
 
     private static final String OLD_KEYGUARD_HOST_PACKAGE = "android";
     private static final String NEW_KEYGUARD_HOST_PACKAGE = "com.android.keyguard";
@@ -254,6 +255,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
 
     private boolean mSafeMode;
     private int mMaxWidgetBitmapMemory;
+    private boolean mIsProviderInfoPersisted;
     private boolean mIsCombinedBroadcastEnabled;
 
     // Mark widget lifecycle broadcasts as 'interactive'
@@ -279,8 +281,14 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         mCallbackHandler = new CallbackHandler(serviceThread.getLooper());
         mBackupRestoreController = new BackupRestoreController();
         mSecurityPolicy = new SecurityPolicy();
+        mIsProviderInfoPersisted = !ActivityManager.isLowRamDeviceStatic()
+                && DeviceConfig.getBoolean(NAMESPACE_SYSTEMUI,
+                SystemUiDeviceConfigFlags.PERSISTS_WIDGET_PROVIDER_INFO, true);
         mIsCombinedBroadcastEnabled = DeviceConfig.getBoolean(NAMESPACE_SYSTEMUI,
             SystemUiDeviceConfigFlags.COMBINED_BROADCAST_ENABLED, true);
+        if (DEBUG_PROVIDER_INFO_CACHE && !mIsProviderInfoPersisted) {
+            Slog.d(TAG, "App widget provider info will not be persisted on this device");
+        }
 
         BroadcastOptions opts = BroadcastOptions.makeBasic();
         opts.setBackgroundActivityStartsAllowed(false);
@@ -2520,7 +2528,21 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         }
     }
 
-    private static void serializeProvider(@NonNull final TypedXmlSerializer out,
+    private static void serializeProvider(
+            @NonNull final TypedXmlSerializer out, @NonNull final Provider p) throws IOException {
+        Objects.requireNonNull(out);
+        Objects.requireNonNull(p);
+        serializeProviderInner(out, p, false /* persistsProviderInfo */);
+    }
+
+    private static void serializeProviderWithProviderInfo(
+            @NonNull final TypedXmlSerializer out, @NonNull final Provider p) throws IOException {
+        Objects.requireNonNull(out);
+        Objects.requireNonNull(p);
+        serializeProviderInner(out, p, true /* persistsProviderInfo */);
+    }
+
+    private static void serializeProviderInner(@NonNull final TypedXmlSerializer out,
             @NonNull final Provider p, final boolean persistsProviderInfo) throws IOException {
         Objects.requireNonNull(out);
         Objects.requireNonNull(p);
@@ -2530,6 +2552,9 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         out.attributeIntHex(null, "tag", p.tag);
         if (!TextUtils.isEmpty(p.infoTag)) {
             out.attribute(null, "info_tag", p.infoTag);
+        }
+        if (DEBUG_PROVIDER_INFO_CACHE && persistsProviderInfo && !p.mInfoParsed) {
+            Slog.d(TAG, "Provider info from " + p.id.componentName + " won't be persisted.");
         }
         if (persistsProviderInfo && p.mInfoParsed) {
             AppWidgetXmlUtil.writeAppWidgetProviderInfoLocked(out, p.info);
@@ -3147,7 +3172,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 if (provider.getUserId() != userId) {
                     continue;
                 }
-                serializeProvider(out, provider, true /* persistsProviderInfo */);
+                if (mIsProviderInfoPersisted) {
+                    serializeProviderWithProviderInfo(out, provider);
+                } else if (provider.shouldBePersisted()) {
+                    serializeProvider(out, provider);
+                }
             }
 
             N = mHosts.size();
@@ -3245,10 +3274,10 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                             provider.zombie = true;
                             provider.id = providerId;
                             mProviders.add(provider);
-                        } else {
+                        } else if (mIsProviderInfoPersisted) {
                             final AppWidgetProviderInfo info =
                                     AppWidgetXmlUtil.readAppWidgetProviderInfoLocked(parser);
-                            if (DEBUG && info == null) {
+                            if (DEBUG_PROVIDER_INFO_CACHE && info == null) {
                                 Slog.d(TAG, "Unable to load widget provider info from xml for "
                                         + providerId.componentName);
                             }
@@ -4572,7 +4601,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                                 && (provider.isInPackageForUser(backedupPackage, userId)
                                 || provider.hostedByPackageForUser(backedupPackage, userId))) {
                             provider.tag = index;
-                            serializeProvider(out, provider, false /* persistsProviderInfo*/);
+                            serializeProvider(out, provider);
                             index++;
                         }
                     }

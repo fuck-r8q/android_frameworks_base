@@ -348,10 +348,6 @@ public final class SmartspaceAction implements Parcelable {
          */
         @NonNull
         public SmartspaceAction build() {
-            if (mIcon != null) {
-                mIcon.convertToAshmem();
-            }
-
             return new SmartspaceAction(mId, mIcon, mTitle, mSubtitle, mContentDescription,
                     mPendingIntent, mIntent, mUserHandle, mExtras);
         }

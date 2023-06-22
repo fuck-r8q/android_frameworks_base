@@ -149,28 +149,19 @@ constructor(
      * If the input is correct, the device will be unlocked and the lock screen and bouncer will be
      * dismissed and hidden.
      *
-     * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
-     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
-     * `null` is returned.
-     *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
-     * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
-     *   request to validate.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
-     *   authentication failed, `null` if the check was not performed.
+     * @return `true` if the authentication succeeded and the device is now unlocked; `false`
+     *   otherwise.
      */
     fun authenticate(
         input: List<Any>,
-        tryAutoConfirm: Boolean = false,
-    ): Boolean? {
+    ): Boolean {
         if (repository.throttling.value != null) {
             return false
         }
 
-        val isAuthenticated =
-            authenticationInteractor.authenticate(input, tryAutoConfirm) ?: return null
-
+        val isAuthenticated = authenticationInteractor.authenticate(input)
         val failedAttempts = authenticationInteractor.failedAuthenticationAttempts.value
         when {
             isAuthenticated -> {
