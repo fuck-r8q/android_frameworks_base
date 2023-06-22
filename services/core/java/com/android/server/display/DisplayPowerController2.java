@@ -1296,7 +1296,7 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
                 mAutomaticBrightnessStrategy.isShortTermModelActive();
         mAutomaticBrightnessStrategy.setAutoBrightnessState(state,
                 mDisplayBrightnessController.isAllowAutoBrightnessWhileDozingConfig(),
-                brightnessState, mBrightnessReasonTemp.getReason(), mPowerRequest.policy,
+                mBrightnessReasonTemp.getReason(), mPowerRequest.policy,
                 mDisplayBrightnessController.getLastUserSetScreenBrightness(),
                 userSetBrightnessChanged);
 
@@ -1306,10 +1306,12 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
                 && (mAutomaticBrightnessStrategy.getAutoBrightnessAdjustmentChanged()
                 || userSetBrightnessChanged);
 
-        mBrightnessRangeController.setAutoBrightnessEnabled(mAutomaticBrightnessStrategy
-                .shouldUseAutoBrightness()
+        mBrightnessRangeController.setAutoBrightnessEnabled(
+                mAutomaticBrightnessStrategy.isAutoBrightnessEnabled()
                 ? AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED
-                : AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED);
+                : mAutomaticBrightnessStrategy.isAutoBrightnessDisabledDueToDisplayOff()
+                        ? AutomaticBrightnessController.AUTO_BRIGHTNESS_OFF_DUE_TO_DISPLAY_STATE
+                        : AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED);
 
         boolean updateScreenBrightnessSetting = false;
         float currentBrightnessSetting = mDisplayBrightnessController.getCurrentBrightness();
@@ -1948,19 +1950,15 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
     }
 
     private void loadAmbientLightSensor() {
-        DisplayDeviceConfig.SensorData lightSensor = mDisplayDeviceConfig.getAmbientLightSensor();
         final int fallbackType = mDisplayId == Display.DEFAULT_DISPLAY
                 ? Sensor.TYPE_LIGHT : SensorUtils.NO_FALLBACK;
-        mLightSensor = SensorUtils.findSensor(mSensorManager, lightSensor.type, lightSensor.name,
-                fallbackType);
+        mLightSensor = SensorUtils.findSensor(mSensorManager,
+                mDisplayDeviceConfig.getAmbientLightSensor(), fallbackType);
     }
 
     private void loadScreenOffBrightnessSensor() {
-        DisplayDeviceConfig.SensorData screenOffBrightnessSensor =
-                mDisplayDeviceConfig.getScreenOffBrightnessSensor();
         mScreenOffBrightnessSensor = SensorUtils.findSensor(mSensorManager,
-                screenOffBrightnessSensor.type, screenOffBrightnessSensor.name,
-                SensorUtils.NO_FALLBACK);
+                mDisplayDeviceConfig.getScreenOffBrightnessSensor(), SensorUtils.NO_FALLBACK);
     }
 
     private float clampScreenBrightness(float value) {

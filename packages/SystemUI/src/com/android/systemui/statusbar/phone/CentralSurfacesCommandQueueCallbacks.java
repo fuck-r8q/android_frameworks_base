@@ -244,8 +244,13 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     }
     /**
      * State is one or more of the DISABLE constants from StatusBarManager.
+     *
+     * @deprecated If you need to react to changes in disable flags, listen to
+     * {@link com.android.systemui.statusbar.disableflags.data.repository.DisableFlagsRepository}
+     * instead.
      */
     @Override
+    @Deprecated
     public void disable(int displayId, int state1, int state2, boolean animate) {
         if (displayId != mDisplayId) {
             return;
@@ -275,17 +280,12 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         }
 
         if ((diff1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
-            if (mCentralSurfaces.areNotificationAlertsDisabled()) {
+            if ((state1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
                 mHeadsUpManager.releaseAllImmediately();
             }
         }
 
-        if ((diff2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
-        }
-
         if ((diff2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
             if ((state2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
                 mShadeController.animateCollapseShade();
             }
