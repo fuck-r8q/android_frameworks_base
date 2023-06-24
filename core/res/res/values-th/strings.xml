@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"อนุญาตให้แอปรับข้อมูลบริการชำระเงิน NFC ที่ต้องการ เช่น รหัสแอป (AID) ที่ลงทะเบียนและปลายทางของเส้นทาง"</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"ควบคุม Near Field Communication"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"อนุญาตให้แอปพลิเคชันสื่อสารกับแท็ก Near Field Communication (NFC) การ์ด และโปรแกรมอ่าน"</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"เหตุการณ์เกี่ยวกับธุรกรรมในองค์ประกอบความปลอดภัย"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"อนุญาตให้แอปรับข้อมูลเกี่ยวกับธุรกรรมที่เกิดขึ้นในองค์ประกอบความปลอดภัย"</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"ปิดใช้งานการล็อกหน้าจอของคุณ"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"อนุญาตให้แอปพลิเคชันปิดใช้งานการล็อกปุ่มกดและการรักษาความปลอดภัยด้วยรหัสผ่านใดๆ ที่เกี่ยวข้อง ตัวอย่างเช่น โทรศัพท์ปิดใช้งานการล็อกปุ่มกดเมื่อรับสายเรียกเข้า จากนั้นจึงเปิดใช้งานการล็อกปุ่มกดใหม่หลังจากวางสาย"</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"ขอความซับซ้อนของการล็อกหน้าจอ"</string>

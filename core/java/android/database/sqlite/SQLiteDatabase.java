@@ -675,6 +675,34 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     /**
+     * Begins a transaction in DEFERRED mode, with the android-specific constraint that the
+     * transaction is read-only. The database may not be modified inside a read-only transaction.
+     * <p>
+     * Read-only transactions may run concurrently with other read-only transactions, and if they
+     * database is in WAL mode, they may also run concurrently with IMMEDIATE or EXCLUSIVE
+     * transactions.
+     * <p>
+     * Transactions can be nested.  However, the behavior of the transaction is not altered by
+     * nested transactions.  A nested transaction may be any of the three transaction types but if
+     * the outermost type is read-only then nested transactions remain read-only, regardless of how
+     * they are started.
+     * <p>
+     * Here is the standard idiom for read-only transactions:
+     *
+     * <pre>
+     *   db.beginTransactionReadOnly();
+     *   try {
+     *     ...
+     *   } finally {
+     *     db.endTransaction();
+     *   }
+     * </pre>
+     */
+    public void beginTransactionReadOnly() {
+        beginTransactionWithListenerReadOnly(null);
+    }
+
+    /**
      * Begins a transaction in EXCLUSIVE mode.
      * <p>
      * Transactions can be nested.
@@ -699,7 +727,8 @@ public final class SQLiteDatabase extends SQLiteClosable {
      * commits, or is rolled back, either explicitly or by a call to
      * {@link #yieldIfContendedSafely}.
      */
-    public void beginTransactionWithListener(SQLiteTransactionListener transactionListener) {
+    public void beginTransactionWithListener(
+            @Nullable SQLiteTransactionListener transactionListener) {
         beginTransaction(transactionListener, true);
     }
 
@@ -728,20 +757,57 @@ public final class SQLiteDatabase extends SQLiteClosable {
      *            explicitly or by a call to {@link #yieldIfContendedSafely}.
      */
     public void beginTransactionWithListenerNonExclusive(
-            SQLiteTransactionListener transactionListener) {
+            @Nullable SQLiteTransactionListener transactionListener) {
         beginTransaction(transactionListener, false);
+    }
+
+    /**
+     * Begins a transaction in read-only mode with a {@link SQLiteTransactionListener} listener.
+     * The database may not be updated inside a read-only transaction.
+     * <p>
+     * Transactions can be nested.  However, the behavior of the transaction is not altered by
+     * nested transactions.  A nested transaction may be any of the three transaction types but if
+     * the outermost type is read-only then nested transactions remain read-only, regardless of how
+     * they are started.
+     * <p>
+     * Here is the standard idiom for read-only transactions:
+     *
+     * <pre>
+     *   db.beginTransactionWightListenerReadOnly(listener);
+     *   try {
+     *     ...
+     *   } finally {
+     *     db.endTransaction();
+     *   }
+     * </pre>
+     */
+    public void beginTransactionWithListenerReadOnly(
+            @Nullable SQLiteTransactionListener transactionListener) {
+        beginTransaction(transactionListener, SQLiteSession.TRANSACTION_MODE_DEFERRED);
     }
 
     @UnsupportedAppUsage
     private void beginTransaction(SQLiteTransactionListener transactionListener,
             boolean exclusive) {
+        beginTransaction(transactionListener,
+                exclusive ? SQLiteSession.TRANSACTION_MODE_EXCLUSIVE :
+                SQLiteSession.TRANSACTION_MODE_IMMEDIATE);
+    }
+
+    /**
+     * Begin a transaction with the specified mode.  Valid modes are
+     * {@link SQLiteSession.TRANSACTION_MODE_DEFERRED},
+     * {@link SQLiteSession.TRANSACTION_MODE_IMMEDIATE}, and
+     * {@link SQLiteSession.TRANSACTION_MODE_EXCLUSIVE}.
+     */
+    private void beginTransaction(@Nullable SQLiteTransactionListener listener, int mode) {
         acquireReference();
         try {
-            getThreadSession().beginTransaction(
-                    exclusive ? SQLiteSession.TRANSACTION_MODE_EXCLUSIVE :
-                            SQLiteSession.TRANSACTION_MODE_IMMEDIATE,
-                    transactionListener,
-                    getThreadDefaultConnectionFlags(false /*readOnly*/), null);
+            // DEFERRED transactions are read-only to allows concurrent read-only transactions.
+            // Others are read/write.
+            boolean readOnly = (mode == SQLiteSession.TRANSACTION_MODE_DEFERRED);
+            getThreadSession().beginTransaction(mode, listener,
+                    getThreadDefaultConnectionFlags(readOnly), null);
         } finally {
             releaseReference();
         }
@@ -2100,6 +2166,36 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     /**
+     * Return a {@link SQLiteRawStatement} connected to the database.  A transaction must be in
+     * progress or an exception will be thrown.  The resulting object will be closed automatically
+     * when the current transaction closes.
+     * @param sql The SQL string to be compiled into a prepared statement.
+     * @return A {@link SQLiteRawStatement} holding the compiled SQL.
+     * @throws IllegalStateException if a transaction is not in progress.
+     * @throws SQLiteException if the SQL cannot be compiled.
+     * @hide
+     */
+    @NonNull
+    public SQLiteRawStatement createRawStatement(@NonNull String sql) {
+        Objects.requireNonNull(sql);
+        return new SQLiteRawStatement(this, sql);
+    }
+
+    /**
+     * Return the "rowid" of the last row to be inserted on the current connection.  See the
+     * SQLite documentation for the specific details.  This method must only be called when inside
+     * a transaction.  {@link IllegalStateException} is thrown if the method is called outside a
+     * transaction.  If the function is called before any inserts in the current transaction, the
+     * value returned will be from a previous transaction, which may be from a different thread.
+     * @return The ROWID of the last row to be inserted under this connection.
+     * @throws IllegalStateException if there is no current transaction.
+     * @hide
+     */
+    public long lastInsertRowId() {
+        return getThreadSession().lastInsertRowId();
+    }
+
+    /**
      * Verifies that a SQL SELECT statement is valid by compiling it.
      * If the SQL statement is not valid, this method will throw a {@link SQLiteException}.
      *
@@ -3113,4 +3209,3 @@ public final class SQLiteDatabase extends SQLiteClosable {
         ContentResolver.onDbCorruption(tag, message, stacktrace);
     }
 }
-

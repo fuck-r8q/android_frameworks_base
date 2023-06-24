@@ -45,8 +45,8 @@ import android.util.AttributeSet;
 import android.util.Slog;
 import android.util.Xml;
 
-import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.R;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -135,8 +135,8 @@ public final class CredentialProviderInfoFactory {
     }
 
     /**
-     * Constructs an information instance of the credential provider for testing purposes. Does not
-     * run any verifications and passes parameters as is.
+     * Constructs an information instance of the credential provider for testing purposes. Does
+     * not run any verifications and passes parameters as is.
      */
     @VisibleForTesting
     public static CredentialProviderInfo createForTests(
@@ -151,6 +151,7 @@ public final class CredentialProviderInfoFactory {
                 .setSystemProvider(isSystemProvider)
                 .addCapabilities(capabilities)
                 .build();
+
     }
 
     private static void verifyProviderPermission(ServiceInfo serviceInfo) throws SecurityException {
@@ -229,7 +230,7 @@ public final class CredentialProviderInfoFactory {
 
         // 4. Extract the XML metadata.
         try {
-            builder = extractXmlMetadata(context, builder, serviceInfo, pm, resources);
+            builder = extractXmlMetadata(context, serviceInfo, pm, resources);
         } catch (Exception e) {
             Slog.e(TAG, "Failed to get XML metadata", e);
         }
@@ -239,10 +240,11 @@ public final class CredentialProviderInfoFactory {
 
     private static CredentialProviderInfo.Builder extractXmlMetadata(
             @NonNull Context context,
-            @NonNull CredentialProviderInfo.Builder builder,
             @NonNull ServiceInfo serviceInfo,
             @NonNull PackageManager pm,
             @NonNull Resources resources) {
+        final CredentialProviderInfo.Builder builder =
+                new CredentialProviderInfo.Builder(serviceInfo);
         final XmlResourceParser parser =
                 serviceInfo.loadXmlMetaData(pm, CredentialProviderService.SERVICE_META_DATA);
         if (parser == null) {
@@ -285,9 +287,9 @@ public final class CredentialProviderInfoFactory {
         return builder;
     }
 
-    private static Set<String> parseXmlProviderOuterCapabilities(
+    private static List<String> parseXmlProviderOuterCapabilities(
             XmlPullParser parser, Resources resources) throws IOException, XmlPullParserException {
-        final Set<String> capabilities = new HashSet<>();
+        final List<String> capabilities = new ArrayList<>();
         final int outerDepth = parser.getDepth();
         int type;
         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT

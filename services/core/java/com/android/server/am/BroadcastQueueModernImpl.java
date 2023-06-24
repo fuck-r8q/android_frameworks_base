@@ -1730,13 +1730,15 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
 
     @Override
     public boolean isDelayBehindServices() {
-        // TODO: implement
+        // Modern queue does not alter the broadcasts delivery behavior based on background
+        // services, so ignore.
         return false;
     }
 
     @Override
     public void backgroundServicesFinishedLocked(int userId) {
-        // TODO: implement
+        // Modern queue does not alter the broadcasts delivery behavior based on background
+        // services, so ignore.
     }
 
     private void checkHealth() {

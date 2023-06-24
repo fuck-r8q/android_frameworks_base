@@ -221,6 +221,7 @@ interface IAudioService {
 
     boolean isSurroundFormatEnabled(int audioFormat);
 
+    @EnforcePermission("WRITE_SETTINGS")
     boolean setEncodedSurroundMode(int mode);
 
     int getEncodedSurroundMode(int targetSdkVersion);
@@ -260,6 +261,7 @@ interface IAudioService {
 
     void forceVolumeControlStream(int streamType, IBinder cb);
 
+    @EnforcePermission("REMOTE_AUDIO_PLAYBACK")
     void setRingtonePlayer(IRingtonePlayer player);
     IRingtonePlayer getRingtonePlayer();
     int getUiSoundsStreamType();
@@ -367,6 +369,7 @@ interface IAudioService {
 
     oneway void playerHasOpPlayAudio(in int piid, in boolean hasOpPlayAudio);
 
+    @EnforcePermission("BLUETOOTH_STACK")
     void handleBluetoothActiveDeviceChanged(in BluetoothDevice newDevice,
             in BluetoothDevice previousDevice, in BluetoothProfileConnectionInfo info);
 

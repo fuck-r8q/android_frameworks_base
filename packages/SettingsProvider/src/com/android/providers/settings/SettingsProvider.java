@@ -5692,6 +5692,7 @@ public class SettingsProvider extends ContentProvider {
                                         R.string.airplane_mode_toggleable_radios),
                                 null, true, SettingsState.SYSTEM_PACKAGE_NAME);
                     }
+
                     currentVersion = 216;
                 }
 

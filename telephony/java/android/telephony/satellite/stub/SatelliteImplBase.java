@@ -421,7 +421,7 @@ public class SatelliteImplBase extends SatelliteService {
      *
      * @param token The token to be used as a unique identifier for provisioning with satellite
      *              gateway.
-     * @param provisionData Data from the provisioning app that can be used by provisioning 
+     * @param provisionData Data from the provisioning app that can be used by provisioning
      *                      server
      * @param errorCallback The callback to receive the error code result of the operation.
      *

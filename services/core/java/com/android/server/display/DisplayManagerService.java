@@ -665,6 +665,12 @@ public final class DisplayManagerService extends SystemService {
                             logicalDisplay.getPrimaryDisplayDeviceLocked().getUniqueId(),
                             userSerial);
                     dpc.setBrightnessConfiguration(config, /* shouldResetShortTermModel= */ true);
+                    // change the brightness value according to the selected user.
+                    final DisplayDevice device = logicalDisplay.getPrimaryDisplayDeviceLocked();
+                    if (device != null) {
+                        dpc.setBrightness(
+                                mPersistentDataStore.getBrightness(device, userSerial), userSerial);
+                    }
                 }
                 dpc.onSwitchUser(newUserId);
             });
@@ -2021,20 +2027,7 @@ public final class DisplayManagerService extends SystemService {
         final Point userPreferredResolution =
                 mPersistentDataStore.getUserPreferredResolution(device);
         final float refreshRate = mPersistentDataStore.getUserPreferredRefreshRate(device);
-        // If value in persistentDataStore is null, preserving the mode from systemPreferredMode.
-        // This is required because in some devices, user-preferred mode was not stored in
-        // persistentDataStore, but was stored in a config which is returned through
-        // systemPreferredMode.
-        if ((userPreferredResolution == null && Float.isNaN(refreshRate))
-                || (userPreferredResolution.equals(0, 0) && refreshRate == 0.0f)) {
-            Display.Mode systemPreferredMode = device.getSystemPreferredDisplayModeLocked();
-            if (systemPreferredMode == null) {
-                return;
-            }
-            storeModeInPersistentDataStoreLocked(
-                    display.getDisplayIdLocked(), systemPreferredMode.getPhysicalWidth(),
-                    systemPreferredMode.getPhysicalHeight(), systemPreferredMode.getRefreshRate());
-            device.setUserPreferredDisplayModeLocked(systemPreferredMode);
+        if (userPreferredResolution == null && Float.isNaN(refreshRate)) {
             return;
         }
         Display.Mode.Builder modeBuilder = new Display.Mode.Builder();
@@ -3163,8 +3156,9 @@ public final class DisplayManagerService extends SystemService {
             mBrightnessTracker = new BrightnessTracker(mContext, null);
         }
 
-        final BrightnessSetting brightnessSetting = new BrightnessSetting(mPersistentDataStore,
-                display, mSyncRoot);
+        final int userSerial = getUserManager().getUserSerialNumber(mContext.getUserId());
+        final BrightnessSetting brightnessSetting = new BrightnessSetting(userSerial,
+                mPersistentDataStore, display, mSyncRoot);
         final DisplayPowerControllerInterface displayPowerController;
 
         // If display is internal and has a HighBrightnessModeMetadata mapping, use that.
@@ -3530,10 +3524,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY)
         @Override // Binder call
         public void startWifiDisplayScan() {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.CONFIGURE_WIFI_DISPLAY,
-                    "Permission required to start wifi display scans");
+            startWifiDisplayScan_enforcePermission();
 
             final int callingPid = Binder.getCallingPid();
             final long token = Binder.clearCallingIdentity();
@@ -3544,10 +3538,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY)
         @Override // Binder call
         public void stopWifiDisplayScan() {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.CONFIGURE_WIFI_DISPLAY,
-                    "Permission required to stop wifi display scans");
+            stopWifiDisplayScan_enforcePermission();
 
             final int callingPid = Binder.getCallingPid();
             final long token = Binder.clearCallingIdentity();
@@ -3621,10 +3615,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY)
         @Override // Binder call
         public void pauseWifiDisplay() {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.CONFIGURE_WIFI_DISPLAY,
-                    "Permission required to pause a wifi display session");
+            pauseWifiDisplay_enforcePermission();
 
             final long token = Binder.clearCallingIdentity();
             try {
@@ -3634,10 +3628,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY)
         @Override // Binder call
         public void resumeWifiDisplay() {
-            mContext.enforceCallingOrSelfPermission(Manifest.permission.CONFIGURE_WIFI_DISPLAY,
-                    "Permission required to resume a wifi display session");
+            resumeWifiDisplay_enforcePermission();
 
             final long token = Binder.clearCallingIdentity();
             try {
@@ -3660,11 +3654,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
         @Override // Binder call
         public void setUserDisabledHdrTypes(int[] userDisabledFormats) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.WRITE_SECURE_SETTINGS,
-                    "Permission required to write the user settings.");
+            setUserDisabledHdrTypes_enforcePermission();
 
             final long token = Binder.clearCallingIdentity();
             try {
@@ -3687,11 +3680,10 @@ public final class DisplayManagerService extends SystemService {
             DisplayControl.overrideHdrTypes(displayToken, modes);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
         @Override // Binder call
         public void setAreUserDisabledHdrTypesAllowed(boolean areUserDisabledHdrTypesAllowed) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.WRITE_SECURE_SETTINGS,
-                    "Permission required to write the user settings.");
+            setAreUserDisabledHdrTypesAllowed_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 setAreUserDisabledHdrTypesAllowedInternal(areUserDisabledHdrTypesAllowed);
@@ -3714,11 +3706,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_DISPLAY_COLOR_MODE)
         @Override // Binder call
         public void requestColorMode(int displayId, int colorMode) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONFIGURE_DISPLAY_COLOR_MODE,
-                    "Permission required to change the display color mode");
+            requestColorMode_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 requestColorModeInternal(displayId, colorMode);
@@ -3795,11 +3786,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.BRIGHTNESS_SLIDER_USAGE)
         @Override // Binder call
         public ParceledListSlice<BrightnessChangeEvent> getBrightnessEvents(String callingPackage) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.BRIGHTNESS_SLIDER_USAGE,
-                    "Permission to read brightness events.");
+            getBrightnessEvents_enforcePermission();
 
             final int callingUid = Binder.getCallingUid();
             AppOpsManager appOpsManager = mContext.getSystemService(AppOpsManager.class);
@@ -3828,11 +3818,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_AMBIENT_LIGHT_STATS)
         @Override // Binder call
         public ParceledListSlice<AmbientBrightnessDayStats> getAmbientBrightnessStats() {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.ACCESS_AMBIENT_LIGHT_STATS,
-                    "Permission required to to access ambient light stats.");
+            getAmbientBrightnessStats_enforcePermission();
             final int callingUid = Binder.getCallingUid();
             final int userId = UserHandle.getUserId(callingUid);
             final long token = Binder.clearCallingIdentity();
@@ -3846,12 +3835,11 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public void setBrightnessConfigurationForUser(
                 BrightnessConfiguration c, @UserIdInt int userId, String packageName) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS,
-                    "Permission required to change the display's brightness configuration");
+            setBrightnessConfigurationForUser_enforcePermission();
             if (userId != UserHandle.getCallingUserId()) {
                 mContext.enforceCallingOrSelfPermission(
                         Manifest.permission.INTERACT_ACROSS_USERS,
@@ -3876,12 +3864,11 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public void setBrightnessConfigurationForDisplay(BrightnessConfiguration c,
                 String uniqueId, int userId, String packageName) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS,
-                    "Permission required to change the display's brightness configuration");
+            setBrightnessConfigurationForDisplay_enforcePermission();
             if (userId != UserHandle.getCallingUserId()) {
                 mContext.enforceCallingOrSelfPermission(
                         Manifest.permission.INTERACT_ACROSS_USERS,
@@ -3896,12 +3883,11 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public BrightnessConfiguration getBrightnessConfigurationForDisplay(String uniqueId,
                 int userId) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS,
-                    "Permission required to read the display's brightness configuration");
+            getBrightnessConfigurationForDisplay_enforcePermission();
             if (userId != UserHandle.getCallingUserId()) {
                 mContext.enforceCallingOrSelfPermission(
                         Manifest.permission.INTERACT_ACROSS_USERS,
@@ -3945,11 +3931,10 @@ public final class DisplayManagerService extends SystemService {
 
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public BrightnessConfiguration getDefaultBrightnessConfiguration() {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS,
-                    "Permission required to read the display's default brightness configuration");
+            getDefaultBrightnessConfiguration_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 synchronized (mSyncRoot) {
@@ -3961,11 +3946,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS)
         @Override
         public BrightnessInfo getBrightnessInfo(int displayId) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS,
-                    "Permission required to read the display's brightness info.");
+            getBrightnessInfo_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 synchronized (mSyncRoot) {
@@ -3993,11 +3977,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public void setTemporaryBrightness(int displayId, float brightness) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS,
-                    "Permission required to set the display's brightness");
+            setTemporaryBrightness_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 synchronized (mSyncRoot) {
@@ -4009,11 +3992,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public void setBrightness(int displayId, float brightness) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS,
-                    "Permission required to set the display's brightness");
+            setBrightness_enforcePermission();
             if (!isValidBrightness(brightness)) {
                 Slog.w(TAG, "Attempted to set invalid brightness" + brightness);
                 return;
@@ -4052,11 +4034,10 @@ public final class DisplayManagerService extends SystemService {
             return brightness;
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS)
         @Override // Binder call
         public void setTemporaryAutoBrightnessAdjustment(float adjustment) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.CONTROL_DISPLAY_BRIGHTNESS,
-                    "Permission required to set the display's auto brightness adjustment");
+            setTemporaryAutoBrightnessAdjustment_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 synchronized (mSyncRoot) {
@@ -4096,11 +4077,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MODIFY_USER_PREFERRED_DISPLAY_MODE)
         @Override // Binder call
         public void setUserPreferredDisplayMode(int displayId, Display.Mode mode) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.MODIFY_USER_PREFERRED_DISPLAY_MODE,
-                    "Permission required to set the user preferred display mode.");
+            setUserPreferredDisplayMode_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 setUserPreferredDisplayModeInternal(displayId, mode);
@@ -4185,11 +4165,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.OVERRIDE_DISPLAY_MODE_REQUESTS)
         @Override // Binder call
         public void setShouldAlwaysRespectAppRequestedMode(boolean enabled) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.OVERRIDE_DISPLAY_MODE_REQUESTS,
-                    "Permission required to override display mode requests.");
+            setShouldAlwaysRespectAppRequestedMode_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 setShouldAlwaysRespectAppRequestedModeInternal(enabled);
@@ -4198,11 +4177,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.OVERRIDE_DISPLAY_MODE_REQUESTS)
         @Override // Binder call
         public boolean shouldAlwaysRespectAppRequestedMode() {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.OVERRIDE_DISPLAY_MODE_REQUESTS,
-                    "Permission required to override display mode requests.");
+            shouldAlwaysRespectAppRequestedMode_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 return shouldAlwaysRespectAppRequestedModeInternal();
@@ -4211,11 +4189,10 @@ public final class DisplayManagerService extends SystemService {
             }
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.MODIFY_REFRESH_RATE_SWITCHING_TYPE)
         @Override // Binder call
         public void setRefreshRateSwitchingType(int newValue) {
-            mContext.enforceCallingOrSelfPermission(
-                    Manifest.permission.MODIFY_REFRESH_RATE_SWITCHING_TYPE,
-                    "Permission required to modify refresh rate switching type.");
+            setRefreshRateSwitchingType_enforcePermission();
             final long token = Binder.clearCallingIdentity();
             try {
                 setRefreshRateSwitchingTypeInternal(newValue);

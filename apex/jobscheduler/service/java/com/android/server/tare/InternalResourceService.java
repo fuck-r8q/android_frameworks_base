@@ -1877,6 +1877,7 @@ public class InternalResourceService extends SystemService {
                 pw.print(" None");
             }
             pw.decreaseIndent();
+            pw.println();
         }
     }
 }

@@ -592,6 +592,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Programai leidžiama gauti pageidaujamą ARL mokamos paslaugos informaciją, pvz., užregistruotą pagalbą ir maršrutų tikslus."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"valdyti artimo lauko perdavimą (angl. „Near Field Communication“)"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Leidžiama programai perduoti artimojo lauko ryšių technologijos (ALR) žymas, korteles ir skaitymo programas."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Saugos elemento operacijos įvykis"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Leidžiama programai gauti informaciją apie operacijas, vykstančias saugos elemente."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"išjungti ekrano užraktą"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Leidžiama programai neleisti klavišo užrakto ir visos susijusios slaptažodžio apsaugos. Pvz., telefonas neleidžia klavišo užrakto priimant gaunamąjį skambutį ir pakartotinai jį įgalina, kai skambutis baigiamas."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"pateikti ekrano užrakto sudėtingumo užklausą"</string>

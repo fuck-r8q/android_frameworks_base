@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Ermöglicht der App, Informationen zum bevorzugten NFC-Zahlungsdienst abzurufen, etwa registrierte Hilfsmittel oder das Routenziel."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"Nahfeldkommunikation steuern"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Ermöglicht der App die Kommunikation mit Tags für die Nahfeldkommunikation, Karten und Readern"</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Transaktion in einem Secure Element"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Ermöglicht der App, Informationen zu Transaktionen abzurufen, die in einem Secure Element stattfinden."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"Displaysperre deaktivieren"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Ermöglicht der App, die Tastensperre sowie den damit verbundenen Passwortschutz zu deaktivieren. Das Telefon deaktiviert die Tastensperre beispielsweise, wenn ein Anruf eingeht, und aktiviert sie wieder, nachdem das Gespräch beendet wurde."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"Komplexitätsstufe der Displaysperre anfragen"</string>

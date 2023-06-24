@@ -32,8 +32,6 @@ import static com.android.server.DeviceIdleController.LIGHT_STATE_INACTIVE;
 import static com.android.server.DeviceIdleController.LIGHT_STATE_OVERRIDE;
 import static com.android.server.DeviceIdleController.LIGHT_STATE_WAITING_FOR_NETWORK;
 import static com.android.server.DeviceIdleController.MSG_REPORT_STATIONARY_STATUS;
-import static com.android.server.DeviceIdleController.MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR;
-import static com.android.server.DeviceIdleController.MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR;
 import static com.android.server.DeviceIdleController.STATE_ACTIVE;
 import static com.android.server.DeviceIdleController.STATE_IDLE;
 import static com.android.server.DeviceIdleController.STATE_IDLE_MAINTENANCE;
@@ -50,6 +48,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -146,6 +145,8 @@ public class DeviceIdleControllerTest {
     private SensorManager mSensorManager;
     @Mock
     private TelephonyManager mTelephonyManager;
+    @Mock
+    private Sensor mOffBodySensor;
 
     class InjectorForTest extends DeviceIdleController.Injector {
         ConnectivityManager connectivityManager;
@@ -198,9 +199,7 @@ public class DeviceIdleControllerTest {
                 mHandler = controller.new MyHandler(getContext().getMainLooper());
                 spyOn(mHandler);
                 doNothing().when(mHandler).handleMessage(argThat((message) ->
-                        message.what != MSG_REPORT_STATIONARY_STATUS
-                        && message.what != MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR
-                        && message.what != MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR));
+                        message.what != MSG_REPORT_STATIONARY_STATUS));
                 doAnswer(new Answer<Boolean>() {
                     @Override
                     public Boolean answer(InvocationOnMock invocation) throws Throwable {
@@ -209,9 +208,7 @@ public class DeviceIdleControllerTest {
                         return true;
                     }
                 }).when(mHandler).sendMessageDelayed(
-                        argThat((message) -> message.what == MSG_REPORT_STATIONARY_STATUS
-                                || message.what == MSG_UPDATE_PRE_IDLE_TIMEOUT_FACTOR
-                                || message.what == MSG_RESET_PRE_IDLE_TIMEOUT_FACTOR),
+                        argThat((message) -> message.what == MSG_REPORT_STATIONARY_STATUS),
                         anyLong());
             }
 
@@ -2085,43 +2082,6 @@ public class DeviceIdleControllerTest {
     }
 
     @Test
-    public void testStepToIdleMode() {
-        float delta = mDeviceIdleController.MIN_PRE_IDLE_FACTOR_CHANGE;
-        for (int mode = PowerManager.PRE_IDLE_TIMEOUT_MODE_NORMAL;
-                mode <= PowerManager.PRE_IDLE_TIMEOUT_MODE_LONG;
-                mode++) {
-            int ret = mDeviceIdleController.setPreIdleTimeoutMode(mode);
-            if (mode == PowerManager.PRE_IDLE_TIMEOUT_MODE_NORMAL) {
-                assertEquals("setPreIdleTimeoutMode: " + mode + " failed.",
-                        mDeviceIdleController.SET_IDLE_FACTOR_RESULT_IGNORED, ret);
-            } else {
-                assertEquals("setPreIdleTimeoutMode: " + mode + " failed.",
-                        mDeviceIdleController.SET_IDLE_FACTOR_RESULT_OK, ret);
-            }
-            //TODO(b/123045185): Mocked Handler of DeviceIdleController to make message loop
-            //workable in this test class
-            float expectedfactor = mDeviceIdleController.getPreIdleTimeoutByMode(mode);
-            float curfactor = mDeviceIdleController.getPreIdleTimeoutFactor();
-            assertEquals("Pre idle time factor of mode [" + mode + "].",
-                    expectedfactor, curfactor, delta);
-            mDeviceIdleController.resetPreIdleTimeoutMode();
-
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_INACTIVE);
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_IDLE_PENDING);
-
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_SENSING);
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_LOCATING);
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_QUICK_DOZE_DELAY);
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_IDLE_MAINTENANCE);
-            checkNextAlarmTimeWithNewPreIdleFactor(expectedfactor, STATE_IDLE);
-            checkMaybeDoAnImmediateMaintenance(expectedfactor);
-        }
-        float curfactor = mDeviceIdleController.getPreIdleTimeoutFactor();
-        assertEquals("Pre idle time factor of mode default.",
-                1.0f, curfactor, delta);
-    }
-
-    @Test
     public void testStationaryDetection_QuickDozeOff() {
         setQuickDozeEnabled(false);
         enterDeepState(STATE_IDLE);
@@ -2452,6 +2412,82 @@ public class DeviceIdleControllerTest {
         verifyLightStateConditions(LIGHT_STATE_ACTIVE);
     }
 
+    @Test
+    public void testLowLatencyBodyDetection_NoBodySensor() {
+        mConstants.USE_BODY_SENSOR = true;
+        doReturn(null).when(mSensorManager).getDefaultSensor(
+                eq(Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT), anyBoolean());
+        cleanupDeviceIdleController();
+        setupDeviceIdleController();
+        verify(mSensorManager, never())
+                .registerListener(any(), any(), anyInt());
+    }
+
+    @Test
+    public void testLowLatencyBodyDetection_NoBatterySaver_QuickDoze() {
+        mConstants.USE_BODY_SENSOR = true;
+        doReturn(mOffBodySensor)
+                .when(mSensorManager)
+                .getDefaultSensor(eq(Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT), anyBoolean());
+        PowerSaveState powerSaveState = new PowerSaveState.Builder().setBatterySaverEnabled(
+                false).build();
+        when(mPowerManagerInternal.getLowPowerState(anyInt()))
+                .thenReturn(powerSaveState);
+        cleanupDeviceIdleController();
+        setupDeviceIdleController();
+
+        ArgumentCaptor<SensorEventListener> listenerCaptor =
+                ArgumentCaptor.forClass(SensorEventListener.class);
+        verify(mSensorManager)
+                .registerListener(listenerCaptor.capture(), eq(mOffBodySensor),
+                        eq(SensorManager.SENSOR_DELAY_NORMAL));
+        final SensorEventListener listener = listenerCaptor.getValue();
+        // Set the device as off body
+        float[] valsZero = {0.0f};
+        SensorEvent offbodyEvent = new SensorEvent(mOffBodySensor, 1, 1L, valsZero);
+        listener.onSensorChanged(offbodyEvent);
+        assertTrue(mDeviceIdleController.isQuickDozeEnabled());
+
+        // Set the device as on body
+        float[] valsNonZero = {1.0f};
+        SensorEvent onbodyEvent = new SensorEvent(mOffBodySensor, 1, 1L, valsNonZero);
+        listener.onSensorChanged(onbodyEvent);
+        assertFalse(mDeviceIdleController.isQuickDozeEnabled());
+        verifyStateConditions(STATE_ACTIVE);
+    }
+
+    @Test
+    public void testLowLatencyBodyDetection_WithBatterySaver_QuickDoze() {
+        mConstants.USE_BODY_SENSOR = true;
+        doReturn(mOffBodySensor)
+                .when(mSensorManager)
+                .getDefaultSensor(eq(Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT), anyBoolean());
+        PowerSaveState powerSaveState = new PowerSaveState.Builder().setBatterySaverEnabled(
+                true).build();
+        when(mPowerManagerInternal.getLowPowerState(anyInt()))
+                .thenReturn(powerSaveState);
+        cleanupDeviceIdleController();
+        setupDeviceIdleController();
+
+        ArgumentCaptor<SensorEventListener> listenerCaptor =
+                ArgumentCaptor.forClass(SensorEventListener.class);
+        verify(mSensorManager)
+                .registerListener(listenerCaptor.capture(), eq(mOffBodySensor),
+                        eq(SensorManager.SENSOR_DELAY_NORMAL));
+        final SensorEventListener listener = listenerCaptor.getValue();
+        // Set the device as off body
+        float[] valsZero = {0.0f};
+        SensorEvent offbodyEvent = new SensorEvent(mOffBodySensor, 1, 1L, valsZero);
+        listener.onSensorChanged(offbodyEvent);
+        assertTrue(mDeviceIdleController.isQuickDozeEnabled());
+
+        // Set the device as on body. Quick doze should remain enabled because battery saver is on.
+        float[] valsNonZero = {1.0f};
+        SensorEvent onbodyEvent = new SensorEvent(mOffBodySensor, 1, 1L, valsNonZero);
+        listener.onSensorChanged(onbodyEvent);
+        assertTrue(mDeviceIdleController.isQuickDozeEnabled());
+    }
+
     private void enterDeepState(int state) {
         switch (state) {
             case STATE_ACTIVE:
@@ -2704,70 +2740,6 @@ public class DeviceIdleControllerTest {
                 break;
             default:
                 fail("Conditions for " + lightStateToString(expectedLightState) + " unknown.");
-        }
-    }
-
-    private void checkNextAlarmTimeWithNewPreIdleFactor(float factor, int state) {
-        final long errorTolerance = 1000;
-        enterDeepState(state);
-        long now = SystemClock.elapsedRealtime();
-        long alarm = mDeviceIdleController.getNextAlarmTime();
-        if (state == STATE_INACTIVE || state == STATE_IDLE_PENDING) {
-            int ret = mDeviceIdleController.setPreIdleTimeoutFactor(factor);
-            if (Float.compare(factor, 1.0f) == 0) {
-                assertEquals("setPreIdleTimeoutMode: " + factor + " failed.",
-                        mDeviceIdleController.SET_IDLE_FACTOR_RESULT_IGNORED, ret);
-            } else {
-                assertEquals("setPreIdleTimeoutMode: " + factor + " failed.",
-                        mDeviceIdleController.SET_IDLE_FACTOR_RESULT_OK, ret);
-            }
-            if (ret == mDeviceIdleController.SET_IDLE_FACTOR_RESULT_OK) {
-                long newAlarm = mDeviceIdleController.getNextAlarmTime();
-                long newDelay = (long) ((alarm - now) * factor);
-                assertTrue("setPreIdleTimeoutFactor: " + factor,
-                        Math.abs(newDelay - (newAlarm - now)) <  errorTolerance);
-                mDeviceIdleController.resetPreIdleTimeoutMode();
-                newAlarm = mDeviceIdleController.getNextAlarmTime();
-                assertTrue("resetPreIdleTimeoutMode from: " + factor,
-                        Math.abs(newAlarm - alarm) < errorTolerance);
-                mDeviceIdleController.setPreIdleTimeoutFactor(factor);
-                now = SystemClock.elapsedRealtime();
-                enterDeepState(state);
-                newAlarm = mDeviceIdleController.getNextAlarmTime();
-                assertTrue("setPreIdleTimeoutFactor: " + factor + " before step to idle",
-                        Math.abs(newDelay - (newAlarm - now)) <  errorTolerance);
-                mDeviceIdleController.resetPreIdleTimeoutMode();
-            }
-        } else {
-            mDeviceIdleController.setPreIdleTimeoutFactor(factor);
-            long newAlarm = mDeviceIdleController.getNextAlarmTime();
-            assertTrue("setPreIdleTimeoutFactor: " + factor
-                    + " shounld not change next alarm" ,
-                    (newAlarm == alarm));
-            mDeviceIdleController.resetPreIdleTimeoutMode();
-        }
-    }
-
-    private void checkMaybeDoAnImmediateMaintenance(float factor) {
-        int ret = mDeviceIdleController.setPreIdleTimeoutFactor(factor);
-        final long minuteInMillis = 60 * 1000;
-        if (Float.compare(factor, 1.0f) == 0) {
-            assertEquals("setPreIdleTimeoutMode: " + factor + " failed.",
-                    mDeviceIdleController.SET_IDLE_FACTOR_RESULT_IGNORED, ret);
-        } else {
-            assertEquals("setPreIdleTimeoutMode: " + factor + " failed.",
-                    mDeviceIdleController.SET_IDLE_FACTOR_RESULT_OK, ret);
-        }
-        if (ret == mDeviceIdleController.SET_IDLE_FACTOR_RESULT_OK) {
-            enterDeepState(STATE_IDLE);
-            long now = SystemClock.elapsedRealtime();
-            mDeviceIdleController.setIdleStartTimeForTest(
-                    now - (long) (mConstants.IDLE_TIMEOUT * 0.6));
-            verifyStateConditions(STATE_IDLE);
-            mDeviceIdleController.setIdleStartTimeForTest(
-                    now - (long) (mConstants.IDLE_TIMEOUT * 1.2));
-            verifyStateConditions(STATE_IDLE_MAINTENANCE);
-            mDeviceIdleController.resetPreIdleTimeoutMode();
         }
     }
 }

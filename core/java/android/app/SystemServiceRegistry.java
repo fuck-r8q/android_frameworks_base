@@ -172,6 +172,7 @@ import android.os.IBinder;
 import android.os.IDumpstate;
 import android.os.IHardwarePropertiesManager;
 import android.os.IPowerManager;
+import android.os.IPowerStatsService;
 import android.os.IRecoverySystem;
 import android.os.ISystemUpdateManager;
 import android.os.IThermalService;
@@ -1118,8 +1119,10 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<SystemHealthManager>() {
             @Override
             public SystemHealthManager createService(ContextImpl ctx) throws ServiceNotFoundException {
-                IBinder b = ServiceManager.getServiceOrThrow(BatteryStats.SERVICE_NAME);
-                return new SystemHealthManager(IBatteryStats.Stub.asInterface(b));
+                IBinder batteryStats = ServiceManager.getServiceOrThrow(BatteryStats.SERVICE_NAME);
+                IBinder powerStats = ServiceManager.getServiceOrThrow(Context.POWER_STATS_SERVICE);
+                return new SystemHealthManager(IBatteryStats.Stub.asInterface(batteryStats),
+                        IPowerStatsService.Stub.asInterface(powerStats));
             }});
 
         registerService(Context.CONTEXTHUB_SERVICE, ContextHubManager.class,

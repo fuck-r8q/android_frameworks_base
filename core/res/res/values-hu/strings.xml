@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Lehetővé teszi az alkalmazás számára preferált NFC fizetési szolgáltatási információk (pl. regisztrált alkalmazásazonosítók és útvonali cél) lekérését."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"NFC technológia vezérlése"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Lehetővé teszi az alkalmazás számára, hogy NFC (Near Field Communication - kis hatósugarú vezeték nélküli kommunikáció) technológiát használó címkékkel, kártyákkal és leolvasókkal kommunikáljon."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Biztonságos elemen zajló tranzakciós esemény"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Lehetővé teszi az alkalmazás számára, hogy információkat kapjon a biztonságos elemeken zajló tranzakciókról."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"képernyőzár kikapcsolása"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Lehetővé teszi az alkalmazás számára a billentyűzár és bármely kapcsolódó jelszavas védelem kikapcsolását. Például a telefon feloldja a billentyűzárat bejövő hívás esetén, majd újra bekapcsolja azt a hívás végeztével."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"képernyőzár összetettségi szintjének lekérése"</string>

@@ -42,6 +42,9 @@ import android.window.WindowContainerTransaction;
 import android.window.WindowContainerTransactionCallback;
 
 import com.android.internal.protolog.common.ProtoLog;
+import com.android.wm.shell.desktopmode.DesktopModeController;
+import com.android.wm.shell.desktopmode.DesktopModeStatus;
+import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.pip.PipTransitionController;
@@ -69,6 +72,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
     private RecentsTransitionHandler mRecentsHandler;
     private StageCoordinator mSplitHandler;
     private final KeyguardTransitionHandler mKeyguardHandler;
+    private DesktopModeController mDesktopModeController;
+    private DesktopTasksController mDesktopTasksController;
     private UnfoldTransitionHandler mUnfoldHandler;
 
     private static class MixedTransition {
@@ -86,8 +91,11 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
         /** Keyguard exit/occlude/unocclude transition. */
         static final int TYPE_KEYGUARD = 5;
 
+        /** Recents Transition while in desktop mode. */
+        static final int TYPE_RECENTS_DURING_DESKTOP = 6;
+
         /** Fuld/Unfold transition. */
-        static final int TYPE_UNFOLD = 6;
+        static final int TYPE_UNFOLD = 7;
 
         /** The default animation for this mixed transition. */
         static final int ANIM_TYPE_DEFAULT = 0;
@@ -141,6 +149,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             Optional<PipTouchHandler> pipTouchHandlerOptional,
             Optional<RecentsTransitionHandler> recentsHandlerOptional,
             KeyguardTransitionHandler keyguardHandler,
+            Optional<DesktopModeController> desktopModeControllerOptional,
+            Optional<DesktopTasksController> desktopTasksControllerOptional,
             Optional<UnfoldTransitionHandler> unfoldHandler) {
         mPlayer = player;
         mKeyguardHandler = keyguardHandler;
@@ -158,6 +168,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                 if (mRecentsHandler != null) {
                     mRecentsHandler.addMixer(this);
                 }
+                mDesktopModeController = desktopModeControllerOptional.orElse(null);
+                mDesktopTasksController = desktopTasksControllerOptional.orElse(null);
                 mUnfoldHandler = unfoldHandler.orElse(null);
             }, this);
         }
@@ -238,7 +250,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
 
     @Override
     public Transitions.TransitionHandler handleRecentsRequest(WindowContainerTransaction outWCT) {
-        if (mRecentsHandler != null && mSplitHandler.isSplitScreenVisible()) {
+        if (mRecentsHandler != null && (mSplitHandler.isSplitScreenVisible()
+                || DesktopModeStatus.isActive(mPlayer.getContext()))) {
             return this;
         }
         return null;
@@ -251,6 +264,13 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                     + "Split-Screen is foreground, so treat it as Mixed.");
             final MixedTransition mixed = new MixedTransition(
                     MixedTransition.TYPE_RECENTS_DURING_SPLIT, transition);
+            mixed.mLeftoversHandler = mRecentsHandler;
+            mActiveTransitions.add(mixed);
+        } else if (DesktopModeStatus.isActive(mPlayer.getContext())) {
+            ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Got a recents request while "
+                    + "desktop mode is active, so treat it as Mixed.");
+            final MixedTransition mixed = new MixedTransition(
+                    MixedTransition.TYPE_RECENTS_DURING_DESKTOP, transition);
             mixed.mLeftoversHandler = mRecentsHandler;
             mActiveTransitions.add(mixed);
         } else {
@@ -338,6 +358,9 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                     finishCallback);
         } else if (mixed.mType == MixedTransition.TYPE_KEYGUARD) {
             return animateKeyguard(mixed, info, startTransaction, finishTransaction,
+                    finishCallback);
+        } else if (mixed.mType == MixedTransition.TYPE_RECENTS_DURING_DESKTOP) {
+            return animateRecentsDuringDesktop(mixed, info, startTransaction, finishTransaction,
                     finishCallback);
         } else if (mixed.mType == MixedTransition.TYPE_UNFOLD) {
             return animateUnfold(mixed, info, startTransaction, finishTransaction, finishCallback);
@@ -625,6 +648,30 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
         return true;
     }
 
+    private boolean animateRecentsDuringDesktop(@NonNull final MixedTransition mixed,
+            @NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startTransaction,
+            @NonNull SurfaceControl.Transaction finishTransaction,
+            @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        boolean consumed = mRecentsHandler.startAnimation(
+                mixed.mTransition, info, startTransaction, finishTransaction, finishCallback);
+        if (!consumed) {
+            return false;
+        }
+        //Sync desktop mode state (proto 1)
+        if (mDesktopModeController != null) {
+            mDesktopModeController.syncSurfaceState(info, finishTransaction);
+            return true;
+        }
+        //Sync desktop mode state (proto 2)
+        if (mDesktopTasksController != null) {
+            mDesktopTasksController.syncSurfaceState(info, finishTransaction);
+            return true;
+        }
+
+        return false;
+    }
+
     private boolean animateUnfold(@NonNull final MixedTransition mixed,
             @NonNull TransitionInfo info,
             @NonNull SurfaceControl.Transaction startTransaction,
@@ -711,6 +758,9 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                         finishCallback);
             } else if (mixed.mType == MixedTransition.TYPE_KEYGUARD) {
                 mKeyguardHandler.mergeAnimation(transition, info, t, mergeTarget, finishCallback);
+            } else if (mixed.mType == MixedTransition.TYPE_RECENTS_DURING_DESKTOP) {
+                mixed.mLeftoversHandler.mergeAnimation(transition, info, t, mergeTarget,
+                        finishCallback);
             } else if (mixed.mType == MixedTransition.TYPE_UNFOLD) {
                 mUnfoldHandler.mergeAnimation(transition, info, t, mergeTarget, finishCallback);
             } else {
@@ -738,6 +788,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             mixed.mLeftoversHandler.onTransitionConsumed(transition, aborted, finishT);
         } else if (mixed.mType == MixedTransition.TYPE_KEYGUARD) {
             mKeyguardHandler.onTransitionConsumed(transition, aborted, finishT);
+        } else if (mixed.mType == MixedTransition.TYPE_RECENTS_DURING_DESKTOP) {
+            mixed.mLeftoversHandler.onTransitionConsumed(transition, aborted, finishT);
         } else if (mixed.mType == MixedTransition.TYPE_UNFOLD) {
             mUnfoldHandler.onTransitionConsumed(transition, aborted, finishT);
         }

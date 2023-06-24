@@ -4801,6 +4801,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             } else if (instr2 != null) {
                 thread.bindApplication(processName, appInfo,
                         app.sdkSandboxClientAppVolumeUuid, app.sdkSandboxClientAppPackage,
+                        instr2.mIsSdkInSandbox,
                         providerList,
                         instr2.mClass,
                         profilerInfo, instr2.mArguments,
@@ -4817,6 +4818,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             } else {
                 thread.bindApplication(processName, appInfo,
                         app.sdkSandboxClientAppVolumeUuid, app.sdkSandboxClientAppPackage,
+                        /* isSdkInSandbox= */ false,
                         providerList, null, profilerInfo, null, null, null, testMode,
                         mBinderTransactionTrackingEnabled, enableTrackAllocation,
                         isRestrictedBackupMode || !normalMode, app.isPersistent(),
@@ -11400,6 +11402,13 @@ public class ActivityManagerService extends IActivityManager.Stub
                 pw.println("\n\n** Cache info for pid " + pid + " [" + r.processName + "] **");
                 pw.flush();
                 try {
+                    if (pid == Process.myPid()) {
+                        // Directly dump to target fd for local dump to avoid hang.
+                        try (ParcelFileDescriptor pfd = ParcelFileDescriptor.fromFd(fd.getInt$())) {
+                            thread.dumpCacheInfo(pfd, args);
+                        }
+                        continue;
+                    }
                     TransferPipe tp = new TransferPipe();
                     try {
                         thread.dumpCacheInfo(tp.getWriteFd(), args);
@@ -15653,7 +15662,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                         ai,
                         noRestart,
                         disableHiddenApiChecks,
-                        disableTestApiChecks);
+                        disableTestApiChecks,
+                        (flags & ActivityManager.INSTR_FLAG_INSTRUMENT_SDK_IN_SANDBOX) != 0);
             }
 
             ActiveInstrumentation activeInstr = new ActiveInstrumentation(this);
@@ -15750,23 +15760,14 @@ public class ActivityManagerService extends IActivityManager.Stub
             ApplicationInfo sdkSandboxClientAppInfo,
             boolean noRestart,
             boolean disableHiddenApiChecks,
-            boolean disableTestApiChecks) {
+            boolean disableTestApiChecks,
+            boolean isSdkInSandbox) {
 
         if (noRestart) {
             reportStartInstrumentationFailureLocked(
                     watcher,
                     className,
                     "Instrumenting sdk sandbox with --no-restart flag is not supported");
-            return false;
-        }
-
-        final ApplicationInfo sdkSandboxInfo;
-        try {
-            final PackageManager pm = mContext.getPackageManager();
-            sdkSandboxInfo = pm.getApplicationInfoAsUser(pm.getSdkSandboxPackageName(), 0, userId);
-        } catch (NameNotFoundException e) {
-            reportStartInstrumentationFailureLocked(
-                    watcher, className, "Can't find SdkSandbox package");
             return false;
         }
 
@@ -15778,13 +15779,22 @@ public class ActivityManagerService extends IActivityManager.Stub
             return false;
         }
 
-        final String processName = sandboxManagerLocal.getSdkSandboxProcessNameForInstrumentation(
-                sdkSandboxClientAppInfo);
+        final ApplicationInfo sdkSandboxInfo;
+        try {
+            sdkSandboxInfo =
+                    sandboxManagerLocal.getSdkSandboxApplicationInfoForInstrumentation(
+                            sdkSandboxClientAppInfo, userId, isSdkInSandbox);
+        } catch (NameNotFoundException e) {
+            reportStartInstrumentationFailureLocked(
+                    watcher, className, "Can't find SdkSandbox package");
+            return false;
+        }
 
         ActiveInstrumentation activeInstr = new ActiveInstrumentation(this);
         activeInstr.mClass = className;
-        activeInstr.mTargetProcesses = new String[]{processName};
+        activeInstr.mTargetProcesses = new String[]{sdkSandboxInfo.processName};
         activeInstr.mTargetInfo = sdkSandboxInfo;
+        activeInstr.mIsSdkInSandbox = isSdkInSandbox;
         activeInstr.mProfileFile = profileFile;
         activeInstr.mArguments = arguments;
         activeInstr.mWatcher = watcher;
@@ -15801,7 +15811,6 @@ public class ActivityManagerService extends IActivityManager.Stub
             sandboxManagerLocal.notifyInstrumentationStarted(
                     sdkSandboxClientAppInfo.packageName, sdkSandboxClientAppInfo.uid);
             synchronized (mProcLock) {
-                int sdkSandboxUid = Process.toSdkSandboxUid(sdkSandboxClientAppInfo.uid);
                 // Kill the package sdk sandbox process belong to. At this point sdk sandbox is
                 // already killed.
                 forceStopPackageLocked(
@@ -15817,10 +15826,10 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                 ProcessRecord app = addAppLocked(
                         sdkSandboxInfo,
-                        processName,
+                        sdkSandboxInfo.processName,
                         /* isolated= */ false,
                         /* isSdkSandbox= */ true,
-                        sdkSandboxUid,
+                        sdkSandboxInfo.uid,
                         sdkSandboxClientAppInfo.packageName,
                         disableHiddenApiChecks,
                         disableTestApiChecks,

@@ -10748,12 +10748,20 @@ public class TelephonyManager {
      * no reason to power it off. When any of the voters want to power it off, it will be turned
      * off. In case of emergency, the radio will be turned on even if there are some reasons for
      * powering it off, and these radio off votes will be cleared.
-     * Multiple apps can vote for the same reason and the last vote will take effect. Each app is
-     * responsible for its vote. A powering-off vote of a reason will be maintained until it is
-     * cleared by calling {@link clearRadioPowerOffForReason} for that reason, or an emergency call
-     * is made, or the device is rebooted. When an app comes backup from a crash, it needs to make
-     * sure if its vote is as expected. An app can use the API {@link getRadioPowerOffReasons} to
-     * check its vote.
+     * <p>
+     * Each API call is for one reason. However, an app can call the API multiple times for multiple
+     * reasons. Multiple apps can vote for the same reason but the vote of one app does not affect
+     * the vote of another app.
+     * <p>
+     * Each app is responsible for its vote. A powering-off vote for a reason of an app will be
+     * maintained until it is cleared by calling {@link #clearRadioPowerOffForReason(int)} for that
+     * reason by the app, or an emergency call is made, or the device is rebooted. When an app
+     * comes backup from a crash, it needs to make sure if its vote is as expected. An app can use
+     * the API {@link #getRadioPowerOffReasons()} to check its votes. Votes won't be removed when
+     * an app crashes.
+     * <p>
+     * User setting for power state is persistent across device reboots. This applies to all users,
+     * callers must be careful to update the off reasons when the current user changes.
      *
      * @param reason The reason for powering off radio.
      * @throws SecurityException if the caller does not have MODIFY_PHONE_STATE permission.
@@ -10810,10 +10818,10 @@ public class TelephonyManager {
     }
 
     /**
-     * Get reasons for powering off radio, as requested by {@link requestRadioPowerOffForReason}.
-     * If the reason set is empty, the radio is on in all cases.
+     * Get reasons for powering off radio of the calling app, as requested by
+     * {@link #requestRadioPowerOffForReason(int)}.
      *
-     * @return Set of reasons for powering off radio.
+     * @return Set of reasons for powering off radio of the calling app.
      * @throws SecurityException if the caller does not have READ_PRIVILEGED_PHONE_STATE permission.
      * @throws IllegalStateException if the Telephony service is not currently available.
      *
@@ -11374,29 +11382,6 @@ public class TelephonyManager {
             Log.e(TAG, "Error calling isDataEnabledForReason e:" + e);
         }
         return false;
-    }
-
-    /**
-     * Returns the result and response from RIL for oem request
-     *
-     * @param oemReq the data is sent to ril.
-     * @param oemResp the respose data from RIL.
-     * @return negative value request was not handled or get error
-     *         0 request was handled succesfully, but no response data
-     *         positive value success, data length of response
-     * @hide
-     * @deprecated OEM needs a vendor-extension hal and their apps should use that instead
-     */
-    @Deprecated
-    public int invokeOemRilRequestRaw(byte[] oemReq, byte[] oemResp) {
-        try {
-            ITelephony telephony = getITelephony();
-            if (telephony != null)
-                return telephony.invokeOemRilRequestRaw(oemReq, oemResp);
-        } catch (RemoteException ex) {
-        } catch (NullPointerException ex) {
-        }
-        return -1;
     }
 
     /**
@@ -15261,6 +15246,14 @@ public class TelephonyManager {
     @TestApi
     public static final int HAL_SERVICE_IMS = 7;
 
+    /**
+     * HAL service type that supports the HAL APIs implementation of IRadioSatellite
+     * {@link RadioSatelliteProxy}
+     * @hide
+     */
+    @TestApi
+    public static final int HAL_SERVICE_SATELLITE = 8;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"HAL_SERVICE_"},
@@ -15273,6 +15266,7 @@ public class TelephonyManager {
                     HAL_SERVICE_SIM,
                     HAL_SERVICE_VOICE,
                     HAL_SERVICE_IMS,
+                    HAL_SERVICE_SATELLITE
             })
     public @interface HalService {}
 

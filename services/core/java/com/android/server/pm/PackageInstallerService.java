@@ -1305,9 +1305,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         }
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.INSTALL_PACKAGES)
     @Override
     public void setPermissionsResult(int sessionId, boolean accepted) {
-        mContext.enforceCallingOrSelfPermission(android.Manifest.permission.INSTALL_PACKAGES, TAG);
+        setPermissionsResult_enforcePermission();
 
         synchronized (mSessions) {
             PackageInstallerSession session = mSessions.get(sessionId);
@@ -1318,10 +1319,16 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     }
 
     private boolean isValidForInstallConstraints(PackageStateInternal ps,
-            String installerPackageName) {
+            String installerPackageName, int installerUid, String packageName) {
+        final var snapshot = mPm.snapshotComputer();
+        final var isSelfUpdatePermissionGranted =
+                (snapshot.checkUidPermission(android.Manifest.permission.INSTALL_SELF_UPDATES,
+                        installerUid) == PackageManager.PERMISSION_GRANTED);
+        final var isSelfUpdateAllowed = isSelfUpdatePermissionGranted && TextUtils.equals(
+                packageName, installerPackageName);
         return TextUtils.equals(ps.getInstallSource().mInstallerPackageName, installerPackageName)
                 || TextUtils.equals(ps.getInstallSource().mUpdateOwnerPackageName,
-                installerPackageName);
+                installerPackageName) || isSelfUpdateAllowed;
     }
 
     private CompletableFuture<InstallConstraintsResult> checkInstallConstraintsInternal(
@@ -1340,7 +1347,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         if (!PackageManagerServiceUtils.isSystemOrRootOrShell(callingUid)) {
             for (var packageName : packageNames) {
                 var ps = snapshot.getPackageStateInternal(packageName);
-                if (ps == null || !isValidForInstallConstraints(ps, installerPackageName)) {
+                if (ps == null || !isValidForInstallConstraints(ps, installerPackageName,
+                        callingUid, packageName)) {
                     throw new SecurityException("Caller has no access to package " + packageName);
                 }
             }

@@ -1596,8 +1596,8 @@ PointerIconStyle NativeInputManager::getDefaultPointerIconId() {
 }
 
 PointerIconStyle NativeInputManager::getDefaultStylusIconId() {
-    // TODO: add resource for default stylus icon and change this
-    return PointerIconStyle::TYPE_CROSSHAIR;
+    // Use the empty icon as the default pointer icon for a hovering stylus.
+    return PointerIconStyle::TYPE_NULL;
 }
 
 PointerIconStyle NativeInputManager::getCustomPointerIconId() {
@@ -2214,13 +2214,25 @@ static jobject nativeGetLights(JNIEnv* env, jobject nativeImplObj, jint deviceId
             jCapability |= env->GetStaticIntField(gLightClassInfo.clazz,
                                                   gLightClassInfo.lightCapabilityColorRgb);
         }
+
+        ScopedLocalRef<jintArray> jPreferredBrightnessLevels{env};
+        if (!lightInfo.preferredBrightnessLevels.empty()) {
+            std::vector<int32_t> vec;
+            for (auto it : lightInfo.preferredBrightnessLevels) {
+              vec.push_back(ftl::to_underlying(it));
+            }
+            jPreferredBrightnessLevels.reset(env->NewIntArray(vec.size()));
+            env->SetIntArrayRegion(jPreferredBrightnessLevels.get(), 0, vec.size(), vec.data());
+        }
+
         ScopedLocalRef<jobject> lightObj(env,
                                          env->NewObject(gLightClassInfo.clazz,
                                                         gLightClassInfo.constructor,
                                                         static_cast<jint>(lightInfo.id),
                                                         env->NewStringUTF(lightInfo.name.c_str()),
                                                         static_cast<jint>(lightInfo.ordinal),
-                                                        jTypeId, jCapability));
+                                                        jTypeId, jCapability,
+                                                        jPreferredBrightnessLevels.get()));
         // Add light object to list
         env->CallBooleanMethod(jLights, gArrayListClassInfo.add, lightObj.get());
     }
@@ -2846,7 +2858,7 @@ int register_android_server_InputManager(JNIEnv* env) {
     FIND_CLASS(gLightClassInfo.clazz, "android/hardware/lights/Light");
     gLightClassInfo.clazz = jclass(env->NewGlobalRef(gLightClassInfo.clazz));
     GET_METHOD_ID(gLightClassInfo.constructor, gLightClassInfo.clazz, "<init>",
-                  "(ILjava/lang/String;III)V");
+                  "(ILjava/lang/String;III[I)V");
 
     gLightClassInfo.clazz = jclass(env->NewGlobalRef(gLightClassInfo.clazz));
     gLightClassInfo.lightTypeInput =

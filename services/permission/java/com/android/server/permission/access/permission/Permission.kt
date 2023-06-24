@@ -140,9 +140,7 @@ data class Permission(
         get() = permissionInfo.flags.hasBits(PermissionInfo.FLAG_SOFT_RESTRICTED)
 
     inline val isHardOrSoftRestricted: Boolean
-        get() = permissionInfo.flags.hasBits(
-            PermissionInfo.FLAG_HARD_RESTRICTED or PermissionInfo.FLAG_SOFT_RESTRICTED
-        )
+        get() = isHardRestricted || isSoftRestricted
 
     inline val isImmutablyRestricted: Boolean
         get() = permissionInfo.flags.hasBits(PermissionInfo.FLAG_IMMUTABLY_RESTRICTED)
@@ -170,5 +168,13 @@ data class Permission(
         const val TYPE_CONFIG = 1
         // The permission is defined dynamically.
         const val TYPE_DYNAMIC = 2
+
+        fun typeToString(type: Int): String =
+            when (type) {
+                TYPE_MANIFEST -> "TYPE_MANIFEST"
+                TYPE_CONFIG -> "TYPE_CONFIG"
+                TYPE_DYNAMIC -> "TYPE_DYNAMIC"
+                else -> type.toString()
+            }
     }
 }

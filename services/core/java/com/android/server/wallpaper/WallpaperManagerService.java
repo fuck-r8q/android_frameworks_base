@@ -1604,7 +1604,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                 mWallpaperCropper);
 
         mIsLockscreenLiveWallpaperEnabled =
-                SystemProperties.getBoolean("persist.wm.debug.lockscreen_live_wallpaper", false);
+                SystemProperties.getBoolean("persist.wm.debug.lockscreen_live_wallpaper", true);
         mIsMultiCropEnabled =
                 SystemProperties.getBoolean("persist.wm.debug.wallpaper_multi_crop", false);
         LocalServices.addService(WallpaperManagerInternal.class, new LocalService());
@@ -2116,8 +2116,8 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                     continue;
                 }
 
-                // ignore managed profiles
-                if (user.isManagedProfile()) {
+                // ignore profiles
+                if (user.isProfile()) {
                     continue;
                 }
                 WallpaperData wd = mWallpaperMap.get(user.id);

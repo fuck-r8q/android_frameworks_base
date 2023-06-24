@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Hiermee kun je zorgen dat de app informatie krijgt over de voorkeursservice voor NFC-betaling, zoals geregistreerde hulpmiddelen en routebestemmingen."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"Near Field Communication regelen"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Hiermee kan de app communiceren met NFC-tags (Near Field Communication), kaarten en lezers."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Secure Element-transactiegebeurtenis"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Staat toe dat de app informatie krijgt over transacties die plaatsvinden in een Secure Element."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"je schermvergrendeling uitzetten"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Hiermee kan de app de toetsenblokkering en bijbehorende wachtwoordbeveiliging uitzetten. Zo kan de telefoon de toetsenblokkering uitzetten als je wordt gebeld en de toetsenblokkering weer aanzetten als het gesprek is beëindigd."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"complexiteit van schermvergrendeling opvragen"</string>

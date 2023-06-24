@@ -1,0 +1,12 @@
+{
+  "presubmit-large": [
+    {
+      "name": "SystemUITests",
+      "options": [
+        {
+          "include-filter": "com.android.systemui.accessibility"
+        }
+      ]
+    }
+  ]
+}

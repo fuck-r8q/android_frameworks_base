@@ -47,6 +47,7 @@ import com.android.wm.shell.common.SystemWindows;
 import com.android.wm.shell.common.TabletopModeController;
 import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.TransactionPool;
+import com.android.wm.shell.common.annotations.ShellAnimationThread;
 import com.android.wm.shell.common.annotations.ShellBackgroundThread;
 import com.android.wm.shell.common.annotations.ShellMainThread;
 import com.android.wm.shell.desktopmode.DesktopModeController;
@@ -263,8 +264,13 @@ public abstract class WMShellModule {
     static FreeformTaskTransitionHandler provideFreeformTaskTransitionHandler(
             ShellInit shellInit,
             Transitions transitions,
-            WindowDecorViewModel windowDecorViewModel) {
-        return new FreeformTaskTransitionHandler(shellInit, transitions, windowDecorViewModel);
+            Context context,
+            WindowDecorViewModel windowDecorViewModel,
+            DisplayController displayController,
+            @ShellMainThread ShellExecutor mainExecutor,
+            @ShellAnimationThread ShellExecutor animExecutor) {
+        return new FreeformTaskTransitionHandler(shellInit, transitions, context,
+                windowDecorViewModel, displayController, mainExecutor, animExecutor);
     }
 
     @WMSingleton
@@ -535,11 +541,13 @@ public abstract class WMShellModule {
             Optional<PipTouchHandler> pipTouchHandlerOptional,
             Optional<RecentsTransitionHandler> recentsTransitionHandler,
             KeyguardTransitionHandler keyguardTransitionHandler,
+            Optional<DesktopModeController> desktopModeController,
+            Optional<DesktopTasksController> desktopTasksController,
             Optional<UnfoldTransitionHandler> unfoldHandler,
             Transitions transitions) {
         return new DefaultMixedHandler(shellInit, transitions, splitScreenOptional,
                 pipTouchHandlerOptional, recentsTransitionHandler, keyguardTransitionHandler,
-                unfoldHandler);
+                desktopModeController, desktopTasksController, unfoldHandler);
     }
 
     @WMSingleton

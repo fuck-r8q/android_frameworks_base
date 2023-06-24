@@ -29,6 +29,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.biometrics.BiometricFaceConstants;
+import android.hardware.biometrics.BiometricFingerprintConstants;
 import android.hardware.biometrics.BiometricSourceType;
 import android.os.Handler;
 import android.os.UserHandle;
@@ -41,9 +42,6 @@ import com.android.systemui.CoreStartable;
 import com.android.systemui.R;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
-
-
-import java.util.Optional;
 
 import javax.inject.Inject;
 
@@ -68,7 +66,6 @@ public class BiometricNotificationService implements CoreStartable {
     private final Handler mHandler;
     private final NotificationManager mNotificationManager;
     private final BiometricNotificationBroadcastReceiver mBroadcastReceiver;
-    private final FingerprintReEnrollNotification mFingerprintReEnrollNotification;
     private NotificationChannel mNotificationChannel;
     private boolean mFaceNotificationQueued;
     private boolean mFingerprintNotificationQueued;
@@ -105,15 +102,8 @@ public class BiometricNotificationService implements CoreStartable {
                         Settings.Secure.putIntForUser(mContext.getContentResolver(),
                                 Settings.Secure.FACE_UNLOCK_RE_ENROLL, REENROLL_REQUIRED,
                                 UserHandle.USER_CURRENT);
-                    }
-                }
-
-                @Override
-                public void onBiometricHelp(int msgId, String helpString,
-                        BiometricSourceType biometricSourceType) {
-                    if (biometricSourceType == BiometricSourceType.FINGERPRINT
-                            && mFingerprintReEnrollNotification.isFingerprintReEnrollRequired(
-                                    msgId)) {
+                    } else if (msgId == BiometricFingerprintConstants.BIOMETRIC_ERROR_RE_ENROLL
+                            && biometricSourceType == BiometricSourceType.FINGERPRINT) {
                         mFingerprintReenrollRequired = true;
                     }
                 }
@@ -125,16 +115,13 @@ public class BiometricNotificationService implements CoreStartable {
             KeyguardUpdateMonitor keyguardUpdateMonitor,
             KeyguardStateController keyguardStateController,
             Handler handler, NotificationManager notificationManager,
-            BiometricNotificationBroadcastReceiver biometricNotificationBroadcastReceiver,
-            Optional<FingerprintReEnrollNotification> fingerprintReEnrollNotification) {
+            BiometricNotificationBroadcastReceiver biometricNotificationBroadcastReceiver) {
         mContext = context;
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mKeyguardStateController = keyguardStateController;
         mHandler = handler;
         mNotificationManager = notificationManager;
         mBroadcastReceiver = biometricNotificationBroadcastReceiver;
-        mFingerprintReEnrollNotification = fingerprintReEnrollNotification.orElse(
-                new FingerprintReEnrollNotificationImpl());
     }
 
     @Override

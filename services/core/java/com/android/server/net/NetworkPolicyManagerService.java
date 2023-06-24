@@ -141,6 +141,7 @@ import static org.xmlpull.v1.XmlPullParser.END_TAG;
 import static org.xmlpull.v1.XmlPullParser.START_TAG;
 
 import android.Manifest;
+import android.annotation.EnforcePermission;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -222,6 +223,7 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.SubscriptionManager.OnSubscriptionsChangedListener;
 import android.telephony.SubscriptionPlan;
+import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
@@ -803,6 +805,16 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             }
             return buckets;
         }
+
+        /** Require IPC call. Don't call when holding a lock. */
+        int getDefaultDataSubId() {
+            return SubscriptionManager.getDefaultDataSubscriptionId();
+        }
+
+        /** Require IPC call. Don't call when holding a lock. */
+        int getActivateDataSubId() {
+            return SubscriptionManager.getActiveDataSubscriptionId();
+        }
     }
 
     @VisibleForTesting
@@ -830,7 +842,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
 
         mSuppressDefaultPolicy = suppressDefaultPolicy;
         mDeps = Objects.requireNonNull(deps, "missing Dependencies");
-
+        mActiveDataSubIdListener = new ActiveDataSubIdListener();
         mPolicyFile = new AtomicFile(new File(systemDir, "netpolicy.xml"), "net-policy");
 
         mAppOps = context.getSystemService(AppOpsManager.class);
@@ -1090,6 +1102,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                         }
                     });
 
+            // Listen for active data sub Id change, upon which data notifications is shown/hidden.
+            mContext.getSystemService(TelephonyManager.class).registerTelephonyCallback(executor,
+                    mActiveDataSubIdListener);
+
             // tell systemReady() that the service has been initialized
             initCompleteSignal.countDown();
         } finally {
@@ -1259,6 +1275,38 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             }
         }
     };
+
+    /**
+     * Listener that watches for active data sub Id change, upon which data notifications are
+     * shown/hidden.
+     */
+    private final ActiveDataSubIdListener mActiveDataSubIdListener;
+    private class ActiveDataSubIdListener extends TelephonyCallback implements
+            TelephonyCallback.ActiveDataSubscriptionIdListener {
+        /**
+         * In most cases active data sub is the same as the default data sub, but if user enabled
+         * auto data switch {@link TelephonyManager#MOBILE_DATA_POLICY_AUTO_DATA_SWITCH},
+         * active data sub could be the non-default data sub.
+         *
+         * If the listener is initialized before the phone process is up, the IPC call to the
+         * static method of SubscriptionManager lead to INVALID_SUBSCRIPTION_ID to be returned,
+         * indicating the phone process is unable to determine a valid data sub Id at this point, in
+         * which case no data notifications should be shown anyway. Later on when an active data
+         * sub is known, notifications will be re-evaluated by this callback.
+         */
+        private int mDefaultDataSubId = mDeps.getDefaultDataSubId();
+        private int mActiveDataSubId = mDeps.getActivateDataSubId();
+        // Only listen to active data sub change is sufficient because default data sub change
+        // leads to active data sub change as well.
+        @Override
+        public void onActiveDataSubscriptionIdChanged(int subId) {
+            mActiveDataSubId = subId;
+            mDefaultDataSubId = mDeps.getDefaultDataSubId();
+            synchronized (mNetworkPoliciesSecondLock) {
+                updateNotificationsNL();
+            }
+        }
+    }
 
     /**
      * Listener that watches for {@link NetworkStatsManager} updates, which
@@ -1449,6 +1497,9 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
 
             // ignore policies that aren't relevant to user
             if (subId == INVALID_SUBSCRIPTION_ID) continue;
+            // ignore if the data sub is neither default nor active for data at the moment.
+            if (subId != mActiveDataSubIdListener.mDefaultDataSubId
+                    && subId != mActiveDataSubIdListener.mActiveDataSubId) continue;
             if (!policy.hasCycle()) continue;
 
             final Pair<ZonedDateTime, ZonedDateTime> cycle = NetworkPolicyManager
@@ -2842,9 +2893,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void setUidPolicy(int uid, int policy) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        setUidPolicy_enforcePermission();
 
         if (!UserHandle.isApp(uid)) {
             throw new IllegalArgumentException("cannot apply policy to UID " + uid);
@@ -2863,9 +2915,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void addUidPolicy(int uid, int policy) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        addUidPolicy_enforcePermission();
 
         if (!UserHandle.isApp(uid)) {
             throw new IllegalArgumentException("cannot apply policy to UID " + uid);
@@ -2881,9 +2934,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void removeUidPolicy(int uid, int policy) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        removeUidPolicy_enforcePermission();
 
         if (!UserHandle.isApp(uid)) {
             throw new IllegalArgumentException("cannot apply policy to UID " + uid);
@@ -2948,18 +3002,20 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public int getUidPolicy(int uid) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        getUidPolicy_enforcePermission();
 
         synchronized (mUidRulesFirstLock) {
             return mUidPolicy.get(uid, POLICY_NONE);
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public int[] getUidsWithPolicy(int policy) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        getUidsWithPolicy_enforcePermission();
 
         int[] uids = new int[0];
         synchronized (mUidRulesFirstLock) {
@@ -3055,9 +3111,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         mListeners.unregister(listener);
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void setNetworkPolicies(NetworkPolicy[] policies) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        setNetworkPolicies_enforcePermission();
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -3078,9 +3135,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         setNetworkPolicies(policies);
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public NetworkPolicy[] getNetworkPolicies(String callingPackage) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        getNetworkPolicies_enforcePermission();
         try {
             mContext.enforceCallingOrSelfPermission(READ_PRIVILEGED_PHONE_STATE, TAG);
             // SKIP checking run-time OP_READ_PHONE_STATE since caller or self has PRIVILEGED
@@ -3176,9 +3234,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         return template;
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void snoozeLimit(NetworkTemplate template) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        snoozeLimit_enforcePermission();
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -3286,9 +3345,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 .sendToTarget();
     }
 
+    @EnforcePermission(ACCESS_NETWORK_STATE)
     @Override
     public int getRestrictBackgroundByCaller() {
-        mContext.enforceCallingOrSelfPermission(ACCESS_NETWORK_STATE, TAG);
+        getRestrictBackgroundByCaller_enforcePermission();
         return getRestrictBackgroundStatusInternal(Binder.getCallingUid());
     }
 
@@ -3321,18 +3381,20 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public boolean getRestrictBackground() {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        getRestrictBackground_enforcePermission();
 
         synchronized (mUidRulesFirstLock) {
             return mRestrictBackground;
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void setDeviceIdleMode(boolean enabled) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        setDeviceIdleMode_enforcePermission();
         Trace.traceBegin(Trace.TRACE_TAG_NETWORK, "setDeviceIdleMode");
         try {
             synchronized (mUidRulesFirstLock) {
@@ -3357,9 +3419,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(MANAGE_NETWORK_POLICY)
     @Override
     public void setWifiMeteredOverride(String networkId, int meteredOverride) {
-        mContext.enforceCallingOrSelfPermission(MANAGE_NETWORK_POLICY, TAG);
+        setWifiMeteredOverride_enforcePermission();
         final long token = Binder.clearCallingIdentity();
         try {
             final WifiManager wm = mContext.getSystemService(WifiManager.class);
@@ -5967,9 +6030,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         }
     }
 
+    @EnforcePermission(NETWORK_SETTINGS)
     @Override
     public void factoryReset(String subscriber) {
-        mContext.enforceCallingOrSelfPermission(NETWORK_SETTINGS, TAG);
+        factoryReset_enforcePermission();
 
         if (mUserManager.hasUserRestriction(UserManager.DISALLOW_NETWORK_RESET)) {
             return;
@@ -6028,9 +6092,10 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
         return blockedReasons != BLOCKED_REASON_NONE;
     }
 
+    @EnforcePermission(OBSERVE_NETWORK_POLICY)
     @Override
     public boolean isUidRestrictedOnMeteredNetworks(int uid) {
-        mContext.enforceCallingOrSelfPermission(OBSERVE_NETWORK_POLICY, TAG);
+        isUidRestrictedOnMeteredNetworks_enforcePermission();
         synchronized (mUidBlockedState) {
             final UidBlockedState uidBlockedState = mUidBlockedState.get(uid);
             int blockedReasons = uidBlockedState == null

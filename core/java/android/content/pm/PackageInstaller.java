@@ -46,10 +46,12 @@ import android.annotation.TestApi;
 import android.app.ActivityManager;
 import android.app.ActivityThread;
 import android.app.AppGlobals;
+import android.app.PendingIntent;
 import android.compat.annotation.UnsupportedAppUsage;
-import android.content.IIntentReceiver;
-import android.content.IIntentSender;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.pm.PackageManager.DeleteFlags;
 import android.content.pm.PackageManager.InstallReason;
@@ -62,11 +64,9 @@ import android.graphics.Bitmap;
 import android.icu.util.ULocale;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.FileBridge;
 import android.os.Handler;
 import android.os.HandlerExecutor;
-import android.os.IBinder;
 import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
@@ -147,6 +147,9 @@ import java.util.function.Consumer;
  */
 public class PackageInstaller {
     private static final String TAG = "PackageInstaller";
+
+    private static final String ACTION_WAIT_INSTALL_CONSTRAINTS =
+            "android.content.pm.action.WAIT_INSTALL_CONSTRAINTS";
 
     /** {@hide} */
     public static final boolean ENABLE_REVOCABLE_FD =
@@ -1066,6 +1069,9 @@ public class PackageInstaller {
      * @param timeoutMillis The maximum time to wait, in milliseconds until the
      *                      constraints are satisfied. The caller will be notified via
      *                      {@code statusReceiver} if timeout happens before commit.
+     * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
+     *             {@link android.app.PendingIntent} when caller has a target SDK of API
+     *             {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
      */
     public void commitSessionAfterInstallConstraintsAreMet(int sessionId,
             @NonNull IntentSender statusReceiver, @NonNull InstallConstraints constraints,
@@ -1074,34 +1080,68 @@ public class PackageInstaller {
             var session = mInstaller.openSession(sessionId);
             session.seal();
             var packageNames = session.fetchPackageNames();
-            var intentSender = new IntentSender((IIntentSender) new IIntentSender.Stub() {
-                @Override
-                public void send(int code, Intent intent, String resolvedType,
-                        IBinder allowlistToken, IIntentReceiver finishedReceiver,
-                        String requiredPermission, Bundle options)  {
-                    var result = intent.getParcelableExtra(
-                            PackageInstaller.EXTRA_INSTALL_CONSTRAINTS_RESULT,
-                            InstallConstraintsResult.class);
-                    try {
-                        if (result.areAllConstraintsSatisfied()) {
-                            session.commit(statusReceiver, false);
-                        } else {
-                            // timeout
-                            final Intent fillIn = new Intent();
-                            fillIn.putExtra(PackageInstaller.EXTRA_SESSION_ID, sessionId);
-                            fillIn.putExtra(PackageInstaller.EXTRA_STATUS, STATUS_FAILURE_TIMEOUT);
-                            fillIn.putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE,
-                                    "Install constraints not satisfied within timeout");
-                            statusReceiver.sendIntent(
-                                    ActivityThread.currentApplication(), 0, fillIn, null, null);
-                        }
-                    } catch (Exception ignore) {
-                    }
-                }
-            });
-            waitForInstallConstraints(packageNames, constraints, intentSender, timeoutMillis);
+            var context = ActivityThread.currentApplication();
+            var localIntentSender = new LocalIntentSender(context, sessionId, session,
+                    statusReceiver);
+            waitForInstallConstraints(packageNames, constraints,
+                    localIntentSender.getIntentSender(), timeoutMillis);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private static final class LocalIntentSender extends BroadcastReceiver {
+
+        private final Context mContext;
+        private final IntentSender mStatusReceiver;
+        private final int mSessionId;
+        private final IPackageInstallerSession mSession;
+
+        LocalIntentSender(Context context, int sessionId, IPackageInstallerSession session,
+                IntentSender statusReceiver) {
+            mContext = context;
+            mSessionId = sessionId;
+            mSession = session;
+            mStatusReceiver = statusReceiver;
+        }
+
+        private IntentSender getIntentSender() {
+            Intent intent = new Intent(ACTION_WAIT_INSTALL_CONSTRAINTS).setPackage(
+                    mContext.getPackageName());
+            mContext.registerReceiver(this, new IntentFilter(ACTION_WAIT_INSTALL_CONSTRAINTS),
+                    Context.RECEIVER_EXPORTED);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0, intent,
+                    PendingIntent.FLAG_MUTABLE);
+            return pendingIntent.getIntentSender();
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            InstallConstraintsResult result = intent.getParcelableExtra(
+                    PackageInstaller.EXTRA_INSTALL_CONSTRAINTS_RESULT,
+                    InstallConstraintsResult.class);
+            try {
+                if (result.areAllConstraintsSatisfied()) {
+                    mSession.commit(mStatusReceiver, false);
+                } else {
+                    // timeout
+                    final Intent fillIn = new Intent();
+                    fillIn.putExtra(PackageInstaller.EXTRA_SESSION_ID, mSessionId);
+                    fillIn.putExtra(PackageInstaller.EXTRA_STATUS, STATUS_FAILURE_TIMEOUT);
+                    fillIn.putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE,
+                            "Install constraints not satisfied within timeout");
+                    mStatusReceiver.sendIntent(ActivityThread.currentApplication(), 0, fillIn, null,
+                            null);
+                }
+            } catch (Exception ignore) {
+                // no-op
+            } finally {
+                unregisterReceiver();
+            }
+        }
+
+        private void unregisterReceiver() {
+            mContext.unregisterReceiver(this);
         }
     }
 
@@ -1740,6 +1780,9 @@ public class PackageInstaller {
          *
          * @throws SecurityException if streams opened through
          *             {@link #openWrite(String, long, long)} are still open.
+         * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
+         *             {@link android.app.PendingIntent} when caller has a target SDK of API
+         *             version {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
          *
          * @see android.app.admin.DevicePolicyManager
          * @see #requestUserPreapproval
@@ -1768,6 +1811,9 @@ public class PackageInstaller {
          * @param statusReceiver Called when the state of the session changes. Intents
          *                       sent to this receiver contain {@link #EXTRA_STATUS}. Refer to the
          *                       individual status codes on how to handle them.
+         * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
+         *             {@link android.app.PendingIntent} when caller has a target SDK of API
+         *             {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
          *
          * @hide
          */
@@ -2099,6 +2145,7 @@ public class PackageInstaller {
      * or the parser isn't able to parse the supplied source(s).
      * @hide
      */
+    @SystemApi
     @NonNull
     public InstallInfo readInstallInfo(@NonNull ParcelFileDescriptor pfd,
             @Nullable String debugPathName, int flags) throws PackageParsingException {
@@ -2172,7 +2219,6 @@ public class PackageInstaller {
          * Includes the size of the raw APKs, possibly unpacked resources, raw dex metadata files,
          * and all relevant native code.
          * @throws IOException when size of native binaries cannot be calculated.
-         * @hide
          */
         public long calculateInstalledSize(@NonNull SessionParams params,
                 @NonNull ParcelFileDescriptor pfd) throws IOException {
@@ -3614,6 +3660,7 @@ public class PackageInstaller {
          *
          * @hide
          */
+        @SystemApi
         @RequiresPermission(Manifest.permission.READ_INSTALLED_SESSION_PATHS)
         public @Nullable String getResolvedBaseApkPath() {
             return resolvedBaseCodePath;

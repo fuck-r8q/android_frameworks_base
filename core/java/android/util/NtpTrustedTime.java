@@ -217,17 +217,24 @@ public abstract class NtpTrustedTime implements TrustedTime {
 
     private static NtpTrustedTime sSingleton;
 
+    /** A lock to prevent multiple refreshes taking place at the same time. */
+    private final Object mRefreshLock = new Object();
+
+    /** A lock to ensure safe read/writes to configuration. */
+    private final Object mConfigLock = new Object();
+
     /** An in-memory config override for use during tests. */
-    @GuardedBy("this")
+    @GuardedBy("mConfigLock")
     @Nullable
     private NtpConfig mNtpConfigForTests;
 
-    @GuardedBy("this")
+    /**
+     * The latest time result.
+     *
+     * <p>Written when holding {@link #mRefreshLock} but declared volatile and can be read outside
+     * synchronized blocks to avoid blocking dump() during {@link #forceRefresh}.
+     */
     @Nullable
-    private URI mLastSuccessfulNtpServerUri;
-
-    // Declared volatile and accessed outside synchronized blocks to avoid blocking reads during
-    // forceRefresh().
     private volatile TimeResult mTimeResult;
 
     private boolean mBackupmode = false;
@@ -235,6 +242,16 @@ public abstract class NtpTrustedTime implements TrustedTime {
     private static int mNtpRetries = 0;
     private static int mNtpRetriesMax = 0;
     private static final String BACKUP_SERVER = "persist.backup.ntpServer";
+
+    /**
+     * The last successful NTP server URI, i.e. the one used to obtain {@link #mTimeResult} when it
+     * is non-null.
+     *
+     * <p>Written when holding {@link #mRefreshLock} but declared volatile and can be read outside
+     * synchronized blocks to avoid blocking dump() during {@link #forceRefresh}.
+     */
+    @Nullable
+    private volatile URI mLastSuccessfulNtpServerUri;
 
     protected NtpTrustedTime() {
     }
@@ -273,7 +290,7 @@ public abstract class NtpTrustedTime implements TrustedTime {
      * test value, i.e. so the normal value will be used next time.
      */
     public void setServerConfigForTests(@NonNull NtpConfig ntpConfig) {
-        synchronized (this) {
+        synchronized (mConfigLock) {
             mNtpConfigForTests = ntpConfig;
         }
     }
@@ -286,7 +303,7 @@ public abstract class NtpTrustedTime implements TrustedTime {
 
     @Override
     public boolean forceSync() {
-        synchronized (this) {
+        synchronized (mRefreshLock) {
             Network network = getDefaultNetwork();
             if (network == null) {
                 if (LOGD) Log.d(TAG, "forceRefresh: no network available");
@@ -301,12 +318,13 @@ public abstract class NtpTrustedTime implements TrustedTime {
     public boolean forceRefresh(@NonNull Network network) {
         Objects.requireNonNull(network);
 
-        synchronized (this) {
+        synchronized (mRefreshLock) {
+            // Prevent concurrent refreshes.
             return forceRefreshLocked(network);
         }
     }
 
-    @GuardedBy("this")
+    @GuardedBy("mRefreshLock")
     private boolean forceRefreshLocked(@NonNull Network network) {
         Objects.requireNonNull(network);
 
@@ -381,12 +399,13 @@ public abstract class NtpTrustedTime implements TrustedTime {
         return false;
     }
 
-    @GuardedBy("this")
     private NtpConfig getNtpConfig() {
-        if (mNtpConfigForTests != null) {
-            return mNtpConfigForTests;
+        synchronized (mConfigLock) {
+            if (mNtpConfigForTests != null) {
+                return mNtpConfigForTests;
+            }
+            return getNtpConfigInternal();
         }
-        return getNtpConfigInternal();
     }
 
     /**
@@ -395,6 +414,7 @@ public abstract class NtpTrustedTime implements TrustedTime {
      *
      * <p>This method has been made public for easy replacement during tests.
      */
+    @GuardedBy("mConfigLock")
     @VisibleForTesting
     @Nullable
     public abstract NtpConfig getNtpConfigInternal();
@@ -511,14 +531,14 @@ public abstract class NtpTrustedTime implements TrustedTime {
 
     /** Sets the last received NTP time. Intended for use during tests. */
     public void setCachedTimeResult(TimeResult timeResult) {
-        synchronized (this) {
+        synchronized (mRefreshLock) {
             mTimeResult = timeResult;
         }
     }
 
     /** Clears the last received NTP time. Intended for use during tests. */
     public void clearCachedTimeResult() {
-        synchronized (this) {
+        synchronized (mRefreshLock) {
             mTimeResult = null;
         }
     }
@@ -617,15 +637,18 @@ public abstract class NtpTrustedTime implements TrustedTime {
 
     /** Prints debug information. */
     public void dump(PrintWriter pw) {
-        synchronized (this) {
+        synchronized (mConfigLock) {
             pw.println("getNtpConfig()=" + getNtpConfig());
             pw.println("mNtpConfigForTests=" + mNtpConfigForTests);
-            pw.println("mLastSuccessfulNtpServerUri=" + mLastSuccessfulNtpServerUri);
-            pw.println("mTimeResult=" + mTimeResult);
-            if (mTimeResult != null) {
-                pw.println("mTimeResult.getAgeMillis()="
-                        + Duration.ofMillis(mTimeResult.getAgeMillis()));
-            }
+        }
+
+        pw.println("mLastSuccessfulNtpServerUri=" + mLastSuccessfulNtpServerUri);
+
+        TimeResult timeResult = mTimeResult;
+        pw.println("mTimeResult=" + timeResult);
+        if (timeResult != null) {
+            pw.println("mTimeResult.getAgeMillis()="
+                    + Duration.ofMillis(timeResult.getAgeMillis()));
         }
     }
 

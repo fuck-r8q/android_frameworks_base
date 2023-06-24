@@ -37,19 +37,14 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.hardware.vibrator.IVibrator;
 import android.net.Uri;
-import android.os.SystemVibrator;
 import android.os.VibrationEffect.Composition.UnreachableAfterRepeatingIndefinitelyException;
-import android.os.Vibrator;
-import android.os.VibratorInfo;
-import android.os.vibrator.PrebakedSegment;
-import android.os.vibrator.PrimitiveSegment;
-import android.os.vibrator.StepSegment;
 import android.platform.test.annotations.Presubmit;
 
 import androidx.test.InstrumentationRegistry;
 
 import com.android.internal.R;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.junit.MockitoJUnitRunner;
@@ -639,125 +634,109 @@ public class VibrationEffectTest {
                         .validate());
     }
 
-    @Test
-    public void testResolveOneShot() {
-        VibrationEffect.Composed resolved = DEFAULT_ONE_SHOT.resolve(51);
-        assertEquals(0.2f, ((StepSegment) resolved.getSegments().get(0)).getAmplitude());
+    private void doTestApplyRepeatingWithNonRepeatingOriginal(@NotNull VibrationEffect original) {
+        assertTrue(original.getDuration() != Long.MAX_VALUE);
+        int loopDelayMs = 123;
+        assertEquals(original, original.applyRepeatingIndefinitely(false, loopDelayMs));
 
-        assertThrows(IllegalArgumentException.class, () -> DEFAULT_ONE_SHOT.resolve(1000));
-    }
-
-    @Test
-    public void testResolveWaveform() {
-        VibrationEffect.Composed resolved = TEST_WAVEFORM.resolve(102);
-        assertEquals(0.4f, ((StepSegment) resolved.getSegments().get(2)).getAmplitude());
-
-        assertThrows(IllegalArgumentException.class, () -> TEST_WAVEFORM.resolve(1000));
-    }
-
-    @Test
-    public void testResolvePrebaked() {
-        VibrationEffect effect = VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
-        assertEquals(effect, effect.resolve(51));
-    }
-
-    @Test
-    public void testResolveComposed() {
-        VibrationEffect effect = VibrationEffect.startComposition()
-                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 1f, 1)
+        // Looping with no delay gets the raw repeated effect.
+        VibrationEffect loopingOriginal = VibrationEffect.startComposition()
+                .repeatEffectIndefinitely(original)
                 .compose();
-        assertEquals(effect, effect.resolve(51));
+        assertEquals(Long.MAX_VALUE, loopingOriginal.getDuration());
+        assertEquals(loopingOriginal, original.applyRepeatingIndefinitely(true, 0));
 
-        VibrationEffect.Composed resolved = VibrationEffect.startComposition()
-                .addEffect(DEFAULT_ONE_SHOT)
-                .compose()
-                .resolve(51);
-        assertEquals(0.2f, ((StepSegment) resolved.getSegments().get(0)).getAmplitude());
-    }
-
-    @Test
-    public void testApplyEffectStrengthOneShot() {
-        VibrationEffect.Composed applied = DEFAULT_ONE_SHOT.applyEffectStrength(
-                VibrationEffect.EFFECT_STRENGTH_LIGHT);
-        assertEquals(DEFAULT_ONE_SHOT, applied);
-    }
-
-    @Test
-    public void testApplyEffectStrengthWaveform() {
-        VibrationEffect.Composed applied = TEST_WAVEFORM.applyEffectStrength(
-                VibrationEffect.EFFECT_STRENGTH_LIGHT);
-        assertEquals(TEST_WAVEFORM, applied);
-    }
-
-    @Test
-    public void testApplyEffectStrengthPrebaked() {
-        VibrationEffect.Composed applied = VibrationEffect.get(VibrationEffect.EFFECT_CLICK)
-                .applyEffectStrength(VibrationEffect.EFFECT_STRENGTH_LIGHT);
-        assertEquals(VibrationEffect.EFFECT_STRENGTH_LIGHT,
-                ((PrebakedSegment) applied.getSegments().get(0)).getEffectStrength());
-    }
-
-    @Test
-    public void testApplyEffectStrengthComposed() {
-        VibrationEffect effect = VibrationEffect.startComposition()
-                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.5f, 1)
+        VibrationEffect loopingPart = VibrationEffect.startComposition()
+                .addEffect(original)
+                .addOffDuration(Duration.ofMillis(loopDelayMs))
                 .compose();
-        assertEquals(effect, effect.applyEffectStrength(VibrationEffect.EFFECT_STRENGTH_LIGHT));
 
-        VibrationEffect.Composed applied = VibrationEffect.startComposition()
-                .addEffect(VibrationEffect.get(VibrationEffect.EFFECT_CLICK))
-                .compose()
-                .applyEffectStrength(VibrationEffect.EFFECT_STRENGTH_LIGHT);
-        assertEquals(VibrationEffect.EFFECT_STRENGTH_LIGHT,
-                ((PrebakedSegment) applied.getSegments().get(0)).getEffectStrength());
+        VibrationEffect loopingWithDelay = VibrationEffect.startComposition()
+                .repeatEffectIndefinitely(loopingPart)
+                .compose();
+        assertEquals(Long.MAX_VALUE, loopingWithDelay.getDuration());
+        assertEquals(loopingWithDelay, original.applyRepeatingIndefinitely(true, loopDelayMs));
     }
 
     @Test
-    public void testScaleOneShot() {
-        VibrationEffect.Composed scaledUp = TEST_ONE_SHOT.scale(1.5f);
-        assertTrue(100 / 255f < ((StepSegment) scaledUp.getSegments().get(0)).getAmplitude());
+    public void testApplyRepeatingIndefinitely_nonRepeatingOriginal() {
+        VibrationEffect oneshot = VibrationEffect.createOneShot(100, DEFAULT_AMPLITUDE);
+        doTestApplyRepeatingWithNonRepeatingOriginal(oneshot);
 
-        VibrationEffect.Composed scaledDown = TEST_ONE_SHOT.scale(0.5f);
-        assertTrue(100 / 255f > ((StepSegment) scaledDown.getSegments().get(0)).getAmplitude());
+        VibrationEffect predefined = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
+        doTestApplyRepeatingWithNonRepeatingOriginal(predefined);
+
+        VibrationEffect primitives = VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 1, 100)
+                .compose();
+        doTestApplyRepeatingWithNonRepeatingOriginal(primitives);
+
+        VibrationEffect legacyWaveform = VibrationEffect.createWaveform(
+                new long[]{1, 2, 3}, new int[]{1, 2, 3}, -1);
+        doTestApplyRepeatingWithNonRepeatingOriginal(legacyWaveform);
+
+        // Test a mix of segments ending in a delay, for completeness.
+        doTestApplyRepeatingWithNonRepeatingOriginal(VibrationEffect.startComposition()
+                .addEffect(oneshot)
+                .addEffect(predefined)
+                .addEffect(primitives)
+                .addEffect(legacyWaveform)
+                .addOffDuration(Duration.ofMillis(1000))
+                .compose());
     }
 
     @Test
-    public void testScaleWaveform() {
-        VibrationEffect.Composed scaledUp = TEST_WAVEFORM.scale(1.5f);
-        assertEquals(1f, ((StepSegment) scaledUp.getSegments().get(0)).getAmplitude(), 1e-5f);
+    public void testApplyRepeatingIndefinitely_repeatingOriginalWaveform() {
+        // The delay parameter has no effect when the effect is already repeating.
+        int delayMs = 999;
+        VibrationEffect waveformNoRepeat = VibrationEffect.createWaveform(
+                new long[]{1, 2, 3}, new int[]{1, 2, 3}, -1);
+        VibrationEffect waveformFullRepeat = VibrationEffect.createWaveform(
+                new long[]{1, 2, 3}, new int[]{1, 2, 3}, 0);
+        assertEquals(waveformFullRepeat,
+                waveformFullRepeat.applyRepeatingIndefinitely(true, delayMs));
+        assertEquals(waveformNoRepeat,
+                waveformFullRepeat.applyRepeatingIndefinitely(false, delayMs));
 
-        VibrationEffect.Composed scaledDown = TEST_WAVEFORM.scale(0.5f);
-        assertTrue(1f > ((StepSegment) scaledDown.getSegments().get(0)).getAmplitude());
+        VibrationEffect waveformOffsetRepeat = VibrationEffect.createWaveform(
+                new long[]{1, 2, 3}, new int[]{1, 2, 3}, 1);
+        assertEquals(waveformOffsetRepeat,
+                waveformOffsetRepeat.applyRepeatingIndefinitely(true, delayMs));
+        assertEquals(waveformNoRepeat,
+                waveformOffsetRepeat.applyRepeatingIndefinitely(false, delayMs));
     }
 
     @Test
-    public void testScalePrebaked() {
-        VibrationEffect effect = VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
+    public void testApplyRepeatingIndefinitely_repeatingOriginalComposition() {
+        // The delay parameter has no effect when the effect is already repeating.
+        int delayMs = 999;
+        VibrationEffect innerEffect = VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK)
+                .compose();
 
-        VibrationEffect.Composed scaledUp = effect.scale(1.5f);
-        assertEquals(effect, scaledUp);
+        VibrationEffect repeatingOriginal = VibrationEffect.startComposition()
+                .repeatEffectIndefinitely(innerEffect)
+                .compose();
+        assertEquals(repeatingOriginal,
+                repeatingOriginal.applyRepeatingIndefinitely(true, delayMs));
+        assertEquals(innerEffect,
+                repeatingOriginal.applyRepeatingIndefinitely(false, delayMs));
 
-        VibrationEffect.Composed scaledDown = effect.scale(0.5f);
-        assertEquals(effect, scaledDown);
+        VibrationEffect offsetOriginal = VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_THUD)
+                .repeatEffectIndefinitely(innerEffect)
+                .compose();
+        assertEquals(offsetOriginal,
+                offsetOriginal.applyRepeatingIndefinitely(true, delayMs));
+        assertEquals(VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_THUD)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK)
+                .compose(),
+                offsetOriginal.applyRepeatingIndefinitely(false, delayMs));
     }
-
-    @Test
-    public void testScaleComposed() {
-        VibrationEffect.Composed effect =
-                (VibrationEffect.Composed) VibrationEffect.startComposition()
-                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.5f, 1)
-                        .addEffect(TEST_ONE_SHOT)
-                        .compose();
-
-        VibrationEffect.Composed scaledUp = effect.scale(1.5f);
-        assertTrue(0.5f < ((PrimitiveSegment) scaledUp.getSegments().get(0)).getScale());
-        assertTrue(100 / 255f < ((StepSegment) scaledUp.getSegments().get(1)).getAmplitude());
-
-        VibrationEffect.Composed scaledDown = effect.scale(0.5f);
-        assertTrue(0.5f > ((PrimitiveSegment) scaledDown.getSegments().get(0)).getScale());
-        assertTrue(100 / 255f > ((StepSegment) scaledDown.getSegments().get(1)).getAmplitude());
-    }
-
 
     @Test
     public void testDuration() {

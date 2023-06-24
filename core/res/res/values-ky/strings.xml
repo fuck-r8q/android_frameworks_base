@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Колдонмого катталган жардам же көздөлгөн жерге маршрут сыяктуу тандалган nfc төлөм кызматы жөнүндө маалыматты алууга уруксат берүү."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"Near Field Communication көзөмөлү"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Колдонмого Жакынкы аралыкта байланышуу (NFC) белгилери, карталары жана окугучтары менен байланышуу мүмкүнчүлүгүн берет."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Коргоочу элементтеги транзакция иш-чарасы"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Колдонмо Коргоочу элементте аткарылган транзакциялар жөнүндө маалымат ала алат."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"экранды бөгөттөөнү өчүрүү"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Колдонмого экрандын бөгөттөөчү жана ага байланыштуу сырсөз коргоосун өчүрүү уруксатын берет. Мисалы, чалуу келгенде экрандын бөгөтүн алып салат, чалуу бүткөндө кайрадан орнотот."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"экранды бөгөттөөнүн татаалдык деңгээлин суроо"</string>

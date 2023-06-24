@@ -16,8 +16,6 @@
 
 package com.android.server.companion.transport;
 
-import static android.Manifest.permission.DELIVER_COMPANION_MESSAGES;
-
 import static com.android.server.companion.transport.Transport.MESSAGE_REQUEST_PERMISSION_RESTORE;
 
 import android.annotation.NonNull;
@@ -155,8 +153,6 @@ public class CompanionTransportManager {
      * third-party companion apps.
      */
     private void enforceCallerCanTransportSystemData(String packageName, int userId) {
-        mContext.enforceCallingOrSelfPermission(DELIVER_COMPANION_MESSAGES, TAG);
-
         try {
             final ApplicationInfo info = mContext.getPackageManager().getApplicationInfoAsUser(
                     packageName, 0, userId);

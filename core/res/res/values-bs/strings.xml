@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Dozvoljava aplikaciji da dobije informacije o preferiranoj usluzi plaćanja putem NFC-a kao što su registrirana pomagala i odredište rute."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"upravljanje NFC-om"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Dozvoljava aplikaciji komuniciranje sa NFC (komunikacija bliskog polja) oznakama, karticama i čitačima."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Događaj transakcije na sigurnom elementu"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Dozvoljava aplikaciji da prima informacije o transakcijama koje se događaju na sigurnom elementu"</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"deaktivacija zaključavanja ekrana"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Omogućava aplikaciji deaktivaciju zaključane tastature i svih povezanih zaštita. Naprimjer, telefon deaktivira zaključavanje tastature kod dolaznog telefonskog poziva, a zatim ponovo aktivira zaključavanje tastature kada je poziv završen."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"zahtjev za kompleksnost zaključavanja ekrana"</string>

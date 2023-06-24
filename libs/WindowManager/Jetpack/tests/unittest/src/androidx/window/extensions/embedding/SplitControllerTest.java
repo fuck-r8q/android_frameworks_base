@@ -183,23 +183,23 @@ public class SplitControllerTest {
         // tf2 has running activity so is active.
         final TaskFragmentContainer tf2 = mock(TaskFragmentContainer.class);
         doReturn(1).when(tf2).getRunningActivityCount();
-        taskContainer.mContainers.add(tf2);
+        taskContainer.addTaskFragmentContainer(tf2);
         // tf3 is finished so is not active.
         final TaskFragmentContainer tf3 = mock(TaskFragmentContainer.class);
         doReturn(true).when(tf3).isFinished();
         doReturn(false).when(tf3).isWaitingActivityAppear();
-        taskContainer.mContainers.add(tf3);
+        taskContainer.addTaskFragmentContainer(tf3);
         mSplitController.mTaskContainers.put(TASK_ID, taskContainer);
 
         assertWithMessage("Must return tf2 because tf3 is not active.")
                 .that(mSplitController.getTopActiveContainer(TASK_ID)).isEqualTo(tf2);
 
-        taskContainer.mContainers.remove(tf3);
+        taskContainer.removeTaskFragmentContainer(tf3);
 
         assertWithMessage("Must return tf2 because tf2 has running activity.")
                 .that(mSplitController.getTopActiveContainer(TASK_ID)).isEqualTo(tf2);
 
-        taskContainer.mContainers.remove(tf2);
+        taskContainer.removeTaskFragmentContainer(tf2);
 
         assertWithMessage("Must return tf because we are waiting for tf1 to appear.")
                 .that(mSplitController.getTopActiveContainer(TASK_ID)).isEqualTo(tf1);
@@ -320,11 +320,11 @@ public class SplitControllerTest {
         doReturn(tf).when(splitContainer).getSecondaryContainer();
         doReturn(createTestTaskContainer()).when(splitContainer).getTaskContainer();
         doReturn(createSplitRule(mActivity, mActivity)).when(splitContainer).getSplitRule();
-        final List<SplitContainer> splitContainers =
-                mSplitController.getTaskContainer(TASK_ID).mSplitContainers;
-        splitContainers.add(splitContainer);
+        final TaskContainer taskContainer = mSplitController.getTaskContainer(TASK_ID);
+        taskContainer.addSplitContainer(splitContainer);
         // Add a mock SplitContainer on top of splitContainer
-        splitContainers.add(1, mock(SplitContainer.class));
+        final SplitContainer splitContainer2 = mock(SplitContainer.class);
+        taskContainer.addSplitContainer(splitContainer2);
 
         mSplitController.updateContainer(mTransaction, tf);
 
@@ -332,7 +332,9 @@ public class SplitControllerTest {
 
         // Verify if one or both containers in the top SplitContainer are finished,
         // dismissPlaceholder() won't be called.
-        splitContainers.remove(1);
+        final ArrayList<SplitContainer> splitContainersToRemove = new ArrayList<>();
+        splitContainersToRemove.add(splitContainer2);
+        taskContainer.removeSplitContainers(splitContainersToRemove);
         doReturn(true).when(tf).isFinished();
 
         mSplitController.updateContainer(mTransaction, tf);
@@ -363,7 +365,8 @@ public class SplitControllerTest {
         final Activity r1 = createMockActivity();
         addSplitTaskFragments(r0, r1);
         final TaskContainer taskContainer = mSplitController.getTaskContainer(TASK_ID);
-        final TaskFragmentContainer taskFragmentContainer = taskContainer.mContainers.get(0);
+        final TaskFragmentContainer taskFragmentContainer =
+                taskContainer.getTaskFragmentContainers().get(0);
         spyOn(taskContainer);
 
         // No update when the Task is invisible.
@@ -377,7 +380,7 @@ public class SplitControllerTest {
         doReturn(true).when(taskContainer).isVisible();
         mSplitController.updateContainer(mTransaction, taskFragmentContainer);
 
-        verify(mSplitPresenter).updateSplitContainer(taskContainer.mSplitContainers.get(0),
+        verify(mSplitPresenter).updateSplitContainer(taskContainer.getSplitContainers().get(0),
                 mTransaction);
     }
 
@@ -1090,8 +1093,8 @@ public class SplitControllerTest {
         verify(mTransaction).finishActivity(mActivity.getActivityToken());
         verify(mTransaction).finishActivity(secondaryActivity0.getActivityToken());
         verify(mTransaction).finishActivity(secondaryActivity1.getActivityToken());
-        assertTrue(taskContainer.mContainers.isEmpty());
-        assertTrue(taskContainer.mSplitContainers.isEmpty());
+        assertTrue(taskContainer.getTaskFragmentContainers().isEmpty());
+        assertTrue(taskContainer.getSplitContainers().isEmpty());
     }
 
     @Test
@@ -1363,15 +1366,13 @@ public class SplitControllerTest {
         TaskFragmentContainer tf = mSplitController.newContainer(mActivity, TASK_ID);
         tf.setInfo(mTransaction, createMockTaskFragmentInfo(tf, mActivity));
 
-        List<TaskFragmentContainer> containers = mSplitController.mTaskContainers.get(TASK_ID)
-                .mContainers;
-
-        assertEquals(containers.get(0), tf);
+        final TaskContainer taskContainer = mSplitController.mTaskContainers.get(TASK_ID);
+        assertEquals(taskContainer.getTaskFragmentContainers().get(0), tf);
 
         mSplitController.finishActivityStacks(Collections.singleton(tf.getTaskFragmentToken()));
 
         verify(mSplitPresenter).deleteTaskFragment(any(), eq(tf.getTaskFragmentToken()));
-        assertTrue(containers.isEmpty());
+        assertTrue(taskContainer.getTaskFragmentContainers().isEmpty());
     }
 
     @Test
@@ -1381,10 +1382,8 @@ public class SplitControllerTest {
         bottomTf.setInfo(mTransaction, createMockTaskFragmentInfo(bottomTf, mActivity));
         topTf.setInfo(mTransaction, createMockTaskFragmentInfo(topTf, createMockActivity()));
 
-        List<TaskFragmentContainer> containers = mSplitController.mTaskContainers.get(TASK_ID)
-                .mContainers;
-
-        assertEquals(containers.size(), 2);
+        final TaskContainer taskContainer = mSplitController.mTaskContainers.get(TASK_ID);
+        assertEquals(taskContainer.getTaskFragmentContainers().size(), 2);
 
         Set<IBinder> activityStackTokens = new ArraySet<>(new IBinder[]{
                 topTf.getTaskFragmentToken(), bottomTf.getTaskFragmentToken()});
@@ -1403,7 +1402,7 @@ public class SplitControllerTest {
                         + "regardless of the order in ActivityStack set",
                 topTf.getTaskFragmentToken(), fragmentTokens.get(1));
 
-        assertTrue(containers.isEmpty());
+        assertTrue(taskContainer.getTaskFragmentContainers().isEmpty());
     }
 
     @Test

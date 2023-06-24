@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Uygulamaya, kayıtlı yardımlar ve rota hedefi gibi tercih edilen NFC ödeme hizmeti bilgilerini alma izni verir."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"Yakın Alan İletişimini denetle"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Uygulamaya, Near Field Communication (NFC) etiketleri, kartlar ve okuyucular ile iletişim kurma izni verir."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Güvenlik Unsuru işlemiyle ilgili etkinlik"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Uygulamanın bir Güvenlik Unsuru\'nda gerçekleşen işlemlerle ilgili bilgi almasına izin verir."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"ekran kilidimi devre dışı bırak"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Uygulamaya, tuş kilidini ve ilişkili tüm şifreli güvenlik önlemlerini devre dışı bırakma izni verir. Örneğin, telefon, çağrı alındığında tuş kilidinin devre dışı bırakır ve sonra, görüşme bittiğinde kilidi yeniden etkinleştirir."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"ekran kilidi karmaşıklığı iste"</string>

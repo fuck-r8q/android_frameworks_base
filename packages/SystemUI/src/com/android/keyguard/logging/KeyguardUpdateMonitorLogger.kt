@@ -679,7 +679,7 @@ constructor(@KeyguardUpdateMonitorLog private val logBuffer: LogBuffer) {
                     "userId: $int1 " +
                     "old: $bool1, " +
                     "new: $bool2 " +
-                    "context: $context"
+                    "context: $str1"
             }
         )
     }

@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Permite que a aplicación obteña información do servizo de pago de NFC preferido, como as axudas rexistradas e o destino da ruta."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"controlar Near Field Communication"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Permite á aplicación comunicarse con etiquetas, tarxetas e lectores Near Field Communication (NFC)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Evento de transacción no elemento seguro"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Permite que a aplicación reciba información sobre transaccións que ocorran nun elemento seguro."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"desactivar o bloqueo da pantalla"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Permite á aplicación desactivar o bloqueo do teclado e calquera seguranza dos contrasinais asociada. Por exemplo, o teléfono desactiva o bloqueo do teclado ao recibir unha chamada telefónica entrante e, a continuación, volve activar o bloqueo do teclado unha vez finalizada a chamada."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"solicitar o nivel de complexidade do bloqueo de pantalla"</string>

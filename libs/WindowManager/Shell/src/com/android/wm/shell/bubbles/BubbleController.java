@@ -719,6 +719,7 @@ public class BubbleController implements ConfigurationChangeListener,
             // TODO(b/273312602): consider foldables where we do need a stack view when folded
             if (mLayerView == null) {
                 mLayerView = new BubbleBarLayerView(mContext, this);
+                mLayerView.setUnBubbleConversationCallback(mSysuiProxy::onUnbubbleConversation);
             }
         } else {
             if (mStackView == null) {
@@ -1217,6 +1218,13 @@ public class BubbleController implements ConfigurationChangeListener,
             b.setShouldAutoExpand(true);
             inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false);
         }
+    }
+
+    /**
+     * Dismiss bubble if it exists and remove it from the stack
+     */
+    public void dismissBubble(Bubble bubble, @Bubbles.DismissReason int reason) {
+        mBubbleData.dismissBubbleWithKey(bubble.getKey(), reason);
     }
 
     /**
@@ -1846,7 +1854,7 @@ public class BubbleController implements ConfigurationChangeListener,
             if (mStackView != null) {
                 mStackView.setVisibility(VISIBLE);
             }
-            if (mLayerView != null && isStackExpanded()) {
+            if (mLayerView != null) {
                 mLayerView.setVisibility(VISIBLE);
             }
         }

@@ -594,6 +594,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"‏يسمح هذا الإذن للتطبيق بالحصول على معلومات الخدمات المدفوعة باستخدام الاتصال قصير المدى NFC المفضّل، مثلاً المساعدات المسجّلة ووجهة المسار."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"التحكم في اتصال الحقل القريب"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"‏للسماح للتطبيق بالاتصال بعلامات الاتصال قريب المدى (NFC)، والبطاقات وبرامج القراءة."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"حدث معاملة \"عنصر آمن\""</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"يسمح هذا الإذن للتطبيق بتلقّي معلومات حول المعاملات التي تتم على \"عنصر آمن\"."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"إيقاف قفل الشاشة"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"للسماح للتطبيق بإيقاف تأمين المفاتيح وأي أمان لكلمة مرور مرتبطة. على سبيل المثال، يعطل الهاتف تأمين المفاتيح عند استقبال مكالمة هاتفية واردة، ثم يعيد تفعيل تأمين المفاتيح عند انتهاء المكالمة."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"طلب معرفة مستوى صعوبة قفل الشاشة"</string>

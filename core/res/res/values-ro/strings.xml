@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Permite aplicației să obțină informații despre serviciul de plăți NFC preferat, de exemplu, identificatorii de aplicație înregistrați și destinația traseului."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"controlare schimb de date prin Near Field Communication"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Permite aplicației să comunice cu etichetele, cardurile și cititoarele NFC (Near Field Communication)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Eveniment de tranzacție în cadrul unui element securizat"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Permite aplicației să primească informații despre tranzacțiile care au loc în cadrul unui element securizat."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"dezactivează blocarea ecranului"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Permite aplicației să dezactiveze blocarea tastelor și orice modalitate asociată de securizare prin parolă. De exemplu, telefonul dezactivează blocarea tastelor când se primește un apel telefonic și reactivează blocarea tastelor la terminarea apelului."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"să solicite complexitatea blocării ecranului"</string>

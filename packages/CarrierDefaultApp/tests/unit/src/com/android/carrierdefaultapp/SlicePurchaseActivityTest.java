@@ -53,7 +53,9 @@ public class SlicePurchaseActivityTest extends ActivityUnitTestCase<SlicePurchas
     private static final int PHONE_ID = 0;
 
     @Mock PendingIntent mPendingIntent;
+    @Mock PendingIntent mSuccessfulIntent;
     @Mock PendingIntent mCanceledIntent;
+    @Mock PendingIntent mRequestFailedIntent;
     @Mock CarrierConfigManager mCarrierConfigManager;
     @Mock NotificationManager mNotificationManager;
     @Mock PersistableBundle mPersistableBundle;
@@ -107,25 +109,28 @@ public class SlicePurchaseActivityTest extends ActivityUnitTestCase<SlicePurchas
         doReturn(true).when(mCanceledIntent).isBroadcast();
         doReturn(mCanceledIntent).when(spiedIntent).getParcelableExtra(
                 eq(SlicePurchaseController.EXTRA_INTENT_CANCELED), eq(PendingIntent.class));
+        doReturn(TelephonyManager.PHONE_PROCESS_NAME).when(mSuccessfulIntent).getCreatorPackage();
+        doReturn(true).when(mSuccessfulIntent).isBroadcast();
+        doReturn(mSuccessfulIntent).when(spiedIntent).getParcelableExtra(
+                eq(SlicePurchaseController.EXTRA_INTENT_SUCCESS), eq(PendingIntent.class));
+        doReturn(TelephonyManager.PHONE_PROCESS_NAME).when(mRequestFailedIntent)
+                .getCreatorPackage();
+        doReturn(true).when(mRequestFailedIntent).isBroadcast();
+        doReturn(mRequestFailedIntent).when(spiedIntent).getParcelableExtra(
+                eq(SlicePurchaseController.EXTRA_INTENT_REQUEST_FAILED), eq(PendingIntent.class));
 
         mSlicePurchaseActivity = startActivity(spiedIntent, null, null);
     }
 
     @Test
     public void testOnPurchaseSuccessful() throws Exception {
-        int duration = 5 * 60 * 1000; // 5 minutes
-        int invalidDuration = -1;
-        mSlicePurchaseActivity.onPurchaseSuccessful(duration);
-        ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
-        verify(mPendingIntent).send(eq(mContext), eq(0), intentCaptor.capture());
-        Intent intent = intentCaptor.getValue();
-        assertEquals(duration, intent.getLongExtra(
-                SlicePurchaseController.EXTRA_PURCHASE_DURATION, invalidDuration));
+        mSlicePurchaseActivity.onPurchaseSuccessful();
+        verify(mSuccessfulIntent).send();
     }
 
     @Test
     public void testOnPurchaseFailed() throws Exception {
-        int failureCode = SlicePurchaseController.FAILURE_CODE_SERVER_UNREACHABLE;
+        int failureCode = SlicePurchaseController.FAILURE_CODE_CARRIER_URL_UNAVAILABLE;
         String failureReason = "Server unreachable";
         mSlicePurchaseActivity.onPurchaseFailed(failureCode, failureReason);
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
@@ -141,5 +146,11 @@ public class SlicePurchaseActivityTest extends ActivityUnitTestCase<SlicePurchas
     public void testOnUserCanceled() throws Exception {
         mSlicePurchaseActivity.onDestroy();
         verify(mCanceledIntent).send();
+    }
+
+    @Test
+    public void testOnDismissFlow() throws Exception {
+        mSlicePurchaseActivity.onDismissFlow();
+        verify(mRequestFailedIntent).send();
     }
 }

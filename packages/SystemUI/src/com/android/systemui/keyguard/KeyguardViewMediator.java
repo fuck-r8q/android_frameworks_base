@@ -17,6 +17,8 @@
 package com.android.systemui.keyguard;
 
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
+import static android.provider.Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT;
+import static android.provider.Settings.System.LOCKSCREEN_SOUNDS_ENABLED;
 import static android.provider.Settings.System.SCREEN_OFF_TIMEOUT;
 import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_NO_WINDOW_ANIMATIONS;
@@ -42,9 +44,9 @@ import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.app.ActivityTaskManager;
 import android.app.AlarmManager;
 import android.app.BroadcastOptions;
+import android.app.IActivityTaskManager;
 import android.app.PendingIntent;
 import android.app.StatusBarManager;
 import android.app.WallpaperManager;
@@ -73,7 +75,6 @@ import android.os.Message;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -162,6 +163,9 @@ import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.util.DeviceConfigProxy;
+import com.android.systemui.util.settings.SecureSettings;
+import com.android.systemui.util.settings.SystemSettings;
+import com.android.systemui.util.time.SystemClock;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
 import dagger.Lazy;
@@ -226,7 +230,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     private final static String TAG = "KeyguardViewMediator";
 
-    private static final String DELAYED_KEYGUARD_ACTION =
+    public static final String DELAYED_KEYGUARD_ACTION =
         "com.android.internal.policy.impl.PhoneWindowManager.DELAYED_KEYGUARD";
     private static final String DELAYED_LOCK_PROFILE_ACTION =
             "com.android.internal.policy.impl.PhoneWindowManager.DELAYED_LOCK";
@@ -261,7 +265,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      * turning on the keyguard (i.e, the user has this much time to turn
      * the screen back on without having to face the keyguard).
      */
-    private static final int KEYGUARD_LOCK_AFTER_DELAY_DEFAULT = 5000;
+    public static final int KEYGUARD_LOCK_AFTER_DELAY_DEFAULT = 5000;
 
     /**
      * How long we'll wait for the {@link ViewMediatorCallback#keyguardDoneDrawing()}
@@ -320,6 +324,9 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     /** UserSwitcherController for creating guest user on boot complete */
     private final UserSwitcherController mUserSwitcherController;
+    private final SecureSettings mSecureSettings;
+    private final SystemSettings mSystemSettings;
+    private final SystemClock mSystemClock;
     private SystemPropertiesHelper mSystemPropertiesHelper;
 
     /**
@@ -1267,6 +1274,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     private Lazy<ActivityLaunchAnimator> mActivityLaunchAnimator;
     private Lazy<ScrimController> mScrimControllerLazy;
+    private IActivityTaskManager mActivityTaskManagerService;
 
     private FeatureFlags mFeatureFlags;
     private final UiEventLogger mUiEventLogger;
@@ -1310,7 +1318,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             Lazy<NotificationShadeWindowController> notificationShadeWindowControllerLazy,
             Lazy<ActivityLaunchAnimator> activityLaunchAnimator,
             Lazy<ScrimController> scrimControllerLazy,
+            IActivityTaskManager activityTaskManagerService,
             FeatureFlags featureFlags,
+            SecureSettings secureSettings,
+            SystemSettings systemSettings,
+            SystemClock systemClock,
             @Main CoroutineDispatcher mainDispatcher,
             Lazy<DreamingToLockscreenTransitionViewModel> dreamingToLockscreenTransitionViewModel,
             SystemPropertiesHelper systemPropertiesHelper) {
@@ -1327,12 +1339,15 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mPM = powerManager;
         mTrustManager = trustManager;
         mUserSwitcherController = userSwitcherController;
+        mSecureSettings = secureSettings;
+        mSystemSettings = systemSettings;
+        mSystemClock = systemClock;
         mSystemPropertiesHelper = systemPropertiesHelper;
         mStatusBarService = IStatusBarService.Stub.asInterface(
                 ServiceManager.getService(Context.STATUS_BAR_SERVICE));
         mKeyguardDisplayManager = keyguardDisplayManager;
         mShadeController = shadeControllerLazy;
-        dumpManager.registerDumpable(getClass().getName(), this);
+        dumpManager.registerDumpable(this);
         mDeviceConfig = deviceConfig;
         mScreenOnCoordinator = screenOnCoordinator;
         mKeyguardTransitions = keyguardTransitions;
@@ -1363,6 +1378,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         mActivityLaunchAnimator = activityLaunchAnimator;
         mScrimControllerLazy = scrimControllerLazy;
+        mActivityTaskManagerService = activityTaskManagerService;
 
         mPowerButtonY = context.getResources().getDimensionPixelSize(
                 R.dimen.physical_power_button_center_screen_location_y);
@@ -1379,7 +1395,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     public void userActivity() {
-        mPM.userActivity(SystemClock.uptimeMillis(), false);
+        mPM.userActivity(mSystemClock.uptimeMillis(), false);
     }
 
     private void setupLocked() {
@@ -1581,7 +1597,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
             if (cameraGestureTriggered) {
                 // Just to make sure, make sure the device is awake.
-                mContext.getSystemService(PowerManager.class).wakeUp(SystemClock.uptimeMillis(),
+                mContext.getSystemService(PowerManager.class).wakeUp(mSystemClock.uptimeMillis(),
                         PowerManager.WAKE_REASON_CAMERA_LAUNCH,
                         "com.android.systemui:CAMERA_GESTURE_PREVENT_LOCK");
                 setPendingLock(false);
@@ -1678,12 +1694,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         // to enable it a bit later (i.e, give the user a chance
         // to turn the screen back on within a certain window without
         // having to unlock the screen)
-        final ContentResolver cr = mContext.getContentResolver();
 
         // From SecuritySettings
-        final long lockAfterTimeout = Settings.Secure.getIntForUser(cr,
-                Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT,
-                KEYGUARD_LOCK_AFTER_DELAY_DEFAULT, userId);
+        final long lockAfterTimeout = mSecureSettings.getIntForUser(LOCK_SCREEN_LOCK_AFTER_TIMEOUT,
+                KEYGUARD_LOCK_AFTER_DELAY_DEFAULT,
+                userId);
 
         // From DevicePolicyAdmin
         final long policyTimeout = mLockPatternUtils.getDevicePolicyManager()
@@ -1695,8 +1710,9 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             timeout = lockAfterTimeout;
         } else {
             // From DisplaySettings
-            long displayTimeout = Settings.System.getIntForUser(cr, SCREEN_OFF_TIMEOUT,
-                    KEYGUARD_DISPLAY_TIMEOUT_DELAY_DEFAULT, userId);
+            long displayTimeout = mSystemSettings.getIntForUser(SCREEN_OFF_TIMEOUT,
+                    KEYGUARD_DISPLAY_TIMEOUT_DELAY_DEFAULT,
+                    userId);
 
             // policy in effect. Make sure we don't go beyond policy limit.
             displayTimeout = Math.max(displayTimeout, 0); // ignore negative values
@@ -1717,7 +1733,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     private void doKeyguardLaterLocked(long timeout) {
         // Lock in the future
-        long when = SystemClock.elapsedRealtime() + timeout;
+        long when = mSystemClock.elapsedRealtime() + timeout;
         Intent intent = new Intent(DELAYED_KEYGUARD_ACTION);
         intent.setPackage(mContext.getPackageName());
         intent.putExtra("seq", mDelayedShowingSequence);
@@ -1739,7 +1755,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 if (userTimeout == 0) {
                     doKeyguardForChildProfilesLocked();
                 } else {
-                    long userWhen = SystemClock.elapsedRealtime() + userTimeout;
+                    long userWhen = mSystemClock.elapsedRealtime() + userTimeout;
                     Intent lockIntent = new Intent(DELAYED_LOCK_PROFILE_ACTION);
                     lockIntent.setPackage(mContext.getPackageName());
                     lockIntent.putExtra("seq", mDelayedProfileShowingSequence);
@@ -1956,10 +1972,15 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     /**
-     * Is the keyguard currently showing and not being force hidden?
+     * Is the keyguard currently showing, and not occluded (no activity is drawing over the
+     * lockscreen).
      */
     public boolean isShowingAndNotOccluded() {
         return mShowing && !mOccluded;
+    }
+
+    public boolean isShowing() {
+        return mShowing;
     }
 
     public boolean isOccludeAnimationPlaying() {
@@ -2553,9 +2574,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     private void playSound(int soundId) {
         if (soundId == 0) return;
-        final ContentResolver cr = mContext.getContentResolver();
-        int lockscreenSoundsEnabled = Settings.System.getIntForUser(cr,
-                Settings.System.LOCKSCREEN_SOUNDS_ENABLED, 1,
+        int lockscreenSoundsEnabled = mSystemSettings.getIntForUser(LOCKSCREEN_SOUNDS_ENABLED, 1,
                 KeyguardUpdateMonitor.getCurrentUser());
         if (lockscreenSoundsEnabled == 1) {
 
@@ -2591,7 +2610,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 Log.d(TAG, "updateActivityLockScreenState(" + showing + ", " + aodShowing + ")");
             }
             try {
-                ActivityTaskManager.getService().setLockScreenShown(showing, aodShowing);
+                mActivityTaskManagerService.setLockScreenShown(showing, aodShowing);
             } catch (RemoteException e) {
             }
         });
@@ -2707,7 +2726,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             final int keyguardFlag = flags;
             mUiBgExecutor.execute(() -> {
                 try {
-                    ActivityTaskManager.getService().keyguardGoingAway(keyguardFlag);
+                    mActivityTaskManagerService.keyguardGoingAway(keyguardFlag);
                 } catch (RemoteException e) {
                     Log.e(TAG, "Error while calling WindowManager", e);
                 }
@@ -2732,31 +2751,29 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         // It's possible that the device was unlocked (via BOUNCER) while dozing. It's time to
         // wake up.
         if (mAodShowing) {
-            mPM.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
+            mPM.wakeUp(mSystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
                     "com.android.systemui:BOUNCER_DOZING");
         }
 
         synchronized (KeyguardViewMediator.this) {
             if (DEBUG) Log.d(TAG, "handleHide");
 
-            mHiding = true;
-
             if (mShowing && !mOccluded) {
+                mHiding = true;
                 mKeyguardGoingAwayRunnable.run();
             } else {
-                // TODO(bc-unlock): Fill parameters
-                mNotificationShadeWindowControllerLazy.get().batchApplyWindowLayoutParams(() -> {
-                    handleStartKeyguardExitAnimation(
-                            SystemClock.uptimeMillis() + mHideAnimation.getStartOffset(),
-                            mHideAnimation.getDuration(), null /* apps */, null /* wallpapers */,
-                            null /* nonApps */, null /* finishedCallback */);
-                });
+                Log.d(TAG, "Hiding keyguard while occluded. Just hide the keyguard view and exit.");
+
+                mKeyguardViewControllerLazy.get().hide(
+                        mSystemClock.uptimeMillis() + mHideAnimation.getStartOffset(),
+                        mHideAnimation.getDuration());
+                onKeyguardExitFinished();
             }
 
             // It's possible that the device was unlocked (via BOUNCER or Fingerprint) while
             // dreaming. It's time to wake up.
             if (mDreamOverlayShowing) {
-                mPM.wakeUp(SystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
+                mPM.wakeUp(mSystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
                         "com.android.systemui:UNLOCK_DREAMING");
             }
         }
@@ -3058,7 +3075,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 flags |= KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
             }
 
-            ActivityTaskManager.getService().keyguardGoingAway(flags);
+            mActivityTaskManagerService.keyguardGoingAway(flags);
             mKeyguardStateController.notifyKeyguardGoingAway(true);
         } catch (RemoteException e) {
             mSurfaceBehindRemoteAnimationRequested = false;

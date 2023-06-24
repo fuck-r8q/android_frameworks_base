@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Ivuemela uhlelo lokusebenza ukuthola ulwazi lesevisi yenkokhelo ye-nfc njengezinsiza zokubhalisa nezindawo zomzila."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"lawula Uxhumano Lwenkambu Eseduze"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Ivuela uhlelo lokusebenza ukuthi ixhumane ne-Near Field Communication (NFC) amathegi, amakhadi kanye nezinhlelo zokufunda."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Umcimbi wokwenziwe Ku-elementi Evikelekile"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Ivumela i-app ukuthi ithole ulwazi mayelana nemisebenzi eyenzekayo Ku-elementi Evikelekile."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"khubaza ukukhiya kwakho iskrini"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Ivumela uhlelo lokusebenza ukukhubaza ukuvala ukhiye nanoma yikuphi ukuphepha kwephasiwedi okuhlobene. Isibonelo, ifoni ikhubaza ukuvala ukhiye lapho ithola ikholi yefoni engenayo, bese inike amandla kabusha ukuvala ukhiye lapho ikholi isiqedile."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"cela ubunkimbinkimbi kokukhiya isikrini"</string>

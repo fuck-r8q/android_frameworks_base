@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Gir appen tilgang til informasjon om prioritert NFC-betalingstjeneste, for eksempel registrerte hjelpemidler og destinasjon."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kontroller overføring av data med NFC-teknologi"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Lar appen kommunisere med etiketter, kort og lesere som benytter NFC-teknologi."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Transaksjonshendelse på sikkert element"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Lar appen motta informasjon om transaksjoner som finner sted på et sikkert element."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"deaktivere skjermlåsen"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Lar appen deaktivere tastelåsen og eventuell tilknyttet passordsikkerhet. Et eksempel er at telefonen deaktiverer tastelåsen når du mottar et innkommende anrop, og deretter aktiverer tastelåsen igjen når samtalen er ferdig."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"be om skjermlåsens kompleksitet"</string>

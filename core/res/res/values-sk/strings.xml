@@ -592,6 +592,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Umožňuje aplikácii získavať preferované informácie platenej služby NFC, napríklad o registrovanej pomoci a trasách k cieľu."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"ovládať technológiu NFC"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Umožňuje aplikácii komunikovať so značkami, kartami a čítačkami s podporou technológie NFC."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Udalosť transakcie bezpečnostného prvku"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Umožňuje aplikácii dostávať informácie o transakciách prebiehajúcich v bezpečnostnom prvku."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"deaktivácia zámky obrazovky"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Umožňuje aplikácii zakázať uzamknutie klávesnice a akékoľvek súvisiace zabezpečenie heslom. Príkladom je zakázanie uzamknutia klávesnice pri prichádzajúcom telefonickom hovore a jeho opätovné povolenie po skončení hovoru."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"požadovať zložitosť zámky obrazovky"</string>

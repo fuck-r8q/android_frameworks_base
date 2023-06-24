@@ -295,6 +295,19 @@ public final class Settings {
             "android.settings.AIRPLANE_MODE_SETTINGS";
 
     /**
+     * Activity Action: Show enabled eSim profile in Settings
+     * <p>
+     * This opens the Settings page for the currently enabled eSim profile
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    public static final String ACTION_SHOW_ENABLED_ESIM_PROFILE =
+            "android.settings.SHOW_ENABLED_ESIM_PROFILE";
+
+    /**
      * Activity Action: Show mobile data usage list.
      * <p>
      * Input: {@link EXTRA_NETWORK_TEMPLATE} and {@link EXTRA_SUB_ID} should be included to specify
@@ -2443,6 +2456,24 @@ public final class Settings {
             "android.settings.REQUEST_SET_AUTOFILL_SERVICE";
 
     /**
+     * Activity Action: Show screen that let user enable a Credential Manager provider.
+     * <p>
+     * Input: Intent's data URI set with an application name, using the
+     * "package" schema (like "package:com.my.app").
+     *
+     * <p>
+     * Output: {@link android.app.Activity#RESULT_OK} if user selected a provider belonging
+     * to the caller package.
+     * <p>
+     * <b>NOTE: </b> Applications should call
+     * {@link android.credentials.CredentialManager#isEnabledCredentialProviderService()}
+     * and only use this action to start an activity if they return {@code false}.
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_CREDENTIAL_PROVIDER =
+            "android.settings.CREDENTIAL_PROVIDER";
+
+    /**
      * Activity Action: Show screen for controlling the Quick Access Wallet.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -2609,6 +2640,26 @@ public final class Settings {
     @SystemApi
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_BEDTIME_SETTINGS = "android.settings.BEDTIME_SETTINGS";
+
+    /**
+     * Activity action: Launch UI to manage the permissions of an app.
+     * <p>
+     * Input: {@link android.content.Intent#EXTRA_PACKAGE_NAME} specifies the package whose
+     * permissions will be managed by the launched UI.
+     * </p>
+     * <p>
+     * Output: Nothing.
+     * </p>
+     *
+     * @see android.content.Intent#EXTRA_PACKAGE_NAME
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.LAUNCH_PERMISSION_SETTINGS)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_APP_PERMISSIONS_SETTINGS =
+            "android.settings.APP_PERMISSIONS_SETTINGS";
 
     // End of Intent actions for Settings
 
@@ -4420,6 +4471,16 @@ public final class Settings {
                 = "wear_accessibility_gesture_enabled";
 
         /**
+         * If the triple press gesture for toggling accessibility is enabled during OOBE.
+         * Set to 1 for true and 0 for false.
+         *
+         * This setting is used only internally.
+         * @hide
+         */
+        public static final String WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE =
+                "wear_accessibility_gesture_enabled_during_oobe";
+
+        /**
          * @deprecated Use {@link android.provider.Settings.Global#AIRPLANE_MODE_ON} instead
          */
         @Deprecated
@@ -5846,6 +5907,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(END_BUTTON_BEHAVIOR);
             PRIVATE_SETTINGS.add(ADVANCED_SETTINGS);
             PRIVATE_SETTINGS.add(WEAR_ACCESSIBILITY_GESTURE_ENABLED);
+            PRIVATE_SETTINGS.add(WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE);
             PRIVATE_SETTINGS.add(SCREEN_AUTO_BRIGHTNESS_ADJ);
             PRIVATE_SETTINGS.add(VIBRATE_INPUT_DEVICES);
             PRIVATE_SETTINGS.add(VOLUME_MASTER);
@@ -7495,6 +7557,14 @@ public final class Settings {
         @Readable
         @SuppressLint("NoSettingsProvider")
         public static final String STYLUS_BUTTONS_ENABLED = "stylus_buttons_enabled";
+
+        /**
+         * Preferred default user profile to use with the notes task button shortcut.
+         *
+         * @hide
+         */
+        @SuppressLint("NoSettingsProvider")
+        public static final String DEFAULT_NOTE_TASK_PROFILE = "default_note_task_profile";
 
         /**
          * Host name and port for global http proxy. Uses ':' seperator for
@@ -11636,6 +11706,15 @@ public final class Settings {
          * @hide
          */
         public static final String LOCK_SCREEN_WEATHER_ENABLED = "lockscreen_weather_enabled";
+
+        /**
+         * Whether the feature that the device will fire a haptic when users scroll and hit
+         * the edge of the screen is enabled.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_DISPLAY_MAGNIFICATION_EDGE_HAPTIC_ENABLED =
+                "accessibility_display_magnification_edge_haptic_enabled";
 
         /**
          * These entries are considered common between the personal and the managed profile,
@@ -18010,6 +18089,15 @@ public final class Settings {
                 "review_permissions_notification_state";
 
         /**
+         * Whether repair mode is active on the device.
+         * <p>
+         * Set to 1 for true and 0 for false.
+         *
+         * @hide
+         */
+        public static final String REPAIR_MODE_ACTIVE = "repair_mode_active";
+
+        /**
          * Settings migrated from Wear OS settings provider.
          * @hide
          */
@@ -18513,7 +18601,7 @@ public final class Settings {
              * @hide
              */
             @Deprecated
-            public static final String COMBINED_LOCATION_ENABLED = "combined_location_enable";
+            public static final String COMBINED_LOCATION_ENABLE = "combined_location_enable";
 
             /**
              * The wrist orientation mode of the device

@@ -24,13 +24,13 @@ import static android.media.MediaRouter2Utils.getOriginalId;
 import static android.media.MediaRouter2Utils.getProviderId;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
+import static com.android.server.media.MediaFeatureFlagManager.FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE;
 
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
-import android.app.ActivityThread;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -95,10 +95,11 @@ class MediaRouter2ServiceImpl {
     //       in MediaRouter2, remove this constant and replace the usages with the real request IDs.
     private static final long DUMMY_REQUEST_ID = -1;
 
-    private static final String MEDIA_BETTER_TOGETHER_NAMESPACE = "media_better_together";
-
-    private static final String KEY_SCANNING_PACKAGE_MINIMUM_IMPORTANCE =
-            "scanning_package_minimum_importance";
+    private static int sPackageImportanceForScanning =
+            MediaFeatureFlagManager.getInstance()
+                    .getInt(
+                            FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE,
+                            IMPORTANCE_FOREGROUND_SERVICE);
 
     /**
      * Contains the list of bluetooth permissions that are required to do system routing.
@@ -110,11 +111,6 @@ class MediaRouter2ServiceImpl {
             new String[] {
                 Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN
             };
-
-    private static int sPackageImportanceForScanning = DeviceConfig.getInt(
-            MEDIA_BETTER_TOGETHER_NAMESPACE,
-            /* name */ KEY_SCANNING_PACKAGE_MINIMUM_IMPORTANCE,
-            /* defaultValue */ IMPORTANCE_FOREGROUND_SERVICE);
 
     private final Context mContext;
     private final UserManagerInternal mUserManagerInternal;
@@ -172,9 +168,8 @@ class MediaRouter2ServiceImpl {
         mContext.registerReceiver(mScreenOnOffReceiver, screenOnOffIntentFilter);
         mContext.getPackageManager().addOnPermissionsChangeListener(this::onPermissionsChanged);
 
-        DeviceConfig.addOnPropertiesChangedListener(MEDIA_BETTER_TOGETHER_NAMESPACE,
-                ActivityThread.currentApplication().getMainExecutor(),
-                this::onDeviceConfigChange);
+        MediaFeatureFlagManager.getInstance()
+                .addOnPropertiesChangedListener(this::onDeviceConfigChange);
     }
 
     /**
@@ -1174,8 +1169,11 @@ class MediaRouter2ServiceImpl {
             // TODO: UserRecord <-> routerRecord, why do they reference each other?
             // How about removing mUserRecord from routerRecord?
             routerRecord.mUserRecord.mHandler.sendMessage(
-                    obtainMessage(UserHandler::notifyDiscoveryPreferenceChangedToManager,
-                        routerRecord.mUserRecord.mHandler, routerRecord, manager));
+                    obtainMessage(
+                            UserHandler::notifyDiscoveryPreferenceChangedToManager,
+                            routerRecord.mUserRecord.mHandler,
+                            routerRecord,
+                            manager));
         }
 
         userRecord.mHandler.sendMessage(
@@ -1455,9 +1453,10 @@ class MediaRouter2ServiceImpl {
     // End of locked methods that are used by both MediaRouter2 and MediaRouter2Manager.
 
     private void onDeviceConfigChange(@NonNull DeviceConfig.Properties properties) {
-        sPackageImportanceForScanning = properties.getInt(
-                /* name */ KEY_SCANNING_PACKAGE_MINIMUM_IMPORTANCE,
-                /* defaultValue */ IMPORTANCE_FOREGROUND_SERVICE);
+        sPackageImportanceForScanning =
+                properties.getInt(
+                        /* name */ FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE,
+                        /* defaultValue */ IMPORTANCE_FOREGROUND_SERVICE);
     }
 
     static long toUniqueRequestId(int requesterId, int originalRequestId) {
@@ -1926,10 +1925,10 @@ class MediaRouter2ServiceImpl {
             }
             boolean isUidRelevant;
             synchronized (service.mLock) {
-                isUidRelevant = mUserRecord.mRouterRecords.stream().anyMatch(
-                        router -> router.mUid == uid)
-                        | mUserRecord.mManagerRecords.stream().anyMatch(
-                            manager -> manager.mUid == uid);
+                isUidRelevant =
+                        mUserRecord.mRouterRecords.stream().anyMatch(router -> router.mUid == uid)
+                                | mUserRecord.mManagerRecords.stream()
+                                        .anyMatch(manager -> manager.mUid == uid);
             }
             if (isUidRelevant) {
                 sendMessage(PooledLambda.obtainMessage(
@@ -2808,6 +2807,7 @@ class MediaRouter2ServiceImpl {
             return null;
         }
     }
+
     static final class SessionCreationRequest {
         public final RouterRecord mRouterRecord;
         public final long mUniqueRequestId;

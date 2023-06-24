@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Ļauj lietotnei iegūt informāciju par vēlamo NFC maksājumu pakalpojumu, piemēram, par reģistrētajiem lietojumprogrammu ID un maršruta galamērķi."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kontrolē tuvlauka saziņu"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Ļauj lietotnei sazināties ar tuva darbības lauka sakaru (Near Field Communication — NFC) atzīmēm, kartēm un lasītājiem."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Darījums, kas apstrādājams, izmantojot drošības elementu"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Ļauj lietotnei saņemt informāciju par darījumiem, kas apstrādājami, izmantojot drošības elementu."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"atspējot ekrāna bloķēšanu"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Ļauj lietotnei atspējot taustiņslēgu un visu saistīto paroļu drošību. Piemēram, tālrunis atspējo taustiņslēgu, saņemot ienākošu zvanu, un pēc zvana pabeigšanas atkārtoti iespējo taustiņslēgu."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"ekrāna bloķēšanas sarežģītības pakāpes informācijas pieprasījums"</string>

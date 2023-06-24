@@ -27,26 +27,25 @@ import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.webkit.CookieManager;
 import android.webkit.WebView;
 
 import com.android.phone.slice.SlicePurchaseController;
 
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Activity that launches when the user clicks on the performance boost notification.
  * This will open a {@link WebView} for the carrier website to allow the user to complete the
  * premium capability purchase.
  * The carrier website can get the requested premium capability using the JavaScript interface
- * method {@code SlicePurchaseWebInterface.getRequestedCapability()}.
+ * method {@code DataBoostWebServiceFlow.getRequestedCapability()}.
  * If the purchase is successful, the carrier website shall notify the slice purchase application
  * using the JavaScript interface method
- * {@code SlicePurchaseWebInterface.notifyPurchaseSuccessful(duration)}, where {@code duration} is
- * the optional duration of the performance boost.
+ * {@code DataBoostWebServiceFlow.notifyPurchaseSuccessful()}.
  * If the purchase was not successful, the carrier website shall notify the slice purchase
  * application using the JavaScript interface method
- * {@code SlicePurchaseWebInterface.notifyPurchaseFailed(code, reason)}, where {@code code} is the
+ * {@code DataBoostWebServiceFlow.notifyPurchaseFailed(code, reason)}, where {@code code} is the
  * {@link SlicePurchaseController.FailureCode} indicating the reason for failure and {@code reason}
  * is the human-readable reason for failure if the failure code is
  * {@link SlicePurchaseController#FAILURE_CODE_UNKNOWN}.
@@ -118,15 +117,11 @@ public class SlicePurchaseActivity extends Activity {
         setupWebView();
     }
 
-    protected void onPurchaseSuccessful(long duration) {
+    protected void onPurchaseSuccessful() {
         logd("onPurchaseSuccessful: Carrier website indicated successfully purchased premium "
-                + "capability " + TelephonyManager.convertPremiumCapabilityToString(mCapability)
-                + (duration > 0 ? " for " + TimeUnit.MILLISECONDS.toMinutes(duration) + " minutes."
-                : "."));
-        Intent intent = new Intent();
-        intent.putExtra(SlicePurchaseController.EXTRA_PURCHASE_DURATION, duration);
-        SlicePurchaseBroadcastReceiver.sendSlicePurchaseAppResponseWithData(mApplicationContext,
-                mIntent, SlicePurchaseController.EXTRA_INTENT_SUCCESS, intent);
+                + "capability " + TelephonyManager.convertPremiumCapabilityToString(mCapability));
+        SlicePurchaseBroadcastReceiver.sendSlicePurchaseAppResponse(
+                mIntent, SlicePurchaseController.EXTRA_INTENT_SUCCESS);
         finishAndRemoveTask();
     }
 
@@ -140,6 +135,14 @@ public class SlicePurchaseActivity extends Activity {
         data.putExtra(SlicePurchaseController.EXTRA_FAILURE_REASON, failureReason);
         SlicePurchaseBroadcastReceiver.sendSlicePurchaseAppResponseWithData(mApplicationContext,
                 mIntent, SlicePurchaseController.EXTRA_INTENT_CARRIER_ERROR, data);
+        finishAndRemoveTask();
+    }
+
+    protected void onDismissFlow() {
+        logd("onDismissFlow: Dismiss flow called while purchasing premium capability "
+                + TelephonyManager.convertPremiumCapabilityToString(mCapability));
+        SlicePurchaseBroadcastReceiver.sendSlicePurchaseAppResponse(
+                mIntent, SlicePurchaseController.EXTRA_INTENT_REQUEST_FAILED);
         finishAndRemoveTask();
     }
 
@@ -174,11 +177,17 @@ public class SlicePurchaseActivity extends Activity {
         // Create WebView
         mWebView = new WebView(this);
 
+        // Clear any cookies and state that might be saved from previous sessions
+        CookieManager.getInstance().removeAllCookies(null);
+        CookieManager.getInstance().flush();
+        mWebView.clearCache(true);
+        mWebView.clearHistory();
+
         // Enable JavaScript for the carrier purchase website to send results back to
         //  the slice purchase application.
         mWebView.getSettings().setJavaScriptEnabled(true);
         mWebView.addJavascriptInterface(
-                new SlicePurchaseWebInterface(this), "SlicePurchaseWebInterface");
+                new DataBoostWebServiceFlow(this), "DataBoostWebServiceFlow");
 
         // Display WebView
         setContentView(mWebView);

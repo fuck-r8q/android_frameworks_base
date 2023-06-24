@@ -385,6 +385,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 case MotionEvent.ACTION_MOVE: {
                     final DesktopModeWindowDecoration decoration =
                             mWindowDecorByTaskId.get(mTaskId);
+                    if (e.findPointerIndex(mDragPointerId) == -1) {
+                        mDragPointerId = e.getPointerId(0);
+                    }
                     final int dragPointerIdx = e.findPointerIndex(mDragPointerId);
                     mDesktopTasksController.ifPresent(c -> c.onDragPositioningMove(taskInfo,
                             decoration.mTaskSurface, e.getRawY(dragPointerIdx)));
@@ -395,6 +398,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                 }
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL: {
+                    if (e.findPointerIndex(mDragPointerId) == -1) {
+                        mDragPointerId = e.getPointerId(0);
+                    }
                     final int dragPointerIdx = e.findPointerIndex(mDragPointerId);
                     // Position of the task is calculated by subtracting the raw location of the
                     // motion event (the location of the motion relative to the display) by the
@@ -405,7 +411,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
                     mDragPositioningCallback.onDragPositioningEnd(
                             e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx));
                     mDesktopTasksController.ifPresent(c -> c.onDragPositioningEnd(taskInfo,
-                            position));
+                            position, e.getRawY()));
                     final boolean wasDragging = mIsDragging;
                     mIsDragging = false;
                     return wasDragging;
@@ -814,8 +820,13 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel {
             @NonNull DesktopModeWindowDecoration windowDecoration,
             @NonNull RunningTaskInfo taskInfo) {
         final int screenWidth = mDisplayController.getDisplayLayout(taskInfo.displayId).width();
-        final Rect disallowedAreaForEndBounds = new Rect(0, 0, screenWidth,
-                getStatusBarHeight(taskInfo.displayId));
+        final Rect disallowedAreaForEndBounds;
+        if (DesktopModeStatus.isProto2Enabled()) {
+            disallowedAreaForEndBounds = new Rect(0, 0, screenWidth,
+                    getStatusBarHeight(taskInfo.displayId));
+        } else {
+            disallowedAreaForEndBounds = null;
+        }
         if (!DesktopModeStatus.isVeiledResizeEnabled()) {
             return new FluidResizeTaskPositioner(mTaskOrganizer, windowDecoration,
                     mDisplayController, disallowedAreaForEndBounds, mDragStartListener,

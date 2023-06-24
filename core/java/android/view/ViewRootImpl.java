@@ -222,7 +222,6 @@ import com.android.internal.os.IResultReceiver;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.policy.DecorView;
 import com.android.internal.policy.PhoneFallbackEventHandler;
-import com.android.internal.util.Preconditions;
 import com.android.internal.view.BaseSurfaceHolder;
 import com.android.internal.view.RootViewSurfaceTaker;
 import com.android.internal.view.SurfaceCallbackHelper;
@@ -3612,6 +3611,11 @@ public final class ViewRootImpl implements ViewParent,
                         mTmpLocation[1] + host.mBottom - host.mTop);
 
                 host.gatherTransparentRegion(mTransparentRegion);
+                final Rect bounds = mAttachInfo.mTmpInvalRect;
+                if (getAccessibilityFocusedRect(bounds)) {
+                  host.applyDrawableToTransparentRegion(getAccessibilityFocusedDrawable(),
+                      mTransparentRegion);
+                }
                 if (mTranslator != null) {
                     mTranslator.translateRegionInWindowToScreen(mTransparentRegion);
                 }
@@ -4889,17 +4893,11 @@ public final class ViewRootImpl implements ViewParent,
             dirty.offset(surfaceInsets.left, surfaceInsets.top);
         }
 
-        boolean accessibilityFocusDirty = false;
-        final Drawable drawable = mAttachInfo.mAccessibilityFocusDrawable;
-        if (drawable != null) {
-            final Rect bounds = mAttachInfo.mTmpInvalRect;
-            final boolean hasFocus = getAccessibilityFocusedRect(bounds);
-            if (!hasFocus) {
-                bounds.setEmpty();
-            }
-            if (!bounds.equals(drawable.getBounds())) {
-                accessibilityFocusDirty = true;
-            }
+        boolean accessibilityFocusDirty = isAccessibilityFocusDirty();
+
+        // Force recalculation of transparent regions
+        if (accessibilityFocusDirty) {
+            requestLayout();
         }
 
         mAttachInfo.mDrawingTime =
@@ -5446,8 +5444,9 @@ public final class ViewRootImpl implements ViewParent,
         mAccessibilityFocusedVirtualView = node;
         updateKeepClearForAccessibilityFocusRect();
 
-        if (mAttachInfo.mThreadedRenderer != null) {
-            mAttachInfo.mThreadedRenderer.invalidateRoot();
+        requestInvalidateRootRenderNode();
+        if (isAccessibilityFocusDirty()) {
+            scheduleTraversals();
         }
     }
 
@@ -7208,7 +7207,11 @@ public final class ViewRootImpl implements ViewParent,
                 final MotionEvent event = (MotionEvent)q.mEvent;
                 final int source = event.getSource();
                 if ((source & InputDevice.SOURCE_CLASS_TRACKBALL) != 0) {
-                    mTrackball.process(event);
+                    // Do not synthesize events for relative mouse movement. If apps opt into
+                    // relative mouse movement they must be prepared to handle the events.
+                    if (!event.isFromSource(InputDevice.SOURCE_MOUSE_RELATIVE)) {
+                        mTrackball.process(event);
+                    }
                     return FINISH_HANDLED;
                 } else if ((source & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
                     mJoystick.process(event);
@@ -9037,8 +9040,7 @@ public final class ViewRootImpl implements ViewParent,
                 return true;
             }
             return mEvent instanceof MotionEvent
-                    && (mEvent.isFromSource(InputDevice.SOURCE_CLASS_POINTER)
-                        || mEvent.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER));
+                    && (mEvent.isFromSource(InputDevice.SOURCE_CLASS_POINTER));
         }
 
         public boolean shouldSendToSynthesizer() {
@@ -9845,6 +9847,21 @@ public final class ViewRootImpl implements ViewParent,
         return AccessibilityNodeIdManager.getInstance().findView(accessibilityViewId);
     }
 
+    private boolean isAccessibilityFocusDirty() {
+        final Drawable drawable = mAttachInfo.mAccessibilityFocusDrawable;
+        if (drawable != null) {
+            final Rect bounds = mAttachInfo.mTmpInvalRect;
+            final boolean hasFocus = getAccessibilityFocusedRect(bounds);
+            if (!hasFocus) {
+                bounds.setEmpty();
+            }
+            if (!bounds.equals(drawable.getBounds())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Updates the focused virtual view, when necessary, in response to a
      * content changed event.
@@ -9931,7 +9948,7 @@ public final class ViewRootImpl implements ViewParent,
 
     @Override
     public void notifySubtreeAccessibilityStateChanged(View child, View source, int changeType) {
-        postSendWindowContentChangedCallback(Preconditions.checkNotNull(source), changeType);
+        postSendWindowContentChangedCallback(Objects.requireNonNull(source), changeType);
     }
 
     @Override
@@ -10998,6 +11015,11 @@ public final class ViewRootImpl implements ViewParent,
                     run();
                 }
             }
+
+            if (!canContinueThrottle(source, changeType)) {
+                removeCallbacksAndRun();
+            }
+
             if (mSource != null) {
                 // If there is no common predecessor, then mSource points to
                 // a removed view, hence in this case always prefer the source.
@@ -11032,18 +11054,32 @@ public final class ViewRootImpl implements ViewParent,
                 mOrigin = Thread.currentThread().getStackTrace();
             }
             final long timeSinceLastMillis = SystemClock.uptimeMillis() - mLastEventTimeMillis;
-            final long minEventIntevalMillis =
+            final long minEventIntervalMillis =
                     ViewConfiguration.getSendRecurringAccessibilityEventsInterval();
-            if (timeSinceLastMillis >= minEventIntevalMillis) {
+            if (timeSinceLastMillis >= minEventIntervalMillis) {
                 removeCallbacksAndRun();
             } else {
-                mHandler.postDelayed(this, minEventIntevalMillis - timeSinceLastMillis);
+                mHandler.postDelayed(this, minEventIntervalMillis - timeSinceLastMillis);
             }
         }
 
         public void removeCallbacksAndRun() {
             mHandler.removeCallbacks(this);
             run();
+        }
+
+        private boolean canContinueThrottle(View source, int changeType) {
+            if (mSource == null) {
+                // We don't have a pending event.
+                return true;
+            }
+            if (mSource == source) {
+                // We can merge a new event with a pending event from the same source.
+                return true;
+            }
+            // We can merge subtree change events.
+            return changeType == AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE
+                    && mChangeTypes == AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE;
         }
     }
 

@@ -9094,7 +9094,10 @@
         <attr name="dotColor" format="color|reference"/>
         <!-- Color of the dot when it's activated -->
         <attr name="dotActivatedColor" format="color|reference"/>
-
+        <!-- Keep dot in activated state until segment completion -->
+        <attr name="keepDotActivated" format="boolean"/>
+        <!-- Enlarge vertex entry area for some form factors -->
+        <attr name="enlargeVertexEntryArea" format="boolean"/>
     </declare-styleable>
 
     <!-- =============================== -->
@@ -9160,10 +9163,10 @@
              {@link android.os.Build.VERSION_CODES#N} and not used in previous versions. -->
         <attr name="supportsLocalInteraction" format="boolean" />
         <!-- The service that provides {@link android.service.voice.HotwordDetectionService}.
-             @hide @SystemApi -->
+             Expect a component name to be provided. @hide @SystemApi -->
         <attr name="hotwordDetectionService" format="string" />
         <!-- The service that provides {@link android.service.voice.VisualQueryDetectionService}.
-             @hide @SystemApi -->
+             Expect a component name to be provided. @hide @SystemApi -->
         <attr name="visualQueryDetectionService" format="string" />
 
     </declare-styleable>
@@ -10113,13 +10116,12 @@
     <declare-styleable name="CredentialProvider">
         <!-- A string that is displayed to the user in the Credential Manager settings
              screen that can be used to provide more information about a provider. For
-             longer strings (40 char) it will be truncated. If multiple services
-             show the subtitle then the string will be joined together. -->
+             longer strings it will be truncated. -->
         <attr name="settingsSubtitle" format="string" />
     </declare-styleable>
 
     <!-- A list of capabilities that indicates to the OS what kinds of credentials
-             this provider supports. This list is defined in CredentialProviderService. -->
+             this provider supports. -->
     <declare-styleable name="CredentialProvider_Capabilities" parent="CredentialProvider">
         <!-- An individual capability declared by the provider. -->
         <attr name="capability" format="string" />

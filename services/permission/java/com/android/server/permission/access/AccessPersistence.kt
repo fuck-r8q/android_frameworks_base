@@ -22,17 +22,19 @@ import android.os.Message
 import android.os.SystemClock
 import android.os.UserHandle
 import android.util.AtomicFile
-import android.util.Log
+import android.util.Slog
+import android.util.SparseLongArray
 import com.android.internal.annotations.GuardedBy
 import com.android.internal.os.BackgroundThread
 import com.android.modules.utils.BinaryXmlPullParser
 import com.android.modules.utils.BinaryXmlSerializer
 import com.android.server.permission.access.collection.* // ktlint-disable no-wildcard-imports
+import com.android.server.permission.access.immutable.* // ktlint-disable no-wildcard-imports
 import com.android.server.permission.access.util.PermissionApex
 import com.android.server.permission.access.util.parseBinaryXml
-import com.android.server.permission.access.util.read
+import com.android.server.permission.access.util.readWithReserveCopy
 import com.android.server.permission.access.util.serializeBinaryXml
-import com.android.server.permission.access.util.writeInlined
+import com.android.server.permission.access.util.writeWithReserveCopy
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -41,9 +43,9 @@ class AccessPersistence(
 ) {
     private val scheduleLock = Any()
     @GuardedBy("scheduleLock")
-    private val pendingMutationTimesMillis = IntLongMap()
+    private val pendingMutationTimesMillis = SparseLongArray()
     @GuardedBy("scheduleLock")
-    private val pendingStates = IntMap<AccessState>()
+    private val pendingStates = MutableIntMap<AccessState>()
     @GuardedBy("scheduleLock")
     private lateinit var writeHandler: WriteHandler
 
@@ -53,36 +55,54 @@ class AccessPersistence(
         writeHandler = WriteHandler(BackgroundThread.getHandler().looper)
     }
 
-    fun read(state: AccessState) {
+    /**
+     * Reads the state either from the disk or migrate legacy data when the data files are missing.
+     */
+    fun read(state: MutableAccessState) {
         readSystemState(state)
-        state.systemState.userIds.forEachIndexed { _, userId ->
+        state.externalState.userIds.forEachIndexed { _, userId ->
             readUserState(state, userId)
         }
     }
 
-    private fun readSystemState(state: AccessState) {
-        systemFile.parse {
+    private fun readSystemState(state: MutableAccessState) {
+        val fileExists = systemFile.parse {
             // This is the canonical way to call an extension function in a different class.
             // TODO(b/259469752): Use context receiver for this when it becomes stable.
             with(policy) { parseSystemState(state) }
         }
-    }
 
-    private fun readUserState(state: AccessState, userId: Int) {
-        getUserFile(userId).parse {
-            with(policy) { parseUserState(state, userId) }
+        if (!fileExists) {
+            policy.migrateSystemState(state)
+            state.systemState.write(state, UserHandle.USER_ALL)
         }
     }
 
-    private inline fun File.parse(block: BinaryXmlPullParser.() -> Unit) {
+    private fun readUserState(state: MutableAccessState, userId: Int) {
+        val fileExists = getUserFile(userId).parse {
+            with(policy) { parseUserState(state, userId) }
+        }
+
+        if (!fileExists) {
+            policy.migrateUserState(state, userId)
+            state.userStates[userId]!!.write(state, userId)
+        }
+    }
+
+    /**
+     * @return {@code true} if the file is successfully read from the disk; {@code false} if
+     * the file doesn't exist yet.
+     */
+    private inline fun File.parse(block: BinaryXmlPullParser.() -> Unit): Boolean =
         try {
-            AtomicFile(this).read { it.parseBinaryXml(block) }
+            AtomicFile(this).readWithReserveCopy { it.parseBinaryXml(block) }
+            true
         } catch (e: FileNotFoundException) {
-            Log.i(LOG_TAG, "$this not found")
+            Slog.i(LOG_TAG, "$this not found")
+            false
         } catch (e: Exception) {
             throw IllegalStateException("Failed to read $this", e)
         }
-    }
 
     fun write(state: AccessState) {
         state.systemState.write(state, UserHandle.USER_ALL)
@@ -94,11 +114,7 @@ class AccessPersistence(
     private fun WritableState.write(state: AccessState, userId: Int) {
         when (val writeMode = writeMode) {
             WriteMode.NONE -> {}
-            WriteMode.SYNC -> {
-                synchronized(scheduleLock) { pendingStates[userId] = state }
-                writePendingState(userId)
-            }
-            WriteMode.ASYNC -> {
+            WriteMode.ASYNCHRONOUS -> {
                 synchronized(scheduleLock) {
                     writeHandler.removeMessages(userId)
                     pendingStates[userId] = state
@@ -117,6 +133,10 @@ class AccessPersistence(
                     }
                 }
             }
+            WriteMode.SYNCHRONOUS -> {
+                synchronized(scheduleLock) { pendingStates[userId] = state }
+                writePendingState(userId)
+            }
             else -> error(writeMode)
         }
     }
@@ -126,7 +146,7 @@ class AccessPersistence(
             val state: AccessState?
             synchronized(scheduleLock) {
                 pendingMutationTimesMillis -= userId
-                state = pendingStates.removeReturnOld(userId)
+                state = pendingStates.remove(userId)
                 writeHandler.removeMessages(userId)
             }
             if (state == null) {
@@ -154,9 +174,9 @@ class AccessPersistence(
 
     private inline fun File.serialize(block: BinaryXmlSerializer.() -> Unit) {
         try {
-            AtomicFile(this).writeInlined { it.serializeBinaryXml(block) }
+            AtomicFile(this).writeWithReserveCopy { it.serializeBinaryXml(block) }
         } catch (e: Exception) {
-            Log.e(LOG_TAG, "Failed to serialize $this", e)
+            Slog.e(LOG_TAG, "Failed to serialize $this", e)
         }
     }
 
@@ -176,16 +196,6 @@ class AccessPersistence(
     }
 
     private inner class WriteHandler(looper: Looper) : Handler(looper) {
-        fun writeAtTime(userId: Int, timeMillis: Long) {
-            removeMessages(userId)
-            val message = obtainMessage(userId)
-            sendMessageDelayed(message, timeMillis)
-        }
-
-        fun cancelWrite(userId: Int) {
-            removeMessages(userId)
-        }
-
         override fun handleMessage(message: Message) {
             val userId = message.what
             writePendingState(userId)

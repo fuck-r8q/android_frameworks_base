@@ -39,8 +39,6 @@ import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanc
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceLocalUserSelectionManager
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceRemoteUserSelectionManager
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
-import com.android.systemui.keyguard.data.repository.FakeKeyguardBouncerRepository
-import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.KeyguardQuickAffordanceRepository
 import com.android.systemui.keyguard.domain.quickaffordance.FakeKeyguardQuickAffordanceRegistry
 import com.android.systemui.keyguard.shared.quickaffordance.KeyguardQuickAffordancePosition
@@ -49,7 +47,6 @@ import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.settings.FakeUserTracker
 import com.android.systemui.settings.UserFileManager
 import com.android.systemui.settings.UserTracker
-import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.FakeSharedPreferences
 import com.android.systemui.util.mockito.any
@@ -226,7 +223,6 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
     @Mock private lateinit var animationController: ActivityLaunchAnimator.Controller
     @Mock private lateinit var expandable: Expandable
     @Mock private lateinit var launchAnimator: DialogLaunchAnimator
-    @Mock private lateinit var commandQueue: CommandQueue
     @Mock private lateinit var devicePolicyManager: DevicePolicyManager
     @Mock private lateinit var logger: KeyguardQuickAffordancesMetricsLogger
 
@@ -312,12 +308,10 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
         underTest =
             KeyguardQuickAffordanceInteractor(
                 keyguardInteractor =
-                    KeyguardInteractor(
-                        repository = FakeKeyguardRepository(),
-                        commandQueue = commandQueue,
-                        featureFlags = featureFlags,
-                        bouncerRepository = FakeKeyguardBouncerRepository(),
-                    ),
+                    KeyguardInteractorFactory.create(
+                            featureFlags = featureFlags,
+                        )
+                        .keyguardInteractor,
                 registry =
                     FakeKeyguardQuickAffordanceRegistry(
                         mapOf(
@@ -372,11 +366,11 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
                     KeyguardQuickAffordanceConfig.OnTriggeredResult.Handled
                 }
 
-        underTest.onQuickAffordanceTriggered(
-            configKey = BuiltInKeyguardQuickAffordanceKeys.HOME_CONTROLS,
-            expandable = expandable,
-            slotId = "",
-        )
+            underTest.onQuickAffordanceTriggered(
+                configKey = BuiltInKeyguardQuickAffordanceKeys.HOME_CONTROLS,
+                expandable = expandable,
+                slotId = "",
+            )
 
             if (startActivity) {
                 if (needsToUnlockFirst) {

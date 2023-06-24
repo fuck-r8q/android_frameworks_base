@@ -15,7 +15,9 @@
 package api
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/blueprint/proptools"
 
@@ -100,6 +102,13 @@ type fgProps struct {
 	Name       *string
 	Srcs       []string
 	Visibility []string
+}
+
+type defaultsProps struct {
+	Name                *string
+	Api_surface         *string
+	Api_contributions   []string
+	Defaults_visibility []string
 }
 
 type Bazel_module struct {
@@ -331,6 +340,30 @@ func createMergedTxts(ctx android.LoadHookContext, bootclasspath, system_server_
 	}
 }
 
+func createApiContributionDefaults(ctx android.LoadHookContext, modules []string) {
+	defaultsSdkKinds := []android.SdkKind{
+		android.SdkPublic, android.SdkSystem, android.SdkModule,
+	}
+	for _, sdkKind := range defaultsSdkKinds {
+		props := defaultsProps{}
+		props.Name = proptools.StringPtr(
+			sdkKind.DefaultJavaLibraryName() + "_contributions")
+		if sdkKind == android.SdkModule {
+			props.Name = proptools.StringPtr(
+				sdkKind.DefaultJavaLibraryName() + "_contributions_full")
+		}
+		props.Api_surface = proptools.StringPtr(sdkKind.String())
+		apiSuffix := ""
+		if sdkKind != android.SdkPublic {
+			apiSuffix = "." + strings.ReplaceAll(sdkKind.String(), "-", "_")
+		}
+		props.Api_contributions = transformArray(
+			modules, "", fmt.Sprintf(".stubs.source%s.api.contribution", apiSuffix))
+		props.Defaults_visibility = []string{"//visibility:public"}
+		ctx.CreateModule(java.DefaultsFactory, &props)
+	}
+}
+
 func (a *CombinedApis) createInternalModules(ctx android.LoadHookContext) {
 	bootclasspath := a.properties.Bootclasspath
 	system_server_classpath := a.properties.System_server_classpath
@@ -349,6 +382,8 @@ func (a *CombinedApis) createInternalModules(ctx android.LoadHookContext) {
 	createMergedAnnotationsFilegroups(ctx, bootclasspath, system_server_classpath)
 
 	createPublicStubsSourceFilegroup(ctx, bootclasspath)
+
+	createApiContributionDefaults(ctx, bootclasspath)
 }
 
 func combinedApisModuleFactory() android.Module {

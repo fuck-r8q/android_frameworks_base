@@ -859,6 +859,7 @@
     <string name="magnification_mode_switch_state_full_screen" msgid="5229653514979530561">"ಪೂರ್ಣ ಸ್ಕ್ರೀನ್‌ ಅನ್ನು ಹಿಗ್ಗಿಸಿ"</string>
     <string name="magnification_mode_switch_state_window" msgid="8597100249594076965">"ಸ್ಕ್ರೀನ್‌ನ ಅರ್ಧಭಾಗವನ್ನು ಝೂಮ್ ಮಾಡಿ"</string>
     <string name="magnification_open_settings_click_label" msgid="6151849212725923363">"ಹಿಗ್ಗಿಸುವಿಕೆ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಿರಿ"</string>
+    <string name="magnification_close_settings_click_label" msgid="4642477260651704517">"ಮ್ಯಾಗ್ನಿಫಿಕೇಶನ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಮುಚ್ಚಿರಿ"</string>
     <string name="magnification_drag_corner_to_resize" msgid="1249766311052418130">"ಮರುಗಾತ್ರಗೊಳಿಸಲು ಮೂಲೆಯನ್ನು ಡ್ರ್ಯಾಗ್ ಮಾಡಿ"</string>
     <string name="accessibility_allow_diagonal_scrolling" msgid="3258050349191496398">"ಡಯಾಗನಲ್ ಸ್ಕ್ರೋಲಿಂಗ್ ಅನ್ನು ಅನುಮತಿಸಿ"</string>
     <string name="accessibility_resize" msgid="5733759136600611551">"ಮರುಗಾತ್ರಗೊಳಿಸಿ"</string>
@@ -1107,7 +1108,10 @@
     <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"ಅಸಿಸ್ಟೆಂಟ್ ಆಲಿಸುತ್ತಿದೆ"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# ನೋಟಿಫಿಕೇಶನ್}one{# ನೋಟಿಫಿಕೇಶನ್‌ಗಳು}other{# ನೋಟಿಫಿಕೇಶನ್‌ಗಳು}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
-    <string name="note_task_button_label" msgid="8718616095800343136">"ಟಿಪ್ಪಣಿಗಳನ್ನು ಬರೆದುಕೊಳ್ಳುವುದು"</string>
+    <!-- no translation found for note_task_button_label (230135078402003532) -->
+    <skip />
+    <!-- no translation found for note_task_shortcut_long_label (7729325091147319409) -->
+    <skip />
     <string name="broadcasting_description_is_broadcasting" msgid="765627502786404290">"ಪ್ರಸಾರ ಮಾಡಲಾಗುತ್ತಿದೆ"</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="3605428497924077811">"<xliff:g id="APP_NAME">%1$s</xliff:g> ನ ಪ್ರಸಾರವನ್ನು ನಿಲ್ಲಿಸಬೇಕೆ?"</string>
     <string name="bt_le_audio_broadcast_dialog_sub_title" msgid="7889684551194225793">"ನೀವು <xliff:g id="SWITCHAPP">%1$s</xliff:g> ಅನ್ನು ಪ್ರಸಾರ ಮಾಡಿದರೆ ಅಥವಾ ಔಟ್‌ಪುಟ್ ಅನ್ನು ಬದಲಾಯಿಸಿದರೆ, ನಿಮ್ಮ ಪ್ರಸ್ತುತ ಪ್ರಸಾರವು ಸ್ಥಗಿತಗೊಳ್ಳುತ್ತದೆ"</string>

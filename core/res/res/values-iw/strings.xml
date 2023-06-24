@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"‏מאפשרת לאפליקציה לקבל פרטים על שירות תשלום מועדף ב-NFC, כמו עזרים רשומים ויעד של נתיב."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"שליטה בתקשורת מטווח קצר"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"‏מאפשרת לאפליקציה נהל תקשורת עם תגים, כרטיסים וקוראים מסוג \'תקשורת מטווח קצר\' (NFC)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"אירוע עסקה של רכיב מאובטח"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"ההרשאה הזו מאפשרת לאפליקציה לקבל מידע על עסקאות שמתרחשות ברכיב מאובטח."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"ביטול נעילת המסך שלך"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"מאפשרת לאפליקציה להשבית את נעילת המקשים וכל אמצעי אבטחה משויך המבוסס על סיסמה. לדוגמה, הטלפון ישבית את נעילת המקשים במהלך שיחת טלפון נכנסת, ויפעיל מחדש את נעילת המקשים עם סיום השיחה."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"בקשת מידע לגבי מידת המורכבות של נעילת המסך"</string>

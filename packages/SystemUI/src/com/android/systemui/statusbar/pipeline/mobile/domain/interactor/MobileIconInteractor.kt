@@ -129,11 +129,11 @@ interface MobileIconInteractor {
     /** See [MobileIconsInteractor.isForceHidden]. */
     val isForceHidden: Flow<Boolean>
 
-    /** True when in carrier network change mode */
-    val carrierNetworkChangeActive: StateFlow<Boolean>
-
     /** True if the rsrp level should be preferred over the primary level for LTE. */
     val alwaysUseRsrpLevelForLte: StateFlow<Boolean>
+
+    /** True when in carrier network change mode */
+    val carrierNetworkChangeActive: StateFlow<Boolean>
 
     /** True if the no internet icon should be hidden.  */
     val hideNoInternetState: StateFlow<Boolean>

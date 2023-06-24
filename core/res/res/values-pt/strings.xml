@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Permite que o app acesse as informações preferidas de serviço de pagamento por NFC, como auxílios registrados ou destinos de trajetos."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"controlar a comunicação a curta distância"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Permite que o app se comunique com leitores, cartões e etiqueta NFC (comunicação a curta distância)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Evento de transação do Elemento de segurança"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Permite que o app receba informações sobre transações que ocorrem em um Elemento de segurança."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"desativar o bloqueio de tela"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Permite que o app desative o bloqueio de teclas e qualquer segurança por senha associada. Por exemplo, o telefone desativa o bloqueio de telas ao receber uma ligação e o reativa quando a chamada é finalizada."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"Solicitar complexidade do bloqueio de tela"</string>

@@ -30,6 +30,7 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.provider.DeviceConfig.NAMESPACE_CONSTRAIN_DISPLAY_APIS;
+import static android.view.InsetsSource.FLAG_INSETS_ROUNDED_CORNER;
 import static android.view.Surface.ROTATION_0;
 import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
@@ -3548,7 +3549,7 @@ public class SizeCompatTests extends WindowTestsBase {
 
         final InsetsSource navSource = new InsetsSource(
                 InsetsSource.createId(null, 0, navigationBars()), navigationBars());
-        navSource.setInsetsRoundedCornerFrame(true);
+        navSource.setFlags(FLAG_INSETS_ROUNDED_CORNER, FLAG_INSETS_ROUNDED_CORNER);
         navSource.setFrame(new Rect(0, screenHeight - taskbarHeight, screenWidth, screenHeight));
 
         mActivity.mWmService.mLetterboxConfiguration.setLetterboxActivityCornersRadius(15);
@@ -3596,7 +3597,7 @@ public class SizeCompatTests extends WindowTestsBase {
 
         final InsetsSource navSource = new InsetsSource(
                 InsetsSource.createId(null, 0, navigationBars()), navigationBars());
-        navSource.setInsetsRoundedCornerFrame(true);
+        navSource.setFlags(FLAG_INSETS_ROUNDED_CORNER, FLAG_INSETS_ROUNDED_CORNER);
         // Immersive activity has transient navbar
         navSource.setVisible(!immersive);
         navSource.setFrame(new Rect(0, screenHeight - taskbarHeight, screenWidth, screenHeight));

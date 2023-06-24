@@ -91,7 +91,8 @@ public class UserManagerServiceUserTypeTest {
                 .setCredentialShareableWithParent(false)
                 .setShowInSettings(900)
                 .setInheritDevicePolicy(340)
-                .setDeleteAppWithParent(true);
+                .setDeleteAppWithParent(true)
+                .setAlwaysVisible(true);
 
         final UserTypeDetails type = new UserTypeDetails.Builder()
                 .setName("a.name")
@@ -106,6 +107,7 @@ public class UserManagerServiceUserTypeTest {
                 .setBadgeNoBackground(30)
                 .setLabel(31)
                 .setMaxAllowedPerParent(32)
+                .setStatusBarIcon(33)
                 .setDefaultRestrictions(restrictions)
                 .setDefaultSystemSettings(systemSettings)
                 .setDefaultSecureSettings(secureSettings)
@@ -122,6 +124,7 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(30, type.getBadgeNoBackground());
         assertEquals(31, type.getLabel());
         assertEquals(32, type.getMaxAllowedPerParent());
+        assertEquals(33, type.getStatusBarIcon());
 
         assertTrue(UserRestrictionsUtils.areEqual(restrictions, type.getDefaultRestrictions()));
         assertNotSame(restrictions, type.getDefaultRestrictions());
@@ -160,6 +163,7 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(340, type.getDefaultUserPropertiesReference()
                 .getInheritDevicePolicy());
         assertTrue(type.getDefaultUserPropertiesReference().getDeleteAppWithParent());
+        assertTrue(type.getDefaultUserPropertiesReference().getAlwaysVisible());
 
         assertEquals(23, type.getBadgeLabel(0));
         assertEquals(24, type.getBadgeLabel(1));
@@ -191,6 +195,7 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(Resources.ID_NULL, type.getIconBadge());
         assertEquals(Resources.ID_NULL, type.getBadgePlain());
         assertEquals(Resources.ID_NULL, type.getBadgeNoBackground());
+        assertEquals(Resources.ID_NULL, type.getStatusBarIcon());
         assertEquals(Resources.ID_NULL, type.getBadgeLabel(0));
         assertEquals(Resources.ID_NULL, type.getBadgeColor(0));
         assertEquals(Resources.ID_NULL, type.getLabel());
@@ -210,6 +215,8 @@ public class UserManagerServiceUserTypeTest {
                 props.getCrossProfileIntentResolutionStrategy());
         assertFalse(props.isMediaSharedWithParent());
         assertFalse(props.isCredentialShareableWithParent());
+        assertFalse(props.getDeleteAppWithParent());
+        assertFalse(props.getAlwaysVisible());
 
         assertFalse(type.hasBadge());
     }
@@ -298,7 +305,8 @@ public class UserManagerServiceUserTypeTest {
                 .setCredentialShareableWithParent(true)
                 .setShowInSettings(20)
                 .setInheritDevicePolicy(21)
-                .setDeleteAppWithParent(true);
+                .setDeleteAppWithParent(true)
+                .setAlwaysVisible(false);
 
         final ArrayMap<String, UserTypeDetails.Builder> builders = new ArrayMap<>();
         builders.put(userTypeAosp1, new UserTypeDetails.Builder()
@@ -339,6 +347,7 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(21, aospType.getDefaultUserPropertiesReference()
                 .getInheritDevicePolicy());
         assertTrue(aospType.getDefaultUserPropertiesReference().getDeleteAppWithParent());
+        assertFalse(aospType.getDefaultUserPropertiesReference().getAlwaysVisible());
 
         // userTypeAosp2 should be modified.
         aospType = builders.get(userTypeAosp2).createUserTypeDetails();
@@ -348,6 +357,8 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(Resources.ID_NULL, aospType.getBadgePlain()); // No resId for 'garbage'
         assertEquals(com.android.internal.R.drawable.ic_corp_badge_no_background,
                 aospType.getBadgeNoBackground());
+        assertEquals(com.android.internal.R.drawable.ic_test_badge_experiment,
+                aospType.getStatusBarIcon());
         assertEquals(com.android.internal.R.string.managed_profile_label_badge,
                 aospType.getBadgeLabel(0));
         assertEquals(com.android.internal.R.string.managed_profile_label_badge_2,
@@ -381,8 +392,8 @@ public class UserManagerServiceUserTypeTest {
         assertEquals(23, aospType.getDefaultUserPropertiesReference().getShowInSettings());
         assertEquals(450, aospType.getDefaultUserPropertiesReference()
                 .getInheritDevicePolicy());
-        assertFalse(aospType.getDefaultUserPropertiesReference()
-                .getDeleteAppWithParent());
+        assertFalse(aospType.getDefaultUserPropertiesReference().getDeleteAppWithParent());
+        assertTrue(aospType.getDefaultUserPropertiesReference().getAlwaysVisible());
 
         // userTypeOem1 should be created.
         UserTypeDetails.Builder customType = builders.get(userTypeOem1);

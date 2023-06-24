@@ -17,12 +17,12 @@
  */
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-   package="com.android.shell"
-   coreApp="true"
-   android:sharedUserId="android.uid.shell"
-   >
+        package="com.android.shell"
+        coreApp="true"
+        android:sharedUserId="android.uid.shell"
+        >
 
-    <!-- Standard permissions granted to the shell. -->
+        <!-- Standard permissions granted to the shell. -->
     <uses-permission android:name="android.permission.MANAGE_HEALTH_PERMISSIONS" />
     <uses-permission android:name="android.permission.MANAGE_HEALTH_DATA" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTE" />
@@ -833,8 +833,13 @@
     <uses-permission android:name="android.permission.WRITE_APN_SETTINGS" />
 
     <uses-permission android:name="android.permission.LOG_FOREGROUND_RESOURCE_USE" />
+
+    <!-- Permission required for CTS test - CtsPackageInstallTestCases -->
+    <uses-permission android:name="android.permission.READ_INSTALLED_SESSION_PATHS" />
+
     <!-- Permission required for GTS test - GtsAttestationVerificationDeviceSideTestCases -->
     <uses-permission android:name="android.permission.USE_ATTESTATION_VERIFICATION_SERVICE" />
+
     <!-- Permission required for GTS test - GtsCredentialsTestCases -->
     <uses-permission android:name="android.permission.LAUNCH_CREDENTIAL_SELECTOR" />
     <!-- Permission required for CTS test IntentRedirectionTest -->

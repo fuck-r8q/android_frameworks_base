@@ -60,7 +60,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.android.server.ExtendedMockitoRule;
+import com.android.modules.utils.testing.ExtendedMockitoRule;
 import com.android.server.LocalServices;
 import com.android.server.am.BatteryStatsService;
 import com.android.server.display.RampAnimator.DualRampAnimator;
@@ -819,7 +819,7 @@ public final class DisplayPowerControllerTest {
                 any(HysteresisLevels.class),
                 any(HysteresisLevels.class),
                 eq(mContext),
-                any(HighBrightnessModeController.class),
+                any(BrightnessRangeController.class),
                 any(BrightnessThrottler.class),
                 isNull(),
                 anyInt(),
@@ -1038,7 +1038,7 @@ public final class DisplayPowerControllerTest {
                 HysteresisLevels screenBrightnessThresholds,
                 HysteresisLevels ambientBrightnessThresholdsIdle,
                 HysteresisLevels screenBrightnessThresholdsIdle, Context context,
-                HighBrightnessModeController hbmController,
+                BrightnessRangeController brightnessRangeController,
                 BrightnessThrottler brightnessThrottler,
                 BrightnessMappingStrategy idleModeBrightnessMapper,
                 int ambientLightHorizonShort, int ambientLightHorizonLong, float userLux,

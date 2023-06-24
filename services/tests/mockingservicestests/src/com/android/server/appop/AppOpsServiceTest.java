@@ -23,6 +23,7 @@ import static android.app.AppOpsManager.OP_FLAG_SELF;
 import static android.app.AppOpsManager.OP_READ_SMS;
 import static android.app.AppOpsManager.OP_WIFI_SCAN;
 import static android.app.AppOpsManager.OP_WRITE_SMS;
+import static android.os.UserHandle.getAppId;
 import static android.os.UserHandle.getUserId;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
@@ -39,6 +40,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -108,6 +110,7 @@ public class AppOpsServiceTest {
         mAppOpsService = new AppOpsService(mRecentAccessesFile, mStorageFile, mHandler,
                 spy(sContext));
         mAppOpsService.mHistoricalRegistry.systemReady(sContext.getContentResolver());
+        mAppOpsService.prepareInternalCallbacks();
 
         // Always approve all permission checks
         doNothing().when(mAppOpsService.mContext).enforcePermission(anyString(), anyInt(),
@@ -161,6 +164,8 @@ public class AppOpsServiceTest {
         when(mockPackageManagerInternal.getPackageStateInternal(sMyPackageName))
                 .thenReturn(mockMyPSInternal);
         when(mockPackageManagerInternal.getPackage(sMyPackageName)).thenReturn(mockMyPkg);
+        when(mockPackageManagerInternal.getPackageUid(eq(sMyPackageName), anyLong(),
+                eq(getUserId(mMyUid)))).thenReturn(mMyUid);
         doReturn(mockPackageManagerInternal).when(
                 () -> LocalServices.getService(PackageManagerInternal.class));
 
@@ -184,6 +189,16 @@ public class AppOpsServiceTest {
         // Mock behavior to use specific Settings.Global.APPOP_HISTORY_PARAMETERS
         doReturn(null).when(() -> Settings.Global.getString(any(ContentResolver.class),
                 eq(Settings.Global.APPOP_HISTORY_PARAMETERS)));
+
+        prepareInstallInvocation(mockPackageManagerInternal);
+    }
+
+    private void prepareInstallInvocation(PackageManagerInternal mockPackageManagerInternal) {
+        when(mockPackageManagerInternal.getPackageList(any())).thenAnswer(invocation -> {
+            PackageManagerInternal.PackageListObserver observer = invocation.getArgument(0);
+            observer.onPackageAdded(sMyPackageName, getAppId(mMyUid));
+            return null;
+        });
     }
 
     @Test

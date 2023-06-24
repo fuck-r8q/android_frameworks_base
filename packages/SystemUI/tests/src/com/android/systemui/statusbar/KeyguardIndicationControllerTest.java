@@ -85,6 +85,7 @@ import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityManager;
 
 import androidx.test.InstrumentationRegistry;
+import androidx.test.filters.FlakyTest;
 import androidx.test.filters.SmallTest;
 
 import com.android.internal.app.IBatteryStats;
@@ -104,6 +105,7 @@ import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.keyguard.KeyguardIndication;
 import com.android.systemui.keyguard.KeyguardIndicationRotateTextViewController;
 import com.android.systemui.keyguard.ScreenLifecycle;
+import com.android.systemui.keyguard.bouncer.domain.interactor.BouncerMessageInteractor;
 import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -302,7 +304,8 @@ public class KeyguardIndicationControllerTest extends SysuiTestCase {
                 mAlternateBouncerInteractor,
                 mAlarmManager,
                 mUserTracker,
-                flags
+                flags,
+                mock(BouncerMessageInteractor.class)
         );
         mController.init();
         mController.setIndicationArea(mIndicationArea);
@@ -388,6 +391,7 @@ public class KeyguardIndicationControllerTest extends SysuiTestCase {
                 .isEqualTo(mContext.getColor(R.color.misalignment_text_color));
     }
 
+    @FlakyTest(bugId = 279944472)
     @Test
     public void onAlignmentStateChanged_whileDozing_showsSlowChargingIndication() {
         mInstrumentation.runOnMainSync(() -> {

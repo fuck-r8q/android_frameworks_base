@@ -362,6 +362,7 @@
   <java-symbol type="bool" name="config_canSwitchToHeadlessSystemUser"/>
   <java-symbol type="bool" name="config_enableMultiUserUI"/>
   <java-symbol type="bool" name="config_enableMultipleAdmins"/>
+  <java-symbol type="bool" name="config_omnipresentCommunalUser"/>
   <java-symbol type="bool" name="config_enableNewAutoSelectNetworkUI"/>
   <java-symbol type="bool" name="config_disableUsbPermissionDialogs"/>
   <java-symbol type="dimen" name="config_highResTaskSnapshotScale" />
@@ -420,6 +421,7 @@
   <java-symbol type="bool" name="config_guestUserAllowEphemeralStateChange" />
   <java-symbol type="bool" name="config_localDisplaysMirrorContent" />
   <java-symbol type="bool" name="config_ignoreUdfpsVote" />
+  <java-symbol type="bool" name="config_enableProximityService" />
   <java-symbol type="array" name="config_localPrivateDisplayPorts" />
   <java-symbol type="integer" name="config_defaultDisplayDefaultColorMode" />
   <java-symbol type="bool" name="config_enableAppWidgetService" />
@@ -1288,6 +1290,8 @@
   <java-symbol type="dimen" name="lock_pattern_fade_away_gradient_width" />
   <java-symbol type="integer" name="lock_pattern_line_fade_out_duration" />
   <java-symbol type="integer" name="lock_pattern_line_fade_out_delay" />
+  <java-symbol type="integer" name="lock_pattern_fade_pattern_delay" />
+  <java-symbol type="integer" name="lock_pattern_fade_pattern_duration" />
   <java-symbol type="drawable" name="clock_dial" />
   <java-symbol type="drawable" name="clock_hand_hour" />
   <java-symbol type="drawable" name="clock_hand_minute" />
@@ -1413,6 +1417,7 @@
   <java-symbol type="drawable" name="ic_corp_user_badge" />
   <java-symbol type="drawable" name="ic_corp_badge_no_background" />
   <java-symbol type="drawable" name="ic_corp_statusbar_icon" />
+  <java-symbol type="drawable" name="stat_sys_managed_profile_status" />
   <java-symbol type="drawable" name="ic_test_badge_experiment" />
   <java-symbol type="drawable" name="ic_test_badge_no_background" />
   <java-symbol type="drawable" name="ic_test_icon_badge_experiment" />
@@ -2056,6 +2061,7 @@
   <java-symbol type="integer" name="config_defaultVibrationAmplitude" />
   <java-symbol type="dimen" name="config_hapticChannelMaxVibrationAmplitude" />
   <java-symbol type="integer" name="config_vibrationWaveformRampStepDuration" />
+  <java-symbol type="bool" name="config_ignoreVibrationsOnWirelessCharger" />
   <java-symbol type="integer" name="config_vibrationWaveformRampDownDuration" />
   <java-symbol type="integer" name="config_radioScanningTimeout" />
   <java-symbol type="integer" name="config_screenBrightnessSettingMinimum" />
@@ -2261,6 +2267,7 @@
   <java-symbol type="string" name="config_persistentDataPackageName" />
   <java-symbol type="string" name="config_deviceConfiguratorPackageName" />
   <java-symbol type="array" name="config_autoTimeSourcesPriority" />
+  <java-symbol type="integer" name="config_timeDetectorAutoUpdateDiffMillis" />
   <java-symbol type="bool" name="config_enableGnssTimeUpdateService" />
   <java-symbol type="bool" name="config_enableGeolocationTimeZoneDetection" />
   <java-symbol type="bool" name="config_enablePrimaryLocationTimeZoneProvider" />
@@ -2361,6 +2368,7 @@
   <java-symbol type="style" name="Animation.RecentApplications" />
   <java-symbol type="integer" name="dock_enter_exit_duration" />
   <java-symbol type="bool" name="config_battery_percentage_setting_available" />
+  <java-symbol type="bool" name="config_defaultBatteryPercentageSetting" />
   <java-symbol type="string" name="nas_upgrade_notification_title" />
   <java-symbol type="string" name="nas_upgrade_notification_content" />
   <java-symbol type="string" name="nas_upgrade_notification_enable_action" />
@@ -3789,6 +3797,7 @@
   <java-symbol type="string" name="config_defaultTextClassifierPackage" />
   <java-symbol type="string" name="config_defaultWellbeingPackage" />
   <java-symbol type="string" name="config_defaultContentCaptureService" />
+  <java-symbol type="string" name="config_defaultContentProtectionService" />
   <java-symbol type="string" name="config_defaultAugmentedAutofillService" />
   <java-symbol type="string" name="config_defaultTranslationService" />
   <java-symbol type="string" name="config_defaultAppPredictionService" />
@@ -4513,9 +4522,8 @@
   <java-symbol type="integer" name="device_idle_sms_temp_app_allowlist_duration_ms" />
   <java-symbol type="integer" name="device_idle_notification_allowlist_duration_ms" />
   <java-symbol type="bool" name="device_idle_wait_for_unlock" />
-  <java-symbol type="integer" name="device_idle_pre_idle_factor_long" />
-  <java-symbol type="integer" name="device_idle_pre_idle_factor_short" />
   <java-symbol type="bool" name="device_idle_use_window_alarms" />
+  <java-symbol type="bool" name="device_idle_use_body_sensor" />
 
   <!-- Binder heavy hitter watcher configs -->
   <java-symbol type="bool" name="config_defaultBinderHeavyHitterWatcherEnabled" />
@@ -4948,6 +4956,8 @@
 
   <java-symbol type="bool" name="config_safetyProtectionEnabled" />
 
+  <java-symbol type="bool" name="config_repairModeSupported" />
+
   <java-symbol type="string" name="config_devicePolicyManagementUpdater" />
 
   <java-symbol type="string" name="config_deviceSpecificDeviceStatePolicyProvider" />
@@ -5167,5 +5177,6 @@
   <java-symbol type="style" name="ThemeOverlay.DeviceDefault.Dark.ActionBar.Accent" />
 
   <java-symbol type="drawable" name="focus_event_pressed_key_background" />
+  <java-symbol type="string" name="config_defaultShutdownVibrationFile" />
   <java-symbol type="string" name="lockscreen_too_many_failed_attempts_countdown" />
 </resources>

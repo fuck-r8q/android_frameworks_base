@@ -72,10 +72,6 @@ object Flags {
     val NOTIFICATION_MEMORY_LOGGING_ENABLED =
         unreleasedFlag(119, "notification_memory_logging_enabled")
 
-    @JvmField
-    val SIMPLIFIED_APPEAR_FRACTION =
-        releasedFlag(259395680, "simplified_appear_fraction")
-
     // TODO(b/257315550): Tracking Bug
     val NO_HUN_FOR_OLD_WHEN = releasedFlag(118, "no_hun_for_old_when")
 
@@ -221,7 +217,7 @@ object Flags {
     // TODO(b/267722622): Tracking Bug
     @JvmField
     val WALLPAPER_PICKER_UI_FOR_AIWP =
-            unreleasedFlag(
+            releasedFlag(
                     229,
                     "wallpaper_picker_ui_for_aiwp"
             )
@@ -364,7 +360,8 @@ object Flags {
 
     // TODO(b/280426085): Tracking Bug
     @JvmField
-    val NEW_BLUETOOTH_REPOSITORY = unreleasedFlag(612, "new_bluetooth_repository")
+    val NEW_BLUETOOTH_REPOSITORY =
+            unreleasedFlag(612, "new_bluetooth_repository", teamfood = true)
 
     // 700 - dialer/calls
     // TODO(b/254512734): Tracking Bug
@@ -543,7 +540,7 @@ object Flags {
     // TODO(b/273443374): Tracking Bug
     @Keep
     @JvmField val LOCKSCREEN_LIVE_WALLPAPER =
-        sysPropBooleanFlag(1117, "persist.wm.debug.lockscreen_live_wallpaper", default = false)
+        sysPropBooleanFlag(1117, "persist.wm.debug.lockscreen_live_wallpaper", default = true)
 
     // TODO(b/281648899): Tracking bug
     @Keep
@@ -578,7 +575,7 @@ object Flags {
 
     // TODO(b/270987164): Tracking Bug
     @JvmField
-    val TRACKPAD_GESTURE_FEATURES = unreleasedFlag(1205, "trackpad_gesture_features", teamfood = true)
+    val TRACKPAD_GESTURE_FEATURES = releasedFlag(1205, "trackpad_gesture_features")
 
     // TODO(b/263826204): Tracking Bug
     @JvmField
@@ -637,6 +634,9 @@ object Flags {
     // TODO(b/265944639): Tracking Bug
     @JvmField val DUAL_SHADE = unreleasedFlag(1801, "dual_shade")
 
+    // TODO(b/283300105): Tracking Bug
+    @JvmField val SCENE_CONTAINER = unreleasedFlag(1802, "scene_container")
+
     // 1900
     @JvmField val NOTE_TASKS = releasedFlag(1900, "keycode_flag")
 
@@ -667,10 +667,11 @@ object Flags {
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag(2300, "track_stylus_ever_used")
     @JvmField
-    val ENABLE_STYLUS_CHARGING_UI = releasedFlag(2301, "enable_stylus_charging_ui")
+    val ENABLE_STYLUS_CHARGING_UI =
+        unreleasedFlag(2301, "enable_stylus_charging_ui", teamfood = true)
     @JvmField
     val ENABLE_USI_BATTERY_NOTIFICATIONS =
-        releasedFlag(2302, "enable_usi_battery_notifications")
+        unreleasedFlag(2302, "enable_usi_battery_notifications", teamfood = true)
     @JvmField val ENABLE_STYLUS_EDUCATION =
         unreleasedFlag(2303, "enable_stylus_education", teamfood = true)
 
@@ -711,8 +712,7 @@ object Flags {
 
     // TODO(b/259428678): Tracking Bug
     @JvmField
-    val KEYBOARD_BACKLIGHT_INDICATOR =
-            unreleasedFlag(2601, "keyboard_backlight_indicator", teamfood = true)
+    val KEYBOARD_BACKLIGHT_INDICATOR = releasedFlag(2601, "keyboard_backlight_indicator")
 
     // TODO(b/277192623): Tracking Bug
     @JvmField

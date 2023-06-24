@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Sallii sovelluksen noutaa tietoja rekisteröidyistä sovellustunnuksista, maksureitin kohteesta ja muita ensisijaisia NFC-maksupalvelutietoja."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"hallitse Near Field Communication -tunnistusta"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Antaa sovelluksen kommunikoida NFC (Near Field Communication) -tagien, -korttien ja -lukijoiden kanssa."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Secure Element ‑maksutapahtuma"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Sallii sovelluksen vastaanottaa tietoa Secure Elementissä tapahtuvista maksutapahtumista."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"poista näytön lukitus käytöstä"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Antaa sovelluksen ottaa näppäinlukon ja siihen liittyvän salasanasuojauksen pois käytöstä. Esimerkki: puhelin poistaa näppäinlukon käytöstä puhelun saapuessa ja asettaa lukon takaisin käyttöön puhelun päättyessä."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"pyytää näytön lukituksen monimutkaisuutta"</string>

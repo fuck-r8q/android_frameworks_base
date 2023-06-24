@@ -20,7 +20,7 @@
 #ifdef __ANDROID__
 #include "HWUIProperties.sysprop.h"
 #endif
-#include "SkTraceEventCommon.h"
+#include "src/core/SkTraceEventCommon.h"
 
 #include <algorithm>
 #include <cstdlib>

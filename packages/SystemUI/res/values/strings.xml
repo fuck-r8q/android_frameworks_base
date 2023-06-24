@@ -2406,6 +2406,8 @@
     <string name="magnification_mode_switch_state_window">Magnify part of screen</string>
     <!-- Click action label for magnification settings panel. [CHAR LIMIT=NONE] -->
     <string name="magnification_open_settings_click_label">Open magnification settings</string>
+    <!-- Click action label for magnification settings panel. [CHAR LIMIT=NONE] -->
+    <string name="magnification_close_settings_click_label">Close magnification settings</string>
     <!-- Label of the corner of a rectangle that you can tap and drag to resize the magnification area. [CHAR LIMIT=NONE] -->
     <string name="magnification_drag_corner_to_resize">Drag corner to resize</string>
 
@@ -2987,9 +2989,11 @@
         <xliff:g id="weather_condition" example="Partly cloudy">%1$s</xliff:g>, <xliff:g id="temperature" example="7°C">%2$s</xliff:g>
     </string>
 
-    <!-- TODO(b/259369672): Replace with final resource. -->
     <!-- [CHAR LIMIT=30] Label used to open Note Task -->
-    <string name="note_task_button_label">Notetaking</string>
+    <string name="note_task_button_label">Note-taking</string>
+
+    <!-- [CHAR LIMIT=25] Long label used by Note Task Shortcut -->
+    <string name="note_task_shortcut_long_label">Note-taking, <xliff:g id="note_taking_app" example="Note-taking App">%1$s</xliff:g></string>
 
     <!-- [CHAR LIMIT=NONE] Le audio broadcast dialog, media app is broadcasting -->
     <string name="broadcasting_description_is_broadcasting">Broadcasting</string>

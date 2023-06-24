@@ -166,6 +166,12 @@ public class UserManager {
     public static final String USER_TYPE_PROFILE_TEST = "android.os.usertype.profile.TEST";
 
     /**
+     * User type representing a communal profile, which is shared by all users of the device.
+     * @hide
+     */
+    public static final String USER_TYPE_PROFILE_COMMUNAL = "android.os.usertype.profile.COMMUNAL";
+
+    /**
      * User type representing a {@link UserHandle#USER_SYSTEM system} user that is <b>not</b> a
      * human user.
      * This type of user cannot be created; it can only pre-exist on first boot.
@@ -2069,6 +2075,13 @@ public class UserManager {
     public static final int REMOVE_RESULT_ALREADY_BEING_REMOVED = 2;
 
     /**
+     * A response code indicating that the specified user is removable.
+     *
+     * @hide
+     */
+    public static final int REMOVE_RESULT_USER_IS_REMOVABLE = 3;
+
+    /**
      * A response code from {@link #removeUserWhenPossible(UserHandle, boolean)} indicating that
      * an unknown error occurred that prevented the user from being removed or set as ephemeral.
      *
@@ -2123,6 +2136,7 @@ public class UserManager {
             REMOVE_RESULT_REMOVED,
             REMOVE_RESULT_DEFERRED,
             REMOVE_RESULT_ALREADY_BEING_REMOVED,
+            REMOVE_RESULT_USER_IS_REMOVABLE,
             REMOVE_RESULT_ERROR_USER_RESTRICTION,
             REMOVE_RESULT_ERROR_USER_NOT_FOUND,
             REMOVE_RESULT_ERROR_SYSTEM_USER,
@@ -2373,6 +2387,16 @@ public class UserManager {
     public static boolean isGuestUserAllowEphemeralStateChange() {
         return Resources.getSystem()
                 .getBoolean(com.android.internal.R.bool.config_guestUserAllowEphemeralStateChange);
+    }
+
+    /**
+     * Returns whether the device is configured to support a Communal Profile.
+     * @hide
+     */
+    public static boolean isCommunalProfileEnabled() {
+        return SystemProperties.getBoolean("persist.fw.omnipresent_communal_user",
+                Resources.getSystem()
+                        .getBoolean(com.android.internal.R.bool.config_omnipresentCommunalUser));
     }
 
     /**
@@ -2682,6 +2706,38 @@ public class UserManager {
             throw re.rethrowFromSystemServer();
         }
     }
+    /**
+     * Returns the designated "communal profile" of the device, or {@code null} if there is none.
+     * @hide
+     */
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MANAGE_USERS,
+            Manifest.permission.CREATE_USERS,
+            Manifest.permission.QUERY_USERS})
+    public @Nullable UserHandle getCommunalProfile() {
+        try {
+            final int userId = mService.getCommunalProfileId();
+            if (userId == UserHandle.USER_NULL) {
+                return null;
+            }
+            return UserHandle.of(userId);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns {@code true} if the given user is the designated "communal profile" of the device.
+     * @hide
+     */
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MANAGE_USERS,
+            Manifest.permission.CREATE_USERS,
+            Manifest.permission.QUERY_USERS})
+    public boolean isCommunalProfile(@UserIdInt int userId) {
+        final UserInfo user = getUserInfo(userId);
+        return user != null && user.isCommunalProfile();
+    }
 
     /**
      * Used to check if the context user is an admin user. An admin user may be allowed to
@@ -2784,6 +2840,15 @@ public class UserManager {
     }
 
     /**
+     * Returns whether the user type is a
+     * {@link UserManager#USER_TYPE_PROFILE_COMMUNAL communal profile}.
+     * @hide
+     */
+    public static boolean isUserTypeCommunalProfile(@Nullable String userType) {
+        return USER_TYPE_PROFILE_COMMUNAL.equals(userType);
+    }
+
+    /**
      * @hide
      * @deprecated Use {@link #isRestrictedProfile()}
      */
@@ -2793,7 +2858,8 @@ public class UserManager {
             enabledSinceTargetSdkVersion = Build.VERSION_CODES.TIRAMISU,
             requiresAnyOfPermissionsIfNotCaller = {
                     android.Manifest.permission.MANAGE_USERS,
-                    android.Manifest.permission.CREATE_USERS}
+                    android.Manifest.permission.CREATE_USERS,
+                    android.Manifest.permission.QUERY_USERS}
     )
     public boolean isLinkedUser() {
         return isRestrictedProfile();
@@ -2811,7 +2877,8 @@ public class UserManager {
             enabledSinceTargetSdkVersion = Build.VERSION_CODES.TIRAMISU,
             requiresAnyOfPermissionsIfNotCaller = {
                     android.Manifest.permission.MANAGE_USERS,
-                    android.Manifest.permission.CREATE_USERS}
+                    android.Manifest.permission.CREATE_USERS,
+                    android.Manifest.permission.QUERY_USERS}
     )
     public boolean isRestrictedProfile() {
         try {
@@ -2832,7 +2899,8 @@ public class UserManager {
     @SystemApi
     @RequiresPermission(anyOf = {
             Manifest.permission.MANAGE_USERS,
-            Manifest.permission.CREATE_USERS},
+            Manifest.permission.CREATE_USERS,
+            Manifest.permission.QUERY_USERS},
             conditional = true)
     public boolean isRestrictedProfile(@NonNull UserHandle user) {
         try {
@@ -3227,6 +3295,7 @@ public class UserManager {
      *   <li>(Running) profiles of the current foreground user.
      *   <li>Background users assigned to secondary displays (for example, passenger users on
      *   automotive builds, using the display associated with their seats).
+     *   <li>A communal profile, if present.
      * </ol>
      *
      * @return whether the user is visible at the moment, as defined above.
@@ -5334,6 +5403,21 @@ public class UserManager {
     public @DrawableRes int getUserBadgeNoBackgroundResId(@UserIdInt int userId) {
         try {
             return mService.getUserBadgeNoBackgroundResId(userId);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the Resource ID of the user's status bar icon.
+     *
+     * @return the Resource ID of the user's status bar icon if it has one; otherwise
+     *         {@link Resources#ID_NULL}.
+     * @hide
+     */
+    public @DrawableRes int getUserStatusBarIconResId(@UserIdInt int userId) {
+        try {
+            return mService.getUserStatusBarIconResId(userId);
         } catch (RemoteException re) {
             throw re.rethrowFromSystemServer();
         }

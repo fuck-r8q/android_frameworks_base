@@ -100,6 +100,10 @@ filegroup {
         ":android.hardware.gnss-V2-java-source",
         ":android.hardware.graphics.common-V3-java-source",
         ":android.hardware.keymaster-V4-java-source",
+        ":android.hardware.radio-V3-java-source",
+        ":android.hardware.radio.data-V3-java-source",
+        ":android.hardware.radio.network-V3-java-source",
+        ":android.hardware.radio.voice-V3-java-source",
         ":android.hardware.security.keymint-V3-java-source",
         ":android.hardware.security.secureclock-V1-java-source",
         ":android.hardware.thermal-V1-java-source",
@@ -213,20 +217,15 @@ java_library {
         "android.hardware.gnss-V1.0-java",
         "android.hardware.gnss-V2.1-java",
         "android.hardware.health-V1.0-java-constants",
-        "android.hardware.radio-V1.0-java",
-        "android.hardware.radio-V1.1-java",
-        "android.hardware.radio-V1.2-java",
-        "android.hardware.radio-V1.3-java",
-        "android.hardware.radio-V1.4-java",
-        "android.hardware.radio-V1.5-java",
         "android.hardware.radio-V1.6-java",
-        "android.hardware.radio.data-V2-java",
-        "android.hardware.radio.ims-V1-java",
-        "android.hardware.radio.messaging-V2-java",
-        "android.hardware.radio.modem-V2-java",
-        "android.hardware.radio.network-V2-java",
-        "android.hardware.radio.sim-V2-java",
-        "android.hardware.radio.voice-V2-java",
+        "android.hardware.radio.data-V3-java",
+        "android.hardware.radio.ims-V2-java",
+        "android.hardware.radio.messaging-V3-java",
+        "android.hardware.radio.modem-V3-java",
+        "android.hardware.radio.network-V3-java",
+        "android.hardware.radio.satellite-V1-java",
+        "android.hardware.radio.sim-V3-java",
+        "android.hardware.radio.voice-V3-java",
         "android.hardware.thermal-V1.0-java-constants",
         "android.hardware.thermal-V1.0-java",
         "android.hardware.thermal-V1.1-java",
@@ -528,6 +527,13 @@ filegroup {
 }
 
 filegroup {
+    name: "framework-android-os-unit-testable-src",
+    srcs: [
+        "core/java/android/os/DdmSyncState.java",
+    ],
+}
+
+filegroup {
     name: "framework-networkstack-shared-srcs",
     srcs: [
         // TODO: remove these annotations as soon as we can use andoid.support.annotations.*
@@ -665,8 +671,6 @@ stubs_defaults {
     libs: [
         "android.hardware.cas-V1.2-java",
         "android.hardware.health-V1.0-java-constants",
-        "android.hardware.radio-V1.5-java",
-        "android.hardware.radio-V1.6-java",
         "android.hardware.thermal-V1.0-java-constants",
         "android.hardware.thermal-V2.0-java",
         "android.hardware.tv.input-V1.0-java-constants",

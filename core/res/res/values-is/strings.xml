@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Gerir forritinu kleift að fá valda NFC-greiðsluþjónustu, svo sem skráða aðstoð og áfangastað leiðar."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"stjórna nándarsamskiptum (NFC)"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Leyfir forriti að eiga samskipti við NFC-merki, -spjöld og -lesara (nándarsamskipti)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Færslutilvik í öryggiseiningu"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Gerir forritinu kleift að móttaka upplýsingar um færslur sem fara fram í öryggiseiningu."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"slökkva á skjálásnum"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Leyfir forriti að slökkva á símalásnum og öðrum öryggisaðgerðum tengdum aðgangsorði. Til dæmis gerir síminn lásinn óvirkan þegar símtal berst og læsist svo aftur að símtali loknu."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"biðja um flókinn skjálás"</string>

@@ -91,6 +91,7 @@ import android.view.Display;
 import android.view.IRemoteAnimationRunner;
 import android.view.IWindowManager;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.ThreadedRenderer;
 import android.view.View;
 import android.view.ViewGroup;
@@ -428,6 +429,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     public void togglePanel() {
         mCommandQueueCallbacks.togglePanel();
     }
+
     /**
      * The {@link StatusBarState} of the status bar.
      */
@@ -455,7 +457,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private PhoneStatusBarTransitions mStatusBarTransitions;
     private final AuthRippleController mAuthRippleController;
     @WindowVisibleState private int mStatusBarWindowState = WINDOW_STATE_SHOWING;
-    protected final NotificationShadeWindowController mNotificationShadeWindowController;
+    private final NotificationShadeWindowController mNotificationShadeWindowController;
     private final StatusBarInitializer mStatusBarInitializer;
     private final StatusBarWindowController mStatusBarWindowController;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -505,7 +507,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final AlternateBouncerInteractor mAlternateBouncerInteractor;
 
     private final PluginDependencyProvider mPluginDependencyProvider;
-    private final KeyguardDismissUtil mKeyguardDismissUtil;
     private final ExtensionController mExtensionController;
     private final UserInfoControllerImpl mUserInfoControllerImpl;
     private final DemoModeController mDemoModeController;
@@ -792,7 +793,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             InitController initController,
             @Named(TIME_TICK_HANDLER_NAME) Handler timeTickHandler,
             PluginDependencyProvider pluginDependencyProvider,
-            KeyguardDismissUtil keyguardDismissUtil,
             ExtensionController extensionController,
             UserInfoControllerImpl userInfoControllerImpl,
             PhoneStatusBarPolicy phoneStatusBarPolicy,
@@ -889,7 +889,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mKeyguardViewMediatorCallback = viewMediatorCallback;
         mInitController = initController;
         mPluginDependencyProvider = pluginDependencyProvider;
-        mKeyguardDismissUtil = keyguardDismissUtil;
         mExtensionController = extensionController;
         mUserInfoControllerImpl = userInfoControllerImpl;
         mIconPolicy = phoneStatusBarPolicy;
@@ -1151,7 +1150,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     @Override
                     public void onPluginConnected(OverlayPlugin plugin, Context pluginContext) {
                         mMainExecutor.execute(
-                                () -> plugin.setup(getNotificationShadeWindowView(),
+                                () -> plugin.setup(
+                                        mNotificationShadeWindowController.getWindowRootView(),
                                         getNavigationBarView(),
                                         new Callback(plugin), mDozeParameters));
                     }
@@ -1665,12 +1665,13 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 CollapsedStatusBarFragment.class,
                 mCentralSurfacesComponent::createCollapsedStatusBarFragment);
 
+        ViewGroup windowRootView = mCentralSurfacesComponent.getWindowRootView();
         mNotificationShadeWindowView = mCentralSurfacesComponent.getNotificationShadeWindowView();
         mNotificationShadeWindowViewController = mCentralSurfacesComponent
                 .getNotificationShadeWindowViewController();
         // TODO(b/277762009): Inject [NotificationShadeWindowView] directly into the controller.
         //  (Right now, there's a circular dependency.)
-        mNotificationShadeWindowController.setNotificationShadeView(mNotificationShadeWindowView);
+        mNotificationShadeWindowController.setWindowRootView(windowRootView);
         mNotificationShadeWindowViewController.setupExpandedStatusBar();
         NotificationPanelViewController npvc =
                 mCentralSurfacesComponent.getNotificationPanelViewController();
@@ -1746,18 +1747,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         mLightBarController.setBiometricUnlockController(mBiometricUnlockController);
         mMediaManager.setBiometricUnlockController(mBiometricUnlockController);
-        mKeyguardDismissUtil.setDismissHandler(this::executeWhenUnlocked);
         Trace.endSection();
-    }
-
-    @Override
-    public NotificationShadeWindowView getNotificationShadeWindowView() {
-        return mNotificationShadeWindowView;
-    }
-
-    @Override
-    public NotificationShadeWindowViewController getNotificationShadeWindowViewController() {
-        return mNotificationShadeWindowViewController;
     }
 
     @Override
@@ -1830,11 +1820,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public void onKeyguardViewManagerStatesUpdated() {
         logStateToEventlog();
-    }
-
-    @Override
-    public ViewGroup getNotificationScrollLayout() {
-        return mStackScroller;
     }
 
     @Override
@@ -1995,6 +1980,11 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         } else {
             mShadeSurface.stopWaitingForExpandGesture(cancel, velocity);
         }
+    }
+
+    @Override
+    public void onStatusBarTrackpadEvent(MotionEvent event) {
+        mCentralSurfacesComponent.getNotificationPanelViewController().handleExternalTouch(event);
     }
 
     @Override
@@ -2256,8 +2246,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 + CameraIntents.getOverrideCameraPackage(mContext));
     }
 
-    @Override
-    public void createAndAddWindows(@Nullable RegisterStatusBarResult result) {
+    private void createAndAddWindows(@Nullable RegisterStatusBarResult result) {
         makeStatusBarView(result);
         mNotificationShadeWindowController.attach();
         mStatusBarWindowController.attach();
@@ -2363,15 +2352,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public void resetUserExpandedStates() {
         mNotificationsController.resetUserExpandedStates();
-    }
-
-    private void executeWhenUnlocked(OnDismissAction action, boolean requiresShadeOpen,
-            boolean afterKeyguardGone) {
-        if (mKeyguardStateController.isShowing() && requiresShadeOpen) {
-            mStatusBarStateController.setLeaveOpenOnKeyguardHide(true);
-        }
-        mActivityStarter.dismissKeyguardThenExecute(action, null /* cancelAction */,
-                afterKeyguardGone /* afterKeyguardGone */);
     }
 
     /**
@@ -3047,11 +3027,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         }
     }
 
-    @Override
-    public LightRevealScrim getLightRevealScrim() {
-        return mLightRevealScrim;
-    }
-
     // TODO: Figure out way to remove these.
     @Override
     public NavigationBarView getNavigationBarView() {
@@ -3074,9 +3049,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     }
 
     protected ViewRootImpl getViewRootImpl()  {
-        NotificationShadeWindowView nswv = getNotificationShadeWindowView();
-        if (nswv != null) return nswv.getViewRootImpl();
-
+        View root = mNotificationShadeWindowController.getWindowRootView();
+        if (root != null) return root.getViewRootImpl();
         return null;
     }
     /**
@@ -3286,7 +3260,22 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mNotificationShadeWindowController.batchApplyWindowLayoutParams(
                         this::startLockscreenTransitionFromAod);
             }
-            mWakeUpCoordinator.setFullyAwake(true);
+            mNotificationShadeWindowController.batchApplyWindowLayoutParams(()-> {
+                // stopDozing() starts the LOCKSCREEN_TRANSITION_FROM_AOD animation.
+                mDozeServiceHost.stopDozing();
+                // This is intentionally below the stopDozing call above, since it avoids that we're
+                // unnecessarily animating the wakeUp transition. Animations should only be enabled
+                // once we fully woke up.
+                updateRevealEffect(true /* wakingUp */);
+                updateNotificationPanelTouchState();
+                mStatusBarTouchableRegionManager.updateTouchableRegion();
+
+                // If we are waking up during the screen off animation, we should undo making the
+                // expanded visible (we did that so the LightRevealScrim would be visible).
+                if (mScreenOffAnimationController.shouldHideLightRevealScrimOnWakeUp()) {
+                    mShadeController.makeExpandedInvisible();
+                }
+            });            mWakeUpCoordinator.setFullyAwake(true);
             mWakeUpCoordinator.setWakingUp(false, false);
             if (mKeyguardStateController.isOccluded()
                     && !mDozeParameters.canControlUnlockedScreenOff()) {

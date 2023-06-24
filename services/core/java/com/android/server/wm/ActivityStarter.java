@@ -105,7 +105,6 @@ import android.app.WaitResult;
 import android.app.WindowConfiguration;
 import android.app.RemoteTaskConstants;
 import android.compat.annotation.ChangeId;
-import android.compat.annotation.Disabled;
 import android.compat.annotation.EnabledSince;
 import android.content.IIntentSender;
 import android.content.Intent;
@@ -192,7 +191,7 @@ class ActivityStarter {
      * Feature flag for go/activity-security rules
      */
     @ChangeId
-    @Disabled
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     static final long ASM_RESTRICTIONS = 230590090L;
 
     private final ActivityTaskManagerService mService;
@@ -2980,15 +2979,6 @@ class ActivityStarter {
                 mTargetRootTask = getOrCreateRootTask(mStartActivity, mLaunchFlags, intentTask,
                         mOptions);
             }
-        }
-
-        // If the matching task is already in the adjacent task of the launch target. Adjust to use
-        // the adjacent task as its launch target. So the existing task will be launched into the
-        // closer one and won't be reparent redundantly.
-        final Task adjacentTargetTask = mTargetRootTask.getAdjacentTask();
-        if (adjacentTargetTask != null && intentActivity.isDescendantOf(adjacentTargetTask)
-                && intentTask.isOnTop()) {
-            mTargetRootTask = adjacentTargetTask;
         }
 
         // If the target task is not in the front, then we need to bring it to the front...

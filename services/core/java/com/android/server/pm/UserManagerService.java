@@ -1049,6 +1049,26 @@ public class UserManagerService extends IUserManager.Stub {
         return previousUser;
     }
 
+    @Override
+    public @UserIdInt int getCommunalProfileId() {
+        checkQueryOrCreateUsersPermission("get communal profile user id");
+        return getCommunalProfileIdUnchecked();
+    }
+
+    /** Returns the currently-designated communal profile, or USER_NULL if not present. */
+    private @UserIdInt int getCommunalProfileIdUnchecked() {
+        synchronized (mUsersLock) {
+            final int userSize = mUsers.size();
+            for (int i = 0; i < userSize; i++) {
+                final UserInfo user = mUsers.valueAt(i).info;
+                if (user.isCommunalProfile() && !mRemovingUserIds.get(user.id)) {
+                    return user.id;
+                }
+            }
+        }
+        return UserHandle.USER_NULL;
+    }
+
     public @NonNull List<UserInfo> getUsers(boolean excludeDying) {
         return getUsers(/*excludePartial= */ true, excludeDying, /* excludePreCreated= */
                 true);
@@ -1209,6 +1229,10 @@ public class UserManagerService extends IUserManager.Stub {
         return isSameProfileGroupNoChecks(userId, otherUserId);
     }
 
+    /**
+     * Returns whether users are in the same non-empty profile group.
+     * Currently, false if empty profile group, even if they are the same user, for whatever reason.
+     */
     private boolean isSameProfileGroupNoChecks(@UserIdInt int userId, int otherUserId) {
         synchronized (mUsersLock) {
             UserInfo userInfo = getUserInfoLU(userId);
@@ -1222,6 +1246,16 @@ public class UserManagerService extends IUserManager.Stub {
             }
             return userInfo.profileGroupId == otherUserInfo.profileGroupId;
         }
+    }
+
+    /**
+     * Returns whether users are in the same profile group, or if the target is a communal profile.
+     */
+    private boolean isSameUserOrProfileGroupOrTargetIsCommunal(UserInfo asker, UserInfo target) {
+        if (asker.id == target.id) return true;
+        if (target.isCommunalProfile()) return true;
+        return (asker.profileGroupId != UserInfo.NO_PROFILE_GROUP_ID
+                && asker.profileGroupId == target.profileGroupId);
     }
 
     @Override
@@ -1875,6 +1909,18 @@ public class UserManagerService extends IUserManager.Stub {
         return userTypeDetails.getBadgeNoBackground();
     }
 
+    @Override
+    public @DrawableRes int getUserStatusBarIconResId(@UserIdInt int userId) {
+        checkManageOrInteractPermissionIfCallerInOtherProfileGroup(userId,
+                "getUserStatusBarIconResId");
+        final UserTypeDetails userTypeDetails = getUserTypeDetailsNoChecks(userId);
+        if (userTypeDetails == null || !userTypeDetails.hasBadge()) {
+            Slog.w(LOG_TAG, "Requested status bar icon for non-badged user " + userId);
+            return Resources.ID_NULL;
+        }
+        return userTypeDetails.getStatusBarIcon();
+    }
+
     public boolean isProfile(@UserIdInt int userId) {
         checkQueryOrInteractPermissionIfCallerInOtherProfileGroup(userId, "isProfile");
         return isProfileUnchecked(userId);
@@ -2286,7 +2332,7 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public boolean isRestricted(@UserIdInt int userId) {
         if (userId != UserHandle.getCallingUserId()) {
-            checkCreateUsersPermission("query isRestricted for user " + userId);
+            checkQueryOrCreateUsersPermission("query isRestricted for user " + userId);
         }
         synchronized (mUsersLock) {
             final UserInfo userInfo = getUserInfoLU(userId);
@@ -2507,39 +2553,56 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public boolean setUserEphemeral(@UserIdInt int userId, boolean enableEphemeral) {
         checkCreateUsersPermission("update ephemeral user flag");
-        UserData userToUpdate = null;
+        return enableEphemeral
+                ? UserManager.isRemoveResultSuccessful(setUserEphemeralUnchecked(userId))
+                : setUserNonEphemeralUnchecked(userId);
+    }
+
+    private boolean setUserNonEphemeralUnchecked(@UserIdInt int userId) {
         synchronized (mPackagesLock) {
+            final UserData userData;
             synchronized (mUsersLock) {
-                final UserData userData = mUsers.get(userId);
+                userData = mUsers.get(userId);
                 if (userData == null) {
-                    Slog.e(LOG_TAG, "User not found for setting ephemeral mode: u" + userId);
+                    Slog.e(LOG_TAG, TextUtils.formatSimple(
+                            "Cannot set user %d non-ephemeral, invalid user id provided.", userId));
                     return false;
                 }
-                boolean isEphemeralUser = (userData.info.flags & UserInfo.FLAG_EPHEMERAL) != 0;
-                boolean isEphemeralOnCreateUser =
-                        (userData.info.flags & UserInfo.FLAG_EPHEMERAL_ON_CREATE) != 0;
-                // when user is created in ephemeral mode via FLAG_EPHEMERAL
-                // its state cannot be changed to non ephemeral.
-                // FLAG_EPHEMERAL_ON_CREATE is used to keep track of this state
-                if (isEphemeralOnCreateUser && !enableEphemeral) {
-                    Slog.e(LOG_TAG, "Failed to change user state to non-ephemeral for user "
-                            + userId);
+                if (!userData.info.isEphemeral()) {
+                    return true;
+                }
+
+                if ((userData.info.flags & UserInfo.FLAG_EPHEMERAL_ON_CREATE) != 0) {
+                    // when user is created in ephemeral mode via FLAG_EPHEMERAL
+                    // its state cannot be changed to non-ephemeral.
+                    // FLAG_EPHEMERAL_ON_CREATE is used to keep track of this state
+                    Slog.e(LOG_TAG, TextUtils.formatSimple("User %d can not be changed to "
+                            + "non-ephemeral because it was set ephemeral on create.", userId));
                     return false;
                 }
-                if (isEphemeralUser != enableEphemeral) {
-                    if (enableEphemeral) {
-                        userData.info.flags |= UserInfo.FLAG_EPHEMERAL;
-                    } else {
-                        userData.info.flags &= ~UserInfo.FLAG_EPHEMERAL;
-                    }
-                    userToUpdate = userData;
-                }
             }
-            if (userToUpdate != null) {
-                writeUserLP(userToUpdate);
-            }
+            userData.info.flags &= ~UserInfo.FLAG_EPHEMERAL;
+            writeUserLP(userData);
         }
         return true;
+    }
+
+    private @UserManager.RemoveResult int setUserEphemeralUnchecked(@UserIdInt int userId) {
+        synchronized (mPackagesLock) {
+            final UserData userData;
+            synchronized (mUsersLock) {
+                final int userRemovability = getUserRemovabilityLocked(userId, "set as ephemeral");
+                if (userRemovability != UserManager.REMOVE_RESULT_USER_IS_REMOVABLE) {
+                    return userRemovability;
+                }
+                userData = mUsers.get(userId);
+            }
+            userData.info.flags |= UserInfo.FLAG_EPHEMERAL;
+            writeUserLP(userData);
+        }
+        Slog.i(LOG_TAG, TextUtils.formatSimple(
+                "User %d is set ephemeral and will be removed on user switch or reboot.", userId));
+        return UserManager.REMOVE_RESULT_DEFERRED;
     }
 
     @Override
@@ -2578,11 +2641,8 @@ public class UserManagerService extends IUserManager.Stub {
             }
 
             final int callingUserId = UserHandle.getCallingUserId();
-            final int callingGroupId = getUserInfoNoChecks(callingUserId).profileGroupId;
-            final int targetGroupId = targetUserInfo.profileGroupId;
-            final boolean sameGroup = (callingGroupId != UserInfo.NO_PROFILE_GROUP_ID
-                    && callingGroupId == targetGroupId);
-            if ((callingUserId != targetUserId) && !sameGroup) {
+            final UserInfo callingUserInfo = getUserInfoNoChecks(callingUserId);
+            if (!isSameUserOrProfileGroupOrTargetIsCommunal(callingUserInfo, targetUserInfo)) {
                 checkManageUsersPermission("get the icon of a user who is not related");
             }
 
@@ -4803,6 +4863,7 @@ public class UserManagerService extends IUserManager.Stub {
         final boolean isRestricted = UserManager.isUserTypeRestricted(userType);
         final boolean isDemo = UserManager.isUserTypeDemo(userType);
         final boolean isManagedProfile = UserManager.isUserTypeManagedProfile(userType);
+        final boolean isCommunalProfile = UserManager.isUserTypeCommunalProfile(userType);
 
         final long ident = Binder.clearCallingIdentity();
         UserInfo userInfo;
@@ -4837,7 +4898,8 @@ public class UserManagerService extends IUserManager.Stub {
                             UserManager.USER_OPERATION_ERROR_MAX_USERS);
                 }
                 // TODO(b/142482943): Perhaps let the following code apply to restricted users too.
-                if (isProfile && !canAddMoreProfilesToUser(userType, parentId, false)) {
+                if (isProfile && !isCommunalProfile &&
+                        !canAddMoreProfilesToUser(userType, parentId, false)) {
                     throwCheckedUserOperationException(
                             "Cannot add more profiles of type " + userType
                                     + " for user " + parentId,
@@ -5422,23 +5484,37 @@ public class UserManagerService extends IUserManager.Stub {
     }
 
     private boolean removeUserWithProfilesUnchecked(@UserIdInt int userId) {
-        UserInfo userInfo = getUserInfoNoChecks(userId);
-
-        if (userInfo == null) {
-            Slog.e(LOG_TAG, TextUtils.formatSimple(
-                    "Cannot remove user %d, invalid user id provided.", userId));
-            return false;
+        final UserData userData;
+        final boolean isProfile;
+        final IntArray profileIds;
+        synchronized (mUsersLock) {
+            final int userRemovability = getUserRemovabilityLocked(userId, "removed");
+            if (userRemovability != UserManager.REMOVE_RESULT_USER_IS_REMOVABLE) {
+                return UserManager.isRemoveResultSuccessful(userRemovability);
+            }
+            userData = mUsers.get(userId);
+            isProfile = userData.info.isProfile();
+            profileIds = isProfile ? null : getProfileIdsLU(userId, null, false);
         }
 
-        if (!userInfo.isProfile()) {
-            int[] profileIds = getProfileIds(userId, false);
-            for (int profileId : profileIds) {
+        if (!isProfile) {
+            Pair<Integer, Integer> currentAndTargetUserIds = getCurrentAndTargetUserIds();
+            if (userId == currentAndTargetUserIds.first) {
+                Slog.w(LOG_TAG, "Current user cannot be removed.");
+                return false;
+            }
+            if (userId == currentAndTargetUserIds.second) {
+                Slog.w(LOG_TAG, "Target user of an ongoing user switch cannot be removed.");
+                return false;
+            }
+            for (int i = profileIds.size() - 1; i >= 0; i--) {
+                int profileId = profileIds.get(i);
                 if (profileId == userId) {
                     //Remove the associated profiles first and then remove the user
                     continue;
                 }
                 Slog.i(LOG_TAG, "removing profile:" + profileId
-                        + "associated with user:" + userId);
+                        + " associated with user:" + userId);
                 if (!removeUserUnchecked(profileId)) {
                     // If the profile was not immediately removed, make sure it is marked as
                     // ephemeral. Don't mark as disabled since, per UserInfo.FLAG_DISABLED
@@ -5485,45 +5561,16 @@ public class UserManagerService extends IUserManager.Stub {
         final long ident = Binder.clearCallingIdentity();
         try {
             final UserData userData;
-            Pair<Integer, Integer> currentAndTargetUserIds = getCurrentAndTargetUserIds();
-            if (userId == currentAndTargetUserIds.first) {
-                Slog.w(LOG_TAG, "Current user cannot be removed.");
-                return false;
-            }
-            if (userId == currentAndTargetUserIds.second) {
-                Slog.w(LOG_TAG, "Target user of an ongoing user switch cannot be removed.");
-                return false;
-            }
             synchronized (mPackagesLock) {
                 synchronized (mUsersLock) {
+                    final int userRemovability = getUserRemovabilityLocked(userId, "removed");
+                    if (userRemovability != UserManager.REMOVE_RESULT_USER_IS_REMOVABLE) {
+                        return UserManager.isRemoveResultSuccessful(userRemovability);
+                    }
                     userData = mUsers.get(userId);
-                    if (userId == UserHandle.USER_SYSTEM) {
-                        Slog.e(LOG_TAG, "System user cannot be removed.");
-                        return false;
-                    }
-
-                    if (userData == null) {
-                        Slog.e(LOG_TAG, TextUtils.formatSimple(
-                                "Cannot remove user %d, invalid user id provided.", userId));
-                        return false;
-                    }
-
-                    if (isNonRemovableMainUser(userData.info)) {
-                        Slog.e(LOG_TAG, "Main user cannot be removed when "
-                                + "it's a permanent admin user.");
-                        return false;
-                    }
-
-                    if (mRemovingUserIds.get(userId)) {
-                        Slog.e(LOG_TAG, TextUtils.formatSimple(
-                                "User %d is already scheduled for removal.", userId));
-                        return false;
-                    }
-
                     Slog.i(LOG_TAG, "Removing user " + userId);
                     addRemovingUserIdLocked(userId);
                 }
-
                 // Set this to a partially created user, so that the user will be purged
                 // on next startup, in case the runtime stops now before stopping and
                 // removing the user completely.
@@ -5606,6 +5653,7 @@ public class UserManagerService extends IUserManager.Stub {
     @Override
     public @UserManager.RemoveResult int removeUserWhenPossible(@UserIdInt int userId,
             boolean overrideDevicePolicy) {
+        Slog.i(LOG_TAG, "removeUserWhenPossible u" + userId);
         checkCreateUsersPermission("Only the system can remove users");
 
         if (!overrideDevicePolicy) {
@@ -5615,64 +5663,46 @@ public class UserManagerService extends IUserManager.Stub {
                 return UserManager.REMOVE_RESULT_ERROR_USER_RESTRICTION;
             }
         }
+        Slog.i(LOG_TAG, "Attempting to immediately remove user " + userId);
+        if (removeUserWithProfilesUnchecked(userId)) {
+            return UserManager.REMOVE_RESULT_REMOVED;
+        }
+        Slog.i(LOG_TAG, TextUtils.formatSimple(
+                "Unable to immediately remove user %d. Now trying to set it ephemeral.", userId));
+        return setUserEphemeralUnchecked(userId);
+    }
+
+    /**
+     * Returns the user's removability status.
+     * User is removable if the return value is {@link UserManager#REMOVE_RESULT_USER_IS_REMOVABLE}.
+     * If the user is not removable this method also prints the reason.
+     * See also {@link UserManager#isRemoveResultSuccessful}.
+     */
+    @GuardedBy("mUsersLock")
+    private @UserManager.RemoveResult int getUserRemovabilityLocked(@UserIdInt int userId,
+            String msg) {
+        String prefix = TextUtils.formatSimple("User %d can not be %s, ", userId, msg);
         if (userId == UserHandle.USER_SYSTEM) {
-            Slog.e(LOG_TAG, "System user cannot be removed.");
+            Slog.e(LOG_TAG, prefix + "system user cannot be removed.");
             return UserManager.REMOVE_RESULT_ERROR_SYSTEM_USER;
         }
-
-        final long ident = Binder.clearCallingIdentity();
-        try {
-            final UserData userData;
-            synchronized (mPackagesLock) {
-                synchronized (mUsersLock) {
-                    userData = mUsers.get(userId);
-                    if (userData == null) {
-                        Slog.e(LOG_TAG,
-                                "Cannot remove user " + userId + ", invalid user id provided.");
-                        return UserManager.REMOVE_RESULT_ERROR_USER_NOT_FOUND;
-                    }
-
-                    if (isNonRemovableMainUser(userData.info)) {
-                        Slog.e(LOG_TAG, "Main user cannot be removed when "
-                                + "it's a permanent admin user.");
-                        return UserManager.REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN;
-                    }
-
-                    if (mRemovingUserIds.get(userId)) {
-                        Slog.e(LOG_TAG, "User " + userId + " is already scheduled for removal.");
-                        return UserManager.REMOVE_RESULT_ALREADY_BEING_REMOVED;
-                    }
-                }
-
-                // Attempt to immediately remove a non-current and non-target user
-                Pair<Integer, Integer> currentAndTargetUserIds = getCurrentAndTargetUserIds();
-                if (userId != currentAndTargetUserIds.first
-                        && userId != currentAndTargetUserIds.second) {
-                    // Attempt to remove the user. This will fail if the user is the current user
-                    if (removeUserWithProfilesUnchecked(userId)) {
-                        return UserManager.REMOVE_RESULT_REMOVED;
-                    }
-                }
-                // If the user was not immediately removed, make sure it is marked as ephemeral.
-                // Don't mark as disabled since, per UserInfo.FLAG_DISABLED documentation, an
-                // ephemeral user should only be marked as disabled when its removal is in progress.
-                Slog.i(LOG_TAG, TextUtils.formatSimple("Unable to immediately remove user %d "
-                                + "(%s is %d). User is set as ephemeral and will be removed on "
-                                + "user switch or reboot.",
-                        userId,
-                        userId == currentAndTargetUserIds.first
-                                ? "current user"
-                                : "target user of an ongoing user switch",
-                        userId));
-                userData.info.flags |= UserInfo.FLAG_EPHEMERAL;
-                writeUserLP(userData);
-
-                return UserManager.REMOVE_RESULT_DEFERRED;
-            }
-        } finally {
-            Binder.restoreCallingIdentity(ident);
+        final UserData userData = mUsers.get(userId);
+        if (userData == null) {
+            Slog.e(LOG_TAG, prefix + "invalid user id provided.");
+            return UserManager.REMOVE_RESULT_ERROR_USER_NOT_FOUND;
         }
+        if (isNonRemovableMainUser(userData.info)) {
+            Slog.e(LOG_TAG, prefix
+                    + "main user cannot be removed when it's a permanent admin user.");
+            return UserManager.REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN;
+        }
+        if (mRemovingUserIds.get(userId)) {
+            Slog.w(LOG_TAG, prefix + "it is already scheduled for removal.");
+            return UserManager.REMOVE_RESULT_ALREADY_BEING_REMOVED;
+        }
+        return UserManager.REMOVE_RESULT_USER_IS_REMOVABLE;
     }
+
 
     private void finishRemoveUser(final @UserIdInt int userId) {
         Slog.i(LOG_TAG, "finishRemoveUser " + userId);
@@ -7057,6 +7087,7 @@ public class UserManagerService extends IUserManager.Stub {
                     return false;
                 }
 
+                // TODO(b/276473320): Probably use isSameUserOrProfileGroupOrTargetIsCommunal.
                 if (targetUserInfo.profileGroupId == UserInfo.NO_PROFILE_GROUP_ID ||
                         targetUserInfo.profileGroupId != callingUserInfo.profileGroupId) {
                     if (throwSecurityException) {
@@ -7141,8 +7172,12 @@ public class UserManagerService extends IUserManager.Stub {
         @UserAssignmentResult
         public int assignUserToDisplayOnStart(@UserIdInt int userId,
                 @UserIdInt int profileGroupId, @UserStartMode int userStartMode, int displayId) {
+
+            final UserProperties properties = getUserProperties(userId);
+            final boolean isAlwaysVisible =  properties != null && properties.getAlwaysVisible();
+
             return mUserVisibilityMediator.assignUserToDisplayOnStart(userId, profileGroupId,
-                    userStartMode, displayId);
+                    userStartMode, displayId, isAlwaysVisible);
         }
 
         @Override
@@ -7247,6 +7282,11 @@ public class UserManagerService extends IUserManager.Stub {
             }
 
             return getBootUserUnchecked();
+        }
+
+        @Override
+        public @UserIdInt int getCommunalProfileId() {
+            return getCommunalProfileIdUnchecked();
         }
 
     } // class LocalService

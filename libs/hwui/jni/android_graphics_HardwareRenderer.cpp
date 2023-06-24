@@ -27,7 +27,7 @@
 #include <SkColorSpace.h>
 #include <SkData.h>
 #include <SkImage.h>
-#include <SkImagePriv.h>
+#include <SkImageAndroid.h>
 #include <SkPicture.h>
 #include <SkPixmap.h>
 #include <SkSerialProcs.h>
@@ -35,6 +35,7 @@
 #include <SkTypeface.h>
 #include <dlfcn.h>
 #include <gui/TraceUtils.h>
+#include <include/encode/SkPngEncoder.h>
 #include <inttypes.h>
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
@@ -54,6 +55,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <log/log.h>
 #include <vector>
 
 #include "JvmErrorReporter.h"
@@ -477,7 +479,7 @@ public:
         // actually cross thread boundaries here, make a copy so it's immutable proper
         if (bitmap && !bitmap->isImmutable()) {
             ATRACE_NAME("Copying mutable bitmap");
-            return SkImage::MakeFromBitmap(*bitmap);
+            return SkImages::RasterFromBitmap(*bitmap);
         }
         if (img->isTextureBacked()) {
             ATRACE_NAME("Readback of texture image");
@@ -497,7 +499,7 @@ public:
                 return sk_ref_sp(img);
             }
             bm.setImmutable();
-            return SkMakeImageFromRasterBitmap(bm, kNever_SkCopyPixelsMode);
+            return SkImages::PinnableRasterFromBitmap(bm);
         }
         return sk_ref_sp(img);
     }
@@ -524,7 +526,16 @@ public:
         if (iter != context->mTextureMap.end()) {
             img = iter->second.get();
         }
-        return img->encodeToData();
+        if (!img) {
+            return nullptr;
+        }
+        // The following encode (specifically the pixel readback) will fail on a
+        // texture-backed image. They should already be raster images, but on
+        // the off-chance they aren't, we will just serialize it as nothing.
+        if (img->isTextureBacked()) {
+            return SkData::MakeEmpty();
+        }
+        return SkPngEncoder::Encode(nullptr, img, {});
     }
 
     void serialize(SkWStream* stream) const override {

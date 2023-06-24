@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Mengizinkan aplikasi untuk mendapatkan informasi layanan pembayaran NFC pilihan seperti bantuan terdaftar dan tujuan rute."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kontrol NFC"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Mengizinkan apl berkomunikasi dengan tag, kartu, dan alat pembaca Komunikasi Nirkabel Jarak Dekat (NFC)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Peristiwa transaksi Elemen Pengaman"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Mengizinkan aplikasi menerima informasi tentang transaksi yang dilakukan pada Elemen Pengaman."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"nonaktifkan kunci layar Anda"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Memungkinkan aplikasi menonaktifkan kunci tombol dan keamanan sandi apa pun yang terkait. Misalnya, ponsel menonaktifkan kunci tombol saat menerima panggilan telepon masuk, kemudian mengaktifkan kembali kunci tombol ketika panggilan selesai."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"meminta kompleksitas kunci layar"</string>

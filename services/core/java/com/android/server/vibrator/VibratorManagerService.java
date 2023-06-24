@@ -54,6 +54,7 @@ import android.os.VibrationEffect;
 import android.os.VibratorInfo;
 import android.os.vibrator.PrebakedSegment;
 import android.os.vibrator.VibrationEffectSegment;
+import android.os.vibrator.persistence.VibrationXmlParser;
 import android.text.TextUtils;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -70,7 +71,9 @@ import com.android.server.SystemService;
 import libcore.util.NativeAllocationRegistry;
 
 import java.io.FileDescriptor;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -151,7 +154,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     private final VibrationSettings mVibrationSettings;
     private final VibrationScaler mVibrationScaler;
     private final InputDeviceDelegate mInputDeviceDelegate;
-    private final DeviceVibrationEffectAdapter mDeviceVibrationEffectAdapter;
+    private final DeviceAdapter mDeviceAdapter;
 
     private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
         @Override
@@ -196,7 +199,6 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         mVibrationSettings = new VibrationSettings(mContext, mHandler);
         mVibrationScaler = new VibrationScaler(mContext, mVibrationSettings);
         mInputDeviceDelegate = new InputDeviceDelegate(mContext, mHandler);
-        mDeviceVibrationEffectAdapter = new DeviceVibrationEffectAdapter(mVibrationSettings);
 
         VibrationCompleteListener listener = new VibrationCompleteListener(this);
         mNativeWrapper = injector.getNativeWrapper();
@@ -233,6 +235,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 mVibrators.put(vibratorId, injector.createVibratorController(vibratorId, listener));
             }
         }
+
+        // Load vibrator adapter, that depends on hardware info.
+        mDeviceAdapter = new DeviceAdapter(mVibrationSettings, mVibrators);
 
         // Reset the hardware to a default state, in case this is a runtime restart instead of a
         // fresh boot.
@@ -298,20 +303,18 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         return controller.isVibratorInfoLoadSuccessful() ? info : null;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
     @Override // Binder call
     public boolean isVibrating(int vibratorId) {
-        mContext.enforceCallingOrSelfPermission(
-                android.Manifest.permission.ACCESS_VIBRATOR_STATE,
-                "isVibrating");
+        isVibrating_enforcePermission();
         VibratorController controller = mVibrators.get(vibratorId);
         return controller != null && controller.isVibrating();
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
     @Override // Binder call
     public boolean registerVibratorStateListener(int vibratorId, IVibratorStateListener listener) {
-        mContext.enforceCallingOrSelfPermission(
-                android.Manifest.permission.ACCESS_VIBRATOR_STATE,
-                "registerVibratorStateListener");
+        registerVibratorStateListener_enforcePermission();
         VibratorController controller = mVibrators.get(vibratorId);
         if (controller == null) {
             return false;
@@ -319,12 +322,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         return controller.registerVibratorStateListener(listener);
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_VIBRATOR_STATE)
     @Override // Binder call
     public boolean unregisterVibratorStateListener(int vibratorId,
             IVibratorStateListener listener) {
-        mContext.enforceCallingOrSelfPermission(
-                android.Manifest.permission.ACCESS_VIBRATOR_STATE,
-                "unregisterVibratorStateListener");
+        unregisterVibratorStateListener_enforcePermission();
         VibratorController controller = mVibrators.get(vibratorId);
         if (controller == null) {
             return false;
@@ -412,7 +414,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
             if (attrs.isFlagSet(VibrationAttributes.FLAG_INVALIDATE_SETTINGS_CACHE)) {
                 // Force update of user settings before checking if this vibration effect should
                 // be ignored or scaled.
-                mVibrationSettings.mSettingObserver.onChange(false);
+                mVibrationSettings.update();
             }
 
             synchronized (mLock) {
@@ -674,16 +676,16 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
     private Vibration.EndInfo startVibrationLocked(HalVibration vib) {
         Trace.traceBegin(Trace.TRACE_TAG_VIBRATOR, "startVibrationLocked");
         try {
-            vib.updateEffects(
-                    effect -> mVibrationScaler.scale(effect, vib.callerInfo.attrs.getUsage()));
+            // Scale effect before dispatching it to the input devices or the vibration thread.
+            vib.scaleEffects(mVibrationScaler::scale);
             boolean inputDevicesAvailable = mInputDeviceDelegate.vibrateIfAvailable(
-                    vib.callerInfo, vib.getEffect());
+                    vib.callerInfo, vib.getEffectToPlay());
             if (inputDevicesAvailable) {
                 return new Vibration.EndInfo(Vibration.Status.FORWARDED_TO_INPUT_DEVICES);
             }
 
             VibrationStepConductor conductor = new VibrationStepConductor(vib, mVibrationSettings,
-                    mDeviceVibrationEffectAdapter, mVibrators, mVibrationThreadCallbacks);
+                    mDeviceAdapter, mVibrationThreadCallbacks);
             if (mCurrentVibration == null) {
                 return startVibrationOnThreadLocked(conductor);
             }
@@ -1509,7 +1511,7 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         }
 
         public Vibration.DebugInfo getDebugInfo() {
-            return new Vibration.DebugInfo(mStatus, stats, /* effect= */ null,
+            return new Vibration.DebugInfo(mStatus, stats, /* playedEffect= */ null,
                     /* originalEffect= */ null, scale, callerInfo);
         }
 
@@ -1899,6 +1901,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 if ("sequential".equals(cmd)) {
                     return runSequential();
                 }
+                if ("xml".equals(cmd)) {
+                    return runXml();
+                }
                 if ("cancel".equals(cmd)) {
                     return runCancel();
                 }
@@ -1970,6 +1975,14 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 combination.addNext(vibratorId, nextEffect());
             }
             runVibrate(commonOptions, combination.combine());
+            return 0;
+        }
+
+        private int runXml() {
+            CommonOptions commonOptions = new CommonOptions();
+            String xml = getNextArgRequired();
+            CombinedVibration vibration = parseXml(xml);
+            runVibrate(commonOptions, vibration);
             return 0;
         }
 
@@ -2166,6 +2179,18 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                     .build();
         }
 
+        private CombinedVibration parseXml(String xml) {
+            try {
+                VibrationEffect effect = VibrationXmlParser.parse(new StringReader(xml));
+                if (effect == null) {
+                    throw new IllegalArgumentException("Error parsing vibration XML " + xml);
+                }
+                return CombinedVibration.createParallel(effect);
+            } catch (IOException e) {
+                throw new RuntimeException("Error parsing vibration XML " + xml, e);
+            }
+        }
+
         @Override
         public void onHelp() {
             try (PrintWriter pw = getOutPrintWriter();) {
@@ -2182,6 +2207,9 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
                 pw.println("    Vibrates different effects on each vibrator in sync.");
                 pw.println("  sequential [options] (-v <vibrator-id> <effect>...)...");
                 pw.println("    Vibrates different effects on each vibrator in sequence.");
+                pw.println("  xml [options] <xml>");
+                pw.println("    Vibrates using combined vibration described in given XML string.");
+                pw.println("    XML containing a single effect it runs on all vibrators in sync.");
                 pw.println("  cancel");
                 pw.println("    Cancels any active vibration");
                 pw.println("");

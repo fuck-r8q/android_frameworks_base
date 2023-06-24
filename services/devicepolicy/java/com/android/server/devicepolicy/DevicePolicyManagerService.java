@@ -3186,6 +3186,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         final ActiveAdmin admin = getActiveAdminUncheckedLocked(adminReceiver, userHandle);
         DevicePolicyData policy = getUserData(userHandle);
         if (admin != null && !policy.mRemovingAdmins.contains(adminReceiver)) {
+            Slogf.d(LOG_TAG, "Adding " + adminReceiver + " for user " + userHandle
+                    + " to list of removing admins.");
+            logStackTrace("removeActiveAdminLocked");
+
             policy.mRemovingAdmins.add(adminReceiver);
             sendAdminCommandLocked(admin,
                     DeviceAdminReceiver.ACTION_DEVICE_ADMIN_DISABLED,
@@ -14842,17 +14846,23 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 "Caller is not managed profile owner or device owner;"
                         + " only managed profile owner or device owner may control the preferential"
                         + " network service");
-        synchronized (getLockObject()) {
-            final ActiveAdmin requiredAdmin = getDeviceOrProfileOwnerAdminLocked(
-                    caller.getUserId());
-            if (!requiredAdmin.mPreferentialNetworkServiceConfigs.equals(
-                    preferentialNetworkServiceConfigs)) {
-                requiredAdmin.mPreferentialNetworkServiceConfigs =
-                        new ArrayList<>(preferentialNetworkServiceConfigs);
-                saveSettingsLocked(caller.getUserId());
+
+        try {
+            updateNetworkPreferenceForUser(caller.getUserId(), preferentialNetworkServiceConfigs);
+            synchronized (getLockObject()) {
+                final ActiveAdmin requiredAdmin = getDeviceOrProfileOwnerAdminLocked(
+                        caller.getUserId());
+                if (!requiredAdmin.mPreferentialNetworkServiceConfigs.equals(
+                        preferentialNetworkServiceConfigs)) {
+                    requiredAdmin.mPreferentialNetworkServiceConfigs =
+                            new ArrayList<>(preferentialNetworkServiceConfigs);
+                    saveSettingsLocked(caller.getUserId());
+                }
             }
+        } catch (Exception e) {
+            Slogf.e(LOG_TAG, "Failed to set preferential network service configs");
+            throw e;
         }
-        updateNetworkPreferenceForUser(caller.getUserId(), preferentialNetworkServiceConfigs);
         DevicePolicyEventLogger
                 .createEvent(DevicePolicyEnums.SET_PREFERENTIAL_NETWORK_SERVICE_ENABLED)
                 .setBoolean(preferentialNetworkServiceConfigs
@@ -17306,9 +17316,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         if (!mUserManager.isUserRunning(new UserHandle(deviceOwnerUserId))) {
             return STATUS_USER_NOT_RUNNING;
         }
-        if (mIsWatch && hasPaired(UserHandle.USER_SYSTEM)) {
-            return STATUS_HAS_PAIRED;
-        }
 
         boolean isHeadlessSystemUserMode = mInjector.userManagerIsHeadlessSystemUserMode();
 
@@ -17332,7 +17339,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
         if (isAdb) {
             // If shell command runs after user setup completed check device status. Otherwise, OK.
-            if (mIsWatch || hasUserSetupCompleted(UserHandle.USER_SYSTEM)) {
+            if (hasUserSetupCompleted(UserHandle.USER_SYSTEM)) {
                 // DO can be setup only if there are no users which are neither created by default
                 // nor marked as FOR_TESTING
 
@@ -18540,7 +18547,15 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             pushActiveAdminPackagesLocked(userHandle);
             saveSettingsLocked(userHandle);
             updateMaximumTimeToLockLocked(userHandle);
+
+            Slogf.d(LOG_TAG,
+                    "Removing device admin " + adminReceiver + " from user " + userHandle);
+            logStackTrace("removeAdminArtifacts");
+
             policy.mRemovingAdmins.remove(adminReceiver);
+            Slogf.d(LOG_TAG, "Current state of DevicePolicyData#mRemovingAdmins for user "
+                    + userHandle + ": " + policy.mRemovingAdmins);
+
             pushScreenCapturePolicy(userHandle);
 
             Slogf.i(LOG_TAG, "Device admin " + adminReceiver + " removed from user " + userHandle);
@@ -24626,5 +24641,29 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     private String getFinancedDeviceKioskRoleHolderOnAnyUser() {
         return getRoleHolderPackageNameOnUser(
                 RoleManager.ROLE_FINANCED_DEVICE_KIOSK, UserHandle.USER_ALL);
+    }
+
+    /**
+     * TODO (b/278924166): this method is added for debugging the specified bug.
+     * Remove once fixed.
+     **/
+    private void logStackTrace(String methodName) {
+        try {
+            StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+            String stackMethod;
+            StringBuilder stackTrace = new StringBuilder();
+            for (StackTraceElement s : stackTraceElements) {
+                stackMethod = s.getMethodName();
+                if (stackMethod == null || stackMethod.equals("getThreadStackTrace")
+                        || stackMethod.equals("getStackTrace")
+                        || stackMethod.equals("logStackTrace")) {
+                    continue;
+                }
+                stackTrace.append(s.getMethodName() + ":" + s.getLineNumber() + "\n");
+            }
+            Slogf.d(LOG_TAG, "StackTrace for " + methodName + ": \n" + stackTrace);
+        } catch (Exception e) {
+            Slogf.d(LOG_TAG, "Unable to get stacktrace");
+        }
     }
 }

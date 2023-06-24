@@ -3663,13 +3663,13 @@ package android.accounts {
   }
 
   public class Account implements android.os.Parcelable {
-    ctor public Account(String, String);
+    ctor public Account(@NonNull String, @NonNull String);
     ctor public Account(android.os.Parcel);
     method public int describeContents();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.accounts.Account> CREATOR;
-    field public final String name;
-    field public final String type;
+    field @NonNull public final String name;
+    field @NonNull public final String type;
   }
 
   @Deprecated public class AccountAuthenticatorActivity extends android.app.Activity {
@@ -4506,6 +4506,7 @@ package android.app {
     method @NonNull public final <T extends android.view.View> T requireViewById(@IdRes int);
     method public final void runOnUiThread(Runnable);
     method public void setActionBar(@Nullable android.widget.Toolbar);
+    method public void setAllowCrossUidActivitySwitchFromBelow(boolean);
     method public void setContentTransitionManager(android.transition.TransitionManager);
     method public void setContentView(@LayoutRes int);
     method public void setContentView(android.view.View);
@@ -6670,6 +6671,21 @@ package android.app {
     method protected void internalSetSummaryText(CharSequence);
     method public void setBuilder(android.app.Notification.Builder);
     field protected android.app.Notification.Builder mBuilder;
+  }
+
+  public static final class Notification.TvExtender implements android.app.Notification.Extender {
+    ctor public Notification.TvExtender();
+    ctor public Notification.TvExtender(@NonNull android.app.Notification);
+    method @NonNull public android.app.Notification.Builder extend(@NonNull android.app.Notification.Builder);
+    method @Nullable public String getChannelId();
+    method @Nullable public android.app.PendingIntent getContentIntent();
+    method @Nullable public android.app.PendingIntent getDeleteIntent();
+    method public boolean isAvailableOnTv();
+    method public boolean isSuppressShowOverApps();
+    method @NonNull public android.app.Notification.TvExtender setChannelId(@Nullable String);
+    method @NonNull public android.app.Notification.TvExtender setContentIntent(@Nullable android.app.PendingIntent);
+    method @NonNull public android.app.Notification.TvExtender setDeleteIntent(@Nullable android.app.PendingIntent);
+    method @NonNull public android.app.Notification.TvExtender setSuppressShowOverApps(boolean);
   }
 
   public static final class Notification.WearableExtender implements android.app.Notification.Extender {
@@ -9767,7 +9783,8 @@ package android.content {
     ctor public AttributionSource.Builder(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource build();
     method @NonNull public android.content.AttributionSource.Builder setAttributionTag(@Nullable String);
-    method @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
+    method @Deprecated @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
+    method @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setPackageName(@Nullable String);
     method @NonNull public android.content.AttributionSource.Builder setPid(int);
   }
@@ -12247,34 +12264,34 @@ package android.content.pm {
     field public static final int REQUESTED_PERMISSION_GRANTED = 2; // 0x2
     field public static final int REQUESTED_PERMISSION_IMPLICIT = 4; // 0x4
     field public static final int REQUESTED_PERMISSION_NEVER_FOR_LOCATION = 65536; // 0x10000
-    field public android.content.pm.ActivityInfo[] activities;
-    field public android.content.pm.ApplicationInfo applicationInfo;
+    field @Nullable public android.content.pm.ActivityInfo[] activities;
+    field @Nullable public android.content.pm.ApplicationInfo applicationInfo;
     field @Nullable public android.content.pm.Attribution[] attributions;
     field public int baseRevisionCode;
-    field public android.content.pm.ConfigurationInfo[] configPreferences;
-    field public android.content.pm.FeatureGroupInfo[] featureGroups;
+    field @Nullable public android.content.pm.ConfigurationInfo[] configPreferences;
+    field @Nullable public android.content.pm.FeatureGroupInfo[] featureGroups;
     field public long firstInstallTime;
-    field public int[] gids;
+    field @Nullable public int[] gids;
     field public int installLocation;
-    field public android.content.pm.InstrumentationInfo[] instrumentation;
+    field @Nullable public android.content.pm.InstrumentationInfo[] instrumentation;
     field public boolean isApex;
     field public long lastUpdateTime;
-    field public String packageName;
-    field public android.content.pm.PermissionInfo[] permissions;
-    field public android.content.pm.ProviderInfo[] providers;
-    field public android.content.pm.ActivityInfo[] receivers;
-    field public android.content.pm.FeatureInfo[] reqFeatures;
-    field public String[] requestedPermissions;
-    field public int[] requestedPermissionsFlags;
-    field public android.content.pm.ServiceInfo[] services;
-    field public String sharedUserId;
+    field @NonNull public String packageName;
+    field @Nullable public android.content.pm.PermissionInfo[] permissions;
+    field @Nullable public android.content.pm.ProviderInfo[] providers;
+    field @Nullable public android.content.pm.ActivityInfo[] receivers;
+    field @Nullable public android.content.pm.FeatureInfo[] reqFeatures;
+    field @Nullable public String[] requestedPermissions;
+    field @Nullable public int[] requestedPermissionsFlags;
+    field @Nullable public android.content.pm.ServiceInfo[] services;
+    field @Nullable public String sharedUserId;
     field public int sharedUserLabel;
-    field @Deprecated public android.content.pm.Signature[] signatures;
-    field public android.content.pm.SigningInfo signingInfo;
-    field public String[] splitNames;
-    field public int[] splitRevisionCodes;
+    field @Deprecated @Nullable public android.content.pm.Signature[] signatures;
+    field @Nullable public android.content.pm.SigningInfo signingInfo;
+    field @NonNull public String[] splitNames;
+    field @NonNull public int[] splitRevisionCodes;
     field @Deprecated public int versionCode;
-    field public String versionName;
+    field @Nullable public String versionName;
   }
 
   public class PackageInstaller {
@@ -13069,7 +13086,7 @@ package android.content.pm {
     method public final int getIconResource();
     method public boolean isCrossProfileIntentForwarderActivity();
     method public android.graphics.drawable.Drawable loadIcon(android.content.pm.PackageManager);
-    method public CharSequence loadLabel(android.content.pm.PackageManager);
+    method @NonNull public CharSequence loadLabel(@NonNull android.content.pm.PackageManager);
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.content.pm.ResolveInfo> CREATOR;
     field public android.content.pm.ActivityInfo activityInfo;
@@ -14321,8 +14338,10 @@ package android.database.sqlite {
   public final class SQLiteDatabase extends android.database.sqlite.SQLiteClosable {
     method public void beginTransaction();
     method public void beginTransactionNonExclusive();
-    method public void beginTransactionWithListener(android.database.sqlite.SQLiteTransactionListener);
-    method public void beginTransactionWithListenerNonExclusive(android.database.sqlite.SQLiteTransactionListener);
+    method public void beginTransactionReadOnly();
+    method public void beginTransactionWithListener(@Nullable android.database.sqlite.SQLiteTransactionListener);
+    method public void beginTransactionWithListenerNonExclusive(@Nullable android.database.sqlite.SQLiteTransactionListener);
+    method public void beginTransactionWithListenerReadOnly(@Nullable android.database.sqlite.SQLiteTransactionListener);
     method public android.database.sqlite.SQLiteStatement compileStatement(String) throws android.database.SQLException;
     method @NonNull public static android.database.sqlite.SQLiteDatabase create(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method @NonNull public static android.database.sqlite.SQLiteDatabase createInMemory(@NonNull android.database.sqlite.SQLiteDatabase.OpenParams);
@@ -24398,7 +24417,13 @@ package android.media {
     field public static final int TYPE_HDMI = 9; // 0x9
     field public static final int TYPE_HEARING_AID = 23; // 0x17
     field public static final int TYPE_REMOTE_AUDIO_VIDEO_RECEIVER = 1003; // 0x3eb
+    field public static final int TYPE_REMOTE_CAR = 1008; // 0x3f0
+    field public static final int TYPE_REMOTE_COMPUTER = 1006; // 0x3ee
+    field public static final int TYPE_REMOTE_GAME_CONSOLE = 1007; // 0x3ef
+    field public static final int TYPE_REMOTE_SMARTWATCH = 1009; // 0x3f1
     field public static final int TYPE_REMOTE_SPEAKER = 1002; // 0x3ea
+    field public static final int TYPE_REMOTE_TABLET = 1004; // 0x3ec
+    field public static final int TYPE_REMOTE_TABLET_DOCKED = 1005; // 0x3ed
     field public static final int TYPE_REMOTE_TV = 1001; // 0x3e9
     field public static final int TYPE_UNKNOWN = 0; // 0x0
     field public static final int TYPE_USB_ACCESSORY = 12; // 0xc
@@ -24889,7 +24914,6 @@ package android.media {
   }
 
   public class Ringtone {
-    method protected void finalize();
     method public android.media.AudioAttributes getAudioAttributes();
     method @Deprecated public int getStreamType();
     method public String getTitle(android.content.Context);
@@ -32737,6 +32761,7 @@ package android.os {
     field public static final int S_V2 = 32; // 0x20
     field public static final int TIRAMISU = 33; // 0x21
     field public static final int UPSIDE_DOWN_CAKE = 34; // 0x22
+    field public static final int VANILLA_ICE_CREAM = 10000; // 0x2710
   }
 
   public final class Bundle extends android.os.BaseBundle implements java.lang.Cloneable android.os.Parcelable {
@@ -37177,6 +37202,7 @@ package android.provider {
     field public static final String ACTION_CAST_SETTINGS = "android.settings.CAST_SETTINGS";
     field public static final String ACTION_CHANNEL_NOTIFICATION_SETTINGS = "android.settings.CHANNEL_NOTIFICATION_SETTINGS";
     field public static final String ACTION_CONDITION_PROVIDER_SETTINGS = "android.settings.ACTION_CONDITION_PROVIDER_SETTINGS";
+    field public static final String ACTION_CREDENTIAL_PROVIDER = "android.settings.CREDENTIAL_PROVIDER";
     field public static final String ACTION_DATA_ROAMING_SETTINGS = "android.settings.DATA_ROAMING_SETTINGS";
     field public static final String ACTION_DATA_USAGE_SETTINGS = "android.settings.DATA_USAGE_SETTINGS";
     field public static final String ACTION_DATE_SETTINGS = "android.settings.DATE_SETTINGS";
@@ -45002,6 +45028,7 @@ package android.telephony {
     method public static final boolean isStartsPostDial(char);
     method public static boolean isVoiceMailNumber(String);
     method public static boolean isWellFormedSmsAddress(String);
+    method public static boolean isWpsCallNumber(@Nullable String);
     method public static byte[] networkPortionToCalledPartyBCD(String);
     method public static byte[] networkPortionToCalledPartyBCDWithLength(String);
     method public static String normalizeNumber(String);
@@ -47229,6 +47256,7 @@ package android.text {
     method public int getBottomPadding();
     method public int getEllipsisCount(int);
     method public int getEllipsisStart(int);
+    method @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
     method public boolean getLineContainsTab(int);
     method public int getLineCount();
     method public int getLineDescent(int);
@@ -47250,6 +47278,7 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setHyphenationFrequency(int);
     method @NonNull public android.text.DynamicLayout.Builder setIncludePad(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setJustificationMode(int);
+    method @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
@@ -49115,7 +49144,7 @@ package android.transition {
     method public abstract void captureEndValues(android.transition.TransitionValues);
     method public abstract void captureStartValues(android.transition.TransitionValues);
     method public android.transition.Transition clone();
-    method public android.animation.Animator createAnimator(android.view.ViewGroup, android.transition.TransitionValues, android.transition.TransitionValues);
+    method @Nullable public android.animation.Animator createAnimator(@NonNull android.view.ViewGroup, @Nullable android.transition.TransitionValues, @Nullable android.transition.TransitionValues);
     method public android.transition.Transition excludeChildren(int, boolean);
     method public android.transition.Transition excludeChildren(android.view.View, boolean);
     method public android.transition.Transition excludeChildren(Class, boolean);
@@ -51678,7 +51707,7 @@ package android.view {
     field public static final int TYPE_CONTEXT_MENU = 1001; // 0x3e9
     field public static final int TYPE_COPY = 1011; // 0x3f3
     field public static final int TYPE_CROSSHAIR = 1007; // 0x3ef
-    field public static final int TYPE_DEFAULT = 1000; // 0x3e8
+    field @Deprecated public static final int TYPE_DEFAULT = 1000; // 0x3e8
     field public static final int TYPE_GRAB = 1020; // 0x3fc
     field public static final int TYPE_GRABBING = 1021; // 0x3fd
     field public static final int TYPE_HAND = 1002; // 0x3ea
@@ -54424,6 +54453,7 @@ package android.view.accessibility {
     method public boolean isEnabled();
     method public boolean isFocusable();
     method public boolean isFocused();
+    method public boolean isGranularScrollingSupported();
     method public boolean isHeading();
     method public boolean isImportantForAccessibility();
     method public boolean isLongClickable();
@@ -54473,6 +54503,7 @@ package android.view.accessibility {
     method public void setError(CharSequence);
     method public void setFocusable(boolean);
     method public void setFocused(boolean);
+    method public void setGranularScrollingSupported(boolean);
     method public void setHeading(boolean);
     method public void setHintText(CharSequence);
     method public void setImportantForAccessibility(boolean);
@@ -54527,6 +54558,7 @@ package android.view.accessibility {
     field public static final String ACTION_ARGUMENT_PRESS_AND_HOLD_DURATION_MILLIS_INT = "android.view.accessibility.action.ARGUMENT_PRESS_AND_HOLD_DURATION_MILLIS_INT";
     field public static final String ACTION_ARGUMENT_PROGRESS_VALUE = "android.view.accessibility.action.ARGUMENT_PROGRESS_VALUE";
     field public static final String ACTION_ARGUMENT_ROW_INT = "android.view.accessibility.action.ARGUMENT_ROW_INT";
+    field public static final String ACTION_ARGUMENT_SCROLL_AMOUNT_FLOAT = "android.view.accessibility.action.ARGUMENT_SCROLL_AMOUNT_FLOAT";
     field public static final String ACTION_ARGUMENT_SELECTION_END_INT = "ACTION_ARGUMENT_SELECTION_END_INT";
     field public static final String ACTION_ARGUMENT_SELECTION_START_INT = "ACTION_ARGUMENT_SELECTION_START_INT";
     field public static final String ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE = "ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE";
@@ -54629,7 +54661,10 @@ package android.view.accessibility {
   public static final class AccessibilityNodeInfo.CollectionInfo {
     ctor public AccessibilityNodeInfo.CollectionInfo(int, int, boolean);
     ctor public AccessibilityNodeInfo.CollectionInfo(int, int, boolean, int);
+    ctor public AccessibilityNodeInfo.CollectionInfo(int, int, boolean, int, int, int);
     method public int getColumnCount();
+    method public int getImportantForAccessibilityItemCount();
+    method public int getItemCount();
     method public int getRowCount();
     method public int getSelectionMode();
     method public boolean isHierarchical();
@@ -54638,6 +54673,18 @@ package android.view.accessibility {
     field public static final int SELECTION_MODE_MULTIPLE = 2; // 0x2
     field public static final int SELECTION_MODE_NONE = 0; // 0x0
     field public static final int SELECTION_MODE_SINGLE = 1; // 0x1
+    field public static final int UNDEFINED = -1; // 0xffffffff
+  }
+
+  public static final class AccessibilityNodeInfo.CollectionInfo.Builder {
+    ctor public AccessibilityNodeInfo.CollectionInfo.Builder();
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo build();
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setColumnCount(int);
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setHierarchical(boolean);
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setImportantForAccessibilityItemCount(int);
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setItemCount(int);
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setRowCount(int);
+    method @NonNull public android.view.accessibility.AccessibilityNodeInfo.CollectionInfo.Builder setSelectionMode(int);
   }
 
   public static final class AccessibilityNodeInfo.CollectionItemInfo {
@@ -55146,6 +55193,7 @@ package android.view.autofill {
 
   public final class AutofillManager {
     method public void cancel();
+    method public void clearAutofillRequestCallback();
     method public void commit();
     method public void disableAutofillServices();
     method @Nullable public android.content.ComponentName getAutofillServiceComponentName();
@@ -55172,6 +55220,7 @@ package android.view.autofill {
     method public void registerCallback(@Nullable android.view.autofill.AutofillManager.AutofillCallback);
     method public void requestAutofill(@NonNull android.view.View);
     method public void requestAutofill(@NonNull android.view.View, int, @NonNull android.graphics.Rect);
+    method @RequiresPermission(android.Manifest.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS) public void setAutofillRequestCallback(@NonNull java.util.concurrent.Executor, @NonNull android.view.autofill.AutofillRequestCallback);
     method public void setUserData(@Nullable android.service.autofill.UserData);
     method public boolean showAutofillDialog(@NonNull android.view.View);
     method public boolean showAutofillDialog(@NonNull android.view.View, int);
@@ -55190,6 +55239,10 @@ package android.view.autofill {
     field public static final int EVENT_INPUT_HIDDEN = 2; // 0x2
     field public static final int EVENT_INPUT_SHOWN = 1; // 0x1
     field public static final int EVENT_INPUT_UNAVAILABLE = 3; // 0x3
+  }
+
+  public interface AutofillRequestCallback {
+    method public void onFillRequest(@Nullable android.view.inputmethod.InlineSuggestionsRequest, @NonNull android.os.CancellationSignal, @NonNull android.service.autofill.FillCallback);
   }
 
   public final class AutofillValue implements android.os.Parcelable {
@@ -55641,10 +55694,12 @@ package android.view.inputmethod {
     ctor public InlineSuggestionsRequest.Builder(@NonNull java.util.List<android.widget.inline.InlinePresentationSpec>);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder addInlinePresentationSpecs(@NonNull android.widget.inline.InlinePresentationSpec);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest build();
+    method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setClientSupported(boolean);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setExtras(@NonNull android.os.Bundle);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setInlinePresentationSpecs(@NonNull java.util.List<android.widget.inline.InlinePresentationSpec>);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setInlineTooltipPresentationSpec(@NonNull android.widget.inline.InlinePresentationSpec);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setMaxSuggestionCount(int);
+    method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setServiceSupported(boolean);
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest.Builder setSupportedLocales(@NonNull android.os.LocaleList);
   }
 
@@ -59681,7 +59736,7 @@ package android.widget {
     method public void setRadioGroupChecked(@IdRes int, @IdRes int);
     method public void setRelativeScrollPosition(@IdRes int, int);
     method @Deprecated public void setRemoteAdapter(int, @IdRes int, android.content.Intent);
-    method public void setRemoteAdapter(@IdRes int, android.content.Intent);
+    method @Deprecated public void setRemoteAdapter(@IdRes int, android.content.Intent);
     method public void setRemoteAdapter(@IdRes int, @NonNull android.widget.RemoteViews.RemoteCollectionItems);
     method public void setScrollPosition(@IdRes int, int);
     method public void setShort(@IdRes int, String, short);

@@ -70,6 +70,7 @@ import android.util.Slog;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
 import com.android.internal.util.function.TriFunction;
 import com.android.server.LocalServices;
@@ -79,6 +80,8 @@ import com.android.server.pm.permission.PermissionManagerServiceInternal.Hotword
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageState;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -390,13 +393,11 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         return oneTimePermissionUserManager;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS)
     @Override
     public void startOneTimePermissionSession(String packageName, @UserIdInt int userId,
             long timeoutMillis, long revokeAfterKilledDelayMillis) {
-        mContext.enforceCallingOrSelfPermission(
-                Manifest.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS,
-                "Must hold " + Manifest.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS
-                        + " to register permissions as one time.");
+        startOneTimePermissionSession_enforcePermission();
         Objects.requireNonNull(packageName);
 
         final long token = Binder.clearCallingIdentity();
@@ -722,20 +723,18 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         public void onPackageUninstalled(@NonNull String packageName, int appId,
                 @NonNull PackageState packageState, @Nullable AndroidPackage pkg,
                 @NonNull List<AndroidPackage> sharedUserPkgs, @UserIdInt int userId) {
+            if (userId != UserHandle.USER_ALL) {
+                final int[] userIds = getAllUserIds();
+                if (!ArrayUtils.contains(userIds, userId)) {
+                    // This may happen due to DeletePackageHelper.removeUnusedPackagesLPw() calling
+                    // deletePackageX() asynchronously.
+                    Slog.w(LOG_TAG, "Skipping onPackageUninstalled() for non-existent user "
+                            + userId);
+                    return;
+                }
+            }
             mPermissionManagerServiceImpl.onPackageUninstalled(packageName, appId, packageState,
                     pkg, sharedUserPkgs, userId);
-        }
-
-        @Override
-        public void addOnRuntimePermissionStateChangedListener(
-                OnRuntimePermissionStateChangedListener listener) {
-            mPermissionManagerServiceImpl.addOnRuntimePermissionStateChangedListener(listener);
-        }
-
-        @Override
-        public void removeOnRuntimePermissionStateChangedListener(
-                OnRuntimePermissionStateChangedListener listener) {
-            mPermissionManagerServiceImpl.removeOnRuntimePermissionStateChangedListener(listener);
         }
 
         @Override
@@ -1776,5 +1775,11 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             }
             return false;
         }
+    }
+
+    @Override
+    protected void dump(@NonNull FileDescriptor fd, @NonNull PrintWriter writer,
+            @Nullable String[] args) {
+        mPermissionManagerServiceImpl.dump(fd, writer, args);
     }
 }

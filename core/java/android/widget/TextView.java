@@ -9223,18 +9223,20 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     @Override
     public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
-        if (mSpannable != null && mLinksClickable) {
-            final float x = event.getX(pointerIndex);
-            final float y = event.getY(pointerIndex);
-            final int offset = getOffsetForPosition(x, y);
-            final ClickableSpan[] clickables = mSpannable.getSpans(offset, offset,
-                    ClickableSpan.class);
-            if (clickables.length > 0) {
-                return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_HAND);
+        if (event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+            if (mSpannable != null && mLinksClickable) {
+                final float x = event.getX(pointerIndex);
+                final float y = event.getY(pointerIndex);
+                final int offset = getOffsetForPosition(x, y);
+                final ClickableSpan[] clickables = mSpannable.getSpans(offset, offset,
+                        ClickableSpan.class);
+                if (clickables.length > 0) {
+                    return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_HAND);
+                }
             }
-        }
-        if (isTextSelectable() || isTextEditable()) {
-            return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_TEXT);
+            if (isTextSelectable() || isTextEditable()) {
+                return PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_TEXT);
+            }
         }
         return super.onResolvePointerIcon(event, pointerIndex);
     }
@@ -10686,6 +10688,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             boolean useSaved) {
         Layout result = null;
         if (useDynamicLayout()) {
+            final boolean autoPhraseBreaking = isAutoPhraseBreakingEnabled();
             final DynamicLayout.Builder builder = DynamicLayout.Builder.obtain(mText, mTextPaint,
                     wantWidth)
                     .setDisplayText(mTransformed)
@@ -10697,6 +10700,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                     .setBreakStrategy(mBreakStrategy)
                     .setHyphenationFrequency(mHyphenationFrequency)
                     .setJustificationMode(mJustificationMode)
+                    .setLineBreakConfig(LineBreakConfig.getLineBreakConfig(
+                            mLineBreakStyle, mLineBreakWordStyle, autoPhraseBreaking))
                     .setEllipsize(getKeyListener() == null ? effectiveEllipsize : null)
                     .setEllipsizedWidth(ellipsisWidth);
             result = builder.build();
@@ -10741,9 +10746,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
         }
         if (result == null) {
-            final boolean autoPhraseBreaking =
-                    !mUserSpeficiedLineBreakwordStyle && FeatureFlagUtils.isEnabled(mContext,
-                            FeatureFlagUtils.SETTINGS_AUTO_TEXT_WRAPPING);
+            final boolean autoPhraseBreaking = isAutoPhraseBreakingEnabled();
             StaticLayout.Builder builder = StaticLayout.Builder.obtain(mTransformed,
                     0, mTransformed.length(), mTextPaint, wantWidth)
                     .setAlignment(alignment)
@@ -10764,6 +10767,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             result = builder.build();
         }
         return result;
+    }
+
+    private boolean isAutoPhraseBreakingEnabled() {
+        return !mUserSpeficiedLineBreakwordStyle && FeatureFlagUtils.isEnabled(mContext,
+                FeatureFlagUtils.SETTINGS_AUTO_TEXT_WRAPPING);
     }
 
     @UnsupportedAppUsage

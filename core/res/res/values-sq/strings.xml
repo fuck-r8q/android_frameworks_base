@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Lejon aplikacionin të marrë informacione për shërbimin e preferuar të pagesës me NFC si p.sh. ndihmat e regjistruara dhe destinacionin e itinerarit."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kontrollo \"Komunikimin e fushës në afërsi\" NFC"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Lejon aplikacionin të komunikojë me etiketimet e \"Komunikimit të fushës së afërt (NFC)\", kartat dhe lexuesit."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Ngjarje transaksioni me elementin e sigurt"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Lejon që aplikacioni të marrë informacione për transaksionet që kryhen në një element të sigurt."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"çaktivizo kyçjen e ekranit"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Lejon aplikacionin të çaktivizojë kyçjen e tasteve dhe çdo mbrojtje të lidhur me fjalëkalimin. Për shembull, telefoni çaktivizon kyçjen e tasteve kur merr një telefonatë hyrëse, pastaj riaktivizon kyçjen e tasteve kur mbaron telefonata."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"kërko kompleksitetin e kyçjes së ekranit"</string>

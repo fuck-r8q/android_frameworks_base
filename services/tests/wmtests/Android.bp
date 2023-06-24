@@ -49,6 +49,7 @@ android_test {
     static_libs: [
         "frameworks-base-testutils",
         "services.core",
+        "service-permission.stubs.system_server",
         "androidx.test.runner",
         "androidx.test.rules",
         "mockito-target-extended-minus-junit4",
@@ -57,7 +58,6 @@ android_test {
         "testng",
         "truth-prebuilt",
         "testables",
-        "ub-uiautomator",
         "hamcrest-library",
         "platform-compat-test-rules",
         "CtsSurfaceValidatorLib",

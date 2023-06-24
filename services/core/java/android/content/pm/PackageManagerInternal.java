@@ -44,11 +44,13 @@ import android.util.ArraySet;
 import android.util.SparseArray;
 
 import com.android.internal.util.function.pooled.PooledLambda;
+import com.android.permission.persistence.RuntimePermissionsState;
 import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.KnownPackages;
 import com.android.server.pm.PackageList;
 import com.android.server.pm.PackageSetting;
 import com.android.server.pm.dex.DynamicCodeLogger;
+import com.android.server.pm.permission.LegacyPermissionSettings;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
 import com.android.server.pm.pkg.SharedUserApi;
@@ -1081,6 +1083,23 @@ public abstract class PackageManagerInternal {
      * the call blocks until the settings have been written.
      */
     public abstract void writePermissionSettings(@NonNull @UserIdInt int[] userIds, boolean async);
+
+    /**
+     * Read legacy permission definitions for permissions migration to new permission subsystem.
+     * Note that this api is supposed to be used for permissions migration only.
+     */
+    public abstract LegacyPermissionSettings getLegacyPermissions();
+
+    /**
+     * Read legacy permission states for permissions migration to new permission subsystem.
+     * Note that this api is supposed to be used for permissions state migration only.
+     */
+    public abstract RuntimePermissionsState getLegacyPermissionsState(@UserIdInt int userId);
+
+    /**
+     * @return permissions file version for the given user.
+     */
+    public abstract int getLegacyPermissionsVersion(@UserIdInt int userId);
 
     /**
      * Returns {@code true} if the caller is the installer of record for the given package.

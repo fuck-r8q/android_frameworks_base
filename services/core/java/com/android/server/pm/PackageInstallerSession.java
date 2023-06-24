@@ -66,6 +66,7 @@ import android.app.NotificationManager;
 import android.app.admin.DevicePolicyEventLogger;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
+import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.content.ComponentName;
@@ -333,6 +334,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private static final long DEFAULT_APP_METADATA_BYTE_SIZE_LIMIT = 32000;
 
     private static final int APP_METADATA_FILE_ACCESS_MODE = 0640;
+
+    /**
+     * Throws IllegalArgumentException if the {@link IntentSender} from an immutable
+     * {@link android.app.PendingIntent} when caller has a target SDK of API
+     * {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    private static final long THROW_EXCEPTION_COMMIT_WITH_IMMUTABLE_PENDING_INTENT = 240618202L;
 
     // TODO: enforce INSTALL_ALLOW_TEST
     // TODO: enforce INSTALL_ALLOW_DOWNGRADE
@@ -1884,6 +1894,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             mIsPerfLockAcquired = false;
         }
         assertNotChild("commit");
+        boolean throwsExceptionCommitImmutableCheck = CompatChanges.isChangeEnabled(
+                THROW_EXCEPTION_COMMIT_WITH_IMMUTABLE_PENDING_INTENT, Binder.getCallingUid());
+        if (throwsExceptionCommitImmutableCheck && statusReceiver.isImmutable()) {
+            throw new IllegalArgumentException(
+                "The commit() status receiver should come from a mutable PendingIntent");
+        }
 
         if (!markAsSealed(statusReceiver, forTransfer)) {
             return;
@@ -4133,16 +4149,18 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         return params.installFlags;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public DataLoaderParamsParcel getDataLoaderParams() {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        getDataLoaderParams_enforcePermission();
         return params.dataLoaderParams != null ? params.dataLoaderParams.getData() : null;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public void addFile(int location, String name, long lengthBytes, byte[] metadata,
             byte[] signature) {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        addFile_enforcePermission();
         if (!isDataLoaderInstallation()) {
             throw new IllegalStateException(
                     "Cannot add files to non-data loader installation session.");
@@ -4173,9 +4191,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.USE_INSTALLER_V2)
     @Override
     public void removeFile(int location, String name) {
-        mContext.enforceCallingOrSelfPermission(Manifest.permission.USE_INSTALLER_V2, null);
+        removeFile_enforcePermission();
         if (!isDataLoaderInstallation()) {
             throw new IllegalStateException(
                     "Cannot add files to non-data loader installation session.");

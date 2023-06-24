@@ -592,6 +592,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Umožňuje aplikaci získat informace o preferované platební službě NFC, například o registrovaných pomůckách a cíli směrování."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"ovládání technologie NFC"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Umožňuje aplikaci komunikovat se štítky, kartami a čtečkami s podporou technologie NFC."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Událost transakce Secure Element"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Umožňuje aplikaci přijímat informace o transakcích probíhajících v prvku Secure Element."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"vypnutí zámku obrazovky"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Umožňuje aplikaci vypnout zámek kláves a související zabezpečení heslem. Telefon například vypne zámek klávesnice při příchozím hovoru a po skončení hovoru jej zase zapne."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"zjištění složitosti zámku obrazovky"</string>

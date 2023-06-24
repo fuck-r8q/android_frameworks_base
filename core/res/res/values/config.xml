@@ -192,6 +192,10 @@
          available on some devices. -->
     <bool name="config_enableHapticTextHandle">false</bool>
 
+    <!-- Enables or disables proximity service that approximates proximity with aiai attention
+         service. Off by default, since the service may not be available on some devices. -->
+    <bool name="config_enableProximityService">false</bool>
+
     <!-- Whether dialogs should close automatically when the user touches outside
          of them.  This should not normally be modified. -->
     <bool name="config_closeDialogWhenTouchOutside">true</bool>
@@ -1840,6 +1844,11 @@
         <item>telephony</item>
     </string-array>
 
+    <!-- The difference in millis that has to exist between a time suggestion under
+         consideration by the time_detector and the system clock before the system clock will be
+         changed. -->
+    <integer name="config_timeDetectorAutoUpdateDiffMillis">2000</integer>
+
     <!-- Enables the GnssTimeUpdate service. This is the global switch for enabling Gnss time based
          suggestions to TimeDetector service. See also config_autoTimeSourcesPriority. -->
     <bool name="config_enableGnssTimeUpdateService">false</bool>
@@ -2856,6 +2865,10 @@
      with admin privileges and admin privileges can be granted/revoked from existing users. -->
     <bool name="config_enableMultipleAdmins">false</bool>
 
+    <!-- Whether there is a communal profile which should always be running.
+         Only relevant for Headless System User Mode (HSUM) devices. -->
+    <bool name="config_omnipresentCommunalUser">false</bool>
+
     <!-- Whether the new Auto Selection Network UI should be shown -->
     <bool name="config_enableNewAutoSelectNetworkUI">false</bool>
 
@@ -3395,7 +3408,7 @@
     <!-- default window ShowCircularMask property -->
     <bool name="config_windowShowCircularMask">false</bool>
 
-    <!-- default value for whether circular emulators (ro.emulator.circular)
+    <!-- default value for whether circular emulators (ro.boot.emulator.circular)
          should show a display overlay on the screen -->
     <bool name="config_windowEnableCircularEmulatorDisplayOverlay">false</bool>
 
@@ -3873,6 +3886,10 @@
     <!-- The duration (in milliseconds) that should be applied to waveform vibrations that ends in
          non-zero amplitudes, to bring the vibrator amplitude down to zero using this timing. -->
     <integer name="config_vibrationWaveformRampDownDuration">0</integer>
+
+    <!-- Ignores vibrations when the device is on a wireless charger.
+         A vibrating device may move out of alignment with the charging pad. -->
+    <bool name="config_ignoreVibrationsOnWirelessCharger">false</bool>
 
     <!-- Number of retries Cell Data should attempt for a given error code before
          restarting the modem.
@@ -4425,6 +4442,14 @@
     -->
     <string name="config_defaultContentCaptureService" translatable="false"></string>
 
+    <!-- The package name for the system's content protection service.
+         This service must be trusted, as it can be activated without explicit consent of the user.
+         If no service with the specified name exists on the device, content protection will be
+         disabled.
+         Example: "com.android.contentprotection/.ContentProtectionService"
+    -->
+    <string name="config_defaultContentProtectionService" translatable="false"></string>
+
     <!-- The package name for the system's augmented autofill service.
          This service must be trusted, as it can be activated without explicit consent of the user.
          If no service with the specified name exists on the device, augmented autofill wil be
@@ -4765,6 +4790,9 @@
 
     <!-- Whether or not we should show the option to show battery percentage -->
     <bool name="config_battery_percentage_setting_available">true</bool>
+
+    <!-- Default value set for battery percentage in status bar false = disabled, true = enabled -->
+    <bool name="config_defaultBatteryPercentageSetting">false</bool>
 
     <!-- Whether or not battery saver should be "sticky" when manually enabled. -->
     <bool name="config_batterySaverStickyBehaviourDisabled">false</bool>
@@ -5997,9 +6025,6 @@
     <!-- Whether changing sensor privacy SW setting requires device to be unlocked -->
     <bool name="config_sensorPrivacyRequiresAuthentication">true</bool>
 
-    <!-- List containing the allowed install sources for accessibility service. -->
-    <string-array name="config_accessibility_allowed_install_source" translatable="false"/>
-
     <!-- Default value for Settings.ASSIST_LONG_PRESS_HOME_ENABLED -->
     <bool name="config_assistLongPressHomeEnabledDefault">true</bool>
     <!-- Default value for Settings.ASSIST_TOUCH_GESTURE_ENABLED -->
@@ -6204,7 +6229,7 @@
 
     <!-- Flag indicating whether the show Stylus pointer icon.
      If set, a pointer icon will be shown over the location of a stylus pointer.-->
-    <bool name="config_enableStylusPointerIcon">false</bool>
+    <bool name="config_enableStylusPointerIcon">true</bool>
 
     <!-- Determines whether SafetyCenter feature is enabled. -->
     <bool name="config_enableSafetyCenter">true</bool>
@@ -6470,4 +6495,16 @@
     <!-- Whether the AOSP support for app cloning building blocks is to be enabled for the
          device. -->
     <bool name="config_enableAppCloningBuildingBlocks">true</bool>
+
+    <!-- Enables or disables support for repair mode. The feature creates a secure
+         environment to protect the user's privacy when the device is being repaired.
+         Off by default, since OEMs may have had a similar feature on their devices. -->
+    <bool name="config_repairModeSupported">false</bool>
+
+    <!-- The file path in which the default shutdown vibration effect should be serialized. If the
+         device does not specify any such file path here, if the file path specified here does not
+         exist, or if the contents of the file does not make up a valid VibrationEffect
+         serialization, a default vibration will be used.
+         Note that, indefinitely repeating vibrations are not allowed as shutdown vibrations. -->
+    <string name="config_defaultShutdownVibrationFile" />
 </resources>

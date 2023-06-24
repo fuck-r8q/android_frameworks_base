@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Laat die program toe om voorkeur-NFC-betalingdiensinligting soos geregistreerde hulpmiddels en roetebestemming te kry."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"beheer kortveldkommunikasie"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Laat die program toe om met kortveldkommunikasie- (NFC) merkers, kaarte en lesers te kommunikeer."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Veilige Element-transaksiegeval"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Laat die app toe om inligting te ontvang oor transaksies wat op ’n Veilige Element plaasvind."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"deaktiveer jou skermslot"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Laat die program toe om die sleutelslot en enige verwante wagwoordsekuriteit te deaktiveer. Byvoorbeeld, die foon deaktiveer die sleutelslot wanneer ’n oproep inkom, en atkiveer dit dan weer wanneer die oproep eindig."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"versoek skermslot-kompleksiteit"</string>

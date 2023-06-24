@@ -4338,6 +4338,7 @@ public class NotificationManagerService extends SystemService {
             return getActiveNotificationsWithAttribution(callingPkg, null);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_NOTIFICATIONS)
         /**
          * System-only API for getting a list of current (i.e. not cleared) notifications.
          *
@@ -4348,9 +4349,7 @@ public class NotificationManagerService extends SystemService {
         public StatusBarNotification[] getActiveNotificationsWithAttribution(String callingPkg,
                 String callingAttributionTag) {
             // enforce() will ensure the calling uid has the correct permission
-            getContext().enforceCallingOrSelfPermission(
-                    android.Manifest.permission.ACCESS_NOTIFICATIONS,
-                    "NotificationManagerService.getActiveNotifications");
+            getActiveNotificationsWithAttribution_enforcePermission();
 
             ArrayList<StatusBarNotification> tmp = new ArrayList<>();
             int uid = Binder.getCallingUid();
@@ -4466,6 +4465,7 @@ public class NotificationManagerService extends SystemService {
                     includeSnoozed);
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_NOTIFICATIONS)
         /**
          * System-only API for getting a list of recent (cleared, no longer shown) notifications.
          */
@@ -4474,9 +4474,7 @@ public class NotificationManagerService extends SystemService {
         public StatusBarNotification[] getHistoricalNotificationsWithAttribution(String callingPkg,
                 String callingAttributionTag, int count, boolean includeSnoozed) {
             // enforce() will ensure the calling uid has the correct permission
-            getContext().enforceCallingOrSelfPermission(
-                    android.Manifest.permission.ACCESS_NOTIFICATIONS,
-                    "NotificationManagerService.getHistoricalNotifications");
+            getHistoricalNotificationsWithAttribution_enforcePermission();
 
             StatusBarNotification[] tmp = null;
             int uid = Binder.getCallingUid();
@@ -4492,6 +4490,7 @@ public class NotificationManagerService extends SystemService {
             return tmp;
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.ACCESS_NOTIFICATIONS)
         /**
          * System-only API for getting a list of historical notifications. May contain multiple days
          * of notifications.
@@ -4502,9 +4501,7 @@ public class NotificationManagerService extends SystemService {
         public NotificationHistory getNotificationHistory(String callingPkg,
                 String callingAttributionTag) {
             // enforce() will ensure the calling uid has the correct permission
-            getContext().enforceCallingOrSelfPermission(
-                    android.Manifest.permission.ACCESS_NOTIFICATIONS,
-                    "NotificationManagerService.getNotificationHistory");
+            getNotificationHistory_enforcePermission();
             int uid = Binder.getCallingUid();
 
             // noteOp will check to make sure the callingPkg matches the uid
@@ -6772,6 +6769,8 @@ public class NotificationManagerService extends SystemService {
             return false;
         }
 
+        mUsageStats.registerEnqueuedByAppAndAccepted(pkg);
+
         if (info != null) {
             // Cache the shortcut synchronously after the associated notification is posted in case
             // the app unpublishes this shortcut immediately after posting the notification. If the
@@ -7210,11 +7209,12 @@ public class NotificationManagerService extends SystemService {
                             + " cannot create notifications");
                 }
 
-                // rate limit updates that aren't completed progress notifications
-                if (mNotificationsByKey.get(r.getSbn().getKey()) != null
-                        && !r.getNotification().hasCompletedProgress()
-                        && !isAutogroup) {
-
+                // Rate limit updates that aren't completed progress notifications
+                // Search for the original one in the posted and not-yet-posted (enqueued) lists.
+                boolean isUpdate = mNotificationsByKey.get(r.getSbn().getKey()) != null
+                        || findNotificationByListLocked(mEnqueuedNotifications, r.getSbn().getKey())
+                        != null;
+                if (isUpdate && !r.getNotification().hasCompletedProgress() && !isAutogroup) {
                     final float appEnqueueRate = mUsageStats.getAppEnqueueRate(pkg);
                     if (appEnqueueRate > mMaxPackageEnqueueRate) {
                         mUsageStats.registerOverRateQuota(pkg);
@@ -7839,15 +7839,8 @@ public class NotificationManagerService extends SystemService {
             boolean posted = false;
             synchronized (mNotificationLock) {
                 try {
-                    NotificationRecord r = null;
-                    int N = mEnqueuedNotifications.size();
-                    for (int i = 0; i < N; i++) {
-                        final NotificationRecord enqueued = mEnqueuedNotifications.get(i);
-                        if (Objects.equals(key, enqueued.getKey())) {
-                            r = enqueued;
-                            break;
-                        }
-                    }
+                    NotificationRecord r = findNotificationByListLocked(mEnqueuedNotifications,
+                            key);
                     if (r == null) {
                         Slog.i(TAG, "Cannot find enqueued record for key: " + key);
                         return false;
@@ -9506,7 +9499,7 @@ public class NotificationManagerService extends SystemService {
      * Determine whether the userId applies to the notification in question, either because
      * they match exactly, or one of them is USER_ALL (which is treated as a wildcard).
      */
-    private boolean notificationMatchesUserId(NotificationRecord r, int userId) {
+    private static boolean notificationMatchesUserId(NotificationRecord r, int userId) {
         return
                 // looking for USER_ALL notifications? match everything
                    userId == UserHandle.USER_ALL
@@ -9865,9 +9858,9 @@ public class NotificationManagerService extends SystemService {
         return null;
     }
 
-    @GuardedBy("mNotificationLock")
-    private NotificationRecord findNotificationByListLocked(ArrayList<NotificationRecord> list,
-            String pkg, String tag, int id, int userId) {
+    @Nullable
+    private static NotificationRecord findNotificationByListLocked(
+            ArrayList<NotificationRecord> list, String pkg, String tag, int id, int userId) {
         final int len = list.size();
         for (int i = 0; i < len; i++) {
             NotificationRecord r = list.get(i);
@@ -9880,8 +9873,7 @@ public class NotificationManagerService extends SystemService {
         return null;
     }
 
-    @GuardedBy("mNotificationLock")
-    private List<NotificationRecord> findNotificationsByListLocked(
+    private static List<NotificationRecord> findNotificationsByListLocked(
             ArrayList<NotificationRecord> list, String pkg, String tag, int id, int userId) {
         List<NotificationRecord> matching = new ArrayList<>();
         final int len = list.size();
@@ -9896,9 +9888,9 @@ public class NotificationManagerService extends SystemService {
         return matching;
     }
 
-    @GuardedBy("mNotificationLock")
-    private NotificationRecord findNotificationByListLocked(ArrayList<NotificationRecord> list,
-            String key) {
+    @Nullable
+    private static NotificationRecord findNotificationByListLocked(
+            ArrayList<NotificationRecord> list, String key) {
         final int N = list.size();
         for (int i = 0; i < N; i++) {
             if (key.equals(list.get(i).getKey())) {
@@ -9906,29 +9898,6 @@ public class NotificationManagerService extends SystemService {
             }
         }
         return null;
-    }
-
-    /**
-     * There may be multiple records that match your criteria. For instance if there have been
-     * multiple notifications posted which are enqueued for the same pkg, tag, id, userId. This
-     * method will find all of them in the given list
-     * @return
-     */
-    @GuardedBy("mNotificationLock")
-    private List<NotificationRecord> findEnqueuedNotificationsForCriteria(
-            String pkg, String tag, int id, int userId) {
-        final ArrayList<NotificationRecord> records = new ArrayList<>();
-        final int n = mEnqueuedNotifications.size();
-        for (int i = 0; i < n; i++) {
-            NotificationRecord r = mEnqueuedNotifications.get(i);
-            if (notificationMatchesUserId(r, userId)
-                    && r.getSbn().getId() == id
-                    && TextUtils.equals(r.getSbn().getTag(), tag)
-                    && r.getSbn().getPackageName().equals(pkg)) {
-                records.add(r);
-            }
-        }
-        return records;
     }
 
     @GuardedBy("mNotificationLock")

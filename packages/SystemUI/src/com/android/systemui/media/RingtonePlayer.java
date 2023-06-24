@@ -16,6 +16,9 @@
 
 package com.android.systemui.media;
 
+import static java.util.Objects.requireNonNull;
+
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -34,6 +37,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
+import android.os.VibrationEffect;
 import android.provider.MediaStore;
 import android.util.Log;
 
@@ -86,11 +90,11 @@ public class RingtonePlayer implements CoreStartable {
      */
     private class Client implements IBinder.DeathRecipient {
         private final IBinder mToken;
-        private final Ringtone mRingtone;
+        private Ringtone mRingtone;
 
-        Client(IBinder token, Ringtone ringtone) {
-            mToken = token;
-            mRingtone = ringtone;
+        Client(@NonNull IBinder token, @NonNull Ringtone ringtone) {
+            mToken = requireNonNull(token);
+            mRingtone = requireNonNull(ringtone);
         }
 
         @Override
@@ -107,45 +111,56 @@ public class RingtonePlayer implements CoreStartable {
         @Override
         public void play(IBinder token, Uri uri, AudioAttributes aa, float volume, boolean looping)
                 throws RemoteException {
-            playWithVolumeShaping(token, uri, aa, volume, looping, null);
+            playRemoteRingtone(token, uri, aa, true, Ringtone.MEDIA_SOUND,
+                    null, volume, looping, /* hapticGenerator= */ false,
+                    null);
         }
+
         @Override
-        public void playWithVolumeShaping(IBinder token, Uri uri, AudioAttributes aa, float volume,
-                boolean looping, @Nullable VolumeShaper.Configuration volumeShaperConfig)
+        public void playRemoteRingtone(IBinder token, Uri uri, AudioAttributes aa,
+                boolean useExactAudioAttributes,
+                @Ringtone.RingtoneMedia int enabledMedia, @Nullable VibrationEffect vibrationEffect,
+                float volume,
+                boolean looping, boolean isHapticGeneratorEnabled,
+                @Nullable VolumeShaper.Configuration volumeShaperConfig)
                 throws RemoteException {
             if (LOGD) {
                 Log.d(TAG, "play(token=" + token + ", uri=" + uri + ", uid="
                         + Binder.getCallingUid() + ")");
             }
+
+            // Don't hold the lock while constructing the ringtone, since it can be slow. The caller
+            // shouldn't call play on the same ringtone from 2 threads, so this shouldn't race and
+            // waste the build.
             Client client;
             synchronized (mClients) {
                 client = mClients.get(token);
             }
-            // Don't hold the lock while constructing the ringtone, since it can be slow. The caller
-            // shouldn't call play on the same ringtone from 2 threads, so this shouldn't race and
-            // waste the build.
             if (client == null) {
                 final UserHandle user = Binder.getCallingUserHandle();
-                Ringtone ringtone = new Ringtone(getContextForUser(user), false);
-                ringtone.setAudioAttributesField(aa);
-                ringtone.setUri(uri, volumeShaperConfig);
-                ringtone.createLocalMediaPlayer();
+                Ringtone ringtone = new Ringtone.Builder(getContextForUser(user), enabledMedia, aa)
+                        .setLocalOnly()
+                        .setUri(uri)
+                        .setLooping(looping)
+                        .setInitialSoundVolume(volume)
+                        .setUseExactAudioAttributes(useExactAudioAttributes)
+                        .setEnableHapticGenerator(isHapticGeneratorEnabled)
+                        .setVibrationEffect(vibrationEffect)
+                        .setVolumeShaperConfig(volumeShaperConfig)
+                        .build();
+                if (ringtone == null) {
+                    return;
+                }
                 synchronized (mClients) {
                     client = mClients.get(token);
                     if (client == null) {
                         client = new Client(token, ringtone);
                         token.linkToDeath(client, 0);
                         mClients.put(token, client);
-                        ringtone = null;  // "owned" by the client now.
                     }
                 }
-                // Clean up ringtone if it was abandoned (a client already existed).
-                if (ringtone != null) {
-                    ringtone.stop();
-                }
             }
-            client.mRingtone.setLooping(looping);
-            client.mRingtone.setVolume(volume);
+            // Ensure the client is initialized outside the all-clients lock, as it can be slow.
             client.mRingtone.play();
         }
 
@@ -177,18 +192,36 @@ public class RingtonePlayer implements CoreStartable {
         }
 
         @Override
-        public void setPlaybackProperties(IBinder token, float volume, boolean looping,
-                boolean hapticGeneratorEnabled) {
+        public void setHapticGeneratorEnabled(IBinder token, boolean hapticGeneratorEnabled) {
+            Client client;
+            synchronized (mClients) {
+                client = mClients.get(token);
+            }
+            if (client != null) {
+                client.mRingtone.setHapticGeneratorEnabled(hapticGeneratorEnabled);
+            }
+        }
+
+        @Override
+        public void setLooping(IBinder token, boolean looping) {
+            Client client;
+            synchronized (mClients) {
+                client = mClients.get(token);
+            }
+            if (client != null) {
+                client.mRingtone.setLooping(looping);
+            }
+        }
+
+        @Override
+        public void setVolume(IBinder token, float volume) {
             Client client;
             synchronized (mClients) {
                 client = mClients.get(token);
             }
             if (client != null) {
                 client.mRingtone.setVolume(volume);
-                client.mRingtone.setLooping(looping);
-                client.mRingtone.setHapticGeneratorEnabled(hapticGeneratorEnabled);
             }
-            // else no client for token when setting playback properties but will be set at play()
         }
 
         @Override

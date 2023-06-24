@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Pinapayagan ang app na makakuha ng impormasyon sa gustong nfc na serbisyo sa pagbabayad tulad ng mga nakarehistrong application ID at destinasyon ng ruta."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kontrolin ang Near Field Communication"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Pinapayagan ang app na makipag-ugnay sa Near Field Communication (NFC) na mga tag, card, at reader."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Event ng transaksyon sa Secure na Elemento"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Nagbibigay-daan sa app na makatanggap ng impormasyon tungkol sa mga transaksyong nangyayari sa isang Secure na Elemento."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"i-disable ang iyong screen lock"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Pinapayagan ang app na i-disable ang keylock at anumang nauugnay na seguridad sa password. Halimbawa, hindi pinapagana ng telepono ang keylock kapag nakakatanggap ng papasok na tawag sa telepono, pagkatapos ay muling pinapagana ang keylock kapag tapos na ang tawag."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"humiling ng pagiging kumplikado ng lock ng screen"</string>

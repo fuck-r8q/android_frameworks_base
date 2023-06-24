@@ -59,6 +59,8 @@ import android.os.ParcelFileDescriptor;
 import android.os.PersistableBundle;
 import android.content.IntentSender;
 
+import java.util.Map;
+
 /**
  *  See {@link PackageManager} for documentation on most of the APIs
  *  here.
@@ -159,6 +161,7 @@ interface IPackageManager {
      */
     ParceledListSlice getInstalledPackages(long flags, in int userId);
 
+    @EnforcePermission("GET_APP_METADATA")
     @nullable ParcelFileDescriptor getAppMetadataFd(String packageName,
                 int userId);
 
@@ -282,9 +285,11 @@ interface IPackageManager {
     void addCrossProfileIntentFilter(in IntentFilter intentFilter, String ownerPackage,
             int sourceUserId, int targetUserId, int flags);
 
+    @EnforcePermission("INTERACT_ACROSS_USERS_FULL")
     boolean removeCrossProfileIntentFilter(in IntentFilter intentFilter, String ownerPackage,
                 int sourceUserId, int targetUserId, int flags);
 
+    @EnforcePermission("INTERACT_ACROSS_USERS_FULL")
     void clearCrossProfileIntentFilters(int sourceUserId, String ownerPackage);
 
     String[] setDistractingPackageRestrictionsAsUser(in String[] packageNames, int restrictionFlags,
@@ -417,6 +422,7 @@ interface IPackageManager {
      * @param observer call back used to notify when
      * the operation is completed
      */
+     @EnforcePermission("CLEAR_APP_CACHE")
      void freeStorageAndNotify(in String volumeUuid, in long freeStorageSize,
              int storageFlags, IPackageDataObserver observer);
 
@@ -441,6 +447,7 @@ interface IPackageManager {
      * notify when the operation is completed.May be null
      * to indicate that no call back is desired.
      */
+     @EnforcePermission("CLEAR_APP_CACHE")
      void freeStorage(in String volumeUuid, in long freeStorageSize,
              int storageFlags, in IntentSender pi);
 
@@ -468,6 +475,7 @@ interface IPackageManager {
      * files need to be deleted
      * @param observer a callback used to notify when the operation is completed.
      */
+    @EnforcePermission("CLEAR_APP_USER_DATA")
     void clearApplicationUserData(in String packageName, IPackageDataObserver observer, int userId);
 
     /**
@@ -488,15 +496,20 @@ interface IPackageManager {
     void getPackageSizeInfo(in String packageName, int userHandle, IPackageStatsObserver observer);
 
     /**
-     * Get a list of shared libraries that are available on the
-     * system.
+     * Get a list of shared libraries that are available on the system.
+     *
+     * @deprecated use getSystemSharedLibraryNamesAndPaths() instead
      */
     @UnsupportedAppUsage
     String[] getSystemSharedLibraryNames();
 
     /**
-     * Get a list of features that are available on the
-     * system.
+     * Get a list of shared library names (key) and paths (values).
+     */
+    Map<String, String> getSystemSharedLibraryNamesAndPaths();
+
+    /**
+     * Get a list of features that are available on the system.
      */
     ParceledListSlice getSystemAvailableFeatures();
 
@@ -579,14 +592,20 @@ interface IPackageManager {
     boolean performDexOptSecondary(String packageName,
             String targetCompilerFilter, boolean force);
 
+    @EnforcePermission("MOUNT_UNMOUNT_FILESYSTEMS")
     int getMoveStatus(int moveId);
 
+    @EnforcePermission("MOUNT_UNMOUNT_FILESYSTEMS")
     void registerMoveCallback(in IPackageMoveObserver callback);
+    @EnforcePermission("MOUNT_UNMOUNT_FILESYSTEMS")
     void unregisterMoveCallback(in IPackageMoveObserver callback);
 
+    @EnforcePermission("MOVE_PACKAGE")
     int movePackage(in String packageName, in String volumeUuid);
+    @EnforcePermission("MOVE_PACKAGE")
     int movePrimaryStorage(in String volumeUuid);
 
+    @EnforcePermission("WRITE_SECURE_SETTINGS")
     boolean setInstallLocation(int loc);
     @UnsupportedAppUsage
     int getInstallLocation();
@@ -607,6 +626,7 @@ interface IPackageManager {
     ParceledListSlice getIntentFilterVerifications(String packageName);
     ParceledListSlice getAllIntentFilters(String packageName);
 
+    @EnforcePermission("PACKAGE_VERIFICATION_AGENT")
     VerifierDeviceIdentity getVerifierDeviceIdentity();
 
     boolean isFirstBoot();
@@ -616,6 +636,7 @@ interface IPackageManager {
     @UnsupportedAppUsage
     boolean isStorageLow();
 
+    @EnforcePermission("MANAGE_USERS")
     @UnsupportedAppUsage
     boolean setApplicationHiddenSettingAsUser(String packageName, boolean hidden, int userId);
     boolean getApplicationHiddenSettingAsUser(String packageName, int userId);
@@ -626,6 +647,7 @@ interface IPackageManager {
     @UnsupportedAppUsage(maxTargetSdk = 30, trackingBug = 170729553)
     IPackageInstaller getPackageInstaller();
 
+    @EnforcePermission("DELETE_PACKAGES")
     boolean setBlockUninstallForUser(String packageName, boolean blockUninstall, int userId);
     @UnsupportedAppUsage
     boolean getBlockUninstallForUser(String packageName, int userId);
@@ -651,6 +673,7 @@ interface IPackageManager {
      * Sets whether or not an update is available. Ostensibly for instant apps
      * to force exteranl resolution.
      */
+    @EnforcePermission("INSTALL_PACKAGES")
     void setUpdateAvailable(String packageName, boolean updateAvaialble);
 
     @UnsupportedAppUsage(maxTargetSdk = 30, trackingBug = 170729553)
@@ -678,6 +701,7 @@ interface IPackageManager {
 
     ComponentName getInstantAppInstallerComponent();
 
+    @EnforcePermission("ACCESS_INSTANT_APPS")
     String getInstantAppAndroidId(String packageName, int userId);
 
     IArtManager getArtManager();
@@ -776,6 +800,7 @@ interface IPackageManager {
 
     void makeProviderVisible(int recipientAppId, String visibleAuthority);
 
+    @EnforcePermission("MAKE_UID_VISIBLE")
     @JavaPassthrough(annotation = "@android.annotation.RequiresPermission(android.Manifest"
             + ".permission.MAKE_UID_VISIBLE)")
     void makeUidVisible(int recipientAppId, int visibleUid);

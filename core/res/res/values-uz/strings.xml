@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Bu ilovaga asosiy NFC toʻlov xizmati haqidagi axborotni olish imkonini beradi (masalan, qayd qilingan AID identifikatorlari va marshrutning yakuniy manzili)."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"NFC modulini boshqarish"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Ilova qisqa masofali aloqa (NFC) texnologiyasi yordamida NFC yorliqlari, kartalar va o‘qish moslamalari bilan ma’lumot almashishi mumkin."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Secure Element tranzaksiya hodisasi"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Ilovaga Secure Element orqali amalga oshuvchi tranzaksiyalar axborotini olishga ruxsat beradi."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"ekran qulfini o‘chirib qo‘yish"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Ilovaga ekran qulfini va har qanday parol  yordamidagi xavfsizlik himoyalarini o‘chirishga ruxsat beradi. Masalan, kirish qo‘ng‘irog‘ida telefon ekran qulfini o‘chiradi va qo‘ng‘iroq tugashi bilan qulfni yoqadi."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"ekran qulfi qiyinligi darajasini talab qilish"</string>

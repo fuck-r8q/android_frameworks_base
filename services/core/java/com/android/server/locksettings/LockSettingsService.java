@@ -394,11 +394,14 @@ public class LockSettingsService extends ILockSettings.Stub {
         if (mStorage.hasChildProfileLock(profileUserId)) {
             return;
         }
+        final UserInfo parent = mUserManager.getProfileParent(profileUserId);
+        if (parent == null) {
+            return;
+        }
         // If parent does not have a screen lock, simply clear credential from the profile,
         // to maintain the invariant that unified profile should always have the same secure state
         // as its parent.
-        final int parentId = mUserManager.getProfileParent(profileUserId).id;
-        if (!isUserSecure(parentId) && !profileUserPassword.isNone()) {
+        if (!isUserSecure(parent.id) && !profileUserPassword.isNone()) {
             Slogf.i(TAG, "Clearing password for profile user %d to match parent", profileUserId);
             setLockCredentialInternal(LockscreenCredential.createNone(), profileUserPassword,
                     profileUserId, /* isLockTiedToParent= */ true);
@@ -409,7 +412,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         // This can only happen during an upgrade path where SID is yet to be
         // generated when the user unlocks for the first time.
         try {
-            parentSid = getGateKeeperService().getSecureUserId(parentId);
+            parentSid = getGateKeeperService().getSecureUserId(parent.id);
             if (parentSid == 0) {
                 return;
             }
@@ -420,7 +423,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         try (LockscreenCredential unifiedProfilePassword = generateRandomProfilePassword()) {
             setLockCredentialInternal(unifiedProfilePassword, profileUserPassword, profileUserId,
                     /* isLockTiedToParent= */ true);
-            tieProfileLockToParent(profileUserId, parentId, unifiedProfilePassword);
+            tieProfileLockToParent(profileUserId, parent.id, unifiedProfilePassword);
             mManagedProfilePasswordCache.storePassword(profileUserId, unifiedProfilePassword,
                     parentSid);
         }
@@ -1782,10 +1785,6 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     private void onPostPasswordChanged(LockscreenCredential newCredential, int userHandle) {
-        if (newCredential.isPattern()) {
-            setBoolean(LockPatternUtils.PATTERN_EVER_CHOSEN_KEY, true, userHandle);
-        }
-
         updatePasswordHistory(newCredential, userHandle);
         mContext.getSystemService(TrustManager.class).reportEnabledTrustAgentsChanged(userHandle);
     }
@@ -2255,17 +2254,6 @@ public class LockSettingsService extends ILockSettings.Stub {
                 // credential has matched
                 mBiometricDeferredQueue.addPendingLockoutResetForUser(userId,
                         authResult.syntheticPassword.deriveGkPassword());
-
-                // perform verifyChallenge with synthetic password which generates the real GK auth
-                // token and response for the current user
-                response = mSpManager.verifyChallenge(getGateKeeperService(),
-                        authResult.syntheticPassword, 0L /* challenge */, userId);
-                if (response.getResponseCode() != VerifyCredentialResponse.RESPONSE_OK) {
-                    // This shouldn't really happen: the unwrapping of SP succeeds, but SP doesn't
-                    // match the recorded GK password handle.
-                    Slog.wtf(TAG, "verifyChallenge with SP failed.");
-                    return VerifyCredentialResponse.ERROR;
-                }
             }
         }
         if (response.getResponseCode() == VerifyCredentialResponse.RESPONSE_OK) {
@@ -2899,7 +2887,7 @@ public class LockSettingsService extends ILockSettings.Stub {
      *
      * Also maintains the invariants described in {@link SyntheticPasswordManager} by
      * setting/clearing the protection (by the SP) on the user's auth-bound Keystore keys when the
-     * LSKF is added/removed, respectively.  If the new LSKF is nonempty, then the Gatekeeper auth
+     * LSKF is added/removed, respectively.  If an LSKF is being added, then the Gatekeeper auth
      * token is also refreshed.
      */
     @GuardedBy("mSpManager")
@@ -2916,9 +2904,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             // not needed by synchronizeUnifiedWorkChallengeForProfiles()
             profilePasswords = null;
 
-            if (mSpManager.hasSidForUser(userId)) {
-                mSpManager.verifyChallenge(getGateKeeperService(), sp, 0L, userId);
-            } else {
+            if (!mSpManager.hasSidForUser(userId)) {
                 mSpManager.newSidForUser(getGateKeeperService(), sp, userId);
                 mSpManager.verifyChallenge(getGateKeeperService(), sp, 0L, userId);
                 setKeystorePassword(sp.deriveKeyStorePassword(), userId);

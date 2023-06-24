@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"允許應用程式取得首選 NFC 付費服務資訊，例如已註冊的輔助工具和路線目的地。"</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"控制近距離無線通訊"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"允許應用程式與近距離無線通訊 (NFC) 電子感應標籤、卡片及感應器進行通訊。"</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"安全元件交易事件"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"允許應用程式接收在安全元件上發生的交易相關資訊。"</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"停用螢幕鎖定"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"允許應用程式停用按鍵鎖定以及其他相關的密碼安全性功能。例如：手機收到來電時停用按鍵鎖定，通話結束後重新啟用按鍵鎖定。"</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"要求螢幕鎖定的複雜度"</string>

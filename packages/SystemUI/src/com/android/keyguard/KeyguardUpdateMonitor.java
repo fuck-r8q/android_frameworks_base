@@ -1442,14 +1442,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                         ErrorAuthenticationStatus error = (ErrorAuthenticationStatus) status;
                         handleFaceError(error.getMsgId(), error.getMsg());
                     } else if (status instanceof FailedAuthenticationStatus) {
-                        if (isFaceLockedOut()) {
-                            // TODO b/270090188: remove this hack when biometrics fixes this issue.
-                            // FailedAuthenticationStatus is emitted after ErrorAuthenticationStatus
-                            // for lockout error is received
-                            mLogger.d("onAuthenticationFailed called after"
-                                    + " face has been locked out");
-                            return;
-                        }
                         handleFaceAuthFailed();
                     } else if (status instanceof HelpAuthenticationStatus) {
                         HelpAuthenticationStatus helpMsg = (HelpAuthenticationStatus) status;
@@ -1960,13 +1952,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
                 @Override
                 public void onAuthenticationFailed() {
-                    if (isFaceLockedOut()) {
-                        // TODO b/270090188: remove this hack when biometrics fixes this issue.
-                        // onAuthenticationFailed is called after onAuthenticationError
-                        // for lockout error is received
-                        mLogger.d("onAuthenticationFailed called after face has been locked out");
-                        return;
-                    }
                     handleFaceAuthFailed();
                 }
 
@@ -2096,6 +2081,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                     state = TelephonyManager.SIM_STATE_PIN_REQUIRED;
                 } else if (Intent.SIM_LOCKED_ON_PUK.equals(lockedReason)) {
                     state = TelephonyManager.SIM_STATE_PUK_REQUIRED;
+                } else if (Intent.SIM_ABSENT_ON_PERM_DISABLED.equals(lockedReason)) {
+                    state = TelephonyManager.SIM_STATE_PERM_DISABLED;
                 } else if (Intent.SIM_LOCKED_NETWORK.equals(lockedReason)) {
                     state = TelephonyManager.SIM_STATE_NETWORK_LOCKED;
                 } else if (Intent.SIM_ABSENT_ON_PERM_DISABLED.equals(lockedReason)) {
@@ -2330,7 +2317,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         mLockPatternUtils = lockPatternUtils;
         mAuthController = authController;
         mSecureSettings = secureSettings;
-        dumpManager.registerDumpable(getClass().getName(), this);
+        dumpManager.registerDumpable(this);
         mSensorPrivacyManager = sensorPrivacyManager;
         mActiveUnlockConfig = activeUnlockConfiguration;
         mLogger = logger;

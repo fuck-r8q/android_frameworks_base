@@ -680,7 +680,6 @@ public final class VirtualDeviceManager {
          *   visibility is true.
          */
         @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
-        @NonNull
         public void setShowPointerIcon(boolean showPointerIcon) {
             mVirtualDeviceInternal.setShowPointerIcon(showPointerIcon);
         }

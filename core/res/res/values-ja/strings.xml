@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"登録されている支援やルートの目的地など、優先される NFC お支払いサービスの情報を取得することをアプリに許可します。"</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"NFCの管理"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"NFCタグ、カード、リーダーとの通信をアプリに許可します。"</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"セキュア エレメントのトランザクション イベント"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"セキュア エレメントで起きたトランザクションに関する情報の受信をアプリに許可します。"</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"画面ロックの無効化"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"キーロックとキーロックに関連付けられたパスワードのセキュリティを無効にすることをアプリに許可します。たとえば、かかってきた電話を受ける際にキーロックを無効にし、通話が終了したらキーロックを再度有効にする場合などに使用します。"</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"画面ロックの複雑さのリクエスト"</string>

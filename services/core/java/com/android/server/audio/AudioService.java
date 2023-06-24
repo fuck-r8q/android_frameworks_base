@@ -22,7 +22,6 @@
 package com.android.server.audio;
 
 import static android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED;
-import static android.Manifest.permission.REMOTE_AUDIO_PLAYBACK;
 import static android.app.BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT;
 import static android.media.AudioManager.RINGER_MODE_NORMAL;
 import static android.media.AudioManager.RINGER_MODE_SILENT;
@@ -2495,13 +2494,11 @@ public class AudioService extends IAudioService.Stub
         return true;
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.WRITE_SETTINGS)
     /** @see AudioManager#setEncodedSurroundMode(int) */
     @Override
     public boolean setEncodedSurroundMode(@AudioManager.EncodedSurroundOutputMode int mode) {
-        if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.WRITE_SETTINGS)
-                != PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("Missing WRITE_SETTINGS permission");
-        }
+        setEncodedSurroundMode_enforcePermission();
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -7615,15 +7612,13 @@ public class AudioService extends IAudioService.Stub
     public @interface BtProfile {}
 
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.BLUETOOTH_STACK)
     /**
      * See AudioManager.handleBluetoothActiveDeviceChanged(...)
      */
     public void handleBluetoothActiveDeviceChanged(BluetoothDevice newDevice,
             BluetoothDevice previousDevice, @NonNull BluetoothProfileConnectionInfo info) {
-        if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH_STACK)
-                != PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("Bluetooth is the only caller allowed");
-        }
+        handleBluetoothActiveDeviceChanged_enforcePermission();
         if (info == null) {
             throw new IllegalArgumentException("Illegal null BluetoothProfileConnectionInfo for"
                     + " device " + previousDevice + " -> " + newDevice);
@@ -9651,14 +9646,14 @@ public class AudioService extends IAudioService.Stub
                         0,
                         null, 0);
             } else if (action.equals(Intent.ACTION_USER_SWITCHED)) {
-                if (mUserSwitchedReceived) {
+                // the current audio focus owner is likely no longer valid
+                final boolean audioDiscarded = mMediaFocusControl.maybeDiscardAudioFocusOwner();
+                if (audioDiscarded && mUserSwitchedReceived) {
                     // attempt to stop music playback for background user except on first user
                     // switch (i.e. first boot)
                     mDeviceBroker.postBroadcastBecomingNoisy();
                 }
                 mUserSwitchedReceived = true;
-                // the current audio focus owner is no longer valid
-                mMediaFocusControl.discardAudioFocusOwner();
 
                 if (mSupportsMicPrivacyToggle) {
                     mMicMuteFromPrivacyToggle = mSensorPrivacyManagerInternal
@@ -10671,9 +10666,10 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
+    @android.annotation.EnforcePermission(android.Manifest.permission.REMOTE_AUDIO_PLAYBACK)
     @Override
     public void setRingtonePlayer(IRingtonePlayer player) {
-        mContext.enforceCallingOrSelfPermission(REMOTE_AUDIO_PLAYBACK, null);
+        setRingtonePlayer_enforcePermission();
         mRingtonePlayer = player;
     }
 

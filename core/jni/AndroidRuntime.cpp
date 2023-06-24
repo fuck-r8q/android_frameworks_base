@@ -138,6 +138,7 @@ extern int register_android_database_CursorWindow(JNIEnv* env);
 extern int register_android_database_SQLiteConnection(JNIEnv* env);
 extern int register_android_database_SQLiteGlobal(JNIEnv* env);
 extern int register_android_database_SQLiteDebug(JNIEnv* env);
+extern int register_android_database_SQLiteRawStatement(JNIEnv* env);
 extern int register_android_media_MediaMetrics(JNIEnv *env);
 extern int register_android_os_Debug(JNIEnv* env);
 extern int register_android_os_GraphicsEnvironment(JNIEnv* env);
@@ -1569,6 +1570,7 @@ static const RegJNIRec gRegJNI[] = {
         REG_JNI(register_android_database_SQLiteConnection),
         REG_JNI(register_android_database_SQLiteGlobal),
         REG_JNI(register_android_database_SQLiteDebug),
+        REG_JNI(register_android_database_SQLiteRawStatement),
         REG_JNI(register_android_os_Debug),
         REG_JNI(register_android_os_FileObserver),
         REG_JNI(register_android_os_GraphicsEnvironment),

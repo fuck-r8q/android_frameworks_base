@@ -24,6 +24,7 @@
 #include <GrTypes.h>
 #include <android/sync.h>
 #include <gui/TraceUtils.h>
+#include <include/gpu/ganesh/SkSurfaceGanesh.h>
 #include <ui/FatVector.h>
 #include <vk/GrVkExtensions.h>
 #include <vk/GrVkTypes.h>
@@ -517,7 +518,7 @@ Frame VulkanManager::dequeueNextBuffer(VulkanSurface* surface) {
                         // The following flush blocks the GPU immediately instead of waiting for
                         // other drawing ops. It seems dequeue_fence is not respected otherwise.
                         // TODO: remove the flush after finding why backendSemaphore is not working.
-                        bufferInfo->skSurface->flushAndSubmit();
+                        skgpu::ganesh::FlushAndSubmit(bufferInfo->skSurface);
                     }
                 }
             }
@@ -585,10 +586,10 @@ nsecs_t VulkanManager::finishFrame(SkSurface* surface) {
     } else {
         semaphore = VK_NULL_HANDLE;
     }
-    GrSemaphoresSubmitted submitted =
-            surface->flush(SkSurface::BackendSurfaceAccess::kPresent, flushInfo);
     GrDirectContext* context = GrAsDirectContext(surface->recordingContext());
     ALOGE_IF(!context, "Surface is not backed by gpu");
+    GrSemaphoresSubmitted submitted = context->flush(
+            surface, SkSurfaces::BackendSurfaceAccess::kPresent, flushInfo);
     context->submit();
     const nsecs_t submissionTime = systemTime();
     if (semaphore != VK_NULL_HANDLE) {
@@ -598,7 +599,8 @@ nsecs_t VulkanManager::finishFrame(SkSurface* surface) {
                 // retrieve VkImage used as render target
                 VkImage image = VK_NULL_HANDLE;
                 GrBackendRenderTarget backendRenderTarget =
-                        surface->getBackendRenderTarget(SkSurface::kFlushRead_BackendHandleAccess);
+                        SkSurfaces::GetBackendRenderTarget(
+                            surface, SkSurfaces::BackendHandleAccess::kFlushRead);
                 if (backendRenderTarget.isValid()) {
                     GrVkImageInfo info;
                     if (backendRenderTarget.getVkImageInfo(&info)) {

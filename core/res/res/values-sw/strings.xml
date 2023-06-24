@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Huruhusu programu kupata maelezo ya huduma inayopendelewa ya malipo ya nfc kama vile huduma zilizosajiliwa na njia."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"kudhibiti Mawasiliano ya Vifaa Vilivyokaribu (NFC)"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Inaruhusu programu kuwasiliana na lebo, kadi na wasomaji wa Near Field Communication (NFC)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Muamala kupitia Kipengele Salama"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Huruhusu programu kupokea maelezo kuhusu miamala inayofanyika kupitia Kipengele Salama."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"zima kufuli la skrini yako"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Inaruhusu programu kulemaza ufunguo wa vitufe na usalama mwingine ambata wa nenosiri. Kwa mfano, simu inalemaza ufunguo wa viitufe inapopokea simu inayoingia, kisha inawezesha upya ufunguo wa vitufe wakati simu inapokamilika."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"iombe kiwango cha uchangamano wa kufunga skrini"</string>

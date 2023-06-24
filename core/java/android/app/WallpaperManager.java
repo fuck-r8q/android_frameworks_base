@@ -853,7 +853,7 @@ public class WallpaperManager {
     private static boolean isLockscreenLiveWallpaperEnabledHelper() {
         if (sGlobals == null) {
             sIsLockscreenLiveWallpaperEnabled = SystemProperties.getBoolean(
-                    "persist.wm.debug.lockscreen_live_wallpaper", false);
+                    "persist.wm.debug.lockscreen_live_wallpaper", true);
         }
         if (sIsLockscreenLiveWallpaperEnabled == null) {
             try {
@@ -1969,7 +1969,6 @@ public class WallpaperManager {
                     mContext.getUserId());
             if (fd != null) {
                 FileOutputStream fos = null;
-                boolean ok = false;
                 try {
                     fos = new ParcelFileDescriptor.AutoCloseOutputStream(fd);
                     copyStreamToWallpaperFile(resources.openRawResource(resid), fos);

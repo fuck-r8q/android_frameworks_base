@@ -591,6 +591,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"Permet que l\'aplicació obtingui informació preferent sobre el servei de pagament per NFC, com ara complements registrats i destinacions de rutes."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"controlar Comunicació de camp proper (NFC)"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"Permet que l\'aplicació es comuniqui amb les etiquetes, les targetes i els lectors de Comunicació de camp proper (NFC)."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"Esdeveniment de transacció d\'un element segur"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"Permet que l\'aplicació rebi informació sobre les transaccions que tenen lloc en un element segur."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"desactivació del bloqueig de pantalla"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"Permet que l\'aplicació desactivi el bloqueig del teclat i qualsevol element de seguretat de contrasenyes associat. Per exemple, el telèfon desactiva el bloqueig del teclat en rebre una trucada entrant i, a continuació, reactiva el bloqueig del teclat quan finalitza la trucada."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"sol·licita una determinada complexitat del bloqueig de pantalla"</string>

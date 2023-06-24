@@ -101,6 +101,7 @@ public class SettingsBackupTest {
                     Settings.System.MIN_REFRESH_RATE, // depends on hardware capabilities
                     Settings.System.PEAK_REFRESH_RATE, // depends on hardware capabilities
                     Settings.System.SCREEN_BRIGHTNESS_FLOAT,
+                    Settings.System.WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE,
                     Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ,
                     Settings.System.MULTI_AUDIO_FOCUS_ENABLED // form-factor/OEM specific
                     );
@@ -590,6 +591,7 @@ public class SettingsBackupTest {
                     Settings.Global.APPOP_HISTORY_BASE_INTERVAL_MILLIS,
                     Settings.Global.AUTO_REVOKE_PARAMETERS,
                     Settings.Global.ENABLE_RADIO_BUG_DETECTION,
+                    Settings.Global.REPAIR_MODE_ACTIVE,
                     Settings.Global.RADIO_BUG_WAKELOCK_TIMEOUT_COUNT_THRESHOLD,
                     Settings.Global.RADIO_BUG_SYSTEM_ERROR_COUNT_THRESHOLD,
                     Settings.Global.ENABLED_SUBSCRIPTION_FOR_SLOT,
@@ -605,7 +607,7 @@ public class SettingsBackupTest {
                     Settings.Global.MANAGED_PROVISIONING_DEFER_PROVISIONING_TO_ROLE_HOLDER,
                     Settings.Global.REVIEW_PERMISSIONS_NOTIFICATION_STATE,
                     Settings.Global.ENABLE_BACK_ANIMATION, // Temporary for T, dev option only
-                    Settings.Global.Wearable.COMBINED_LOCATION_ENABLED,
+                    Settings.Global.Wearable.COMBINED_LOCATION_ENABLE,
                     Settings.Global.Wearable.HAS_PAY_TOKENS,
                     Settings.Global.Wearable.GMS_CHECKIN_TIMEOUT_MIN,
                     Settings.Global.Wearable.HOTWORD_DETECTION_ENABLED,
@@ -724,6 +726,7 @@ public class SettingsBackupTest {
                  Settings.Secure.CONNECTIVITY_RELEASE_PENDING_INTENT_DELAY_MS,
                  Settings.Secure.CONTENT_CAPTURE_ENABLED,
                  Settings.Secure.DEFAULT_INPUT_METHOD,
+                 Settings.Secure.DEFAULT_NOTE_TASK_PROFILE,
                  Settings.Secure.DEVICE_PAIRED,
                  Settings.Secure.DIALER_DEFAULT_APPLICATION,
                  Settings.Secure.DISABLED_PRINT_SERVICES,
@@ -843,7 +846,8 @@ public class SettingsBackupTest {
                  Settings.Secure.ACCESSIBILITY_FLOATING_MENU_MIGRATION_TOOLTIP_PROMPT,
                  Settings.Secure.UI_TRANSLATION_ENABLED,
                  Settings.Secure.CREDENTIAL_SERVICE,
-                 Settings.Secure.CREDENTIAL_SERVICE_PRIMARY);
+                 Settings.Secure.CREDENTIAL_SERVICE_PRIMARY,
+                 Settings.Secure.ACCESSIBILITY_DISPLAY_MAGNIFICATION_EDGE_HAPTIC_ENABLED);
 
     @Test
     public void systemSettingsBackedUpOrDenied() {

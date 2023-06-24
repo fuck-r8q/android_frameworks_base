@@ -301,8 +301,8 @@ public class ComputerEngine implements Computer {
         }
 
         @NonNull
-        public Collection<SharedUserSetting> getAllSharedUsers() {
-            return mSettings.getAllSharedUsersLPw();
+        ArrayMap<String, ? extends SharedUserApi> getSharedUsers() {
+            return mSettings.getSharedUsersLocked().untrackedStorage();
         }
 
         @Nullable
@@ -4053,13 +4053,12 @@ public class ComputerEngine implements Computer {
         return null;
     }
 
-    @Nullable
     @Override
-    public String[] getSystemSharedLibraryNames() {
+    public ArrayMap<String, String> getSystemSharedLibraryNamesAndPaths() {
         // allow instant applications
         final WatchedArrayMap<String, WatchedLongSparseArray<SharedLibraryInfo>> sharedLibraries =
                 getSharedLibraries();
-        Set<String> libs = null;
+        final ArrayMap<String, String> libs = new ArrayMap<>();
         final int libCount = sharedLibraries.size();
         for (int i = 0; i < libCount; i++) {
             WatchedLongSparseArray<SharedLibraryInfo> versionedLib = sharedLibraries.valueAt(i);
@@ -4070,10 +4069,7 @@ public class ComputerEngine implements Computer {
             for (int j = 0; j < versionCount; j++) {
                 SharedLibraryInfo libraryInfo = versionedLib.valueAt(j);
                 if (!libraryInfo.isStatic()) {
-                    if (libs == null) {
-                        libs = new ArraySet<>();
-                    }
-                    libs.add(libraryInfo.getName());
+                    libs.put(libraryInfo.getName(), libraryInfo.getPath());
                     break;
                 }
                 final PackageStateInternal ps =
@@ -4081,22 +4077,12 @@ public class ComputerEngine implements Computer {
                 if (ps != null && !filterSharedLibPackage(ps, Binder.getCallingUid(),
                         UserHandle.getUserId(Binder.getCallingUid()),
                         PackageManager.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES)) {
-                    if (libs == null) {
-                        libs = new ArraySet<>();
-                    }
-                    libs.add(libraryInfo.getName());
+                    libs.put(libraryInfo.getName(), libraryInfo.getPath());
                     break;
                 }
             }
         }
-
-        if (libs != null) {
-            String[] libsArray = new String[libs.size()];
-            libs.toArray(libsArray);
-            return libsArray;
-        }
-
-        return null;
+        return libs;
     }
 
     @Override
@@ -5519,8 +5505,8 @@ public class ComputerEngine implements Computer {
     @Override
     public SparseArray<String> getAppsWithSharedUserIds() {
         final SparseArray<String> sharedUserIds = new SparseArray<>();
-        for (SharedUserSetting setting : mSettings.getAllSharedUsers()) {
-            sharedUserIds.put(UserHandle.getAppId(setting.mAppId), setting.name);
+        for (SharedUserApi sharedUser : mSettings.getSharedUsers().values()) {
+            sharedUserIds.put(UserHandle.getAppId(sharedUser.getAppId()), sharedUser.getName());
         }
         return sharedUserIds;
     }
@@ -5644,7 +5630,12 @@ public class ComputerEngine implements Computer {
             return sus.getPackages();
         } else if (settingBase instanceof PackageSetting) {
             final PackageSetting ps = (PackageSetting) settingBase;
-            return List.of(ps.getPkg());
+            final AndroidPackage pkg = ps.getPkg();
+            if (pkg != null) {
+                return Collections.singletonList(pkg);
+            } else {
+                return Collections.emptyList();
+            }
         } else {
             return Collections.emptyList();
         }
@@ -5820,8 +5811,8 @@ public class ComputerEngine implements Computer {
 
     @Override
     @NonNull
-    public Collection<SharedUserSetting> getAllSharedUsers() {
-        return mSettings.getAllSharedUsers();
+    public ArrayMap<String, ? extends SharedUserApi> getSharedUsers() {
+        return mSettings.getSharedUsers();
     }
 
     @Override

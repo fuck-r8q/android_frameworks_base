@@ -24,6 +24,7 @@
 #include "SkClipStack.h"
 #include "SkRect.h"
 #include "SkM44.h"
+#include <include/gpu/ganesh/SkSurfaceGanesh.h>
 #include "include/gpu/GpuTypes.h" // from Skia
 #include "utils/GLUtils.h"
 #include <effects/GainmapRenderer.h>
@@ -95,11 +96,12 @@ void GLFunctorDrawable::onDraw(SkCanvas* canvas) {
         SkImageInfo surfaceInfo =
                 canvas->imageInfo().makeWH(clipBounds.width(), clipBounds.height());
         tmpSurface =
-                SkSurface::MakeRenderTarget(directContext, skgpu::Budgeted::kYes, surfaceInfo);
+                SkSurfaces::RenderTarget(directContext, skgpu::Budgeted::kYes, surfaceInfo);
         tmpSurface->getCanvas()->clear(SK_ColorTRANSPARENT);
 
         GrGLFramebufferInfo fboInfo;
-        if (!tmpSurface->getBackendRenderTarget(SkSurface::kFlushWrite_BackendHandleAccess)
+        if (!SkSurfaces::GetBackendRenderTarget(tmpSurface.get(),
+                                                SkSurfaces::BackendHandleAccess::kFlushWrite)
                      .getGLFramebufferInfo(&fboInfo)) {
             ALOGW("Unable to extract renderTarget info from offscreen canvas; aborting GLFunctor");
             return;

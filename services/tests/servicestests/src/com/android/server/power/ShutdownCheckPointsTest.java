@@ -112,7 +112,7 @@ public class ShutdownCheckPointsTest {
         mTestInjector.setCurrentTime(1000);
         // Matching pid in getRunningAppProcesses
         mInstance.recordCheckPointInternal(1, "reason1");
-        // Mising pid in getRunningAppProcesses
+        // Missing pid in getRunningAppProcesses
         mInstance.recordCheckPointInternal(2, "reason2");
 
         assertEquals(

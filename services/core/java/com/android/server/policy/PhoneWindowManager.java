@@ -70,6 +70,7 @@ import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerGlobal.ADD_PERMISSION_DENIED;
 
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
+import static com.android.internal.util.FrameworkStatsLog.ACCESSIBILITY_SHORTCUT_REPORTED__SHORTCUT_TYPE__A11Y_WEAR_TRIPLE_PRESS_GESTURE;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.CAMERA_LENS_COVERED;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.CAMERA_LENS_COVER_ABSENT;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.CAMERA_LENS_UNCOVERED;
@@ -127,6 +128,7 @@ import android.hardware.hdmi.HdmiAudioSystemClient;
 import android.hardware.hdmi.HdmiControlManager;
 import android.hardware.hdmi.HdmiPlaybackClient;
 import android.hardware.hdmi.HdmiPlaybackClient.OneTouchPlayCallback;
+import android.hardware.input.InputManager;
 import android.media.AudioManager;
 import android.media.AudioManagerInternal;
 import android.media.AudioSystem;
@@ -194,6 +196,7 @@ import android.widget.Toast;
 
 import com.android.internal.R;
 import com.android.internal.accessibility.AccessibilityShortcutController;
+import com.android.internal.accessibility.util.AccessibilityStatsLogUtils;
 import com.android.internal.accessibility.util.AccessibilityUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.AssistUtils;
@@ -209,6 +212,7 @@ import com.android.internal.policy.PhoneWindow;
 import com.android.internal.policy.TransitionAnimation;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.ArrayUtils;
+import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.AccessibilityManagerInternal;
 import com.android.server.ExtconStateObserver;
@@ -219,6 +223,7 @@ import com.android.server.SystemServiceManager;
 import com.android.server.UiThread;
 import com.android.server.display.BrightnessUtils;
 import com.android.server.input.InputManagerInternal;
+import com.android.server.input.KeyboardMetricsCollector;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.KeyCombinationManager.TwoKeysCombinationRule;
@@ -541,10 +546,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mShortPressOnSleepBehavior;
     int mShortPressOnWindowBehavior;
     int mPowerVolUpBehavior;
-    int mShortPressOnStemPrimaryBehavior;
-    int mDoublePressOnStemPrimaryBehavior;
-    int mTriplePressOnStemPrimaryBehavior;
-    int mLongPressOnStemPrimaryBehavior;
     boolean mStylusButtonsEnabled = true;
     boolean mHasSoftInput = false;
     boolean mHapticTextHandleEnabled;
@@ -557,6 +558,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     long mWakeUpToLastStateTimeout;
     int mSearchKeyBehavior;
     ComponentName mSearchKeyTargetActivity;
+
+    // Key Behavior - Stem Primary
+    private int mShortPressOnStemPrimaryBehavior;
+    private int mDoublePressOnStemPrimaryBehavior;
+    private int mTriplePressOnStemPrimaryBehavior;
+    private int mLongPressOnStemPrimaryBehavior;
 
     private boolean mHandleVolumeKeysInWM;
 
@@ -681,6 +688,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_LAUNCH_ASSIST = 23;
     private static final int MSG_RINGER_TOGGLE_CHORD = 24;
     private static final int MSG_SWITCH_KEYBOARD_LAYOUT = 25;
+    private static final int MSG_LOG_KEYBOARD_SYSTEM_EVENT = 26;
 
     private class PolicyHandler extends Handler {
         @Override
@@ -753,6 +761,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     break;
                 case MSG_SWITCH_KEYBOARD_LAYOUT:
                     handleSwitchKeyboardLayout(msg.arg1, msg.arg2);
+                    break;
+                case MSG_LOG_KEYBOARD_SYSTEM_EVENT:
+                    handleKeyboardSystemEvent(msg.arg2, (KeyEvent) msg.obj);
                     break;
             }
         }
@@ -1444,7 +1455,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (DEBUG_INPUT) {
                     Slog.d(TAG, "Executing stem primary triple press action behavior.");
                 }
-                toggleTalkBack();
+
+                if (Settings.System.getIntForUser(mContext.getContentResolver(),
+                        Settings.System.WEAR_ACCESSIBILITY_GESTURE_ENABLED,
+                        /* def= */ 0, UserHandle.USER_CURRENT) == 1) {
+                    /** Toggle talkback begin */
+                    ComponentName componentName = getTalkbackComponent();
+                    if (componentName != null && toggleTalkBack(componentName)) {
+                        /** log stem triple press telemetry if it's a talkback enabled event */
+                        logStemTriplePressAccessibilityTelemetry(componentName);
+                    }
+                    performHapticFeedback(HapticFeedbackConstants.CONFIRM, /* always = */ false,
+                        /* reason = */ "Stem primary - Triple Press - Toggle Accessibility");
+                    /** Toggle talkback end */
+                }
                 break;
         }
     }
@@ -1463,17 +1487,39 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void toggleTalkBack() {
-        final ComponentName componentName = getTalkbackComponent();
-        if (componentName == null) {
-            return;
-        }
-
+    /**
+     * A function that toggles talkback service
+     *
+     * @return {@code true} if talkback is enabled, {@code false} if talkback is disabled
+     */
+    private boolean toggleTalkBack(ComponentName componentName) {
         final Set<ComponentName> enabledServices =
                 AccessibilityUtils.getEnabledServicesFromSettings(mContext, mCurrentUserId);
 
+        boolean isTalkbackAlreadyEnabled = enabledServices.contains(componentName);
         AccessibilityUtils.setAccessibilityServiceState(mContext, componentName,
-                !enabledServices.contains(componentName));
+                !isTalkbackAlreadyEnabled);
+        /** if isTalkbackAlreadyEnabled is true, then it's a disabled event so return false
+         * and if isTalkbackAlreadyEnabled is false, return true as it's an enabled event */
+        return !isTalkbackAlreadyEnabled;
+    }
+
+    /**
+     * A function that logs stem triple press accessibility telemetry
+     * If the user setup (Oobe) is not completed, set the
+     * WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE
+     * setting which will be later logged via Settings Snapshot
+     * else, log ACCESSIBILITY_SHORTCUT_REPORTED atom
+     */
+    private void logStemTriplePressAccessibilityTelemetry(ComponentName componentName) {
+        if (!AccessibilityUtils.isUserSetupCompleted(mContext)) {
+            Settings.Secure.putInt(mContext.getContentResolver(),
+                    Settings.System.WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE, 1);
+        } else {
+            AccessibilityStatsLogUtils.logAccessibilityShortcutActivated(mContext, componentName,
+                    ACCESSIBILITY_SHORTCUT_REPORTED__SHORTCUT_TYPE__A11Y_WEAR_TRIPLE_PRESS_GESTURE,
+                    /* serviceEnabled= */ true);
+        }
     }
 
     private ComponentName getTalkbackComponent() {
@@ -2019,6 +2065,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         Supplier<GlobalActions> getGlobalActionsFactory() {
             return () -> new GlobalActions(mContext, mWindowManagerFuncs);
         }
+
+        KeyguardServiceDelegate getKeyguardServiceDelegate() {
+            return new KeyguardServiceDelegate(mContext,
+                    new StateCallback() {
+                        @Override
+                        public void onTrustedChanged() {
+                            mWindowManagerFuncs.notifyKeyguardTrustedChanged();
+                        }
+
+                        @Override
+                        public void onShowingChanged() {
+                            mWindowManagerFuncs.onKeyguardShowingAndNotOccludedChanged();
+                        }
+                    });
+        }
     }
 
     /** {@inheritDoc} */
@@ -2180,6 +2241,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 com.android.internal.R.integer.config_shortPressOnSleepBehavior);
         mAllowStartActivityForLongPressOnPowerDuringSetup = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_allowStartActivityForLongPressOnPowerInSetup);
+        mShortPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_shortPressOnStemPrimaryBehavior);
+        mLongPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_longPressOnStemPrimaryBehavior);
+        mDoublePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_doublePressOnStemPrimaryBehavior);
+        mTriplePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
+                com.android.internal.R.integer.config_triplePressOnStemPrimaryBehavior);
 
         mHapticTextHandleEnabled = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_enableHapticTextHandle);
@@ -2276,18 +2345,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         mKeyguardDrawnTimeout = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_keyguardDrawnTimeout);
-        mKeyguardDelegate = new KeyguardServiceDelegate(mContext,
-                new StateCallback() {
-                    @Override
-                    public void onTrustedChanged() {
-                        mWindowManagerFuncs.notifyKeyguardTrustedChanged();
-                    }
-
-                    @Override
-                    public void onShowingChanged() {
-                        mWindowManagerFuncs.onKeyguardShowingAndNotOccludedChanged();
-                    }
-                });
+        mKeyguardDelegate = injector.getKeyguardServiceDelegate();
         initKeyCombinationRules();
         initSingleKeyGestureRules();
         mSideFpsEventHandler = new SideFpsEventHandler(mContext, mHandler, mPowerManager);
@@ -2312,6 +2370,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             cancelPendingScreenshotChordAction();
                         }
                     });
+
             if (mHasFeatureWatch) {
                 mKeyCombinationManager.addRule(
                         new TwoKeysCombinationRule(KEYCODE_POWER, KEYCODE_STEM_PRIMARY) {
@@ -2597,14 +2656,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mPackageManager.hasSystemFeature(FEATURE_PICTURE_IN_PICTURE)) {
             mShortPressOnWindowBehavior = SHORT_PRESS_WINDOW_PICTURE_IN_PICTURE;
         }
-        mShortPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_shortPressOnStemPrimaryBehavior);
-        mLongPressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_longPressOnStemPrimaryBehavior);
-        mDoublePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_doublePressOnStemPrimaryBehavior);
-        mTriplePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_triplePressOnStemPrimaryBehavior);
     }
 
     public void updateSettings() {
@@ -2937,7 +2988,30 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
         };
 
+    /**
+     * Log the keyboard shortcuts without blocking the current thread.
+     *
+     * We won't log keyboard events when the input device is null
+     * or when it is virtual.
+     */
+    private void handleKeyboardSystemEvent(int keyboardSystemEvent, KeyEvent event) {
+        final InputManager inputManager = mContext.getSystemService(InputManager.class);
+        final InputDevice inputDevice = inputManager != null
+                ? inputManager.getInputDevice(event.getDeviceId()) : null;
+        if (inputDevice != null && !inputDevice.isVirtual()) {
+            KeyboardMetricsCollector.logKeyboardSystemsEventReportedAtom(
+                    inputDevice, keyboardSystemEvent,
+                    new int[]{event.getKeyCode()}, event.getMetaState());
+        }
+    }
+
+    private void logKeyboardSystemsEvent(KeyEvent event, int keyboardSystemEvent) {
+        mHandler.obtainMessage(MSG_LOG_KEYBOARD_SYSTEM_EVENT, 0, keyboardSystemEvent, event)
+                .sendToTarget();
+    }
+
     // TODO(b/117479243): handle it in InputPolicy
+    // TODO (b/283241997): Add the remaining keyboard shortcut logging after refactoring
     /** {@inheritDoc} */
     @Override
     public long interceptKeyBeforeDispatching(IBinder focusedToken, KeyEvent event,
@@ -2991,6 +3065,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         switch(keyCode) {
             case KeyEvent.KEYCODE_HOME:
+                logKeyboardSystemsEvent(event, FrameworkStatsLog
+                        .KEYBOARD_SYSTEMS_EVENT_REPORTED__KEYBOARD_SYSTEM_EVENT__HOME);
                 return handleHomeShortcuts(displayId, focusedToken, event);
             case KeyEvent.KEYCODE_MENU:
                 // Hijack modified menu keys for debugging features
@@ -3008,6 +3084,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_RECENT_APPS:
                 if (down && repeatCount == 0) {
                     showRecentApps(false /* triggeredFromAltTab */);
+                    logKeyboardSystemsEvent(event, FrameworkStatsLog
+                            .KEYBOARD_SYSTEMS_EVENT_REPORTED__KEYBOARD_SYSTEM_EVENT__RECENT_APPS);
                 }
                 return key_consumed;
             case KeyEvent.KEYCODE_APP_SWITCH:

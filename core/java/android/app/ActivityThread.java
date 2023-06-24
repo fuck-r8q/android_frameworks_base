@@ -121,6 +121,8 @@ import android.os.BluetoothServiceManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.DdmSyncStageUpdater;
+import android.os.DdmSyncState.Stage;
 import android.os.Debug;
 import android.os.Environment;
 import android.os.FileUtils;
@@ -268,9 +270,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class ActivityThread extends ClientTransactionHandler
         implements ActivityThreadInternal {
+
+    private final DdmSyncStageUpdater mDdmSyncStageUpdater = new DdmSyncStageUpdater();
+
     /** @hide */
     public static final String TAG = "ActivityThread";
-    private static final android.graphics.Bitmap.Config THUMBNAIL_FORMAT = Bitmap.Config.RGB_565;
     static final boolean localLOGV = false;
     static final boolean DEBUG_MESSAGES = false;
     /** @hide */
@@ -371,7 +375,7 @@ public final class ActivityThread extends ClientTransactionHandler
     private final AtomicInteger mNumLaunchingActivities = new AtomicInteger();
     @GuardedBy("mAppThread")
     private int mLastProcessState = PROCESS_STATE_UNKNOWN;
-    ArrayList<WeakReference<AssistStructure>> mLastAssistStructures = new ArrayList<>();
+    final ArrayList<WeakReference<AssistStructure>> mLastAssistStructures = new ArrayList<>();
     private int mLastSessionId;
     // Holds the value of the last reported device ID value from the server for the top activity.
     int mLastReportedDeviceId;
@@ -562,7 +566,7 @@ public final class ActivityThread extends ClientTransactionHandler
         Configuration createdConfig;
         Configuration overrideConfig;
         // Used for consolidating configs before sending on to Activity.
-        private Configuration tmpConfig = new Configuration();
+        private final Configuration tmpConfig = new Configuration();
         // Callback used for updating activity override config and camera compat control state.
         ViewRootImpl.ActivityConfigCallback activityConfigCallback;
 
@@ -770,7 +774,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    final class ProviderClientRecord {
+    static final class ProviderClientRecord {
         final String[] mNames;
         @UnsupportedAppUsage
         final IContentProvider mProvider;
@@ -799,7 +803,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @UnsupportedAppUsage
-        Intent intent;
+        final Intent intent;
         @UnsupportedAppUsage
         ActivityInfo info;
         @UnsupportedAppUsage
@@ -883,6 +887,7 @@ public final class ActivityThread extends ClientTransactionHandler
         ApplicationInfo appInfo;
         String sdkSandboxClientAppVolumeUuid;
         String sdkSandboxClientAppPackage;
+        boolean isSdkInSandbox;
         @UnsupportedAppUsage
         List<ProviderInfo> providers;
         ComponentName instrumentationName;
@@ -1164,19 +1169,34 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         @Override
-        public final void bindApplication(String processName, ApplicationInfo appInfo,
-                String sdkSandboxClientAppVolumeUuid, String sdkSandboxClientAppPackage,
-                ProviderInfoList providerList, ComponentName instrumentationName,
-                ProfilerInfo profilerInfo, Bundle instrumentationArgs,
+        public final void bindApplication(
+                String processName,
+                ApplicationInfo appInfo,
+                String sdkSandboxClientAppVolumeUuid,
+                String sdkSandboxClientAppPackage,
+                boolean isSdkInSandbox,
+                ProviderInfoList providerList,
+                ComponentName instrumentationName,
+                ProfilerInfo profilerInfo,
+                Bundle instrumentationArgs,
                 IInstrumentationWatcher instrumentationWatcher,
-                IUiAutomationConnection instrumentationUiConnection, int debugMode,
-                boolean enableBinderTracking, boolean trackAllocation,
-                boolean isRestrictedBackupMode, boolean persistent, Configuration config,
-                CompatibilityInfo compatInfo, Map services, Bundle coreSettings,
-                String buildSerial, AutofillOptions autofillOptions,
-                ContentCaptureOptions contentCaptureOptions, long[] disabledCompatChanges,
+                IUiAutomationConnection instrumentationUiConnection,
+                int debugMode,
+                boolean enableBinderTracking,
+                boolean trackAllocation,
+                boolean isRestrictedBackupMode,
+                boolean persistent,
+                Configuration config,
+                CompatibilityInfo compatInfo,
+                Map services,
+                Bundle coreSettings,
+                String buildSerial,
+                AutofillOptions autofillOptions,
+                ContentCaptureOptions contentCaptureOptions,
+                long[] disabledCompatChanges,
                 SharedMemory serializedSystemFontMap,
-                long startRequestedElapsedTime, long startRequestedUptime) {
+                long startRequestedElapsedTime,
+                long startRequestedUptime) {
             if (services != null) {
                 if (false) {
                     // Test code to make sure the app could see the passed-in services.
@@ -1210,6 +1230,7 @@ public final class ActivityThread extends ClientTransactionHandler
             data.appInfo = appInfo;
             data.sdkSandboxClientAppVolumeUuid = sdkSandboxClientAppVolumeUuid;
             data.sdkSandboxClientAppPackage = sdkSandboxClientAppPackage;
+            data.isSdkInSandbox = isSdkInSandbox;
             data.providers = providerList.getList();
             data.instrumentationName = instrumentationName;
             data.instrumentationArgs = instrumentationArgs;
@@ -3461,11 +3482,8 @@ public final class ActivityThread extends ClientTransactionHandler
     public void registerOnActivityPausedListener(Activity activity,
             OnActivityPausedListener listener) {
         synchronized (mOnPauseListeners) {
-            ArrayList<OnActivityPausedListener> list = mOnPauseListeners.get(activity);
-            if (list == null) {
-                list = new ArrayList<OnActivityPausedListener>();
-                mOnPauseListeners.put(activity, list);
-            }
+            ArrayList<OnActivityPausedListener> list =
+                    mOnPauseListeners.computeIfAbsent(activity, k -> new ArrayList<>());
             list.add(listener);
         }
     }
@@ -5572,7 +5590,7 @@ public final class ActivityThread extends ClientTransactionHandler
     /** Core implementation of activity destroy call. */
     void performDestroyActivity(ActivityClientRecord r, boolean finishing,
             int configChanges, boolean getNonConfigInstance, String reason) {
-        Class<? extends Activity> activityClass = null;
+        Class<? extends Activity> activityClass;
         if (localLOGV) Slog.v(TAG, "Performing finish of " + r);
         activityClass = r.activity.getClass();
         r.activity.mConfigChangeFlags |= configChanges;
@@ -6694,6 +6712,8 @@ public final class ActivityThread extends ClientTransactionHandler
     private void handleBindApplication(AppBindData data) {
         long st_bindApp = SystemClock.uptimeMillis();
         BoostFramework ux_perf = null;
+        mDdmSyncStageUpdater.next(Stage.Bind);
+
         // Register the UI Thread as a sensitive thread to the runtime.
         VMRuntime.registerSensitiveThread();
         // In the case the stack depth property exists, pass it down to the runtime.
@@ -6743,6 +6763,7 @@ public final class ActivityThread extends ClientTransactionHandler
                                                 data.appInfo.packageName,
                                                 UserHandle.myUserId());
         VMRuntime.setProcessPackageName(data.appInfo.packageName);
+        mDdmSyncStageUpdater.next(Stage.Named);
 
         // Pass data directory path to ART. This is used for caching information and
         // should be set before any application code is loaded.
@@ -6963,6 +6984,7 @@ public final class ActivityThread extends ClientTransactionHandler
         final StrictMode.ThreadPolicy writesAllowedPolicy = StrictMode.getThreadPolicy();
 
         if (data.debugMode != ApplicationThreadConstants.DEBUG_OFF) {
+            mDdmSyncStageUpdater.next(Stage.Debugger);
             if (data.debugMode == ApplicationThreadConstants.DEBUG_WAIT) {
                 waitForDebugger(data);
             } else if (data.debugMode == ApplicationThreadConstants.DEBUG_SUSPEND) {
@@ -6970,6 +6992,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
             // Nothing special to do in case of DEBUG_ON.
         }
+        mDdmSyncStageUpdater.next(Stage.Running);
 
         try {
             // If the app is being launched for full backup or restore, bring it up in
@@ -7248,8 +7271,14 @@ public final class ActivityThread extends ClientTransactionHandler
         // The test context's op package name == the target app's op package name, because
         // the app ops manager checks the op package name against the real calling UID,
         // which is what the target package name is associated with.
-        final ContextImpl instrContext = ContextImpl.createAppContext(this, pi,
-                appContext.getOpPackageName());
+        // In the case of instrumenting an sdk running in the sdk sandbox, appContext refers
+        // to the context of the sdk running in the sandbox. Since the sandbox does not have
+        // access to data outside the sandbox, we require the instrContext to point to the
+        // sdk in the sandbox as well, and not to the test context.
+        final ContextImpl instrContext =
+                (data.isSdkInSandbox)
+                        ? appContext
+                        : ContextImpl.createAppContext(this, pi, appContext.getOpPackageName());
 
         try {
             final ClassLoader cl = instrContext.getClassLoader();
@@ -7348,7 +7377,7 @@ public final class ActivityThread extends ClientTransactionHandler
         // Note that we cannot hold the lock while acquiring and installing the
         // provider since it might take a long time to run and it could also potentially
         // be re-entrant in the case where the provider is in the same process.
-        ContentProviderHolder holder = null;
+        ContentProviderHolder holder;
         final ProviderKey key = getGetProviderKey(auth, userId);
         try {
             synchronized (key) {
@@ -7402,11 +7431,7 @@ public final class ActivityThread extends ClientTransactionHandler
     private ProviderKey getGetProviderKey(String auth, int userId) {
         final ProviderKey key = new ProviderKey(auth, userId);
         synchronized (mGetProviderKeys) {
-            ProviderKey lock = mGetProviderKeys.get(key);
-            if (lock == null) {
-                lock = key;
-                mGetProviderKeys.put(key, lock);
-            }
+            ProviderKey lock = mGetProviderKeys.computeIfAbsent(key, k -> k);
             return lock;
         }
     }
@@ -7900,6 +7925,7 @@ public final class ActivityThread extends ClientTransactionHandler
         mConfigurationController = new ConfigurationController(this);
         mSystemThread = system;
         mStartSeq = startSeq;
+        mDdmSyncStageUpdater.next(Stage.Attach);
 
         if (!system) {
             android.ddm.DdmHandleAppName.setAppName("<pre-initialized>",
@@ -8043,7 +8069,7 @@ public final class ActivityThread extends ClientTransactionHandler
             if (!DEPRECATE_DATA_COLUMNS) return;
 
             // Install interception and make sure it sticks!
-            Os def = null;
+            Os def;
             do {
                 def = Os.getDefault();
             } while (!Os.compareAndSetDefault(def, new AndroidOs(def)));

@@ -16,11 +16,14 @@
 
 package com.android.wm.shell.bubbles.bar;
 
+import android.annotation.ColorInt;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewOutlineProvider;
@@ -31,7 +34,11 @@ import com.android.wm.shell.R;
 import com.android.wm.shell.bubbles.Bubble;
 import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.bubbles.BubbleTaskViewHelper;
+import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.taskview.TaskView;
+
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Expanded view of a bubble when it's part of the bubble bar.
@@ -45,11 +52,14 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
 
     private BubbleController mController;
     private BubbleTaskViewHelper mBubbleTaskViewHelper;
+    private BubbleBarMenuViewController mMenuViewController;
+    private @Nullable Supplier<Rect> mLayerBoundsSupplier;
+    private @Nullable Consumer<String> mUnBubbleConversationCallback;
 
-    private HandleView mMenuView;
-    private TaskView mTaskView;
+    private BubbleBarHandleView mHandleView = new BubbleBarHandleView(getContext());
+    private @Nullable TaskView mTaskView;
 
-    private int mMenuHeight;
+    private int mHandleHeight;
     private int mBackgroundColor;
     private float mCornerRadius = 0f;
 
@@ -83,11 +93,9 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
         super.onFinishInflate();
         Context context = getContext();
         setElevation(getResources().getDimensionPixelSize(R.dimen.bubble_elevation));
-        mMenuHeight = context.getResources().getDimensionPixelSize(
-                R.dimen.bubblebar_expanded_view_menu_size);
-        mMenuView = new HandleView(context);
-        addView(mMenuView);
-
+        mHandleHeight = context.getResources().getDimensionPixelSize(
+                R.dimen.bubble_bar_expanded_view_handle_size);
+        addView(mHandleView);
         applyThemeAttrs();
         setClipToOutline(true);
         setOutlineProvider(new ViewOutlineProvider() {
@@ -96,6 +104,13 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
                 outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), mCornerRadius);
             }
         });
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        // Hide manage menu when view disappears
+        mMenuViewController.hideMenu(false /* animated */);
     }
 
     /** Set the BubbleController on the view, must be called before doing anything else. */
@@ -108,13 +123,43 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
         addView(mTaskView);
         mTaskView.setEnableSurfaceClipping(true);
         mTaskView.setCornerRadius(mCornerRadius);
+        mMenuViewController = new BubbleBarMenuViewController(mContext, this);
+        mMenuViewController.setListener(new BubbleBarMenuViewController.Listener() {
+            @Override
+            public void onMenuVisibilityChanged(boolean visible) {
+                if (mTaskView == null || mLayerBoundsSupplier == null) return;
+                // Updates the obscured touchable region for the task surface.
+                mTaskView.setObscuredTouchRect(visible ? mLayerBoundsSupplier.get() : null);
+            }
+
+            @Override
+            public void onUnBubbleConversation(Bubble bubble) {
+                if (mUnBubbleConversationCallback != null) {
+                    mUnBubbleConversationCallback.accept(bubble.getKey());
+                }
+            }
+
+            @Override
+            public void onOpenAppSettings(Bubble bubble) {
+                mController.collapseStack();
+                mContext.startActivityAsUser(bubble.getSettingsIntent(mContext), bubble.getUser());
+            }
+
+            @Override
+            public void onDismissBubble(Bubble bubble) {
+                mController.dismissBubble(bubble, Bubbles.DISMISS_USER_REMOVED);
+            }
+        });
+        mHandleView.setOnClickListener(view -> {
+            mMenuViewController.showMenu(true /* animated */);
+        });
     }
 
     // TODO (b/275087636): call this when theme/config changes
     void applyThemeAttrs() {
         boolean supportsRoundedCorners = ScreenDecorationsUtils.supportsRoundedCornersOnWindows(
                 mContext.getResources());
-        final TypedArray ta = mContext.obtainStyledAttributes(new int[] {
+        final TypedArray ta = mContext.obtainStyledAttributes(new int[]{
                 android.R.attr.dialogCornerRadius,
                 android.R.attr.colorBackgroundFloating});
         mCornerRadius = supportsRoundedCorners ? ta.getDimensionPixelSize(0, 0) : 0;
@@ -123,14 +168,12 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
 
         ta.recycle();
 
-        mMenuView.setCornerRadius(mCornerRadius);
-        mMenuHeight = getResources().getDimensionPixelSize(
-                R.dimen.bubblebar_expanded_view_menu_size);
+        mHandleHeight = getResources().getDimensionPixelSize(
+                R.dimen.bubble_bar_expanded_view_handle_size);
 
         if (mTaskView != null) {
             mTaskView.setCornerRadius(mCornerRadius);
-            mTaskView.setElevation(150);
-            updateMenuColor();
+            updateHandleAndBackgroundColor(true /* animated */);
         }
     }
 
@@ -138,10 +181,8 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
-
-        // Add corner radius here so that the menu extends behind the rounded corners of TaskView.
-        int menuViewHeight = Math.min((int) (mMenuHeight + mCornerRadius), height);
-        measureChild(mMenuView, widthMeasureSpec, MeasureSpec.makeMeasureSpec(menuViewHeight,
+        int menuViewHeight = Math.min(mHandleHeight, height);
+        measureChild(mHandleView, widthMeasureSpec, MeasureSpec.makeMeasureSpec(menuViewHeight,
                 MeasureSpec.getMode(heightMeasureSpec)));
 
         if (mTaskView != null) {
@@ -153,12 +194,12 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
         // Drag handle above
-        final int dragHandleBottom = t + mMenuView.getMeasuredHeight();
-        mMenuView.layout(l, t, r, dragHandleBottom);
+        final int dragHandleBottom = t + mHandleView.getMeasuredHeight();
+        mHandleView.layout(l, t, r, dragHandleBottom);
         if (mTaskView != null) {
-            // Subtract radius so that the menu extends behind the rounded corners of TaskView.
-            mTaskView.layout(l, (int) (dragHandleBottom - mCornerRadius), r,
+            mTaskView.layout(l, dragHandleBottom, r,
                     dragHandleBottom + mTaskView.getMeasuredHeight());
         }
     }
@@ -166,7 +207,7 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
     @Override
     public void onTaskCreated() {
         setContentVisibility(true);
-        updateMenuColor();
+        updateHandleAndBackgroundColor(false /* animated */);
     }
 
     @Override
@@ -187,16 +228,29 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
             }
             mBubbleTaskViewHelper.cleanUpTaskView();
         }
+        mMenuViewController.hideMenu(false /* animated */);
     }
 
-    /** Updates the bubble shown in this task view. */
+    /** Updates the bubble shown in the expanded view. */
     public void update(Bubble bubble) {
         mBubbleTaskViewHelper.update(bubble);
+        mMenuViewController.updateMenu(bubble);
     }
 
     /** The task id of the activity shown in the task view, if it exists. */
     public int getTaskId() {
         return mBubbleTaskViewHelper != null ? mBubbleTaskViewHelper.getTaskId() : INVALID_TASK_ID;
+    }
+
+    /** Sets layer bounds supplier used for obscured touchable region of task view */
+    void setLayerBoundsSupplier(@Nullable Supplier<Rect> supplier) {
+        mLayerBoundsSupplier = supplier;
+    }
+
+    /** Sets the function to call to un-bubble the given conversation. */
+    public void setUnBubbleConversationCallback(
+            @Nullable Consumer<String> unBubbleConversationCallback) {
+        mUnBubbleConversationCallback = unBubbleConversationCallback;
     }
 
     /**
@@ -218,16 +272,33 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
         }
     }
 
-    /** Updates the menu bar to be the status bar color specified by the app. */
-    private void updateMenuColor() {
+    /**
+     * Updates the background color to match with task view status/bg color, and sets handle color
+     * to contrast with the background
+     */
+    private void updateHandleAndBackgroundColor(boolean animated) {
         if (mTaskView == null) return;
-        ActivityManager.RunningTaskInfo info = mTaskView.getTaskInfo();
-        final int taskBgColor = info.taskDescription.getStatusBarColor();
-        final int color = Color.valueOf(taskBgColor == -1 ? Color.WHITE : taskBgColor).toArgb();
-        if (color != -1) {
-            mMenuView.setBackgroundColor(color);
+        final int color = getTaskViewColor();
+        final boolean isRegionDark = Color.luminance(color) <= 0.5;
+        mHandleView.updateHandleColor(isRegionDark, animated);
+        setBackgroundColor(color);
+    }
+
+    /**
+     * Retrieves task view status/nav bar color or background if available
+     *
+     * TODO (b/283075226): Update with color sampling when
+     *                     RegionSamplingHelper or alternative is available
+     */
+    private @ColorInt int getTaskViewColor() {
+        if (mTaskView == null || mTaskView.getTaskInfo() == null) return mBackgroundColor;
+        ActivityManager.TaskDescription taskDescription = mTaskView.getTaskInfo().taskDescription;
+        if (taskDescription.getStatusBarColor() != Color.TRANSPARENT) {
+            return taskDescription.getStatusBarColor();
+        } else if (taskDescription.getBackgroundColor() != Color.TRANSPARENT) {
+            return taskDescription.getBackgroundColor();
         } else {
-            mMenuView.setBackgroundColor(mBackgroundColor);
+            return mBackgroundColor;
         }
     }
 

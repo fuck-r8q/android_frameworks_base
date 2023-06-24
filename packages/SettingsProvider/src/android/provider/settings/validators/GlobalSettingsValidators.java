@@ -373,7 +373,7 @@ public class GlobalSettingsValidators {
                 Global.Wearable.WEAR_ACTIVITY_AUTO_RESUME_TIMEOUT_SET_BY_USER,
                 BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.BURN_IN_PROTECTION_ENABLED, BOOLEAN_VALIDATOR);
-        VALIDATORS.put(Global.Wearable.COMBINED_LOCATION_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Global.Wearable.COMBINED_LOCATION_ENABLE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.WRIST_ORIENTATION_MODE,
                        new DiscreteValueValidator(new String[] {"0", "1", "2", "3"}));
         VALIDATORS.put(Global.USER_PREFERRED_REFRESH_RATE, NON_NEGATIVE_FLOAT_VALIDATOR);
@@ -405,7 +405,7 @@ public class GlobalSettingsValidators {
         VALIDATORS.put(Global.Wearable.BEDTIME_MODE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.BEDTIME_HARD_MODE, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.DYNAMIC_COLOR_THEME_ENABLED, BOOLEAN_VALIDATOR);
-	VALIDATORS.put(Global.Wearable.SCREENSHOT_ENABLED, BOOLEAN_VALIDATOR);
+        VALIDATORS.put(Global.Wearable.SCREENSHOT_ENABLED, BOOLEAN_VALIDATOR);
         VALIDATORS.put(Global.Wearable.UPGRADE_DATA_MIGRATION_STATUS,
                        new DiscreteValueValidator(
                         new String[] {

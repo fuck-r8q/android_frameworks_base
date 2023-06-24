@@ -2833,12 +2833,14 @@ public class Notification implements Parcelable
     }
 
     /**
-     * Note all {@link Uri} that are referenced internally, with the expectation
-     * that Uri permission grants will need to be issued to ensure the recipient
-     * of this object is able to render its contents.
-     *
-     * @hide
-     */
+    * Note all {@link Uri} that are referenced internally, with the expectation that Uri permission
+    * grants will need to be issued to ensure the recipient of this object is able to render its
+    * contents.
+    * See b/281044385 for more context and examples about what happens when this isn't done
+    * correctly.
+    *
+    * @hide
+    */
     public void visitUris(@NonNull Consumer<Uri> visitor) {
         if (publicVersion != null) {
             publicVersion.visitUris(visitor);
@@ -2882,13 +2884,13 @@ public class Notification implements Parcelable
             ArrayList<Person> people = extras.getParcelableArrayList(EXTRA_PEOPLE_LIST, android.app.Person.class);
             if (people != null && !people.isEmpty()) {
                 for (Person p : people) {
-                    visitor.accept(p.getIconUri());
+                    p.visitUris(visitor);
                 }
             }
 
             final Person person = extras.getParcelable(EXTRA_MESSAGING_PERSON, Person.class);
             if (person != null) {
-                visitor.accept(person.getIconUri());
+                person.visitUris(visitor);
             }
 
             final RemoteInputHistoryItem[] history = extras.getParcelableArray(
@@ -2910,12 +2912,7 @@ public class Notification implements Parcelable
             if (!ArrayUtils.isEmpty(messages)) {
                 for (MessagingStyle.Message message : MessagingStyle.Message
                         .getMessagesFromBundleArray(messages)) {
-                    visitor.accept(message.getDataUri());
-
-                    Person senderPerson = message.getSenderPerson();
-                    if (senderPerson != null) {
-                        visitor.accept(senderPerson.getIconUri());
-                    }
+                    message.visitUris(visitor);
                 }
             }
 
@@ -2924,12 +2921,7 @@ public class Notification implements Parcelable
             if (!ArrayUtils.isEmpty(historic)) {
                 for (MessagingStyle.Message message : MessagingStyle.Message
                         .getMessagesFromBundleArray(historic)) {
-                    visitor.accept(message.getDataUri());
-
-                    Person senderPerson = message.getSenderPerson();
-                    if (senderPerson != null) {
-                        visitor.accept(senderPerson.getIconUri());
-                    }
+                    message.visitUris(visitor);
                 }
             }
 
@@ -2939,7 +2931,7 @@ public class Notification implements Parcelable
         if (isStyle(CallStyle.class) & extras != null) {
             Person callPerson = extras.getParcelable(EXTRA_CALL_PERSON, Person.class);
             if (callPerson != null) {
-                visitor.accept(callPerson.getIconUri());
+                callPerson.visitUris(visitor);
             }
             visitIconUri(visitor, extras.getParcelable(EXTRA_VERIFICATION_ICON, Icon.class));
         }
@@ -8803,9 +8795,11 @@ public class Notification implements Parcelable
             }
 
             /**
+             * Converts the message into a {@link Bundle}. To extract the message back,
+             * check {@link #getMessageFromBundle()}
              * @hide
              */
-            @VisibleForTesting
+            @NonNull
             public Bundle toBundle() {
                 Bundle bundle = new Bundle();
                 if (mText != null) {
@@ -8830,6 +8824,18 @@ public class Notification implements Parcelable
                     bundle.putBoolean(KEY_REMOTE_INPUT_HISTORY, mRemoteInputHistory);
                 }
                 return bundle;
+            }
+
+            /**
+             * See {@link Notification#visitUris(Consumer)}.
+             *
+             * @hide
+             */
+            public void visitUris(@NonNull Consumer<Uri> visitor) {
+                visitor.accept(getDataUri());
+                if (mSender != null) {
+                    mSender.visitUris(visitor);
+                }
             }
 
             /**
@@ -12136,10 +12142,7 @@ public class Notification implements Parcelable
      * <p>TV extensions can be accessed on an existing notification by using the
      * {@code TvExtender(Notification)} constructor, and then using the {@code get} methods
      * to access values.
-     *
-     * @hide
      */
-    @SystemApi
     public static final class TvExtender implements Extender {
         private static final String TAG = "TvExtender";
 
@@ -12171,7 +12174,7 @@ public class Notification implements Parcelable
          *
          * @param notif The notification from which to copy options.
          */
-        public TvExtender(Notification notif) {
+        public TvExtender(@NonNull Notification notif) {
             Bundle bundle = notif.extras == null ?
                 null : notif.extras.getBundle(EXTRA_TV_EXTENDER);
             if (bundle != null) {
@@ -12189,7 +12192,8 @@ public class Notification implements Parcelable
          * method of {@link Notification.Builder}.
          */
         @Override
-        public Notification.Builder extend(Notification.Builder builder) {
+        @NonNull
+        public Notification.Builder extend(@NonNull Notification.Builder builder) {
             Bundle bundle = new Bundle();
 
             bundle.putInt(EXTRA_FLAGS, mFlags);
@@ -12208,7 +12212,7 @@ public class Notification implements Parcelable
         }
 
         /**
-         * Returns true if this notification should be shown on TV. This method return true
+         * Returns true if this notification should be shown on TV. This method returns true
          * if the notification was extended with a TvExtender.
          */
         public boolean isAvailableOnTv() {
@@ -12218,8 +12222,11 @@ public class Notification implements Parcelable
         /**
          * Specifies the channel the notification should be delivered on when shown on TV.
          * It can be different from the channel that the notification is delivered to when
-         * posting on a non-TV device.
+         * posting on a non-TV device. Prefer to use {@link setChannelId(String)}.
+         *
+         * @hide
          */
+        @SystemApi
         public TvExtender setChannel(String channelId) {
             mChannelId = channelId;
             return this;
@@ -12229,14 +12236,21 @@ public class Notification implements Parcelable
          * Specifies the channel the notification should be delivered on when shown on TV.
          * It can be different from the channel that the notification is delivered to when
          * posting on a non-TV device.
+         *
+         * @return this object for method chaining
          */
-        public TvExtender setChannelId(String channelId) {
+        @NonNull
+        public TvExtender setChannelId(@Nullable String channelId) {
             mChannelId = channelId;
             return this;
         }
 
-        /** @removed */
+        /**
+         * @removed
+         * @hide
+         */
         @Deprecated
+        @SystemApi
         public String getChannel() {
             return mChannelId;
         }
@@ -12244,6 +12258,7 @@ public class Notification implements Parcelable
         /**
          * Returns the id of the channel this notification posts to on TV.
          */
+        @Nullable
         public String getChannelId() {
             return mChannelId;
         }
@@ -12252,8 +12267,12 @@ public class Notification implements Parcelable
          * Supplies a {@link PendingIntent} to be sent when the notification is selected on TV.
          * If provided, it is used instead of the content intent specified
          * at the level of Notification.
+         *
+         * @param intent the {@link PendingIntent} for the associated notification content
+         * @return this object for method chaining
          */
-        public TvExtender setContentIntent(PendingIntent intent) {
+        @NonNull
+        public TvExtender setContentIntent(@Nullable PendingIntent intent) {
             mContentIntent = intent;
             return this;
         }
@@ -12262,8 +12281,9 @@ public class Notification implements Parcelable
          * Returns the TV-specific content intent.  If this method returns null, the
          * main content intent on the notification should be used.
          *
-         * @see {@link Notification#contentIntent}
+         * @see Notification#contentIntent
          */
+        @Nullable
         public PendingIntent getContentIntent() {
             return mContentIntent;
         }
@@ -12272,8 +12292,12 @@ public class Notification implements Parcelable
          * Supplies a {@link PendingIntent} to send when the notification is cleared explicitly
          * by the user on TV.  If provided, it is used instead of the delete intent specified
          * at the level of Notification.
+         *
+         * @param intent the {@link PendingIntent} for the associated notification deletion
+         * @return this object for method chaining
          */
-        public TvExtender setDeleteIntent(PendingIntent intent) {
+        @NonNull
+        public TvExtender setDeleteIntent(@Nullable PendingIntent intent) {
             mDeleteIntent = intent;
             return this;
         }
@@ -12282,8 +12306,9 @@ public class Notification implements Parcelable
          * Returns the TV-specific delete intent.  If this method returns null, the
          * main delete intent on the notification should be used.
          *
-         * @see {@link Notification#deleteIntent}
+         * @see Notification#deleteIntent
          */
+        @Nullable
         public PendingIntent getDeleteIntent() {
             return mDeleteIntent;
         }
@@ -12291,7 +12316,11 @@ public class Notification implements Parcelable
         /**
          * Specifies whether this notification should suppress showing a message over top of apps
          * outside of the launcher.
+         *
+         * @param suppress whether the notification should suppress showing over apps.
+         * @return this object for method chaining
          */
+        @NonNull
         public TvExtender setSuppressShowOverApps(boolean suppress) {
             mSuppressShowOverApps = suppress;
             return this;
@@ -12300,8 +12329,19 @@ public class Notification implements Parcelable
         /**
          * Returns true if this notification should not show messages over top of apps
          * outside of the launcher.
+         *
+         * @hide
          */
+        @SystemApi
         public boolean getSuppressShowOverApps() {
+            return mSuppressShowOverApps;
+        }
+
+        /**
+         * Returns true if this notification should not show messages over top of apps
+         * outside of the launcher.
+         */
+        public boolean isSuppressShowOverApps() {
             return mSuppressShowOverApps;
         }
     }

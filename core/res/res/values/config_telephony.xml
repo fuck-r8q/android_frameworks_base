@@ -172,11 +172,6 @@
     <bool name="ignore_emergency_number_routing_from_db">false</bool>
     <java-symbol type="bool" name="ignore_emergency_number_routing_from_db" />
 
-    <!-- Whether "Virtual DSDA", i.e. in-call IMS connectivity can be provided on both subs with
-         only single logical modem, by using its data connection in addition to cellular IMS. -->
-    <bool name="config_enable_virtual_dsda">false</bool>
-    <java-symbol type="bool" name="config_enable_virtual_dsda" />
-
     <!-- To disable the AOSP DSDA logic and use only QTI specific logic-->
     <bool name="config_disable_aosp_dsda_logic">true</bool>
     <java-symbol type="bool" name="config_disable_aosp_dsda_logic" />

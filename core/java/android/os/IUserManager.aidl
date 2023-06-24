@@ -60,6 +60,7 @@ interface IUserManager {
     ParcelFileDescriptor getUserIcon(int userId);
     UserInfo getPrimaryUser();
     int getMainUserId();
+    int getCommunalProfileId();
     int getPreviousFullUserToEnterForeground();
     List<UserInfo> getUsers(boolean excludePartial, boolean excludeDying, boolean excludePreCreated);
     List<UserInfo> getProfiles(int userId, boolean enabledOnly);
@@ -128,6 +129,7 @@ interface IUserManager {
     int getUserBadgeLabelResId(int userId);
     int getUserBadgeColorResId(int userId);
     int getUserBadgeDarkColorResId(int userId);
+    int getUserStatusBarIconResId(int userId);
     boolean hasBadge(int userId);
     boolean isUserUnlocked(int userId);
     boolean isUserRunning(int userId);

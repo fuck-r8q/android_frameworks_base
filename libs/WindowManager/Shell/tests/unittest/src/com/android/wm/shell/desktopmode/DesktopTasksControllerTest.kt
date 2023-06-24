@@ -39,6 +39,7 @@ import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
 import com.android.dx.mockito.inline.extended.ExtendedMockito.never
 import com.android.dx.mockito.inline.extended.StaticMockitoSession
+import com.android.wm.shell.MockToken
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
@@ -345,6 +346,18 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
+    fun moveTaskToFront_postsWctWithReorderOp() {
+        val task1 = setUpFreeformTask()
+        val task2 = setUpFreeformTask()
+
+        controller.moveTaskToFront(task1)
+
+        val wct = getLatestWct(expectTransition = TRANSIT_TO_FRONT)
+        assertThat(wct.hierarchyOps).hasSize(1)
+        wct.assertReorderAt(index = 0, task1)
+    }
+
+    @Test
     fun moveToNextDisplay_noOtherDisplays() {
         whenever(rootTaskDisplayAreaOrganizer.displayIds).thenReturn(intArrayOf(DEFAULT_DISPLAY))
         val task = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -451,6 +464,27 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
+    fun handleRequest_fullscreenTask_desktopStashed_returnWCTWithAllAppsBroughtToFront() {
+        assumeTrue(ENABLE_SHELL_TRANSITIONS)
+
+        val stashedFreeformTask = setUpFreeformTask(DEFAULT_DISPLAY)
+        markTaskHidden(stashedFreeformTask)
+
+        val fullscreenTask = createFullscreenTask(DEFAULT_DISPLAY)
+
+        controller.stashDesktopApps(DEFAULT_DISPLAY)
+
+        val result = controller.handleRequest(Binder(), createTransition(fullscreenTask))
+        assertThat(result).isNotNull()
+        result!!.assertReorderSequence(stashedFreeformTask, fullscreenTask)
+        assertThat(result.changes[fullscreenTask.token.asBinder()]?.windowingMode)
+                .isEqualTo(WINDOWING_MODE_FREEFORM)
+
+        // Stashed state should be cleared
+        assertThat(desktopModeTaskRepository.isStashed(DEFAULT_DISPLAY)).isFalse()
+    }
+
+    @Test
     fun handleRequest_freeformTask_freeformVisible_returnNull() {
         assumeTrue(ENABLE_SHELL_TRANSITIONS)
 
@@ -501,6 +535,25 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
+    fun handleRequest_freeformTask_desktopStashed_returnWCTWithAllAppsBroughtToFront() {
+        assumeTrue(ENABLE_SHELL_TRANSITIONS)
+
+        val stashedFreeformTask = setUpFreeformTask(DEFAULT_DISPLAY)
+        markTaskHidden(stashedFreeformTask)
+
+        val freeformTask = createFreeformTask(DEFAULT_DISPLAY)
+
+        controller.stashDesktopApps(DEFAULT_DISPLAY)
+
+        val result = controller.handleRequest(Binder(), createTransition(freeformTask))
+        assertThat(result).isNotNull()
+        result?.assertReorderSequence(stashedFreeformTask, freeformTask)
+
+        // Stashed state should be cleared
+        assertThat(desktopModeTaskRepository.isStashed(DEFAULT_DISPLAY)).isFalse()
+    }
+
+    @Test
     fun handleRequest_notOpenOrToFrontTransition_returnNull() {
         assumeTrue(ENABLE_SHELL_TRANSITIONS)
 
@@ -537,6 +590,25 @@ class DesktopTasksControllerTest : ShellTestCase() {
                 .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
                 .build()
         assertThat(controller.handleRequest(Binder(), createTransition(task))).isNull()
+    }
+
+    @Test
+    fun stashDesktopApps_stateUpdates() {
+        controller.stashDesktopApps(DEFAULT_DISPLAY)
+
+        assertThat(desktopModeTaskRepository.isStashed(DEFAULT_DISPLAY)).isTrue()
+        assertThat(desktopModeTaskRepository.isStashed(SECOND_DISPLAY)).isFalse()
+    }
+
+    @Test
+    fun hideStashedDesktopApps_stateUpdates() {
+        desktopModeTaskRepository.setStashed(DEFAULT_DISPLAY, true)
+        desktopModeTaskRepository.setStashed(SECOND_DISPLAY, true)
+        controller.hideStashedDesktopApps(DEFAULT_DISPLAY)
+
+        assertThat(desktopModeTaskRepository.isStashed(DEFAULT_DISPLAY)).isFalse()
+        // Check that second display is not affected
+        assertThat(desktopModeTaskRepository.isStashed(SECOND_DISPLAY)).isTrue()
     }
 
     private fun setUpFreeformTask(displayId: Int = DEFAULT_DISPLAY): RunningTaskInfo {

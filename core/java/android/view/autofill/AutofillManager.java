@@ -16,12 +16,12 @@
 
 package android.view.autofill;
 
+import static android.Manifest.permission.PROVIDE_OWN_AUTOFILL_SUGGESTIONS;
 import static android.service.autofill.FillRequest.FLAG_IME_SHOWING;
 import static android.service.autofill.FillRequest.FLAG_MANUAL_REQUEST;
 import static android.service.autofill.FillRequest.FLAG_PASSWORD_INPUT_TYPE;
 import static android.service.autofill.FillRequest.FLAG_PCC_DETECTION;
 import static android.service.autofill.FillRequest.FLAG_RESET_FILL_DIALOG_STATE;
-import static android.service.autofill.FillRequest.FLAG_SCREEN_HAS_CREDMAN_FIELD;
 import static android.service.autofill.FillRequest.FLAG_SUPPORTS_FILL_DIALOG;
 import static android.service.autofill.FillRequest.FLAG_VIEW_NOT_FOCUSED;
 import static android.view.ContentInfo.SOURCE_AUTOFILL;
@@ -30,10 +30,12 @@ import static android.view.autofill.Helper.sVerbose;
 import static android.view.autofill.Helper.toList;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.annotation.CallbackExecutor;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
+import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
@@ -50,16 +52,21 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Rect;
 import android.metrics.LogMaker;
+import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.ICancellationSignal;
 import android.os.Looper;
 import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.service.autofill.AutofillService;
+import android.service.autofill.FillCallback;
 import android.service.autofill.FillEventHistory;
+import android.service.autofill.IFillCallback;
 import android.service.autofill.UserData;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -80,6 +87,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeProvider;
 import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InlineSuggestionsRequest;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.CheckBox;
 import android.widget.DatePicker;
@@ -109,6 +117,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import sun.misc.Cleaner;
@@ -177,6 +186,12 @@ import sun.misc.Cleaner;
  * <p>Finally, after the autofill context is commited (i.e., not cancelled), the Android System
  * shows an autofill save UI if the value of savable views have changed. If the user selects the
  * option to Save, the current value of the views is then sent to the autofill service.
+ *
+ * <p>There is another choice for the application to provide it's datasets to the Autofill framework
+ * by setting an {@link AutofillRequestCallback} through
+ * {@link #setAutofillRequestCallback(Executor, AutofillRequestCallback)}. The application can use
+ * its callback instead of the default {@link AutofillService}. See
+ * {@link AutofillRequestCallback} for more details.
  *
  * <h3 id="additional-notes">Additional notes</h3>
  *
@@ -311,6 +326,7 @@ public final class AutofillManager {
     /** @hide */ public static final int FLAG_ADD_CLIENT_DEBUG = 0x2;
     /** @hide */ public static final int FLAG_ADD_CLIENT_VERBOSE = 0x4;
     /** @hide */ public static final int FLAG_ADD_CLIENT_ENABLED_FOR_AUGMENTED_AUTOFILL_ONLY = 0x8;
+    /** @hide */ public static final int FLAG_ENABLED_CLIENT_SUGGESTIONS = 0x20;
 
     // NOTE: flag below is used by the session start receiver only, hence it can have values above
     /** @hide */ public static final int RECEIVER_FLAG_SESSION_FOR_AUGMENTED_AUTOFILL_ONLY = 0x1;
@@ -644,7 +660,10 @@ public final class AutofillManager {
     @GuardedBy("mLock")
     private boolean mEnabledForAugmentedAutofillOnly;
 
-    private boolean mHasCredentialField;
+    @GuardedBy("mLock")
+    @Nullable private AutofillRequestCallback mAutofillRequestCallback;
+    @GuardedBy("mLock")
+    @Nullable private Executor mRequestCallbackExecutor;
 
     /**
      * Indicates whether there is already a field to do a fill request after
@@ -660,8 +679,6 @@ public final class AutofillManager {
     @Nullable private List<AutofillId> mFillDialogTriggerIds;
 
     private final boolean mIsFillDialogEnabled;
-
-    private final boolean mIsFillAndSaveDialogDisabledForCredentialManager;
 
     // Indicate whether trigger fill request on unimportant views is enabled
     private boolean mIsTriggerFillRequestOnUnimportantViewEnabled = false;
@@ -708,6 +725,9 @@ public final class AutofillManager {
 
     // Indicates whether called the showAutofillDialog() method.
     private boolean mShowAutofillDialogCalled = false;
+
+    // Cached autofill feature flag
+    private boolean mShouldIgnoreCredentialViews = false;
 
     private final String[] mFillDialogEnabledHints;
 
@@ -856,10 +876,7 @@ public final class AutofillManager {
 
         mIsFillDialogEnabled = AutofillFeatureFlags.isFillDialogEnabled();
         mFillDialogEnabledHints = AutofillFeatureFlags.getFillDialogEnabledHints();
-
-        mIsFillAndSaveDialogDisabledForCredentialManager =
-            AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager();
-
+        mShouldIgnoreCredentialViews = AutofillFeatureFlags.shouldIgnoreCredentialViews();
         if (sDebug) {
             Log.d(TAG, "Fill dialog is enabled:" + mIsFillDialogEnabled
                     + ", hints=" + Arrays.toString(mFillDialogEnabledHints));
@@ -1426,12 +1443,12 @@ public final class AutofillManager {
         if (infos.size() == 0) {
             throw new IllegalArgumentException("No VirtualViewInfo found");
         }
-        if (view.isCredential() && mIsFillAndSaveDialogDisabledForCredentialManager) {
+        if (AutofillFeatureFlags.isFillDialogDisabledForCredentialManager()
+                && view.isCredential()) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
                         + view.getAutofillId().toString());
             }
-            mHasCredentialField = true;
             return;
         }
         for (int i = 0; i < infos.size(); i++) {
@@ -1453,13 +1470,12 @@ public final class AutofillManager {
         if (sDebug) {
             Log.d(TAG, "notifyViewEnteredForFillDialog:" + v.getAutofillId());
         }
-        if (v.isCredential()
-                && mIsFillAndSaveDialogDisabledForCredentialManager) {
+        if (AutofillFeatureFlags.isFillDialogDisabledForCredentialManager()
+                && v.isCredential()) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
-                        + v.getAutofillId());
+                        + v.getAutofillId().toString());
             }
-            mHasCredentialField = true;
             return;
         }
         notifyViewReadyInner(v.getAutofillId(), v.getAutofillHints());
@@ -1519,7 +1535,7 @@ public final class AutofillManager {
         if (mIsFillDialogEnabled
                 || ArrayUtils.containsAny(autofillHints, mFillDialogEnabledHints)) {
             if (sDebug) {
-                Log.d(TAG, "Triggering pre-emptive request for fill dialog.");
+                Log.d(TAG, "Trigger fill request when the view is ready.");
             }
 
             int flags = FLAG_SUPPORTS_FILL_DIALOG;
@@ -1754,15 +1770,6 @@ public final class AutofillManager {
         if (!isClientDisablingEnterExitEvent()) {
             if (view instanceof TextView && ((TextView) view).isAnyPasswordInputType()) {
                 flags |= FLAG_PASSWORD_INPUT_TYPE;
-            }
-
-            // Update session when screen has credman field
-            if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
-                    && mHasCredentialField) {
-                flags |= FLAG_SCREEN_HAS_CREDMAN_FIELD;
-                if (sVerbose) {
-                    Log.v(TAG, "updating session with flag screen has credman view");
-                }
             }
 
             flags |= getImeStateFlag(view);
@@ -2269,6 +2276,11 @@ public final class AutofillManager {
     }
 
     /** @hide */
+    public boolean shouldIgnoreCredentialViews() {
+        return mShouldIgnoreCredentialViews;
+    }
+
+    /** @hide */
     public void onAuthenticationResult(int authenticationId, Intent data, View focusView) {
         if (!hasAutofillFeature()) {
             return;
@@ -2350,6 +2362,38 @@ public final class AutofillManager {
         return new AutofillId(parent.getAutofillViewId(), virtualId);
     }
 
+    /**
+     * Sets the client's suggestions callback for autofill.
+     *
+     * @see AutofillRequestCallback
+     *
+     * @param executor specifies the thread upon which the callbacks will be invoked.
+     * @param callback which handles autofill request to provide client's suggestions.
+     */
+    @RequiresPermission(PROVIDE_OWN_AUTOFILL_SUGGESTIONS)
+    public void setAutofillRequestCallback(@NonNull @CallbackExecutor Executor executor,
+            @NonNull AutofillRequestCallback callback) {
+        if (mContext.checkSelfPermission(PROVIDE_OWN_AUTOFILL_SUGGESTIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            throw new SecurityException("Requires PROVIDE_OWN_AUTOFILL_SUGGESTIONS permission!");
+        }
+
+        synchronized (mLock) {
+            mRequestCallbackExecutor = executor;
+            mAutofillRequestCallback = callback;
+        }
+    }
+
+    /**
+     * clears the client's suggestions callback for autofill.
+     */
+    public void clearAutofillRequestCallback() {
+        synchronized (mLock) {
+            mRequestCallbackExecutor = null;
+            mAutofillRequestCallback = null;
+        }
+    }
+
     @GuardedBy("mLock")
     private void startSessionLocked(@NonNull AutofillId id, @NonNull Rect bounds,
             @NonNull AutofillValue value, int flags) {
@@ -2408,6 +2452,13 @@ public final class AutofillManager {
                     client.autofillClientResetableStateAvailable();
                     return;
                 }
+            }
+
+            if (mAutofillRequestCallback != null) {
+                if (sDebug) {
+                    Log.d(TAG, "startSession with the client suggestions provider");
+                }
+                flags |= FLAG_ENABLED_CLIENT_SUGGESTIONS;
             }
 
             mService.startSession(client.autofillClientGetActivityToken(),
@@ -2473,7 +2524,6 @@ public final class AutofillManager {
         mIsFillRequested.set(false);
         mShowAutofillDialogCalled = false;
         mFillDialogTriggerIds = null;
-        mHasCredentialField = false;
         mAllTrackedViews.clear();
         if (resetEnteredIds) {
             mEnteredIds = null;
@@ -2761,6 +2811,28 @@ public final class AutofillManager {
                     client.autofillClientDispatchUnhandledKey(anchor, keyEvent);
                 }
             }
+        }
+    }
+
+    private void onFillRequest(InlineSuggestionsRequest request,
+            CancellationSignal cancellationSignal, FillCallback callback) {
+        final AutofillRequestCallback autofillRequestCallback;
+        final Executor executor;
+        synchronized (mLock) {
+            autofillRequestCallback = mAutofillRequestCallback;
+            executor = mRequestCallbackExecutor;
+        }
+        if (autofillRequestCallback != null && executor != null) {
+            final long ident = Binder.clearCallingIdentity();
+            try {
+                executor.execute(() ->
+                        autofillRequestCallback.onFillRequest(
+                                request, cancellationSignal, callback));
+            } finally {
+                Binder.restoreCallingIdentity(ident);
+            }
+        } else {
+            callback.onSuccess(null);
         }
     }
 
@@ -3565,8 +3637,7 @@ public final class AutofillManager {
     private boolean shouldShowAutofillDialog(View view, AutofillId id) {
         if (!hasFillDialogUiFeature()
                 || mShowAutofillDialogCalled
-                || mFillDialogTriggerIds == null
-                || mHasCredentialField) {
+                || mFillDialogTriggerIds == null) {
             return false;
         }
 
@@ -4312,6 +4383,23 @@ public final class AutofillManager {
             final AutofillManager afm = mAfm.get();
             if (afm != null) {
                 afm.post(() -> afm.requestShowSoftInput(id));
+            }
+        }
+
+        @Override
+        public void requestFillFromClient(int id, InlineSuggestionsRequest request,
+                IFillCallback callback) {
+            final AutofillManager afm = mAfm.get();
+            if (afm != null) {
+                ICancellationSignal transport = CancellationSignal.createTransport();
+                try {
+                    callback.onCancellable(transport);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "Error requesting a cancellation", e);
+                }
+
+                afm.onFillRequest(request, CancellationSignal.fromTransport(transport),
+                        new FillCallback(callback, id));
             }
         }
 

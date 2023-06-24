@@ -60,7 +60,6 @@ import com.android.server.utils.WatchedLongSparseArray;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -406,8 +405,7 @@ public interface Computer extends PackageDataSnapshot {
     ProviderInfo getProviderInfo(@NonNull ComponentName component,
             @PackageManager.ComponentInfoFlagsBits long flags, @UserIdInt int userId);
 
-    @Nullable
-    String[] getSystemSharedLibraryNames();
+    ArrayMap<String, String> getSystemSharedLibraryNamesAndPaths();
 
     /**
      * @return the state if the given package is installed and isn't filtered by visibility.
@@ -679,5 +677,5 @@ public interface Computer extends PackageDataSnapshot {
     UserInfo[] getUserInfos();
 
     @NonNull
-    Collection<SharedUserSetting> getAllSharedUsers();
+    ArrayMap<String, ? extends SharedUserApi> getSharedUsers();
 }

@@ -157,6 +157,7 @@ package android {
     field public static final String KILL_ALL_BACKGROUND_PROCESSES = "android.permission.KILL_ALL_BACKGROUND_PROCESSES";
     field public static final String KILL_UID = "android.permission.KILL_UID";
     field public static final String LAUNCH_DEVICE_MANAGER_SETUP = "android.permission.LAUNCH_DEVICE_MANAGER_SETUP";
+    field public static final String LAUNCH_PERMISSION_SETTINGS = "android.permission.LAUNCH_PERMISSION_SETTINGS";
     field public static final String LOCAL_MAC_ADDRESS = "android.permission.LOCAL_MAC_ADDRESS";
     field public static final String LOCATION_BYPASS = "android.permission.LOCATION_BYPASS";
     field public static final String LOCK_DEVICE = "android.permission.LOCK_DEVICE";
@@ -271,6 +272,7 @@ package android {
     field public static final String READ_DEVICE_CONFIG = "android.permission.READ_DEVICE_CONFIG";
     field public static final String READ_DREAM_STATE = "android.permission.READ_DREAM_STATE";
     field public static final String READ_GLOBAL_APP_SEARCH_DATA = "android.permission.READ_GLOBAL_APP_SEARCH_DATA";
+    field public static final String READ_INSTALLED_SESSION_PATHS = "android.permission.READ_INSTALLED_SESSION_PATHS";
     field public static final String READ_INSTALL_SESSIONS = "android.permission.READ_INSTALL_SESSIONS";
     field public static final String READ_NETWORK_USAGE_HISTORY = "android.permission.READ_NETWORK_USAGE_HISTORY";
     field public static final String READ_OEM_UNLOCK_STATE = "android.permission.READ_OEM_UNLOCK_STATE";
@@ -969,19 +971,8 @@ package android.app {
   }
 
   public static final class Notification.TvExtender implements android.app.Notification.Extender {
-    ctor public Notification.TvExtender();
-    ctor public Notification.TvExtender(android.app.Notification);
-    method public android.app.Notification.Builder extend(android.app.Notification.Builder);
-    method public String getChannelId();
-    method public android.app.PendingIntent getContentIntent();
-    method public android.app.PendingIntent getDeleteIntent();
     method public boolean getSuppressShowOverApps();
-    method public boolean isAvailableOnTv();
     method public android.app.Notification.TvExtender setChannel(String);
-    method public android.app.Notification.TvExtender setChannelId(String);
-    method public android.app.Notification.TvExtender setContentIntent(android.app.PendingIntent);
-    method public android.app.Notification.TvExtender setDeleteIntent(android.app.PendingIntent);
-    method public android.app.Notification.TvExtender setSuppressShowOverApps(boolean);
   }
 
   public final class NotificationChannel implements android.os.Parcelable {
@@ -3214,7 +3205,7 @@ package android.companion.virtual {
     method @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE) public void registerIntentInterceptor(@NonNull android.content.IntentFilter, @NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.IntentInterceptorCallback);
     method public void removeActivityListener(@NonNull android.companion.virtual.VirtualDeviceManager.ActivityListener);
     method public void removeSoundEffectListener(@NonNull android.companion.virtual.VirtualDeviceManager.SoundEffectListener);
-    method @NonNull @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE) public void setShowPointerIcon(boolean);
+    method @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE) public void setShowPointerIcon(boolean);
     method @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE) public void unregisterIntentInterceptor(@NonNull android.companion.virtual.VirtualDeviceManager.IntentInterceptorCallback);
   }
 
@@ -3524,7 +3515,7 @@ package android.content {
     field @Deprecated public static final String ACTION_INTENT_FILTER_NEEDS_VERIFICATION = "android.intent.action.INTENT_FILTER_NEEDS_VERIFICATION";
     field public static final String ACTION_LOAD_DATA = "android.intent.action.LOAD_DATA";
     field @RequiresPermission(android.Manifest.permission.GRANT_RUNTIME_PERMISSIONS) public static final String ACTION_MANAGE_APP_PERMISSION = "android.intent.action.MANAGE_APP_PERMISSION";
-    field public static final String ACTION_MANAGE_APP_PERMISSIONS = "android.intent.action.MANAGE_APP_PERMISSIONS";
+    field @Deprecated public static final String ACTION_MANAGE_APP_PERMISSIONS = "android.intent.action.MANAGE_APP_PERMISSIONS";
     field @RequiresPermission(android.Manifest.permission.MANAGE_ROLE_HOLDERS) public static final String ACTION_MANAGE_DEFAULT_APP = "android.intent.action.MANAGE_DEFAULT_APP";
     field public static final String ACTION_MANAGE_PERMISSIONS = "android.intent.action.MANAGE_PERMISSIONS";
     field public static final String ACTION_MANAGE_PERMISSION_APPS = "android.intent.action.MANAGE_PERMISSION_APPS";
@@ -3796,6 +3787,7 @@ package android.content.pm {
 
   public class PackageInstaller {
     method @NonNull public android.content.pm.PackageInstaller.InstallInfo readInstallInfo(@NonNull java.io.File, int) throws android.content.pm.PackageInstaller.PackageParsingException;
+    method @NonNull public android.content.pm.PackageInstaller.InstallInfo readInstallInfo(@NonNull android.os.ParcelFileDescriptor, @Nullable String, int) throws android.content.pm.PackageInstaller.PackageParsingException;
     method @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void setPermissionsResult(int, boolean);
     field public static final String ACTION_CONFIRM_INSTALL = "android.content.pm.action.CONFIRM_INSTALL";
     field public static final String ACTION_CONFIRM_PRE_APPROVAL = "android.content.pm.action.CONFIRM_PRE_APPROVAL";
@@ -3816,6 +3808,7 @@ package android.content.pm {
 
   public static class PackageInstaller.InstallInfo {
     method public long calculateInstalledSize(@NonNull android.content.pm.PackageInstaller.SessionParams) throws java.io.IOException;
+    method public long calculateInstalledSize(@NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.os.ParcelFileDescriptor) throws java.io.IOException;
     method public int getInstallLocation();
     method @NonNull public String getPackageName();
   }
@@ -3842,6 +3835,7 @@ package android.content.pm {
     method public boolean getInstallAsVirtualPreload();
     method public int getPendingUserActionReason();
     method public boolean getRequestDowngrade();
+    method @Nullable @RequiresPermission(android.Manifest.permission.READ_INSTALLED_SESSION_PATHS) public String getResolvedBaseApkPath();
     method public int getRollbackDataPolicy();
     method @NonNull public java.util.Set<java.lang.String> getWhitelistedRestrictedPermissions();
   }
@@ -10122,6 +10116,7 @@ package android.net.wifi.sharedconnectivity.app {
     method public int getDeviceType();
     method @NonNull public android.os.Bundle getExtras();
     method @NonNull public String getModelName();
+    method public boolean isBatteryCharging();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.sharedconnectivity.app.NetworkProviderInfo> CREATOR;
     field public static final int DEVICE_TYPE_AUTO = 5; // 0x5
@@ -10135,6 +10130,7 @@ package android.net.wifi.sharedconnectivity.app {
   public static final class NetworkProviderInfo.Builder {
     ctor public NetworkProviderInfo.Builder(@NonNull String, @NonNull String);
     method @NonNull public android.net.wifi.sharedconnectivity.app.NetworkProviderInfo build();
+    method @NonNull public android.net.wifi.sharedconnectivity.app.NetworkProviderInfo.Builder setBatteryCharging(boolean);
     method @NonNull public android.net.wifi.sharedconnectivity.app.NetworkProviderInfo.Builder setBatteryPercentage(@IntRange(from=0, to=100) int);
     method @NonNull public android.net.wifi.sharedconnectivity.app.NetworkProviderInfo.Builder setConnectionStrength(@IntRange(from=0, to=4) int);
     method @NonNull public android.net.wifi.sharedconnectivity.app.NetworkProviderInfo.Builder setDeviceName(@NonNull String);
@@ -10996,7 +10992,7 @@ package android.os {
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean isPrimaryUser();
     method public static boolean isRemoveResultSuccessful(int);
     method public boolean isRestrictedProfile();
-    method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}, conditional=true) public boolean isRestrictedProfile(@NonNull android.os.UserHandle);
+    method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}, conditional=true) public boolean isRestrictedProfile(@NonNull android.os.UserHandle);
     method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean isSameProfileGroup(@NonNull android.os.UserHandle, @NonNull android.os.UserHandle);
     method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS, android.Manifest.permission.GET_ACCOUNTS_PRIVILEGED}) public boolean isUserNameSet();
     method @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean isUserOfType(@NonNull String);
@@ -11238,7 +11234,7 @@ package android.permission {
 
   public abstract class PermissionControllerService extends android.app.Service {
     ctor public PermissionControllerService();
-    method @NonNull @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public String getPrivilegesDescriptionStringForProfile(@NonNull String);
+    method @Deprecated @NonNull @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public String getPrivilegesDescriptionStringForProfile(@NonNull String);
     method @BinderThread public void onApplyStagedRuntimePermissionBackup(@NonNull String, @NonNull android.os.UserHandle, @NonNull java.util.function.Consumer<java.lang.Boolean>);
     method @NonNull public final android.os.IBinder onBind(android.content.Intent);
     method @BinderThread public abstract void onCountPermissionApps(@NonNull java.util.List<java.lang.String>, int, @NonNull java.util.function.IntConsumer);
@@ -11598,6 +11594,7 @@ package android.provider {
     method @Deprecated public static boolean checkAndNoteWriteSettingsOperation(@NonNull android.content.Context, int, @NonNull String, boolean);
     method public static boolean checkAndNoteWriteSettingsOperation(@NonNull android.content.Context, int, @NonNull String, @Nullable String, boolean);
     field public static final String ACTION_ACCESSIBILITY_DETAILS_SETTINGS = "android.settings.ACCESSIBILITY_DETAILS_SETTINGS";
+    field @RequiresPermission(android.Manifest.permission.LAUNCH_PERMISSION_SETTINGS) public static final String ACTION_APP_PERMISSIONS_SETTINGS = "android.settings.APP_PERMISSIONS_SETTINGS";
     field public static final String ACTION_BEDTIME_SETTINGS = "android.settings.BEDTIME_SETTINGS";
     field public static final String ACTION_BUGREPORT_HANDLER_SETTINGS = "android.settings.BUGREPORT_HANDLER_SETTINGS";
     field public static final String ACTION_ENTERPRISE_PRIVACY_SETTINGS = "android.settings.ENTERPRISE_PRIVACY_SETTINGS";

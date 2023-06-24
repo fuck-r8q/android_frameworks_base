@@ -39,13 +39,18 @@ android_app {
 
     certificate: "platform",
     privileged: true,
-    platform_apis: true,
+    platform_apis: false,
+    sdk_version: "system_current",
     rename_resources_package: false,
     static_libs: [
         "xz-java",
         "androidx.leanback_leanback",
         "androidx.annotation_annotation",
     ],
+
+    lint: {
+        error_checks: ["Recycle"],
+    },
 }
 
 android_app {
@@ -56,7 +61,8 @@ android_app {
 
     certificate: "platform",
     privileged: true,
-    platform_apis: true,
+    platform_apis: false,
+    sdk_version: "system_current",
     rename_resources_package: false,
     overrides: ["PackageInstaller"],
 
@@ -65,6 +71,10 @@ android_app {
         "androidx.leanback_leanback",
     ],
     aaptflags: ["--product tablet"],
+
+    lint: {
+        error_checks: ["Recycle"],
+    },
 }
 
 android_app {
@@ -75,7 +85,8 @@ android_app {
 
     certificate: "platform",
     privileged: true,
-    platform_apis: true,
+    platform_apis: false,
+    sdk_version: "system_current",
     rename_resources_package: false,
     overrides: ["PackageInstaller"],
 
@@ -85,4 +96,8 @@ android_app {
         "androidx.annotation_annotation",
     ],
     aaptflags: ["--product tv"],
+
+    lint: {
+        error_checks: ["Recycle"],
+    },
 }

@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"앱이 등록된 AID와 경로 목적지 같은 기본 NFC 결제 서비스 정보를 확인하도록 허용합니다."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"NFC(Near Field Communication) 제어"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"앱이 NFC(근거리 무선 통신) 태그, 카드 및 리더와 통신할 수 있도록 허용합니다."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"보안 요소 트랜잭션 이벤트"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"앱이 보안 요소에서 발생하는 트랜잭션에 관한 정보를 받도록 허용합니다."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"화면 잠금 사용 중지"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"앱이 키 잠금 및 관련 비밀번호 보안을 사용중지할 수 있도록 허용합니다. 예를 들어, 휴대전화가 수신전화를 받을 때 키 잠금을 사용중지했다가 통화가 끝나면 키 잠금을 다시 사용할 수 있습니다."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"화면 잠금 복잡도 요청"</string>

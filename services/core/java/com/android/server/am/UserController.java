@@ -126,6 +126,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.IKeyguardDismissCallback;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FrameworkStatsLog;
+import com.android.internal.util.ObjectUtils;
 import com.android.internal.util.Preconditions;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.FactoryResetter;
@@ -146,6 +147,7 @@ import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerService;
 
 import java.io.PrintWriter;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -261,6 +263,10 @@ class UserController implements Handler.Callback {
     // once target user goes into the foreground. Use mLock when updating
     @GuardedBy("mLock")
     private volatile int mTargetUserId = UserHandle.USER_NULL;
+    // If a user switch request comes during an ongoing user switch, it is postponed to the end of
+    // the current switch, and this variable holds those user ids. Use mLock when updating
+    @GuardedBy("mLock")
+    private final ArrayDeque<Integer> mPendingTargetUserIds = new ArrayDeque<>();
 
     /**
      * Which users have been started, so are allowed to run code.
@@ -291,6 +297,7 @@ class UserController implements Handler.Callback {
 
     /**
      * Mapping from each known user ID to the profile group ID it is associated with.
+     * <p>Users not present in this array have a profile group of NO_PROFILE_GROUP_ID.
      */
     @GuardedBy("mLock")
     private final SparseIntArray mUserProfileGroupIds = new SparseIntArray();
@@ -484,9 +491,7 @@ class UserController implements Handler.Callback {
         mHandler.post(() -> {
             finishUserBoot(uss);
             startProfiles();
-            synchronized (mLock) {
-                stopRunningUsersLU(mMaxRunningUsers);
-            }
+            stopExcessRunningUsers();
         });
     }
 
@@ -510,14 +515,31 @@ class UserController implements Handler.Callback {
         return runningUsers;
     }
 
+    private void stopExcessRunningUsers() {
+        final ArraySet<Integer> exemptedUsers = new ArraySet<>();
+        final List<UserInfo> users = mInjector.getUserManager().getUsers(true);
+        for (int i = 0; i < users.size(); i++) {
+            final int userId = users.get(i).id;
+            if (isAlwaysVisibleUser(userId)) {
+                exemptedUsers.add(userId);
+            }
+        }
+
+        synchronized (mLock) {
+            stopExcessRunningUsersLU(mMaxRunningUsers, exemptedUsers);
+        }
+    }
+
     @GuardedBy("mLock")
-    private void stopRunningUsersLU(int maxRunningUsers) {
+    private void stopExcessRunningUsersLU(int maxRunningUsers, ArraySet<Integer> exemptedUsers) {
         List<Integer> currentlyRunning = getRunningUsersLU();
         Iterator<Integer> iterator = currentlyRunning.iterator();
         while (currentlyRunning.size() > maxRunningUsers && iterator.hasNext()) {
             Integer userId = iterator.next();
-            if (userId == UserHandle.USER_SYSTEM || userId == mCurrentUserId) {
-                // Owner/System user and current user can't be stopped
+            if (userId == UserHandle.USER_SYSTEM
+                    || userId == mCurrentUserId
+                    || exemptedUsers.contains(userId)) {
+                // System and current users can't be stopped, and an exempt user shouldn't be
                 continue;
             }
             // allowDelayedLocking set here as stopping user is done without any explicit request
@@ -595,22 +617,18 @@ class UserController implements Handler.Callback {
             }
         }
 
-        // We need to delay unlocking managed profiles until the parent user
-        // is also unlocked.
-        if (mInjector.getUserManager().isProfile(userId)) {
-            final UserInfo parent = mInjector.getUserManager().getProfileParent(userId);
-            if (parent != null
-                    && isUserRunning(parent.id, ActivityManager.FLAG_AND_UNLOCKED)) {
-                Slogf.d(TAG, "User " + userId + " (parent " + parent.id
-                        + "): attempting unlock because parent is unlocked");
-                maybeUnlockUser(userId);
-            } else {
-                String parentId = (parent == null) ? "<null>" : String.valueOf(parent.id);
-                Slogf.d(TAG, "User " + userId + " (parent " + parentId
-                        + "): delaying unlock because parent is locked");
-            }
-        } else {
+        // We need to delay unlocking profiles until the parent user is also unlocked.
+        final UserInfo parent = mInjector.getUserManager().getProfileParent(userId);
+        if (parent == null) {
+            // Not a profile (or is a parentless profile) so no parent for which to wait.
             maybeUnlockUser(userId);
+        } else if (isUserRunning(parent.id, ActivityManager.FLAG_AND_UNLOCKED)) {
+            Slogf.d(TAG, "User " + userId + " (parent " + parent.id
+                    + "): attempting unlock because parent is unlocked");
+            maybeUnlockUser(userId);
+        } else {
+            Slogf.d(TAG, "User " + userId + " (parent " + parent.id
+                    + "): delaying unlock because parent is locked");
         }
     }
 
@@ -1693,7 +1711,6 @@ class UserController implements Handler.Callback {
                 boolean userSwitchUiEnabled;
                 synchronized (mLock) {
                     mCurrentUserId = userId;
-                    mTargetUserId = UserHandle.USER_NULL; // reset, mCurrentUserId has caught up
                     userSwitchUiEnabled = mUserSwitchUiEnabled;
                 }
                 mInjector.updateUserConfiguration();
@@ -1822,8 +1839,7 @@ class UserController implements Handler.Callback {
         boolean success = startUser(targetUserId, USER_START_MODE_FOREGROUND);
         if (!success) {
             mInjector.getWindowManager().setSwitchingUser(false);
-            mTargetUserId = UserHandle.USER_NULL;
-            dismissUserSwitchDialog(null);
+            dismissUserSwitchDialog(this::endUserSwitch);
         }
     }
 
@@ -1900,8 +1916,7 @@ class UserController implements Handler.Callback {
             return false;
         }
 
-        // We just unlocked a user, so let's now attempt to unlock any
-        // managed profiles under that user.
+        // We just unlocked a user, so let's now attempt to unlock any profiles under that user.
 
         // First, get list of userIds. Requires mLock, so we cannot make external calls, e.g. to UMS
         int[] userIds;
@@ -1944,12 +1959,19 @@ class UserController implements Handler.Callback {
             Slogf.w(TAG, "Cannot switch to User #" + targetUserId + ": factory reset in progress");
             return false;
         }
+
         boolean userSwitchUiEnabled;
         synchronized (mLock) {
             if (!mInitialized) {
                 Slogf.e(TAG, "Cannot switch to User #" + targetUserId
                         + ": UserController not ready yet");
                 return false;
+            }
+            if (mTargetUserId != UserHandle.USER_NULL) {
+                Slogf.w(TAG, "There is already an ongoing user switch to User #" + mTargetUserId
+                        + ". User #" + targetUserId + " will be added to the queue.");
+                mPendingTargetUserIds.offer(targetUserId);
+                return true;
             }
             mTargetUserId = targetUserId;
             userSwitchUiEnabled = mUserSwitchUiEnabled;
@@ -2017,6 +2039,19 @@ class UserController implements Handler.Callback {
         sendUserSwitchBroadcasts(oldUserId, newUserId);
         t.traceEnd();
         t.traceEnd();
+
+        endUserSwitch();
+    }
+
+    private void endUserSwitch() {
+        final int nextUserId;
+        synchronized (mLock) {
+            nextUserId = ObjectUtils.getOrElse(mPendingTargetUserIds.poll(), UserHandle.USER_NULL);
+            mTargetUserId = UserHandle.USER_NULL;
+        }
+        if (nextUserId != UserHandle.USER_NULL) {
+            switchUser(nextUserId);
+        }
     }
 
     private void dispatchLockedBootComplete(@UserIdInt int userId) {
@@ -2784,6 +2819,12 @@ class UserController implements Handler.Callback {
         return userId == getCurrentOrTargetUserIdLU();
     }
 
+    /** Returns whether the user is always-visible (such as a communal profile). */
+    private boolean isAlwaysVisibleUser(@UserIdInt int userId) {
+        final UserProperties properties = getUserProperties(userId);
+        return properties != null && properties.getAlwaysVisible();
+    }
+
     int[] getUsers() {
         UserManagerService ums = mInjector.getUserManager();
         return ums != null ? ums.getUserIds() : new int[] { 0 };
@@ -2853,6 +2894,7 @@ class UserController implements Handler.Callback {
         return mInjector.getUserManager().hasUserRestriction(restriction, userId);
     }
 
+    /** Returns whether the two users are in the same profile group. */
     boolean isSameProfileGroup(int callingUserId, int targetUserId) {
         if (callingUserId == targetUserId) {
             return true;
@@ -2900,7 +2942,9 @@ class UserController implements Handler.Callback {
             if (user.profileGroupId == mCurrentUserId) {
                 mCurrentProfileIds = ArrayUtils.appendInt(mCurrentProfileIds, user.id);
             }
-            mUserProfileGroupIds.put(user.id, user.profileGroupId);
+            if (user.profileGroupId != UserInfo.NO_PROFILE_GROUP_ID) {
+                mUserProfileGroupIds.put(user.id, user.profileGroupId);
+            }
         }
     }
 

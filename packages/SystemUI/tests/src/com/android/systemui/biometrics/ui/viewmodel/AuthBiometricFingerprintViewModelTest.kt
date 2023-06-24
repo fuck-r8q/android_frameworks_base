@@ -48,6 +48,7 @@ class AuthBiometricFingerprintViewModelTest : SysuiTestCase() {
     fun iconUpdates_onConfigurationChanged() {
         testScope.runTest {
             runCurrent()
+
             val testConfig = Configuration()
             val folded = INNER_SCREEN_SMALLEST_SCREEN_WIDTH_THRESHOLD_DP - 1
             val unfolded = INNER_SCREEN_SMALLEST_SCREEN_WIDTH_THRESHOLD_DP + 1

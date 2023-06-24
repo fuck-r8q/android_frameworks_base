@@ -590,6 +590,8 @@
     <string name="permdesc_preferredPaymentInfo" msgid="8583552469807294967">"ලියාපදිංචි කළ ආධාර සහ ගමන් මාර්ග ගමනාන්ත වැනි කැමති nfc ගෙවීම් සේවා තොරතුරු ලබා ගැනීමට යෙදුමට ඉඩ දෙයි."</string>
     <string name="permlab_nfc" msgid="1904455246837674977">"ආසන්න ක්ෂේත්‍ර සන්නිවේදනය පාලනය කරන්න"</string>
     <string name="permdesc_nfc" msgid="8352737680695296741">"ආසන්න ක්ෂේත්‍ර සන්නිවේදන (NFC) ටැග්, පත්, සහ කියවන්නන් සමඟ සන්නිවේදනය කිරීමට යෙදුමට අවසර දෙන්න."</string>
+    <string name="permlab_nfcTransactionEvent" msgid="5868209446710407679">"සුරක්ෂිත මූලද්‍රව්‍ය ගනුදෙනු සිදුවීම"</string>
+    <string name="permdesc_nfcTransactionEvent" msgid="1904286701876487397">"සුරක්ෂිත මූලද්‍රව්‍යයක සිදු වන ගනුදෙනු පිළිබඳ තොරතුරු ලබා ගැනීමට යෙදුමට ඉඩ දෙයි."</string>
     <string name="permlab_disableKeyguard" msgid="3605253559020928505">"ඔබගේ තිරයේ අගුල අබල කරන්න"</string>
     <string name="permdesc_disableKeyguard" msgid="3223710003098573038">"යතුරු අගුල සහ ඕනෑම සම්බන්ධිත මුරපද ආරක්ෂාවක් අබල කිරීමට යෙදුමට අවසර දෙන්න. මෙහි උදාහරණයක් වන්නේ පැමිණෙන ඇමතුමක් ලැබෙද්දී, දුරකථනය අක්‍රිය වන අතර ඇමතුම අවසාන වන විට යතුරු අගුල නැවත සක්‍රිය වෙයි."</string>
     <string name="permlab_requestPasswordComplexity" msgid="1808977190557794109">"තිර අඟුලු සංකීර්ණතාව ඉල්ලන්න"</string>
