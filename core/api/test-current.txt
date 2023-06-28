@@ -540,6 +540,7 @@ package android.app.admin {
     field public static final String PERMITTED_INPUT_METHODS_POLICY = "permittedInputMethods";
     field public static final String PERSONAL_APPS_SUSPENDED_POLICY = "personalAppsSuspended";
     field public static final String SCREEN_CAPTURE_DISABLED_POLICY = "screenCaptureDisabled";
+    field public static final String USB_DATA_SIGNALING_POLICY = "usbDataSignaling";
   }
 
   public class DevicePolicyManager {
@@ -2681,7 +2682,7 @@ package android.os.vibrator.persistence {
     method public static void serialize(@NonNull android.os.VibrationEffect, @NonNull java.io.Writer) throws java.io.IOException, android.os.vibrator.persistence.VibrationXmlSerializer.SerializationFailedException;
   }
 
-  public static final class VibrationXmlSerializer.SerializationFailedException extends java.lang.IllegalStateException {
+  public static final class VibrationXmlSerializer.SerializationFailedException extends java.lang.RuntimeException {
   }
 
 }
@@ -3659,6 +3660,7 @@ package android.view.accessibility {
 
   public final class AccessibilityWindowInfo implements android.os.Parcelable {
     method public static void setNumInstancesInUseCounter(java.util.concurrent.atomic.AtomicInteger);
+    field public static final int UNDEFINED_WINDOW_ID = -1; // 0xffffffff
   }
 
 }
