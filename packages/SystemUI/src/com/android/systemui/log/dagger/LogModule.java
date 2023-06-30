@@ -224,6 +224,15 @@ public class LogModule {
                 false /* systrace */);
     }
 
+    /** Provides a logging buffer for the disable flags repository. */
+    @Provides
+    @SysUISingleton
+    @DisableFlagsRepositoryLog
+    public static LogBuffer provideDisableFlagsRepositoryLogBuffer(LogBufferFactory factory) {
+        return factory.create("DisableFlagsRepository", 40 /* maxSize */,
+                false /* systrace */);
+    }
+
     /** Provides a logging buffer for logs related to swipe up gestures. */
     @Provides
     @SysUISingleton
@@ -478,5 +487,13 @@ public class LogModule {
     @DreamLog
     public static LogBuffer provideDreamLogBuffer(LogBufferFactory factory) {
         return factory.create("DreamLog", 250);
+    }
+
+    /** Provides a {@link LogBuffer} for display metrics related logs. */
+    @Provides
+    @SysUISingleton
+    @DisplayMetricsRepoLog
+    public static LogBuffer provideDisplayMetricsRepoLogBuffer(LogBufferFactory factory) {
+        return factory.create("DisplayMetricsRepo", 50);
     }
 }

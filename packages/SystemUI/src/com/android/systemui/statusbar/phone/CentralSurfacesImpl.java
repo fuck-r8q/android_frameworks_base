@@ -312,7 +312,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final DeviceStateManager mDeviceStateManager;
     private CentralSurfacesCommandQueueCallbacks mCommandQueueCallbacks;
     private float mTransitionToFullShadeProgress = 0f;
-    private NotificationListContainer mNotifListContainer;
+    private final NotificationListContainer mNotifListContainer;
     private boolean mIsShortcutListSearchEnabled;
 
     private final KeyguardStateController.Callback mKeyguardStateControllerCallback =
@@ -360,26 +360,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     public void resendMessage(Object msg) {
         mMessageRouter.cancelMessages(msg.getClass());
         mMessageRouter.sendMessage(msg);
-    }
-
-    @Override
-    public int getDisabled1() {
-        return mDisabled1;
-    }
-
-    @Override
-    public void setDisabled1(int disabled) {
-        mDisabled1 = disabled;
-    }
-
-    @Override
-    public int getDisabled2() {
-        return mDisabled2;
-    }
-
-    @Override
-    public void setDisabled2(int disabled) {
-        mDisabled2 = disabled;
     }
 
     @Override
@@ -530,11 +510,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     private CentralSurfacesComponent mCentralSurfacesComponent;
 
-    // Flags for disabling the status bar
-    // Two variables because the first one evidently ran out of room for new flags.
-    private int mDisabled1 = 0;
-    private int mDisabled2 = 0;
-
     /**
      * This keeps track of whether we have (or haven't) registered the predictive back callback.
      * Since we can have visible -> visible transitions, we need to avoid
@@ -660,8 +635,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     private final ActivityIntentHelper mActivityIntentHelper;
 
-    @VisibleForTesting
-    protected NotificationStackScrollLayoutController mStackScrollerController;
+    private final NotificationStackScrollLayoutController mStackScrollerController;
 
     private final ColorExtractor.OnColorsChangedListener mOnColorsChangedListener =
             (extractor, which) -> updateTheme();
@@ -749,6 +723,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             ConfigurationController configurationController,
             NotificationShadeWindowController notificationShadeWindowController,
             NotificationShelfController notificationShelfController,
+            NotificationStackScrollLayoutController notificationStackScrollLayoutController,
             DozeParameters dozeParameters,
             ScrimController scrimController,
             Lazy<LockscreenWallpaper> lockscreenWallpaperLazy,
@@ -849,6 +824,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mConfigurationController = configurationController;
         mNotificationShadeWindowController = notificationShadeWindowController;
         mNotificationShelfController = notificationShelfController;
+        mStackScrollerController = notificationStackScrollLayoutController;
+        mStackScroller = mStackScrollerController.getView();
+        mNotifListContainer = mStackScrollerController.getNotificationListContainer();
         mDozeServiceHost = dozeServiceHost;
         mPowerManager = powerManager;
         mDozeParameters = dozeParameters;
@@ -1582,7 +1560,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mGutsManager.setNotificationActivityStarter(mNotificationActivityStarter);
         mShadeController.setNotificationPresenter(mPresenter);
         mNotificationsController.initialize(
-                this,
                 mPresenter,
                 mNotifListContainer,
                 mStackScrollerController.getNotifStackController(),
@@ -1596,24 +1573,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      */
     protected void setUpDisableFlags(int state1, int state2) {
         mCommandQueue.disable(mDisplayId, state1, state2, false /* animate */);
-    }
-
-    /**
-     * Ask the display to wake up if currently dozing, else do nothing
-     *
-     * @deprecated Use {@link PowerInteractor#wakeUpIfDozing(String, int)} instead.
-     *
-     * @param time when to wake up
-     * @param why the reason for the wake up
-     */
-    @Override
-    @Deprecated
-    public void wakeUpIfDozing(long time, String why, @PowerManager.WakeReason int wakeReason) {
-        if (mDozing && mScreenOffAnimationController.allowWakeUpIfDozing()) {
-            mPowerManager.wakeUp(
-                    time, wakeReason, "com.android.systemui:" + why);
-            mFalsingCollector.onScreenOnFromTouch();
-        }
     }
 
     // TODO(b/117478341): This was left such that CarStatusBar can override this method.
@@ -1658,12 +1617,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mShadeController.setNotificationPanelViewController(npvc);
         mShadeController.setNotificationShadeWindowViewController(
                 mNotificationShadeWindowViewController);
-        mStackScrollerController =
-                mCentralSurfacesComponent.getNotificationStackScrollLayoutController();
         mQsController = mCentralSurfacesComponent.getQuickSettingsController();
         mBackActionInteractor.setup(mQsController, mShadeSurface);
-        mStackScroller = mStackScrollerController.getView();
-        mNotifListContainer = mCentralSurfacesComponent.getNotificationListContainer();
         mPresenter = mCentralSurfacesComponent.getNotificationPresenter();
         mNotificationActivityStarter = mCentralSurfacesComponent.getNotificationActivityStarter();
 
@@ -1744,39 +1699,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         return mStatusBarWindowController.getStatusBarHeight();
     }
 
-    /**
-     * Disable QS if device not provisioned.
-     * If the user switcher is simple then disable QS during setup because
-     * the user intends to use the lock screen user switcher, QS in not needed.
-     */
-    @Override
-    public void updateQsExpansionEnabled() {
-        final boolean expandEnabled = mDeviceProvisionedController.isDeviceProvisioned()
-                && (mUserSetup || mUserSwitcherController == null
-                        || !mUserSwitcherController.isSimpleUserSwitcher())
-                && !isShadeDisabled()
-                && ((mDisabled2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) == 0)
-                && !mDozing;
-        mQsController.setExpansionEnabledPolicy(expandEnabled);
-        Log.d(TAG, "updateQsExpansionEnabled - QS Expand enabled: " + expandEnabled);
-    }
-
-    @Override
-    public boolean isShadeDisabled() {
-        return (mDisabled2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0;
-    }
-
     private void updateReportRejectedTouchVisibility() {
         if (mReportRejectedTouch == null) {
             return;
         }
         mReportRejectedTouch.setVisibility(mState == StatusBarState.KEYGUARD && !mDozing
                 && mFalsingCollector.isReportingEnabled() ? View.VISIBLE : View.INVISIBLE);
-    }
-
-    @Override
-    public boolean areNotificationAlertsDisabled() {
-        return (mDisabled1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0;
     }
 
     /**
@@ -2156,16 +2084,19 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     }
 
     @Override
+    @Deprecated
     public float getDisplayDensity() {
         return mDisplayMetrics.density;
     }
 
     @Override
+    @Deprecated
     public float getDisplayWidth() {
         return mDisplayMetrics.widthPixels;
     }
 
     @Override
+    @Deprecated
     public float getDisplayHeight() {
         return mDisplayMetrics.heightPixels;
     }
@@ -2252,7 +2183,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         if (mLockscreenWallpaper != null && !mWallpaperManager.isLockscreenLiveWallpaperEnabled()) {
             mLockscreenWallpaper.setCurrentUser(newUserId);
         }
-        mScrimController.setCurrentUser(newUserId);
         if (mWallpaperSupported) {
             mWallpaperChangedReceiver.onReceive(mContext, null);
         }
@@ -2728,7 +2658,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 || (mDozing && mDozeParameters.shouldControlScreenOff() && keyguardVisibleOrWillBe);
 
         mShadeSurface.setDozing(mDozing, animate);
-        updateQsExpansionEnabled();
         Trace.endSection();
     }
 
@@ -2913,8 +2842,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mStatusBarHideIconsForBouncerManager.setBouncerShowingAndTriggerUpdate(bouncerShowing);
         mCommandQueue.recomputeDisableFlags(mDisplayId, true /* animate */);
         if (mBouncerShowing) {
-            wakeUpIfDozing(SystemClock.uptimeMillis(), "BOUNCER_VISIBLE",
-                    PowerManager.WAKE_REASON_GESTURE);
+            mPowerInteractor.wakeUpIfDozing("BOUNCER_VISIBLE", PowerManager.WAKE_REASON_GESTURE);
         }
         updateScrimController();
         if (!mBouncerShowing) {
@@ -3369,7 +3297,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     protected IStatusBarService mBarService;
 
     // all notifications
-    protected NotificationStackScrollLayout mStackScroller;
+    private final NotificationStackScrollLayout mStackScroller;
 
     protected AccessibilityManager mAccessibilityManager;
 
@@ -3636,7 +3564,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     mShadeSurface.collapse(true /* animate */, false  /* delayed */,
                             1.0f  /* speedUpFactor */);
                 }
-                updateQsExpansionEnabled();
             }
         }
     };
@@ -3771,7 +3698,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     // reset them again when we're waking up
                     mShadeSurface.resetViews(dozingAnimated && isDozing);
 
-                    updateQsExpansionEnabled();
                     mKeyguardViewMediator.setDozing(mDozing);
 
                     updateDozingState();

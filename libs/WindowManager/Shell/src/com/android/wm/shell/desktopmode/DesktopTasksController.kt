@@ -33,6 +33,7 @@ import android.os.IBinder
 import android.os.SystemProperties
 import android.util.DisplayMetrics.DENSITY_DEFAULT
 import android.view.SurfaceControl
+import android.view.SurfaceControl.Transaction
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManager.TRANSIT_NONE
 import android.view.WindowManager.TRANSIT_OPEN
@@ -98,6 +99,10 @@ class DesktopTasksController(
             launchAdjacentController.launchAdjacentEnabled = !hasVisibleFreeformTasks
         }
     }
+
+    private val transitionAreaHeight
+        get() = context.resources.getDimensionPixelSize(
+                com.android.wm.shell.R.dimen.desktop_mode_transition_area_height)
 
     init {
         desktopMode = DesktopModeImpl()
@@ -267,16 +272,24 @@ class DesktopTasksController(
      */
     fun cancelMoveToFreeform(task: RunningTaskInfo, position: Point) {
         KtProtoLog.v(
-                WM_SHELL_DESKTOP_MODE,
-                "DesktopTasksController: cancelMoveToFreeform taskId=%d",
-                task.taskId
+            WM_SHELL_DESKTOP_MODE,
+            "DesktopTasksController: cancelMoveToFreeform taskId=%d",
+            task.taskId
         )
         val wct = WindowContainerTransaction()
-        addMoveToFullscreenChanges(wct, task)
+        wct.setBounds(task.token, null)
+
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct, position,
-                    mOnAnimationFinishedCallback)
+            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(
+                wct, position) { t ->
+                val callbackWCT = WindowContainerTransaction()
+                visualIndicator?.releaseVisualIndicator(t)
+                visualIndicator = null
+                addMoveToFullscreenChanges(callbackWCT, task)
+                shellTaskOrganizer.applyTransaction(callbackWCT)
+            }
         } else {
+            addMoveToFullscreenChanges(wct, task)
             shellTaskOrganizer.applyTransaction(wct)
             releaseVisualIndicator()
         }
@@ -691,13 +704,12 @@ class DesktopTasksController(
             y: Float
     ) {
         if (taskInfo.windowingMode == WINDOWING_MODE_FREEFORM) {
-            val statusBarHeight = getStatusBarHeight(taskInfo)
-            if (y <= statusBarHeight && visualIndicator == null) {
+            if (y <= transitionAreaHeight && visualIndicator == null) {
                 visualIndicator = DesktopModeVisualIndicator(syncQueue, taskInfo,
                         displayController, context, taskSurface, shellTaskOrganizer,
                         rootTaskDisplayAreaOrganizer)
                 visualIndicator?.createFullscreenIndicatorWithAnimatedBounds()
-            } else if (y > statusBarHeight && visualIndicator != null) {
+            } else if (y > transitionAreaHeight && visualIndicator != null) {
                 releaseVisualIndicator()
             }
         }
@@ -717,8 +729,7 @@ class DesktopTasksController(
             y: Float,
             windowDecor: DesktopModeWindowDecoration
     ) {
-        val statusBarHeight = getStatusBarHeight(taskInfo)
-        if (y <= statusBarHeight && taskInfo.windowingMode == WINDOWING_MODE_FREEFORM) {
+        if (y <= transitionAreaHeight && taskInfo.windowingMode == WINDOWING_MODE_FREEFORM) {
             windowDecor.incrementRelayoutBlock()
             moveToFullscreenWithAnimation(taskInfo, position)
         }
@@ -737,9 +748,9 @@ class DesktopTasksController(
             taskSurface: SurfaceControl,
             y: Float
     ) {
-        // If the motion event is above the status bar, return since we do not need to show the
-        // visual indicator at this point.
-        if (y < getStatusBarHeight(taskInfo)) {
+        // If the motion event is above the status bar and the visual indicator is not yet visible,
+        // return since we do not need to show the visual indicator at this point.
+        if (y < getStatusBarHeight(taskInfo) && visualIndicator == null) {
             return
         }
         if (visualIndicator == null) {

@@ -649,6 +649,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             switch (simState) {
                 case TelephonyManager.SIM_STATE_NOT_READY:
                 case TelephonyManager.SIM_STATE_ABSENT:
+                case TelephonyManager.SIM_STATE_UNKNOWN:
+                    mPendingPinLock = false;
                     // only force lock screen in case of missing sim if user hasn't
                     // gone through setup wizard
                     synchronized (KeyguardViewMediator.this) {
@@ -712,9 +714,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                             resetStateLocked();
                         }
                     }
-                    break;
-                case TelephonyManager.SIM_STATE_UNKNOWN:
-                    mPendingPinLock = false;
                     break;
                 default:
                     if (DEBUG_SIM_STATES) Log.v(TAG, "Unspecific state: " + simState);
@@ -832,6 +831,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         @Override
         public void onCancelClicked() {
             mKeyguardViewControllerLazy.get().onCancelClicked();
+        }
+
+        @Override
+        public void onBouncerSwipeDown() {
+            mKeyguardViewControllerLazy.get().reset(/* hideBouncerWhenShowing= */ true);
         }
 
         @Override
@@ -2770,7 +2774,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
             // It's possible that the device was unlocked (via BOUNCER or Fingerprint) while
             // dreaming. It's time to wake up.
-            if (mDreamOverlayShowing) {
+            if (mDreamOverlayShowing || mUpdateMonitor.isDreaming()) {
                 mPM.wakeUp(mSystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
                         "com.android.systemui:UNLOCK_DREAMING");
             }

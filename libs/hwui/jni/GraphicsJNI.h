@@ -125,14 +125,6 @@ public:
     static jobject createBitmapRegionDecoder(JNIEnv* env,
                                              android::BitmapRegionDecoderWrapper* bitmap);
 
-    /**
-     * Given a bitmap we natively allocate a memory block to store the contents
-     * of that bitmap.  The memory is then attached to the bitmap via an
-     * SkPixelRef, which ensures that upon deletion the appropriate caches
-     * are notified.
-     */
-    static bool allocatePixels(JNIEnv* env, SkBitmap* bitmap);
-
     /** Copy the colors in colors[] to the bitmap, convert to the correct
         format along the way.
         Whether to use premultiplied pixels is determined by dstBitmap's alphaType.
@@ -222,9 +214,8 @@ private:
  */
 class RecyclingClippingPixelAllocator : public android::skia::BRDAllocator {
 public:
-
     RecyclingClippingPixelAllocator(android::Bitmap* recycledBitmap,
-            size_t recycledBytes);
+                                    bool mustMatchColorType = true);
 
     ~RecyclingClippingPixelAllocator();
 
@@ -252,6 +243,7 @@ private:
     const size_t     mRecycledBytes;
     SkBitmap*        mSkiaBitmap;
     bool             mNeedsCopy;
+    const bool mMustMatchColorType;
 };
 
 class AshmemPixelAllocator : public SkBitmap::Allocator {

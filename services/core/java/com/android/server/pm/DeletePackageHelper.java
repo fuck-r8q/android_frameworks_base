@@ -16,6 +16,7 @@
 
 package com.android.server.pm;
 
+import static android.Manifest.permission.CONTROL_KEYGUARD;
 import static android.Manifest.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
@@ -134,10 +135,6 @@ final class DeletePackageHelper {
         final int removeUser = (deleteFlags & PackageManager.DELETE_ALL_USERS) != 0
                 ? UserHandle.USER_ALL : userId;
 
-        if (mPm.isPackageDeviceAdmin(packageName, removeUser)) {
-            Slog.w(TAG, "Not removing package " + packageName + ": has active device admin");
-            return PackageManager.DELETE_FAILED_DEVICE_POLICY_MANAGER;
-        }
 
         final PackageSetting uninstalledPs;
         final PackageSetting disabledSystemPs;
@@ -368,6 +365,12 @@ final class DeletePackageHelper {
         synchronized (mPm.mLock) {
             final PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
             final PackageSetting disabledPs = mPm.mSettings.getDisabledSystemPkgLPr(ps);
+            if (PackageManagerServiceUtils.isSystemApp(ps)
+                    && mPm.checkPermission(CONTROL_KEYGUARD, packageName, UserHandle.USER_SYSTEM)
+                    == PERMISSION_GRANTED) {
+                Slog.w(TAG, "Attempt to delete keyguard system package " + packageName);
+                return false;
+            }
             action = mayDeletePackageLocked(outInfo, ps, disabledPs, flags, user);
         }
         if (DEBUG_REMOVE) Slog.d(TAG, "deletePackageLI: " + packageName + " user " + user);
@@ -699,18 +702,6 @@ final class DeletePackageHelper {
         final String packageName = versionedPackage.getPackageName();
         final long versionCode = versionedPackage.getLongVersionCode();
 
-        if (mPm.mProtectedPackages.isPackageDataProtected(userId, packageName)) {
-            mPm.mHandler.post(() -> {
-                try {
-                    Slog.w(TAG, "Attempted to delete protected package: " + packageName);
-                    observer.onPackageDeleted(packageName,
-                            PackageManager.DELETE_FAILED_INTERNAL_ERROR, null);
-                } catch (RemoteException re) {
-                }
-            });
-            return;
-        }
-
         try {
             if (mPm.mInjector.getLocalService(ActivityTaskManagerInternal.class)
                     .isBaseOfLockedTask(packageName)) {
@@ -749,6 +740,41 @@ final class DeletePackageHelper {
             mPm.mContext.enforceCallingOrSelfPermission(
                     android.Manifest.permission.INTERACT_ACROSS_USERS_FULL,
                     "deletePackage for user " + userId);
+        }
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            // If a package is device admin, or is data protected for any user, it should not be
+            // uninstalled from that user, or from any users if DELETE_ALL_USERS flag is passed.
+            for (int user : users) {
+                if (mPm.isPackageDeviceAdmin(packageName, user)) {
+                    mPm.mHandler.post(() -> {
+                        try {
+                            Slog.w(TAG, "Not removing package " + packageName
+                                    + ": has active device admin");
+                            observer.onPackageDeleted(packageName,
+                                    PackageManager.DELETE_FAILED_DEVICE_POLICY_MANAGER, null);
+                        } catch (RemoteException e) {
+                            // no-op
+                        }
+                    });
+                    return;
+                }
+                if (mPm.mProtectedPackages.isPackageDataProtected(user, packageName)) {
+                    mPm.mHandler.post(() -> {
+                        try {
+                            Slog.w(TAG, "Attempted to delete protected package: " + packageName);
+                            observer.onPackageDeleted(packageName,
+                                    PackageManager.DELETE_FAILED_INTERNAL_ERROR, null);
+                        } catch (RemoteException re) {
+                            // no-op
+                        }
+                    });
+                    return;
+                }
+            }
+        } finally {
+            Binder.restoreCallingIdentity(token);
         }
 
         if (mPm.isUserRestricted(userId, UserManager.DISALLOW_UNINSTALL_APPS)) {

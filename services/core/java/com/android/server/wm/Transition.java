@@ -77,6 +77,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.IRemoteCallback;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -358,22 +359,30 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mTransientLaunches.put(activity, restoreBelow);
         setTransientLaunchToChanges(activity);
 
-        if (restoreBelow != null) {
-            final Task transientRootTask = activity.getRootTask();
+        final Task transientRootTask = activity.getRootTask();
+        final WindowContainer<?> parent = restoreBelow != null ? restoreBelow.getParent()
+                : (transientRootTask != null ? transientRootTask.getParent() : null);
+        if (parent != null) {
             // Collect all visible tasks which can be occluded by the transient activity to
             // make sure they are in the participants so their visibilities can be updated when
             // finishing transition.
-            ((WindowContainer<?>) restoreBelow.getParent()).forAllTasks(t -> {
+            parent.forAllTasks(t -> {
+                // Skip transient-launch task
+                if (t == transientRootTask) return false;
                 if (t.isVisibleRequested() && !t.isAlwaysOnTop()
                         && !t.getWindowConfiguration().tasksAreFloating()) {
-                    if (t.isRootTask() && t != transientRootTask) {
+                    if (t.isRootTask()) {
                         mTransientHideTasks.add(t);
                     }
                     if (t.isLeafTask()) {
                         collect(t);
                     }
                 }
-                return t == restoreBelow;
+                return restoreBelow != null
+                        // Stop at the restoreBelow task
+                        ? t == restoreBelow
+                        // Or stop at the last visible task if no restore-below (new task)
+                        : (t.isRootTask() && t.fillsParent());
             });
             // Add FLAG_ABOVE_TRANSIENT_LAUNCH to the tree of transient-hide tasks,
             // so ChangeInfo#hasChanged() can return true to report the transition info.
@@ -979,7 +988,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         if (ar.pictureInPictureArgs != null && ar.pictureInPictureArgs.isAutoEnterEnabled()) {
-            if (didCommitTransientLaunch()) {
+            if (!ar.getTask().isVisibleRequested() || didCommitTransientLaunch()) {
                 // force enable pip-on-task-switch now that we've committed to actually launching
                 // to the transient activity.
                 ar.supportsEnterPipOnTaskSwitch = true;
@@ -1008,7 +1017,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         // Legacy pip-entry (not via isAutoEnterEnabled).
-        if (didCommitTransientLaunch() && ar.supportsPictureInPicture()) {
+        if ((!ar.getTask().isVisibleRequested() || didCommitTransientLaunch())
+                && ar.supportsPictureInPicture()) {
             // force enable pip-on-task-switch now that we've committed to actually launching to the
             // transient activity, and then recalculate whether we can attempt pip.
             ar.supportsEnterPipOnTaskSwitch = true;
@@ -1092,6 +1102,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final Task task = ar.getTask();
                 if (task == null) continue;
                 boolean visibleAtTransitionEnd = mVisibleAtTransitionEndTokens.contains(ar);
+                // visibleAtTransitionEnd is used to guard against pre-maturely committing
+                // invisible on a window which is actually hidden by a later transition and not this
+                // one. However, for a transient launch, we can't use this mechanism because the
+                // visibility is determined at finish. Instead, use a different heuristic: don't
+                // commit invisible if the window is already in a later transition. That later
+                // transition will then handle the commit.
+                if (isTransientLaunch(ar) && !ar.isVisibleRequested()
+                        && mController.inCollectingTransition(ar)) {
+                    visibleAtTransitionEnd = true;
+                }
                 // We need both the expected visibility AND current requested-visibility to be
                 // false. If it is expected-visible but not currently visible, it means that
                 // another animation is queued-up to animate this to invisibility, so we can't
@@ -2665,13 +2685,36 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mController.mStateValidators.add(() -> {
             for (int i = mTargets.size() - 1; i >= 0; --i) {
                 final ChangeInfo change = mTargets.get(i);
-                if (!change.mContainer.isVisibleRequested()) continue;
+                if (!change.mContainer.isVisibleRequested()
+                        || change.mContainer.mSurfaceControl == null) {
+                    continue;
+                }
                 Slog.e(TAG, "Force show for visible " + change.mContainer
                         + " which may be hidden by transition unexpectedly");
                 change.mContainer.getSyncTransaction().show(change.mContainer.mSurfaceControl);
                 change.mContainer.scheduleAnimation();
             }
         });
+    }
+
+    /**
+     * Returns {@code true} if the transition and the corresponding transaction should be applied
+     * on display thread. Currently, this only checks for display rotation change because the order
+     * of dispatching the new display info will be after requesting the windows to sync drawing.
+     * That avoids potential flickering of screen overlays (e.g. cutout, rounded corner). Also,
+     * because the display thread has a higher priority, it is faster to perform the configuration
+     * changes and window hierarchy traversal.
+     */
+    boolean shouldApplyOnDisplayThread() {
+        for (int i = mParticipants.size() - 1; i >= 0; --i) {
+            final DisplayContent dc = mParticipants.valueAt(i).asDisplayContent();
+            if (dc == null) continue;
+            final ChangeInfo changeInfo = mChanges.get(dc);
+            if (changeInfo != null && changeInfo.mRotation != dc.getRotation()) {
+                return Looper.myLooper() != mController.mAtm.mWindowManager.mH.getLooper();
+            }
+        }
+        return false;
     }
 
     /** Applies the new configuration for the changed displays. */

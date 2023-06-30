@@ -567,7 +567,16 @@ public class PipTransition extends PipTransitionController {
                 mPipBoundsState.getDisplayBounds());
         mFinishCallback = (wct, wctCB) -> {
             mPipOrganizer.onExitPipFinished(taskInfo);
-            if (!Transitions.SHELL_TRANSITIONS_ROTATION && toFullscreen) {
+
+            // TODO(b/286346098): remove the OPEN app flicker completely
+            // not checking if we go to fullscreen helps avoid getting pip into an inconsistent
+            // state after the flicker occurs. This is a temp solution until flicker is removed.
+            if (!Transitions.SHELL_TRANSITIONS_ROTATION) {
+                // will help to debug the case when we are not exiting to fullscreen
+                if (!toFullscreen) {
+                    ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
+                            "%s: startExitAnimation() not exiting to fullscreen", TAG);
+                }
                 wct = wct != null ? wct : new WindowContainerTransaction();
                 wct.setBounds(pipTaskToken, null);
                 mPipOrganizer.applyWindowingModeChangeOnExit(wct, TRANSITION_DIRECTION_LEAVE_PIP);
@@ -831,7 +840,7 @@ public class PipTransition extends PipTransitionController {
         }
 
         final Rect destinationBounds = mPipBoundsAlgorithm.getEntryDestinationBounds();
-        final Rect currentBounds = taskInfo.configuration.windowConfiguration.getBounds();
+        final Rect currentBounds = pipChange.getStartAbsBounds();
         int rotationDelta = deltaRotation(startRotation, endRotation);
         Rect sourceHintRect = PipBoundsAlgorithm.getValidSourceHintRect(
                 taskInfo.pictureInPictureParams, currentBounds, destinationBounds);
@@ -856,6 +865,9 @@ public class PipTransition extends PipTransitionController {
         final int enterAnimationType = mEnterAnimationType;
         if (enterAnimationType == ANIM_TYPE_ALPHA) {
             startTransaction.setAlpha(leash, 0f);
+        } else {
+            // set alpha to 1, because for multi-activity PiP it will create a new task with alpha 0
+            startTransaction.setAlpha(leash, 1f);
         }
         startTransaction.apply();
 
@@ -953,7 +965,8 @@ public class PipTransition extends PipTransitionController {
         if (swipePipToHomeOverlay != null) {
             // Launcher fade in the overlay on top of the fullscreen Task. It is possible we
             // reparent the PIP activity to a new PIP task (in case there are other activities
-            // in the original Task), so we should also reparent the overlay to the PIP task.
+            // in the original Task, in other words multi-activity apps), so we should also reparent
+            // the overlay to the final PIP task.
             startTransaction.reparent(swipePipToHomeOverlay, leash)
                     .setLayer(swipePipToHomeOverlay, Integer.MAX_VALUE);
             mPipOrganizer.mSwipePipToHomeOverlay = null;
@@ -1046,7 +1059,7 @@ public class PipTransition extends PipTransitionController {
         // When the PIP window is visible and being a part of the transition, such as display
         // rotation, we need to update its bounds and rounded corner.
         final SurfaceControl leash = pipChange.getLeash();
-        final Rect destBounds = mPipBoundsState.getBounds();
+        final Rect destBounds = mPipOrganizer.getCurrentOrAnimatingBounds();
         final boolean isInPip = mPipTransitionState.isInPip();
         mSurfaceTransactionHelper
                 .crop(startTransaction, leash, destBounds)

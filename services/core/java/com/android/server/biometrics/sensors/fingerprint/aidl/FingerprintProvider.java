@@ -43,7 +43,6 @@ import android.hardware.fingerprint.FingerprintManager;
 import android.hardware.fingerprint.FingerprintSensorPropertiesInternal;
 import android.hardware.fingerprint.IFingerprintServiceReceiver;
 import android.hardware.fingerprint.ISidefpsController;
-import android.hardware.fingerprint.IUdfpsOverlay;
 import android.hardware.fingerprint.IUdfpsOverlayController;
 import android.os.Binder;
 import android.os.Handler;
@@ -122,7 +121,6 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
     @Nullable private IFingerprint mDaemon;
     @Nullable private IUdfpsOverlayController mUdfpsOverlayController;
     @Nullable private ISidefpsController mSidefpsController;
-    @Nullable private IUdfpsOverlay mUdfpsOverlay;
     private AuthSessionCoordinator mAuthSessionCoordinator;
 
     private final class BiometricTaskStackListener extends TaskStackListener {
@@ -420,7 +418,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
                             BiometricsProtoEnums.CLIENT_UNKNOWN),
                     mBiometricContext,
                     mFingerprintSensors.get(sensorId).getSensorProperties(),
-                    mUdfpsOverlayController, mSidefpsController, mUdfpsOverlay,
+                    mUdfpsOverlayController, mSidefpsController,
                     maxTemplatesPerUser, enrollReason);
             scheduleForSensor(sensorId, client, new ClientMonitorCompositeCallback(
                     mBiometricStateCallback, new ClientMonitorCallback() {
@@ -458,8 +456,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
                     mFingerprintSensors.get(sensorId).getLazySession(), token, id, callback,
                     options,
                     createLogger(BiometricsProtoEnums.ACTION_AUTHENTICATE, statsClient),
-                    mBiometricContext,
-                    mUdfpsOverlayController, mUdfpsOverlay, isStrongBiometric);
+                    mBiometricContext, mUdfpsOverlayController, isStrongBiometric);
             scheduleForSensor(sensorId, client, mBiometricStateCallback);
         });
 
@@ -483,7 +480,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
                     createLogger(BiometricsProtoEnums.ACTION_AUTHENTICATE, statsClient),
                     mBiometricContext, isStrongBiometric,
                     mTaskStackListener, mFingerprintSensors.get(sensorId).getLockoutCache(),
-                    mUdfpsOverlayController, mSidefpsController, mUdfpsOverlay,
+                    mUdfpsOverlayController, mSidefpsController,
                     allowBackgroundAuthentication,
                     mFingerprintSensors.get(sensorId).getSensorProperties(), mHandler,
                     Utils.getCurrentStrength(sensorId),
@@ -719,11 +716,6 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
     }
 
     @Override
-    public void setUdfpsOverlay(@NonNull IUdfpsOverlay controller) {
-        mUdfpsOverlay = controller;
-    }
-
-    @Override
     public void dumpProtoState(int sensorId, @NonNull ProtoOutputStream proto,
             boolean clearSchedulerBuffer) {
         if (mFingerprintSensors.contains(sensorId)) {
@@ -856,5 +848,19 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
             return;
         }
         biometricScheduler.startWatchdog();
+    }
+
+    @Override
+    public void simulateVhalFingerDown(int userId, int sensorId) {
+        Slog.d(getTag(), "Simulate virtual HAL finger down event");
+        final AidlSession session = mFingerprintSensors.get(sensorId).getSessionForUser(userId);
+        final PointerContext pc = new PointerContext();
+        try {
+            session.getSession().onPointerDownWithContext(pc);
+            session.getSession().onUiReady();
+            session.getSession().onPointerUpWithContext(pc);
+        } catch (RemoteException e) {
+            Slog.e(getTag(), "failed hal operation ", e);
+        }
     }
 }

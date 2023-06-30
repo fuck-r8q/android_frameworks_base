@@ -54,7 +54,6 @@ import android.hardware.fingerprint.IFingerprintClientActiveCallback;
 import android.hardware.fingerprint.IFingerprintService;
 import android.hardware.fingerprint.IFingerprintServiceReceiver;
 import android.hardware.fingerprint.ISidefpsController;
-import android.hardware.fingerprint.IUdfpsOverlay;
 import android.hardware.fingerprint.IUdfpsOverlayController;
 import android.os.Binder;
 import android.os.Build;
@@ -913,7 +912,6 @@ public class FingerprintService extends SystemService {
             }
             provider.onPointerDown(requestId, sensorId, pc);
         }
-
         @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
         @Override
 
@@ -959,16 +957,6 @@ public class FingerprintService extends SystemService {
 
             for (ServiceProvider provider : mRegistry.getProviders()) {
                 provider.setSidefpsController(controller);
-            }
-        }
-
-        @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
-        @Override
-        public void setUdfpsOverlay(@NonNull IUdfpsOverlay controller) {
-            super.setUdfpsOverlay_enforcePermission();
-
-            for (ServiceProvider provider : mRegistry.getProviders()) {
-                provider.setUdfpsOverlay(controller);
             }
         }
 
@@ -1181,6 +1169,17 @@ public class FingerprintService extends SystemService {
                 latch.await(3, TimeUnit.SECONDS);
             } catch (Exception e) {
                 Slog.e(TAG, "Failed to wait for sync finishing", e);
+            }
+        }
+    }
+
+    void simulateVhalFingerDown() {
+        if (Utils.isVirtualEnabled(getContext())) {
+            Slog.i(TAG, "Simulate virtual HAL finger down event");
+            final Pair<Integer, ServiceProvider> provider = mRegistry.getSingleProvider();
+            if (provider != null) {
+                provider.second.simulateVhalFingerDown(UserHandle.getCallingUserId(),
+                        provider.first);
             }
         }
     }

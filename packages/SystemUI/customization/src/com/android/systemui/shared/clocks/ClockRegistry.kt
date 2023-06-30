@@ -24,11 +24,11 @@ import android.provider.Settings
 import android.util.Log
 import androidx.annotation.OpenForTesting
 import com.android.systemui.log.LogBuffer
-import com.android.systemui.log.LogLevel
-import com.android.systemui.log.LogMessage
 import com.android.systemui.log.LogMessageImpl
-import com.android.systemui.log.MessageInitializer
-import com.android.systemui.log.MessagePrinter
+import com.android.systemui.log.core.LogLevel
+import com.android.systemui.log.core.LogMessage
+import com.android.systemui.log.core.MessageInitializer
+import com.android.systemui.log.core.MessagePrinter
 import com.android.systemui.plugins.ClockController
 import com.android.systemui.plugins.ClockId
 import com.android.systemui.plugins.ClockMetadata
@@ -56,6 +56,7 @@ private val KNOWN_PLUGINS =
         "com.android.systemui.falcon.four" to listOf(ClockMetadata("DIGITAL_CLOCK_GROWTH")),
         "com.android.systemui.falcon.five" to listOf(ClockMetadata("DIGITAL_CLOCK_HANDWRITTEN")),
         "com.android.systemui.falcon.six" to listOf(ClockMetadata("DIGITAL_CLOCK_INFLATE")),
+        "com.android.systemui.falcon.seven" to listOf(ClockMetadata("DIGITAL_CLOCK_METRO")),
         "com.android.systemui.falcon.eight" to listOf(ClockMetadata("DIGITAL_CLOCK_NUMBEROVERLAP")),
         "com.android.systemui.falcon.nine" to listOf(ClockMetadata("DIGITAL_CLOCK_WEATHER")),
     )
@@ -112,6 +113,7 @@ open class ClockRegistry(
     val logBuffer: LogBuffer? = null,
     val keepAllLoaded: Boolean,
     subTag: String,
+    var isTransitClockEnabled: Boolean = false,
 ) {
     private val TAG = "${ClockRegistry::class.simpleName} ($subTag)"
     interface ClockChangeListener {
@@ -203,6 +205,10 @@ open class ClockRegistry(
                 var isClockListChanged = false
                 for (clock in plugin.getClocks()) {
                     val id = clock.clockId
+                    if (!isTransitClockEnabled && id == "DIGITAL_CLOCK_METRO") {
+                        continue
+                    }
+
                     val info =
                         availableClocks.concurrentGetOrPut(id, ClockInfo(clock, plugin, manager)) {
                             isClockListChanged = true

@@ -24,7 +24,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.os.UserHandle;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -41,9 +40,9 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.keyguard.AuthKeyguardMessageArea;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityLaunchAnimator;
+import com.android.systemui.display.data.repository.DisplayMetricsRepository;
 import com.android.systemui.navigationbar.NavigationBarView;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
-import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.qs.QSPanelController;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.shared.system.RemoteAnimationRunnerCompat;
@@ -196,14 +195,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     @Override
     Lifecycle getLifecycle();
 
-    /**
-     * Wakes up the device if the device was dozing.
-     *
-     * @deprecated Use {@link PowerInteractor#wakeUpIfDozing(String, int)} instead.
-     */
-    @Deprecated
-    void wakeUpIfDozing(long time, String why, @PowerManager.WakeReason int wakeReason);
-
     /** */
     ShadeViewController getShadeViewController();
 
@@ -211,10 +202,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     AuthKeyguardMessageArea getKeyguardMessageArea();
 
     int getStatusBarHeight();
-
-    void updateQsExpansionEnabled();
-
-    boolean isShadeDisabled();
 
     boolean isLaunchingActivityOverLockscreen();
 
@@ -262,8 +249,12 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     @Override
     void dump(PrintWriter pwOriginal, String[] args);
 
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayWidth();
 
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayHeight();
 
     void readyForKeyguardDone();
@@ -387,14 +378,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     void resendMessage(Object msg);
 
-    int getDisabled1();
-
-    void setDisabled1(int disabled);
-
-    int getDisabled2();
-
-    void setDisabled2(int disabled);
-
     void setLastCameraLaunchSource(int source);
 
     void setLaunchCameraOnFinishedGoingToSleep(boolean launch);
@@ -407,8 +390,8 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     QSPanelController getQSPanelController();
 
-    boolean areNotificationAlertsDisabled();
-
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayDensity();
 
     void extendDozePulse();

@@ -25,9 +25,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /** Hosts application business logic related to authentication. */
 @SysUISingleton
@@ -38,12 +37,6 @@ constructor(
     private val repository: AuthenticationRepository,
 ) {
     /**
-     * The currently-configured authentication method. This determines how the authentication
-     * challenge is completed in order to unlock an otherwise locked device.
-     */
-    val authenticationMethod: StateFlow<AuthenticationMethodModel> = repository.authenticationMethod
-
-    /**
      * Whether the device is unlocked.
      *
      * A device that is not yet unlocked requires unlocking by completing an authentication
@@ -52,20 +45,18 @@ constructor(
      * Note that this state has no real bearing on whether the lock screen is showing or dismissed.
      */
     val isUnlocked: StateFlow<Boolean> =
-        combine(authenticationMethod, repository.isUnlocked) { authMethod, isUnlocked ->
-                isUnlockedWithAuthMethod(
-                    isUnlocked = isUnlocked,
-                    authMethod = authMethod,
-                )
+        repository.isUnlocked
+            .map { isUnlocked ->
+                if (getAuthenticationMethod() is AuthenticationMethodModel.None) {
+                    true
+                } else {
+                    isUnlocked
+                }
             }
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.Eagerly,
-                initialValue =
-                    isUnlockedWithAuthMethod(
-                        isUnlocked = repository.isUnlocked.value,
-                        authMethod = repository.authenticationMethod.value,
-                    )
+                initialValue = true,
             )
 
     /**
@@ -82,54 +73,55 @@ constructor(
      */
     val failedAuthenticationAttempts: StateFlow<Int> = repository.failedAuthenticationAttempts
 
-    init {
-        // UNLOCKS WHEN AUTH METHOD REMOVED.
-        //
-        // Unlocks the device if the auth method becomes None.
-        applicationScope.launch {
-            repository.authenticationMethod.collect {
-                if (it is AuthenticationMethodModel.None) {
-                    unlockDevice()
-                }
-            }
-        }
+    /**
+     * Returns the currently-configured authentication method. This determines how the
+     * authentication challenge is completed in order to unlock an otherwise locked device.
+     */
+    suspend fun getAuthenticationMethod(): AuthenticationMethodModel {
+        return repository.getAuthenticationMethod()
     }
 
     /**
      * Returns `true` if the device currently requires authentication before content can be viewed;
      * `false` if content can be displayed without unlocking first.
      */
-    fun isAuthenticationRequired(): Boolean {
-        return !isUnlocked.value && authenticationMethod.value.isSecure
-    }
-
-    /**
-     * Unlocks the device, assuming that the authentication challenge has been completed
-     * successfully.
-     */
-    fun unlockDevice() {
-        repository.setUnlocked(true)
-    }
-
-    /**
-     * Locks the device. From now on, the device will remain locked until [authenticate] is called
-     * with the correct input.
-     */
-    fun lockDevice() {
-        repository.setUnlocked(false)
+    suspend fun isAuthenticationRequired(): Boolean {
+        return !isUnlocked.value && getAuthenticationMethod().isSecure
     }
 
     /**
      * Attempts to authenticate the user and unlock the device.
      *
+     * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
+     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
+     * `null` is returned.
+     *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false`
-     *   otherwise.
+     * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
+     *   request to validate.
+     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
+     *   authentication failed, `null` if the check was not performed.
      */
-    fun authenticate(input: List<Any>): Boolean {
+    suspend fun authenticate(input: List<Any>, tryAutoConfirm: Boolean = false): Boolean? {
+        val authMethod = getAuthenticationMethod()
+        if (tryAutoConfirm) {
+            if ((authMethod as? AuthenticationMethodModel.Pin)?.autoConfirm != true) {
+                // Do not attempt to authenticate unless the PIN lock is set to auto-confirm.
+                return null
+            }
+
+            if (input.size < authMethod.code.size) {
+                // Do not attempt to authenticate if the PIN has not yet the required amount of
+                // digits. This intentionally only skip for shorter PINs; if the PIN is longer, the
+                // layer above might have throttled this check, and the PIN should be rejected via
+                // the auth code below.
+                return null
+            }
+        }
+
         val isSuccessful =
-            when (val authMethod = this.authenticationMethod.value) {
+            when (authMethod) {
                 is AuthenticationMethodModel.Pin -> input.asCode() == authMethod.code
                 is AuthenticationMethodModel.Password -> input.asPassword() == authMethod.password
                 is AuthenticationMethodModel.Pattern -> input.asPattern() == authMethod.coordinates
@@ -138,7 +130,6 @@ constructor(
 
         if (isSuccessful) {
             repository.setFailedAuthenticationAttempts(0)
-            repository.setUnlocked(true)
         } else {
             repository.setFailedAuthenticationAttempts(
                 repository.failedAuthenticationAttempts.value + 1
@@ -148,53 +139,27 @@ constructor(
         return isSuccessful
     }
 
-    /** Triggers a biometric-powered unlock of the device. */
-    fun biometricUnlock() {
-        // TODO(b/280883900): only allow this if the biometric is enabled and there's a match.
-        repository.setUnlocked(true)
-    }
-
-    /** See [authenticationMethod]. */
-    fun setAuthenticationMethod(authenticationMethod: AuthenticationMethodModel) {
-        repository.setAuthenticationMethod(authenticationMethod)
-    }
-
     /** See [isBypassEnabled]. */
     fun toggleBypassEnabled() {
         repository.setBypassEnabled(!repository.isBypassEnabled.value)
     }
 
     companion object {
-        private fun isUnlockedWithAuthMethod(
-            isUnlocked: Boolean,
-            authMethod: AuthenticationMethodModel,
-        ): Boolean {
-            return if (authMethod is AuthenticationMethodModel.None) {
-                true
-            } else {
-                isUnlocked
-            }
-        }
-
         /**
          * Returns a PIN code from the given list. It's assumed the given list elements are all
          * [Int] in the range [0-9].
          */
-        private fun List<Any>.asCode(): Long? {
+        private fun List<Any>.asCode(): List<Int>? {
             if (isEmpty() || size > DevicePolicyManager.MAX_PASSWORD_LENGTH) {
                 return null
             }
 
-            var code = 0L
-            map {
-                    require(it is Int && it in 0..9) {
-                        "Pin is required to be Int in range [0..9], but got $it"
-                    }
-                    it
+            return map {
+                require(it is Int && it in 0..9) {
+                    "Pin is required to be Int in range [0..9], but got $it"
                 }
-                .forEach { integer -> code = code * 10 + integer }
-
-            return code
+                it
+            }
         }
 
         /**

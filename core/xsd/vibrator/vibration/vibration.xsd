@@ -90,7 +90,7 @@
     </xs:simpleType>
 
     <xs:complexType name="PredefinedEffect">
-        <xs:attribute name="name" type="PredefinedEffectName"/>
+        <xs:attribute name="name" type="PredefinedEffectName" use="required"/>
     </xs:complexType>
 
     <!-- Predefined effect names as defined by VibrationEffect.EFFECT_* -->
@@ -104,7 +104,7 @@
     </xs:simpleType>
 
     <xs:complexType name="PrimitiveEffect">
-        <xs:attribute name="name" type="PrimitiveEffectName"/>
+        <xs:attribute name="name" type="PrimitiveEffectName" use="required"/>
         <xs:attribute name="scale" type="PrimitiveScale"/>
         <xs:attribute name="delayMs" type="xs:nonNegativeInteger"/>
     </xs:complexType>

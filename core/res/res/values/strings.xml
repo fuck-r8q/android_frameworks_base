@@ -1793,6 +1793,8 @@
     <string name="biometric_error_hw_unavailable">Biometric hardware unavailable</string>
     <!-- Message shown when biometric authentication was canceled by the user [CHAR LIMIT=50] -->
     <string name="biometric_error_user_canceled">Authentication canceled</string>
+    <!-- Message shown by the biometric dialog when biometric is not recognized -->
+    <string name="biometric_not_recognized">Not recognized</string>
     <!-- Message shown by the biometric dialog when face is not recognized [CHAR LIMIT=50] -->
     <string name="biometric_face_not_recognized">Face not recognized</string>
     <!-- Message shown when biometric authentication has been canceled [CHAR LIMIT=50] -->
@@ -3796,7 +3798,7 @@
          keyboard is connected -->
     <string name="show_ime">Keep it on screen while physical keyboard is active</string>
     <!-- Title of the physical keyboard category in the input method selector [CHAR LIMIT=30] -->
-    <string name="hardware">Show virtual keyboard</string>
+    <string name="hardware">Use on-screen keyboard</string>
 
     <!-- Title of the notification to prompt the user to configure physical keyboard settings. [CHAR LIMIT=NOTIF_TITLE] -->
     <string name="select_keyboard_layout_notification_title">Configure <xliff:g id="device_name" example="Foobar USB Keyboard">%s</xliff:g></string>

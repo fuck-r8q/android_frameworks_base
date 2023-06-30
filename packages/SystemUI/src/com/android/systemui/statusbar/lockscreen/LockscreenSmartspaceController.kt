@@ -78,7 +78,7 @@ class LockscreenSmartspaceController
 constructor(
         private val context: Context,
         private val featureFlags: FeatureFlags,
-        private val smartspaceManager: SmartspaceManager,
+        private val smartspaceManager: SmartspaceManager?,
         private val activityStarter: ActivityStarter,
         private val falsingManager: FalsingManager,
         private val systemClock: SystemClock,
@@ -124,6 +124,7 @@ constructor(
     private var showSensitiveContentForCurrentUser = false
     private var showSensitiveContentForManagedUser = false
     private var managedUserHandle: UserHandle? = null
+    private var mSplitShadeEnabled = false
 
     // TODO(b/202758428): refactor so that we can test color updates via region samping, similar to
     //  how we test color updates when theme changes (See testThemeChangeUpdatesTextColor).
@@ -131,6 +132,7 @@ constructor(
     // TODO: Move logic into SmartspaceView
     var stateChangeListener = object : View.OnAttachStateChangeListener {
         override fun onViewAttachedToWindow(v: View) {
+            (v as SmartspaceView).setSplitShadeEnabled(mSplitShadeEnabled)
             smartspaceViews.add(v as SmartspaceView)
 
             connectSession()
@@ -176,7 +178,16 @@ constructor(
                     now.isBefore(Instant.ofEpochMilli(t.expiryTimeMillis))
         }
         if (weatherTarget != null) {
-            val weatherData = WeatherData.fromBundle(weatherTarget.baseAction.extras)
+            val clickIntent = weatherTarget.headerAction?.intent
+            val weatherData = WeatherData.fromBundle(weatherTarget.baseAction.extras, { v ->
+                if (!falsingManager.isFalseTap(FalsingManager.LOW_PENALTY)) {
+                    activityStarter.startActivity(
+                        clickIntent,
+                        true, /* dismissShade */
+                        null,
+                        false)
+                }
+            })
             if (weatherData != null) {
                 keyguardUpdateMonitor.sendWeatherData(weatherData)
             }
@@ -211,6 +222,11 @@ constructor(
         override fun onDozeAmountChanged(linear: Float, eased: Float) {
             execution.assertIsMainThread()
             smartspaceViews.forEach { it.setDozeAmount(eased) }
+        }
+
+        override fun onDozingChanged(isDozing: Boolean) {
+            execution.assertIsMainThread()
+            smartspaceViews.forEach { it.setDozing(isDozing) }
         }
     }
 
@@ -371,6 +387,7 @@ constructor(
     }
 
     private fun connectSession() {
+        if (smartspaceManager == null) return
         if (datePlugin == null && weatherPlugin == null && plugin == null) return
         if (session != null || smartspaceViews.isEmpty()) {
             return
@@ -415,6 +432,11 @@ constructor(
 
         updateBypassEnabled()
         reloadSmartspace()
+    }
+
+    fun setSplitShadeEnabled(enabled: Boolean) {
+        mSplitShadeEnabled = enabled
+        smartspaceViews.forEach { it.setSplitShadeEnabled(enabled) }
     }
 
     /**

@@ -46,6 +46,7 @@ import com.android.systemui.controls.dagger.ControlsModule;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.SystemUser;
 import com.android.systemui.demomode.dagger.DemoModeModule;
+import com.android.systemui.display.DisplayModule;
 import com.android.systemui.doze.dagger.DozeComponent;
 import com.android.systemui.dreams.dagger.DreamModule;
 import com.android.systemui.dump.DumpManager;
@@ -87,6 +88,7 @@ import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.connectivity.ConnectivityModule;
+import com.android.systemui.statusbar.disableflags.dagger.DisableFlagsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
@@ -161,11 +163,13 @@ import javax.inject.Named;
             ClipboardOverlayModule.class,
             ClockRegistryModule.class,
             CommonRepositoryModule.class,
+            DisplayModule.class,
             ConnectivityModule.class,
             CoroutinesModule.class,
             DreamModule.class,
             ControlsModule.class,
             DemoModeModule.class,
+            DisableFlagsModule.class,
             FalsingModule.class,
             FlagsModule.class,
             SystemPropertiesFlagsModule.class,

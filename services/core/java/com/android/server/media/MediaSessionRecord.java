@@ -16,6 +16,7 @@
 
 package com.android.server.media;
 
+import static android.media.MediaRoute2Info.PLAYBACK_VOLUME_FIXED;
 import static android.media.VolumeProvider.VOLUME_CONTROL_ABSOLUTE;
 import static android.media.VolumeProvider.VOLUME_CONTROL_FIXED;
 import static android.media.VolumeProvider.VOLUME_CONTROL_RELATIVE;
@@ -44,7 +45,9 @@ import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.media.MediaMetadata;
+import android.media.MediaRouter2Manager;
 import android.media.Rating;
+import android.media.RoutingSessionInfo;
 import android.media.VolumeProvider;
 import android.media.session.ISession;
 import android.media.session.ISessionCallback;
@@ -102,6 +105,16 @@ public class MediaSessionRecord implements IBinder.DeathRecipient, MediaSessionR
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     static final long THROW_FOR_INVALID_BROADCAST_RECEIVER = 270049379L;
+
+    /**
+     * {@link MediaSession#setMediaButtonReceiver(PendingIntent)} throws an {@link
+     * IllegalArgumentException} if the provided {@link PendingIntent} targets an {@link
+     * android.app.Activity activity} for apps targeting Android V and above. For apps targeting
+     * Android U and below, the request will be ignored.
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    static final long THROW_FOR_ACTIVITY_MEDIA_BUTTON_RECEIVER = 272737196L;
 
     private static final String TAG = "MediaSessionRecord";
     private static final String[] ART_URIS = new String[] {
@@ -510,7 +523,33 @@ public class MediaSessionRecord implements IBinder.DeathRecipient, MediaSessionR
 
     @Override
     public boolean canHandleVolumeKey() {
-        return mVolumeControlType != VOLUME_CONTROL_FIXED;
+        if (isPlaybackTypeLocal()) {
+            return true;
+        }
+        if (mVolumeControlType == VOLUME_CONTROL_FIXED) {
+            return false;
+        }
+        if (mVolumeAdjustmentForRemoteGroupSessions) {
+            return true;
+        }
+        // See b/228021646 for details.
+        MediaRouter2Manager mRouter2Manager = MediaRouter2Manager.getInstance(mContext);
+        List<RoutingSessionInfo> sessions = mRouter2Manager.getRoutingSessions(mPackageName);
+        boolean foundNonSystemSession = false;
+        boolean remoteSessionAllowVolumeAdjustment = true;
+        for (RoutingSessionInfo session : sessions) {
+            if (!session.isSystemSession()) {
+                foundNonSystemSession = true;
+                if (session.getVolumeHandling() == PLAYBACK_VOLUME_FIXED) {
+                    remoteSessionAllowVolumeAdjustment = false;
+                }
+            }
+        }
+        if (!foundNonSystemSession) {
+            Log.d(TAG, "Package " + mPackageName
+                    + " has a remote media session but no associated routing session");
+        }
+        return foundNonSystemSession && remoteSessionAllowVolumeAdjustment;
     }
 
     @Override
@@ -1026,13 +1065,26 @@ public class MediaSessionRecord implements IBinder.DeathRecipient, MediaSessionR
         }
 
         @Override
-        public void setMediaButtonReceiver(PendingIntent pi) throws RemoteException {
+        public void setMediaButtonReceiver(@Nullable PendingIntent pi) throws RemoteException {
+            final int uid = Binder.getCallingUid();
             final long token = Binder.clearCallingIdentity();
             try {
                 if ((mPolicies & MediaSessionPolicyProvider.SESSION_POLICY_IGNORE_BUTTON_RECEIVER)
                         != 0) {
                     return;
                 }
+
+                if (pi != null && pi.isActivity()) {
+                    if (CompatChanges.isChangeEnabled(
+                            THROW_FOR_ACTIVITY_MEDIA_BUTTON_RECEIVER, uid)) {
+                        throw new IllegalArgumentException(
+                                "The media button receiver cannot be set to an activity.");
+                    } else {
+                        Log.w(TAG, "Ignoring invalid media button receiver targeting an activity.");
+                        return;
+                    }
+                }
+
                 mMediaButtonReceiverHolder =
                         MediaButtonReceiverHolder.create(mUserId, pi, mPackageName);
                 mService.onMediaButtonReceiverChanged(MediaSessionRecord.this);

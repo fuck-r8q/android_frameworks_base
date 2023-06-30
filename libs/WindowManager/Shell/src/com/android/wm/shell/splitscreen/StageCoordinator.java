@@ -2453,11 +2453,17 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
             mSplitLayout.setFreezeDividerWindow(false);
             final StageChangeRecord record = new StageChangeRecord();
+            final int transitType = info.getType();
+            boolean hasEnteringPip = false;
             for (int iC = 0; iC < info.getChanges().size(); ++iC) {
                 final TransitionInfo.Change change = info.getChanges().get(iC);
                 if (change.getMode() == TRANSIT_CHANGE
                         && (change.getFlags() & FLAG_IS_DISPLAY) != 0) {
                     mSplitLayout.update(startTransaction);
+                }
+
+                if (mMixedHandler.isEnteringPip(change, transitType)) {
+                    hasEnteringPip = true;
                 }
 
                 final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
@@ -2508,6 +2514,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     }
                 }
             }
+
+            if (hasEnteringPip) {
+                mMixedHandler.animatePendingEnterPipFromSplit(transition, info,
+                        startTransaction, finishTransaction, finishCallback);
+                return true;
+            }
+
             final ArraySet<StageTaskListener> dismissStages = record.getShouldDismissedStage();
             if (mMainStage.getChildCount() == 0 || mSideStage.getChildCount() == 0
                     || dismissStages.size() == 1) {
@@ -2840,16 +2853,24 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             }
         }
 
+        final ArrayMap<Integer, SurfaceControl> dismissingTasks = new ArrayMap<>();
+        for (int i = info.getChanges().size() - 1; i >= 0; --i) {
+            final TransitionInfo.Change change = info.getChanges().get(i);
+            final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
+            if (taskInfo == null) continue;
+            if (getStageOfTask(taskInfo) != null
+                    || getSplitItemPosition(change.getLastParent()) != SPLIT_POSITION_UNDEFINED) {
+                dismissingTasks.put(taskInfo.taskId, change.getLeash());
+            }
+        }
+
+
         if (shouldBreakPairedTaskInRecents(dismissReason)) {
             // Notify recents if we are exiting in a way that breaks the pair, and disable further
             // updates to splits in the recents until we enter split again
             mRecentTasks.ifPresent(recentTasks -> {
-                for (int i = info.getChanges().size() - 1; i >= 0; --i) {
-                    final TransitionInfo.Change change = info.getChanges().get(i);
-                    final ActivityManager.RunningTaskInfo taskInfo = change.getTaskInfo();
-                    if (taskInfo != null && getStageOfTask(taskInfo) != null) {
-                        recentTasks.removeSplitPair(taskInfo.taskId);
-                    }
+                for (int i = dismissingTasks.keySet().size() - 1; i >= 0; --i) {
+                    recentTasks.removeSplitPair(dismissingTasks.keyAt(i));
                 }
             });
         }
@@ -2867,6 +2888,10 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             t.hide(toStage == STAGE_TYPE_MAIN ? mSideStage.mRootLeash : mMainStage.mRootLeash);
             t.setPosition(toStage == STAGE_TYPE_MAIN
                     ? mMainStage.mRootLeash : mSideStage.mRootLeash, 0, 0);
+        } else {
+            for (int i = dismissingTasks.keySet().size() - 1; i >= 0; --i) {
+                finishT.hide(dismissingTasks.valueAt(i));
+            }
         }
 
         if (toStage == STAGE_TYPE_UNDEFINED) {
@@ -2876,7 +2901,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         // Hide divider and dim layer on transition finished.
-        setDividerVisibility(false, finishT);
+        setDividerVisibility(false, t);
         finishT.hide(mMainStage.mDimLayer);
         finishT.hide(mSideStage.mDimLayer);
     }

@@ -73,7 +73,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -588,11 +587,10 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    fun testConnectionRepository_invalidSubId_throws() =
+    fun testConnectionRepository_invalidSubId_doesNotThrow() =
         testScope.runTest {
-            assertThrows(IllegalArgumentException::class.java) {
-                underTest.getRepoForSubId(SUB_1_ID)
-            }
+            underTest.getRepoForSubId(SUB_1_ID)
+            // No exception
         }
 
     @Test
@@ -626,23 +624,17 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
 
             assertThat(latest).isEqualTo(INVALID_SUBSCRIPTION_ID)
 
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(
-                    context,
-                    Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
-                        .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_2_ID)
-                )
-            }
+            val intent2 =
+                Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
+                    .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_2_ID)
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent2)
 
             assertThat(latest).isEqualTo(SUB_2_ID)
 
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(
-                    context,
-                    Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
-                        .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_1_ID)
-                )
-            }
+            val intent1 =
+                Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
+                    .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_1_ID)
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent1)
 
             assertThat(latest).isEqualTo(SUB_1_ID)
         }
@@ -1074,13 +1066,10 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
             assertThat(configFromContext.showAtLeast3G).isTrue()
 
             // WHEN the change event is fired
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(
-                    context,
-                    Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
-                        .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_1_ID)
-                )
-            }
+            val intent =
+                Intent(TelephonyManager.ACTION_DEFAULT_DATA_SUBSCRIPTION_CHANGED)
+                    .putExtra(PhoneConstants.SUBSCRIPTION_KEY, SUB_1_ID)
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent)
 
             // THEN the config is updated
             assertTrue(latest!!.areEqual(configFromContext))
@@ -1099,12 +1088,10 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
             assertThat(configFromContext.showAtLeast3G).isTrue()
 
             // WHEN the change event is fired
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(
-                    context,
-                    Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)
-                )
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(
+                context,
+                Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED),
+            )
 
             // THEN the config is updated
             assertThat(latest!!.areEqual(configFromContext)).isTrue()
@@ -1123,12 +1110,10 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
             assertThat(configFromContext.showAtLeast3G).isTrue()
 
             // WHEN the change event is fired
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(
-                    context,
-                    Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)
-                )
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(
+                context,
+                Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED),
+            )
 
             // WHEN collection starts AFTER the broadcast is sent out
             val latest by collectLastValue(underTest.defaultDataSubRatConfig)

@@ -40,7 +40,7 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.log.LogBuffer;
-import com.android.systemui.log.LogLevel;
+import com.android.systemui.log.core.LogLevel;
 import com.android.systemui.log.dagger.KeyguardClockLog;
 import com.android.systemui.plugins.ClockController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -349,6 +349,13 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
      */
     public void setSplitShadeCentered(boolean splitShadeCentered) {
         mView.setSplitShadeCentered(splitShadeCentered);
+    }
+
+    /**
+     * Set if the split shade is enabled
+     */
+    public void setSplitShadeEnabled(boolean splitShadeEnabled) {
+        mSmartspaceController.setSplitShadeEnabled(splitShadeEnabled);
     }
 
     /**

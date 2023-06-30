@@ -2790,6 +2790,8 @@ final class InstallPackageHelper {
                     final String[] pkgNames = new String[]{
                             request.getRemovedInfo().mRemovedPackage};
                     final int[] uids = new int[]{request.getRemovedInfo().mUid};
+                    mPm.notifyResourcesChanged(false /* mediaStatus */,
+                            true /* replacing */, pkgNames, uids);
                     mBroadcastHelper.sendResourcesChangedBroadcast(mPm::snapshotComputer,
                             false /* mediaStatus */, true /* replacing */, pkgNames, uids);
                 }
@@ -2995,6 +2997,8 @@ final class InstallPackageHelper {
                     final int[] uids = new int[]{request.getPkg().getUid()};
                     mBroadcastHelper.sendResourcesChangedBroadcast(mPm::snapshotComputer,
                             true /* mediaStatus */, true /* replacing */, pkgNames, uids);
+                    mPm.notifyResourcesChanged(true /* mediaStatus */, true /* replacing */,
+                            pkgNames, uids);
                 }
             } else if (!ArrayUtils.isEmpty(request.getLibraryConsumers())) { // if static shared lib
                 // No need to kill consumers if it's installation of new version static shared lib.
@@ -3712,12 +3716,15 @@ final class InstallPackageHelper {
 
             if (throwable == null) {
                 try {
+                    Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "addForInitLI");
                     addForInitLI(parseResult.parsedPackage, parseFlags, scanFlags,
                             new UserHandle(UserHandle.USER_SYSTEM), apexInfo);
                 } catch (PackageManagerException e) {
                     errorCode = e.error;
                     errorMsg = "Failed to scan " + parseResult.scanFile + ": " + e.getMessage();
                     Slog.w(TAG, errorMsg);
+                } finally {
+                    Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
                 }
             } else if (throwable instanceof PackageManagerException) {
                 PackageManagerException e = (PackageManagerException) throwable;

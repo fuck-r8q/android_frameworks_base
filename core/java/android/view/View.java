@@ -21190,19 +21190,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mRoundScrollbarRenderer == null) {
             getStraightVerticalScrollBarBounds(bounds, touchBounds);
         } else {
-            getRoundVerticalScrollBarBounds(bounds != null ? bounds : touchBounds);
+            mRoundScrollbarRenderer.getRoundVerticalScrollBarBounds(
+                    bounds != null ? bounds : touchBounds);
         }
-    }
-
-    private void getRoundVerticalScrollBarBounds(Rect bounds) {
-        final int width = mRight - mLeft;
-        final int height = mBottom - mTop;
-        // Do not take padding into account as we always want the scrollbars
-        // to hug the screen for round wearable devices.
-        bounds.left = mScrollX;
-        bounds.top = mScrollY;
-        bounds.right = bounds.left + width;
-        bounds.bottom = mScrollY + height;
     }
 
     private void getStraightVerticalScrollBarBounds(@Nullable Rect drawBounds,
@@ -21314,8 +21304,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 if (drawVerticalScrollBar) {
                     final Rect bounds = cache.mScrollBarBounds;
                     getVerticalScrollBarBounds(bounds, null);
+                    boolean shouldDrawScrollbarAtLeft =
+                            (mVerticalScrollbarPosition == SCROLLBAR_POSITION_LEFT)
+                                    || (mVerticalScrollbarPosition == SCROLLBAR_POSITION_DEFAULT
+                                    && isLayoutRtl());
+
                     mRoundScrollbarRenderer.drawRoundScrollbars(
-                            canvas, (float) cache.scrollBar.getAlpha() / 255f, bounds);
+                            canvas, (float) cache.scrollBar.getAlpha() / 255f, bounds,
+                            shouldDrawScrollbarAtLeft);
                     if (invalidate) {
                         invalidate();
                     }
@@ -22462,6 +22458,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public void setRenderEffect(@Nullable RenderEffect renderEffect) {
         if (mRenderNode.setRenderEffect(renderEffect)) {
+            invalidateViewProperty(true, true);
+        }
+    }
+
+    /**
+     * Configure the {@link android.graphics.RenderEffect} to apply to the backdrop contents of this
+     * View. This will apply a visual effect to the result of the backdrop contents of this View
+     * before it is drawn. For example if
+     * {@link RenderEffect#createBlurEffect(float, float, RenderEffect, Shader.TileMode)}
+     * is provided, the previous content behind this View will be blurred before this View is drawn.
+     * @param renderEffect to be applied to the View. Passing null clears the previously configured
+     *                     {@link RenderEffect}
+     * @hide
+     */
+    public void setBackdropRenderEffect(@Nullable RenderEffect renderEffect) {
+        if (mRenderNode.setBackdropRenderEffect(renderEffect)) {
             invalidateViewProperty(true, true);
         }
     }

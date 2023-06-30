@@ -25,6 +25,7 @@ import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
 import static com.android.wm.shell.common.split.SplitScreenConstants.FLAG_IS_DIVIDER_BAR;
 import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_UNDEFINED;
+import static com.android.wm.shell.pip.PipAnimationController.ANIM_TYPE_ALPHA;
 import static com.android.wm.shell.splitscreen.SplitScreen.STAGE_TYPE_UNDEFINED;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_CHILD_TASK_ENTER_PIP;
 import static com.android.wm.shell.util.TransitionUtil.isOpeningType;
@@ -42,10 +43,10 @@ import android.window.WindowContainerTransaction;
 import android.window.WindowContainerTransactionCallback;
 
 import com.android.internal.protolog.common.ProtoLog;
+import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.desktopmode.DesktopModeController;
 import com.android.wm.shell.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
-import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.pip.phone.PipTouchHandler;
@@ -470,7 +471,8 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             }
             finishCallback.onTransitionFinished(mixed.mFinishWCT, wctCB);
         };
-        if (isGoingHome) {
+        if (isGoingHome || mSplitHandler.getSplitItemPosition(pipChange.getLastParent())
+                != SPLIT_POSITION_UNDEFINED) {
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animation is actually mixed "
                     + "since entering-PiP caused us to leave split and return home.");
             // We need to split the transition into 2 parts: the pip part (animated by pip)
@@ -499,6 +501,7 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                 }
             }
 
+            mPipHandler.setEnterAnimationType(ANIM_TYPE_ALPHA);
             mPipHandler.startEnterAnimation(pipChange, startTransaction, finishTransaction,
                     finishCB);
             // Dispatch the rest of the transition normally. This will most-likely be taken by
@@ -539,10 +542,27 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
     }
 
     /**
+     * This is intended to be called by SplitCoordinator as a helper to mix a split handling
+     * transition with an entering-pip change. The use-case for this is when an auto-pip change
+     * gets collected into the transition which has already claimed by
+     * StageCoordinator.handleRequest. This happens when launching a fullscreen app while having an
+     * auto-pip activity in the foreground split pair.
+     */
+    // TODO(b/287704263): Remove when split/mixed are reversed.
+    public boolean animatePendingEnterPipFromSplit(IBinder transition, TransitionInfo info,
+            SurfaceControl.Transaction startT, SurfaceControl.Transaction finishT,
+            Transitions.TransitionFinishCallback finishCallback) {
+        final MixedTransition mixed = new MixedTransition(
+                MixedTransition.TYPE_ENTER_PIP_FROM_SPLIT, transition);
+        mActiveTransitions.add(mixed);
+        return animateEnterPipFromSplit(mixed, info, startT, finishT, finishCallback);
+    }
+
+    /**
      * This is intended to be called by SplitCoordinator as a helper to mix an already-pending
      * split transition with a display-change. The use-case for this is when a display
      * change/rotation gets collected into a split-screen enter/exit transition which has already
-     * been claimed by StageCoordinator.handleRequest . This happens during launcher tests.
+     * been claimed by StageCoordinator.handleRequest. This happens during launcher tests.
      */
     public boolean animatePendingSplitWithDisplayChange(@NonNull IBinder transition,
             @NonNull TransitionInfo info, @NonNull SurfaceControl.Transaction startT,
@@ -702,6 +722,13 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
     /** @return whether the transition-request represents a pip-entry. */
     public boolean requestHasPipEnter(TransitionRequestInfo request) {
         return mPipHandler.requestHasPipEnter(request);
+    }
+
+    /** Whether a particular change is a window that is entering pip. */
+    // TODO(b/287704263): Remove when split/mixed are reversed.
+    public boolean isEnteringPip(TransitionInfo.Change change,
+            @WindowManager.TransitionType int transitType) {
+        return mPipHandler.isEnteringPip(change, transitType);
     }
 
     @Override

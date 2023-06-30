@@ -16,10 +16,16 @@
 
 package com.android.systemui.bouncer.ui.viewmodel
 
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /** Holds UI state and handles user input for the PIN code bouncer UI. */
 class PinBouncerViewModel(
@@ -34,6 +40,47 @@ class PinBouncerViewModel(
     private val mutablePinEntries = MutableStateFlow<List<EnteredKey>>(emptyList())
     val pinEntries: StateFlow<List<EnteredKey>> = mutablePinEntries
 
+    /** The length of the hinted PIN, or `null` if pin length hint should not be shown. */
+    val hintedPinLength: StateFlow<Int?> =
+        flow { emit(interactor.getAuthenticationMethod()) }
+            .map { authMethod ->
+                // Hinting is enabled for 6-digit codes only
+                autoConfirmPinLength(authMethod).takeIf { it == HINTING_PASSCODE_LENGTH }
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.Eagerly,
+                initialValue = null,
+            )
+
+    /** Appearance of the backspace button. */
+    val backspaceButtonAppearance: StateFlow<ActionButtonAppearance> =
+        mutablePinEntries
+            .map { mutablePinEntries ->
+                computeBackspaceButtonAppearance(
+                    interactor.getAuthenticationMethod(),
+                    mutablePinEntries
+                )
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ActionButtonAppearance.Hidden,
+            )
+
+    /** Appearance of the confirm button. */
+    val confirmButtonAppearance: StateFlow<ActionButtonAppearance> =
+        flow {
+                emit(null)
+                emit(interactor.getAuthenticationMethod())
+            }
+            .map { authMethod -> computeConfirmButtonAppearance(authMethod) }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.Eagerly,
+                initialValue = ActionButtonAppearance.Hidden,
+            )
+
     /** Notifies that the UI has been shown to the user. */
     fun onShown() {
         interactor.resetMessage()
@@ -46,6 +93,8 @@ class PinBouncerViewModel(
         }
 
         mutablePinEntries.value += EnteredKey(input)
+
+        tryAuthenticate(useAutoConfirm = true)
     }
 
     /** Notifies that the user clicked the backspace button. */
@@ -63,13 +112,69 @@ class PinBouncerViewModel(
 
     /** Notifies that the user clicked the "enter" button. */
     fun onAuthenticateButtonClicked() {
-        if (!interactor.authenticate(mutablePinEntries.value.map { it.input })) {
-            showFailureAnimation()
-        }
+        tryAuthenticate(useAutoConfirm = false)
+    }
 
-        mutablePinEntries.value = emptyList()
+    private fun tryAuthenticate(useAutoConfirm: Boolean) {
+        val pinCode = mutablePinEntries.value.map { it.input }
+
+        applicationScope.launch {
+            val isSuccess = interactor.authenticate(pinCode, useAutoConfirm) ?: return@launch
+
+            if (!isSuccess) {
+                showFailureAnimation()
+            }
+
+            mutablePinEntries.value = emptyList()
+        }
+    }
+
+    private fun isAutoConfirmEnabled(authMethodModel: AuthenticationMethodModel?): Boolean {
+        return (authMethodModel as? AuthenticationMethodModel.Pin)?.autoConfirm == true
+    }
+
+    private fun autoConfirmPinLength(authMethodModel: AuthenticationMethodModel?): Int? {
+        if (!isAutoConfirmEnabled(authMethodModel)) return null
+
+        return (authMethodModel as? AuthenticationMethodModel.Pin)?.code?.size
+    }
+
+    private fun computeBackspaceButtonAppearance(
+        authMethodModel: AuthenticationMethodModel,
+        enteredPin: List<EnteredKey>
+    ): ActionButtonAppearance {
+        val isAutoConfirmEnabled = isAutoConfirmEnabled(authMethodModel)
+        val isEmpty = enteredPin.isEmpty()
+
+        return when {
+            isAutoConfirmEnabled && isEmpty -> ActionButtonAppearance.Hidden
+            isAutoConfirmEnabled -> ActionButtonAppearance.Subtle
+            else -> ActionButtonAppearance.Shown
+        }
+    }
+    private fun computeConfirmButtonAppearance(
+        authMethodModel: AuthenticationMethodModel?
+    ): ActionButtonAppearance {
+        return if (isAutoConfirmEnabled(authMethodModel)) {
+            ActionButtonAppearance.Hidden
+        } else {
+            ActionButtonAppearance.Shown
+        }
     }
 }
+
+/** Appearance of pin-pad action buttons. */
+enum class ActionButtonAppearance {
+    /** Button must not be shown. */
+    Hidden,
+    /** Button is shown, but with no background to make it less prominent. */
+    Subtle,
+    /** Button is shown. */
+    Shown,
+}
+
+/** Auto-confirm passcodes of exactly 6 digits show a length hint, see http://shortn/_IXlmSNbDh6 */
+private const val HINTING_PASSCODE_LENGTH = 6
 
 private var nextSequenceNumber = 1
 

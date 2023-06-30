@@ -111,6 +111,9 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     private static final VibrationAttributes HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES =
             VibrationAttributes.createForUsage(VibrationAttributes.USAGE_HARDWARE_FEEDBACK);
 
+    private int mDisabled1;
+    private int mDisabled2;
+
     @Inject
     CentralSurfacesCommandQueueCallbacks(
             CentralSurfaces centralSurfaces,
@@ -244,29 +247,26 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     }
     /**
      * State is one or more of the DISABLE constants from StatusBarManager.
+     *
+     * @deprecated If you need to react to changes in disable flags, listen to
+     * {@link com.android.systemui.statusbar.disableflags.data.repository.DisableFlagsRepository}
+     * instead.
      */
     @Override
+    @Deprecated
     public void disable(int displayId, int state1, int state2, boolean animate) {
         if (displayId != mDisplayId) {
             return;
         }
 
-        int state2BeforeAdjustment = state2;
-        state2 = mRemoteInputQuickSettingsDisabler.adjustDisableFlags(state2);
-        Log.d(CentralSurfaces.TAG,
-                mDisableFlagsLogger.getDisableFlagsString(
-                        /* new= */ new DisableFlagsLogger.DisableState(
-                                state1, state2BeforeAdjustment),
-                        /* newStateAfterLocalModification= */ new DisableFlagsLogger.DisableState(
-                                state1, state2)));
-
-        final int old1 = mCentralSurfaces.getDisabled1();
+        final int old1 = mDisabled1;
         final int diff1 = state1 ^ old1;
-        mCentralSurfaces.setDisabled1(state1);
+        mDisabled1 = state1;
 
-        final int old2 = mCentralSurfaces.getDisabled2();
+        state2 = mRemoteInputQuickSettingsDisabler.adjustDisableFlags(state2);
+        final int old2 = mDisabled2;
         final int diff2 = state2 ^ old2;
-        mCentralSurfaces.setDisabled2(state2);
+        mDisabled2 = state2;
 
         if ((diff1 & StatusBarManager.DISABLE_EXPAND) != 0) {
             if ((state1 & StatusBarManager.DISABLE_EXPAND) != 0) {
@@ -275,17 +275,12 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         }
 
         if ((diff1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
-            if (mCentralSurfaces.areNotificationAlertsDisabled()) {
+            if ((state1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
                 mHeadsUpManager.releaseAllImmediately();
             }
         }
 
-        if ((diff2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
-        }
-
         if ((diff2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
             if ((state2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
                 mShadeController.animateCollapseShade();
             }
