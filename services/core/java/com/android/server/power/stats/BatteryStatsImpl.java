@@ -12159,7 +12159,8 @@ public class BatteryStatsImpl extends BatteryStats {
         if (DEBUG_ENERGY) {
             Slog.d(TAG, "Updating mobile radio stats with " + activityInfo);
         }
-        ModemActivityInfo deltaInfo = mLastModemActivityInfo == null ? activityInfo
+        ModemActivityInfo deltaInfo = mLastModemActivityInfo == null
+                ? (activityInfo == null ? null : activityInfo.getDelta(activityInfo))
                 : mLastModemActivityInfo.getDelta(activityInfo);
         mLastModemActivityInfo = activityInfo;
 
@@ -14614,17 +14615,13 @@ public class BatteryStatsImpl extends BatteryStats {
 
     // Inform StatsLog of setBatteryState changes.
     private void reportChangesToStatsLog(final int status, final int plugType, final int level) {
-        if (!mHaveBatteryLevel) {
-            return;
-        }
-
-        if (mBatteryStatus != status) {
+        if (!mHaveBatteryLevel || mBatteryStatus != status) {
             FrameworkStatsLog.write(FrameworkStatsLog.CHARGING_STATE_CHANGED, status);
         }
-        if (mBatteryPlugType != plugType) {
+        if (!mHaveBatteryLevel || mBatteryPlugType != plugType) {
             FrameworkStatsLog.write(FrameworkStatsLog.PLUGGED_STATE_CHANGED, plugType);
         }
-        if (mBatteryLevel != level) {
+        if (!mHaveBatteryLevel || mBatteryLevel != level) {
             FrameworkStatsLog.write(FrameworkStatsLog.BATTERY_LEVEL_CHANGED, level);
         }
     }
