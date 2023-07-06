@@ -475,16 +475,20 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
     /**
      * Represents the event of selecting an item usually in the context of an
      * {@link android.widget.AdapterView}.
+     * @see AccessibilityNodeInfo.AccessibilityAction#ACTION_SELECT
      */
     public static final int TYPE_VIEW_SELECTED = 1 << 2;
 
     /**
      * Represents the event of setting input focus of a {@link android.view.View}.
+     * @see AccessibilityNodeInfo.AccessibilityAction#ACTION_ACCESSIBILITY_FOCUS for the difference
+     * between input and accessibility focus.
      */
     public static final int TYPE_VIEW_FOCUSED = 1 << 3;
 
     /**
      * Represents the event of changing the text of an {@link android.widget.EditText}.
+     * @see AccessibilityNodeInfo#setText(CharSequence)
      */
     public static final int TYPE_VIEW_TEXT_CHANGED = 1 << 4;
 
@@ -554,11 +558,15 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
 
     /**
      * Represents the event of gaining accessibility focus.
+     * @see AccessibilityNodeInfo.AccessibilityAction#ACTION_ACCESSIBILITY_FOCUS for the difference
+     * between input and accessibility focus.
      */
     public static final int TYPE_VIEW_ACCESSIBILITY_FOCUSED = 1 << 15;
 
     /**
      * Represents the event of clearing accessibility focus.
+     * @see AccessibilityNodeInfo.AccessibilityAction#ACTION_ACCESSIBILITY_FOCUS for the difference
+     * between input and accessibility focus.
      */
     public static final int TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED = 1 << 16;
 
@@ -646,6 +654,7 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
     /**
      * Change type for {@link #TYPE_WINDOW_CONTENT_CHANGED} event:
      * The node's text changed.
+     * @see AccessibilityNodeInfo#setText(CharSequence)
      */
     public static final int CONTENT_CHANGE_TYPE_TEXT = 1 << 1;
 
@@ -662,7 +671,7 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
      * If this makes the pane appear, {@link #CONTENT_CHANGE_TYPE_PANE_APPEARED} is sent
      * instead. If this makes the pane disappear, {@link #CONTENT_CHANGE_TYPE_PANE_DISAPPEARED}
      * is sent.
-     *
+     * @see View#setAccessibilityPaneTitle(CharSequence)
      */
     public static final int CONTENT_CHANGE_TYPE_PANE_TITLE = 1 << 3;
 
@@ -670,6 +679,7 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
      * Change type for {@link #TYPE_WINDOW_STATE_CHANGED} event:
      * The node has a pane title, and either just appeared or just was assigned a title when it
      * had none before.
+     * @see View#setAccessibilityPaneTitle(CharSequence)
      */
     public static final int CONTENT_CHANGE_TYPE_PANE_APPEARED = 1 << 4;
 
@@ -681,6 +691,7 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
      * No source will be returned if the node is no longer on the screen. To make the change more
      * clear for the user, the first entry in {@link #getText()} will return the value that would
      * have been returned by {@code getSource().getPaneTitle()}.
+     * @see View#setAccessibilityPaneTitle(CharSequence)
      */
     public static final int CONTENT_CHANGE_TYPE_PANE_DISAPPEARED = 1 << 5;
 
@@ -691,6 +702,7 @@ public final class AccessibilityEvent extends AccessibilityRecord implements Par
      * changes, the changed part can be put into event text. For example, if state description
      * changed from "on, wifi signal full" to "on, wifi three bars", "wifi three bars" can be put
      * into the event text.
+     * @see View#setStateDescription(CharSequence)
      */
     public static final int CONTENT_CHANGE_TYPE_STATE_DESCRIPTION = 1 << 6;
 
