@@ -1028,7 +1028,7 @@
          requires swapping ROTATION_90 and ROTATION_270.
          TODO(b/265991392): This should eventually be configured and parsed in
           display_settings.xml -->
-    <bool name="config_matchSecondaryInternalDisplaysOrientationToReverseDefaultDisplay">true</bool>
+    <bool name="config_matchSecondaryInternalDisplaysOrientationToReverseDefaultDisplay">false</bool>
 
     <!-- Indicate available ColorDisplayManager.COLOR_MODE_xxx. -->
     <integer-array name="config_availableColorModes">
@@ -2309,6 +2309,8 @@
     <string name="config_systemFinancedDeviceController" translatable="false">com.android.devicelockcontroller</string>
     <!-- The name of the package that will hold the call streaming role. -->
     <string name="config_systemCallStreaming" translatable="false"></string>
+    <!-- The name of the package that will hold the default retail demo role. -->
+    <string name="config_defaultRetailDemo" translatable="false"></string>
 
     <!-- The component name of the wear service class that will be started by the system server. -->
     <string name="config_wearServiceComponent" translatable="false"></string>
