@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.server.wm.flicker.ime
+package com.android.systemui.statusbar.notification.row
 
-import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
-import android.tools.device.flicker.legacy.LegacyFlickerTest
-import org.junit.FixMethodOrder
-import org.junit.runner.RunWith
-import org.junit.runners.MethodSorters
-import org.junit.runners.Parameterized
+import android.content.Context
+import android.util.AttributeSet
+import android.view.View
 
-@RunWith(Parameterized::class)
-@Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class CloseImeToHomeOnFinishActivityTestCfArm(flicker: LegacyFlickerTest) :
-    CloseImeToHomeOnFinishActivityTest(flicker)
+/** Interface used to create replacement view instances in Notification RemoteViews. */
+interface NotifRemoteViewsFactory {
+
+    /** return the replacement view instance for the given view name */
+    fun instantiate(parent: View?, name: String, context: Context, attrs: AttributeSet): View?
+}
