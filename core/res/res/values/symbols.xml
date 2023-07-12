@@ -2306,6 +2306,7 @@
 
   <java-symbol type="bool" name="config_alwaysUseCdmaRssi" />
   <java-symbol type="dimen" name="status_bar_icon_size" />
+  <java-symbol type="dimen" name="status_bar_icon_size_sp" />
   <java-symbol type="dimen" name="status_bar_system_icon_size" />
   <java-symbol type="dimen" name="status_bar_system_icon_intrinsic_size" />
   <java-symbol type="drawable" name="list_selector_pressed_holo_dark" />
@@ -4972,7 +4973,6 @@
   <!-- For VirtualDeviceManager -->
   <java-symbol type="string" name="vdm_camera_access_denied" />
   <java-symbol type="string" name="vdm_secure_window" />
-  <java-symbol type="string" name="vdm_pip_blocked" />
 
   <java-symbol type="color" name="camera_privacy_light_day"/>
   <java-symbol type="color" name="camera_privacy_light_night"/>

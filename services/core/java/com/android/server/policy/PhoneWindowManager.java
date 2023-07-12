@@ -3304,8 +3304,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             minLinearBrightness, maxLinearBrightness);
                     mDisplayManager.setBrightness(screenDisplayId, adjustedLinearBrightness);
 
-                    startActivityAsUser(new Intent(Intent.ACTION_SHOW_BRIGHTNESS_DIALOG),
-                            UserHandle.CURRENT_OR_SELF);
+                    Intent intent = new Intent(Intent.ACTION_SHOW_BRIGHTNESS_DIALOG);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                    intent.putExtra(EXTRA_FROM_BRIGHTNESS_KEY, true);
+                    startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
                 }
                 return true;
             case KeyEvent.KEYCODE_KEYBOARD_BACKLIGHT_DOWN:
@@ -3535,16 +3537,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void requestBugreportForTv() {
-        if ("1".equals(SystemProperties.get("ro.debuggable"))
-                || Settings.Global.getInt(mContext.getContentResolver(),
-                        Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1) {
-            try {
-                if (!ActivityManager.getService().launchBugReportHandlerApp()) {
-                    ActivityManager.getService().requestInteractiveBugReport();
-                }
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Error taking bugreport", e);
+        try {
+            if (!ActivityManager.getService().launchBugReportHandlerApp()) {
+                ActivityManager.getService().requestInteractiveBugReport();
             }
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Error taking bugreport", e);
         }
     }
 
