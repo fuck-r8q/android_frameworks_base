@@ -5822,12 +5822,25 @@ public class ActivityManagerService extends IActivityManager.Stub
     /**
      * Allows if {@code pid} is {@link #MY_PID}, then denies if the {@code pid} has been denied
      * provided non-{@code null} {@code permission} before. Otherwise calls into
-     * {@link ActivityManager#checkComponentPermission(String, int, int, boolean)}.
+     * {@link ActivityManager#checkComponentPermission(String, int, int, int, boolean)}.
      */
     @PackageManager.PermissionResult
     @PermissionMethod
     public static int checkComponentPermission(@PermissionName String permission, int pid, int uid,
             int owningUid, boolean exported) {
+        return checkComponentPermission(permission, pid, uid, Context.DEVICE_ID_DEFAULT,
+                owningUid, exported);
+    }
+
+    /**
+     * Allows if {@code pid} is {@link #MY_PID}, then denies if the {@code pid} has been denied
+     * provided non-{@code null} {@code permission} before. Otherwise calls into
+     * {@link ActivityManager#checkComponentPermission(String, int, int, int, boolean)}.
+     */
+    @PackageManager.PermissionResult
+    @PermissionMethod
+    public static int checkComponentPermission(@PermissionName String permission, int pid, int uid,
+            int deviceId, int owningUid, boolean exported) {
         if (pid == MY_PID) {
             return PackageManager.PERMISSION_GRANTED;
         }
@@ -5846,7 +5859,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             }
         }
-        return ActivityManager.checkComponentPermission(permission, uid,
+        return ActivityManager.checkComponentPermission(permission, uid, deviceId,
                 owningUid, exported);
     }
 
@@ -5875,10 +5888,27 @@ public class ActivityManagerService extends IActivityManager.Stub
     @PackageManager.PermissionResult
     @PermissionMethod
     public int checkPermission(@PermissionName String permission, int pid, int uid) {
+        return checkPermissionForDevice(permission, pid, uid, Context.DEVICE_ID_DEFAULT);
+    }
+
+    /**
+     * As the only public entry point for permissions checking, this method
+     * can enforce the semantic that requesting a check on a null global
+     * permission is automatically denied.  (Internally a null permission
+     * string is used when calling {@link #checkComponentPermission} in cases
+     * when only uid-based security is needed.)
+     *
+     * This can be called with or without the global lock held.
+     */
+    @Override
+    @PackageManager.PermissionResult
+    @PermissionMethod
+    public int checkPermissionForDevice(@PermissionName String permission, int pid, int uid,
+            int deviceId) {
         if (permission == null) {
             return PackageManager.PERMISSION_DENIED;
         }
-        return checkComponentPermission(permission, pid, uid, -1, true);
+        return checkComponentPermission(permission, pid, uid, deviceId, -1, true);
     }
 
     /**
@@ -8108,8 +8138,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         return killed;
     }
 
-    @Override
-    public void killUid(int appId, int userId, String reason) {
+    private void killUid(int appId, int userId, int reason, int subReason,
+            String reasonAsString) {
         enforceCallingPermission(Manifest.permission.KILL_UID, "killUid");
         synchronized (this) {
             final long identity = Binder.clearCallingIdentity();
@@ -8120,14 +8150,20 @@ public class ActivityManagerService extends IActivityManager.Stub
                             true /* callerWillRestart */, true /* doit */,
                             true /* evenPersistent */, false /* setRemoved */,
                             false /* uninstalling */,
-                            ApplicationExitInfo.REASON_OTHER,
-                            ApplicationExitInfo.SUBREASON_KILL_UID,
-                            reason != null ? reason : "kill uid");
+                            reason,
+                            subReason,
+                            reasonAsString != null ? reasonAsString : "kill uid");
                 }
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
         }
+    }
+
+    @Override
+    public void killUid(int appId, int userId, String reason) {
+        killUid(appId, userId, ApplicationExitInfo.REASON_OTHER,
+                ApplicationExitInfo.SUBREASON_KILL_UID, reason);
     }
 
     @Override
@@ -8645,6 +8681,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                             Slog.i(TAG, "Skipping kill (uid is SYSTEM)");
                         } else {
                             killUid(UserHandle.getAppId(uid), UserHandle.getUserId(uid),
+                                    ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
+                                    ApplicationExitInfo.SUBREASON_EXCESSIVE_BINDER_OBJECTS,
                                     "Too many Binders sent to SYSTEM");
                             // We need to run a GC here, because killing the processes involved
                             // actually isn't guaranteed to free up the proxies; in fact, if the
