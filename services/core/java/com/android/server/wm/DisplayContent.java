@@ -522,7 +522,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     boolean mWaitingForConfig;
 
     // TODO(multi-display): remove some of the usages.
-    @VisibleForTesting
     boolean isDefaultDisplay;
 
     /** Detect user tapping outside of current focused task bounds .*/
@@ -3358,6 +3357,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             mRootWindowContainer.mTaskSupervisor
                     .getKeyguardController().onDisplayRemoved(mDisplayId);
             mWallpaperController.resetLargestDisplay(mDisplay);
+            mWmService.mDisplayWindowSettings.onDisplayRemoved(this);
         } finally {
             mDisplayReady = false;
         }
@@ -7031,5 +7031,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     int getRelativeDisplayRotation() {
         // Display is the root, so it's not rotated relative to anything.
         return Surface.ROTATION_0;
+    }
+
+    public void replaceContent(SurfaceControl sc) {
+        new Transaction().reparent(sc, getSurfaceControl())
+                .reparent(mWindowingLayer, null)
+                .reparent(mOverlayLayer, null)
+                .reparent(mA11yOverlayLayer, null)
+                .apply();
     }
 }
