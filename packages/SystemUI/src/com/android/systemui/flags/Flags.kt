@@ -61,19 +61,12 @@ object Flags {
     // TODO(b/254512538): Tracking Bug
     val INSTANT_VOICE_REPLY = unreleasedFlag(111, "instant_voice_reply")
 
-    // TODO(b/279735475): Tracking Bug
-    @JvmField
-    val NEW_LIGHT_BAR_LOGIC = releasedFlag(279735475, "new_light_bar_logic")
-
     /**
      * This flag is server-controlled and should stay as [unreleasedFlag] since we never want to
      * enable it on release builds.
      */
     val NOTIFICATION_MEMORY_LOGGING_ENABLED =
         unreleasedFlag(119, "notification_memory_logging_enabled")
-
-    // TODO(b/257315550): Tracking Bug
-    val NO_HUN_FOR_OLD_WHEN = releasedFlag(118, "no_hun_for_old_when")
 
     // TODO(b/260335638): Tracking Bug
     @JvmField
@@ -372,21 +365,9 @@ object Flags {
     // TODO(b/256614753): Tracking Bug
     val NEW_STATUS_BAR_MOBILE_ICONS = releasedFlag(606, "new_status_bar_mobile_icons")
 
-    // TODO(b/256614210): Tracking Bug
-    val NEW_STATUS_BAR_WIFI_ICON = releasedFlag(607, "new_status_bar_wifi_icon")
-
     // TODO(b/256614751): Tracking Bug
     val NEW_STATUS_BAR_MOBILE_ICONS_BACKEND =
         unreleasedFlag(608, "new_status_bar_mobile_icons_backend", teamfood = true)
-
-    // TODO(b/256613548): Tracking Bug
-    val NEW_STATUS_BAR_WIFI_ICON_BACKEND =
-        unreleasedFlag(609, "new_status_bar_wifi_icon_backend", teamfood = true)
-
-    // TODO(b/256623670): Tracking Bug
-    @JvmField
-    val BATTERY_SHIELD_ICON =
-        resourceBooleanFlag(610, R.bool.flag_battery_shield_icon, "battery_shield_icon")
 
     // TODO(b/260881289): Tracking Bug
     val NEW_STATUS_BAR_ICONS_DEBUG_COLORING =
@@ -804,4 +785,11 @@ object Flags {
     // TODO(b/285174336): Tracking Bug
     @JvmField
     val USE_REPOS_FOR_BOUNCER_SHOWING = unreleasedFlag(2900, "use_repos_for_bouncer_showing")
+
+    // 3100 - Haptic interactions
+
+    // TODO(b/290213663): Tracking Bug
+    @JvmField
+    val ONE_WAY_HAPTICS_API_MIGRATION =
+        unreleasedFlag(3100, "oneway_haptics_api_migration")
 }

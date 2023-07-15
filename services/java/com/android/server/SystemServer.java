@@ -133,7 +133,6 @@ import com.android.server.display.DisplayManagerService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
 import com.android.server.emergency.EmergencyAffordanceService;
-import com.android.server.flags.FeatureFlagsService;
 import com.android.server.gpu.GpuService;
 import com.android.server.grammaticalinflection.GrammaticalInflectionService;
 import com.android.server.graphics.fonts.FontManagerService;
@@ -444,6 +443,10 @@ public final class SystemServer implements Dumpable {
                     + "OnDevicePersonalizationSystemService$Lifecycle";
     private static final String UPDATABLE_DEVICE_CONFIG_SERVICE_CLASS =
             "com.android.server.deviceconfig.DeviceConfigInit$Lifecycle";
+    private static final String DEVICE_LOCK_SERVICE_CLASS =
+            "com.android.server.devicelock.DeviceLockService";
+    private static final String DEVICE_LOCK_APEX_PATH =
+            "/apex/com.android.devicelock/javalib/service-devicelock.jar";
 
     private static final String TETHERING_CONNECTOR_CLASS = "android.net.ITetheringConnector";
 
@@ -1112,12 +1115,6 @@ public final class SystemServer implements Dumpable {
         // therefore register the device identifier policy before the activity manager.
         t.traceBegin("DeviceIdentifiersPolicyService");
         mSystemServiceManager.startService(DeviceIdentifiersPolicyService.class);
-        t.traceEnd();
-
-        // Starts a service for reading runtime flag overrides, and keeping processes
-        // in sync with one another.
-        t.traceBegin("StartFeatureFlagsService");
-        mSystemServiceManager.startService(FeatureFlagsService.class);
         t.traceEnd();
 
         // Uri Grants Manager.
@@ -2904,6 +2901,13 @@ public final class SystemServer implements Dumpable {
         t.traceBegin("HealthConnectManagerService");
         mSystemServiceManager.startService(HEALTHCONNECT_MANAGER_SERVICE_CLASS);
         t.traceEnd();
+
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_DEVICE_LOCK)) {
+            t.traceBegin("DeviceLockService");
+            mSystemServiceManager.startServiceFromJar(DEVICE_LOCK_SERVICE_CLASS,
+                    DEVICE_LOCK_APEX_PATH);
+            t.traceEnd();
+        }
 
         // These are needed to propagate to the runnable below.
         final NetworkManagementService networkManagementF = networkManagement;
