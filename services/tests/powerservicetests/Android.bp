@@ -12,9 +12,19 @@ android_test {
 
     static_libs: [
         "frameworks-base-testutils",
+        "platform-compat-test-rules",
         "platform-test-annotations",
         "services.core",
         "servicestests-utils",
+        "testables",
+    ],
+
+    libs: [
+        "android.test.mock",
+    ],
+
+    defaults: [
+        "modules-utils-testable-device-config-defaults",
     ],
 
     platform_apis: true,
