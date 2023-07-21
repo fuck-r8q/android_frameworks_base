@@ -93,7 +93,6 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
@@ -197,7 +196,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
         mMediaOutputController = new MediaOutputController(mSpyContext, TEST_PACKAGE_NAME,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
         mLocalMediaManager = spy(mMediaOutputController.mLocalMediaManager);
         when(mLocalMediaManager.isPreferenceRouteListingExist()).thenReturn(false);
@@ -279,7 +278,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
         mMediaOutputController = new MediaOutputController(mSpyContext, null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         mMediaOutputController.start(mCb);
@@ -309,7 +308,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
         mMediaOutputController = new MediaOutputController(mSpyContext, null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         mMediaOutputController.start(mCb);
@@ -530,7 +529,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
                 "",
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
         testMediaOutputController.start(mCb);
         reset(mCb);
@@ -553,7 +552,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
                 "",
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
         testMediaOutputController.start(mCb);
         reset(mCb);
@@ -589,7 +588,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
                 null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         LocalMediaManager testLocalMediaManager = spy(testMediaOutputController.mLocalMediaManager);
@@ -606,7 +605,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
                 null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         LocalMediaManager testLocalMediaManager = spy(testMediaOutputController.mLocalMediaManager);
@@ -783,30 +782,17 @@ public class MediaOutputControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void getActiveRemoteMediaDevice_isSystemSession_returnSession() {
+    public void getActiveRemoteMediaDevices() {
         when(mRemoteSessionInfo.getId()).thenReturn(TEST_SESSION_ID);
         when(mRemoteSessionInfo.getName()).thenReturn(TEST_SESSION_NAME);
         when(mRemoteSessionInfo.getVolumeMax()).thenReturn(100);
         when(mRemoteSessionInfo.getVolume()).thenReturn(10);
         when(mRemoteSessionInfo.isSystemSession()).thenReturn(false);
         mRoutingSessionInfos.add(mRemoteSessionInfo);
-        when(mLocalMediaManager.getActiveMediaSession()).thenReturn(mRoutingSessionInfos);
+        when(mLocalMediaManager.getRemoteRoutingSessions()).thenReturn(mRoutingSessionInfos);
 
         assertThat(mMediaOutputController.getActiveRemoteMediaDevices()).containsExactly(
                 mRemoteSessionInfo);
-    }
-
-    @Test
-    public void getActiveRemoteMediaDevice_notSystemSession_returnEmpty() {
-        when(mRemoteSessionInfo.getId()).thenReturn(TEST_SESSION_ID);
-        when(mRemoteSessionInfo.getName()).thenReturn(TEST_SESSION_NAME);
-        when(mRemoteSessionInfo.getVolumeMax()).thenReturn(100);
-        when(mRemoteSessionInfo.getVolume()).thenReturn(10);
-        when(mRemoteSessionInfo.isSystemSession()).thenReturn(true);
-        mRoutingSessionInfos.add(mRemoteSessionInfo);
-        when(mLocalMediaManager.getActiveMediaSession()).thenReturn(mRoutingSessionInfos);
-
-        assertThat(mMediaOutputController.getActiveRemoteMediaDevices()).isEmpty();
     }
 
     @Test
@@ -888,7 +874,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
         mMediaOutputController = new MediaOutputController(mSpyContext, null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         assertThat(mMediaOutputController.getNotificationIcon()).isNull();
@@ -1080,7 +1066,7 @@ public class MediaOutputControllerTest extends SysuiTestCase {
                 null,
                 mMediaSessionManager, mLocalBluetoothManager, mStarter,
                 mNotifCollection, mDialogLaunchAnimator,
-                Optional.of(mNearbyMediaDevicesManager), mAudioManager, mPowerExemptionManager,
+                mNearbyMediaDevicesManager, mAudioManager, mPowerExemptionManager,
                 mKeyguardManager, mFlags, mUserTracker);
 
         testMediaOutputController.setTemporaryAllowListExceptionIfNeeded(mMediaDevice2);
