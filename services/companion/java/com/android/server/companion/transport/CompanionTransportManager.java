@@ -138,7 +138,6 @@ public class CompanionTransportManager {
 
     public void attachSystemDataTransport(String packageName, int userId, int associationId,
             ParcelFileDescriptor fd) {
-        mContext.enforceCallingOrSelfPermission(DELIVER_COMPANION_MESSAGES, TAG);
         synchronized (mTransports) {
             if (mTransports.contains(associationId)) {
                 detachSystemDataTransport(packageName, userId, associationId);
@@ -152,7 +151,6 @@ public class CompanionTransportManager {
     }
 
     public void detachSystemDataTransport(String packageName, int userId, int associationId) {
-        mContext.enforceCallingOrSelfPermission(DELIVER_COMPANION_MESSAGES, TAG);
         synchronized (mTransports) {
             final Transport transport = mTransports.get(associationId);
             if (transport != null) {
