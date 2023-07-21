@@ -271,7 +271,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // Whether to allow devices placed in vr headset viewers to have an alternative Home intent.
     static final boolean ENABLE_VR_HEADSET_HOME_CAPTURE = true;
 
+    // --------- Key behavior definitions below. ---------
+    // NOTE: When updating the valid range of any of these behaviors, and if that behavior has a
+    // Settings key associated to it for dynamic update, update its valid Settings value range in
+    // android.provider.settings.validators.GlobalSettingsValidators.
+
     // must match: config_shortPressOnPowerBehavior in config.xml
+    // The config value can be overridden using Settings.Global.POWER_BUTTON_SHORT_PRESS
     static final int SHORT_PRESS_POWER_NOTHING = 0;
     static final int SHORT_PRESS_POWER_GO_TO_SLEEP = 1;
     static final int SHORT_PRESS_POWER_REALLY_GO_TO_SLEEP = 2;
@@ -282,6 +288,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int SHORT_PRESS_POWER_DREAM_OR_SLEEP = 7;
 
     // must match: config_LongPressOnPowerBehavior in config.xml
+    // The config value can be overridden using Settings.Global.POWER_BUTTON_LONG_PRESS
     static final int LONG_PRESS_POWER_NOTHING = 0;
     static final int LONG_PRESS_POWER_GLOBAL_ACTIONS = 1;
     static final int LONG_PRESS_POWER_SHUT_OFF = 2;
@@ -290,6 +297,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int LONG_PRESS_POWER_ASSISTANT = 5; // Settings.Secure.ASSISTANT
 
     // must match: config_veryLongPresOnPowerBehavior in config.xml
+    // The config value can be overridden using Settings.Global.POWER_BUTTON_VERY_LONG_PRESS
     static final int VERY_LONG_PRESS_POWER_NOTHING = 0;
     static final int VERY_LONG_PRESS_POWER_GLOBAL_ACTIONS = 1;
 
@@ -299,6 +307,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int POWER_VOLUME_UP_BEHAVIOR_GLOBAL_ACTIONS = 2;
 
     // must match: config_doublePressOnPowerBehavior in config.xml
+    // The config value can be overridden using Settings.Global.POWER_BUTTON_DOUBLE_PRESS and/or
+    // Settings.Global.POWER_BUTTON_TRIPLE_PRESS
     static final int MULTI_PRESS_POWER_NOTHING = 0;
     static final int MULTI_PRESS_POWER_THEATER_MODE = 1;
     static final int MULTI_PRESS_POWER_BRIGHTNESS_BOOST = 2;
@@ -329,18 +339,22 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int PENDING_KEY_NULL = -1;
 
     // Must match: config_shortPressOnStemPrimaryBehavior in config.xml
+    // The config value can be overridden using Settings.Global.STEM_PRIMARY_BUTTON_SHORT_PRESS
     static final int SHORT_PRESS_PRIMARY_NOTHING = 0;
     static final int SHORT_PRESS_PRIMARY_LAUNCH_ALL_APPS = 1;
 
     // Must match: config_longPressOnStemPrimaryBehavior in config.xml
+    // The config value can be overridden using Settings.Global.STEM_PRIMARY_BUTTON_LONG_PRESS
     static final int LONG_PRESS_PRIMARY_NOTHING = 0;
     static final int LONG_PRESS_PRIMARY_LAUNCH_VOICE_ASSISTANT = 1;
 
     // Must match: config_doublePressOnStemPrimaryBehavior in config.xml
+    //The config value can be overridden using Settings.Global.STEM_PRIMARY_BUTTON_DOUBLE_PRESS
     static final int DOUBLE_PRESS_PRIMARY_NOTHING = 0;
     static final int DOUBLE_PRESS_PRIMARY_SWITCH_RECENT_APP = 1;
 
     // Must match: config_triplePressOnStemPrimaryBehavior in config.xml
+    // The config value can be overridden using Settings.Global.STEM_PRIMARY_BUTTON_TRIPLE_PRESS
     static final int TRIPLE_PRESS_PRIMARY_NOTHING = 0;
     static final int TRIPLE_PRESS_PRIMARY_TOGGLE_ACCESSIBILITY = 1;
 
@@ -607,8 +621,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // What we do when the user double-taps on home
     private int mDoubleTapOnHomeBehavior;
 
-    // Whether to lock the device after the next app transition has finished.
-    boolean mLockAfterAppTransitionFinished;
+    // Whether to lock the device after the next dreaming transition has finished.
+    private boolean mLockAfterDreamingTransitionFinished;
 
     // Allowed theater mode wake actions
     private boolean mAllowTheaterModeWakeFromKey;
@@ -828,6 +842,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Settings.Secure.SYSTEM_NAVIGATION_KEYS_ENABLED), false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.POWER_BUTTON_SHORT_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.POWER_BUTTON_DOUBLE_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.POWER_BUTTON_TRIPLE_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.POWER_BUTTON_LONG_PRESS), false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Global.getUriFor(
@@ -835,6 +858,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.POWER_BUTTON_VERY_LONG_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.STEM_PRIMARY_BUTTON_SHORT_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.STEM_PRIMARY_BUTTON_DOUBLE_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.STEM_PRIMARY_BUTTON_TRIPLE_PRESS), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.STEM_PRIMARY_BUTTON_LONG_PRESS), false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.KEY_CHORD_POWER_VOLUME_UP), false, this,
@@ -850,7 +885,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         @Override public void onChange(boolean selfChange) {
             updateSettings();
-            updateRotation(false);
         }
     }
 
@@ -1010,6 +1044,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void interceptPowerKeyUp(KeyEvent event, boolean canceled) {
+        // Inform the StatusBar; but do not allow it to consume the event.
+        sendSystemKeyToStatusBarAsync(event);
+
         final boolean handled = canceled || mPowerKeyHandled;
 
         if (!handled) {
@@ -1137,7 +1174,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         synchronized (mLock) {
             // If the setting to lock instantly on power button press is true, then set the flag to
             // lock after the dream transition has finished.
-            mLockAfterAppTransitionFinished =
+            mLockAfterDreamingTransitionFinished =
                     mLockPatternUtils.getPowerButtonInstantlyLocks(mCurrentUserId);
         }
 
@@ -2225,21 +2262,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mLongPressOnBackBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnBackBehavior);
 
-        mShortPressOnPowerBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_shortPressOnPowerBehavior);
         mLongPressOnPowerBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnPowerBehavior);
         mLongPressOnPowerAssistantTimeoutMs = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnPowerDurationMs);
         mVeryLongPressOnPowerBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_veryLongPressOnPowerBehavior);
-        mDoublePressOnPowerBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_doublePressOnPowerBehavior);
         mPowerDoublePressTargetActivity = ComponentName.unflattenFromString(
             mContext.getResources().getString(
                 com.android.internal.R.string.config_doublePressOnPowerTargetActivity));
-        mTriplePressOnPowerBehavior = mContext.getResources().getInteger(
-                com.android.internal.R.integer.config_triplePressOnPowerBehavior);
         mShortPressOnSleepBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_shortPressOnSleepBehavior);
         mAllowStartActivityForLongPressOnPowerDuringSetup = mContext.getResources().getBoolean(
@@ -2329,20 +2360,22 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         true /* notifyOccluded */);
 
                 synchronized (mLock) {
-                    mLockAfterAppTransitionFinished = false;
+                    mLockAfterDreamingTransitionFinished = false;
                 }
             }
 
             @Override
             public void onAppTransitionFinishedLocked(IBinder token) {
                 synchronized (mLock) {
-                    if (!mLockAfterAppTransitionFinished) {
-                        return;
+                    final DreamManagerInternal dreamManagerInternal = getDreamManagerInternal();
+                    // check both isDreaming and mLockAfterDreamingTransitionFinished before lockNow
+                    // so it won't relock after dreaming has stopped
+                    if (dreamManagerInternal != null && dreamManagerInternal.isDreaming()
+                            && mLockAfterDreamingTransitionFinished) {
+                        lockNow(null);
                     }
-                    mLockAfterAppTransitionFinished = false;
+                    mLockAfterDreamingTransitionFinished = false;
                 }
-
-                lockNow(null);
             }
         });
 
@@ -2711,6 +2744,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 updateRotation = true;
             }
 
+            mShortPressOnPowerBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.POWER_BUTTON_SHORT_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_shortPressOnPowerBehavior));
+            mDoublePressOnPowerBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.POWER_BUTTON_DOUBLE_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_doublePressOnPowerBehavior));
+            mTriplePressOnPowerBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.POWER_BUTTON_TRIPLE_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_triplePressOnPowerBehavior));
+
             final int longPressOnPowerBehavior = Settings.Global.getInt(resolver,
                     Settings.Global.POWER_BUTTON_LONG_PRESS,
                     mContext.getResources().getInteger(
@@ -2735,6 +2781,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Settings.Global.KEY_CHORD_POWER_VOLUME_UP,
                     mContext.getResources().getInteger(
                             com.android.internal.R.integer.config_keyChordPowerVolumeUp));
+
+            mShortPressOnStemPrimaryBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.STEM_PRIMARY_BUTTON_SHORT_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_shortPressOnStemPrimaryBehavior));
+            mDoublePressOnStemPrimaryBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.STEM_PRIMARY_BUTTON_DOUBLE_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer
+                                    .config_doublePressOnStemPrimaryBehavior));
+            mTriplePressOnStemPrimaryBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.STEM_PRIMARY_BUTTON_TRIPLE_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer
+                                    .config_triplePressOnStemPrimaryBehavior));
+            mLongPressOnStemPrimaryBehavior = Settings.Global.getInt(resolver,
+                    Settings.Global.STEM_PRIMARY_BUTTON_LONG_PRESS,
+                    mContext.getResources().getInteger(
+                            com.android.internal.R.integer.config_longPressOnStemPrimaryBehavior));
 
             mStylusButtonsEnabled = Settings.Secure.getIntForUser(resolver,
                     Secure.STYLUS_BUTTONS_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
@@ -3117,6 +3182,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_I:
                 if (down && event.isMetaPressed()) {
                     showSystemSettings();
+                    return key_consumed;
+                }
+                break;
+            case KeyEvent.KEYCODE_L:
+                if (down && event.isMetaPressed() && repeatCount == 0) {
+                    lockNow(null /* options */);
                     return key_consumed;
                 }
                 break;
@@ -4538,6 +4609,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_MACRO_4:
                 result &= ~ACTION_PASS_TO_USER;
                 break;
+            case KeyEvent.KEYCODE_STEM_PRIMARY:
+                sendSystemKeyToStatusBarAsync(event);
+                break;
         }
 
         if (useHapticFeedback) {
@@ -4708,7 +4782,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if ((policyFlags & FLAG_WAKE) != 0) {
             if (wakeUp(whenNanos / 1000000, mAllowTheaterModeWakeFromMotion,
                     PowerManager.WAKE_REASON_WAKE_MOTION, "android.policy:MOTION")) {
-                return 0;
+                // Woke up. Pass motion events to user.
+                return ACTION_PASS_TO_USER;
             }
         }
 
@@ -4720,8 +4795,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // there will be no dream to intercept the touch and wake into ambient.  The device should
         // wake up in this case.
         if (isTheaterModeEnabled() && (policyFlags & FLAG_WAKE) != 0) {
-            wakeUp(whenNanos / 1000000, mAllowTheaterModeWakeFromMotionWhenNotDreaming,
-                    PowerManager.WAKE_REASON_WAKE_MOTION, "android.policy:MOTION");
+            if (wakeUp(whenNanos / 1000000, mAllowTheaterModeWakeFromMotionWhenNotDreaming,
+                    PowerManager.WAKE_REASON_WAKE_MOTION, "android.policy:MOTION")) {
+                // Woke up. Pass motion events to user.
+                return ACTION_PASS_TO_USER;
+            }
         }
 
         return 0;
@@ -4737,28 +4815,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean displayOff = (display == null
                 || display.getState() == STATE_OFF);
 
-        if (displayOff && !mHasFeatureWatch) {
+        if (displayOff) {
             return false;
         }
 
         // Send events to keyguard while the screen is on and it's showing.
-        if (isKeyguardShowingAndNotOccluded() && !displayOff) {
+        if (isKeyguardShowingAndNotOccluded()) {
             return true;
-        }
-
-        // Watches handle BACK and hardware buttons specially
-        if (mHasFeatureWatch && (keyCode == KeyEvent.KEYCODE_BACK
-                || keyCode == KeyEvent.KEYCODE_STEM_PRIMARY
-                || keyCode == KeyEvent.KEYCODE_STEM_1
-                || keyCode == KeyEvent.KEYCODE_STEM_2
-                || keyCode == KeyEvent.KEYCODE_STEM_3)) {
-            return false;
         }
 
         // TODO(b/123372519): Refine when dream can support multi display.
         if (isDefaultDisplay) {
-            // Send events to a dozing dream even if the screen is off since the dream
-            // is in control of the state of the screen.
+            // Send events to a dozing dream since the dream is in control of the state of the
+            // screen.
             IDreamManager dreamManager = getDreamManager();
 
             try {
@@ -5953,7 +6022,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case HapticFeedbackConstants.CONTEXT_CLICK:
             case HapticFeedbackConstants.GESTURE_END:
             case HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE:
-            case HapticFeedbackConstants.ROTARY_SCROLL_TICK:
+            case HapticFeedbackConstants.SCROLL_TICK:
             case HapticFeedbackConstants.SEGMENT_TICK:
                 return VibrationEffect.get(VibrationEffect.EFFECT_TICK);
 
@@ -5978,8 +6047,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case HapticFeedbackConstants.CALENDAR_DATE:
             case HapticFeedbackConstants.CONFIRM:
             case HapticFeedbackConstants.GESTURE_START:
-            case HapticFeedbackConstants.ROTARY_SCROLL_ITEM_FOCUS:
-            case HapticFeedbackConstants.ROTARY_SCROLL_LIMIT:
+            case HapticFeedbackConstants.SCROLL_ITEM_FOCUS:
+            case HapticFeedbackConstants.SCROLL_LIMIT:
                 return VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
 
             case HapticFeedbackConstants.LONG_PRESS:
@@ -6057,9 +6126,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 return PHYSICAL_EMULATION_VIBRATION_ATTRIBUTES;
             case HapticFeedbackConstants.ASSISTANT_BUTTON:
             case HapticFeedbackConstants.LONG_PRESS_POWER_BUTTON:
-            case HapticFeedbackConstants.ROTARY_SCROLL_TICK:
-            case HapticFeedbackConstants.ROTARY_SCROLL_ITEM_FOCUS:
-            case HapticFeedbackConstants.ROTARY_SCROLL_LIMIT:
+            case HapticFeedbackConstants.SCROLL_TICK:
+            case HapticFeedbackConstants.SCROLL_ITEM_FOCUS:
+            case HapticFeedbackConstants.SCROLL_LIMIT:
                 return HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES;
             default:
                 return TOUCH_VIBRATION_ATTRIBUTES;

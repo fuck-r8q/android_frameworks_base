@@ -190,7 +190,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private Executor mExecutor;
     private AccessPointController mAccessPointController;
     private IntentFilter mConnectionStateFilter;
-    private InternetDialogCallback mCallback;
+    @VisibleForTesting
+    @Nullable
+    InternetDialogCallback mCallback;
     private UiEventLogger mUiEventLogger;
     private BroadcastDispatcher mBroadcastDispatcher;
     private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -269,12 +271,16 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             new KeyguardUpdateMonitorCallback() {
                 @Override
                 public void onRefreshCarrierInfo() {
-                    mCallback.onRefreshCarrierInfo();
+                    if (mCallback != null) {
+                        mCallback.onRefreshCarrierInfo();
+                    }
                 }
 
                 @Override
                 public void onSimStateChanged(int subId, int slotId, int simState) {
-                    mCallback.onSimStateChanged();
+                    if (mCallback != null) {
+                        mCallback.onSimStateChanged();
+                    }
                 }
             };
 
@@ -395,9 +401,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mKeyguardUpdateMonitor.removeCallback(mKeyguardUpdateCallback);
         mConnectivityManager.unregisterNetworkCallback(mConnectivityManagerNetworkCallback);
         mConnectedWifiInternetMonitor.unregisterCallback();
-        if (mIsExtTelServiceConnected) {
-            mExtTelephonyManager.disconnectService(mExtTelServiceCallback);
-        }
+        mCallback = null;
     }
 
     @VisibleForTesting
@@ -801,7 +805,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         ActivityLaunchAnimator.Controller controller =
                 mDialogLaunchAnimator.createActivityLaunchController(view);
 
-        if (controller == null) {
+        if (controller == null && mCallback != null) {
             mCallback.dismissDialog();
         }
 
@@ -1193,7 +1197,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             mHasWifiEntries = false;
         }
 
-        mCallback.onAccessPointsChanged(wifiEntries, connectedEntry, hasMoreWifiEntries);
+        if (mCallback != null) {
+            mCallback.onAccessPointsChanged(wifiEntries, connectedEntry, hasMoreWifiEntries);
+        }
     }
 
     @Override
@@ -1282,34 +1288,46 @@ public class InternetDialogController implements AccessPointController.AccessPoi
 
         @Override
         public void onServiceStateChanged(@NonNull ServiceState serviceState) {
-            mCallback.onServiceStateChanged(serviceState);
+            if (mCallback != null) {
+                mCallback.onServiceStateChanged(serviceState);
+            }
         }
 
         @Override
         public void onDataConnectionStateChanged(int state, int networkType) {
-            mCallback.onDataConnectionStateChanged(state, networkType);
+            if (mCallback != null) {
+                mCallback.onDataConnectionStateChanged(state, networkType);
+            }
         }
 
         @Override
         public void onSignalStrengthsChanged(@NonNull SignalStrength signalStrength) {
-            mCallback.onSignalStrengthsChanged(signalStrength);
+            if (mCallback != null) {
+                mCallback.onSignalStrengthsChanged(signalStrength);
+            }
         }
 
         @Override
         public void onDisplayInfoChanged(@NonNull TelephonyDisplayInfo telephonyDisplayInfo) {
             mSubIdTelephonyDisplayInfoMap.put(mSubId, telephonyDisplayInfo);
-            mCallback.onDisplayInfoChanged(telephonyDisplayInfo);
+            if (mCallback != null) {
+                mCallback.onDisplayInfoChanged(telephonyDisplayInfo);
+            }
         }
 
         @Override
         public void onUserMobileDataStateChanged(boolean enabled) {
-            mCallback.onUserMobileDataStateChanged(enabled);
+            if (mCallback != null) {
+                mCallback.onUserMobileDataStateChanged(enabled);
+            }
         }
 
         @Override
         public void onCarrierNetworkChange(boolean active) {
             mCarrierNetworkChangeMode = active;
-            mCallback.onCarrierNetworkChange(active);
+            if (mCallback != null) {
+                mCallback.onCarrierNetworkChange(active);
+            }
         }
 
         @Override
@@ -1354,14 +1372,18 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                 scanWifiAccessPoints();
             }
             // update UI
-            mCallback.onCapabilitiesChanged(network, capabilities);
+            if (mCallback != null) {
+                mCallback.onCapabilitiesChanged(network, capabilities);
+            }
         }
 
         @Override
         @WorkerThread
         public void onLost(@NonNull Network network) {
             mHasEthernet = false;
-            mCallback.onLost(network);
+            if (mCallback != null) {
+                mCallback.onLost(network);
+            }
         }
     }
 

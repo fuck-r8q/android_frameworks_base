@@ -79,9 +79,9 @@ import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.render.GroupExpansionManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
+import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.FooterView;
-import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
@@ -111,7 +111,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     private AmbientState mAmbientState;
     private TestableResources mTestableResources;
     @Rule public MockitoRule mockito = MockitoJUnit.rule();
-    @Mock private CentralSurfaces mCentralSurfaces;
+    @Mock private NotificationsController mNotificationsController;
     @Mock private SysuiStatusBarStateController mBarState;
     @Mock private GroupMembershipManager mGroupMembershipManger;
     @Mock private GroupExpansionManager mGroupExpansionManager;
@@ -177,7 +177,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
                 mNotificationStackSizeCalculator);
         mStackScroller = spy(mStackScrollerInternal);
         mStackScroller.setShelfController(notificationShelfController);
-        mStackScroller.setCentralSurfaces(mCentralSurfaces);
+        mStackScroller.setNotificationsController(mNotificationsController);
         mStackScroller.setEmptyShadeView(mEmptyShadeView);
         when(mStackScrollLayoutController.isHistoryEnabled()).thenReturn(true);
         when(mStackScrollLayoutController.getNotificationRoundnessManager())

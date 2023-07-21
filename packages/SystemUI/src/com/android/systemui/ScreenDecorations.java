@@ -71,6 +71,7 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.decor.CutoutDecorProviderFactory;
+import com.android.systemui.decor.DebugRoundedCornerDelegate;
 import com.android.systemui.decor.DecorProvider;
 import com.android.systemui.decor.DecorProviderFactory;
 import com.android.systemui.decor.DecorProviderKt;
@@ -78,14 +79,12 @@ import com.android.systemui.decor.FaceScanningProviderFactory;
 import com.android.systemui.decor.OverlayWindow;
 import com.android.systemui.decor.PrivacyDotDecorProviderFactory;
 import com.android.systemui.decor.RoundedCornerDecorProviderFactory;
-import com.android.systemui.decor.RoundedCornerResDelegate;
+import com.android.systemui.decor.RoundedCornerResDelegateImpl;
 import com.android.systemui.log.ScreenDecorationsLogger;
 import com.android.systemui.qs.SettingObserver;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
-import com.android.systemui.tuner.TunerService;
-import com.android.systemui.tuner.TunerService.Tunable;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.concurrency.ThreadFactory;
 import com.android.systemui.util.settings.SecureSettings;
@@ -105,12 +104,10 @@ import javax.inject.Inject;
  * for antialiasing and emulation purposes.
  */
 @SysUISingleton
-public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
-    private static final boolean DEBUG = false;
+public class ScreenDecorations implements CoreStartable, Dumpable {
+    private static final boolean DEBUG_LOGGING = false;
     private static final String TAG = "ScreenDecorations";
 
-    public static final String SIZE = "sysui_rounded_size";
-    public static final String PADDING = "sysui_rounded_content_padding";
     // Provide a way for factory to disable ScreenDecorations to run the Display tests.
     private static final boolean DEBUG_DISABLE_SCREEN_DECORATIONS =
             SystemProperties.getBoolean("debug.disable_screen_decorations", false);
@@ -120,8 +117,8 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
     private static int mDisableRoundedCorner =
             SystemProperties.getInt("vendor.display.disable_rounded_corner", 0);
 
-    private static final boolean VERBOSE = false;
-    static final boolean DEBUG_COLOR = DEBUG_SCREENSHOT_ROUNDED_CORNERS;
+    private boolean mDebug = DEBUG_SCREENSHOT_ROUNDED_CORNERS;
+    private int mDebugColor = Color.RED;
 
     private static final int[] DISPLAY_CUTOUT_IDS = {
             R.id.display_cutout,
@@ -138,7 +135,6 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
     protected boolean mIsRegistered;
     private final Context mContext;
     private final Executor mMainExecutor;
-    private final TunerService mTunerService;
     private final SecureSettings mSecureSettings;
     @VisibleForTesting
     DisplayTracker.Callback mDisplayListener;
@@ -151,9 +147,13 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
     public final int mFaceScanningViewId;
 
     @VisibleForTesting
-    protected RoundedCornerResDelegate mRoundedCornerResDelegate;
+    protected RoundedCornerResDelegateImpl mRoundedCornerResDelegate;
     @VisibleForTesting
     protected DecorProviderFactory mRoundedCornerFactory;
+    @VisibleForTesting
+    protected DebugRoundedCornerDelegate mDebugRoundedCornerDelegate =
+            new DebugRoundedCornerDelegate();
+    protected DecorProviderFactory mDebugRoundedCornerFactory;
     private CutoutDecorProviderFactory mCutoutFactory;
     private int mProviderRefreshToken = 0;
     @VisibleForTesting
@@ -319,7 +319,6 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
     public ScreenDecorations(Context context,
             @Main Executor mainExecutor,
             SecureSettings secureSettings,
-            TunerService tunerService,
             UserTracker userTracker,
             DisplayTracker displayTracker,
             PrivacyDotViewController dotViewController,
@@ -331,7 +330,6 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         mContext = context;
         mMainExecutor = mainExecutor;
         mSecureSettings = secureSettings;
-        mTunerService = tunerService;
         mUserTracker = userTracker;
         mDisplayTracker = displayTracker;
         mDotViewController = dotViewController;
@@ -369,16 +367,47 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         mAuthController.addCallback(mAuthControllerCallback);
     }
 
+    /**
+     * Change the value of {@link ScreenDecorations#mDebug}. This operation is heavyweight, since
+     * it requires essentially re-init-ing this screen decorations process with the debug
+     * information taken into account.
+     */
+    @VisibleForTesting
+    protected void setDebug(boolean debug) {
+        if (mDebug == debug) {
+            return;
+        }
+
+        mDebug = debug;
+        if (!mDebug) {
+            mDebugRoundedCornerDelegate.removeDebugState();
+        }
+
+        mExecutor.execute(() -> {
+            // Re-trigger all of the screen decorations setup here so that the debug values
+            // can be picked up
+            removeAllOverlays();
+            removeHwcOverlay();
+            startOnScreenDecorationsThread();
+            updateColorInversionDefault();
+        });
+    }
+
     private boolean isPrivacyDotEnabled() {
         return mDotFactory.getHasProviders();
     }
 
     @NonNull
-    private List<DecorProvider> getProviders(boolean hasHwLayer) {
+    @VisibleForTesting
+    protected List<DecorProvider> getProviders(boolean hasHwLayer) {
         List<DecorProvider> decorProviders = new ArrayList<>(mDotFactory.getProviders());
         decorProviders.addAll(mFaceScanningFactory.getProviders());
         if (!hasHwLayer) {
-            decorProviders.addAll(mRoundedCornerFactory.getProviders());
+            if (mDebug && mDebugRoundedCornerFactory.getHasProviders()) {
+                decorProviders.addAll(mDebugRoundedCornerFactory.getProviders());
+            } else {
+                decorProviders.addAll(mRoundedCornerFactory.getProviders());
+            }
             decorProviders.addAll(mCutoutFactory.getProviders());
         }
         return decorProviders;
@@ -420,11 +449,13 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         mDisplayMode = mDisplayInfo.getMode();
         mDisplayUniqueId = mDisplayInfo.uniqueId;
         mDisplayCutout = mDisplayInfo.displayCutout;
-        mRoundedCornerResDelegate = new RoundedCornerResDelegate(mContext.getResources(),
-                mDisplayUniqueId);
+        mRoundedCornerResDelegate =
+                new RoundedCornerResDelegateImpl(mContext.getResources(), mDisplayUniqueId);
         mRoundedCornerResDelegate.setPhysicalPixelDisplaySizeRatio(
                 getPhysicalPixelDisplaySizeRatio());
         mRoundedCornerFactory = new RoundedCornerDecorProviderFactory(mRoundedCornerResDelegate);
+        mDebugRoundedCornerFactory =
+                new RoundedCornerDecorProviderFactory(mDebugRoundedCornerDelegate);
         mCutoutFactory = getCutoutFactory();
         mHwcScreenDecorationSupport = mContext.getDisplay().getDisplayDecorationSupport();
         updateHwLayerRoundedCornerDrawable();
@@ -448,15 +479,12 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
                     // - we are trying to redraw. This because WM resized our window and told us to.
                     // - the config change has been dispatched, so WM is no longer deferring layout.
                     mPendingConfigChange = true;
-                    if (DEBUG) {
-                        if (mRotation != newRotation) {
-                            Log.i(TAG, "Rotation changed, deferring " + newRotation
-                                            + ", staying at " + mRotation);
-                        }
-                        if (displayModeChanged(mDisplayMode, newDisplayMode)) {
-                            Log.i(TAG, "Resolution changed, deferring " + newDisplayMode
-                                    + ", staying at " + mDisplayMode);
-                        }
+                    if (mRotation != newRotation) {
+                        mLogger.logRotationChangeDeferred(mRotation, newRotation);
+                    }
+                    if (displayModeChanged(mDisplayMode, newDisplayMode)) {
+                        mLogger.logDisplayModeChanged(
+                                newDisplayMode.getModeId(), mDisplayMode.getModeId());
                     }
 
                     if (mOverlays != null) {
@@ -612,12 +640,6 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
                 return;
             }
 
-            mMainExecutor.execute(() -> {
-                Trace.beginSection("ScreenDecorations#addTunable");
-                mTunerService.addTunable(this, SIZE);
-                Trace.endSection();
-            });
-
             // Watch color inversion and invert the overlay as needed.
             if (mColorInversionSetting == null) {
                 mColorInversionSetting = new SettingObserver(mSecureSettings, mHandler,
@@ -636,12 +658,6 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             mUserTracker.addCallback(mUserChangedCallback, mExecutor);
             mIsRegistered = true;
         } else {
-            mMainExecutor.execute(() -> {
-                Trace.beginSection("ScreenDecorations#removeTunable");
-                mTunerService.removeTunable(this);
-                Trace.endSection();
-            });
-
             if (mColorInversionSetting != null) {
                 mColorInversionSetting.setListening(false);
             }
@@ -781,7 +797,8 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         }
         mScreenDecorHwcWindow = (ViewGroup) LayoutInflater.from(mContext).inflate(
                 R.layout.screen_decor_hwc_layer, null);
-        mScreenDecorHwcLayer = new ScreenDecorHwcLayer(mContext, mHwcScreenDecorationSupport);
+        mScreenDecorHwcLayer =
+                new ScreenDecorHwcLayer(mContext, mHwcScreenDecorationSupport, mDebug);
         mScreenDecorHwcWindow.addView(mScreenDecorHwcLayer, new FrameLayout.LayoutParams(
                 MATCH_PARENT, MATCH_PARENT, Gravity.TOP | Gravity.START));
         mWindowManager.addView(mScreenDecorHwcWindow, getHwcWindowLayoutParams());
@@ -829,7 +846,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         lp.height = MATCH_PARENT;
         lp.setTitle("ScreenDecorHwcOverlay");
         lp.gravity = Gravity.TOP | Gravity.START;
-        if (!DEBUG_COLOR) {
+        if (!mDebug) {
             lp.setColorMode(ActivityInfo.COLOR_MODE_A8);
         }
         return lp;
@@ -937,19 +954,42 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             new UserTracker.Callback() {
                 @Override
                 public void onUserChanged(int newUser, @NonNull Context userContext) {
-                    if (DEBUG) {
-                        Log.d(TAG, "UserSwitched newUserId=" + newUser);
-                    }
+                    mLogger.logUserSwitched(newUser);
                     // update color inversion setting to the new user
                     mColorInversionSetting.setUserId(newUser);
                     updateColorInversion(mColorInversionSetting.getValue());
                 }
             };
 
+    /**
+     * Use the current value of {@link ScreenDecorations#mColorInversionSetting} and passes it
+     * to {@link ScreenDecorations#updateColorInversion}
+     */
+    private void updateColorInversionDefault() {
+        int inversion = 0;
+        if (mColorInversionSetting != null) {
+            inversion = mColorInversionSetting.getValue();
+        }
+
+        updateColorInversion(inversion);
+    }
+
+    /**
+     * Update the tint color of screen decoration assets. Defaults to Color.BLACK. In the case of
+     * a color inversion being set, use Color.WHITE (which inverts to black).
+     *
+     * When {@link ScreenDecorations#mDebug} is {@code true}, this value is updated to use
+     * {@link ScreenDecorations#mDebugColor}, and does not handle inversion.
+     *
+     * @param colorsInvertedValue if non-zero, assume that colors are inverted, and use Color.WHITE
+     *                            for screen decoration tint
+     */
     private void updateColorInversion(int colorsInvertedValue) {
         mTintColor = colorsInvertedValue != 0 ? Color.WHITE : Color.BLACK;
-        if (DEBUG_COLOR) {
-            mTintColor = Color.RED;
+        if (mDebug) {
+            mTintColor = mDebugColor;
+            mDebugRoundedCornerDelegate.setColor(mTintColor);
+            //TODO(b/285941724): update the hwc layer color here too (or disable it in debug mode)
         }
 
         updateOverlayProviderViews(new Integer[] {
@@ -990,7 +1030,9 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             int oldRotation = mRotation;
             mPendingConfigChange = false;
             updateConfiguration();
-            if (DEBUG) Log.i(TAG, "onConfigChanged from rot " + oldRotation + " to " + mRotation);
+            if (oldRotation != mRotation) {
+                mLogger.logRotationChanged(oldRotation, mRotation);
+            }
             setupDecorations();
             if (mOverlays != null) {
                 // Updating the layout params ensures that ViewRootImpl will call relayoutWindow(),
@@ -1020,6 +1062,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         if (DEBUG_DISABLE_SCREEN_DECORATIONS) {
             return;
         }
+        ipw.println("mDebug:" + mDebug);
 
         ipw.println("mIsPrivacyDotEnabled:" + isPrivacyDotEnabled());
         ipw.println("shouldOptimizeOverlayVisibility:" + shouldOptimizeVisibility());
@@ -1075,6 +1118,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             }
         }
         mRoundedCornerResDelegate.dump(pw, args);
+        mDebugRoundedCornerDelegate.dump(pw);
     }
 
     @VisibleForTesting
@@ -1097,8 +1141,9 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             mRotation = newRotation;
             mDisplayMode = newMod;
             mDisplayCutout = newCutout;
-            mRoundedCornerResDelegate.setPhysicalPixelDisplaySizeRatio(
-                    getPhysicalPixelDisplaySizeRatio());
+            float ratio = getPhysicalPixelDisplaySizeRatio();
+            mRoundedCornerResDelegate.setPhysicalPixelDisplaySizeRatio(ratio);
+            mDebugRoundedCornerDelegate.setPhysicalPixelDisplaySizeRatio(ratio);
             if (mScreenDecorHwcLayer != null) {
                 mScreenDecorHwcLayer.pendingConfigChange = false;
                 mScreenDecorHwcLayer.updateConfiguration(mDisplayUniqueId);
@@ -1121,7 +1166,8 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
     }
 
     private boolean hasRoundedCorners() {
-        return mRoundedCornerFactory.getHasProviders();
+        return mRoundedCornerFactory.getHasProviders()
+                || mDebugRoundedCornerFactory.getHasProviders();
     }
 
     private boolean shouldOptimizeVisibility() {
@@ -1178,41 +1224,17 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         Trace.endSection();
     }
 
-    @Override
-    public void onTuningChanged(String key, String newValue) {
-        if (DEBUG_DISABLE_SCREEN_DECORATIONS) {
-            Log.i(TAG, "ScreenDecorations is disabled");
-            return;
-        }
-        mExecutor.execute(() -> {
-            if (mOverlays == null || !SIZE.equals(key)) {
-                return;
-            }
-            Trace.beginSection("ScreenDecorations#onTuningChanged");
-            try {
-                final int sizeFactor = Integer.parseInt(newValue);
-                mRoundedCornerResDelegate.setTuningSizeFactor(sizeFactor);
-            } catch (NumberFormatException e) {
-                mRoundedCornerResDelegate.setTuningSizeFactor(null);
-            }
-            updateOverlayProviderViews(new Integer[] {
-                    R.id.rounded_corner_top_left,
-                    R.id.rounded_corner_top_right,
-                    R.id.rounded_corner_bottom_left,
-                    R.id.rounded_corner_bottom_right
-            });
-            updateHwLayerRoundedCornerExistAndSize();
-            Trace.endSection();
-        });
-    }
-
     private void updateHwLayerRoundedCornerDrawable() {
         if (mScreenDecorHwcLayer == null) {
             return;
         }
 
-        final Drawable topDrawable = mRoundedCornerResDelegate.getTopRoundedDrawable();
-        final Drawable bottomDrawable = mRoundedCornerResDelegate.getBottomRoundedDrawable();
+        Drawable topDrawable = mRoundedCornerResDelegate.getTopRoundedDrawable();
+        Drawable bottomDrawable = mRoundedCornerResDelegate.getBottomRoundedDrawable();
+        if (mDebug && (mDebugRoundedCornerFactory.getHasProviders())) {
+            topDrawable = mDebugRoundedCornerDelegate.getTopRoundedDrawable();
+            bottomDrawable = mDebugRoundedCornerDelegate.getBottomRoundedDrawable();
+        }
 
         if (topDrawable == null || bottomDrawable == null) {
             return;
@@ -1224,11 +1246,19 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
         if (mScreenDecorHwcLayer == null) {
             return;
         }
-        mScreenDecorHwcLayer.updateRoundedCornerExistenceAndSize(
-                mRoundedCornerResDelegate.getHasTop(),
-                mRoundedCornerResDelegate.getHasBottom(),
-                mRoundedCornerResDelegate.getTopRoundedSize().getWidth(),
-                mRoundedCornerResDelegate.getBottomRoundedSize().getWidth());
+        if (mDebug && mDebugRoundedCornerFactory.getHasProviders()) {
+            mScreenDecorHwcLayer.updateRoundedCornerExistenceAndSize(
+                    mDebugRoundedCornerDelegate.getHasTop(),
+                    mDebugRoundedCornerDelegate.getHasBottom(),
+                    mDebugRoundedCornerDelegate.getTopRoundedSize().getWidth(),
+                    mDebugRoundedCornerDelegate.getBottomRoundedSize().getWidth());
+        } else {
+            mScreenDecorHwcLayer.updateRoundedCornerExistenceAndSize(
+                    mRoundedCornerResDelegate.getHasTop(),
+                    mRoundedCornerResDelegate.getHasBottom(),
+                    mRoundedCornerResDelegate.getTopRoundedSize().getWidth(),
+                    mRoundedCornerResDelegate.getBottomRoundedSize().getWidth());
+        }
     }
 
     @VisibleForTesting
@@ -1255,7 +1285,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
 
             paint.setColor(mColor);
             paint.setStyle(Paint.Style.FILL);
-            if (DEBUG) {
+            if (DEBUG_LOGGING) {
                 getViewTreeObserver().addOnDrawListener(() -> Log.i(TAG,
                         getWindowTitleByPos(pos) + " drawn in rot " + mRotation));
             }
@@ -1448,7 +1478,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             mView.getViewTreeObserver().removeOnPreDrawListener(this);
             if (mTargetRotation == mRotation
                     && !displayModeChanged(mDisplayMode, mTargetDisplayMode)) {
-                if (DEBUG) {
+                if (DEBUG_LOGGING) {
                     final String title = mPosition < 0 ? "ScreenDecorHwcLayer"
                             : getWindowTitleByPos(mPosition);
                     Log.i(TAG, title + " already in target rot "
@@ -1464,7 +1494,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             // This changes the window attributes - we need to restart the traversal for them to
             // take effect.
             updateConfiguration();
-            if (DEBUG) {
+            if (DEBUG_LOGGING) {
                 final String title = mPosition < 0 ? "ScreenDecorHwcLayer"
                         : getWindowTitleByPos(mPosition);
                 Log.i(TAG, title
@@ -1499,7 +1529,7 @@ public class ScreenDecorations implements CoreStartable, Tunable , Dumpable {
             final Display.Mode displayMode = mDisplayInfo.getMode();
             if ((displayRotation != mRotation || displayModeChanged(mDisplayMode, displayMode))
                     && !mPendingConfigChange) {
-                if (DEBUG) {
+                if (DEBUG_LOGGING) {
                     if (displayRotation != mRotation) {
                         Log.i(TAG, "Drawing rot " + mRotation + ", but display is at rot "
                                 + displayRotation + ". Restarting draw");

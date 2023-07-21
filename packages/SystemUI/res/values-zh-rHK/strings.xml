@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"音訊"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"耳機"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"輸入"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"助聽器"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"助聽器"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"正在開啟…"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"自動旋轉"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"自動旋轉螢幕"</string>
@@ -1046,6 +1046,7 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"讀取電池計量器時發生問題"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"輕按即可瞭解詳情"</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"未設定鬧鐘"</string>
+    <string name="accessibility_bouncer" msgid="5896923685673320070">"輸入螢幕鎖定憑證"</string>
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"指紋感應器"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"驗證"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"進入裝置"</string>
@@ -1108,10 +1109,8 @@
     <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"「Google 助理」正在聆聽"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# 則通知}other{# 則通知}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>，<xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
-    <!-- no translation found for note_task_button_label (230135078402003532) -->
-    <skip />
-    <!-- no translation found for note_task_shortcut_long_label (7729325091147319409) -->
-    <skip />
+    <string name="note_task_button_label" msgid="230135078402003532">"做筆記"</string>
+    <string name="note_task_shortcut_long_label" msgid="7729325091147319409">"做筆記，<xliff:g id="NOTE_TAKING_APP">%1$s</xliff:g>"</string>
     <string name="broadcasting_description_is_broadcasting" msgid="765627502786404290">"廣播"</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="3605428497924077811">"要停止廣播「<xliff:g id="APP_NAME">%1$s</xliff:g>」的內容嗎？"</string>
     <string name="bt_le_audio_broadcast_dialog_sub_title" msgid="7889684551194225793">"如要廣播「<xliff:g id="SWITCHAPP">%1$s</xliff:g>」的內容或變更輸出來源，系統就會停止廣播目前的內容"</string>
@@ -1127,12 +1126,18 @@
     <string name="log_access_confirmation_learn_more" msgid="3134565480986328004">"瞭解詳情"</string>
     <string name="log_access_confirmation_learn_more_at" msgid="5635666259505215905">"詳情請瀏覽 <xliff:g id="URL">%s</xliff:g>"</string>
     <string name="keyguard_affordance_enablement_dialog_action_template" msgid="8164857863036314664">"開啟「<xliff:g id="APPNAME">%1$s</xliff:g>」"</string>
-    <string name="wallet_quick_affordance_unavailable_install_the_app" msgid="7298552910007208368">"如要將「錢包」應用程式新增為捷徑，請確認已安裝該應用程式"</string>
-    <string name="wallet_quick_affordance_unavailable_configure_the_app" msgid="4387433357429873258">"如要將「錢包」應用程式新增為捷徑，請確認已新增至少一張付款卡"</string>
-    <string name="qr_scanner_quick_affordance_unavailable_explanation" msgid="3049582306241150946">"如要將 QR 碼掃瞄器新增為捷徑，請確認已安裝相機應用程式"</string>
-    <string name="home_quick_affordance_unavailable_install_the_app" msgid="6187820778998446168">"如要將 Home 應用程式新增為捷徑，請確認已安裝該應用程式"</string>
-    <string name="home_quick_affordance_unavailable_configure_the_app" msgid="7953595390775156839">"• 至少一部裝置可用"</string>
-    <string name="notes_app_quick_affordance_unavailable_explanation" msgid="4796955161600178530">"選取預設的筆記應用程式，即可使用筆記捷徑"</string>
+    <!-- no translation found for wallet_quick_affordance_unavailable_install_the_app (7298552910007208368) -->
+    <skip />
+    <!-- no translation found for wallet_quick_affordance_unavailable_configure_the_app (4387433357429873258) -->
+    <skip />
+    <!-- no translation found for qr_scanner_quick_affordance_unavailable_explanation (3049582306241150946) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_install_the_app (6187820778998446168) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_configure_the_app (7953595390775156839) -->
+    <skip />
+    <!-- no translation found for notes_app_quick_affordance_unavailable_explanation (4796955161600178530) -->
+    <skip />
     <string name="keyguard_affordance_enablement_dialog_notes_app_action" msgid="6821710209675089470">"選取應用程式"</string>
     <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"輕觸並按住快速鍵"</string>
     <string name="rear_display_bottom_sheet_cancel" msgid="3461468855493357248">"取消"</string>

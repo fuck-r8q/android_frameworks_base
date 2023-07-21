@@ -1911,9 +1911,10 @@ public final class ViewRootImpl implements ViewParent,
                 && !Objects.equals(mTmpFrames.attachedFrame, attachedFrame);
         final boolean displayChanged = mDisplay.getDisplayId() != displayId;
         final boolean compatScaleChanged = mTmpFrames.compatScale != compatScale;
+        final boolean dragResizingChanged = mPendingDragResizing != dragResizing;
         if (msg == MSG_RESIZED && !frameChanged && !configChanged && !attachedFrameChanged
                 && !displayChanged && !forceNextWindowRelayout
-                && !compatScaleChanged) {
+                && !compatScaleChanged && !dragResizingChanged) {
             return;
         }
 
@@ -4151,6 +4152,9 @@ public final class ViewRootImpl implements ViewParent,
         // implement AccessibilityNodeProvider#findFocus
         AccessibilityNodeInfo current = provider.createAccessibilityNodeInfo(
                 AccessibilityNodeProvider.HOST_VIEW_ID);
+        if (current == null) {
+            return null;
+        }
         if (current.isFocused()) {
             return current;
         }
@@ -11626,5 +11630,18 @@ public final class ViewRootImpl implements ViewParent,
         mChildBoundingInsets.set(insets);
         mChildBoundingInsetsChanged = true;
         scheduleTraversals();
+    }
+
+    @Override
+    public void addTrustedPresentationCallback(@NonNull SurfaceControl.Transaction t,
+            @NonNull SurfaceControl.TrustedPresentationThresholds thresholds,
+            @NonNull Executor executor, @NonNull Consumer<Boolean> listener) {
+        t.setTrustedPresentationCallback(getSurfaceControl(), thresholds, executor, listener);
+    }
+
+    @Override
+    public void removeTrustedPresentationCallback(@NonNull SurfaceControl.Transaction t,
+            @NonNull Consumer<Boolean> listener) {
+        t.clearTrustedPresentationCallback(getSurfaceControl());
     }
 }

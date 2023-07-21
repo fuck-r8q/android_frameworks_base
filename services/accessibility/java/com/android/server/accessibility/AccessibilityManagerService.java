@@ -74,6 +74,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
+import android.content.pm.ParceledListSlice;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.database.ContentObserver;
@@ -958,7 +959,13 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         final ComponentName menuToMigrate =
                 AccessibilityUtils.getAccessibilityMenuComponentToMigrate(mPackageManager, userId);
         if (menuToMigrate != null) {
-            mPackageManager.setComponentEnabledSetting(
+            // PackageManager#setComponentEnabledSetting disables the component for only the user
+            // linked to PackageManager's context, but mPackageManager is linked to the system user,
+            // so grab a new PackageManager for the current user to support secondary users.
+            final PackageManager userPackageManager =
+                    mContext.createContextAsUser(UserHandle.of(userId), /* flags = */ 0)
+                            .getPackageManager();
+            userPackageManager.setComponentEnabledSetting(
                     menuToMigrate,
                     PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                     PackageManager.DONT_KILL_APP);
@@ -1244,7 +1251,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     @Override
-    public List<AccessibilityServiceInfo> getInstalledAccessibilityServiceList(int userId) {
+    public ParceledListSlice<AccessibilityServiceInfo> getInstalledAccessibilityServiceList(
+            int userId) {
         if (mTraceManager.isA11yTracingEnabledForTypes(FLAGS_ACCESSIBILITY_MANAGER)) {
             mTraceManager.logTrace(LOG_TAG + ".getInstalledAccessibilityServiceList",
                     FLAGS_ACCESSIBILITY_MANAGER, "userId=" + userId);
@@ -1256,8 +1264,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             final int deviceId = mProxyManager.getFirstDeviceIdForUidLocked(
                     Binder.getCallingUid());
             if (mProxyManager.isProxyedDeviceId(deviceId)) {
-                return mProxyManager.getInstalledAndEnabledServiceInfosLocked(
-                        AccessibilityServiceInfo.FEEDBACK_ALL_MASK, deviceId);
+                return new ParceledListSlice<>(
+                        mProxyManager.getInstalledAndEnabledServiceInfosLocked(
+                                AccessibilityServiceInfo.FEEDBACK_ALL_MASK, deviceId));
             }
             // We treat calls from a profile as if made by its parent as profiles
             // share the accessibility state of the parent. The call below
@@ -1269,7 +1278,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         }
 
         if (Binder.getCallingPid() == OWN_PROCESS_ID) {
-            return serviceInfos;
+            return new ParceledListSlice<>(serviceInfos);
         }
         final PackageManagerInternal pm = LocalServices.getService(
                 PackageManagerInternal.class);
@@ -1281,7 +1290,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 serviceInfos.remove(i);
             }
         }
-        return serviceInfos;
+        return new ParceledListSlice<>(serviceInfos);
     }
 
     @Override
@@ -1845,6 +1854,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             // find out a way to detect the device finished the OTA and switch the user.
             migrateAccessibilityButtonSettingsIfNecessaryLocked(userState, null,
                     /* restoreFromSdkInt = */0);
+            // Package components are disabled per user, so secondary users also need their migrated
+            // Accessibility Menu component disabled.
+            disableAccessibilityMenuToMigrateIfNeeded();
 
             if (announceNewUser) {
                 // Schedule announcement of the current user if needed.

@@ -237,7 +237,12 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
         final int captionHeight = loadDimensionPixelSize(resources, params.mCaptionHeightId);
         final int captionWidth = taskBounds.width();
+
+        // We use mDecorationContainerSurface to define input window for task resizing; by layering
+        // it in front of mCaptionContainerSurface, we can allow it to handle input prior to
+        // caption view itself, treating corner inputs as resize events rather than repositioning.
         startT.setWindowCrop(mCaptionContainerSurface, captionWidth, captionHeight)
+                .setLayer(mCaptionContainerSurface, -1)
                 .show(mCaptionContainerSurface);
 
         if (ViewRootImpl.CAPTION_ON_SHELL) {
@@ -267,6 +272,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
                 .setColor(mTaskSurface, mTmpColor)
                 .show(mTaskSurface);
         finishT.setPosition(mTaskSurface, taskPosition.x, taskPosition.y)
+                .setShadowRadius(mTaskSurface, shadowRadius)
                 .setWindowCrop(mTaskSurface, outResult.mWidth, outResult.mHeight);
         if (mTaskInfo.getWindowingMode() == WINDOWING_MODE_FREEFORM) {
             startT.setCornerRadius(mTaskSurface, params.mCornerRadius);
@@ -302,6 +308,10 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
             }
             mViewHost.relayout(lp);
         }
+    }
+
+    int getCaptionHeightId() {
+        return Resources.ID_NULL;
     }
 
     /**
@@ -416,6 +426,21 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         ssg.add(viewHost.getSurfacePackage(), () -> viewHost.setView(v, lp));
         return new AdditionalWindow(windowSurfaceControl, viewHost,
                 mSurfaceControlTransactionSupplier);
+    }
+
+    /**
+     * Adds caption inset source to a WCT
+     */
+    public void addCaptionInset(WindowContainerTransaction wct) {
+        final int captionHeightId = getCaptionHeightId();
+        if (!ViewRootImpl.CAPTION_ON_SHELL || captionHeightId == Resources.ID_NULL) {
+            return;
+        }
+
+        final int captionHeight = loadDimensionPixelSize(mContext.getResources(), captionHeightId);
+        final Rect captionInsets = new Rect(0, 0, 0, captionHeight);
+        wct.addInsetsSource(mTaskInfo.token, mOwner, 0 /* index */, WindowInsets.Type.captionBar(),
+                captionInsets);
     }
 
     static class RelayoutParams {

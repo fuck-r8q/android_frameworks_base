@@ -46,8 +46,8 @@ import com.android.systemui.animation.ActivityLaunchAnimator
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor
-import com.android.systemui.keyguard.domain.interactor.PrimaryBouncerInteractor
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.shade.ShadeExpansionStateManager
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
@@ -114,6 +114,8 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
     @Mock private lateinit var primaryBouncerInteractor: PrimaryBouncerInteractor
     @Mock private lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
     @Mock private lateinit var udfpsUtils: UdfpsUtils
+    @Mock private lateinit var udfpsKeyguardAccessibilityDelegate:
+            UdfpsKeyguardAccessibilityDelegate
     @Captor private lateinit var layoutParamsCaptor: ArgumentCaptor<WindowManager.LayoutParams>
 
     private val onTouch = { _: View, _: MotionEvent, _: Boolean -> true }
@@ -144,7 +146,8 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             configurationController, keyguardStateController, unlockedScreenOffAnimationController,
             udfpsDisplayMode, secureSettings, REQUEST_ID, reason,
             controllerCallback, onTouch, activityLaunchAnimator, featureFlags,
-            primaryBouncerInteractor, alternateBouncerInteractor, isDebuggable, udfpsUtils
+            primaryBouncerInteractor, alternateBouncerInteractor, isDebuggable, udfpsUtils,
+            udfpsKeyguardAccessibilityDelegate,
         )
         block()
     }

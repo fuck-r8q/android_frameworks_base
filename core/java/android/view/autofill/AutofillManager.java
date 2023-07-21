@@ -1443,7 +1443,7 @@ public final class AutofillManager {
         if (infos.size() == 0) {
             throw new IllegalArgumentException("No VirtualViewInfo found");
         }
-        if (AutofillFeatureFlags.isFillDialogDisabledForCredentialManager()
+        if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
                 && view.isCredential()) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
@@ -1470,7 +1470,7 @@ public final class AutofillManager {
         if (sDebug) {
             Log.d(TAG, "notifyViewEnteredForFillDialog:" + v.getAutofillId());
         }
-        if (AutofillFeatureFlags.isFillDialogDisabledForCredentialManager()
+        if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
                 && v.isCredential()) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"

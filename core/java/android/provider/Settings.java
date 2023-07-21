@@ -8562,6 +8562,18 @@ public final class Settings {
         public static final String MULTI_PRESS_TIMEOUT = "multi_press_timeout";
 
         /**
+         * The duration before a key repeat begins in milliseconds.
+         * @hide
+         */
+        public static final String KEY_REPEAT_TIMEOUT_MS = "key_repeat_timeout";
+
+        /**
+         * The duration between successive key repeats in milliseconds.
+         * @hide
+         */
+        public static final String KEY_REPEAT_DELAY_MS = "key_repeat_delay";
+
+        /**
          * Setting that specifies recommended timeout in milliseconds for controls
          * which don't need user's interactions.
          *
@@ -16755,6 +16767,30 @@ public final class Settings {
         public static final String AWARE_ALLOWED = "aware_allowed";
 
         /**
+         * Overrides internal R.integer.config_shortPressOnPowerBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String POWER_BUTTON_SHORT_PRESS = "power_button_short_press";
+
+        /**
+         * Overrides internal R.integer.config_doublePressOnPowerBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String POWER_BUTTON_DOUBLE_PRESS = "power_button_double_press";
+
+        /**
+         * Overrides internal R.integer.config_triplePressOnPowerBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String POWER_BUTTON_TRIPLE_PRESS = "power_button_triple_press";
+
+        /**
          * Overrides internal R.integer.config_longPressOnPowerBehavior.
          * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
          * Used by PhoneWindowManager.
@@ -16783,6 +16819,42 @@ public final class Settings {
         @Readable
         public static final String POWER_BUTTON_VERY_LONG_PRESS =
                 "power_button_very_long_press";
+
+        /**
+         * Overrides internal R.integer.config_shortPressOnStemPrimaryBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String STEM_PRIMARY_BUTTON_SHORT_PRESS =
+                "stem_primary_button_short_press";
+
+        /**
+         * Overrides internal R.integer.config_doublePressOnStemPrimaryBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String STEM_PRIMARY_BUTTON_DOUBLE_PRESS =
+                "stem_primary_button_double_press";
+
+        /**
+         * Overrides internal R.integer.config_triplePressOnStemPrimaryBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String STEM_PRIMARY_BUTTON_TRIPLE_PRESS =
+                "stem_primary_button_triple_press";
+
+        /**
+         * Overrides internal R.integer.config_longPressOnStemPrimaryBehavior.
+         * Allowable values detailed in frameworks/base/core/res/res/values/config.xml.
+         * Used by PhoneWindowManager.
+         * @hide
+         */
+        public static final String STEM_PRIMARY_BUTTON_LONG_PRESS =
+                "stem_primary_button_long_press";
 
         /**
          * Overrides internal R.integer.config_keyChordPowerVolumeUp.

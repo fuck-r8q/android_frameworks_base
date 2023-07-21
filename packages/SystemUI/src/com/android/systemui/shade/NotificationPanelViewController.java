@@ -116,6 +116,8 @@ import com.android.systemui.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.LaunchAnimator;
 import com.android.systemui.biometrics.AuthController;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.classifier.Classifier;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.qualifiers.DisplayId;
@@ -128,14 +130,13 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.fragments.FragmentService;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewConfigurator;
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardBottomAreaInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
-import com.android.systemui.keyguard.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.keyguard.shared.model.TransitionState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
+import com.android.systemui.keyguard.shared.model.WakefulnessModel;
 import com.android.systemui.keyguard.ui.binder.KeyguardLongPressViewBinder;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.GoneToDreamingTransitionViewModel;
@@ -225,8 +226,6 @@ import com.android.systemui.util.Utils;
 import com.android.systemui.util.time.SystemClock;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
-import kotlin.Unit;
-
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -236,6 +235,8 @@ import java.util.function.Consumer;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
+
+import kotlin.Unit;
 
 import kotlinx.coroutines.CoroutineDispatcher;
 
@@ -1041,7 +1042,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 new NsslHeightChangedListener());
         mNotificationStackScrollLayoutController.setOnEmptySpaceClickListener(
                 mOnEmptySpaceClickListener);
-        mQsController.initNotificationStackScrollLayoutController();
+        mQsController.init();
         mShadeExpansionStateManager.addQsExpansionListener(this::onQsExpansionChanged);
         mShadeHeadsUpTracker.addTrackingHeadsUpListener(
                 mNotificationStackScrollLayoutController::setTrackingHeadsUp);
@@ -2168,8 +2169,12 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     int getFalsingThreshold() {
-        float factor = mCentralSurfaces.isWakeUpComingFromTouch() ? 1.5f : 1.0f;
+        float factor = ShadeViewController.getFalsingThresholdFactor(getWakefulness());
         return (int) (mQsController.getFalsingThreshold() * factor);
+    }
+
+    private WakefulnessModel getWakefulness() {
+        return mKeyguardInteractor.getWakefulnessModel().getValue();
     }
 
     private void maybeAnimateBottomAreaAlpha() {
@@ -2449,6 +2454,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         boolean isExpanded = !isFullyCollapsed() || mExpectingSynthesizedDown;
         if (mPanelExpanded != isExpanded) {
             mPanelExpanded = isExpanded;
+            updateSystemUiStateFlags();
             mShadeExpansionStateManager.onShadeExpansionFullyChanged(isExpanded);
             if (!isExpanded) {
                 mQsController.closeQsCustomizer();
@@ -2456,6 +2462,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         }
     }
 
+    @Override
     public boolean isPanelExpanded() {
         return mPanelExpanded;
     }
@@ -2483,7 +2490,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             alpha = getFadeoutAlpha();
         }
         if (mBarState == KEYGUARD && !mHintAnimationRunning
-                && !mKeyguardBypassController.getBypassEnabled()) {
+                && !mKeyguardBypassController.getBypassEnabled()
+                && !mQsController.getFullyExpanded()) {
             alpha *= mClockPositionResult.clockAlpha;
         }
         mNotificationStackScrollLayoutController.setAlpha(alpha);
@@ -2913,9 +2921,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         float scrimMinFraction;
         if (mSplitShadeEnabled) {
             boolean highHun = mHeadsUpStartHeight * 2.5
-                    >
-                    (mFeatureFlags.isEnabled(Flags.LARGE_SHADE_GRANULAR_ALPHA_INTERPOLATION)
-                    ? mSplitShadeFullTransitionDistance : mSplitShadeScrimTransitionDistance);
+                    > mSplitShadeFullTransitionDistance;
             // if HUN height is higher than 40% of predefined transition distance, it means HUN
             // is too high for regular transition. In that case we need to calculate transition
             // distance - here we take scrim transition distance as equal to shade transition
@@ -3449,9 +3455,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             Log.d(TAG, "Updating panel sysui state flags: fullyExpanded="
                     + isFullyExpanded() + " inQs=" + mQsController.getExpanded());
         }
-        boolean isPanelVisible = mCentralSurfaces != null && mCentralSurfaces.isPanelExpanded();
         mSysUiState
-                .setFlag(SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE, isPanelVisible)
+                .setFlag(SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE, mPanelExpanded)
                 .setFlag(SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED,
                         isFullyExpanded() && !mQsController.getExpanded())
                 .setFlag(SYSUI_STATE_QUICK_SETTINGS_EXPANDED,
@@ -3611,8 +3616,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 mShadeLog.logEndMotionEvent("endMotionEvent: flingExpands", forceCancel, expand);
             }
 
-            mDozeLog.traceFling(expand, mTouchAboveFalsingThreshold,
-                    mCentralSurfaces.isWakeUpComingFromTouch());
+            mDozeLog.traceFling(
+                    expand,
+                    mTouchAboveFalsingThreshold,
+                    /* screenOnFromTouch=*/ getWakefulness().isDeviceInteractiveFromTapOrGesture());
             // Log collapse gesture if on lock screen.
             if (!expand && onKeyguard) {
                 float displayDensity = mCentralSurfaces.getDisplayDensity();

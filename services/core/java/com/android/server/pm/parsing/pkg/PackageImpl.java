@@ -160,8 +160,8 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
      */
     @NonNull
     @Deprecated
-    @DataClass.ParcelWith(Parcelling.BuiltIn.ForInternedStringList.class)
-    protected List<String> requestedPermissions = emptyList();
+    @DataClass.ParcelWith(Parcelling.BuiltIn.ForInternedStringSet.class)
+    protected Set<String> requestedPermissions = emptySet();
     @NonNull
     @DataClass.ParcelWith(Parcelling.BuiltIn.ForInternedStringList.class)
     protected List<String> protectedBroadcasts = emptyList();
@@ -277,8 +277,8 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     @NonNull
     private List<ParsedUsesPermission> usesPermissions = emptyList();
     @NonNull
-    @DataClass.ParcelWith(Parcelling.BuiltIn.ForInternedStringList.class)
-    private List<String> implicitPermissions = emptyList();
+    @DataClass.ParcelWith(Parcelling.BuiltIn.ForInternedStringSet.class)
+    private Set<String> implicitPermissions = emptySet();
     @NonNull
     private Set<String> upgradeKeySets = emptySet();
     @NonNull
@@ -664,29 +664,39 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
 
     @Override
     public PackageImpl addUsesLibrary(String libraryName) {
-        this.usesLibraries = CollectionUtils.add(this.usesLibraries,
-                TextUtils.safeIntern(libraryName));
+        libraryName = TextUtils.safeIntern(libraryName);
+        if (!ArrayUtils.contains(this.usesLibraries, libraryName)) {
+            this.usesLibraries = CollectionUtils.add(this.usesLibraries, libraryName);
+        }
         return this;
     }
 
     @Override
     public final PackageImpl addUsesNativeLibrary(String libraryName) {
-        this.usesNativeLibraries = CollectionUtils.add(this.usesNativeLibraries,
-                TextUtils.safeIntern(libraryName));
+        libraryName = TextUtils.safeIntern(libraryName);
+        if (!ArrayUtils.contains(this.usesNativeLibraries, libraryName)) {
+            this.usesNativeLibraries = CollectionUtils.add(this.usesNativeLibraries, libraryName);
+        }
         return this;
     }
 
     @Override
     public PackageImpl addUsesOptionalLibrary(String libraryName) {
-        this.usesOptionalLibraries = CollectionUtils.add(this.usesOptionalLibraries,
-                TextUtils.safeIntern(libraryName));
+        libraryName = TextUtils.safeIntern(libraryName);
+        if (!ArrayUtils.contains(this.usesOptionalLibraries, libraryName)) {
+            this.usesOptionalLibraries = CollectionUtils.add(this.usesOptionalLibraries,
+                    libraryName);
+        }
         return this;
     }
 
     @Override
     public final PackageImpl addUsesOptionalNativeLibrary(String libraryName) {
-        this.usesOptionalNativeLibraries = CollectionUtils.add(this.usesOptionalNativeLibraries,
-                TextUtils.safeIntern(libraryName));
+        libraryName = TextUtils.safeIntern(libraryName);
+        if (!ArrayUtils.contains(this.usesOptionalNativeLibraries, libraryName)) {
+            this.usesOptionalNativeLibraries = CollectionUtils.add(this.usesOptionalNativeLibraries,
+                    libraryName);
+        }
         return this;
     }
 
@@ -967,7 +977,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
 
     @NonNull
     @Override
-    public List<String> getImplicitPermissions() {
+    public Set<String> getImplicitPermissions() {
         return implicitPermissions;
     }
 
@@ -1225,7 +1235,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     @NonNull
     @Override
     @Deprecated
-    public List<String> getRequestedPermissions() {
+    public Set<String> getRequestedPermissions() {
         return requestedPermissions;
     }
 
@@ -2729,7 +2739,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         usesOptionalNativeLibraries = Collections.unmodifiableList(usesOptionalNativeLibraries);
         originalPackages = Collections.unmodifiableList(originalPackages);
         adoptPermissions = Collections.unmodifiableList(adoptPermissions);
-        requestedPermissions = Collections.unmodifiableList(requestedPermissions);
+        requestedPermissions = Collections.unmodifiableSet(requestedPermissions);
         protectedBroadcasts = Collections.unmodifiableList(protectedBroadcasts);
         apexSystemServices = Collections.unmodifiableList(apexSystemServices);
 
@@ -2750,7 +2760,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         featureGroups = Collections.unmodifiableList(featureGroups);
         usesPermissions = Collections.unmodifiableList(usesPermissions);
         usesSdkLibraries = Collections.unmodifiableList(usesSdkLibraries);
-        implicitPermissions = Collections.unmodifiableList(implicitPermissions);
+        implicitPermissions = Collections.unmodifiableSet(implicitPermissions);
         upgradeKeySets = Collections.unmodifiableSet(upgradeKeySets);
         keySetMapping = Collections.unmodifiableMap(keySetMapping);
         attributions = Collections.unmodifiableList(attributions);
@@ -3121,9 +3131,9 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         dest.writeByteArray(this.restrictUpdateHash);
         dest.writeStringList(this.originalPackages);
         sForInternedStringList.parcel(this.adoptPermissions, dest, flags);
-        sForInternedStringList.parcel(this.requestedPermissions, dest, flags);
+        sForInternedStringSet.parcel(this.requestedPermissions, dest, flags);
         ParsingUtils.writeParcelableList(dest, this.usesPermissions);
-        sForInternedStringList.parcel(this.implicitPermissions, dest, flags);
+        sForInternedStringSet.parcel(this.implicitPermissions, dest, flags);
         sForStringSet.parcel(this.upgradeKeySets, dest, flags);
         ParsingPackageUtils.writeKeySetMapping(dest, this.keySetMapping);
         sForInternedStringList.parcel(this.protectedBroadcasts, dest, flags);
@@ -3273,10 +3283,10 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         this.restrictUpdateHash = in.createByteArray();
         this.originalPackages = in.createStringArrayList();
         this.adoptPermissions = sForInternedStringList.unparcel(in);
-        this.requestedPermissions = sForInternedStringList.unparcel(in);
+        this.requestedPermissions = sForInternedStringSet.unparcel(in);
         this.usesPermissions = ParsingUtils.createTypedInterfaceList(in,
                 ParsedUsesPermissionImpl.CREATOR);
-        this.implicitPermissions = sForInternedStringList.unparcel(in);
+        this.implicitPermissions = sForInternedStringSet.unparcel(in);
         this.upgradeKeySets = sForStringSet.unparcel(in);
         this.keySetMapping = ParsingPackageUtils.readKeySetMapping(in);
         this.protectedBroadcasts = sForInternedStringList.unparcel(in);

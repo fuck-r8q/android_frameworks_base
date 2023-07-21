@@ -913,7 +913,6 @@ public class FingerprintService extends SystemService {
             }
             provider.onPointerDown(requestId, sensorId, pc);
         }
-
         @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
         @Override
 
@@ -929,16 +928,18 @@ public class FingerprintService extends SystemService {
 
         @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
         @Override
-        public void onUiReady(long requestId, int sensorId) {
-            super.onUiReady_enforcePermission();
+        public void onUdfpsUiEvent(@FingerprintManager.UdfpsUiEvent int event, long requestId,
+                int sensorId) {
+            super.onUdfpsUiEvent_enforcePermission();
 
             final ServiceProvider provider = mRegistry.getProviderForSensor(sensorId);
             if (provider == null) {
-                Slog.w(TAG, "No matching provider for onUiReady, sensorId: " + sensorId);
+                Slog.w(TAG, "No matching provider for onUdfpsUiEvent, sensorId: " + sensorId);
                 return;
             }
-            provider.onUiReady(requestId, sensorId);
+            provider.onUdfpsUiEvent(event, requestId, sensorId);
         }
+
 
         @android.annotation.EnforcePermission(android.Manifest.permission.USE_BIOMETRIC_INTERNAL)
         @Override
@@ -1179,6 +1180,17 @@ public class FingerprintService extends SystemService {
                 latch.await(3, TimeUnit.SECONDS);
             } catch (Exception e) {
                 Slog.e(TAG, "Failed to wait for sync finishing", e);
+            }
+        }
+    }
+
+    void simulateVhalFingerDown() {
+        if (Utils.isVirtualEnabled(getContext())) {
+            Slog.i(TAG, "Simulate virtual HAL finger down event");
+            final Pair<Integer, ServiceProvider> provider = mRegistry.getSingleProvider();
+            if (provider != null) {
+                provider.second.simulateVhalFingerDown(UserHandle.getCallingUserId(),
+                        provider.first);
             }
         }
     }

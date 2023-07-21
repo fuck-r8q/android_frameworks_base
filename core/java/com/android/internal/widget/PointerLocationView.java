@@ -367,12 +367,8 @@ public class PointerLocationView extends View implements InputDeviceListener,
                 drawOval(canvas, ps.mCoords.x, ps.mCoords.y, ps.mCoords.toolMajor * mDensity,
                         ps.mCoords.toolMinor * mDensity, ps.mCoords.orientation, mPaint);
 
-                // Draw the orientation arrow.
-                float arrowSize = ps.mCoords.toolMajor * 0.7f;
-                if (arrowSize < 20) {
-                    arrowSize = 20;
-                }
-                arrowSize *= mDensity;
+                // Draw the orientation arrow, and ensure it has a minimum size of 24dp.
+                final float arrowSize = Math.max(ps.mCoords.toolMajor * 0.7f, 24 * mDensity);
                 mPaint.setARGB(255, pressureLevel, 255, 0);
                 float orientationVectorX = (float) (Math.sin(ps.mCoords.orientation)
                         * arrowSize);

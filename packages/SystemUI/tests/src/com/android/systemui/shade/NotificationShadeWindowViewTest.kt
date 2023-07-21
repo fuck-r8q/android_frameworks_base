@@ -27,6 +27,12 @@ import com.android.keyguard.LockIconViewController
 import com.android.keyguard.dagger.KeyguardBouncerComponent
 import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.back.domain.interactor.BackActionInteractor
+import com.android.systemui.bouncer.data.factory.BouncerMessageFactory
+import com.android.systemui.bouncer.data.repository.FakeBouncerMessageRepository
+import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
+import com.android.systemui.bouncer.domain.interactor.CountDownTimerUtil
+import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel
 import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.classifier.FalsingManagerFake
 import com.android.systemui.dock.DockManager
@@ -40,13 +46,13 @@ import com.android.systemui.keyguard.bouncer.domain.interactor.CountDownTimerUti
 import com.android.systemui.keyguard.data.repository.FakeBouncerMessageRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
-import com.android.systemui.keyguard.ui.viewmodel.KeyguardBouncerViewModel
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel
 import com.android.systemui.log.BouncerLogger
 import com.android.systemui.multishade.data.remoteproxy.MultiShadeInputProxy
 import com.android.systemui.multishade.data.repository.MultiShadeRepository
 import com.android.systemui.multishade.domain.interactor.MultiShadeInteractor
 import com.android.systemui.multishade.domain.interactor.MultiShadeMotionEventInteractor
+import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.shade.NotificationShadeWindowView.InteractionEventHandler
 import com.android.systemui.statusbar.DragDownHelper
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
@@ -93,6 +99,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock private lateinit var statusBarStateController: SysuiStatusBarStateController
     @Mock private lateinit var shadeController: ShadeController
     @Mock private lateinit var centralSurfaces: CentralSurfaces
+    @Mock private lateinit var backActionInteractor: BackActionInteractor
+    @Mock private lateinit var powerInteractor: PowerInteractor
     @Mock private lateinit var dockManager: DockManager
     @Mock private lateinit var notificationPanelViewController: NotificationPanelViewController
     @Mock private lateinit var notificationStackScrollLayout: NotificationStackScrollLayout
@@ -184,6 +192,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 statusBarWindowStateController,
                 lockIconViewController,
                 centralSurfaces,
+                backActionInteractor,
+                powerInteractor,
                 notificationShadeWindowController,
                 unfoldTransitionProgressProvider,
                 keyguardUnlockAnimationController,

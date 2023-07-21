@@ -1184,6 +1184,12 @@ public final class JobStore {
             }
         }
 
+        /** Returns the {@link String#intern() interned} String if it's not null. */
+        @Nullable
+        private static String intern(@Nullable String val) {
+            return val == null ? null : val.intern();
+        }
+
         private List<JobStatus> readJobMapImpl(InputStream fis, boolean rtcIsGood, long nowElapsed)
                 throws XmlPullParserException, IOException {
             TypedXmlPullParser parser = Xml.resolvePullParser(fis);
@@ -1298,8 +1304,8 @@ public final class JobStore {
             }
 
             String sourcePackageName = parser.getAttributeValue(null, "sourcePackageName");
-            final String namespace = parser.getAttributeValue(null, "namespace");
-            final String sourceTag = parser.getAttributeValue(null, "sourceTag");
+            final String namespace = intern(parser.getAttributeValue(null, "namespace"));
+            final String sourceTag = intern(parser.getAttributeValue(null, "sourceTag"));
 
             int eventType;
             // Read out constraints tag.
@@ -1461,7 +1467,7 @@ public final class JobStore {
             final int appBucket = JobSchedulerService.standbyBucketForPackage(sourcePackageName,
                     sourceUserId, nowElapsed);
             JobStatus js = new JobStatus(
-                    builtJob, uid, sourcePackageName, sourceUserId,
+                    builtJob, uid, intern(sourcePackageName), sourceUserId,
                     appBucket, namespace, sourceTag,
                     elapsedRuntimes.first, elapsedRuntimes.second,
                     lastSuccessfulRunTime, lastFailedRunTime, cumulativeExecutionTime,
@@ -1478,8 +1484,8 @@ public final class JobStore {
                 throws XmlPullParserException {
             // Pull out required fields from <job> attributes.
             int jobId = parser.getAttributeInt(null, "jobid");
-            String packageName = parser.getAttributeValue(null, "package");
-            String className = parser.getAttributeValue(null, "class");
+            String packageName = intern(parser.getAttributeValue(null, "package"));
+            String className = intern(parser.getAttributeValue(null, "class"));
             ComponentName cname = new ComponentName(packageName, className);
 
             return new JobInfo.Builder(jobId, cname);

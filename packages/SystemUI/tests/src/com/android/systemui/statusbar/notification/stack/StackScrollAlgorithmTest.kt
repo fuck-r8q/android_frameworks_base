@@ -9,7 +9,6 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.ShadeInterpolation.getContentAlpha
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.shade.transition.LargeScreenShadeInterpolator
 import com.android.systemui.statusbar.EmptyShadeView
 import com.android.systemui.statusbar.NotificationShelf
@@ -191,12 +190,10 @@ class StackScrollAlgorithmTest : SysuiTestCase() {
     }
 
     @Test
-    fun resetViewStates_flagTrue_largeScreen_expansionChanging_alphaUpdated_largeScreenValue() {
+    fun resetViewStates_largeScreen_expansionChanging_alphaUpdated_largeScreenValue() {
         val expansionFraction = 0.6f
         val surfaceAlpha = 123f
         ambientState.isSmallScreen = false
-        whenever(featureFlags.isEnabled(Flags.LARGE_SHADE_GRANULAR_ALPHA_INTERPOLATION))
-                .thenReturn(true)
         whenever(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit).thenReturn(false)
         whenever(largeScreenShadeInterpolator.getNotificationContentAlpha(expansionFraction))
             .thenReturn(surfaceAlpha)
@@ -204,23 +201,6 @@ class StackScrollAlgorithmTest : SysuiTestCase() {
         resetViewStates_expansionChanging_notificationAlphaUpdated(
             expansionFraction = expansionFraction,
             expectedAlpha = surfaceAlpha,
-        )
-    }
-
-    @Test
-    fun resetViewStates_flagFalse_largeScreen_expansionChanging_alphaUpdated_standardValue() {
-        val expansionFraction = 0.6f
-        val surfaceAlpha = 123f
-        ambientState.isSmallScreen = false
-        whenever(featureFlags.isEnabled(Flags.LARGE_SHADE_GRANULAR_ALPHA_INTERPOLATION))
-                .thenReturn(false)
-        whenever(mStatusBarKeyguardViewManager.isPrimaryBouncerInTransit).thenReturn(false)
-        whenever(largeScreenShadeInterpolator.getNotificationContentAlpha(expansionFraction))
-            .thenReturn(surfaceAlpha)
-
-        resetViewStates_expansionChanging_notificationAlphaUpdated(
-            expansionFraction = expansionFraction,
-            expectedAlpha = getContentAlpha(expansionFraction),
         )
     }
 
@@ -834,6 +814,74 @@ class StackScrollAlgorithmTest : SysuiTestCase() {
                 fraction = 1f
         )
     }
+
+    // region shouldPinHunToBottomOfExpandedQs
+    @Test
+    fun shouldHunBeVisibleWhenScrolled_mustStayOnScreenFalse_false() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */false,
+            /* headsUpIsVisible= */false,
+            /* showingPulsing= */false,
+            /* isOnKeyguard=*/false,
+            /*headsUpOnKeyguard=*/false
+        )).isFalse()
+    }
+
+    @Test
+    fun shouldPinHunToBottomOfExpandedQs_headsUpIsVisible_false() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */true,
+            /* headsUpIsVisible= */true,
+            /* showingPulsing= */false,
+            /* isOnKeyguard=*/false,
+            /*headsUpOnKeyguard=*/false
+        )).isFalse()
+    }
+
+    @Test
+    fun shouldHunBeVisibleWhenScrolled_showingPulsing_false() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */true,
+            /* headsUpIsVisible= */false,
+            /* showingPulsing= */true,
+            /* isOnKeyguard=*/false,
+            /* headsUpOnKeyguard= */false
+        )).isFalse()
+    }
+
+    @Test
+    fun shouldHunBeVisibleWhenScrolled_isOnKeyguard_false() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */true,
+            /* headsUpIsVisible= */false,
+            /* showingPulsing= */false,
+            /* isOnKeyguard=*/true,
+            /* headsUpOnKeyguard= */false
+        )).isFalse()
+    }
+
+    @Test
+    fun shouldHunBeVisibleWhenScrolled_isNotOnKeyguard_true() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */true,
+            /* headsUpIsVisible= */false,
+            /* showingPulsing= */false,
+            /* isOnKeyguard=*/false,
+            /* headsUpOnKeyguard= */false
+        )).isTrue()
+    }
+
+    @Test
+    fun shouldHunBeVisibleWhenScrolled_headsUpOnKeyguard_true() {
+        assertThat(stackScrollAlgorithm.shouldHunBeVisibleWhenScrolled(
+            /* mustStayOnScreen= */true,
+            /* headsUpIsVisible= */false,
+            /* showingPulsing= */false,
+            /* isOnKeyguard=*/true,
+            /* headsUpOnKeyguard= */true
+        )).isTrue()
+    }
+    // endregion
 
     private fun createHunViewMock(
             isShadeOpen: Boolean,

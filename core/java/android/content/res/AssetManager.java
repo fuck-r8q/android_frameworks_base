@@ -16,6 +16,8 @@
 
 package android.content.res;
 
+import static android.content.res.Resources.ID_NULL;
+
 import android.annotation.AnyRes;
 import android.annotation.ArrayRes;
 import android.annotation.AttrRes;
@@ -1089,7 +1091,7 @@ public final class AssetManager implements AutoCloseable {
     public @NonNull XmlResourceParser openXmlResourceParser(int cookie, @NonNull String fileName)
             throws IOException {
         try (XmlBlock block = openXmlBlockAsset(cookie, fileName)) {
-            XmlResourceParser parser = block.newParser();
+            XmlResourceParser parser = block.newParser(ID_NULL, new Validator());
             // If openXmlBlockAsset doesn't throw, it will always return an XmlBlock object with
             // a valid native pointer, which makes newParser always return non-null. But let's
             // be careful.
@@ -1419,7 +1421,7 @@ public final class AssetManager implements AutoCloseable {
      * <a href="https://tools.ietf.org/html/bcp47">BCP-47</a> language tags and can be
      * parsed using {@link Locale#forLanguageTag(String)}.
      *
-     * <p>On SDK 20 (Android 4.4W: Kitkat for watches) and below, locale strings
+     * <p>On SDK 20 (Android 4.4W: KitKat for watches) and below, locale strings
      * are of the form {@code ll_CC} where {@code ll} is a two letter language code,
      * and {@code CC} is a two letter country code.
      */

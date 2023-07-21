@@ -1431,29 +1431,39 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
             final long origId = Binder.clearCallingIdentity();
             // TODO(b/64750076): Check if calling pid should really be -1.
-            final int res = getActivityStartController()
-                    .obtainStarter(intent, "startNextMatchingActivity")
-                    .setCaller(r.app.getThread())
-                    .setResolvedType(r.resolvedType)
-                    .setActivityInfo(aInfo)
-                    .setResultTo(resultTo != null ? resultTo.token : null)
-                    .setResultWho(resultWho)
-                    .setRequestCode(requestCode)
-                    .setCallingPid(-1)
-                    .setCallingUid(r.launchedFromUid)
-                    .setCallingPackage(r.launchedFromPackage)
-                    .setCallingFeatureId(r.launchedFromFeatureId)
-                    .setRealCallingPid(-1)
-                    .setRealCallingUid(r.launchedFromUid)
-                    .setActivityOptions(options)
-                    .execute();
-            Binder.restoreCallingIdentity(origId);
+            try {
+                if (options == null) {
+                    options = new SafeActivityOptions(ActivityOptions.makeBasic());
+                }
 
-            r.finishing = wasFinishing;
-            if (res != ActivityManager.START_SUCCESS) {
-                return false;
+                // Fixes b/230492947
+                // Prevents background activity launch through #startNextMatchingActivity
+                // An activity going into the background could still go back to the foreground
+                // if the intent used matches both:
+                // - the activity in the background
+                // - a second activity.
+                options.getOptions(r).setAvoidMoveToFront();
+                final int res = getActivityStartController()
+                        .obtainStarter(intent, "startNextMatchingActivity")
+                        .setCaller(r.app.getThread())
+                        .setResolvedType(r.resolvedType)
+                        .setActivityInfo(aInfo)
+                        .setResultTo(resultTo != null ? resultTo.token : null)
+                        .setResultWho(resultWho)
+                        .setRequestCode(requestCode)
+                        .setCallingPid(-1)
+                        .setCallingUid(r.launchedFromUid)
+                        .setCallingPackage(r.launchedFromPackage)
+                        .setCallingFeatureId(r.launchedFromFeatureId)
+                        .setRealCallingPid(-1)
+                        .setRealCallingUid(r.launchedFromUid)
+                        .setActivityOptions(options)
+                        .execute();
+                r.finishing = wasFinishing;
+                return res == ActivityManager.START_SUCCESS;
+            } finally {
+                Binder.restoreCallingIdentity(origId);
             }
-            return true;
         }
     }
 
@@ -6099,6 +6109,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         @Override
         public void showSystemReadyErrorDialogsIfNeeded() {
+            if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+                Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "showSystemReadyErrorDialogs");
+            }
+            // Pull the check for build consistency outside the lock, to avoid holding the lock for
+            // too long, given that `Build.isBuildConsistent()` takes relatively long.
+            boolean isBuildConsistent = Build.isBuildConsistent();
             synchronized (mGlobalLock) {
                 try {
                     if (AppGlobals.getPackageManager().hasSystemUidErrors()) {
@@ -6121,7 +6137,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 } catch (RemoteException e) {
                 }
 
-                if (!Build.isBuildConsistent()) {
+                if (!isBuildConsistent) {
                     Slog.e(TAG, "Build fingerprint is not consistent, warning user");
                     mUiHandler.post(() -> {
                         if (mShowDialogs) {
@@ -6138,6 +6154,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     });
                 }
             }
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
         }
 
         @Override

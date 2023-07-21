@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -59,6 +60,9 @@ import com.android.keyguard.FaceAuthApiRequestReason;
 import com.android.keyguard.EmergencyButtonController;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.R;
+import com.android.systemui.keyguard.shared.model.WakeSleepReason;
+import com.android.systemui.keyguard.shared.model.WakefulnessModel;
+import com.android.systemui.keyguard.shared.model.WakefulnessState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.ExpandableView.OnHeightChangedListener;
@@ -742,6 +746,47 @@ public class NotificationPanelViewControllerTest extends NotificationPanelViewCo
     }
 
     @Test
+    public void onQsSetExpansionHeightCalled_qsFullyExpandedOnKeyguard_showNSSL() {
+        // GIVEN
+        mStatusBarStateController.setState(KEYGUARD);
+        when(mKeyguardBypassController.getBypassEnabled()).thenReturn(false);
+        when(mQsController.getFullyExpanded()).thenReturn(true);
+        when(mQsController.getExpanded()).thenReturn(true);
+
+        // WHEN
+        int transitionDistance = mNotificationPanelViewController.getMaxPanelTransitionDistance();
+        mNotificationPanelViewController.setExpandedHeight(transitionDistance);
+
+        // THEN
+        // We are interested in the last value of the stack alpha.
+        ArgumentCaptor<Float> alphaCaptor = ArgumentCaptor.forClass(Float.class);
+        verify(mNotificationStackScrollLayoutController, atLeastOnce())
+                .setAlpha(alphaCaptor.capture());
+        assertThat(alphaCaptor.getValue()).isEqualTo(1.0f);
+    }
+
+    @Test
+    public void onQsSetExpansionHeightCalled_qsFullyExpandedOnKeyguard_hideNSSL() {
+        // GIVEN
+        mStatusBarStateController.setState(KEYGUARD);
+        when(mKeyguardBypassController.getBypassEnabled()).thenReturn(false);
+        when(mQsController.getFullyExpanded()).thenReturn(false);
+        when(mQsController.getExpanded()).thenReturn(true);
+
+        // WHEN
+        int transitionDistance = mNotificationPanelViewController
+                .getMaxPanelTransitionDistance() / 2;
+        mNotificationPanelViewController.setExpandedHeight(transitionDistance);
+
+        // THEN
+        // We are interested in the last value of the stack alpha.
+        ArgumentCaptor<Float> alphaCaptor = ArgumentCaptor.forClass(Float.class);
+        verify(mNotificationStackScrollLayoutController, atLeastOnce())
+                .setAlpha(alphaCaptor.capture());
+        assertThat(alphaCaptor.getValue()).isEqualTo(0.0f);
+    }
+
+    @Test
     public void testSwitchesToBigClockInSplitShadeOnAodAnimateDisabled() {
         when(mScreenOffAnimationController.shouldAnimateClockChange()).thenReturn(false);
         mStatusBarStateController.setState(KEYGUARD);
@@ -1180,5 +1225,44 @@ public class NotificationPanelViewControllerTest extends NotificationPanelViewCo
     public void shadeExpanded_whenUnlockedOffscreenAnimationRunning() {
         when(mUnlockedScreenOffAnimationController.isAnimationPlaying()).thenReturn(true);
         assertThat(mNotificationPanelViewController.isExpanded()).isTrue();
+    }
+
+    @Test
+    public void getFalsingThreshold_deviceNotInteractive_isQsThreshold() {
+        mFakeKeyguardRepository.setWakefulnessModel(
+                new WakefulnessModel(
+                        WakefulnessState.ASLEEP,
+                        /* lastWakeReason= */ WakeSleepReason.TAP,
+                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
+        );
+        when(mQsController.getFalsingThreshold()).thenReturn(14);
+
+        assertThat(mNotificationPanelViewController.getFalsingThreshold()).isEqualTo(14);
+    }
+
+    @Test
+    public void getFalsingThreshold_lastWakeNotDueToTouch_isQsThreshold() {
+        mFakeKeyguardRepository.setWakefulnessModel(
+                new WakefulnessModel(
+                        WakefulnessState.AWAKE,
+                        /* lastWakeReason= */ WakeSleepReason.POWER_BUTTON,
+                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
+        );
+        when(mQsController.getFalsingThreshold()).thenReturn(14);
+
+        assertThat(mNotificationPanelViewController.getFalsingThreshold()).isEqualTo(14);
+    }
+
+    @Test
+    public void getFalsingThreshold_lastWakeDueToTouch_greaterThanQsThreshold() {
+        mFakeKeyguardRepository.setWakefulnessModel(
+                new WakefulnessModel(
+                        WakefulnessState.AWAKE,
+                        /* lastWakeReason= */ WakeSleepReason.TAP,
+                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
+        );
+        when(mQsController.getFalsingThreshold()).thenReturn(14);
+
+        assertThat(mNotificationPanelViewController.getFalsingThreshold()).isGreaterThan(14);
     }
 }

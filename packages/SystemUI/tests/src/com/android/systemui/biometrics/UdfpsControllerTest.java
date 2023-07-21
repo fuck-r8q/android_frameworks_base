@@ -87,9 +87,9 @@ import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.ScreenLifecycle;
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
-import com.android.systemui.keyguard.domain.interactor.PrimaryBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -217,6 +217,8 @@ public class UdfpsControllerTest extends SysuiTestCase {
     private AlternateBouncerInteractor mAlternateBouncerInteractor;
     @Mock
     private SecureSettings mSecureSettings;
+    @Mock
+    private UdfpsKeyguardAccessibilityDelegate mUdfpsKeyguardAccessibilityDelegate;
 
     // Capture listeners so that they can be used to send events
     @Captor
@@ -315,7 +317,8 @@ public class UdfpsControllerTest extends SysuiTestCase {
                 mActivityLaunchAnimator, alternateTouchProvider, mBiometricExecutor,
                 mPrimaryBouncerInteractor, mSinglePointerTouchProcessor, mSessionTracker,
                 mAlternateBouncerInteractor, mSecureSettings, mInputManager, mUdfpsUtils,
-                mock(KeyguardFaceAuthInteractor.class));
+                mock(KeyguardFaceAuthInteractor.class),
+                mUdfpsKeyguardAccessibilityDelegate);
         verify(mFingerprintManager).setUdfpsOverlayController(mOverlayCaptor.capture());
         mOverlayController = mOverlayCaptor.getValue();
         verify(mScreenLifecycle).addObserver(mScreenObserverCaptor.capture());
@@ -437,6 +440,16 @@ public class UdfpsControllerTest extends SysuiTestCase {
 
         // THEN the udfps bouncer is reset
         verify(mStatusBarKeyguardViewManager).hideAlternateBouncer(eq(true));
+    }
+
+    @Test
+    public void showUdfpsOverlay_callsListener() throws RemoteException {
+        mOverlayController.showUdfpsOverlay(TEST_REQUEST_ID, mOpticalProps.sensorId,
+                BiometricOverlayConstants.REASON_AUTH_KEYGUARD, mUdfpsOverlayControllerCallback);
+        mFgExecutor.runAllReady();
+
+        verify(mFingerprintManager).onUdfpsUiEvent(FingerprintManager.UDFPS_UI_OVERLAY_SHOWN,
+                TEST_REQUEST_ID, mOpticalProps.sensorId);
     }
 
     @Test
@@ -759,17 +772,20 @@ public class UdfpsControllerTest extends SysuiTestCase {
                 inOrder.verify(mAlternateTouchProvider).onUiReady();
                 inOrder.verify(mLatencyTracker).onActionEnd(
                         eq(LatencyTracker.ACTION_UDFPS_ILLUMINATE));
-                verify(mFingerprintManager, never()).onUiReady(anyLong(), anyInt());
+                verify(mFingerprintManager, never()).onUdfpsUiEvent(
+                        eq(FingerprintManager.UDFPS_UI_READY), anyLong(), anyInt());
             } else {
                 InOrder inOrder = inOrder(mFingerprintManager, mLatencyTracker);
-                inOrder.verify(mFingerprintManager).onUiReady(eq(TEST_REQUEST_ID),
+                inOrder.verify(mFingerprintManager).onUdfpsUiEvent(
+                        eq(FingerprintManager.UDFPS_UI_READY), eq(TEST_REQUEST_ID),
                         eq(testParams.sensorProps.sensorId));
                 inOrder.verify(mLatencyTracker).onActionEnd(
                         eq(LatencyTracker.ACTION_UDFPS_ILLUMINATE));
                 verify(mAlternateTouchProvider, never()).onUiReady();
             }
         } else {
-            verify(mFingerprintManager, never()).onUiReady(anyLong(), anyInt());
+            verify(mFingerprintManager, never()).onUdfpsUiEvent(
+                    eq(FingerprintManager.UDFPS_UI_READY), anyLong(), anyInt());
             verify(mAlternateTouchProvider, never()).onUiReady();
             verify(mLatencyTracker, never()).onActionEnd(
                     eq(LatencyTracker.ACTION_UDFPS_ILLUMINATE));

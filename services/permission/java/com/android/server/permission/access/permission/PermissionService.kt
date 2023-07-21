@@ -1992,6 +1992,15 @@ class PermissionService(
 
     override fun writeLegacyPermissionStateTEMP() {}
 
+    override fun getDefaultPermissionGrantFingerprint(userId: Int): String? =
+        service.getState { state.userStates[userId]!!.defaultPermissionGrantFingerprint }
+
+    override fun setDefaultPermissionGrantFingerprint(fingerprint: String, userId: Int) {
+        service.mutateState {
+            newState.mutateUserState(userId)!!.setDefaultPermissionGrantFingerprint(fingerprint)
+        }
+    }
+
     override fun onSystemReady() {
         service.onSystemReady()
         permissionControllerManager = PermissionControllerManager(
@@ -2000,7 +2009,9 @@ class PermissionService(
     }
 
     override fun onUserCreated(userId: Int) {
-        service.onUserAdded(userId)
+        withCorkedPackageInfoCache {
+            service.onUserAdded(userId)
+        }
     }
 
     override fun onUserRemoved(userId: Int) {
@@ -2015,7 +2026,9 @@ class PermissionService(
             packageNames = storageVolumePackageNames.remove(volumeUuid) ?: emptyList()
             mountedStorageVolumes += volumeUuid
         }
-        service.onStorageVolumeMounted(volumeUuid, packageNames, fingerprintChanged)
+        withCorkedPackageInfoCache {
+            service.onStorageVolumeMounted(volumeUuid, packageNames, fingerprintChanged)
+        }
     }
 
     override fun onPackageAdded(
@@ -2108,6 +2121,15 @@ class PermissionService(
         val packageState = packageManagerInternal.packageStates[packageName]
         if (packageState == null) {
             service.onPackageRemoved(packageName, appId)
+        }
+    }
+
+    private inline fun <T> withCorkedPackageInfoCache(block: () -> T): T {
+        PackageManager.corkPackageInfoCache()
+        try {
+            return block()
+        } finally {
+            PackageManager.uncorkPackageInfoCache()
         }
     }
 

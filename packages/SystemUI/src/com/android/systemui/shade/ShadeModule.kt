@@ -16,6 +16,7 @@
 
 package com.android.systemui.shade
 
+import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.os.Handler
 import android.view.LayoutInflater
@@ -28,6 +29,7 @@ import com.android.systemui.battery.BatteryMeterView
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.biometrics.AuthRippleController
 import com.android.systemui.biometrics.AuthRippleView
+import com.android.systemui.compose.ComposeFacade
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
@@ -37,6 +39,10 @@ import com.android.systemui.privacy.OngoingPrivacyChip
 import com.android.systemui.scene.ui.view.WindowRootView
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.LightRevealScrim
+import com.android.systemui.statusbar.NotificationShelf
+import com.android.systemui.statusbar.NotificationShelfController
+import com.android.systemui.statusbar.notification.row.dagger.NotificationShelfComponent
+import com.android.systemui.statusbar.notification.shelf.ui.viewbinder.NotificationShelfViewBinderWrapperControllerImpl
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
 import com.android.systemui.statusbar.phone.StatusIconContainer
 import com.android.systemui.statusbar.phone.TapAgainView
@@ -49,6 +55,7 @@ import dagger.Provides
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import javax.inject.Named
+import javax.inject.Provider
 
 /** Module for classes related to the notification shade. */
 @Module
@@ -61,6 +68,24 @@ abstract class ShadeModule {
 
     companion object {
         const val SHADE_HEADER = "large_screen_shade_header"
+
+        @SuppressLint("InflateParams") // Root views don't have parents.
+        @Provides
+        @SysUISingleton
+        fun providesWindowRootView(
+            layoutInflater: LayoutInflater,
+            featureFlags: FeatureFlags,
+        ): WindowRootView {
+            return if (
+                featureFlags.isEnabled(Flags.SCENE_CONTAINER) && ComposeFacade.isComposeAvailable()
+            ) {
+                layoutInflater.inflate(R.layout.scene_window_root, null)
+            } else {
+                layoutInflater.inflate(R.layout.super_notification_shade, null)
+            }
+                as WindowRootView?
+                ?: throw IllegalStateException("Window root view could not be properly inflated")
+        }
 
         @Provides
         @SysUISingleton
@@ -100,6 +125,32 @@ abstract class ShadeModule {
             notificationShadeWindowView: NotificationShadeWindowView,
         ): NotificationStackScrollLayout {
             return notificationShadeWindowView.findViewById(R.id.notification_stack_scroller)
+        }
+
+        @Provides
+        @SysUISingleton
+        fun providesNotificationShelfController(
+            featureFlags: FeatureFlags,
+            newImpl: Provider<NotificationShelfViewBinderWrapperControllerImpl>,
+            notificationShelfComponentBuilder: NotificationShelfComponent.Builder,
+            layoutInflater: LayoutInflater,
+            notificationStackScrollLayout: NotificationStackScrollLayout,
+        ): NotificationShelfController {
+            return if (featureFlags.isEnabled(Flags.NOTIFICATION_SHELF_REFACTOR)) {
+                newImpl.get()
+            } else {
+                val shelfView =
+                    layoutInflater.inflate(
+                        R.layout.status_bar_notification_shelf,
+                        notificationStackScrollLayout,
+                        false
+                    ) as NotificationShelf
+                val component =
+                    notificationShelfComponentBuilder.notificationShelf(shelfView).build()
+                val notificationShelfController = component.notificationShelfController
+                notificationShelfController.init()
+                notificationShelfController
+            }
         }
 
         // TODO(b/277762009): Only allow this view's controller to inject the view. See above.
@@ -152,6 +203,15 @@ abstract class ShadeModule {
             notificationPanelView: NotificationPanelView,
         ): TapAgainView {
             return notificationPanelView.findViewById(R.id.shade_falsing_tap_again)
+        }
+
+        // TODO(b/277762009): Only allow this view's controller to inject the view. See above.
+        @Provides
+        @SysUISingleton
+        fun providesNotificationsQuickSettingsContainer(
+            notificationShadeWindowView: NotificationShadeWindowView,
+        ): NotificationsQuickSettingsContainer {
+            return notificationShadeWindowView.findViewById(R.id.notification_container_parent)
         }
 
         // TODO(b/277762009): Only allow this view's controller to inject the view. See above.

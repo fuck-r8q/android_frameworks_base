@@ -859,7 +859,7 @@ public class InternetDialog extends SystemUIDialog implements
                 ? mMobileDataToggle : mSecondaryMobileDataToggle;
         mAlertDialog = new Builder(mContext)
                 .setTitle(R.string.mobile_data_disable_title)
-                .setMessage(mobileDataDisableDialogMessage)
+                .setMessage(mContext.getString(R.string.mobile_data_disable_message, carrierName))
                 .setNegativeButton(android.R.string.cancel, (d, w) -> {})
                 .setPositiveButton(
                         com.android.internal.R.string.alert_windows_notification_turn_off_action,

@@ -78,6 +78,7 @@ import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.screenrecord.RecordingController;
 import com.android.systemui.shade.data.repository.ShadeRepository;
+import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.shade.transition.ShadeTransitionController;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -101,6 +102,7 @@ import com.android.systemui.statusbar.phone.dagger.CentralSurfacesComponent;
 import com.android.systemui.statusbar.policy.CastController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.LargeScreenUtils;
+import com.android.systemui.util.kotlin.JavaAdapter;
 
 import dagger.Lazy;
 
@@ -153,6 +155,8 @@ public class QuickSettingsController implements Dumpable {
     private final FeatureFlags mFeatureFlags;
     private final InteractionJankMonitor mInteractionJankMonitor;
     private final ShadeRepository mShadeRepository;
+    private final ShadeInteractor mShadeInteractor;
+    private final JavaAdapter mJavaAdapter;
     private final FalsingManager mFalsingManager;
     private final AccessibilityManager mAccessibilityManager;
     private final MetricsLogger mMetricsLogger;
@@ -342,6 +346,8 @@ public class QuickSettingsController implements Dumpable {
             DumpManager dumpManager,
             KeyguardFaceAuthInteractor keyguardFaceAuthInteractor,
             ShadeRepository shadeRepository,
+            ShadeInteractor shadeInteractor,
+            JavaAdapter javaAdapter,
             CastController castController
     ) {
         mPanelViewControllerLazy = panelViewControllerLazy;
@@ -387,6 +393,8 @@ public class QuickSettingsController implements Dumpable {
         mFeatureFlags = featureFlags;
         mInteractionJankMonitor = interactionJankMonitor;
         mShadeRepository = shadeRepository;
+        mShadeInteractor = shadeInteractor;
+        mJavaAdapter = javaAdapter;
 
         mLockscreenShadeTransitionController.addCallback(new LockscreenShadeTransitionCallback());
         dumpManager.registerDumpable(this);
@@ -459,7 +467,13 @@ public class QuickSettingsController implements Dumpable {
     }
 
     // TODO (b/265054088): move this and others to a CoreStartable
-    void initNotificationStackScrollLayoutController() {
+    void init() {
+        initNotificationStackScrollLayoutController();
+        mJavaAdapter.alwaysCollectFlow(
+                mShadeInteractor.isExpandToQsEnabled(), this::setExpansionEnabledPolicy);
+    }
+
+    private void initNotificationStackScrollLayoutController() {
         mNotificationStackScrollLayoutController.setOverscrollTopChangedListener(
                 new NsslOverscrollTopChangedListener());
         mNotificationStackScrollLayoutController.setOnStackYChanged(this::onStackYChanged);
@@ -780,7 +794,6 @@ public class QuickSettingsController implements Dumpable {
 
     /** update Qs height state */
     public void setExpansionHeight(float height) {
-        checkCorrectSplitShadeState(height);
         int maxHeight = getMaxExpansionHeight();
         height = Math.min(Math.max(
                 height, getMinExpansionHeight()), maxHeight);
@@ -799,14 +812,6 @@ public class QuickSettingsController implements Dumpable {
 
         if (mExpansionHeightListener != null) {
             mExpansionHeightListener.onQsSetExpansionHeightCalled(getFullyExpanded());
-        }
-    }
-
-    /** TODO(b/269742565) Remove this logging */
-    private void checkCorrectSplitShadeState(float height) {
-        if (mSplitShadeEnabled && height == 0
-                && mPanelViewControllerLazy.get().isShadeFullyExpanded()) {
-            Log.wtfStack(TAG, "qsExpansion set to 0 while split shade is expanding or open");
         }
     }
 
@@ -892,7 +897,7 @@ public class QuickSettingsController implements Dumpable {
     }
 
     /** */
-    public void setExpansionEnabledPolicy(boolean expansionEnabledPolicy) {
+    private void setExpansionEnabledPolicy(boolean expansionEnabledPolicy) {
         mExpansionEnabledPolicy = expansionEnabledPolicy;
         if (mQs != null) {
             mQs.setHeaderClickable(isExpansionEnabled());
@@ -1888,7 +1893,7 @@ public class QuickSettingsController implements Dumpable {
                 target = getMaxExpansionHeight();
                 break;
             case FLING_COLLAPSE:
-                if (mSplitShadeEnabled) { // TODO:(b/269742565) remove below log
+                if (mSplitShadeEnabled) {
                     Log.wtfStack(TAG, "FLING_COLLAPSE called in split shade");
                 }
                 setExpandImmediate(false);

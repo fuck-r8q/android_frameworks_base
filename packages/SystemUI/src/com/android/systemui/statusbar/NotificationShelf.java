@@ -40,8 +40,6 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.SystemBarUtils;
 import com.android.systemui.R;
 import com.android.systemui.animation.ShadeInterpolation;
-import com.android.systemui.flags.FeatureFlags;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.shade.transition.LargeScreenShadeInterpolator;
 import com.android.systemui.statusbar.notification.NotificationUtils;
@@ -97,7 +95,7 @@ public class NotificationShelf extends ActivatableNotificationView implements St
     private float mCornerAnimationDistance;
     private NotificationShelfController mController;
     private float mActualWidth = -1;
-    private boolean mSensitiveRevealAnimEndabled;
+    private boolean mSensitiveRevealAnimEnabled;
     private boolean mShelfRefactorFlagEnabled;
     private boolean mCanModifyColorOfNotifications;
     private boolean mCanInteract;
@@ -226,9 +224,7 @@ public class NotificationShelf extends ActivatableNotificationView implements St
                 if (ambientState.isBouncerInTransit()) {
                     viewState.setAlpha(aboutToShowBouncerProgress(expansion));
                 } else {
-                    FeatureFlags flags = ambientState.getFeatureFlags();
-                    if (ambientState.isSmallScreen() || !flags.isEnabled(
-                            Flags.LARGE_SHADE_GRANULAR_ALPHA_INTERPOLATION)) {
+                    if (ambientState.isSmallScreen()) {
                         viewState.setAlpha(ShadeInterpolation.getContentAlpha(expansion));
                     } else {
                         LargeScreenShadeInterpolator interpolator =
@@ -265,20 +261,20 @@ public class NotificationShelf extends ActivatableNotificationView implements St
                     viewState.hidden = true;
                 }
             }
-
-            final float stackEnd = ambientState.getStackY() + ambientState.getStackHeight();
-            if (mSensitiveRevealAnimEndabled && viewState.hidden) {
-                // if the shelf is hidden, position it at the end of the stack (plus the clip
-                // padding), such that when it appears animated, it will smoothly move in from the
-                // bottom, without jump cutting any notifications
-                viewState.setYTranslation(stackEnd + mPaddingBetweenElements);
-            } else {
-                viewState.setYTranslation(stackEnd - viewState.height);
-            }
         } else {
             viewState.hidden = true;
             viewState.location = ExpandableViewState.LOCATION_GONE;
             viewState.hasItemsInStableShelf = false;
+        }
+
+        final float stackEnd = ambientState.getStackY() + ambientState.getStackHeight();
+        if (mSensitiveRevealAnimEnabled && viewState.hidden) {
+            // if the shelf is hidden, position it at the end of the stack (plus the clip
+            // padding), such that when it appears animated, it will smoothly move in from the
+            // bottom, without jump cutting any notifications
+            viewState.setYTranslation(stackEnd + mPaddingBetweenElements);
+        } else {
+            viewState.setYTranslation(stackEnd - viewState.height);
         }
     }
 
@@ -417,7 +413,7 @@ public class NotificationShelf extends ActivatableNotificationView implements St
                     expandingAnimated, isLastChild, shelfClipStart);
 
             // TODO(b/172289889) scale mPaddingBetweenElements with expansion amount
-            if ((!mSensitiveRevealAnimEndabled && ((isLastChild && !child.isInShelf())
+            if ((!mSensitiveRevealAnimEnabled && ((isLastChild && !child.isInShelf())
                     || backgroundForceHidden)) || aboveShelf) {
                 notificationClipEnd = shelfStart + getIntrinsicHeight();
             } else {
@@ -466,7 +462,7 @@ public class NotificationShelf extends ActivatableNotificationView implements St
                 // if the shelf is visible, but if the shelf is hidden, it causes incorrect curling.
                 // notificationClipEnd handles the discrepancy between a visible and hidden shelf,
                 // so we use that when on the keyguard (and while animating away) to reduce curling.
-                final float keyguardSafeShelfStart = !mSensitiveRevealAnimEndabled
+                final float keyguardSafeShelfStart = !mSensitiveRevealAnimEnabled
                         && mAmbientState.isOnKeyguard() ? notificationClipEnd : shelfStart;
                 updateCornerRoundnessOnScroll(anv, viewStart, keyguardSafeShelfStart);
             }
@@ -1068,8 +1064,8 @@ public class NotificationShelf extends ActivatableNotificationView implements St
      * Set whether the sensitive reveal animation feature flag is enabled
      * @param enabled true if enabled
      */
-    public void setSensitiveRevealAnimEndabled(boolean enabled) {
-        mSensitiveRevealAnimEndabled = enabled;
+    public void setSensitiveRevealAnimEnabled(boolean enabled) {
+        mSensitiveRevealAnimEnabled = enabled;
     }
 
     public void setRefactorFlagEnabled(boolean enabled) {

@@ -158,7 +158,7 @@ object BiometricViewBinder {
                 view.updateFingerprintAffordanceSize(iconController)
             }
             if (iconController is HackyCoexIconController) {
-                iconController.faceMode = !viewModel.isConfirmationRequested.first()
+                iconController.faceMode = !viewModel.isConfirmationRequired.first()
             }
 
             // the icon controller must be created before this happens for the legacy
@@ -339,7 +339,13 @@ object BiometricViewBinder {
 
                             launch {
                                 delay(authState.delay)
-                                legacyCallback.onAction(Callback.ACTION_AUTHENTICATED)
+                                legacyCallback.onAction(
+                                    if (authState.isAuthenticatedAndExplicitlyConfirmed) {
+                                        Callback.ACTION_AUTHENTICATED_AND_CONFIRMED
+                                    } else {
+                                        Callback.ACTION_AUTHENTICATED
+                                    }
+                                )
                             }
                         }
                     }
@@ -512,9 +518,10 @@ private class Spaghetti(
         }
 
         applicationScope.launch {
-            viewModel.showTemporaryHelp(
+            // help messages from the HAL should be displayed as temporary (i.e. soft) errors
+            viewModel.showTemporaryError(
                 help,
-                messageAfterHelp = modalities.asDefaultHelpMessage(applicationContext),
+                messageAfterError = modalities.asDefaultHelpMessage(applicationContext),
             )
         }
     }

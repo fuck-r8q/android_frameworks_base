@@ -555,12 +555,27 @@ public final class MediaRoute2Info implements Parcelable {
     /**
      * Returns the type of this route.
      *
+     * @see #TYPE_UNKNOWN
+     * @see #TYPE_BUILTIN_SPEAKER
+     * @see #TYPE_WIRED_HEADSET
+     * @see #TYPE_WIRED_HEADPHONES
+     * @see #TYPE_BLUETOOTH_A2DP
+     * @see #TYPE_HDMI
+     * @see #TYPE_DOCK
+     * @see #TYPE_USB_DEVICE
+     * @see #TYPE_USB_ACCESSORY
+     * @see #TYPE_USB_HEADSET
+     * @see #TYPE_HEARING_AID
+     * @see #TYPE_REMOTE_TV
+     * @see #TYPE_REMOTE_SPEAKER
+     * @see #TYPE_REMOTE_AUDIO_VIDEO_RECEIVER
      * @see #TYPE_REMOTE_TABLET
      * @see #TYPE_REMOTE_TABLET_DOCKED
      * @see #TYPE_REMOTE_COMPUTER
      * @see #TYPE_REMOTE_GAME_CONSOLE
      * @see #TYPE_REMOTE_CAR
      * @see #TYPE_REMOTE_SMARTWATCH
+     * @see #TYPE_GROUP
      */
     @Type
     public int getType() {

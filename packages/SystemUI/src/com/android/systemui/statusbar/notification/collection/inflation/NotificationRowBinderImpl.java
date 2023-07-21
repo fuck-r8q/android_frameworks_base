@@ -71,7 +71,6 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
 
     private NotificationPresenter mPresenter;
     private NotificationListContainer mListContainer;
-    private BindRowCallback mBindRowCallback;
     private NotificationClicker mNotificationClicker;
     private FeatureFlags mFeatureFlags;
 
@@ -103,11 +102,9 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
      * Sets up late-bound dependencies for this component.
      */
     public void setUpWithPresenter(NotificationPresenter presenter,
-            NotificationListContainer listContainer,
-            BindRowCallback bindRowCallback) {
+            NotificationListContainer listContainer) {
         mPresenter = presenter;
         mListContainer = listContainer;
-        mBindRowCallback = bindRowCallback;
 
         mIconManager.attach();
     }
@@ -143,7 +140,6 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
                                         .expandableNotificationRow(row)
                                         .notificationEntry(entry)
                                         .onExpandClickListener(mPresenter)
-                                        .listContainer(mListContainer)
                                         .build();
                         ExpandableNotificationRowController rowController =
                                 component.getExpandableNotificationRowController();
@@ -179,7 +175,7 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
         mNotificationRemoteInputManager.bindRow(row);
         entry.setRow(row);
         mNotifBindPipeline.manageRow(entry, row);
-        mBindRowCallback.onBindRow(row);
+        mPresenter.onBindRow(row);
         row.setInlineReplyAnimationFlagEnabled(
                 mFeatureFlags.isEnabled(NOTIFICATION_INLINE_REPLY_ANIMATION));
     }
@@ -234,13 +230,5 @@ public class NotificationRowBinderImpl implements NotificationRowBinder {
                 inflationCallback.onAsyncInflationFinished(en);
             }
         });
-    }
-
-    /** Callback for when a row is bound to an entry. */
-    public interface BindRowCallback {
-        /**
-         * Called when a new row is created and bound to a notification.
-         */
-        void onBindRow(ExpandableNotificationRow row);
     }
 }

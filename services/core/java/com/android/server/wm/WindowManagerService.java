@@ -7193,15 +7193,45 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public void requestAppKeyboardShortcuts(IResultReceiver receiver, int deviceId) {
-        mContext.enforceCallingOrSelfPermission(REGISTER_WINDOW_MANAGER_LISTENERS,
-                "requestAppKeyboardShortcuts");
+        enforceRegisterWindowManagerListenersPermission("requestAppKeyboardShortcuts");
 
+        WindowState focusedWindow = getFocusedWindow();
+        if (focusedWindow == null || focusedWindow.mClient == null) {
+            notifyReceiverWithEmptyBundle(receiver);
+            return;
+        }
         try {
-            WindowState focusedWindow = getFocusedWindow();
-            if (focusedWindow != null && focusedWindow.mClient != null) {
-                getFocusedWindow().mClient.requestAppKeyboardShortcuts(receiver, deviceId);
-            }
+            focusedWindow.mClient.requestAppKeyboardShortcuts(receiver, deviceId);
         } catch (RemoteException e) {
+            notifyReceiverWithEmptyBundle(receiver);
+        }
+    }
+
+    @Override
+    public void requestImeKeyboardShortcuts(IResultReceiver receiver, int deviceId) {
+        enforceRegisterWindowManagerListenersPermission("requestImeKeyboardShortcuts");
+
+        WindowState imeWindow = mRoot.getCurrentInputMethodWindow();
+        if (imeWindow == null || imeWindow.mClient == null) {
+            notifyReceiverWithEmptyBundle(receiver);
+            return;
+        }
+        try {
+            imeWindow.mClient.requestAppKeyboardShortcuts(receiver, deviceId);
+        } catch (RemoteException e) {
+            notifyReceiverWithEmptyBundle(receiver);
+        }
+    }
+
+    private void enforceRegisterWindowManagerListenersPermission(String message) {
+        mContext.enforceCallingOrSelfPermission(REGISTER_WINDOW_MANAGER_LISTENERS, message);
+    }
+
+    private static void notifyReceiverWithEmptyBundle(IResultReceiver receiver) {
+        try {
+            receiver.send(0, Bundle.EMPTY);
+        } catch (RemoteException e) {
+            ProtoLog.e(WM_ERROR, "unable to call receiver for empty keyboard shortcuts");
         }
     }
 
@@ -8279,6 +8309,13 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public void addTrustedTaskOverlay(int taskId,
                 SurfaceControlViewHost.SurfacePackage overlay) {
+            if (overlay == null) {
+                throw new IllegalArgumentException("Invalid overlay passed in for task=" + taskId);
+            } else if (overlay.getSurfaceControl() == null
+                    || !overlay.getSurfaceControl().isValid()) {
+                throw new IllegalArgumentException(
+                        "Invalid overlay surfacecontrol passed in for task=" + taskId);
+            }
             synchronized (mGlobalLock) {
                 final Task task = mRoot.getRootTask(taskId);
                 if (task == null) {
@@ -8291,6 +8328,13 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public void removeTrustedTaskOverlay(int taskId,
                 SurfaceControlViewHost.SurfacePackage overlay) {
+            if (overlay == null) {
+                throw new IllegalArgumentException("Invalid overlay passed in for task=" + taskId);
+            } else if (overlay.getSurfaceControl() == null
+                    || !overlay.getSurfaceControl().isValid()) {
+                throw new IllegalArgumentException(
+                        "Invalid overlay surfacecontrol passed in for task=" + taskId);
+            }
             synchronized (mGlobalLock) {
                 final Task task = mRoot.getRootTask(taskId);
                 if (task == null) {
@@ -8756,24 +8800,22 @@ public class WindowManagerService extends IWindowManager.Stub
         final int sanitizedType = sanitizeWindowType(session, displayId, windowToken, type);
         final InputApplicationHandle applicationHandle;
         final String name;
-        final InputChannel clientChannel;
+        Objects.requireNonNull(outInputChannel);
         synchronized (mGlobalLock) {
             EmbeddedWindowController.EmbeddedWindow win =
                     new EmbeddedWindowController.EmbeddedWindow(session, this, window,
                             mInputToWindowMap.get(hostInputToken), callingUid, callingPid,
                             sanitizedType, displayId, focusGrantToken, inputHandleName,
                             (flags & FLAG_NOT_FOCUSABLE) == 0);
-            clientChannel = win.openInputChannel();
-            mEmbeddedWindowController.add(clientChannel.getToken(), win);
+            win.openInputChannel(outInputChannel);
+            mEmbeddedWindowController.add(outInputChannel.getToken(), win);
             applicationHandle = win.getApplicationHandle();
             name = win.toString();
         }
 
-        updateInputChannel(clientChannel.getToken(), callingUid, callingPid, displayId, surface,
+        updateInputChannel(outInputChannel.getToken(), callingUid, callingPid, displayId, surface,
                 name, applicationHandle, flags, privateFlags, inputFeatures, sanitizedType,
                 null /* region */, window);
-
-        clientChannel.copyTo(outInputChannel);
     }
 
     boolean transferEmbeddedTouchFocusToHost(IWindow embeddedWindow) {

@@ -56,11 +56,15 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.systemui.ExpandHelper;
 import com.android.systemui.Gefingerpoken;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.classifier.Classifier;
 import com.android.systemui.classifier.FalsingCollector;
+import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.Flags;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.media.controls.ui.KeyguardMediaController;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
@@ -69,6 +73,7 @@ import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.OnMenuEv
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.shade.ShadeController;
+import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager.UserChangedListener;
@@ -98,6 +103,7 @@ import com.android.systemui.statusbar.notification.collection.render.NotifStats;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.collection.render.SectionHeaderController;
 import com.android.systemui.statusbar.notification.dagger.SilentHeader;
+import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
@@ -107,14 +113,12 @@ import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.row.NotificationSnooze;
 import com.android.systemui.statusbar.notification.stack.ui.viewbinder.NotificationListViewBinder;
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModel;
-import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
 import com.android.systemui.statusbar.phone.HeadsUpManagerPhone;
 import com.android.systemui.statusbar.phone.HeadsUpTouchHelper;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.NotificationIconAreaController;
 import com.android.systemui.statusbar.phone.ScrimController;
-import com.android.systemui.statusbar.phone.dagger.CentralSurfacesComponent;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -137,13 +141,14 @@ import javax.inject.Named;
 /**
  * Controller for {@link NotificationStackScrollLayout}.
  */
-@CentralSurfacesComponent.CentralSurfacesScope
+@SysUISingleton
 public class NotificationStackScrollLayoutController {
     private static final String TAG = "StackScrollerController";
     private static final boolean DEBUG = Compile.IS_DEBUG && Log.isLoggable(TAG, Log.DEBUG);
 
     private final boolean mAllowLongPress;
     private final NotificationGutsManager mNotificationGutsManager;
+    private final NotificationsController mNotificationsController;
     private final NotificationVisibilityProvider mVisibilityProvider;
     private final HeadsUpManagerPhone mHeadsUpManager;
     private final NotificationRoundnessManager mNotificationRoundnessManager;
@@ -170,9 +175,9 @@ public class NotificationStackScrollLayoutController {
     private final KeyguardMediaController mKeyguardMediaController;
     private final SysuiStatusBarStateController mStatusBarStateController;
     private final KeyguardBypassController mKeyguardBypassController;
+    private final KeyguardInteractor mKeyguardInteractor;
+    private final PrimaryBouncerInteractor mPrimaryBouncerInteractor;
     private final NotificationLockscreenUserManager mLockscreenUserManager;
-    // TODO: CentralSurfaces should be encapsulated behind a Controller
-    private final CentralSurfaces mCentralSurfaces;
     private final SectionHeaderController mSilentHeaderController;
     private final LockscreenShadeTransitionController mLockscreenShadeTransitionController;
     private final InteractionJankMonitor mJankMonitor;
@@ -190,6 +195,7 @@ public class NotificationStackScrollLayoutController {
     @Nullable
     private Boolean mHistoryEnabled;
     private int mBarState;
+    private boolean mIsBouncerShowingFromCentralSurfaces;
     private HeadsUpAppearanceController mHeadsUpAppearanceController;
     private final FeatureFlags mFeatureFlags;
     private final NotificationTargetsHelper mNotificationTargetsHelper;
@@ -430,7 +436,7 @@ public class NotificationStackScrollLayoutController {
                 @Override
                 public void onSnooze(StatusBarNotification sbn,
                                      NotificationSwipeActionHelper.SnoozeOption snoozeOption) {
-                    mCentralSurfaces.setNotificationSnoozed(sbn, snoozeOption);
+                    mNotificationsController.setNotificationSnoozed(sbn, snoozeOption);
                 }
 
                 @Override
@@ -561,7 +567,8 @@ public class NotificationStackScrollLayoutController {
 
                 @Override
                 public float getFalsingThresholdFactor() {
-                    return mCentralSurfaces.isWakeUpComingFromTouch() ? 1.5f : 1.0f;
+                    return ShadeViewController.getFalsingThresholdFactor(
+                            mKeyguardInteractor.getWakefulnessModel().getValue());
                 }
 
                 @Override
@@ -615,6 +622,7 @@ public class NotificationStackScrollLayoutController {
             NotificationStackScrollLayout view,
             @Named(ALLOW_NOTIFICATION_LONG_PRESS_NAME) boolean allowLongPress,
             NotificationGutsManager notificationGutsManager,
+            NotificationsController notificationsController,
             NotificationVisibilityProvider visibilityProvider,
             HeadsUpManagerPhone headsUpManager,
             NotificationRoundnessManager notificationRoundnessManager,
@@ -625,6 +633,8 @@ public class NotificationStackScrollLayoutController {
             SysuiStatusBarStateController statusBarStateController,
             KeyguardMediaController keyguardMediaController,
             KeyguardBypassController keyguardBypassController,
+            KeyguardInteractor keyguardInteractor,
+            PrimaryBouncerInteractor primaryBouncerInteractor,
             ZenModeController zenModeController,
             NotificationLockscreenUserManager lockscreenUserManager,
             Optional<NotificationListViewModel> nsslViewModel,
@@ -634,7 +644,6 @@ public class NotificationStackScrollLayoutController {
             FalsingManager falsingManager,
             @Main Resources resources,
             NotificationSwipeHelper.Builder notificationSwipeHelperBuilder,
-            CentralSurfaces centralSurfaces,
             ScrimController scrimController,
             GroupExpansionManager groupManager,
             @SilentHeader SectionHeaderController silentHeaderController,
@@ -662,6 +671,7 @@ public class NotificationStackScrollLayoutController {
         mLogger = logger;
         mAllowLongPress = allowLongPress;
         mNotificationGutsManager = notificationGutsManager;
+        mNotificationsController = notificationsController;
         mVisibilityProvider = visibilityProvider;
         mHeadsUpManager = headsUpManager;
         mNotificationRoundnessManager = notificationRoundnessManager;
@@ -672,6 +682,8 @@ public class NotificationStackScrollLayoutController {
         mStatusBarStateController = statusBarStateController;
         mKeyguardMediaController = keyguardMediaController;
         mKeyguardBypassController = keyguardBypassController;
+        mKeyguardInteractor = keyguardInteractor;
+        mPrimaryBouncerInteractor = primaryBouncerInteractor;
         mZenModeController = zenModeController;
         mLockscreenUserManager = lockscreenUserManager;
         mViewModel = nsslViewModel;
@@ -682,7 +694,6 @@ public class NotificationStackScrollLayoutController {
         mFalsingManager = falsingManager;
         mResources = resources;
         mNotificationSwipeHelperBuilder = notificationSwipeHelperBuilder;
-        mCentralSurfaces = centralSurfaces;
         mScrimController = scrimController;
         mJankMonitor = jankMonitor;
         mNotificationStackSizeCalculator = notificationStackSizeCalculator;
@@ -711,7 +722,7 @@ public class NotificationStackScrollLayoutController {
         mView.setController(this);
         mView.setLogger(mLogger);
         mView.setTouchHandler(new TouchHandler());
-        mView.setCentralSurfaces(mCentralSurfaces);
+        mView.setNotificationsController(mNotificationsController);
         mView.setActivityStarter(mActivityStarter);
         mView.setClearAllAnimationListener(this::onAnimationEnd);
         mView.setClearAllListener((selection) -> mUiEventLogger.log(
@@ -1198,6 +1209,14 @@ public class NotificationStackScrollLayoutController {
     }
 
     /**
+     * Sets whether the bouncer is currently showing. Should only be called from
+     * {@link CentralSurfaces}.
+     */
+    public void setBouncerShowingFromCentralSurfaces(boolean bouncerShowing) {
+        mIsBouncerShowingFromCentralSurfaces = bouncerShowing;
+    }
+
+    /**
      * Set the visibility of the view, and propagate it to specific children.
      *
      * @param visible either the view is visible or not.
@@ -1228,11 +1247,30 @@ public class NotificationStackScrollLayoutController {
                 // That avoids "No Notifications" to blink when transitioning to AOD.
                 // For more details, see: b/228790482
                 && !isInTransitionToKeyguard()
-                && !mCentralSurfaces.isBouncerShowing();
+                // Don't show any notification content if the bouncer is showing. See b/267060171.
+                && !isBouncerShowing();
 
         mView.updateEmptyShadeView(shouldShow, mZenModeController.areNotificationsHiddenInShade());
 
         Trace.endSection();
+    }
+
+    /**
+     * Returns whether the bouncer is currently showing.
+     *
+     * There's a possible timing difference between when CentralSurfaces marks the bouncer as not
+     * showing and when PrimaryBouncerInteractor marks the bouncer as not showing. (CentralSurfaces
+     * appears to mark the bouncer as showing for 10-200ms longer than PrimaryBouncerInteractor.)
+     *
+     * This timing difference could be load bearing, which is why we have a feature flag protecting
+     * where we fetch the value from. This flag is intended to be short-lived.
+     */
+    private boolean isBouncerShowing() {
+        if (mFeatureFlags.isEnabled(Flags.USE_REPOS_FOR_BOUNCER_SHOWING)) {
+            return mPrimaryBouncerInteractor.isBouncerShowing();
+        } else {
+            return mIsBouncerShowingFromCentralSurfaces;
+        }
     }
 
     /**
@@ -1426,7 +1464,7 @@ public class NotificationStackScrollLayoutController {
         return mNotificationRoundnessManager;
     }
 
-    NotificationListContainer getNotificationListContainer() {
+    public NotificationListContainer getNotificationListContainer() {
         return mNotificationListContainer;
     }
 

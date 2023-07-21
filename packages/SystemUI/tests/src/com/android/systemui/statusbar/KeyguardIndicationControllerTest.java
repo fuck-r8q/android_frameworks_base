@@ -105,8 +105,8 @@ import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.keyguard.KeyguardIndication;
 import com.android.systemui.keyguard.KeyguardIndicationRotateTextViewController;
 import com.android.systemui.keyguard.ScreenLifecycle;
-import com.android.systemui.keyguard.bouncer.domain.interactor.BouncerMessageInteractor;
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.settings.UserTracker;
@@ -304,8 +304,8 @@ public class KeyguardIndicationControllerTest extends SysuiTestCase {
                 mAlternateBouncerInteractor,
                 mAlarmManager,
                 mUserTracker,
-                flags,
-                mock(BouncerMessageInteractor.class)
+                mock(BouncerMessageInteractor.class),
+                flags
         );
         mController.init();
         mController.setIndicationArea(mIndicationArea);

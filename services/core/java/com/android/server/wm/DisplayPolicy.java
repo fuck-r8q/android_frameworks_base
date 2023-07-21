@@ -1678,9 +1678,14 @@ public class DisplayPolicy {
             }
         } else if (win.isDimming()) {
             if (mStatusBar != null) {
-                if (addStatusBarAppearanceRegionsForDimmingWindow(
-                        win.mAttrs.insetsFlags.appearance & APPEARANCE_LIGHT_STATUS_BARS,
-                        mStatusBar.getFrame(), win.getBounds(), win.getFrame())) {
+                // If the dim window is below status bar window, we should update the appearance
+                // region if needed. Otherwise, leave it as it is.
+                final int statusBarLayer = mStatusBar.mToken.getWindowLayerFromType();
+                final int targetWindowLayer = win.mToken.getWindowLayerFromType();
+                if (targetWindowLayer < statusBarLayer
+                        && addStatusBarAppearanceRegionsForDimmingWindow(
+                                win.mAttrs.insetsFlags.appearance & APPEARANCE_LIGHT_STATUS_BARS,
+                                mStatusBar.getFrame(), win.getBounds(), win.getFrame())) {
                     addSystemBarColorApp(win);
                 }
             }
@@ -2436,8 +2441,8 @@ public class DisplayPolicy {
                 && Arrays.equals(mLastLetterboxDetails, letterboxDetails)) {
             return;
         }
-        if (mDisplayContent.isDefaultDisplay && mLastFocusIsFullscreen != isFullscreen
-                && ((mLastAppearance ^ appearance) & APPEARANCE_LOW_PROFILE_BARS) != 0) {
+        if (mDisplayContent.isDefaultDisplay && (mLastFocusIsFullscreen != isFullscreen
+                || ((mLastAppearance ^ appearance) & APPEARANCE_LOW_PROFILE_BARS) != 0)) {
             mService.mInputManager.setSystemUiLightsOut(
                     isFullscreen || (appearance & APPEARANCE_LOW_PROFILE_BARS) != 0);
         }

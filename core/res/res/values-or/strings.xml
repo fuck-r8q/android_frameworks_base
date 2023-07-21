@@ -622,6 +622,7 @@
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"ବାୟୋମେଟ୍ରିକ୍‌ ହାର୍ଡୱେର୍‌ ଉପଲବ୍ଧ ନାହିଁ"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"ପ୍ରାମାଣିକତାକୁ ବାତିଲ୍ କରାଯାଇଛି"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"ଚିହ୍ନଟ ହେଲାନାହିଁ"</string>
+    <string name="biometric_face_not_recognized" msgid="5535599455744525200">"ଫେସ ଚିହ୍ନଟ କରାଯାଇନାହିଁ"</string>
     <string name="biometric_error_canceled" msgid="8266582404844179778">"ପ୍ରାମାଣିକତାକୁ ବାତିଲ୍ କରାଯାଇଛି"</string>
     <string name="biometric_error_device_not_secured" msgid="3129845065043995924">"କୌଣସି ପିନ୍, ପେଟେର୍ନ ବା ପାସ୍‍ୱର୍ଡ ସେଟ୍ ନାହିଁ"</string>
     <string name="biometric_error_generic" msgid="6784371929985434439">"ପ୍ରାମାଣିକରଣ କରିବା ସମୟରେ ତ୍ରୁଟି"</string>
@@ -1367,7 +1368,7 @@
     <string name="usb_midi_notification_title" msgid="7404506788950595557">"USB ମାଧ୍ୟମରେ MIDIକୁ ଚାଲୁ କରାଗଲା"</string>
     <string name="usb_uvc_notification_title" msgid="2030032862673400008">"ୱେବକେମ ଭାବେ ଡିଭାଇସ କନେକ୍ଟ କରାଯାଇଛି"</string>
     <string name="usb_accessory_notification_title" msgid="1385394660861956980">"USB ଆକ୍ସେସୋରୀ ଯୋଡ଼ାଗଲା"</string>
-    <string name="usb_notification_message" msgid="4715163067192110676">"ଅଧିକ ବିକଳ୍ପ ପାଇଁ ଟାପ କରନ୍ତୁ।"</string>
+    <string name="usb_notification_message" msgid="4715163067192110676">"ଅଧିକ ବିକଳ୍ପ ପାଇଁ ଟାପ୍‍ କରନ୍ତୁ।"</string>
     <string name="usb_power_notification_message" msgid="7284765627437897702">"ଯୋଡ଼ାଯାଇଥିବା ଡିଭାଇସ୍ ଚାର୍ଜ ହେଉଛି। ଅଧିକ ବିକଳ୍ପ ପାଇଁ ଟାପ୍ କରନ୍ତୁ।"</string>
     <string name="usb_unsupported_audio_accessory_title" msgid="2335775548086533065">"ଆନାଲଗ୍‍ ଅଡିଓ ଆକ୍ସେସରୀ ଚିହ୍ନଟ ହେଲା"</string>
     <string name="usb_unsupported_audio_accessory_message" msgid="1300168007129796621">"ଏହି ଫୋନ୍‌ରେ କନେକ୍ଟ ଥିବା ଡିଭାଇସ୍‍ କମ୍ପାଟିବଲ୍‍ ନୁହେଁ। ଅଧିକ ଜାଣିବା ପାଇଁ ଟାପ୍‌ କରନ୍ତୁ।"</string>

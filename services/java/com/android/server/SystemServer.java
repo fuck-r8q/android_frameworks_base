@@ -1946,10 +1946,11 @@ public final class SystemServer implements Dumpable {
             }
 
             // Search UI manager service
-            // TODO: add deviceHasConfigString(context, R.string.config_defaultSearchUiService)
-            t.traceBegin("StartSearchUiService");
-            mSystemServiceManager.startService(SEARCH_UI_MANAGER_SERVICE_CLASS);
-            t.traceEnd();
+            if (deviceHasConfigString(context, R.string.config_defaultSearchUiService)) {
+                t.traceBegin("StartSearchUiService");
+                mSystemServiceManager.startService(SEARCH_UI_MANAGER_SERVICE_CLASS);
+                t.traceEnd();
+            }
 
             // Smartspace manager service
             // TODO: add deviceHasConfigString(context, R.string.config_defaultSmartspaceService)
@@ -2062,14 +2063,17 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            t.traceBegin("StartPacProxyService");
-            try {
-                pacProxyService = new PacProxyService(context);
-                ServiceManager.addService(Context.PAC_PROXY_SERVICE, pacProxyService);
-            } catch (Throwable e) {
-                reportWtf("starting PacProxyService", e);
+            // Devices without WebView/JavaScript cannot support PAC proxies.
+            if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WEBVIEW)) {
+                t.traceBegin("StartPacProxyService");
+                try {
+                    pacProxyService = new PacProxyService(context);
+                    ServiceManager.addService(Context.PAC_PROXY_SERVICE, pacProxyService);
+                } catch (Throwable e) {
+                    reportWtf("starting PacProxyService", e);
+                }
+                t.traceEnd();
             }
-            t.traceEnd();
 
             t.traceBegin("StartConnectivityService");
             // This has to be called after NetworkManagementService, NetworkStatsService
@@ -2230,12 +2234,13 @@ public final class SystemServer implements Dumpable {
             }
 
             // WallpaperEffectsGeneration manager service
-            // TODO (b/135218095): Use deviceHasConfigString(context,
-            //  R.string.config_defaultWallpaperEffectsGenerationService)
-            t.traceBegin("StartWallpaperEffectsGenerationService");
-            mSystemServiceManager.startService(
+            if (deviceHasConfigString(context,
+                R.string.config_defaultWallpaperEffectsGenerationService)) {
+                t.traceBegin("StartWallpaperEffectsGenerationService");
+                mSystemServiceManager.startService(
                     WALLPAPER_EFFECTS_GENERATION_MANAGER_SERVICE_CLASS);
-            t.traceEnd();
+                t.traceEnd();
+            }
 
             t.traceBegin("StartAudioService");
             if (!isArc) {

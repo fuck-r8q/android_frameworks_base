@@ -56,13 +56,6 @@ class AccessPolicy private constructor(
             "Scheme policy for $subjectScheme and $objectScheme does not exist"
         }
 
-    fun GetStateScope.getDecision(subject: AccessUri, `object`: AccessUri): Int =
-        with(getSchemePolicy(subject, `object`)) { getDecision(subject, `object`) }
-
-    fun MutateStateScope.setDecision(subject: AccessUri, `object`: AccessUri, decision: Int) {
-        with(getSchemePolicy(subject, `object`)) { setDecision(subject, `object`, decision) }
-    }
-
     fun initialize(
         state: MutableAccessState,
         userIds: IntSet,
@@ -372,6 +365,8 @@ class AccessPolicy private constructor(
                     forEachTag {
                         when (tagName) {
                             TAG_PACKAGE_VERSIONS -> parsePackageVersions(state, userId)
+                            TAG_DEFAULT_PERMISSION_GRANT ->
+                                parseDefaultPermissionGrant(state, userId)
                             else -> {
                                 forEachSchemePolicy {
                                     with(it) { parseUserState(state, userId) }
@@ -416,12 +411,24 @@ class AccessPolicy private constructor(
         packageVersions[packageName] = version
     }
 
+    private fun BinaryXmlPullParser.parseDefaultPermissionGrant(
+        state: MutableAccessState,
+        userId: Int
+    ) {
+        val userState = state.mutateUserState(userId, WriteMode.NONE)!!
+        val fingerprint = getAttributeValueOrThrow(ATTR_FINGERPRINT).intern()
+        userState.setDefaultPermissionGrantFingerprint(fingerprint)
+    }
+
     fun BinaryXmlSerializer.serializeUserState(state: AccessState, userId: Int) {
         tag(TAG_ACCESS) {
+            serializePackageVersions(state.userStates[userId]!!.packageVersions)
+            serializeDefaultPermissionGrantFingerprint(
+                state.userStates[userId]!!.defaultPermissionGrantFingerprint
+            )
             forEachSchemePolicy {
                 with(it) { serializeUserState(state, userId) }
             }
-            serializePackageVersions(state.userStates[userId]!!.packageVersions)
         }
     }
 
@@ -434,6 +441,16 @@ class AccessPolicy private constructor(
                     attributeInterned(ATTR_NAME, packageName)
                     attributeInt(ATTR_VERSION, version)
                 }
+            }
+        }
+    }
+
+    private fun BinaryXmlSerializer.serializeDefaultPermissionGrantFingerprint(
+        fingerprint: String?
+    ) {
+        if (fingerprint != null) {
+            tag(TAG_DEFAULT_PERMISSION_GRANT) {
+                attributeInterned(ATTR_FINGERPRINT, fingerprint)
             }
         }
     }
@@ -452,12 +469,14 @@ class AccessPolicy private constructor(
     companion object {
         private val LOG_TAG = AccessPolicy::class.java.simpleName
 
-        internal const val VERSION_LATEST = 14
+        internal const val VERSION_LATEST = 15
 
         private const val TAG_ACCESS = "access"
+        private const val TAG_DEFAULT_PERMISSION_GRANT = "default-permission-grant"
         private const val TAG_PACKAGE_VERSIONS = "package-versions"
         private const val TAG_PACKAGE = "package"
 
+        private const val ATTR_FINGERPRINT = "fingerprint"
         private const val ATTR_NAME = "name"
         private const val ATTR_VERSION = "version"
     }
@@ -467,14 +486,6 @@ abstract class SchemePolicy {
     abstract val subjectScheme: String
 
     abstract val objectScheme: String
-
-    abstract fun GetStateScope.getDecision(subject: AccessUri, `object`: AccessUri): Int
-
-    abstract fun MutateStateScope.setDecision(
-        subject: AccessUri,
-        `object`: AccessUri,
-        decision: Int
-    )
 
     open fun GetStateScope.onStateMutated() {}
 

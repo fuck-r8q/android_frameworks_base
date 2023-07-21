@@ -46,6 +46,7 @@ import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.DockStateReader;
 import com.android.wm.shell.common.FloatingContentCoordinator;
+import com.android.wm.shell.common.LaunchAdjacentController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.SystemWindows;
@@ -273,6 +274,13 @@ public abstract class WMShellBaseModule {
     static WindowManagerShellWrapper provideWindowManagerShellWrapper(
             @ShellMainThread ShellExecutor mainExecutor) {
         return new WindowManagerShellWrapper(mainExecutor);
+    }
+
+    @WMSingleton
+    @Provides
+    static LaunchAdjacentController provideLaunchAdjacentController(
+            SyncTransactionQueue syncQueue) {
+        return new LaunchAdjacentController(syncQueue);
     }
 
     //

@@ -92,7 +92,6 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -175,12 +174,12 @@ public class WallpaperManagerServiceTests {
         sImageWallpaperComponentName = ComponentName.unflattenFromString(
                 sContext.getResources().getString(R.string.image_wallpaper_component));
         // Mock default wallpaper as image wallpaper if there is no pre-defined default wallpaper.
-        sDefaultWallpaperComponent = WallpaperManager.getDefaultWallpaperComponent(sContext);
+        sDefaultWallpaperComponent = WallpaperManager.getCmfDefaultWallpaperComponent(sContext);
 
         if (sDefaultWallpaperComponent == null) {
             sDefaultWallpaperComponent = sImageWallpaperComponentName;
             doReturn(sImageWallpaperComponentName).when(() ->
-                    WallpaperManager.getDefaultWallpaperComponent(any()));
+                    WallpaperManager.getCmfDefaultWallpaperComponent(any()));
         } else {
             sContext.addMockService(sDefaultWallpaperComponent, sWallpaperService);
         }
@@ -300,10 +299,8 @@ public class WallpaperManagerServiceTests {
 
     /**
      * Tests setWallpaperComponent and clearWallpaper should work as expected.
-     * TODO ignored since the assumption never passes. to be investigated.
      */
     @Test
-    @Ignore("b/264533465")
     public void testSetThenClearComponent() {
         // Skip if there is no pre-defined default wallpaper component.
         assumeThat(sDefaultWallpaperComponent,
