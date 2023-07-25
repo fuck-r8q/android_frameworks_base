@@ -722,7 +722,7 @@ public abstract class InfoMediaManager extends MediaManager {
             final List<MediaRoute2Info> sortedInfoList = new ArrayList<>(selectedRouteInfos);
             infolist.removeAll(selectedRouteInfos);
             sortedInfoList.addAll(infolist.stream().filter(
-                    MediaRoute2Info::isSystemRoute).collect(Collectors.toList()));
+                    MediaRoute2Info::isSystemRoute).toList());
             for (RouteListingPreference.Item item : preferenceRouteListing) {
                 for (MediaRoute2Info info : infolist) {
                     if (item.getRouteId().equals(info.getId())
