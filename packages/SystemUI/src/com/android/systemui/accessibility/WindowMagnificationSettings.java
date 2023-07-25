@@ -431,13 +431,6 @@ class WindowMagnificationSettings implements MagnificationGestureDetector.OnGest
                 UserHandle.USER_CURRENT);
     }
 
-    private float getMagnificationScale() {
-        return mSecureSettings.getFloatForUser(
-                Settings.Secure.ACCESSIBILITY_DISPLAY_MAGNIFICATION_SCALE,
-                SCALE_MIN_VALUE,
-                UserHandle.USER_CURRENT);
-    }
-
     private void updateUIControlsIfNeeded() {
         int capability = getMagnificationCapability();
         int selectedButtonIndex = mLastSelectedButtonIndex;

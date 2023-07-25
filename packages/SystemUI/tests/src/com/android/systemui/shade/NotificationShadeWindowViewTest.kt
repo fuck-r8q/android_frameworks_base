@@ -40,10 +40,6 @@ import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
-import com.android.systemui.keyguard.bouncer.data.factory.BouncerMessageFactory
-import com.android.systemui.keyguard.bouncer.domain.interactor.BouncerMessageInteractor
-import com.android.systemui.keyguard.bouncer.domain.interactor.CountDownTimerUtil
-import com.android.systemui.keyguard.data.repository.FakeBouncerMessageRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel

@@ -540,11 +540,4 @@ public class WindowMagnificationSettingsTest extends SysuiTestCase {
                 MagnificationConstants.SCALE_MIN_VALUE,
                 UserHandle.USER_CURRENT)).thenReturn(scale);
     }
-
-    private void setupScaleInSecureSettings(float scale) {
-        when(mSecureSettings.getFloatForUser(
-                ACCESSIBILITY_DISPLAY_MAGNIFICATION_SCALE,
-                MagnificationConstants.SCALE_MIN_VALUE,
-                UserHandle.USER_CURRENT)).thenReturn(scale);
-    }
 }

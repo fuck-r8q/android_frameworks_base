@@ -89,21 +89,6 @@ abstract class ShadeModule {
 
         @Provides
         @SysUISingleton
-        fun providesWindowRootView(
-            layoutInflater: LayoutInflater,
-            featureFlags: FeatureFlags,
-        ): WindowRootView {
-            return if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
-                layoutInflater.inflate(R.layout.scene_window_root, null)
-            } else {
-                layoutInflater.inflate(R.layout.super_notification_shade, null)
-            }
-                as WindowRootView?
-                ?: throw IllegalStateException("Window root view could not be properly inflated")
-        }
-
-        @Provides
-        @SysUISingleton
         // TODO(b/277762009): Do something similar to
         //  {@link StatusBarWindowModule.InternalWindowView} so that only
         //  {@link NotificationShadeWindowViewController} can inject this view.
