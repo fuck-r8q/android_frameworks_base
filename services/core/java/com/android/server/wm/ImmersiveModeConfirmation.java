@@ -19,6 +19,7 @@ package com.android.server.wm;
 import static android.app.ActivityManager.LOCK_TASK_MODE_LOCKED;
 import static android.app.ActivityManager.LOCK_TASK_MODE_NONE;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.ViewRootImpl.CLIENT_TRANSIENT;
 import static android.window.DisplayAreaOrganizer.FEATURE_UNDEFINED;
 import static android.window.DisplayAreaOrganizer.KEY_ROOT_DISPLAY_AREA_ID;
 
@@ -234,7 +235,8 @@ public class ImmersiveModeConfirmation {
         lp.setFitInsetsTypes(lp.getFitInsetsTypes() & ~Type.statusBars());
         // Trusted overlay so touches outside the touchable area are allowed to pass through
         lp.privateFlags |= WindowManager.LayoutParams.SYSTEM_FLAG_SHOW_FOR_ALL_USERS
-                | WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY;
+                | WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY
+                | WindowManager.LayoutParams.PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW;
         lp.setTitle("ImmersiveModeConfirmation");
         lp.windowAnimations = com.android.internal.R.style.Animation_ImmersiveModeConfirmation;
         lp.token = getWindowToken();
@@ -475,6 +477,9 @@ public class ImmersiveModeConfirmation {
 
         @Override
         public void handleMessage(Message msg) {
+            if (CLIENT_TRANSIENT) {
+                return;
+            }
             switch(msg.what) {
                 case SHOW:
                     handleShow(msg.arg1);
