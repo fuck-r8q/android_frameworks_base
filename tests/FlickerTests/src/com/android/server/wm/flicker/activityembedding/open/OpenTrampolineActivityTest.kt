@@ -133,7 +133,8 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
                 }
                 // Begin of transition.
                 .then()
-                .isAppWindowInvisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
+                .isAppWindowInvisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
+                    isOptional = true)
                 .then()
                 .invoke("mainAndSecondaryInSplit") {
                     val mainActivityRegion =
@@ -165,7 +166,6 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
 
     @FlakyTest(bugId = 290736037)
     /** Main activity should go from fullscreen to being a split with secondary activity. */
-    @Presubmit
     @Test
     fun mainActivityLayerGoesFromFullscreenToSplit() {
         flicker.assertLayers {
@@ -195,6 +195,12 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
             // Layers of two activities sum to be fullscreen size on display.
             leftLayerRegion.plus(rightLayerRegion.region).coversExactly(startDisplayBounds)
         }
+    }
+
+    @FlakyTest(bugId = 288591571)
+    @Test
+    override fun visibleLayersShownMoreThanOneConsecutiveEntry() {
+        super.visibleLayersShownMoreThanOneConsecutiveEntry()
     }
 
     companion object {

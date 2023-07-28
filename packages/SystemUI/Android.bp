@@ -154,6 +154,7 @@ android_library {
         "res-keyguard",
         "res",
     ],
+    use_resource_processor: true,
     static_libs: [
         "WifiTrackerLib",
         "WindowManager-Shell",
@@ -193,6 +194,7 @@ android_library {
         "SystemUI-tags",
         "SystemUI-proto",
         "monet",
+        "libmonet",
         "dagger2",
         "jsr305",
         "jsr330",
@@ -307,6 +309,8 @@ filegroup {
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/WifiRepositorySwitcherTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/prod/DisabledWifiRepositoryTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/prod/WifiRepositoryImplTest.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/wifi/domain/interactor/WifiInteractorImplTest.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/wifi/ui/viewmodel/WifiViewModelTest.kt",
     ],
     path: "tests/src",
 }
@@ -372,6 +376,7 @@ android_library {
         "testables",
         "truth-prebuilt",
         "monet",
+        "libmonet",
         "dagger2",
         "jsr330",
         "WindowManager-Shell",
@@ -528,6 +533,7 @@ android_app {
     ],
     resource_dirs: [],
 
+    use_resource_processor: true,
     platform_apis: true,
     system_ext_specific: true,
     certificate: "platform",

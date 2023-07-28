@@ -23,7 +23,6 @@ import android.graphics.Rect;
 import android.util.ArrayMap;
 import android.widget.ImageView;
 
-import com.android.systemui.R;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dump.DumpManager;
 
@@ -31,6 +30,11 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import javax.inject.Inject;
+
+import kotlinx.coroutines.flow.FlowKt;
+import kotlinx.coroutines.flow.MutableStateFlow;
+import kotlinx.coroutines.flow.StateFlow;
+import kotlinx.coroutines.flow.StateFlowKt;
 
 /**
  */
@@ -47,6 +51,9 @@ public class DarkIconDispatcherImpl implements SysuiDarkIconDispatcher,
     private int mDarkModeIconColorSingleTone;
     private int mLightModeIconColorSingleTone;
 
+    private final MutableStateFlow<DarkChange> mDarkChangeFlow = StateFlowKt.MutableStateFlow(
+            DarkChange.EMPTY);
+
     /**
      */
     @Inject
@@ -54,8 +61,10 @@ public class DarkIconDispatcherImpl implements SysuiDarkIconDispatcher,
             Context context,
             LightBarTransitionsController.Factory lightBarTransitionsControllerFactory,
             DumpManager dumpManager) {
-        mDarkModeIconColorSingleTone = context.getColor(R.color.dark_mode_icon_color_single_tone);
-        mLightModeIconColorSingleTone = context.getColor(R.color.light_mode_icon_color_single_tone);
+        mDarkModeIconColorSingleTone = context.getColor(
+                com.android.settingslib.R.color.dark_mode_icon_color_single_tone);
+        mLightModeIconColorSingleTone = context.getColor(
+                com.android.settingslib.R.color.light_mode_icon_color_single_tone);
 
         mTransitionsController = lightBarTransitionsControllerFactory.create(this);
 
@@ -64,6 +73,11 @@ public class DarkIconDispatcherImpl implements SysuiDarkIconDispatcher,
 
     public LightBarTransitionsController getTransitionsController() {
         return mTransitionsController;
+    }
+
+    @Override
+    public StateFlow<DarkChange> darkChangeFlow() {
+        return FlowKt.asStateFlow(mDarkChangeFlow);
     }
 
     public void addDarkReceiver(DarkReceiver receiver) {
@@ -122,6 +136,7 @@ public class DarkIconDispatcherImpl implements SysuiDarkIconDispatcher,
     }
 
     private void applyIconTint() {
+        mDarkChangeFlow.setValue(new DarkChange(mTintAreas, mDarkIntensity, mIconTint));
         for (int i = 0; i < mReceivers.size(); i++) {
             mReceivers.valueAt(i).onDarkChanged(mTintAreas, mDarkIntensity, mIconTint);
         }
