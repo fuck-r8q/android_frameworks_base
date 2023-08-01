@@ -329,7 +329,9 @@ public class SystemActions implements CoreStartable {
         // binder calls
         final Optional<CentralSurfaces> centralSurfacesOptional =
                 mCentralSurfacesOptionalLazy.get();
-        if (centralSurfacesOptional.map(CentralSurfaces::isPanelExpanded).orElse(false)
+        if (centralSurfacesOptional.isPresent()
+                && centralSurfacesOptional.get().getShadeViewController() != null
+                && centralSurfacesOptional.get().getShadeViewController().isPanelExpanded()
                 && !centralSurfacesOptional.get().isKeyguardShowing()) {
             if (!mDismissNotificationShadeActionRegistered) {
                 mA11yManager.registerSystemAction(
@@ -485,13 +487,11 @@ public class SystemActions implements CoreStartable {
     }
 
     private void handleNotifications() {
-        mCentralSurfacesOptionalLazy.get().ifPresent(
-                CentralSurfaces::animateExpandNotificationsPanel);
+        mShadeController.animateExpandShade();
     }
 
     private void handleQuickSettings() {
-        mCentralSurfacesOptionalLazy.get().ifPresent(
-                centralSurfaces -> centralSurfaces.animateExpandSettingsPanel(null));
+        mShadeController.animateExpandQs();
     }
 
     private void handlePowerDialog() {

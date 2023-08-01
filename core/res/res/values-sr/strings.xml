@@ -623,6 +623,7 @@
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Биометријски хардвер није доступан"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Потврда идентитета је отказана"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Није препознато"</string>
+    <string name="biometric_face_not_recognized" msgid="5535599455744525200">"Лице није препознато"</string>
     <string name="biometric_error_canceled" msgid="8266582404844179778">"Потврда идентитета је отказана"</string>
     <string name="biometric_error_device_not_secured" msgid="3129845065043995924">"Нисте подесили ни PIN, ни шаблон, ни лозинку"</string>
     <string name="biometric_error_generic" msgid="6784371929985434439">"Грешка при потврди идентитета"</string>
@@ -1366,7 +1367,7 @@
     <string name="usb_ptp_notification_title" msgid="5043437571863443281">"Режим PTP преко USB-а је укључен"</string>
     <string name="usb_tether_notification_title" msgid="8828527870612663771">"USB привезивање је укључено"</string>
     <string name="usb_midi_notification_title" msgid="7404506788950595557">"Режим MIDI преко USB-а је укључен"</string>
-    <string name="usb_uvc_notification_title" msgid="2030032862673400008">"Уређај повезан као веб-камера"</string>
+    <string name="usb_uvc_notification_title" msgid="2030032862673400008">"Уређај повезан са веб-камером"</string>
     <string name="usb_accessory_notification_title" msgid="1385394660861956980">"USB додатак је повезан"</string>
     <string name="usb_notification_message" msgid="4715163067192110676">"Додирните за још опција."</string>
     <string name="usb_power_notification_message" msgid="7284765627437897702">"Повезани уређај се пуни. Додирните за још опција."</string>

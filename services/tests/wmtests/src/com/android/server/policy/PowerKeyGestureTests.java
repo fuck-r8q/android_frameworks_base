@@ -21,6 +21,7 @@ import static android.view.KeyEvent.KEYCODE_VOLUME_UP;
 import static com.android.server.policy.PhoneWindowManager.LONG_PRESS_POWER_ASSISTANT;
 import static com.android.server.policy.PhoneWindowManager.LONG_PRESS_POWER_GLOBAL_ACTIONS;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_DREAM_OR_SLEEP;
+import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_GO_TO_SLEEP;
 
 import android.provider.Settings;
 import android.view.Display;
@@ -39,6 +40,7 @@ public class PowerKeyGestureTests extends ShortcutKeyTestBase {
      */
     @Test
     public void testPowerSinglePress() {
+        mPhoneWindowManager.overrideShortPressOnPower(SHORT_PRESS_POWER_GO_TO_SLEEP);
         sendKey(KEYCODE_POWER);
         mPhoneWindowManager.assertPowerSleep();
 
@@ -58,7 +60,18 @@ public class PowerKeyGestureTests extends ShortcutKeyTestBase {
         mPhoneWindowManager.overrideCanStartDreaming(true);
         sendKey(KEYCODE_POWER);
         mPhoneWindowManager.assertDreamRequest();
+        mPhoneWindowManager.overrideIsDreaming(true);
         mPhoneWindowManager.assertLockedAfterAppTransitionFinished();
+    }
+
+    @Test
+    public void testAppTransitionFinishedCalledAfterDreamStoppedWillNotLockAgain() {
+        mPhoneWindowManager.overrideShortPressOnPower(SHORT_PRESS_POWER_DREAM_OR_SLEEP);
+        mPhoneWindowManager.overrideCanStartDreaming(true);
+        sendKey(KEYCODE_POWER);
+        mPhoneWindowManager.assertDreamRequest();
+        mPhoneWindowManager.overrideIsDreaming(false);
+        mPhoneWindowManager.assertDidNotLockAfterAppTransitionFinished();
     }
 
     /**
@@ -72,7 +85,7 @@ public class PowerKeyGestureTests extends ShortcutKeyTestBase {
         sendKey(KEYCODE_POWER);
         sendKey(KEYCODE_POWER);
         mPhoneWindowManager.assertCameraLaunch();
-        mPhoneWindowManager.assertWillNotLockAfterAppTransitionFinished();
+        mPhoneWindowManager.assertDidNotLockAfterAppTransitionFinished();
     }
 
     /**

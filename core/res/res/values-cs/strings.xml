@@ -624,6 +624,7 @@
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Biometrický hardware není k dispozici"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Ověření bylo zrušeno"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Nerozpoznáno"</string>
+    <string name="biometric_face_not_recognized" msgid="5535599455744525200">"Obličej nebyl rozpoznán"</string>
     <string name="biometric_error_canceled" msgid="8266582404844179778">"Ověření bylo zrušeno"</string>
     <string name="biometric_error_device_not_secured" msgid="3129845065043995924">"Není nastaven žádný PIN, gesto ani heslo"</string>
     <string name="biometric_error_generic" msgid="6784371929985434439">"Při ověřování došlo k chybě"</string>
@@ -633,7 +634,7 @@
     <string name="fingerprint_acquired_insufficient" msgid="623888149088216458">"Otisk prstu se nepodařilo rozpoznat. Zkuste to znovu."</string>
     <string name="fingerprint_acquired_imager_dirty" msgid="1770676120848224250">"Vyčistěte snímač otisků prstů a zkuste to znovu"</string>
     <string name="fingerprint_acquired_imager_dirty_alt" msgid="9169582140486372897">"Vyčistěte senzor a zkuste to znovu"</string>
-    <string name="fingerprint_acquired_too_fast" msgid="1628459767349116104">"Pevně přitiskněte prst na snímač"</string>
+    <string name="fingerprint_acquired_too_fast" msgid="1628459767349116104">"Pevně přitiskněte na snímač"</string>
     <string name="fingerprint_acquired_too_slow" msgid="6683510291554497580">"Pohyb prstem byl příliš pomalý. Zkuste to znovu."</string>
     <string name="fingerprint_acquired_already_enrolled" msgid="2285166003936206785">"Zkuste jiný otisk prstu"</string>
     <string name="fingerprint_acquired_too_bright" msgid="3863560181670915607">"Je příliš světlo"</string>

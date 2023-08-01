@@ -4258,6 +4258,13 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @VisibleForTesting
+    void overrideSensorManager(SensorManager sensorManager) {
+        synchronized (mSyncRoot) {
+            mSensorManager = sensorManager;
+        }
+    }
+
+    @VisibleForTesting
     final class LocalService extends DisplayManagerInternal {
 
         @Override
@@ -4510,7 +4517,7 @@ public final class DisplayManagerService extends SystemService {
                 }
                 final DisplayDeviceConfig config = device.getDisplayDeviceConfig();
                 SensorData sensorData = config.getProximitySensor();
-                if (sensorData.matches(sensorName, sensorType)) {
+                if (sensorData != null && sensorData.matches(sensorName, sensorType)) {
                     return new RefreshRateRange(sensorData.minRefreshRate,
                             sensorData.maxRefreshRate);
                 }
@@ -4622,6 +4629,22 @@ public final class DisplayManagerService extends SystemService {
 
                 return display.getPrimaryDisplayDeviceLocked().getDisplayDeviceConfig()
                         .getHostUsiVersion();
+            }
+        }
+
+        @Override
+        public AmbientLightSensorData getAmbientLightSensorData(int displayId) {
+            synchronized (mSyncRoot) {
+                final LogicalDisplay display = mLogicalDisplayMapper.getDisplayLocked(displayId);
+                if (display == null) {
+                    return null;
+                }
+                final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
+                if (device == null) {
+                    return null;
+                }
+                SensorData data = device.getDisplayDeviceConfig().getAmbientLightSensor();
+                return new AmbientLightSensorData(data.name, data.type);
             }
         }
 

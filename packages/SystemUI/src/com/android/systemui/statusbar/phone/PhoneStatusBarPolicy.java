@@ -289,6 +289,11 @@ public class PhoneStatusBarPolicy
         mIconController.setIcon(mSlotCast, R.drawable.stat_sys_cast, null);
         mIconController.setIconVisibility(mSlotCast, false);
 
+        // hotspot
+        mIconController.setIcon(mSlotHotspot, R.drawable.stat_sys_hotspot,
+                mResources.getString(R.string.accessibility_status_bar_hotspot));
+        mIconController.setIconVisibility(mSlotHotspot, mHotspot.isHotspotEnabled());
+
         // profile
         updateProfileIcon();
 

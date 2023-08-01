@@ -33,11 +33,14 @@ import android.window.TransitionInfo;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
+import androidx.annotation.Nullable;
+
 import com.android.wm.shell.R;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter;
+import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.transition.Transitions;
 
 /**
@@ -87,6 +90,9 @@ public class CaptionWindowDecorViewModel implements WindowDecorViewModel {
     public void setFreeformTaskTransitionStarter(FreeformTaskTransitionStarter transitionStarter) {
         mTaskOperations = new TaskOperations(transitionStarter, mContext, mSyncQueue);
     }
+
+    @Override
+    public void setSplitScreenController(SplitScreenController splitScreenController) {}
 
     @Override
     public boolean onTaskOpening(
@@ -254,7 +260,7 @@ public class CaptionWindowDecorViewModel implements WindowDecorViewModel {
          * @return {@code true} if a drag is happening; or {@code false} if it is not
          */
         @Override
-        public boolean handleMotionEvent(MotionEvent e) {
+        public boolean handleMotionEvent(@Nullable View v, MotionEvent e) {
             final RunningTaskInfo taskInfo = mTaskOrganizer.getRunningTaskInfo(mTaskId);
             if (taskInfo.getWindowingMode() == WINDOWING_MODE_FULLSCREEN) {
                 return false;

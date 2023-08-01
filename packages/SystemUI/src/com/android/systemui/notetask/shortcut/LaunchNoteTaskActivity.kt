@@ -31,7 +31,13 @@ class LaunchNoteTaskActivity @Inject constructor(private val controller: NoteTas
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        controller.showNoteTaskAsUser(entryPoint = NoteTaskEntryPoint.WIDGET_PICKER_SHORTCUT, user)
+        val entryPoint =
+            if (isInMultiWindowMode) {
+                NoteTaskEntryPoint.WIDGET_PICKER_SHORTCUT_IN_MULTI_WINDOW_MODE
+            } else {
+                NoteTaskEntryPoint.WIDGET_PICKER_SHORTCUT
+            }
+        controller.showNoteTaskAsUser(entryPoint, user)
         finish()
     }
 

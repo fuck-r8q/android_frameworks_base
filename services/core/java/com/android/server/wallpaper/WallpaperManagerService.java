@@ -45,6 +45,7 @@ import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
+import android.app.ApplicationExitInfo;
 import android.app.ILocalWallpaperColorConsumer;
 import android.app.IWallpaperManager;
 import android.app.IWallpaperManagerCallback;
@@ -186,6 +187,10 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
     private final boolean mIsMultiCropEnabled;
     /** Tracks wallpaper being migrated from system+lock to lock when setting static wp. */
     WallpaperDestinationChangeHandler mPendingMigrationViaStatic;
+
+    private static final double LMK_LOW_THRESHOLD_MEMORY_PERCENTAGE = 10;
+    private static final int LMK_RECONNECT_REBIND_RETRIES = 3;
+    private static final long LMK_RECONNECT_DELAY_MS = 5000;
 
     /**
      * Minimum time between crashes of a wallpaper service for us to consider
@@ -366,6 +371,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                     if (lockedWallpaper != null) {
                         detachWallpaperLocked(lockedWallpaper);
                     }
+                    clearWallpaperBitmaps(mWallpaper.userId, FLAG_LOCK);
                     mLockWallpaperMap.remove(wallpaper.userId);
                     notifyColorsWhich |= FLAG_LOCK;
                 }
@@ -988,6 +994,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         /** Time in milliseconds until we expect the wallpaper to reconnect (unless we're in the
          *  middle of an update). If exceeded, the wallpaper gets reset to the system default. */
         private static final long WALLPAPER_RECONNECT_TIMEOUT_MS = 10000;
+        private int mLmkLimitRebindRetries = LMK_RECONNECT_REBIND_RETRIES;
 
         final WallpaperInfo mInfo;
         IWallpaperService mService;
@@ -1209,20 +1216,51 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                             && mWallpaper.userId == mCurrentUserId
                             && !Objects.equals(mDefaultWallpaperComponent, wpService)
                             && !Objects.equals(mImageWallpaper, wpService)) {
-                        // There is a race condition which causes
-                        // {@link #mWallpaper.wallpaperUpdating} to be false even if it is
-                        // currently updating since the broadcast notifying us is async.
-                        // This race is overcome by the general rule that we only reset the
-                        // wallpaper if its service was shut down twice
-                        // during {@link #MIN_WALLPAPER_CRASH_TIME} millis.
-                        if (mWallpaper.lastDiedTime != 0
-                                && mWallpaper.lastDiedTime + MIN_WALLPAPER_CRASH_TIME
-                                > SystemClock.uptimeMillis()) {
-                            Slog.w(TAG, "Reverting to built-in wallpaper!");
-                            clearWallpaperLocked(true, FLAG_SYSTEM, mWallpaper.userId, null);
+                        List<ApplicationExitInfo> reasonList =
+                                mActivityManager.getHistoricalProcessExitReasons(
+                                wpService.getPackageName(), 0, 1);
+                        int exitReason = ApplicationExitInfo.REASON_UNKNOWN;
+                        if (reasonList != null && !reasonList.isEmpty()) {
+                            ApplicationExitInfo info = reasonList.get(0);
+                            exitReason = info.getReason();
+                        }
+                        Slog.d(TAG, "exitReason: " + exitReason);
+                        // If exit reason is LOW_MEMORY_KILLER
+                        // delay the mTryToRebindRunnable for 10s
+                        if (exitReason == ApplicationExitInfo.REASON_LOW_MEMORY) {
+                            if (isRunningOnLowMemory()) {
+                                Slog.i(TAG, "Rebind is delayed due to lmk");
+                                mContext.getMainThreadHandler().postDelayed(mTryToRebindRunnable,
+                                        LMK_RECONNECT_DELAY_MS);
+                                mLmkLimitRebindRetries = LMK_RECONNECT_REBIND_RETRIES;
+                            } else {
+                                if (mLmkLimitRebindRetries <= 0) {
+                                    Slog.w(TAG, "Reverting to built-in wallpaper due to lmk!");
+                                    clearWallpaperLocked(true, FLAG_SYSTEM, mWallpaper.userId,
+                                            null);
+                                    mLmkLimitRebindRetries = LMK_RECONNECT_REBIND_RETRIES;
+                                    return;
+                                }
+                                mLmkLimitRebindRetries--;
+                                mContext.getMainThreadHandler().postDelayed(mTryToRebindRunnable,
+                                        LMK_RECONNECT_DELAY_MS);
+                            }
                         } else {
-                            mWallpaper.lastDiedTime = SystemClock.uptimeMillis();
-                            tryToRebind();
+                            // There is a race condition which causes
+                            // {@link #mWallpaper.wallpaperUpdating} to be false even if it is
+                            // currently updating since the broadcast notifying us is async.
+                            // This race is overcome by the general rule that we only reset the
+                            // wallpaper if its service was shut down twice
+                            // during {@link #MIN_WALLPAPER_CRASH_TIME} millis.
+                            if (mWallpaper.lastDiedTime != 0
+                                    && mWallpaper.lastDiedTime + MIN_WALLPAPER_CRASH_TIME
+                                    > SystemClock.uptimeMillis()) {
+                                Slog.w(TAG, "Reverting to built-in wallpaper!");
+                                clearWallpaperLocked(true, FLAG_SYSTEM, mWallpaper.userId, null);
+                            } else {
+                                mWallpaper.lastDiedTime = SystemClock.uptimeMillis();
+                                tryToRebind();
+                            }
                         }
                     }
                 } else {
@@ -1232,6 +1270,14 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                 }
             }
         };
+
+        private boolean isRunningOnLowMemory() {
+            ActivityManager.MemoryInfo memoryInfo = new ActivityManager.MemoryInfo();
+            mActivityManager.getMemoryInfo(memoryInfo);
+            double availableMBsInPercentage = memoryInfo.availMem / (double)memoryInfo.totalMem *
+                    100.0;
+            return availableMBsInPercentage < LMK_LOW_THRESHOLD_MEMORY_PERCENTAGE;
+        }
 
         /**
          * Called by a live wallpaper if its colors have changed.
@@ -1417,6 +1463,10 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                 }
             }
 
+            synchronized (mLock) {
+                saveSettingsLocked(mNewWallpaper.userId);
+            }
+
             if (DEBUG) {
                 Slog.v(TAG, "--- wallpaper changed --");
                 Slog.v(TAG, "new sysWp: " + mWallpaperMap.get(mCurrentUserId));
@@ -1588,7 +1638,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         mShuttingDown = false;
         mImageWallpaper = ComponentName.unflattenFromString(
                 context.getResources().getString(R.string.image_wallpaper_component));
-        mDefaultWallpaperComponent = WallpaperManager.getDefaultWallpaperComponent(context);
+        mDefaultWallpaperComponent = WallpaperManager.getCmfDefaultWallpaperComponent(context);
         mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
         mIPackageManager = AppGlobals.getPackageManager();
@@ -1775,21 +1825,23 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
             if (record.exists()) {
                 Slog.w(TAG, "User:" + userID + ", wallpaper tyep = " + type
                         + ", wallpaper fail detect!! reset to default wallpaper");
-                clearWallpaperData(userID, type);
+                clearWallpaperBitmaps(userID, type);
                 record.delete();
             }
         });
     }
 
-    private void clearWallpaperData(int userID, int wallpaperType) {
+    private void clearWallpaperBitmaps(int userID, int wallpaperType) {
         final WallpaperData wallpaper = new WallpaperData(userID, wallpaperType);
-        if (wallpaper.sourceExists()) {
-            wallpaper.wallpaperFile.delete();
-        }
-        if (wallpaper.cropExists()) {
-            wallpaper.cropFile.delete();
-        }
+        clearWallpaperBitmaps(wallpaper);
+    }
 
+    private boolean clearWallpaperBitmaps(WallpaperData wallpaper) {
+        boolean sourceExists = wallpaper.sourceExists();
+        boolean cropExists = wallpaper.cropExists();
+        if (sourceExists) wallpaper.wallpaperFile.delete();
+        if (cropExists) wallpaper.cropFile.delete();
+        return sourceExists || cropExists;
     }
 
     @Override
@@ -1966,10 +2018,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         // files from the previous static wallpaper may still be stored in memory.
         // delete them in order to show the default wallpaper.
-        if (wallpaper.wallpaperFile.exists()) {
-            wallpaper.wallpaperFile.delete();
-            wallpaper.cropFile.delete();
-        }
+        clearWallpaperBitmaps(wallpaper);
 
         bindWallpaperComponentLocked(mImageWallpaper, true, false, fallback, reply);
         if ((wallpaper.mWhich & FLAG_SYSTEM) != 0) mHomeWallpaperWaitingForUnlock = true;
@@ -1988,7 +2037,11 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         WallpaperData data = null;
         synchronized (mLock) {
-            clearWallpaperLocked(false, which, userId, null);
+            if (mIsLockscreenLiveWallpaperEnabled) {
+                clearWallpaperLocked(callingPackage, false, which, userId);
+            } else {
+                clearWallpaperLocked(false, which, userId, null);
+            }
 
             if (which == FLAG_LOCK) {
                 data = mLockWallpaperMap.get(userId);
@@ -2005,7 +2058,64 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         }
     }
 
-    void clearWallpaperLocked(boolean defaultFailed, int which, int userId, IRemoteCallback reply) {
+    private void clearWallpaperLocked(String callingPackage, boolean defaultFailed,
+            int which, int userId) {
+
+        // Might need to bring it in the first time to establish our rewrite
+        if (!mWallpaperMap.contains(userId)) {
+            loadSettingsLocked(userId, false, FLAG_LOCK | FLAG_SYSTEM);
+        }
+        final WallpaperData wallpaper = mWallpaperMap.get(userId);
+        final WallpaperData lockWallpaper = mLockWallpaperMap.get(userId);
+        if (which == FLAG_LOCK && lockWallpaper == null) {
+            // It's already gone; we're done.
+            if (DEBUG) {
+                Slog.i(TAG, "Lock wallpaper already cleared");
+            }
+            return;
+        }
+
+        RuntimeException e = null;
+        try {
+            if (userId != mCurrentUserId && !hasCrossUserPermission()) return;
+
+            final ComponentName component;
+            final int finalWhich;
+
+            if ((which & FLAG_LOCK) > 0 && lockWallpaper != null) {
+                clearWallpaperBitmaps(lockWallpaper);
+            }
+            if ((which & FLAG_SYSTEM) > 0) {
+                clearWallpaperBitmaps(wallpaper);
+            }
+
+            // lock only case: set the system wallpaper component to both screens
+            if (which == FLAG_LOCK) {
+                component = wallpaper.wallpaperComponent;
+                finalWhich = FLAG_LOCK | FLAG_SYSTEM;
+            } else {
+                component = defaultFailed ? mImageWallpaper : null;
+                finalWhich = which;
+            }
+
+            boolean success = withCleanCallingIdentity(() -> setWallpaperComponent(
+                    component, callingPackage, finalWhich, userId));
+            if (success) return;
+        } catch (IllegalArgumentException e1) {
+            e = e1;
+        }
+
+        // This can happen if the default wallpaper component doesn't
+        // exist. This should be a system configuration problem, but
+        // let's not let it crash the system and just live with no
+        // wallpaper.
+        Slog.e(TAG, "Default wallpaper component not found!", e);
+        withCleanCallingIdentity(() -> clearWallpaperComponentLocked(wallpaper));
+    }
+
+    // TODO(b/266818039) remove this version of the method
+    private void clearWallpaperLocked(boolean defaultFailed, int which, int userId,
+            IRemoteCallback reply) {
         if (which != FLAG_SYSTEM && which != FLAG_LOCK) {
             throw new IllegalArgumentException("Must specify exactly one kind of wallpaper to clear");
         }
@@ -2034,9 +2144,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         final long ident = Binder.clearCallingIdentity();
         try {
-            if (wallpaper.wallpaperFile.exists()) {
-                wallpaper.wallpaperFile.delete();
-                wallpaper.cropFile.delete();
+            if (clearWallpaperBitmaps(wallpaper)) {
                 if (which == FLAG_LOCK) {
                     mLockWallpaperMap.remove(userId);
                     final IWallpaperManagerCallback cb = mKeyguardListener;
@@ -3101,8 +3209,13 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
 
         // Migrate the bitmap files outright; no need to copy
         try {
-            Os.rename(sysWP.wallpaperFile.getAbsolutePath(), lockWP.wallpaperFile.getAbsolutePath());
-            Os.rename(sysWP.cropFile.getAbsolutePath(), lockWP.cropFile.getAbsolutePath());
+            if (!mIsLockscreenLiveWallpaperEnabled || sysWP.wallpaperFile.exists()) {
+                Os.rename(sysWP.wallpaperFile.getAbsolutePath(),
+                        lockWP.wallpaperFile.getAbsolutePath());
+            }
+            if (!mIsLockscreenLiveWallpaperEnabled || sysWP.cropFile.exists()) {
+                Os.rename(sysWP.cropFile.getAbsolutePath(), lockWP.cropFile.getAbsolutePath());
+            }
             mLockWallpaperMap.put(userId, lockWP);
             if (mIsLockscreenLiveWallpaperEnabled) {
                 SELinux.restorecon(lockWP.wallpaperFile);
@@ -3112,8 +3225,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         } catch (ErrnoException e) {
             // can happen when migrating default wallpaper (which is not stored in wallpaperFile)
             Slog.w(TAG, "Couldn't migrate system wallpaper: " + e.getMessage());
-            lockWP.wallpaperFile.delete();
-            lockWP.cropFile.delete();
+            clearWallpaperBitmaps(lockWP);
             return false;
         }
     }
@@ -3169,16 +3281,17 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
     }
 
     @VisibleForTesting
-    void setWallpaperComponent(ComponentName name, String callingPackage,
+    boolean setWallpaperComponent(ComponentName name, String callingPackage,
             @SetWallpaperFlags int which, int userId) {
         if (mIsLockscreenLiveWallpaperEnabled) {
-            setWallpaperComponentInternal(name, callingPackage, which, userId);
+            return setWallpaperComponentInternal(name, callingPackage, which, userId);
         } else {
             setWallpaperComponentInternalLegacy(name, callingPackage, which, userId);
+            return true;
         }
     }
 
-    private void setWallpaperComponentInternal(ComponentName name, String callingPackage,
+    private boolean setWallpaperComponentInternal(ComponentName name, String callingPackage,
             @SetWallpaperFlags int which, int userIdIn) {
         if (DEBUG) {
             Slog.v(TAG, "Setting new live wallpaper: which=" + which + ", component: " + name);
@@ -3189,6 +3302,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
         checkPermission(android.Manifest.permission.SET_WALLPAPER_COMPONENT);
 
         boolean shouldNotifyColors = false;
+        boolean bindSuccess;
         final WallpaperData newWallpaper;
 
         synchronized (mLock) {
@@ -3237,7 +3351,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                  */
                 boolean forceRebind = same && systemIsBoth && which == FLAG_SYSTEM;
 
-                boolean bindSuccess = bindWallpaperComponentLocked(name, /* force */
+                bindSuccess = bindWallpaperComponentLocked(name, /* force */
                         forceRebind, /* fromUser */ true, newWallpaper, callback);
                 if (bindSuccess) {
                     if (!same) {
@@ -3256,6 +3370,11 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                             });
                         }
                     }
+                    boolean lockBitmapCleared = false;
+                    if (!mImageWallpaper.equals(newWallpaper.wallpaperComponent)) {
+                        clearWallpaperBitmaps(newWallpaper);
+                        lockBitmapCleared = newWallpaper.mWhich == FLAG_LOCK;
+                    }
                     newWallpaper.wallpaperId = makeWallpaperIdLocked();
                     notifyCallbacksLocked(newWallpaper);
                     shouldNotifyColors = true;
@@ -3272,6 +3391,9 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
                                 updateEngineFlags(newWallpaper);
                             }
                         }
+                        if (!lockBitmapCleared) {
+                            clearWallpaperBitmaps(newWallpaper.userId, FLAG_LOCK);
+                        }
                         mLockWallpaperMap.remove(newWallpaper.userId);
                     }
                 }
@@ -3284,6 +3406,7 @@ public class WallpaperManagerService extends IWallpaperManager.Stub
             notifyWallpaperColorsChanged(newWallpaper, which);
             notifyWallpaperColorsChanged(mFallbackWallpaper, FLAG_SYSTEM);
         }
+        return bindSuccess;
     }
 
     // TODO(b/266818039) Remove this method

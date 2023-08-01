@@ -76,6 +76,7 @@ import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.ExternalInterfaceBinder;
+import com.android.wm.shell.common.LaunchAdjacentController;
 import com.android.wm.shell.common.RemoteCallable;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SingleInstanceRemoteListener;
@@ -94,6 +95,7 @@ import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
+import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -171,6 +173,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
     private final TransactionPool mTransactionPool;
     private final IconProvider mIconProvider;
     private final Optional<RecentTasksController> mRecentTasksOptional;
+    private final LaunchAdjacentController mLaunchAdjacentController;
+    private final Optional<WindowDecorViewModel> mWindowDecorViewModel;
     private final SplitScreenShellCommandHandler mSplitScreenShellCommandHandler;
     private final String[] mAppsSupportMultiInstances;
 
@@ -197,6 +201,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             TransactionPool transactionPool,
             IconProvider iconProvider,
             Optional<RecentTasksController> recentTasks,
+            LaunchAdjacentController launchAdjacentController,
+            Optional<WindowDecorViewModel> windowDecorViewModel,
             ShellExecutor mainExecutor) {
         mShellCommandHandler = shellCommandHandler;
         mShellController = shellController;
@@ -213,6 +219,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mTransactionPool = transactionPool;
         mIconProvider = iconProvider;
         mRecentTasksOptional = recentTasks;
+        mLaunchAdjacentController = launchAdjacentController;
+        mWindowDecorViewModel = windowDecorViewModel;
         mSplitScreenShellCommandHandler = new SplitScreenShellCommandHandler(this);
         // TODO(b/238217847): Temporarily add this check here until we can remove the dynamic
         //                    override for this controller from the base module
@@ -242,6 +250,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             TransactionPool transactionPool,
             IconProvider iconProvider,
             RecentTasksController recentTasks,
+            LaunchAdjacentController launchAdjacentController,
+            WindowDecorViewModel windowDecorViewModel,
             ShellExecutor mainExecutor,
             StageCoordinator stageCoordinator) {
         mShellCommandHandler = shellCommandHandler;
@@ -259,6 +269,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mTransactionPool = transactionPool;
         mIconProvider = iconProvider;
         mRecentTasksOptional = Optional.of(recentTasks);
+        mLaunchAdjacentController = launchAdjacentController;
+        mWindowDecorViewModel = Optional.of(windowDecorViewModel);
         mStageCoordinator = stageCoordinator;
         mSplitScreenShellCommandHandler = new SplitScreenShellCommandHandler(this);
         shellInit.addInitCallback(this::onInit, this);
@@ -291,13 +303,15 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             mStageCoordinator = createStageCoordinator();
         }
         mDragAndDropController.ifPresent(controller -> controller.setSplitScreenController(this));
+        mWindowDecorViewModel.ifPresent(viewModel -> viewModel.setSplitScreenController(this));
     }
 
     protected StageCoordinator createStageCoordinator() {
         return new StageCoordinator(mContext, DEFAULT_DISPLAY, mSyncQueue,
                 mTaskOrganizer, mDisplayController, mDisplayImeController,
-                mDisplayInsetsController, mTransitions, mTransactionPool,
-                mIconProvider, mMainExecutor, mRecentTasksOptional);
+                mDisplayInsetsController, mTransitions, mTransactionPool, mIconProvider,
+                mMainExecutor, mRecentTasksOptional, mLaunchAdjacentController,
+                mWindowDecorViewModel);
     }
 
     @Override

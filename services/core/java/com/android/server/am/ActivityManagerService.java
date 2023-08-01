@@ -1548,7 +1548,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     int mBootPhase;
 
-    volatile boolean mDeterministicUidIdle = false;
+    @GuardedBy("this")
+    boolean mDeterministicUidIdle = false;
 
     @VisibleForTesting
     public WindowManagerService mWindowManager;
@@ -4666,14 +4667,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         synchronized (mProcLock) {
-            app.mState.setCurAdj(ProcessList.INVALID_ADJ);
-            app.mState.setSetAdj(ProcessList.INVALID_ADJ);
-            app.mState.setVerifiedAdj(ProcessList.INVALID_ADJ);
-            mOomAdjuster.setAttachingSchedGroupLSP(app);
-            app.mState.setForcingToImportant(null);
+            mOomAdjuster.setAttachingProcessStatesLSP(app);
             clearProcessForegroundLocked(app);
-            app.mState.setHasShownUi(false);
-            app.mState.setCached(false);
             app.setDebugging(false);
             app.setKilledByAm(false);
             app.setKilled(false);
@@ -4842,8 +4837,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                 app.makeActive(thread, mProcessStats);
                 checkTime(startTime, "attachApplicationLocked: immediately after bindApplication");
             }
+            app.setPendingFinishAttach(true);
+
             updateLruProcessLocked(app, false, null);
             checkTime(startTime, "attachApplicationLocked: after updateLruProcessLocked");
+
+            updateOomAdjLocked(app, OOM_ADJ_REASON_PROCESS_BEGIN);
+            checkTime(startTime, "attachApplicationLocked: after updateOomAdjLocked");
+
             final long now = SystemClock.uptimeMillis();
             synchronized (mAppProfiler.mProfilerLock) {
                 app.mProfile.setLastRequestedGc(now);
@@ -4859,8 +4860,6 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             if (!mConstants.mEnableWaitForFinishAttachApplication) {
                 finishAttachApplicationInner(startSeq, callingUid, pid);
-            } else {
-                app.setPendingFinishAttach(true);
             }
         } catch (Exception e) {
             // We need kill the process group here. (b/148588589)
@@ -8684,10 +8683,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 t.traceEnd();
             }
 
-            t.traceBegin("showSystemReadyErrorDialogs");
-            mAtmInternal.showSystemReadyErrorDialogsIfNeeded();
-            t.traceEnd();
-
+            mHandler.post(mAtmInternal::showSystemReadyErrorDialogsIfNeeded);
 
             if (isBootingSystemUser) {
                 // Need to send the broadcasts for the system user here because
@@ -9307,6 +9303,11 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private final DropboxRateLimiter mDropboxRateLimiter = new DropboxRateLimiter();
+
+    /** Initializes the Dropbox Rate Limiter parameters from flags. */
+    public void initDropboxRateLimiter() {
+        mDropboxRateLimiter.init();
+    }
 
     /**
      * Write a description of an error (crash, WTF, ANR) to the drop box.
@@ -16656,7 +16657,9 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @Override
     public void setDeterministicUidIdle(boolean deterministic) {
-        mDeterministicUidIdle = deterministic;
+        synchronized (this) {
+            mDeterministicUidIdle = deterministic;
+        }
     }
 
     /** Make the currently active UIDs idle after a certain grace period. */
@@ -19727,7 +19730,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             for (Display display : allDisplays) {
                 int displayId = display.getDisplayId();
                 // TODO(b/247592632): check other properties like isSecure or proper display type
-                if (display.isValid()
+                if (display.isValid() && ((display.getFlags() & Display.FLAG_PRIVATE) == 0)
                         && (allowOnDefaultDisplay || displayId != Display.DEFAULT_DISPLAY)) {
                     displayIds[numberValidDisplays++] = displayId;
                 }

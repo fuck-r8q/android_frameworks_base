@@ -16,17 +16,15 @@
 
 package com.android.server.contentprotection;
 
-import static android.view.contentcapture.ContentCaptureSession.FLUSH_REASON_LOGIN_DETECTED;
-
 import android.annotation.NonNull;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ParceledListSlice;
 import android.service.contentcapture.ContentCaptureService;
+import android.service.contentcapture.IContentProtectionService;
 import android.util.Slog;
 import android.view.contentcapture.ContentCaptureEvent;
-import android.view.contentcapture.IContentCaptureDirectManager;
 
 import com.android.internal.infra.ServiceConnector;
 
@@ -37,7 +35,8 @@ import java.time.Duration;
  *
  * @hide
  */
-class RemoteContentProtectionService extends ServiceConnector.Impl<IContentCaptureDirectManager> {
+public class RemoteContentProtectionService
+        extends ServiceConnector.Impl<IContentProtectionService> {
 
     private static final String TAG = RemoteContentProtectionService.class.getSimpleName();
 
@@ -45,7 +44,7 @@ class RemoteContentProtectionService extends ServiceConnector.Impl<IContentCaptu
 
     @NonNull private final ComponentName mComponentName;
 
-    protected RemoteContentProtectionService(
+    public RemoteContentProtectionService(
             @NonNull Context context,
             @NonNull ComponentName componentName,
             int userId,
@@ -56,7 +55,7 @@ class RemoteContentProtectionService extends ServiceConnector.Impl<IContentCaptu
                         .setComponent(componentName),
                 bindAllowInstant ? Context.BIND_ALLOW_INSTANT : 0,
                 userId,
-                IContentCaptureDirectManager.Stub::asInterface);
+                IContentProtectionService.Stub::asInterface);
         mComponentName = componentName;
     }
 
@@ -67,7 +66,7 @@ class RemoteContentProtectionService extends ServiceConnector.Impl<IContentCaptu
 
     @Override // from ServiceConnector.Impl
     protected void onServiceConnectionStatusChanged(
-            @NonNull IContentCaptureDirectManager service, boolean isConnected) {
+            @NonNull IContentProtectionService service, boolean isConnected) {
         Slog.i(
                 TAG,
                 "Connection status for: "
@@ -77,9 +76,6 @@ class RemoteContentProtectionService extends ServiceConnector.Impl<IContentCaptu
     }
 
     public void onLoginDetected(@NonNull ParceledListSlice<ContentCaptureEvent> events) {
-        run(
-                service ->
-                        service.sendEvents(
-                                events, FLUSH_REASON_LOGIN_DETECTED, /* options= */ null));
+        run(service -> service.onLoginDetected(events));
     }
 }

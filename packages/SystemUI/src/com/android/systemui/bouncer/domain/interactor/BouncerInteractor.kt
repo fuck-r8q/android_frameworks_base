@@ -21,7 +21,7 @@ import androidx.annotation.VisibleForTesting
 import com.android.systemui.R
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
-import com.android.systemui.bouncer.data.repo.BouncerRepository
+import com.android.systemui.bouncer.data.repository.BouncerRepository
 import com.android.systemui.bouncer.shared.model.AuthenticationThrottledModel
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.scene.domain.interactor.SceneInteractor
@@ -149,19 +149,28 @@ constructor(
      * If the input is correct, the device will be unlocked and the lock screen and bouncer will be
      * dismissed and hidden.
      *
+     * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
+     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
+     * `null` is returned.
+     *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false`
-     *   otherwise.
+     * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
+     *   request to validate.
+     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
+     *   authentication failed, `null` if the check was not performed.
      */
     fun authenticate(
         input: List<Any>,
-    ): Boolean {
+        tryAutoConfirm: Boolean = false,
+    ): Boolean? {
         if (repository.throttling.value != null) {
             return false
         }
 
-        val isAuthenticated = authenticationInteractor.authenticate(input)
+        val isAuthenticated =
+            authenticationInteractor.authenticate(input, tryAutoConfirm) ?: return null
+
         val failedAttempts = authenticationInteractor.failedAuthenticationAttempts.value
         when {
             isAuthenticated -> {

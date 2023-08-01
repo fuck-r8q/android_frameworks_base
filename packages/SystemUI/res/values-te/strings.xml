@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"ఆడియో"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"హెడ్‌సెట్"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"ఇన్‌పుట్"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"వినికిడి పరికరాలు"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"వినికిడి పరికరాలు"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"ఆన్ చేస్తోంది…"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"ఆటో-రొటేట్‌"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"స్క్రీన్ ఆటో-రొటేట్‌"</string>
@@ -1046,6 +1046,7 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"మీ బ్యాటరీ మీటర్‌ను చదవడంలో సమస్య"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"మరింత సమాచారం కోసం ట్యాప్ చేయండి"</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"అలారం సెట్ చేయలేదు"</string>
+    <string name="accessibility_bouncer" msgid="5896923685673320070">"స్క్రీన్ లాక్‌ను ఎంటర్ చేయండి"</string>
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"వేలిముద్ర సెన్సార్"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"ప్రామాణీకరించండి"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"పరికరాన్ని ఎంటర్ చేయండి"</string>
@@ -1108,10 +1109,8 @@
     <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"Assistant వింటోంది"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# నోటిఫికేషన్}other{# నోటిఫికేషన్‌లు}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
-    <!-- no translation found for note_task_button_label (230135078402003532) -->
-    <skip />
-    <!-- no translation found for note_task_shortcut_long_label (7729325091147319409) -->
-    <skip />
+    <string name="note_task_button_label" msgid="230135078402003532">"నోట్-టేకింగ్"</string>
+    <string name="note_task_shortcut_long_label" msgid="7729325091147319409">"నోట్-టేకింగ్, <xliff:g id="NOTE_TAKING_APP">%1$s</xliff:g>"</string>
     <string name="broadcasting_description_is_broadcasting" msgid="765627502786404290">"ప్రసారం చేస్తోంది"</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="3605428497924077811">"<xliff:g id="APP_NAME">%1$s</xliff:g> ప్రసారం చేయడాన్ని ఆపివేయాలా?"</string>
     <string name="bt_le_audio_broadcast_dialog_sub_title" msgid="7889684551194225793">"మీరు <xliff:g id="SWITCHAPP">%1$s</xliff:g> ప్రసారం చేస్తే లేదా అవుట్‌పుట్‌ను మార్చినట్లయితే, మీ ప్రస్తుత ప్రసారం ఆగిపోతుంది"</string>

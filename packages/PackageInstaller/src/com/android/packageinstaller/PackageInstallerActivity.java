@@ -16,8 +16,9 @@
 */
 package com.android.packageinstaller;
 
+import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP;
 import static android.content.Intent.FLAG_ACTIVITY_NO_HISTORY;
-import static android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT;
+import static android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
 
 import android.Manifest;
@@ -48,6 +49,8 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
+import android.text.Html;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -143,9 +146,12 @@ public class PackageInstallerActivity extends AlertActivity {
             final CharSequence requestedUpdateOwnerLabel = getApplicationLabel(mCallingPackage);
             if (!TextUtils.isEmpty(existingUpdateOwnerLabel)
                     && mPendingUserActionReason == PackageInstaller.REASON_REMIND_OWNERSHIP) {
-                viewToEnable.setText(
+                String updateOwnerString =
                         getString(R.string.install_confirm_question_update_owner_reminder,
-                                requestedUpdateOwnerLabel, existingUpdateOwnerLabel));
+                                requestedUpdateOwnerLabel, existingUpdateOwnerLabel);
+                Spanned styledUpdateOwnerString =
+                        Html.fromHtml(updateOwnerString, Html.FROM_HTML_MODE_LEGACY);
+                viewToEnable.setText(styledUpdateOwnerString);
                 mOk.setText(R.string.update_anyway);
             } else {
                 mOk.setText(R.string.update);
@@ -789,7 +795,8 @@ public class PackageInstallerActivity extends AlertActivity {
             }
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 if (!isDestroyed()) {
-                    startActivity(getIntent().addFlags(FLAG_ACTIVITY_REORDER_TO_FRONT));
+                    startActivity(getIntent().addFlags(
+                            FLAG_ACTIVITY_CLEAR_TOP | FLAG_ACTIVITY_SINGLE_TOP));
                 }
             }, 500);
 

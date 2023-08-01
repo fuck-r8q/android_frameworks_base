@@ -82,9 +82,9 @@ import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.ScreenLifecycle;
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
-import com.android.systemui.keyguard.domain.interactor.PrimaryBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -173,6 +173,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     @NonNull private final SecureSettings mSecureSettings;
     @NonNull private final UdfpsUtils mUdfpsUtils;
     @NonNull private final InputManager mInputManager;
+    @NonNull private final UdfpsKeyguardAccessibilityDelegate mUdfpsKeyguardAccessibilityDelegate;
     private final boolean mIgnoreRefreshRate;
 
     // Currently the UdfpsController supports a single UDFPS sensor. If devices have multiple
@@ -272,7 +273,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                             mUdfpsDisplayMode, mSecureSettings, requestId, reason, callback,
                             (view, event, fromUdfpsView) -> onTouch(requestId, event,
                                     fromUdfpsView), mActivityLaunchAnimator, mFeatureFlags,
-                            mPrimaryBouncerInteractor, mAlternateBouncerInteractor, mUdfpsUtils)));
+                            mPrimaryBouncerInteractor, mAlternateBouncerInteractor, mUdfpsUtils,
+                            mUdfpsKeyguardAccessibilityDelegate)));
         }
 
         @Override
@@ -354,7 +356,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                 UdfpsController.this.mAlternateTouchProvider.onUiReady();
             } else {
                 final long requestId = (mOverlay != null) ? mOverlay.getRequestId() : 0L;
-                UdfpsController.this.mFingerprintManager.onUiReady(requestId, sensorId);
+                UdfpsController.this.mFingerprintManager.onUdfpsUiEvent(
+                        FingerprintManager.UDFPS_UI_READY, requestId, sensorId);
             }
         }
     }
@@ -825,7 +828,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             @NonNull SecureSettings secureSettings,
             @NonNull InputManager inputManager,
             @NonNull UdfpsUtils udfpsUtils,
-            @NonNull KeyguardFaceAuthInteractor keyguardFaceAuthInteractor) {
+            @NonNull KeyguardFaceAuthInteractor keyguardFaceAuthInteractor,
+            @NonNull UdfpsKeyguardAccessibilityDelegate udfpsKeyguardAccessibilityDelegate) {
         mContext = context;
         mExecution = execution;
         mVibrator = vibrator;
@@ -871,6 +875,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mSecureSettings = secureSettings;
         mUdfpsUtils = udfpsUtils;
         mInputManager = inputManager;
+        mUdfpsKeyguardAccessibilityDelegate = udfpsKeyguardAccessibilityDelegate;
 
         mTouchProcessor = mFeatureFlags.isEnabled(Flags.UDFPS_NEW_TOUCH_DETECTION)
                 ? singlePointerTouchProcessor : null;
@@ -952,6 +957,10 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             mOnFingerDown = false;
             mAttemptedToDismissKeyguard = false;
             mOrientationListener.enable();
+            if (mFingerprintManager != null) {
+                mFingerprintManager.onUdfpsUiEvent(FingerprintManager.UDFPS_UI_OVERLAY_SHOWN,
+                        overlay.getRequestId(), mSensorProps.sensorId);
+            }
         } else {
             Log.v(TAG, "showUdfpsOverlay | the overlay is already showing");
         }
@@ -1093,7 +1102,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                 mLatencyTracker.onActionEnd(LatencyTracker.ACTION_UDFPS_ILLUMINATE);
             });
         } else {
-            mFingerprintManager.onUiReady(requestId, mSensorProps.sensorId);
+            mFingerprintManager.onUdfpsUiEvent(FingerprintManager.UDFPS_UI_READY, requestId,
+                    mSensorProps.sensorId);
             mLatencyTracker.onActionEnd(LatencyTracker.ACTION_UDFPS_ILLUMINATE);
         }
     }

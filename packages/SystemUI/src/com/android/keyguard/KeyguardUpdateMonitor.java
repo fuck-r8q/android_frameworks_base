@@ -155,6 +155,8 @@ import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.dump.DumpsysTableLogger;
+import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.domain.interactor.FaceAuthenticationListener;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.shared.constants.TrustAgentUiEvent;
@@ -384,6 +386,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private final ActiveUnlockConfig mActiveUnlockConfig;
     private final IDreamManager mDreamManager;
     private final TelephonyManager mTelephonyManager;
+    private final FeatureFlags mFeatureFlags;
     @Nullable
     private final FingerprintManager mFpm;
     @Nullable
@@ -2305,7 +2308,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             @Nullable BiometricManager biometricManager,
             FaceWakeUpTriggersConfig faceWakeUpTriggersConfig,
             DevicePostureController devicePostureController,
-            Optional<FingerprintInteractiveToAuthProvider> interactiveToAuthProvider) {
+            Optional<FingerprintInteractiveToAuthProvider> interactiveToAuthProvider,
+            FeatureFlags featureFlags) {
         mContext = context;
         mSubscriptionManager = subscriptionManager;
         mUserTracker = userTracker;
@@ -2337,6 +2341,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         mPackageManager = packageManager;
         mFpm = fingerprintManager;
         mFaceManager = faceManager;
+        mFeatureFlags = featureFlags;
         mActiveUnlockConfig.setKeyguardUpdateMonitor(this);
         mFaceAcquiredInfoIgnoreList = Arrays.stream(
                 mContext.getResources().getIntArray(
@@ -3028,7 +3033,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                         || shouldListenForFingerprintAssistant
                         || (mKeyguardOccluded && mIsDreaming)
                         || (mKeyguardOccluded && userDoesNotHaveTrust && mKeyguardShowing
-                            && (mOccludingAppRequestingFp || isUdfps || mAlternateBouncerShowing));
+                        && (mOccludingAppRequestingFp
+                        || isUdfps
+                        || mAlternateBouncerShowing
+                        || mFeatureFlags.isEnabled(Flags.FP_LISTEN_OCCLUDING_APPS)
+                )
+            );
 
         // Only listen if this KeyguardUpdateMonitor belongs to the system user. There is an
         // instance of KeyguardUpdateMonitor for each user but KeyguardUpdateMonitor is user-aware.
@@ -3183,6 +3193,13 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private boolean doesPostureAllowFaceAuth(@DevicePostureInt int posture) {
         return mConfigFaceAuthSupportedPosture == DEVICE_POSTURE_UNKNOWN
                 || (posture == mConfigFaceAuthSupportedPosture);
+    }
+
+    /**
+     * If the current device posture allows face auth to run.
+     */
+    public boolean doesCurrentPostureAllowFaceAuth() {
+        return doesPostureAllowFaceAuth(mPostureState);
     }
 
     private void logListenerModelData(@NonNull KeyguardListenModel model) {

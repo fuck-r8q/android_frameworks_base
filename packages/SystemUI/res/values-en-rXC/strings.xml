@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‎‎‏‎‏‎‏‏‎‏‎‏‎‎‎‏‎‎‏‏‎‏‎‎‎‏‎‏‎‏‏‎‎‎‎‏‏‏‏‏‎‎‏‏‏‎‏‎‎‎‏‏‎‏‎‏‎‏‏‎‎‏‎Audio‎‏‎‎‏‎"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‎‎‎‎‎‎‏‎‏‏‏‎‏‎‏‎‎‎‎‏‎‎‏‎‎‏‎‎‏‏‏‏‏‏‎‏‎‏‎‏‎‎‏‎‏‏‏‎‎‏‏‎‏‏‎‎‏‎‏‎‎‎Headset‎‏‎‎‏‎"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‏‎‏‎‏‏‏‏‏‎‎‏‏‎‏‎‏‏‏‎‎‏‎‎‏‏‎‏‎‎‏‎‏‎‎‏‎‏‎‏‏‎‏‎‎‎‏‏‏‏‎‎‎‏‏‏‎‎‏‎‎‎Input‎‏‎‎‏‎"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‎‏‎‎‏‏‎‏‎‏‏‏‎‎‎‎‎‎‎‎‎‏‎‎‎‎‏‎‎‏‏‎‎‏‏‎‎‏‎‎‏‏‏‏‏‏‎‎‏‎‎‏‎‎‎‏‎‎‏‎‏‎Hearing Aids‎‏‎‎‏‎"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‎‎‏‏‎‏‎‎‎‏‎‎‎‎‎‏‏‎‎‏‏‎‏‏‏‏‏‎‏‏‎‎‎‎‎‏‎‏‏‎‏‏‏‏‏‏‏‎‏‏‏‎‏‎‎‎‎‏‎‏‏‏‎Hearing aids‎‏‎‎‏‎"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‏‎‏‎‏‏‏‏‎‎‎‏‎‏‏‎‎‎‏‏‎‏‎‏‏‎‏‏‎‏‏‏‎‎‏‏‎‏‎‎‎‎‏‎‏‏‏‎‏‏‏‏‏‏‏‎‏‎‎‏‎‎Turning on…‎‏‎‎‏‎"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‎‎‎‎‎‏‏‎‎‎‎‎‎‎‎‏‎‎‎‎‏‎‏‎‎‎‎‎‏‎‎‎‎‏‎‎‏‎‎‎‎‏‎‎‏‎‏‏‏‎‏‏‏‏‎‎‎‎‎‎‎‎Auto-rotate‎‏‎‎‏‎"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‎‎‎‎‏‎‏‎‎‏‏‏‎‏‎‎‏‏‎‏‎‎‎‎‏‏‏‎‎‏‎‏‎‎‎‎‏‏‎‎‏‏‎‏‏‎‏‏‎‎‏‎‎‎‏‎‎‎‎‎‏‎‎Auto-rotate screen‎‏‎‎‏‎"</string>
@@ -1046,6 +1046,7 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‏‏‎‏‎‏‎‏‏‏‏‎‎‎‏‎‏‎‏‎‏‏‎‎‎‏‏‏‎‎‏‏‏‏‎‎‏‏‏‏‏‏‏‏‎‏‏‎‏‏‏‏‎‎‎‎‎‎‏‏‏‎‎Problem reading your battery meter‎‏‎‎‏‎"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‎‏‏‎‏‏‎‎‎‎‏‎‏‏‏‏‏‏‎‎‎‏‏‏‏‎‏‏‎‎‏‎‎‏‏‏‏‎‏‎‎‎‎‎‎‎‎‎‏‎‎‎‏‎‎‎‏‏‎Tap for more information‎‏‎‎‏‎"</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‎‎‎‎‏‎‏‏‏‏‏‎‏‏‎‎‎‏‎‎‏‎‏‎‏‏‏‎‎‎‎‏‎‏‎‏‏‏‏‏‏‏‏‎‎‎‏‎‎‎‏‏‎‏‏‏‏‏‎‎‏‏‎No alarm set‎‏‎‎‏‎"</string>
+    <string name="accessibility_bouncer" msgid="5896923685673320070">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‎‏‎‎‎‏‏‏‎‏‎‏‏‎‎‎‎‏‎‏‎‎‏‏‎‏‏‎‎‏‎‏‎‏‎‎‎‎‎‎‏‎‎‏‎‏‎‎‏‏‏‏‏‎‏‎‎‎‎‏‏‎‎enter screen lock‎‏‎‎‏‎"</string>
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‏‏‎‎‏‎‎‎‏‏‏‏‎‎‎‎‎‎‎‏‏‎‏‏‏‎‏‏‎‎‏‏‎‏‎‎‎‎‎‏‏‎‎‎‏‎‏‏‏‏‏‎‏‎‏‏‏‎‏‏‏‏‎‎‎Fingerprint sensor‎‏‎‎‏‎"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‎‎‏‎‏‏‎‎‎‏‎‏‏‎‎‏‎‏‎‎‎‎‎‎‏‏‎‎‎‎‎‎‏‏‎‎‎‎‏‏‎‏‏‎‏‏‏‏‎‎‏‏‏‎‏‏‎‏‏‎‎‏‎authenticate‎‏‎‎‏‎"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"‎‏‎‎‎‎‎‏‎‏‏‏‎‎‎‎‎‎‏‎‎‏‎‎‎‎‏‏‏‏‏‏‎‏‎‎‏‎‎‎‏‎‏‎‏‎‎‏‎‎‎‎‏‎‏‎‏‏‏‏‏‏‎‏‏‏‎‎‏‏‏‎‏‏‏‎‏‏‏‎‎‏‏‏‎‏‎‎‎‎‎‎‎‏‎‎enter device‎‏‎‎‏‎"</string>

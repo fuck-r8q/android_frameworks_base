@@ -42,6 +42,7 @@ import android.view.InputEventReceiver;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
 import android.view.SurfaceControl;
+import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManagerGlobal;
 
@@ -55,7 +56,6 @@ import com.android.internal.view.BaseIWindow;
  */
 class DragResizeInputListener implements AutoCloseable {
     private static final String TAG = "DragResizeInputListener";
-
     private final IWindowSession mWindowSession = WindowManagerGlobal.getWindowSession();
     private final Handler mHandler;
     private final Choreographer mChoreographer;
@@ -73,6 +73,7 @@ class DragResizeInputListener implements AutoCloseable {
     private int mTaskHeight;
     private int mResizeHandleThickness;
     private int mCornerSize;
+    private int mTaskCornerRadius;
 
     private Rect mLeftTopCornerBounds;
     private Rect mRightTopCornerBounds;
@@ -87,12 +88,14 @@ class DragResizeInputListener implements AutoCloseable {
             Handler handler,
             Choreographer choreographer,
             int displayId,
+            int taskCornerRadius,
             SurfaceControl decorationSurface,
             DragPositioningCallback callback) {
         mInputManager = context.getSystemService(InputManager.class);
         mHandler = handler;
         mChoreographer = choreographer;
         mDisplayId = displayId;
+        mTaskCornerRadius = taskCornerRadius;
         mDecorationSurface = decorationSurface;
         // Use a fake window as the backing surface is a container layer and we don't want to create
         // a buffer layer for it so we can't use ViewRootImpl.
@@ -126,12 +129,7 @@ class DragResizeInputListener implements AutoCloseable {
     }
 
     /**
-     * Updates geometry of this drag resize handler. Needs to be called every time there is a size
-     * change to notify the input event receiver it's ready to take the next input event. Otherwise
-     * it'll keep batching move events and the drag resize process is stalled.
-     *
-     * This is also used to update the touch regions of this handler every event dispatched here is
-     * a potential resize request.
+     * Updates the geometry (the touch region) of this drag resize handler.
      *
      * @param taskWidth The width of the task.
      * @param taskHeight The height of the task.
@@ -303,7 +301,7 @@ class DragResizeInputListener implements AutoCloseable {
         }
 
         @Override
-        public boolean handleMotionEvent(MotionEvent e) {
+        public boolean handleMotionEvent(View v, MotionEvent e) {
             boolean result = false;
             // Check if this is a touch event vs mouse event.
             // Touch events are tracked in four corners. Other events are tracked in resize edges.
@@ -383,19 +381,64 @@ class DragResizeInputListener implements AutoCloseable {
         @DragPositioningCallback.CtrlType
         private int calculateResizeHandlesCtrlType(float x, float y) {
             int ctrlType = 0;
-            if (x < 0) {
+            // mTaskCornerRadius is only used in comparing with corner regions. Comparisons with
+            // sides will use the bounds specified in setGeometry and not go into task bounds.
+            if (x < mTaskCornerRadius) {
                 ctrlType |= CTRL_TYPE_LEFT;
             }
-            if (x > mTaskWidth) {
+            if (x > mTaskWidth - mTaskCornerRadius) {
                 ctrlType |= CTRL_TYPE_RIGHT;
             }
-            if (y < 0) {
+            if (y < mTaskCornerRadius) {
                 ctrlType |= CTRL_TYPE_TOP;
             }
-            if (y > mTaskHeight) {
+            if (y > mTaskHeight - mTaskCornerRadius) {
                 ctrlType |= CTRL_TYPE_BOTTOM;
             }
-            return ctrlType;
+            return checkDistanceFromCenter(ctrlType, x, y);
+        }
+
+        // If corner input is not within appropriate distance of corner radius, do not use it.
+        // If input is not on a corner or is within valid distance, return ctrlType.
+        @DragPositioningCallback.CtrlType
+        private int checkDistanceFromCenter(@DragPositioningCallback.CtrlType int ctrlType,
+                float x, float y) {
+            int centerX;
+            int centerY;
+
+            // Determine center of rounded corner circle; this is simply the corner if radius is 0.
+            switch (ctrlType) {
+                case CTRL_TYPE_LEFT | CTRL_TYPE_TOP: {
+                    centerX = mTaskCornerRadius;
+                    centerY = mTaskCornerRadius;
+                    break;
+                }
+                case CTRL_TYPE_LEFT | CTRL_TYPE_BOTTOM: {
+                    centerX = mTaskCornerRadius;
+                    centerY = mTaskHeight - mTaskCornerRadius;
+                    break;
+                }
+                case CTRL_TYPE_RIGHT | CTRL_TYPE_TOP: {
+                    centerX = mTaskWidth - mTaskCornerRadius;
+                    centerY = mTaskCornerRadius;
+                    break;
+                }
+                case CTRL_TYPE_RIGHT | CTRL_TYPE_BOTTOM: {
+                    centerX = mTaskWidth - mTaskCornerRadius;
+                    centerY = mTaskHeight - mTaskCornerRadius;
+                    break;
+                }
+                default: {
+                    return ctrlType;
+                }
+            }
+            double distanceFromCenter = Math.hypot(x - centerX, y - centerY);
+
+            if (distanceFromCenter < mTaskCornerRadius + mResizeHandleThickness
+                    && distanceFromCenter >= mTaskCornerRadius) {
+                return ctrlType;
+            }
+            return 0;
         }
 
         @DragPositioningCallback.CtrlType

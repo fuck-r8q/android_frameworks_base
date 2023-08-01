@@ -89,7 +89,7 @@ object Flags {
     // TODO(b/277338665): Tracking Bug
     @JvmField
     val NOTIFICATION_SHELF_REFACTOR =
-        unreleasedFlag(271161129, "notification_shelf_refactor")
+        unreleasedFlag(271161129, "notification_shelf_refactor", teamfood = true)
 
     @JvmField
     val ANIMATED_NOTIFICATION_SHADE_INSETS =
@@ -247,12 +247,20 @@ object Flags {
     /** Whether to delay showing bouncer UI when face auth or active unlock are enrolled. */
     // TODO(b/279794160): Tracking bug.
     @JvmField
-    val DELAY_BOUNCER = unreleasedFlag(235, "delay_bouncer")
+    val DELAY_BOUNCER = unreleasedFlag(235, "delay_bouncer", teamfood = true)
+
+
+    /** Keyguard Migration */
 
     /** Migrate the indication area to the new keyguard root view. */
     // TODO(b/280067944): Tracking bug.
     @JvmField
-    val MIGRATE_INDICATION_AREA = unreleasedFlag(236, "migrate_indication_area")
+    val MIGRATE_INDICATION_AREA = unreleasedFlag(236, "migrate_indication_area", teamfood = true)
+
+    /** Migrate the lock icon view to the new keyguard root view. */
+    // TODO(b/286552209): Tracking bug.
+    @JvmField
+    val MIGRATE_LOCK_ICON = unreleasedFlag(238, "migrate_lock_icon")
 
     /** Whether to listen for fingerprint authentication over keyguard occluding activities. */
     // TODO(b/283260512): Tracking bug.
@@ -263,6 +271,10 @@ object Flags {
     // TODO(b/286563884): Tracking bug
     @JvmField
     val KEYGUARD_TALKBACK_FIX = releasedFlag(238, "keyguard_talkback_fix")
+
+    // TODO(b/287268101): Tracking bug.
+    @JvmField
+    val TRANSIT_CLOCK = unreleasedFlag(239, "lockscreen_custom_transit_clock")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -360,8 +372,7 @@ object Flags {
 
     // TODO(b/280426085): Tracking Bug
     @JvmField
-    val NEW_BLUETOOTH_REPOSITORY =
-            unreleasedFlag(612, "new_bluetooth_repository", teamfood = true)
+    val NEW_BLUETOOTH_REPOSITORY = releasedFlag(612, "new_bluetooth_repository")
 
     // 700 - dialer/calls
     // TODO(b/254512734): Tracking Bug
@@ -443,9 +454,6 @@ object Flags {
     // TODO(b/254512758): Tracking Bug
     @JvmField val ROUNDED_BOX_RIPPLE = releasedFlag(1002, "rounded_box_ripple")
 
-    // TODO(b/265045965): Tracking Bug
-    val SHOW_LOWLIGHT_ON_DIRECT_BOOT = releasedFlag(1003, "show_lowlight_on_direct_boot")
-
     // TODO(b/273509374): Tracking Bug
     @JvmField
     val ALWAYS_SHOW_HOME_CONTROLS_ON_DREAMS = releasedFlag(1006,
@@ -482,7 +490,7 @@ object Flags {
     @Keep
     @JvmField
     val WM_CAPTION_ON_SHELL =
-        sysPropBooleanFlag(1105, "persist.wm.debug.caption_on_shell", default = false)
+        sysPropBooleanFlag(1105, "persist.wm.debug.caption_on_shell", default = true)
 
     @Keep
     @JvmField
@@ -662,7 +670,7 @@ object Flags {
     @JvmField val UDFPS_NEW_TOUCH_DETECTION = releasedFlag(2200, "udfps_new_touch_detection")
     @JvmField val UDFPS_ELLIPSE_DETECTION = releasedFlag(2201, "udfps_ellipse_detection")
     // TODO(b/278622168): Tracking Bug
-    @JvmField val BIOMETRIC_BP_STRONG = unreleasedFlag(2202, "biometric_bp_strong")
+    @JvmField val BIOMETRIC_BP_STRONG = releasedFlag(2202, "biometric_bp_strong")
 
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag(2300, "track_stylus_ever_used")
@@ -719,15 +727,10 @@ object Flags {
     val KEYBOARD_EDUCATION =
         unreleasedFlag(2603, "keyboard_education", teamfood = false)
 
-    // TODO(b/272036292): Tracking Bug
-    @JvmField
-    val LARGE_SHADE_GRANULAR_ALPHA_INTERPOLATION =
-            releasedFlag(2602, "large_shade_granular_alpha_interpolation")
-
     // TODO(b/277201412): Tracking Bug
     @JvmField
     val SPLIT_SHADE_SUBPIXEL_OPTIMIZATION =
-            unreleasedFlag(2805, "split_shade_subpixel_optimization", teamfood = true)
+            releasedFlag(2805, "split_shade_subpixel_optimization")
 
     // TODO(b/278761837): Tracking Bug
     @JvmField

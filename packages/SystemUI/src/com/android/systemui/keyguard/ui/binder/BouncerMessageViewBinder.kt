@@ -25,9 +25,9 @@ import com.android.keyguard.KeyguardMessageArea
 import com.android.keyguard.KeyguardMessageAreaController
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.bouncer.domain.interactor.BouncerMessageInteractor
-import com.android.systemui.keyguard.bouncer.shared.model.Message
-import com.android.systemui.keyguard.bouncer.ui.BouncerMessageView
+import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
+import com.android.systemui.bouncer.shared.model.Message
+import com.android.systemui.bouncer.ui.BouncerMessageView
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.log.BouncerLogger
 import kotlinx.coroutines.launch

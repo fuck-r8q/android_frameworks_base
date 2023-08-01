@@ -50,6 +50,7 @@ import android.content.Context;
 import android.content.pm.ActivityPresentationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ParceledListSlice;
 import android.content.pm.UserInfo;
 import android.database.ContentObserver;
 import android.os.Binder;
@@ -69,6 +70,7 @@ import android.provider.DeviceConfig;
 import android.provider.DeviceConfig.Properties;
 import android.provider.Settings;
 import android.service.contentcapture.ActivityEvent.ActivityEventType;
+import android.service.contentcapture.ContentCaptureServiceInfo;
 import android.service.contentcapture.IDataShareCallback;
 import android.service.contentcapture.IDataShareReadAdapter;
 import android.service.voice.VoiceInteractionManagerInternal;
@@ -79,6 +81,7 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.view.contentcapture.ContentCaptureCondition;
+import android.view.contentcapture.ContentCaptureEvent;
 import android.view.contentcapture.ContentCaptureHelper;
 import android.view.contentcapture.ContentCaptureManager;
 import android.view.contentcapture.DataRemovalRequest;
@@ -88,11 +91,15 @@ import android.view.contentcapture.IContentCaptureOptionsCallback;
 import android.view.contentcapture.IDataShareWriteAdapter;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.infra.AbstractRemoteService;
 import com.android.internal.infra.GlobalWhitelistState;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.util.DumpUtils;
 import com.android.server.LocalServices;
+import com.android.server.contentprotection.ContentProtectionBlocklistManager;
+import com.android.server.contentprotection.ContentProtectionPackageManager;
+import com.android.server.contentprotection.RemoteContentProtectionService;
 import com.android.server.infra.AbstractMasterSystemService;
 import com.android.server.infra.FrameworkResourcesServiceNameResolver;
 
@@ -117,7 +124,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * with other sources to provide contextual data in other areas of the system
  * such as Autofill.
  */
-public final class ContentCaptureManagerService extends
+public class ContentCaptureManagerService extends
         AbstractMasterSystemService<ContentCaptureManagerService, ContentCapturePerUserService> {
 
     private static final String TAG = ContentCaptureManagerService.class.getSimpleName();
@@ -205,6 +212,10 @@ public final class ContentCaptureManagerService extends
     final GlobalContentCaptureOptions mGlobalContentCaptureOptions =
             new GlobalContentCaptureOptions();
 
+    @Nullable private final ComponentName mContentProtectionServiceComponentName;
+
+    @Nullable private final ContentProtectionBlocklistManager mContentProtectionBlocklistManager;
+
     public ContentCaptureManagerService(@NonNull Context context) {
         super(context, new FrameworkResourcesServiceNameResolver(context,
                 com.android.internal.R.string.config_defaultContentCaptureService),
@@ -241,6 +252,20 @@ public final class ContentCaptureManagerService extends
             mGlobalContentCaptureOptions.setServiceInfo(userId,
                     mServiceNameResolver.getServiceName(userId),
                     mServiceNameResolver.isTemporary(userId));
+        }
+
+        if (getEnableContentProtectionReceiverLocked()) {
+            mContentProtectionServiceComponentName = getContentProtectionServiceComponentName();
+            if (mContentProtectionServiceComponentName != null) {
+                mContentProtectionBlocklistManager = createContentProtectionBlocklistManager();
+                mContentProtectionBlocklistManager.updateBlocklist(
+                        mDevCfgContentProtectionAppsBlocklistSize);
+            } else {
+                mContentProtectionBlocklistManager = null;
+            }
+        } else {
+            mContentProtectionServiceComponentName = null;
+            mContentProtectionBlocklistManager = null;
         }
     }
 
@@ -397,7 +422,9 @@ public final class ContentCaptureManagerService extends
         }
     }
 
-    private void setFineTuneParamsFromDeviceConfig() {
+    /** @hide */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    protected void setFineTuneParamsFromDeviceConfig() {
         synchronized (mLock) {
             mDevCfgMaxBufferSize =
                     DeviceConfig.getInt(
@@ -443,6 +470,8 @@ public final class ContentCaptureManagerService extends
                             ContentCaptureManager
                                     .DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_APPS_BLOCKLIST_SIZE,
                             ContentCaptureManager.DEFAULT_CONTENT_PROTECTION_APPS_BLOCKLIST_SIZE);
+            // mContentProtectionBlocklistManager.updateBlocklist not called on purpose here to keep
+            // it immutable at this point
             mDevCfgContentProtectionBufferSize =
                     DeviceConfig.getInt(
                             DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
@@ -754,6 +783,94 @@ public final class ContentCaptureManagerService extends
         mGlobalContentCaptureOptions.dump(prefix2, pw);
     }
 
+    /**
+     * Used by the constructor in order to be able to override the value in the tests.
+     *
+     * @hide
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @GuardedBy("mLock")
+    protected boolean getEnableContentProtectionReceiverLocked() {
+        return mDevCfgEnableContentProtectionReceiver;
+    }
+
+    /** @hide */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @NonNull
+    protected ContentProtectionBlocklistManager createContentProtectionBlocklistManager() {
+        return new ContentProtectionBlocklistManager(
+                new ContentProtectionPackageManager(getContext()));
+    }
+
+    @Nullable
+    private ComponentName getContentProtectionServiceComponentName() {
+        String flatComponentName = getContentProtectionServiceFlatComponentName();
+        return ComponentName.unflattenFromString(flatComponentName);
+    }
+
+    /** @hide */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @Nullable
+    protected String getContentProtectionServiceFlatComponentName() {
+        return getContext()
+                .getString(com.android.internal.R.string.config_defaultContentProtectionService);
+    }
+
+    /**
+     * Can also throw runtime exceptions such as {@link SecurityException}.
+     *
+     * @hide
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @NonNull
+    protected ContentCaptureServiceInfo createContentProtectionServiceInfo(
+            @NonNull ComponentName componentName) throws PackageManager.NameNotFoundException {
+        return new ContentCaptureServiceInfo(
+                getContext(), componentName, /* isTemp= */ false, UserHandle.getCallingUserId());
+    }
+
+    @Nullable
+    private RemoteContentProtectionService createRemoteContentProtectionService() {
+        if (mContentProtectionServiceComponentName == null) {
+            // This case should not be possible but make sure
+            return null;
+        }
+        synchronized (mLock) {
+            if (!mDevCfgEnableContentProtectionReceiver) {
+                return null;
+            }
+        }
+
+        // Check permissions by trying to construct {@link ContentCaptureServiceInfo}
+        try {
+            createContentProtectionServiceInfo(mContentProtectionServiceComponentName);
+        } catch (Exception ex) {
+            // Swallow, exception was already logged
+            return null;
+        }
+
+        return createRemoteContentProtectionService(mContentProtectionServiceComponentName);
+    }
+
+    /** @hide */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @NonNull
+    protected RemoteContentProtectionService createRemoteContentProtectionService(
+            @NonNull ComponentName componentName) {
+        return new RemoteContentProtectionService(
+                getContext(),
+                componentName,
+                UserHandle.getCallingUserId(),
+                isBindInstantServiceAllowed());
+    }
+
+    /** @hide */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @NonNull
+    protected ContentCaptureManagerServiceStub getContentCaptureManagerServiceStub() {
+        return mContentCaptureManagerServiceStub;
+    }
+
     final class ContentCaptureManagerServiceStub extends IContentCaptureManager.Stub {
 
         @Override
@@ -987,6 +1104,19 @@ public final class ContentCaptureManagerService extends
         public void setDefaultServiceEnabled(@UserIdInt int userId, boolean enabled) {
             ContentCaptureManagerService.this.setDefaultServiceEnabled(userId, enabled);
         }
+
+        @Override
+        public void onLoginDetected(@NonNull ParceledListSlice<ContentCaptureEvent> events) {
+            RemoteContentProtectionService service = createRemoteContentProtectionService();
+            if (service == null) {
+                return;
+            }
+            try {
+                service.onLoginDetected(events);
+            } catch (Exception ex) {
+                Slog.e(TAG, "Failed to call remote service", ex);
+            }
+        }
     }
 
     private final class LocalService extends ContentCaptureManagerInternal {
@@ -1075,14 +1205,21 @@ public final class ContentCaptureManagerService extends
         @GuardedBy("mGlobalWhitelistStateLock")
         public ContentCaptureOptions getOptions(@UserIdInt int userId,
                 @NonNull String packageName) {
-            boolean packageWhitelisted;
+            boolean isContentCaptureReceiverEnabled;
+            boolean isContentProtectionReceiverEnabled;
             ArraySet<ComponentName> whitelistedComponents = null;
+
             synchronized (mGlobalWhitelistStateLock) {
-                packageWhitelisted = isWhitelisted(userId, packageName);
-                if (!packageWhitelisted) {
-                    // Full package is not allowlisted: check individual components first
+                isContentCaptureReceiverEnabled =
+                        isContentCaptureReceiverEnabled(userId, packageName);
+                isContentProtectionReceiverEnabled =
+                        isContentProtectionReceiverEnabled(packageName);
+
+                if (!isContentCaptureReceiverEnabled) {
+                    // Full package is not allowlisted: check individual components next
                     whitelistedComponents = getWhitelistedComponents(userId, packageName);
-                    if (whitelistedComponents == null
+                    if (!isContentProtectionReceiverEnabled
+                            && whitelistedComponents == null
                             && packageName.equals(mServicePackages.get(userId))) {
                         // No components allowlisted either, but let it go because it's the
                         // service's own package
@@ -1101,7 +1238,9 @@ public final class ContentCaptureManagerService extends
                 }
             }
 
-            if (!packageWhitelisted && whitelistedComponents == null) {
+            if (!isContentCaptureReceiverEnabled
+                    && !isContentProtectionReceiverEnabled
+                    && whitelistedComponents == null) {
                 // No can do!
                 if (verbose) {
                     Slog.v(TAG, "getOptionsForPackage(" + packageName + "): not whitelisted");
@@ -1118,9 +1257,9 @@ public final class ContentCaptureManagerService extends
                                 mDevCfgTextChangeFlushingFrequencyMs,
                                 mDevCfgLogHistorySize,
                                 mDevCfgDisableFlushForViewTreeAppearing,
-                                /* enableReceiver= */ true,
+                                isContentCaptureReceiverEnabled || whitelistedComponents != null,
                                 new ContentCaptureOptions.ContentProtectionOptions(
-                                        mDevCfgEnableContentProtectionReceiver,
+                                        isContentProtectionReceiverEnabled,
                                         mDevCfgContentProtectionBufferSize),
                                 whitelistedComponents);
                 if (verbose) Slog.v(TAG, "getOptionsForPackage(" + packageName + "): " + options);
@@ -1140,6 +1279,36 @@ public final class ContentCaptureManagerService extends
                     pw.print(prefix); pw.print("Temp services: "); pw.println(mTemporaryServices);
                 }
             }
+        }
+
+        @Override // from GlobalWhitelistState
+        public boolean isWhitelisted(@UserIdInt int userId, @NonNull String packageName) {
+            return isContentCaptureReceiverEnabled(userId, packageName)
+                    || isContentProtectionReceiverEnabled(packageName);
+        }
+
+        @Override // from GlobalWhitelistState
+        public boolean isWhitelisted(@UserIdInt int userId, @NonNull ComponentName componentName) {
+            return super.isWhitelisted(userId, componentName)
+                    || isContentProtectionReceiverEnabled(componentName.getPackageName());
+        }
+
+        private boolean isContentCaptureReceiverEnabled(
+                @UserIdInt int userId, @NonNull String packageName) {
+            return super.isWhitelisted(userId, packageName);
+        }
+
+        private boolean isContentProtectionReceiverEnabled(@NonNull String packageName) {
+            if (mContentProtectionServiceComponentName == null
+                    || mContentProtectionBlocklistManager == null) {
+                return false;
+            }
+            synchronized (mLock) {
+                if (!mDevCfgEnableContentProtectionReceiver) {
+                    return false;
+                }
+            }
+            return mContentProtectionBlocklistManager.isAllowed(packageName);
         }
     }
 

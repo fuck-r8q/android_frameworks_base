@@ -19,13 +19,13 @@ package com.android.systemui.keyguard.domain.interactor
 
 import android.app.StatusBarManager
 import android.graphics.Point
+import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
 import com.android.systemui.common.ui.data.repository.ConfigurationRepository
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.data.repository.KeyguardBouncerRepository
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.CameraLaunchSourceModel
@@ -40,6 +40,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -99,7 +100,7 @@ constructor(
     }
 
     /** The device wake/sleep state */
-    val wakefulnessModel: Flow<WakefulnessModel> = repository.wakefulness
+    val wakefulnessModel: StateFlow<WakefulnessModel> = repository.wakefulness
 
     /**
      * Dozing and dreaming have overlapping events. If the doze state remains in FINISH, it means

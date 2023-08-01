@@ -17,6 +17,7 @@ package com.android.systemui.shade
 
 import android.view.MotionEvent
 import android.view.ViewGroup
+import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.statusbar.RemoteInputController
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
@@ -59,7 +60,7 @@ interface ShadeViewController {
      * Returns whether the shade height is greater than zero or the shade is expecting a synthesized
      * down event.
      */
-    @get:Deprecated("use {@link #isExpanded()} instead") val isPanelExpanded: Boolean
+    val isPanelExpanded: Boolean
 
     /** Returns whether the shade is fully expanded in either QS or QQS. */
     val isShadeFullyExpanded: Boolean
@@ -75,6 +76,17 @@ interface ShadeViewController {
 
     /** Collapses the shade with an animation duration in milliseconds. */
     fun collapseWithDuration(animationDuration: Int)
+
+    /**
+     * Animate QS collapse by flinging it. If QS is expanded, it will collapse into QQS and stop. If
+     * in split shade, it will collapse the whole shade.
+     *
+     * @param fullyCollapse Do not stop when QS becomes QQS. Fling until QS isn't visible anymore.
+     */
+    fun animateCollapseQs(fullyCollapse: Boolean)
+
+    /** Returns whether the shade can be collapsed. */
+    fun canBeCollapsed(): Boolean
 
     /** Returns whether the shade is in the process of collapsing. */
     val isCollapsing: Boolean
@@ -124,6 +136,19 @@ interface ShadeViewController {
 
     /** Sets the amount of progress in the status bar launch animation. */
     fun applyLaunchAnimationProgress(linearProgress: Float)
+
+    /**
+     * Close the keyguard user switcher if it is open and capable of closing.
+     *
+     * Has no effect if user switcher isn't supported, if the user switcher is already closed, or if
+     * the user switcher uses "simple" mode. The simple user switcher cannot be closed.
+     *
+     * @return true if the keyguard user switcher was open, and is now closed
+     */
+    fun closeUserSwitcherIfOpen(): Boolean
+
+    /** Called when Back gesture has been committed (i.e. a back event has definitely occurred) */
+    fun onBackPressed()
 
     /** Sets whether the status bar launch animation is currently running. */
     fun setIsLaunchAnimationRunning(running: Boolean)
@@ -218,6 +243,16 @@ interface ShadeViewController {
     val shadeNotificationPresenter: ShadeNotificationPresenter
 
     companion object {
+        /**
+         * Returns a multiplicative factor to use when determining the falsing threshold for touches
+         * on the shade. The factor will be larger when the device is waking up due to a touch or
+         * gesture.
+         */
+        @JvmStatic
+        fun getFalsingThresholdFactor(wakefulness: WakefulnessModel): Float {
+            return if (wakefulness.isDeviceInteractiveFromTapOrGesture()) 1.5f else 1.0f
+        }
+
         const val WAKEUP_ANIMATION_DELAY_MS = 250
         const val FLING_MAX_LENGTH_SECONDS = 0.6f
         const val FLING_SPEED_UP_FACTOR = 0.6f

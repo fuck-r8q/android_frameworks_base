@@ -160,6 +160,17 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
             @NonNull LockoutResetDispatcher lockoutResetDispatcher,
             @NonNull GestureAvailabilityDispatcher gestureAvailabilityDispatcher,
             @NonNull BiometricContext biometricContext) {
+        this(context, biometricStateCallback, props, halInstanceName, lockoutResetDispatcher,
+                gestureAvailabilityDispatcher, biometricContext, null /* daemon */);
+    }
+
+    @VisibleForTesting FingerprintProvider(@NonNull Context context,
+            @NonNull BiometricStateCallback biometricStateCallback,
+            @NonNull SensorProps[] props, @NonNull String halInstanceName,
+            @NonNull LockoutResetDispatcher lockoutResetDispatcher,
+            @NonNull GestureAvailabilityDispatcher gestureAvailabilityDispatcher,
+            @NonNull BiometricContext biometricContext,
+            IFingerprint daemon) {
         mContext = context;
         mBiometricStateCallback = biometricStateCallback;
         mHalInstanceName = halInstanceName;
@@ -170,6 +181,7 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
         mTaskStackListener = new BiometricTaskStackListener();
         mBiometricContext = biometricContext;
         mAuthSessionCoordinator = mBiometricContext.getAuthSessionCoordinator();
+        mDaemon = daemon;
 
         final List<SensorLocationInternal> workaroundLocations = getWorkaroundSensorProps(context);
 
@@ -669,14 +681,15 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
     }
 
     @Override
-    public void onUiReady(long requestId, int sensorId) {
+    public void onUdfpsUiEvent(@FingerprintManager.UdfpsUiEvent int event, long requestId,
+            int sensorId) {
         mFingerprintSensors.get(sensorId).getScheduler().getCurrentClientIfMatches(
                 requestId, (client) -> {
                     if (!(client instanceof Udfps)) {
-                        Slog.e(getTag(), "onUiReady received during client: " + client);
+                        Slog.e(getTag(), "onUdfpsUiEvent received during client: " + client);
                         return;
                     }
-                    ((Udfps) client).onUiReady();
+                    ((Udfps) client).onUdfpsUiEvent(event);
                 });
     }
 
@@ -843,5 +856,19 @@ public class FingerprintProvider implements IBinder.DeathRecipient, ServiceProvi
             return;
         }
         biometricScheduler.startWatchdog();
+    }
+
+    @Override
+    public void simulateVhalFingerDown(int userId, int sensorId) {
+        Slog.d(getTag(), "Simulate virtual HAL finger down event");
+        final AidlSession session = mFingerprintSensors.get(sensorId).getSessionForUser(userId);
+        final PointerContext pc = new PointerContext();
+        try {
+            session.getSession().onPointerDownWithContext(pc);
+            session.getSession().onUiReady();
+            session.getSession().onPointerUpWithContext(pc);
+        } catch (RemoteException e) {
+            Slog.e(getTag(), "failed hal operation ", e);
+        }
     }
 }

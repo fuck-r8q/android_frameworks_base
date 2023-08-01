@@ -1119,9 +1119,7 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
 
             ArrayList<String> allowlistedPermissions = null;
 
-            final int permissionCount = ArrayUtils.size(pkg.getRequestedPermissions());
-            for (int i = 0; i < permissionCount; i++) {
-                final String permissionName = pkg.getRequestedPermissions().get(i);
+            for (final String permissionName : pkg.getRequestedPermissions()) {
                 final int currentFlags =
                         uidState.getPermissionFlags(permissionName);
                 if ((currentFlags & queryFlags) != 0) {
@@ -1748,10 +1746,11 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                 | FLAG_PERMISSION_POLICY_FIXED;
 
         final String packageName = pkg.getPackageName();
-        final int permissionCount = ArrayUtils.size(pkg.getRequestedPermissions());
-        for (int i = 0; i < permissionCount; i++) {
-            final String permName = pkg.getRequestedPermissions().get(i);
-
+        for (final String permName : pkg.getRequestedPermissions()) {
+            if (mIsLeanback && NOTIFICATION_PERMISSIONS.contains(permName)) {
+                // Do not reset the Notification permissions on TV
+                continue;
+            }
             final boolean isRuntimePermission;
             synchronized (mLock) {
                 final Permission permission = mRegistry.getPermission(permName);
@@ -2047,11 +2046,9 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
 
         final int callingUid = Binder.getCallingUid();
         for (int userId: getAllUserIds()) {
-            int numRequestedPermissions = newPackage.getRequestedPermissions().size();
-            for (int i = 0; i < numRequestedPermissions; i++) {
-                PermissionInfo permInfo = getPermissionInfo(
-                        newPackage.getRequestedPermissions().get(i),
-                        0, newPackage.getPackageName());
+            for (final String permName : newPackage.getRequestedPermissions()) {
+                PermissionInfo permInfo = getPermissionInfo(permName, 0,
+                        newPackage.getPackageName());
                 if (permInfo == null) {
                     continue;
                 }
@@ -2383,10 +2380,8 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                 if (DEBUG_REMOVE) Log.d(TAG, "  Permissions: " + r);
             }
 
-            n = pkg.getRequestedPermissions().size();
             r = null;
-            for (int i = 0; i < n; i++) {
-                final String permissionName = pkg.getRequestedPermissions().get(i);
+            for (final String permissionName : pkg.getRequestedPermissions()) {
                 final Permission permission = mRegistry.getPermission(permissionName);
                 if (permission != null && permission.isAppOp()) {
                     mRegistry.removeAppOpPermissionPackage(permissionName,
@@ -2504,11 +2499,8 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
         ArraySet<String> shouldGrantSignaturePermission = null;
         ArraySet<String> shouldGrantInternalPermission = null;
         ArraySet<String> shouldGrantPrivilegedPermissionIfWasGranted = new ArraySet<>();
-        final List<String> requestedPermissions = pkg.getRequestedPermissions();
-        final int requestedPermissionsSize = requestedPermissions.size();
-        for (int i = 0; i < requestedPermissionsSize; i++) {
-            final String permissionName = pkg.getRequestedPermissions().get(i);
-
+        final Set<String> requestedPermissions = pkg.getRequestedPermissions();
+        for (final String permissionName : pkg.getRequestedPermissions()) {
             final Permission permission;
             synchronized (mLock) {
                 permission = mRegistry.getPermission(permissionName);
@@ -2639,9 +2631,7 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                 ArraySet<String> newImplicitPermissions = new ArraySet<>();
                 final String friendlyName = pkg.getPackageName() + "(" + pkg.getUid() + ")";
 
-                for (int i = 0; i < requestedPermissionsSize; i++) {
-                    final String permName = requestedPermissions.get(i);
-
+                for (final String permName : requestedPermissions) {
                     final Permission bp = mRegistry.getPermission(permName);
                     final boolean appSupportsRuntimePermissions =
                             pkg.getTargetSdkVersion() >= Build.VERSION_CODES.M;
@@ -3637,12 +3627,9 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
             @UserIdInt int userId) {
         ArraySet<String> oldGrantedRestrictedPermissions = null;
         boolean updatePermissions = false;
-        final int permissionCount = pkg.getRequestedPermissions().size();
         final int myUid = Process.myUid();
 
-        for (int j = 0; j < permissionCount; j++) {
-            final String permissionName = pkg.getRequestedPermissions().get(j);
-
+        for (final String permissionName : pkg.getRequestedPermissions()) {
             final boolean isGranted;
             synchronized (mLock) {
                 final Permission bp = mRegistry.getPermission(permissionName);
@@ -4608,6 +4595,19 @@ public class PermissionManagerServiceImpl implements PermissionManagerServiceInt
                 legacyPermissionSettings.replacePermissionTrees(legacyPermissions);
             }
         }
+    }
+
+    @Nullable
+    @Override
+    public String getDefaultPermissionGrantFingerprint(@UserIdInt int userId) {
+        return mPackageManagerInt.isPermissionUpgradeNeeded(userId) ? null : Build.FINGERPRINT;
+    }
+
+    @Override
+    public void setDefaultPermissionGrantFingerprint(@NonNull String fingerprint,
+            @UserIdInt int userId) {
+        // Ignored - default permission grant here shares the same version with runtime permission
+        // upgrade, and the new version is set by that later.
     }
 
     private void onPackageAddedInternal(@NonNull PackageState packageState,

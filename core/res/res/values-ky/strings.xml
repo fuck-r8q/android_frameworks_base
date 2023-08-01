@@ -622,6 +622,7 @@
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Биометрикалык аппарат жеткиликсиз"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Аныктыгын текшерүү жокко чыгарылды"</string>
     <string name="biometric_not_recognized" msgid="5106687642694635888">"Таанылган жок"</string>
+    <string name="biometric_face_not_recognized" msgid="5535599455744525200">"Жүз таанылган жок"</string>
     <string name="biometric_error_canceled" msgid="8266582404844179778">"Аныктыгын текшерүү жокко чыгарылды"</string>
     <string name="biometric_error_device_not_secured" msgid="3129845065043995924">"PIN код, графикалык ачкыч же сырсөз коюлган жок"</string>
     <string name="biometric_error_generic" msgid="6784371929985434439">"Аутентификация катасы"</string>
@@ -2157,10 +2158,10 @@
     <string name="resolver_personal_tab_accessibility" msgid="5739524949153091224">"Жеке көрүнүш"</string>
     <string name="resolver_work_tab_accessibility" msgid="4753168230363802734">"Жумуш көрүнүшү"</string>
     <string name="resolver_cross_profile_blocked" msgid="3014597376026044840">"IT администраторуңуз бөгөттөп койгон"</string>
-    <string name="resolver_cant_share_with_work_apps_explanation" msgid="9071442683080586643">"Бул нерсени жумуш колдонмолору менен бөлүшө албайсыз"</string>
-    <string name="resolver_cant_access_work_apps_explanation" msgid="1129960195389373279">"Бул нерсени жумуш колдонмолору менен ача албайсыз"</string>
-    <string name="resolver_cant_share_with_personal_apps_explanation" msgid="6349766201904601544">"Бул нерсени жеке колдонмолор менен бөлүшө албайсыз"</string>
-    <string name="resolver_cant_access_personal_apps_explanation" msgid="1679399548862724359">"Бул нерсени жеке колдонмолор менен ача албайсыз"</string>
+    <string name="resolver_cant_share_with_work_apps_explanation" msgid="9071442683080586643">"Бул мазмунду жумуш колдонмолору менен бөлүшүү мүмкүн эмес"</string>
+    <string name="resolver_cant_access_work_apps_explanation" msgid="1129960195389373279">"Бул мазмунду жумуш колдонмолору менен ачуу мүмкүн эмес"</string>
+    <string name="resolver_cant_share_with_personal_apps_explanation" msgid="6349766201904601544">"Бул мазмунду жеке колдонмолор менен бөлүшүү мүмкүн эмес"</string>
+    <string name="resolver_cant_access_personal_apps_explanation" msgid="1679399548862724359">"Бул мазмунду жеке колдонмолор менен ачуу мүмкүн эмес"</string>
     <string name="resolver_turn_on_work_apps" msgid="1535946298236678122">"Жумуш колдонмолору тындырылды"</string>
     <string name="resolver_switch_on_work" msgid="4527096360772311894">"Иштетүү"</string>
     <string name="resolver_no_work_apps_available" msgid="3298291360133337270">"Жумуш колдонмолору жок"</string>

@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"აუდიო"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"ყურსაცვამი"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"შეყვანა"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"სმენის მოწყობილობები"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"სმენის მოწყობილობები"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"ირთვება…"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"ავტოროტაცია"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"ეკრანის ავტომატური შეტრიალება"</string>
@@ -1046,6 +1046,8 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"თქვენი ბატარეის მზომის წაკითხვასთან დაკავშირებით პრობლემა დაფიქსირდა"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"შეეხეთ მეტი ინფორმაციისთვის"</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"მაღვიძარა არ არის"</string>
+    <!-- no translation found for accessibility_bouncer (5896923685673320070) -->
+    <skip />
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"თითის ანაბეჭდის სენსორი"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"ავტორიზაცია"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"მოწყობილობის შეყვანა"</string>

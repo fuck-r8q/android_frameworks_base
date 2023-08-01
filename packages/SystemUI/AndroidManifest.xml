@@ -373,7 +373,7 @@
         android:defaultToDeviceProtectedStorage="true"
         android:directBootAware="true"
         tools:replace="android:appComponentFactory"
-        android:appComponentFactory=".SystemUIAppComponentFactory">
+        android:appComponentFactory=".PhoneSystemUIAppComponentFactory">
         <!-- Keep theme in sync with SystemUIApplication.onCreate().
              Setting the theme on the application does not affect views inflated by services.
              The application theme is set again from onCreate to take effect for those views. -->
@@ -820,7 +820,8 @@
         <service
             android:name=".dreams.DreamOverlayService"
             android:enabled="false"
-            android:exported="true" />
+            android:exported="true"
+            android:singleUser="true" />
 
         <activity android:name=".keyguard.WorkLockActivity"
                   android:label="@string/accessibility_desc_work_lock"
@@ -1019,7 +1020,6 @@
             android:name=".notetask.LaunchNotesRoleSettingsTrampolineActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:resizeableActivity="false"
             android:theme="@android:style/Theme.NoDisplay" >
             <intent-filter>
                 <action android:name="com.android.systemui.action.MANAGE_NOTES_ROLE_FROM_QUICK_AFFORDANCE" />
@@ -1069,15 +1069,6 @@
                   android:authorities="com.android.systemui.keyguard"
                   android:grantUriPermissions="true"
                   android:exported="true">
-        </provider>
-
-        <!-- Provides list and realistic previews of clock faces for the picker app. -->
-        <provider
-            android:name="com.android.keyguard.clock.ClockOptionsProvider"
-            android:authorities="com.android.keyguard.clock"
-            android:enabled="false"
-            android:exported="false"
-            android:grantUriPermissions="true">
         </provider>
 
         <receiver

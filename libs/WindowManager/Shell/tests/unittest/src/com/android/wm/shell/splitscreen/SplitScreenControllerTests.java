@@ -61,6 +61,7 @@ import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.DisplayLayout;
+import com.android.wm.shell.common.LaunchAdjacentController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.TransactionPool;
@@ -71,6 +72,7 @@ import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.sysui.ShellSharedConstants;
 import com.android.wm.shell.transition.Transitions;
+import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -102,6 +104,8 @@ public class SplitScreenControllerTests extends ShellTestCase {
     @Mock IconProvider mIconProvider;
     @Mock StageCoordinator mStageCoordinator;
     @Mock RecentTasksController mRecentTasks;
+    @Mock LaunchAdjacentController mLaunchAdjacentController;
+    @Mock WindowDecorViewModel mWindowDecorViewModel;
     @Captor ArgumentCaptor<Intent> mIntentCaptor;
 
     private ShellController mShellController;
@@ -117,7 +121,8 @@ public class SplitScreenControllerTests extends ShellTestCase {
                 mShellCommandHandler, mShellController, mTaskOrganizer, mSyncQueue,
                 mRootTDAOrganizer, mDisplayController, mDisplayImeController,
                 mDisplayInsetsController, mDragAndDropController, mTransitions, mTransactionPool,
-                mIconProvider, mRecentTasks, mMainExecutor, mStageCoordinator));
+                mIconProvider, mRecentTasks, mLaunchAdjacentController, mWindowDecorViewModel,
+                mMainExecutor, mStageCoordinator));
     }
 
     @Test

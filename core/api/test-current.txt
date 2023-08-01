@@ -1303,6 +1303,7 @@ package android.database.sqlite {
 
   public final class SQLiteDirectCursorDriver implements android.database.sqlite.SQLiteCursorDriver {
     ctor public SQLiteDirectCursorDriver(android.database.sqlite.SQLiteDatabase, String, String, android.os.CancellationSignal);
+    ctor public SQLiteDirectCursorDriver(@NonNull android.database.sqlite.SQLiteDatabase, @Nullable android.database.sqlite.SQLiteAuthorizer, @NonNull String, @Nullable String, @Nullable android.os.CancellationSignal);
     method public void cursorClosed();
     method public void cursorDeactivated();
     method public void cursorRequeried(android.database.Cursor);
@@ -1972,6 +1973,39 @@ package android.media {
     method public android.media.PlaybackParams setAudioStretchMode(int);
   }
 
+  public final class RingtoneSelection {
+    method @NonNull public static android.media.RingtoneSelection fromUri(@Nullable android.net.Uri, int);
+    method public int getSoundSource();
+    method @Nullable public android.net.Uri getSoundUri();
+    method public int getVibrationSource();
+    method @Nullable public android.net.Uri getVibrationUri();
+    method public static boolean isRingtoneSelectionUri(@Nullable android.net.Uri);
+    method @NonNull public android.net.Uri toUri();
+    field public static final String DEFAULT_SELECTION_URI_STRING = "content://media/ringtone";
+    field public static final int FROM_URI_RINGTONE_SELECTION_ONLY = 3; // 0x3
+    field public static final int FROM_URI_RINGTONE_SELECTION_OR_SOUND = 1; // 0x1
+    field public static final int FROM_URI_RINGTONE_SELECTION_OR_VIBRATION = 2; // 0x2
+    field public static final int SOUND_SOURCE_DEFAULT = 0; // 0x0
+    field public static final int SOUND_SOURCE_OFF = 1; // 0x1
+    field public static final int SOUND_SOURCE_URI = 2; // 0x2
+    field public static final int VIBRATION_SOURCE_APPLICATION_PROVIDED = 3; // 0x3
+    field public static final int VIBRATION_SOURCE_AUDIO_CHANNEL = 10; // 0xa
+    field public static final int VIBRATION_SOURCE_DEFAULT = 0; // 0x0
+    field public static final int VIBRATION_SOURCE_HAPTIC_GENERATOR = 11; // 0xb
+    field public static final int VIBRATION_SOURCE_OFF = 1; // 0x1
+    field public static final int VIBRATION_SOURCE_URI = 2; // 0x2
+  }
+
+  public static final class RingtoneSelection.Builder {
+    ctor public RingtoneSelection.Builder();
+    ctor public RingtoneSelection.Builder(@NonNull android.media.RingtoneSelection);
+    method @NonNull public android.media.RingtoneSelection build();
+    method @NonNull public android.media.RingtoneSelection.Builder setSoundSource(int);
+    method @NonNull public android.media.RingtoneSelection.Builder setSoundSource(@NonNull android.net.Uri);
+    method @NonNull public android.media.RingtoneSelection.Builder setVibrationSource(int);
+    method @NonNull public android.media.RingtoneSelection.Builder setVibrationSource(@NonNull android.net.Uri);
+  }
+
   public static final class VolumeShaper.Configuration.Builder {
     method @NonNull public android.media.VolumeShaper.Configuration.Builder setOptionFlags(int);
   }
@@ -2168,6 +2202,10 @@ package android.net.wifi.sharedconnectivity.service {
 }
 
 package android.os {
+
+  public class BatteryManager {
+    field public static final int BATTERY_PLUGGED_ANY = 15; // 0xf
+  }
 
   public final class BatteryStatsManager {
     method @RequiresPermission(android.Manifest.permission.DEVICE_POWER) public void resetBattery(boolean);
@@ -2975,6 +3013,10 @@ package android.service.notification {
     method @Deprecated public boolean isBound();
   }
 
+  public class NotificationRankingUpdate implements android.os.Parcelable {
+    method public final boolean isFdNotNullAndClosed();
+  }
+
 }
 
 package android.service.quickaccesswallet {
@@ -3412,6 +3454,7 @@ package android.view {
 
   public final class Choreographer {
     method public static long getFrameDelay();
+    method public long getFrameTimeNanos();
     method public void postCallback(int, Runnable, Object);
     method public void postCallbackDelayed(int, Runnable, Object, long);
     method public void removeCallbacks(int, Runnable, Object);
@@ -3624,7 +3667,7 @@ package android.view.accessibility {
 package android.view.animation {
 
   public class AnimationUtils {
-    method public static void lockAnimationClock(long);
+    method public static void lockAnimationClock(long, long);
     method public static void unlockAnimationClock();
   }
 

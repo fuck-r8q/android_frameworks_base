@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"Audio"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"Headset"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"Input"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"Hearing aids"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"Hearing aids"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"Turning on…"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"Auto-rotate"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"Auto-rotate screen"</string>
@@ -1046,6 +1046,8 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"Problem reading your battery meter"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"Tap for more information"</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"No alarm set"</string>
+    <!-- no translation found for accessibility_bouncer (5896923685673320070) -->
+    <skip />
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"Fingerprint sensor"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"Authenticate"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"enter device"</string>
@@ -1108,10 +1110,8 @@
     <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"Assistant is listening"</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# notification}other{# notifications}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
-    <!-- no translation found for note_task_button_label (230135078402003532) -->
-    <skip />
-    <!-- no translation found for note_task_shortcut_long_label (7729325091147319409) -->
-    <skip />
+    <string name="note_task_button_label" msgid="230135078402003532">"Note-taking"</string>
+    <string name="note_task_shortcut_long_label" msgid="7729325091147319409">"Note-taking, <xliff:g id="NOTE_TAKING_APP">%1$s</xliff:g>"</string>
     <string name="broadcasting_description_is_broadcasting" msgid="765627502786404290">"Broadcasting"</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="3605428497924077811">"Stop broadcasting <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
     <string name="bt_le_audio_broadcast_dialog_sub_title" msgid="7889684551194225793">"If you broadcast <xliff:g id="SWITCHAPP">%1$s</xliff:g> or change the output, your current broadcast will stop"</string>
@@ -1127,12 +1127,18 @@
     <string name="log_access_confirmation_learn_more" msgid="3134565480986328004">"Learn more"</string>
     <string name="log_access_confirmation_learn_more_at" msgid="5635666259505215905">"Learn more at <xliff:g id="URL">%s</xliff:g>"</string>
     <string name="keyguard_affordance_enablement_dialog_action_template" msgid="8164857863036314664">"Open <xliff:g id="APPNAME">%1$s</xliff:g>"</string>
-    <string name="wallet_quick_affordance_unavailable_install_the_app" msgid="7298552910007208368">"To add the Wallet app as a shortcut, make sure that the app is installed"</string>
-    <string name="wallet_quick_affordance_unavailable_configure_the_app" msgid="4387433357429873258">"To add the Wallet app as a shortcut, make sure that at least one card has been added"</string>
-    <string name="qr_scanner_quick_affordance_unavailable_explanation" msgid="3049582306241150946">"To add the QR code scanner as a shortcut, make sure that a camera app is installed"</string>
-    <string name="home_quick_affordance_unavailable_install_the_app" msgid="6187820778998446168">"To add the Home app as a shortcut, make sure that the app is installed"</string>
-    <string name="home_quick_affordance_unavailable_configure_the_app" msgid="7953595390775156839">"• At least one device is available"</string>
-    <string name="notes_app_quick_affordance_unavailable_explanation" msgid="4796955161600178530">"Select a default notes app to use the note-taking shortcut"</string>
+    <!-- no translation found for wallet_quick_affordance_unavailable_install_the_app (7298552910007208368) -->
+    <skip />
+    <!-- no translation found for wallet_quick_affordance_unavailable_configure_the_app (4387433357429873258) -->
+    <skip />
+    <!-- no translation found for qr_scanner_quick_affordance_unavailable_explanation (3049582306241150946) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_install_the_app (6187820778998446168) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_configure_the_app (7953595390775156839) -->
+    <skip />
+    <!-- no translation found for notes_app_quick_affordance_unavailable_explanation (4796955161600178530) -->
+    <skip />
     <string name="keyguard_affordance_enablement_dialog_notes_app_action" msgid="6821710209675089470">"Select app"</string>
     <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"Touch &amp; hold shortcut"</string>
     <string name="rear_display_bottom_sheet_cancel" msgid="3461468855493357248">"Cancel"</string>

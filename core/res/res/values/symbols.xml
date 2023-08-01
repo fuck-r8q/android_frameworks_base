@@ -526,6 +526,7 @@
   <java-symbol type="dimen" name="config_viewConfigurationHandwritingSlop" />
   <java-symbol type="dimen" name="config_viewConfigurationHoverSlop" />
   <java-symbol type="dimen" name="config_ambiguousGestureMultiplier" />
+  <java-symbol type="dimen" name="config_autoKeyboardBrightnessSmoothingConstant" />
   <java-symbol type="dimen" name="config_viewMinFlingVelocity" />
   <java-symbol type="dimen" name="config_viewMaxFlingVelocity" />
   <java-symbol type="dimen" name="config_viewMinRotaryEncoderFlingVelocity" />
@@ -1918,11 +1919,13 @@
   <java-symbol type="anim" name="dream_activity_open_enter" />
   <java-symbol type="anim" name="dream_activity_close_exit" />
   <java-symbol type="array" name="config_autoBrightnessButtonBacklightValues" />
-  <java-symbol type="array" name="config_autoBrightnessKeyboardBacklightValues" />
   <java-symbol type="array" name="config_autoBrightnessLcdBacklightValues" />
   <java-symbol type="array" name="config_autoBrightnessLcdBacklightValues_doze" />
   <java-symbol type="array" name="config_autoBrightnessLevels" />
   <java-symbol type="array" name="config_autoBrightnessLevelsIdle" />
+  <java-symbol type="array" name="config_autoKeyboardBacklightBrightnessValues" />
+  <java-symbol type="array" name="config_autoKeyboardBacklightDecreaseLuxThreshold" />
+  <java-symbol type="array" name="config_autoKeyboardBacklightIncreaseLuxThreshold" />
   <java-symbol type="array" name="config_ambientThresholdLevels" />
   <java-symbol type="array" name="config_ambientBrighteningThresholds" />
   <java-symbol type="array" name="config_ambientDarkeningThresholds" />
@@ -2057,6 +2060,7 @@
   <java-symbol type="integer" name="config_notificationsBatteryMediumARGB" />
   <java-symbol type="integer" name="config_notificationsBatteryNearlyFullLevel" />
   <java-symbol type="integer" name="config_notificationServiceArchiveSize" />
+  <java-symbol type="dimen" name="config_rotaryEncoderAxisScrollTickInterval" />
   <java-symbol type="integer" name="config_previousVibrationsDumpLimit" />
   <java-symbol type="integer" name="config_defaultVibrationAmplitude" />
   <java-symbol type="dimen" name="config_hapticChannelMaxVibrationAmplitude" />
@@ -2148,6 +2152,7 @@
   <java-symbol type="string" name="data_usage_rapid_body" />
   <java-symbol type="string" name="data_usage_rapid_app_body" />
   <java-symbol type="string" name="default_wallpaper_component" />
+  <java-symbol type="array" name="cmf_default_wallpaper_component" />
   <java-symbol type="string" name="device_storage_monitor_notification_channel" />
   <java-symbol type="string" name="dlg_ok" />
   <java-symbol type="string" name="dump_heap_notification" />
@@ -2605,6 +2610,7 @@
   <java-symbol type="string" name="biometric_error_hw_unavailable" />
   <java-symbol type="string" name="biometric_error_user_canceled" />
   <java-symbol type="string" name="biometric_not_recognized" />
+  <java-symbol type="string" name="biometric_face_not_recognized" />
   <java-symbol type="string" name="biometric_error_canceled" />
   <java-symbol type="string" name="biometric_error_device_not_secured" />
   <java-symbol type="string" name="biometric_error_generic" />
@@ -3370,6 +3376,7 @@
   <java-symbol type="string" name="app_streaming_blocked_title_for_playstore_dialog" />
   <java-symbol type="string" name="app_streaming_blocked_title_for_settings_dialog" />
   <java-symbol type="string" name="app_streaming_blocked_message" />
+  <java-symbol type="string" name="app_streaming_blocked_message_for_permission_request" />
   <java-symbol type="string" name="app_streaming_blocked_message_for_fingerprint_dialog" />
   <java-symbol type="string" name="app_streaming_blocked_message_for_settings_dialog" />
 
@@ -3957,7 +3964,6 @@
 
   <!-- From media projection -->
   <java-symbol type="string" name="config_mediaProjectionPermissionDialogComponent" />
-  <java-symbol type="string" name="config_batterySaverDeviceSpecificConfig" />
 
   <!-- Compile SDK check -->
   <java-symbol type="layout" name="unsupported_compile_sdk_dialog_content" />
@@ -4021,11 +4027,30 @@
   <java-symbol type="string" name="notification_app_name_system" />
   <java-symbol type="string" name="notification_app_name_settings" />
 
+  <!-- Battery saver config -->
   <java-symbol type="integer" name="config_lowBatteryAutoTriggerDefaultLevel" />
+  <java-symbol type="string" name="config_batterySaverDeviceSpecificConfig" />
   <java-symbol type="bool" name="config_batterySaverStickyBehaviourDisabled" />
   <java-symbol type="integer" name="config_dynamicPowerSavingsDefaultDisableThreshold" />
   <java-symbol type="string" name="config_batterySaverScheduleProvider" />
   <java-symbol type="string" name="config_powerSaveModeChangedListenerPackage" />
+  <java-symbol type="dimen" name="config_batterySaver_full_adjustBrightnessFactor" />
+  <java-symbol type="bool" name="config_batterySaver_full_deferFullBackup" />
+  <java-symbol type="bool" name="config_batterySaver_full_deferKeyValueBackup" />
+  <java-symbol type="bool" name="config_batterySaver_full_disableAnimation" />
+  <java-symbol type="bool" name="config_batterySaver_full_disableAod" />
+  <java-symbol type="bool" name="config_batterySaver_full_disableLaunchBoost" />
+  <java-symbol type="bool" name="config_batterySaver_full_disableOptionalSensors" />
+  <java-symbol type="bool" name="config_batterySaver_full_disableVibration" />
+  <java-symbol type="bool" name="config_batterySaver_full_enableAdjustBrightness" />
+  <java-symbol type="bool" name="config_batterySaver_full_enableDataSaver" />
+  <java-symbol type="bool" name="config_batterySaver_full_enableFirewall" />
+  <java-symbol type="bool" name="config_batterySaver_full_enableNightMode" />
+  <java-symbol type="bool" name="config_batterySaver_full_enableQuickDoze" />
+  <java-symbol type="bool" name="config_batterySaver_full_forceAllAppsStandby" />
+  <java-symbol type="bool" name="config_batterySaver_full_forceBackgroundCheck" />
+  <java-symbol type="integer" name="config_batterySaver_full_locationMode" />
+  <java-symbol type="integer" name="config_batterySaver_full_soundTriggerMode" />
 
   <!-- For car devices -->
   <java-symbol type="string" name="car_loading_profile" />
@@ -4469,9 +4494,6 @@
   <!-- Set to true to make assistant show in front of the dream/screensaver. -->
   <java-symbol type="bool" name="config_assistantOnTopOfDream"/>
 
-  <!-- Set to true to enable letterboxing on translucent activities. -->
-  <java-symbol type="bool" name="config_letterboxIsEnabledForTranslucentActivities" />
-
   <java-symbol type="string" name="config_overrideComponentUiPackage" />
 
   <java-symbol type="string" name="notification_channel_network_status" />
@@ -4566,6 +4588,12 @@
   <java-symbol type="dimen" name="config_letterboxDefaultMinAspectRatioForUnresizableApps" />
   <java-symbol type="bool" name="config_letterboxIsSplitScreenAspectRatioForUnresizableAppsEnabled" />
   <java-symbol type="bool" name="config_letterboxIsDisplayAspectRatioForFixedOrientationLetterboxEnabled" />
+  <!-- Set to true to enable letterboxing on translucent activities. -->
+  <java-symbol type="bool" name="config_letterboxIsEnabledForTranslucentActivities" />
+
+  <!-- Whether per-app user aspect ratio override settings is enabled -->
+  <java-symbol type="bool" name="config_appCompatUserAppAspectRatioSettingsIsEnabled" />
+
   <java-symbol type="bool" name="config_isCompatFakeFocusEnabled" />
   <java-symbol type="bool" name="config_isWindowManagerCameraCompatTreatmentEnabled" />
   <java-symbol type="bool" name="config_isWindowManagerCameraCompatSplitScreenAspectRatioEnabled" />

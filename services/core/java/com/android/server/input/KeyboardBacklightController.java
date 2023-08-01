@@ -18,6 +18,7 @@ package com.android.server.input;
 
 import android.animation.ValueAnimator;
 import android.annotation.BinderThread;
+import android.annotation.Nullable;
 import android.content.Context;
 import android.graphics.Color;
 import android.hardware.input.IKeyboardBacklightListener;
@@ -93,6 +94,7 @@ final class KeyboardBacklightController implements
     private final PersistentDataStore mDataStore;
     private final Handler mHandler;
     private final AnimatorFactory mAnimatorFactory;
+    private final UEventManager mUEventManager;
     // Always access on handler thread or need to lock this for synchronization.
     private final SparseArray<KeyboardBacklightState> mKeyboardBacklights = new SparseArray<>(1);
     // Maintains state if all backlights should be on or turned off
@@ -105,6 +107,12 @@ final class KeyboardBacklightController implements
     private final SparseArray<KeyboardBacklightListenerRecord> mKeyboardBacklightListenerRecords =
             new SparseArray<>();
 
+    private final AmbientKeyboardBacklightController mAmbientController;
+    @Nullable
+    private AmbientKeyboardBacklightController.AmbientKeyboardBacklightListener mAmbientListener;
+
+    private int mAmbientBacklightValue = 0;
+
     static {
         // Fixed brightness levels to avoid issues when converting back and forth from the
         // device brightness range to [0-255]
@@ -116,18 +124,21 @@ final class KeyboardBacklightController implements
     }
 
     KeyboardBacklightController(Context context, NativeInputManagerService nativeService,
-            PersistentDataStore dataStore, Looper looper) {
-        this(context, nativeService, dataStore, looper, ValueAnimator::ofInt);
+            PersistentDataStore dataStore, Looper looper, UEventManager uEventManager) {
+        this(context, nativeService, dataStore, looper, ValueAnimator::ofInt, uEventManager);
     }
 
     @VisibleForTesting
     KeyboardBacklightController(Context context, NativeInputManagerService nativeService,
-            PersistentDataStore dataStore, Looper looper, AnimatorFactory animatorFactory) {
+            PersistentDataStore dataStore, Looper looper, AnimatorFactory animatorFactory,
+            UEventManager uEventManager) {
         mContext = context;
         mNative = nativeService;
         mDataStore = dataStore;
         mHandler = new Handler(looper, this::handleMessage);
         mAnimatorFactory = animatorFactory;
+        mAmbientController = new AmbientKeyboardBacklightController(context, looper);
+        mUEventManager = uEventManager;
     }
 
     @Override
@@ -144,13 +155,17 @@ final class KeyboardBacklightController implements
         // We want to observe creation of such LED nodes since they might be created after device
         // FD created and InputDevice creation logic doesn't initialize LED nodes which leads to
         // backlight not working.
-        UEventObserver observer = new UEventObserver() {
+        mUEventManager.addListener(new UEventManager.UEventListener() {
             @Override
-            public void onUEvent(UEvent event) {
+            public void onUEvent(UEventObserver.UEvent event) {
                 onKeyboardBacklightUEvent(event);
             }
-        };
-        observer.startObserving(UEVENT_KEYBOARD_BACKLIGHT_TAG);
+        }, UEVENT_KEYBOARD_BACKLIGHT_TAG);
+
+        if (InputFeatureFlagProvider.isAmbientKeyboardBacklightControlEnabled()) {
+            // Start ambient backlight controller
+            mAmbientController.systemRunning();
+        }
     }
 
     @Override
@@ -183,9 +198,21 @@ final class KeyboardBacklightController implements
         if (inputDevice == null || state == null) {
             return;
         }
-        Light keyboardBacklight = state.mLight;
         // Follow preset levels of brightness defined in BRIGHTNESS_LEVELS
-        final int currBrightnessLevel = state.mBrightnessLevel;
+        final int currBrightnessLevel;
+        if (state.mUseAmbientController) {
+            int index = Arrays.binarySearch(state.mBrightnessValueForLevel, mAmbientBacklightValue);
+            // Set current level to the lower bound of the ambient value in the brightness array.
+            if (index < 0) {
+                int lowerBound = Math.max(0, -(index + 1) - 1);
+                currBrightnessLevel =
+                        direction == Direction.DIRECTION_UP ? lowerBound : lowerBound + 1;
+            } else {
+                currBrightnessLevel = index;
+            }
+        } else {
+            currBrightnessLevel = state.mBrightnessLevel;
+        }
         final int newBrightnessLevel;
         if (direction == Direction.DIRECTION_UP) {
             newBrightnessLevel = Math.min(currBrightnessLevel + 1,
@@ -193,33 +220,67 @@ final class KeyboardBacklightController implements
         } else {
             newBrightnessLevel = Math.max(currBrightnessLevel - 1, 0);
         }
-        updateBacklightState(deviceId, newBrightnessLevel, true /* isTriggeredByKeyPress */);
 
+        state.setBrightnessLevel(newBrightnessLevel);
+
+        // Might need to stop listening to ALS since user has manually selected backlight
+        // level through keyboard up/down button
+        updateAmbientLightListener();
+
+        maybeBackupBacklightBrightness(inputDevice, state.mLight,
+                state.mBrightnessValueForLevel[newBrightnessLevel]);
+
+        if (DEBUG) {
+            Slog.d(TAG,
+                    "Changing state from " + state.mBrightnessLevel + " to " + newBrightnessLevel);
+        }
+
+        synchronized (mKeyboardBacklightListenerRecords) {
+            for (int i = 0; i < mKeyboardBacklightListenerRecords.size(); i++) {
+                IKeyboardBacklightState callbackState = new IKeyboardBacklightState();
+                callbackState.brightnessLevel = newBrightnessLevel;
+                callbackState.maxBrightnessLevel = state.getNumBrightnessChangeSteps();
+                mKeyboardBacklightListenerRecords.valueAt(i).notifyKeyboardBacklightChanged(
+                        deviceId, callbackState, true);
+            }
+        }
+    }
+
+    private void maybeBackupBacklightBrightness(InputDevice inputDevice, Light keyboardBacklight,
+            int brightnessValue) {
+        // Don't back up or restore when ALS based keyboard backlight is enabled
+        if (InputFeatureFlagProvider.isAmbientKeyboardBacklightControlEnabled()) {
+            return;
+        }
         synchronized (mDataStore) {
             try {
                 mDataStore.setKeyboardBacklightBrightness(inputDevice.getDescriptor(),
                         keyboardBacklight.getId(),
-                        state.mBrightnessValueForLevel[newBrightnessLevel]);
+                        brightnessValue);
             } finally {
                 mDataStore.saveIfNeeded();
             }
         }
     }
 
-    private void restoreBacklightBrightness(InputDevice inputDevice, Light keyboardBacklight) {
+    private void maybeRestoreBacklightBrightness(InputDevice inputDevice, Light keyboardBacklight) {
+        // Don't back up or restore when ALS based keyboard backlight is enabled
+        if (InputFeatureFlagProvider.isAmbientKeyboardBacklightControlEnabled()) {
+            return;
+        }
         KeyboardBacklightState state = mKeyboardBacklights.get(inputDevice.getId());
         OptionalInt brightness;
         synchronized (mDataStore) {
             brightness = mDataStore.getKeyboardBacklightBrightness(
                     inputDevice.getDescriptor(), keyboardBacklight.getId());
         }
-        if (brightness.isPresent()) {
+        if (state != null && brightness.isPresent()) {
             int brightnessValue = Math.max(0, Math.min(MAX_BRIGHTNESS, brightness.getAsInt()));
-            int index = Arrays.binarySearch(state.mBrightnessValueForLevel, brightnessValue);
-            if (index < 0) {
-                index = Math.min(state.getNumBrightnessChangeSteps(), -(index + 1));
+            int newLevel = Arrays.binarySearch(state.mBrightnessValueForLevel, brightnessValue);
+            if (newLevel < 0) {
+                newLevel = Math.min(state.getNumBrightnessChangeSteps(), -(newLevel + 1));
             }
-            updateBacklightState(inputDevice.getId(), index, false /* isTriggeredByKeyPress */);
+            state.setBrightnessLevel(newLevel);
             if (DEBUG) {
                 Slog.d(TAG, "Restoring brightness level " + brightness.getAsInt());
             }
@@ -260,6 +321,16 @@ final class KeyboardBacklightController implements
         } else {
             handleUserInactivity();
         }
+        updateAmbientLightListener();
+    }
+
+    @VisibleForTesting
+    public void handleAmbientLightValueChanged(int brightnessValue) {
+        mAmbientBacklightValue = brightnessValue;
+        for (int i = 0; i < mKeyboardBacklights.size(); i++) {
+            KeyboardBacklightState state = mKeyboardBacklights.valueAt(i);
+            state.onAmbientBacklightValueChanged();
+        }
     }
 
     private boolean handleMessage(Message msg) {
@@ -292,12 +363,14 @@ final class KeyboardBacklightController implements
     @Override
     public void onInputDeviceAdded(int deviceId) {
         onInputDeviceChanged(deviceId);
+        updateAmbientLightListener();
     }
 
     @VisibleForTesting
     @Override
     public void onInputDeviceRemoved(int deviceId) {
         mKeyboardBacklights.remove(deviceId);
+        updateAmbientLightListener();
     }
 
     @VisibleForTesting
@@ -318,7 +391,7 @@ final class KeyboardBacklightController implements
         }
         // The keyboard backlight was added or changed.
         mKeyboardBacklights.put(deviceId, new KeyboardBacklightState(deviceId, keyboardBacklight));
-        restoreBacklightBrightness(inputDevice, keyboardBacklight);
+        maybeRestoreBacklightBrightness(inputDevice, keyboardBacklight);
     }
 
     private InputDevice getInputDevice(int deviceId) {
@@ -379,30 +452,6 @@ final class KeyboardBacklightController implements
         }
     }
 
-    private void updateBacklightState(int deviceId, int brightnessLevel,
-            boolean isTriggeredByKeyPress) {
-        KeyboardBacklightState state = mKeyboardBacklights.get(deviceId);
-        if (state == null) {
-            return;
-        }
-
-        state.setBrightnessLevel(brightnessLevel);
-
-        synchronized (mKeyboardBacklightListenerRecords) {
-            for (int i = 0; i < mKeyboardBacklightListenerRecords.size(); i++) {
-                IKeyboardBacklightState callbackState = new IKeyboardBacklightState();
-                callbackState.brightnessLevel = brightnessLevel;
-                callbackState.maxBrightnessLevel = state.getNumBrightnessChangeSteps();
-                mKeyboardBacklightListenerRecords.valueAt(i).notifyKeyboardBacklightChanged(
-                        deviceId, callbackState, isTriggeredByKeyPress);
-            }
-        }
-
-        if (DEBUG) {
-            Slog.d(TAG, "Changing state from " + state.mBrightnessLevel + " to " + brightnessLevel);
-        }
-    }
-
     private void onKeyboardBacklightListenerDied(int pid) {
         synchronized (mKeyboardBacklightListenerRecords) {
             mKeyboardBacklightListenerRecords.remove(pid);
@@ -417,6 +466,25 @@ final class KeyboardBacklightController implements
             if (isValidBacklightNodePath(devPath)) {
                 mNative.sysfsNodeChanged("/sys" + devPath);
             }
+        }
+    }
+
+    private void updateAmbientLightListener() {
+        if (!InputFeatureFlagProvider.isAmbientKeyboardBacklightControlEnabled()) {
+            return;
+        }
+        boolean needToListenAmbientLightSensor = false;
+        for (int i = 0; i < mKeyboardBacklights.size(); i++) {
+            needToListenAmbientLightSensor |= mKeyboardBacklights.valueAt(i).mUseAmbientController;
+        }
+        needToListenAmbientLightSensor &= mIsInteractive;
+        if (needToListenAmbientLightSensor && mAmbientListener == null) {
+            mAmbientListener = this::handleAmbientLightValueChanged;
+            mAmbientController.registerAmbientBacklightListener(mAmbientListener);
+        }
+        if (!needToListenAmbientLightSensor && mAmbientListener != null) {
+            mAmbientController.unregisterAmbientBacklightListener(mAmbientListener);
+            mAmbientListener = null;
         }
     }
 
@@ -485,6 +553,8 @@ final class KeyboardBacklightController implements
         private int mBrightnessLevel;
         private ValueAnimator mAnimator;
         private final int[] mBrightnessValueForLevel;
+        private boolean mUseAmbientController =
+                InputFeatureFlagProvider.isAmbientKeyboardBacklightControlEnabled();
 
         KeyboardBacklightState(int deviceId, Light light) {
             mDeviceId = deviceId;
@@ -525,13 +595,23 @@ final class KeyboardBacklightController implements
         }
 
         private void onBacklightStateChanged() {
-            setBacklightValue(mIsBacklightOn ? mBrightnessValueForLevel[mBrightnessLevel] : 0);
+            int toValue = mUseAmbientController ? mAmbientBacklightValue
+                    : mBrightnessValueForLevel[mBrightnessLevel];
+            setBacklightValue(mIsBacklightOn ? toValue : 0);
         }
         private void setBrightnessLevel(int brightnessLevel) {
+            // Once we manually set level, disregard ambient light controller
+            mUseAmbientController = false;
             if (mIsBacklightOn) {
                 setBacklightValue(mBrightnessValueForLevel[brightnessLevel]);
             }
             mBrightnessLevel = brightnessLevel;
+        }
+
+        private void onAmbientBacklightValueChanged() {
+            if (mIsBacklightOn && mUseAmbientController) {
+                setBacklightValue(mAmbientBacklightValue);
+            }
         }
 
         private void cancelAnimation() {

@@ -201,7 +201,9 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
     final TaskStackListener mTaskStackListener = new TaskStackListener() {
         @Override
         public void onTaskStackChanged() {
-            mHandler.post(AuthController.this::cancelIfOwnerIsNotInForeground);
+            if (!isOwnerInForeground()) {
+                mHandler.post(AuthController.this::cancelIfOwnerIsNotInForeground);
+            }
         }
     };
 
@@ -239,33 +241,39 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
         }
     }
 
+    private boolean isOwnerInForeground() {
+        if (mCurrentDialog != null) {
+            final String clientPackage = mCurrentDialog.getOpPackageName();
+            final List<ActivityManager.RunningTaskInfo> runningTasks =
+                    mActivityTaskManager.getTasks(1);
+            if (!runningTasks.isEmpty()) {
+                final String topPackage = runningTasks.get(0).topActivity.getPackageName();
+                if (!topPackage.contentEquals(clientPackage)
+                        && !Utils.isSystem(mContext, clientPackage)) {
+                    Log.w(TAG, "Evicting client due to: " + topPackage);
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private void cancelIfOwnerIsNotInForeground() {
         mExecution.assertIsMainThread();
         if (mCurrentDialog != null) {
             try {
-                final String clientPackage = mCurrentDialog.getOpPackageName();
-                Log.w(TAG, "Task stack changed, current client: " + clientPackage);
-                final List<ActivityManager.RunningTaskInfo> runningTasks =
-                        mActivityTaskManager.getTasks(1);
-                if (!runningTasks.isEmpty()) {
-                    final String topPackage = runningTasks.get(0).topActivity.getPackageName();
-                    if (!topPackage.contentEquals(clientPackage)
-                            && !Utils.isSystem(mContext, clientPackage)) {
-                        Log.e(TAG, "Evicting client due to: " + topPackage);
-                        mCurrentDialog.dismissWithoutCallback(true /* animate */);
-                        mCurrentDialog = null;
+                mCurrentDialog.dismissWithoutCallback(true /* animate */);
+                mCurrentDialog = null;
 
-                        for (Callback cb : mCallbacks) {
-                            cb.onBiometricPromptDismissed();
-                        }
+                for (Callback cb : mCallbacks) {
+                    cb.onBiometricPromptDismissed();
+                }
 
-                        if (mReceiver != null) {
-                            mReceiver.onDialogDismissed(
-                                    BiometricPrompt.DISMISSED_REASON_USER_CANCEL,
-                                    null /* credentialAttestation */);
-                            mReceiver = null;
-                        }
-                    }
+                if (mReceiver != null) {
+                    mReceiver.onDialogDismissed(
+                            BiometricPrompt.DISMISSED_REASON_USER_CANCEL,
+                            null /* credentialAttestation */);
+                    mReceiver = null;
                 }
             } catch (RemoteException e) {
                 Log.e(TAG, "Remote exception", e);
@@ -1048,6 +1056,18 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
         return false;
     }
 
+    private String getNotRecognizedString(@Modality int modality) {
+        final int messageRes;
+        final int userId = mCurrentDialogArgs.argi1;
+        if (isFaceAuthEnrolled(userId) && isFingerprintEnrolled(userId)) {
+            messageRes = modality == TYPE_FACE
+                    ? R.string.biometric_face_not_recognized
+                    : R.string.fingerprint_error_not_match;
+        } else {
+            messageRes = R.string.biometric_not_recognized;
+        }
+        return mContext.getString(messageRes);
+    }
 
     private String getErrorString(@Modality int modality, int error, int vendorCode) {
         switch (modality) {
@@ -1094,7 +1114,7 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
                 mCurrentDialog.animateToCredentialUI();
             } else if (isSoftError) {
                 final String errorMessage = (error == BiometricConstants.BIOMETRIC_PAUSED_REJECTED)
-                        ? mContext.getString(R.string.biometric_not_recognized)
+                        ? getNotRecognizedString(modality)
                         : getErrorString(modality, error, vendorCode);
                 if (DEBUG) Log.d(TAG, "onBiometricError, soft error: " + errorMessage);
                 // The camera privacy error can return before the prompt initializes its state,
@@ -1204,8 +1224,11 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
 
         final PromptInfo promptInfo = (PromptInfo) args.arg1;
         final int[] sensorIds = (int[]) args.arg3;
+
+        // TODO(b/251476085): remove these unused parameters (replaced with SSOT elsewhere)
         final boolean credentialAllowed = (boolean) args.arg4;
         final boolean requireConfirmation = (boolean) args.arg5;
+
         final int userId = args.argi1;
         final String opPackageName = (String) args.arg6;
         final long operationId = args.argl1;
@@ -1253,10 +1276,11 @@ public class AuthController implements CoreStartable, CommandQueue.Callbacks,
             cb.onBiometricPromptShown();
         }
         mCurrentDialog = newDialog;
-        mCurrentDialog.show(mWindowManager, savedState);
 
-        if (!promptInfo.isAllowBackgroundAuthentication()) {
-            mHandler.post(this::cancelIfOwnerIsNotInForeground);
+        if (!promptInfo.isAllowBackgroundAuthentication() && !isOwnerInForeground()) {
+            cancelIfOwnerIsNotInForeground();
+        } else {
+            mCurrentDialog.show(mWindowManager, savedState);
         }
     }
 

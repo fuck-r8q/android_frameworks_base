@@ -135,7 +135,7 @@
     <string name="accessibility_send_smart_reply" msgid="8885032190442015141">"Жіберу"</string>
     <string name="cancel" msgid="1089011503403416730">"Бас тарту"</string>
     <string name="biometric_dialog_confirm" msgid="2005978443007344895">"Растау"</string>
-    <string name="biometric_dialog_try_again" msgid="8575345628117768844">"Қайта көру"</string>
+    <string name="biometric_dialog_try_again" msgid="8575345628117768844">"Қайталап көріңіз"</string>
     <string name="biometric_dialog_empty_space_description" msgid="3330555462071453396">"Аутентификациядан бас тарту үшін түртіңіз."</string>
     <string name="biometric_dialog_face_icon_description_idle" msgid="4351777022315116816">"Қайталап көріңіз."</string>
     <string name="biometric_dialog_face_icon_description_authenticating" msgid="3401633342366146535">"Құрылғы бетіңізді талдап жатыр."</string>
@@ -243,7 +243,7 @@
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"Aудио"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"Гарнитура"</string>
     <string name="quick_settings_bluetooth_secondary_label_input" msgid="3887552721233148132">"Кіріс"</string>
-    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="3003338571871392293">"Есту аппараттары"</string>
+    <string name="quick_settings_bluetooth_secondary_label_hearing_aids" msgid="5553051568867097111">"Есту аппараттары"</string>
     <string name="quick_settings_bluetooth_secondary_label_transient" msgid="3882884317600669650">"Қосылуда…"</string>
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"Автоматты түрде бұру"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"Автоматты айналатын экран"</string>
@@ -1046,6 +1046,8 @@
     <string name="battery_state_unknown_notification_title" msgid="8464703640483773454">"Батарея зарядының дерегі алынбай жатыр"</string>
     <string name="battery_state_unknown_notification_text" msgid="13720937839460899">"Толығырақ ақпарат алу үшін түртіңіз."</string>
     <string name="qs_alarm_tile_no_alarm" msgid="4826472008616807923">"Оятқыш орнатылмаған."</string>
+    <!-- no translation found for accessibility_bouncer (5896923685673320070) -->
+    <skip />
     <string name="accessibility_fingerprint_label" msgid="5255731221854153660">"Саусақ ізін оқу сканері"</string>
     <string name="accessibility_authenticate_hint" msgid="798914151813205721">"аутентификациялау"</string>
     <string name="accessibility_enter_hint" msgid="2617864063504824834">"құрылғыны енгізу"</string>
@@ -1108,10 +1110,8 @@
     <string name="dream_overlay_status_bar_assistant_attention_indicator" msgid="4712565923771372690">"Assistant тыңдап тұр."</string>
     <string name="dream_overlay_status_bar_notification_indicator" msgid="8091389255691081711">"{count,plural, =1{# хабарландыру}other{# хабарландыру}}"</string>
     <string name="dream_overlay_weather_complication_desc" msgid="824503662089783824">"<xliff:g id="WEATHER_CONDITION">%1$s</xliff:g>, <xliff:g id="TEMPERATURE">%2$s</xliff:g>"</string>
-    <!-- no translation found for note_task_button_label (230135078402003532) -->
-    <skip />
-    <!-- no translation found for note_task_shortcut_long_label (7729325091147319409) -->
-    <skip />
+    <string name="note_task_button_label" msgid="230135078402003532">"Ескертпе жазу"</string>
+    <string name="note_task_shortcut_long_label" msgid="7729325091147319409">"Ескертпе жазу, <xliff:g id="NOTE_TAKING_APP">%1$s</xliff:g>"</string>
     <string name="broadcasting_description_is_broadcasting" msgid="765627502786404290">"Таратуда"</string>
     <string name="bt_le_audio_broadcast_dialog_title" msgid="3605428497924077811">"<xliff:g id="APP_NAME">%1$s</xliff:g> қолданбасын таратуды тоқтатасыз ба?"</string>
     <string name="bt_le_audio_broadcast_dialog_sub_title" msgid="7889684551194225793">"<xliff:g id="SWITCHAPP">%1$s</xliff:g> қолданбасын таратсаңыз немесе аудио шығысын өзгертсеңіз, қазіргі тарату сеансы тоқтайды."</string>
@@ -1127,12 +1127,18 @@
     <string name="log_access_confirmation_learn_more" msgid="3134565480986328004">"Толық ақпарат"</string>
     <string name="log_access_confirmation_learn_more_at" msgid="5635666259505215905">"Толық ақпарат: <xliff:g id="URL">%s</xliff:g>"</string>
     <string name="keyguard_affordance_enablement_dialog_action_template" msgid="8164857863036314664">"<xliff:g id="APPNAME">%1$s</xliff:g> ашу"</string>
-    <string name="wallet_quick_affordance_unavailable_install_the_app" msgid="7298552910007208368">"Wallet қолданбасын таңбаша ретінде қосу үшін қолданбаның орнатылғанын тексеріңіз."</string>
-    <string name="wallet_quick_affordance_unavailable_configure_the_app" msgid="4387433357429873258">"Wallet қолданбасын таңбаша ретінде қосу үшін кемінде бір картаның қосылғанын тексеріңіз."</string>
-    <string name="qr_scanner_quick_affordance_unavailable_explanation" msgid="3049582306241150946">"QR кодының сканерін таңбаша ретінде қосу үшін камера қолданбасының орнатылғанын тексеріңіз."</string>
-    <string name="home_quick_affordance_unavailable_install_the_app" msgid="6187820778998446168">"Home қолданбасын таңбаша ретінде қосу үшін қолданбаның орнатылғанын тексеріңіз."</string>
-    <string name="home_quick_affordance_unavailable_configure_the_app" msgid="7953595390775156839">"• Кемінде бір құрылғы қолжетімді."</string>
-    <string name="notes_app_quick_affordance_unavailable_explanation" msgid="4796955161600178530">"Жазба жазу таңбашасын пайдалану үшін әдепкі жазба қолданбаны таңдаңыз."</string>
+    <!-- no translation found for wallet_quick_affordance_unavailable_install_the_app (7298552910007208368) -->
+    <skip />
+    <!-- no translation found for wallet_quick_affordance_unavailable_configure_the_app (4387433357429873258) -->
+    <skip />
+    <!-- no translation found for qr_scanner_quick_affordance_unavailable_explanation (3049582306241150946) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_install_the_app (6187820778998446168) -->
+    <skip />
+    <!-- no translation found for home_quick_affordance_unavailable_configure_the_app (7953595390775156839) -->
+    <skip />
+    <!-- no translation found for notes_app_quick_affordance_unavailable_explanation (4796955161600178530) -->
+    <skip />
     <string name="keyguard_affordance_enablement_dialog_notes_app_action" msgid="6821710209675089470">"Қолданба таңдау"</string>
     <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"Таңбашаны басып тұрыңыз."</string>
     <string name="rear_display_bottom_sheet_cancel" msgid="3461468855493357248">"Бас тарту"</string>

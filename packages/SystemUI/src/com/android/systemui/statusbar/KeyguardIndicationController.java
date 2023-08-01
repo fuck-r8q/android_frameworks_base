@@ -95,8 +95,8 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.keyguard.KeyguardIndication;
 import com.android.systemui.keyguard.KeyguardIndicationRotateTextViewController;
 import com.android.systemui.keyguard.ScreenLifecycle;
-import com.android.systemui.keyguard.bouncer.domain.interactor.BouncerMessageInteractor;
-import com.android.systemui.keyguard.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.log.LogLevel;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -258,8 +258,8 @@ public class KeyguardIndicationController {
             AlternateBouncerInteractor alternateBouncerInteractor,
             AlarmManager alarmManager,
             UserTracker userTracker,
-            FeatureFlags flags,
-            BouncerMessageInteractor bouncerMessageInteractor
+            BouncerMessageInteractor bouncerMessageInteractor,
+            FeatureFlags flags
     ) {
         mContext = context;
         mBroadcastDispatcher = broadcastDispatcher;

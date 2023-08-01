@@ -27,6 +27,8 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.systemui.keyguard.KeyguardViewMediator.DELAYED_KEYGUARD_ACTION;
 import static com.android.systemui.keyguard.KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
+import static com.android.systemui.keyguard.KeyguardViewMediator.DELAYED_KEYGUARD_ACTION;
+import static com.android.systemui.keyguard.KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT;
 import static com.android.systemui.keyguard.KeyguardViewMediator.REBOOT_MAINLINE_UPDATE;
 import static com.android.systemui.keyguard.KeyguardViewMediator.SYS_BOOT_REASON_PROP;
 
@@ -197,9 +199,10 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
 
     /** Most recent value passed to {@link KeyguardStateController#notifyKeyguardGoingAway}. */
     private boolean mKeyguardGoingAway = false;
-    private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
+
     private @Mock CoroutineDispatcher mDispatcher;
     private @Mock DreamingToLockscreenTransitionViewModel mDreamingToLockscreenTransitionViewModel;
+    private @Mock SystemPropertiesHelper mSystemPropertiesHelper;
 
     private FakeFeatureFlags mFeatureFlags;
     private int mInitialUserId;

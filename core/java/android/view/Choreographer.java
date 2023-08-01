@@ -718,6 +718,7 @@ public final class Choreographer {
      * @throws IllegalStateException if no frame is in progress.
      * @hide
      */
+    @TestApi
     @UnsupportedAppUsage
     public long getFrameTimeNanos() {
         synchronized (mLock) {
@@ -739,6 +740,38 @@ public final class Choreographer {
         synchronized (mLock) {
             return USE_FRAME_TIME ? mLastFrameTimeNanos : System.nanoTime();
         }
+    }
+
+    /**
+     * Gets the time in {@link System#nanoTime()} timebase which the current frame
+     * is expected to be presented.
+     * <p>
+     * This time should be used to advance any animation clocks.
+     * Prefer using this method over {@link #getFrameTimeNanos()}.
+     * </p><p>
+     * This method should only be called from within a callback.
+     * </p>
+     *
+     * @return The frame start time, in the {@link System#nanoTime()} time base.
+     *
+     * @throws IllegalStateException if no frame is in progress.
+     * @hide
+     */
+    public long getExpectedPresentationTimeNanos() {
+        return mFrameData.getPreferredFrameTimeline().getExpectedPresentationTimeNanos();
+    }
+
+
+    /**
+     * Same as {@link #getExpectedPresentationTimeNanos()} but with millisecond precision.
+     *
+     * @return The frame start time, in the {@link SystemClock#uptimeMillis()} time base.
+     *
+     * @throws IllegalStateException if no frame is in progress.
+     * @hide
+     */
+    public long getExpectedPresentationTimeMillis() {
+        return getExpectedPresentationTimeNanos() / TimeUtils.NANOS_PER_MS;
     }
 
     private void scheduleFrameLocked(long now) {
@@ -952,7 +985,8 @@ public final class Choreographer {
                 Trace.traceBegin(Trace.TRACE_TAG_VIEW, message);
             }
 
-            AnimationUtils.lockAnimationClock(frameTimeNanos / TimeUtils.NANOS_PER_MS);
+            AnimationUtils.lockAnimationClock(frameTimeNanos / TimeUtils.NANOS_PER_MS,
+                    timeline.mExpectedPresentationTimeNanos);
 
             mFrameInfo.markInputHandlingStart();
             doCallbacks(Choreographer.CALLBACK_INPUT, frameIntervalNanos);
@@ -1292,6 +1326,10 @@ public final class Choreographer {
             if (newPreferredDeadline < minimumDeadline) {
                 DisplayEventReceiver.VsyncEventData latestVsyncEventData =
                         displayEventReceiver.getLatestVsyncEventData();
+                if (latestVsyncEventData == null) {
+                    throw new IllegalArgumentException(
+                            "Could not get VsyncEventData. Did SurfaceFlinger crash?");
+                }
                 update(frameTimeNanos, latestVsyncEventData);
             } else {
                 update(frameTimeNanos, newPreferredIndex);

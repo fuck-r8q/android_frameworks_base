@@ -208,7 +208,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
 
     @Override
     public void animateCollapsePanels(int flags, boolean force) {
-        mShadeController.animateCollapsePanels(flags, force, false /* delayed */,
+        mShadeController.animateCollapseShade(flags, force, false /* delayed */,
                 1.0f /* speedUpFactor */);
     }
 
@@ -218,11 +218,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
             Log.d(CentralSurfaces.TAG,
                     "animateExpand: mExpandedVisible=" + mShadeController.isExpandedVisible());
         }
-        if (!mCommandQueue.panelsEnabled()) {
-            return;
-        }
-
-        mShadeViewController.expandToNotifications();
+        mShadeController.animateExpandShade();
     }
 
     @Override
@@ -231,14 +227,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
             Log.d(CentralSurfaces.TAG,
                     "animateExpand: mExpandedVisible=" + mShadeController.isExpandedVisible());
         }
-        if (!mCommandQueue.panelsEnabled()) {
-            return;
-        }
-
-        // Settings are not available in setup
-        if (!mDeviceProvisionedController.isCurrentUserSetup()) return;
-
-        mShadeViewController.expandToQs();
+        mShadeController.animateExpandQs();
     }
 
     @Override
@@ -255,8 +244,13 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     }
     /**
      * State is one or more of the DISABLE constants from StatusBarManager.
+     *
+     * @deprecated If you need to react to changes in disable flags, listen to
+     * {@link com.android.systemui.statusbar.disableflags.data.repository.DisableFlagsRepository}
+     * instead.
      */
     @Override
+    @Deprecated
     public void disable(int displayId, int state1, int state2, boolean animate) {
         if (displayId != mDisplayId) {
             return;
@@ -266,8 +260,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         state2 = mRemoteInputQuickSettingsDisabler.adjustDisableFlags(state2);
         Log.d(CentralSurfaces.TAG,
                 mDisableFlagsLogger.getDisableFlagsString(
-                        /* old= */ new DisableFlagsLogger.DisableState(
-                                mCentralSurfaces.getDisabled1(), mCentralSurfaces.getDisabled2()),
                         /* new= */ new DisableFlagsLogger.DisableState(
                                 state1, state2BeforeAdjustment),
                         /* newStateAfterLocalModification= */ new DisableFlagsLogger.DisableState(
@@ -288,17 +280,12 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         }
 
         if ((diff1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
-            if (mCentralSurfaces.areNotificationAlertsDisabled()) {
+            if ((state1 & StatusBarManager.DISABLE_NOTIFICATION_ALERTS) != 0) {
                 mHeadsUpManager.releaseAllImmediately();
             }
         }
 
-        if ((diff2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
-        }
-
         if ((diff2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
-            mCentralSurfaces.updateQsExpansionEnabled();
             if ((state2 & StatusBarManager.DISABLE2_NOTIFICATION_SHADE) != 0) {
                 mShadeController.animateCollapseShade();
             }
@@ -556,10 +543,10 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
 
     @Override
     public void togglePanel() {
-        if (mCentralSurfaces.isPanelExpanded()) {
+        if (mShadeViewController.isPanelExpanded()) {
             mShadeController.animateCollapseShade();
         } else {
-            animateExpandNotificationsPanel();
+            mShadeController.animateExpandShade();
         }
     }
 
