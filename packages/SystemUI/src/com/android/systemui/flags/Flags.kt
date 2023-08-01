@@ -62,11 +62,12 @@ object Flags {
     val INSTANT_VOICE_REPLY = unreleasedFlag(111, "instant_voice_reply")
 
     /**
-     * This flag is server-controlled and should stay as [unreleasedFlag] since we never want to
-     * enable it on release builds.
+     * This flag controls whether we register a listener for StatsD notification memory reports.
+     * For statsd to actually call the listener however, a server-side toggle needs to be
+     * enabled as well.
      */
     val NOTIFICATION_MEMORY_LOGGING_ENABLED =
-        unreleasedFlag(119, "notification_memory_logging_enabled")
+            releasedFlag(119, "notification_memory_logging_enabled")
 
     // TODO(b/260335638): Tracking Bug
     @JvmField
@@ -616,8 +617,6 @@ object Flags {
     @JvmField val NOTE_TASKS = releasedFlag(1900, "keycode_flag")
 
     // 2000 - device controls
-    @Keep @JvmField val USE_APP_PANELS = releasedFlag(2000, "use_app_panels")
-
     @JvmField val APP_PANELS_ALL_APPS_ALLOWED = releasedFlag(2001, "app_panels_all_apps_allowed")
 
     @JvmField
@@ -734,4 +733,12 @@ object Flags {
     // TODO(b/290213663): Tracking Bug
     @JvmField
     val ONE_WAY_HAPTICS_API_MIGRATION = unreleasedFlag(3100, "oneway_haptics_api_migration")
+
+    /** Enable the Compose implementation of the PeopleSpaceActivity. */
+    @JvmField
+    val COMPOSE_PEOPLE_SPACE = unreleasedFlag(293570761, "compose_people_space")
+
+    /** Enable the Compose implementation of the Quick Settings footer actions. */
+    @JvmField
+    val COMPOSE_QS_FOOTER_ACTIONS = unreleasedFlag(293569320, "compose_qs_footer_actions")
 }
