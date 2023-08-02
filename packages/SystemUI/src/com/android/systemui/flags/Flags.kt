@@ -283,6 +283,15 @@ object Flags {
     // TODO(b/291767565): Tracking bug.
     @JvmField val MIGRATE_KEYGUARD_STATUS_VIEW = unreleasedFlag(243, "migrate_keyguard_status_view")
 
+    /** Enables preview loading animation in the wallpaper picker. */
+    // TODO(b/274443705): Tracking Bug
+    @JvmField
+    val WALLPAPER_PICKER_PREVIEW_ANIMATION =
+            unreleasedFlag(
+                    244,
+                    "wallpaper_picker_preview_animation"
+            )
+
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
     @JvmField val POWER_MENU_LITE = releasedFlag(300, "power_menu_lite")
@@ -619,9 +628,6 @@ object Flags {
     // 2000 - device controls
     @JvmField val APP_PANELS_ALL_APPS_ALLOWED = releasedFlag(2001, "app_panels_all_apps_allowed")
 
-    @JvmField
-    val CONTROLS_MANAGEMENT_NEW_FLOWS = releasedFlag(2002, "controls_management_new_flows")
-
     // Enables removing app from Home control panel as a part of a new flow
     // TODO(b/269132640): Tracking Bug
     @JvmField
@@ -703,7 +709,7 @@ object Flags {
     // TODO(b/285059790) : Tracking Bug
     @JvmField
     val LOCKSCREEN_WALLPAPER_DREAM_ENABLED =
-        unreleasedFlag(3000, name = "enable_lockscreen_wallpaper_dream")
+        unreleasedFlag(3000, name = "enable_lockscreen_wallpaper_dream", teamfood = true)
 
     // TODO(b/283084712): Tracking Bug
     @JvmField val IMPROVED_HUN_ANIMATIONS = unreleasedFlag(283084712, "improved_hun_animations")
