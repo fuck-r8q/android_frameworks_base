@@ -10104,6 +10104,13 @@ public final class Settings {
         public static final String SPATIAL_AUDIO_ENABLED = "spatial_audio_enabled";
 
         /**
+         * Internal collection of audio device inventory items
+         * The device item stored are {@link com.android.server.audio.AdiDeviceState}
+         * @hide
+         */
+        public static final String AUDIO_DEVICE_INVENTORY = "audio_device_inventory";
+
+        /**
          * Indicates whether notification display on the lock screen is enabled.
          * <p>
          * Type: int (0 for false, 1 for true)
@@ -19147,6 +19154,12 @@ public final class Settings {
              * @hide
              */
             public static final String WEAR_MEDIA_SESSIONS_PACKAGE = "wear_media_sessions_package";
+
+            /*
+             * Controls the launcher ui mode on wearable devices.
+             * @hide
+             */
+            public static final String WEAR_LAUNCHER_UI_MODE = "wear_launcher_ui_mode";
         }
     }
 
