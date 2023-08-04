@@ -4454,6 +4454,7 @@
 
   <java-symbol type="string" name="notification_history_title_placeholder" />
 
+  <java-symbol type="dimen" name="config_wallpaperMinScale"/>
   <!-- The max scale for the wallpaper when it's zoomed in -->
   <java-symbol type="dimen" name="config_wallpaperMaxScale"/>
 
@@ -5184,4 +5185,7 @@
   <java-symbol type="bool" name="config_enable_a11y_magnification_single_panning" />
 
   <java-symbol type="string" name="config_hapticFeedbackCustomizationFile" />
+
+  <!-- For ActivityManager PSS profiling configurability -->
+  <java-symbol type="bool" name="config_am_disablePssProfiling" />
 </resources>
