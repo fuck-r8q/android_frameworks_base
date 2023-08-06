@@ -132,6 +132,17 @@ android_library {
     manifest: "AndroidManifest-res.xml",
 }
 
+aconfig_declarations {
+    name: "systemui_aconfig_flags",
+    package: "com.android.systemui.aconfig",
+    srcs: ["src/com/android/systemui/aconfig/systemui.aconfig"],
+}
+
+java_aconfig_library {
+    name: "systemui_aconfig_flags_lib",
+    aconfig_declarations: "systemui_aconfig_flags",
+}
+
 android_library {
     name: "SystemUI-core",
     defaults: [
@@ -166,6 +177,7 @@ android_library {
         "SystemUISharedLib",
         "SystemUI-statsd",
         "SettingsLib",
+        "systemui_aconfig_flags_lib",
         "androidx.core_core-ktx",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
@@ -201,7 +213,6 @@ android_library {
         "lottie",
         "LowLightDreamLib",
         "motion_tool_lib",
-        "IntentResolver-core",
     ],
     manifest: "AndroidManifest.xml",
 
@@ -344,6 +355,7 @@ android_library {
         "SystemUICustomizationLib",
         "SystemUI-statsd",
         "SettingsLib",
+        "systemui_aconfig_flags_lib",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
         "androidx.recyclerview_recyclerview",
@@ -385,7 +397,6 @@ android_library {
         "motion_tool_lib",
         "androidx.core_core-animation-testing-nodeps",
         "androidx.compose.ui_ui",
-        "IntentResolver-core",
     ],
 }
 
@@ -408,6 +419,7 @@ android_library {
     static_libs: [
         "SystemUI-tests-base",
         "androidx.test.uiautomator_uiautomator",
+        "androidx.core_core-animation-testing",
         "mockito-target-extended-minus-junit4",
         "androidx.test.ext.junit",
         "androidx.test.ext.truth",
@@ -477,6 +489,7 @@ android_robolectric_test {
     ],
     static_libs: [
         "androidx.test.uiautomator_uiautomator",
+        "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
         "inline-mockito-robolectric-prebuilt",
     ],
