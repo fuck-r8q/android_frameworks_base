@@ -540,6 +540,7 @@ package android.app.admin {
     field public static final String PERMITTED_INPUT_METHODS_POLICY = "permittedInputMethods";
     field public static final String PERSONAL_APPS_SUSPENDED_POLICY = "personalAppsSuspended";
     field public static final String SCREEN_CAPTURE_DISABLED_POLICY = "screenCaptureDisabled";
+    field public static final String USB_DATA_SIGNALING_POLICY = "usbDataSignaling";
   }
 
   public class DevicePolicyManager {
@@ -1060,6 +1061,7 @@ package android.content.pm {
     method public boolean isMain();
     method public boolean isManagedProfile();
     method @Deprecated public boolean isPrimary();
+    method public boolean isPrivateProfile();
     method public boolean isProfile();
     method public boolean isQuietModeEnabled();
     method public boolean isRestricted();
@@ -1303,7 +1305,6 @@ package android.database.sqlite {
 
   public final class SQLiteDirectCursorDriver implements android.database.sqlite.SQLiteCursorDriver {
     ctor public SQLiteDirectCursorDriver(android.database.sqlite.SQLiteDatabase, String, String, android.os.CancellationSignal);
-    ctor public SQLiteDirectCursorDriver(@NonNull android.database.sqlite.SQLiteDatabase, @Nullable android.database.sqlite.SQLiteAuthorizer, @NonNull String, @Nullable String, @Nullable android.os.CancellationSignal);
     method public void cursorClosed();
     method public void cursorDeactivated();
     method public void cursorRequeried(android.database.Cursor);
@@ -2682,7 +2683,7 @@ package android.os.vibrator.persistence {
     method public static void serialize(@NonNull android.os.VibrationEffect, @NonNull java.io.Writer) throws java.io.IOException, android.os.vibrator.persistence.VibrationXmlSerializer.SerializationFailedException;
   }
 
-  public static final class VibrationXmlSerializer.SerializationFailedException extends java.lang.IllegalStateException {
+  public static final class VibrationXmlSerializer.SerializationFailedException extends java.lang.RuntimeException {
   }
 
 }
@@ -3335,6 +3336,15 @@ package android.text {
     field @NonNull public static final android.os.Parcelable.Creator<android.text.FontConfig.NamedFamilyList> CREATOR;
   }
 
+  public class MeasuredParagraph {
+    method @NonNull public static android.text.MeasuredParagraph buildForStaticLayoutTest(@NonNull android.text.TextPaint, @Nullable android.graphics.text.LineBreakConfig, @NonNull CharSequence, @IntRange(from=0) int, @IntRange(from=0) int, @NonNull android.text.TextDirectionHeuristic, int, boolean, @Nullable android.text.MeasuredParagraph.StyleRunCallback);
+  }
+
+  public static interface MeasuredParagraph.StyleRunCallback {
+    method public void onAppendReplacementRun(@NonNull android.graphics.Paint, @IntRange(from=0) int, @FloatRange(from=0) @Px float);
+    method public void onAppendStyleRun(@NonNull android.graphics.Paint, @Nullable android.graphics.text.LineBreakConfig, @IntRange(from=0) int, boolean);
+  }
+
   public static final class Selection.MemoryTextWatcher implements android.text.TextWatcher {
     ctor public Selection.MemoryTextWatcher();
     method public void afterTextChanged(android.text.Editable);
@@ -3660,6 +3670,7 @@ package android.view.accessibility {
 
   public final class AccessibilityWindowInfo implements android.os.Parcelable {
     method public static void setNumInstancesInUseCounter(java.util.concurrent.atomic.AtomicInteger);
+    field public static final int UNDEFINED_WINDOW_ID = -1; // 0xffffffff
   }
 
 }

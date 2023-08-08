@@ -39,6 +39,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
@@ -372,6 +373,27 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         verify(mUnfoldAnimation).onScreenTurningOn(overlayReadyCaptor.capture());
         overlayReadyCaptor.getValue().run();
         TestableLooper.get(this).processAllMessages();
+    }
+
+    @Test
+    @TestableLooper.RunWithLooper(setAsMainLooper = true)
+    public void wakeupFromDreamingWhenKeyguardHides() {
+        mViewMediator.onSystemReady();
+        TestableLooper.get(this).processAllMessages();
+
+        // Given device is dreaming
+        when(mUpdateMonitor.isDreaming()).thenReturn(true);
+
+        // When keyguard is going away
+        mKeyguardStateController.notifyKeyguardGoingAway(true);
+
+        // And keyguard is disabled which will call #handleHide
+        mViewMediator.setKeyguardEnabled(false);
+        TestableLooper.get(this).processAllMessages();
+
+        // Then dream should wake up
+        verify(mPowerManager).wakeUp(anyLong(), anyInt(),
+                eq("com.android.systemui:UNLOCK_DREAMING"));
     }
 
     private void onFoldAodReady() {
@@ -841,6 +863,11 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         assertTrue(mViewMediator.isShowingAndNotOccluded());
     }
 
+    @Test
+    public void testBouncerSwipeDown() {
+        mViewMediator.getViewMediatorCallback().onBouncerSwipeDown();
+        verify(mStatusBarKeyguardViewManager).reset(true);
+    }
     private void createAndStartViewMediator() {
         mViewMediator = new KeyguardViewMediator(
                 mContext,

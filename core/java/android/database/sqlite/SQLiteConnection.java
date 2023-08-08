@@ -17,7 +17,8 @@
 package android.database.sqlite;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
+import com.android.internal.annotations.GuardedBy;
+
 import android.database.Cursor;
 import android.database.CursorWindow;
 import android.database.DatabaseUtils;
@@ -33,10 +34,8 @@ import android.util.Log;
 import android.util.LruCache;
 import android.util.Pair;
 import android.util.Printer;
-
 import dalvik.system.BlockGuard;
 import dalvik.system.CloseGuard;
-
 import java.io.File;
 import java.io.IOException;
 import java.lang.ref.Reference;
@@ -112,8 +111,12 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private final int mConnectionId;
     private final boolean mIsPrimaryConnection;
     private final boolean mIsReadOnlyConnection;
-    private final PreparedStatementCache mPreparedStatementCache;
     private PreparedStatement mPreparedStatementPool;
+
+    // A lock access to the statement cache.
+    private final Object mCacheLock = new Object();
+    @GuardedBy("mCacheLock")
+    private final PreparedStatementCache mPreparedStatementCache;
 
     // The recent operations log.
     private final OperationLog mRecentOperations;
@@ -130,10 +133,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private int mCancellationSignalAttachCount;
 
     private static native long nativeOpen(String path, int openFlags, String label,
-            int lookasideSlotSize, int lookasideSlotCount);
+            boolean enableTrace, boolean enableProfile, int lookasideSlotSize,
+            int lookasideSlotCount);
     private static native void nativeClose(long connectionPtr);
-    private static native void nativeSetAuthorizer(long connectionPtr,
-            SQLiteAuthorizer authorizer);
     private static native void nativeRegisterCustomScalarFunction(long connectionPtr,
             String name, UnaryOperator<String> function);
     private static native void nativeRegisterCustomAggregateFunction(long connectionPtr,
@@ -228,7 +230,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         final String file = mConfiguration.path;
         final int cookie = mRecentOperations.beginOperation("open", null, null);
         try {
-            mConnectionPtr = nativeOpen(file, mConfiguration.openFlags, mConfiguration.label,
+            mConnectionPtr = nativeOpen(file, mConfiguration.openFlags,
+                    mConfiguration.label,
+                    NoPreloadHolder.DEBUG_SQL_STATEMENTS, NoPreloadHolder.DEBUG_SQL_TIME,
                     mConfiguration.lookasideSlotSize, mConfiguration.lookasideSlotCount);
         } catch (SQLiteCantOpenDatabaseException e) {
             final StringBuilder message = new StringBuilder("Cannot open database '")
@@ -302,9 +306,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private void setPageSize() {
         if (!mConfiguration.isInMemoryDb() && !mIsReadOnlyConnection) {
             final long newValue = SQLiteGlobal.getDefaultPageSize();
-            long value = executeForLong(null, "PRAGMA page_size", null, null);
+            long value = executeForLong("PRAGMA page_size", null, null);
             if (value != newValue) {
-                execute(null, "PRAGMA page_size=" + newValue, null, null);
+                execute("PRAGMA page_size=" + newValue, null, null);
             }
         }
     }
@@ -312,9 +316,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private void setAutoCheckpointInterval() {
         if (!mConfiguration.isInMemoryDb() && !mIsReadOnlyConnection) {
             final long newValue = SQLiteGlobal.getWALAutoCheckpoint();
-            long value = executeForLong(null, "PRAGMA wal_autocheckpoint", null, null);
+            long value = executeForLong("PRAGMA wal_autocheckpoint", null, null);
             if (value != newValue) {
-                executeForLong(null, "PRAGMA wal_autocheckpoint=" + newValue, null, null);
+                executeForLong("PRAGMA wal_autocheckpoint=" + newValue, null, null);
             }
         }
     }
@@ -322,9 +326,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private void setJournalSizeLimit() {
         if (!mConfiguration.isInMemoryDb() && !mIsReadOnlyConnection) {
             final long newValue = SQLiteGlobal.getJournalSizeLimit();
-            long value = executeForLong(null, "PRAGMA journal_size_limit", null, null);
+            long value = executeForLong("PRAGMA journal_size_limit", null, null);
             if (value != newValue) {
-                executeForLong(null, "PRAGMA journal_size_limit=" + newValue, null, null);
+                executeForLong("PRAGMA journal_size_limit=" + newValue, null, null);
             }
         }
     }
@@ -332,9 +336,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     private void setForeignKeyModeFromConfiguration() {
         if (!mIsReadOnlyConnection) {
             final long newValue = mConfiguration.foreignKeyConstraintsEnabled ? 1 : 0;
-            long value = executeForLong(null, "PRAGMA foreign_keys", null, null);
+            long value = executeForLong("PRAGMA foreign_keys", null, null);
             if (value != newValue) {
-                execute(null, "PRAGMA foreign_keys=" + newValue, null, null);
+                execute("PRAGMA foreign_keys=" + newValue, null, null);
             }
         }
     }
@@ -387,7 +391,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         Log.i(TAG, walFile.getAbsolutePath() + " " + size + " bytes: Bigger than "
                 + threshold + "; truncating");
         try {
-            executeForString(null, "PRAGMA wal_checkpoint(TRUNCATE)", null, null);
+            executeForString("PRAGMA wal_checkpoint(TRUNCATE)", null, null);
             mConfiguration.shouldTruncateWalFile = false;
         } catch (SQLiteException e) {
             Log.w(TAG, "Failed to truncate the -wal file", e);
@@ -399,10 +403,10 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             // No change to the sync mode is intended
             return;
         }
-        String value = executeForString(null, "PRAGMA synchronous", null, null);
+        String value = executeForString("PRAGMA synchronous", null, null);
         if (!canonicalizeSyncMode(value).equalsIgnoreCase(
                 canonicalizeSyncMode(newValue))) {
-            execute(null, "PRAGMA synchronous=" + newValue, null, null);
+            execute("PRAGMA synchronous=" + newValue, null, null);
         }
     }
 
@@ -421,11 +425,10 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             // No change to the journal mode is intended
             return;
         }
-        String value = executeForString(null, "PRAGMA journal_mode", null, null);
+        String value = executeForString("PRAGMA journal_mode", null, null);
         if (!value.equalsIgnoreCase(newValue)) {
             try {
-                String result = executeForString(null, "PRAGMA journal_mode=" + newValue,
-                        null, null);
+                String result = executeForString("PRAGMA journal_mode=" + newValue, null, null);
                 if (result.equalsIgnoreCase(newValue)) {
                     return;
                 }
@@ -477,26 +480,26 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 
         try {
             // Ensure the android metadata table exists.
-            execute(null, "CREATE TABLE IF NOT EXISTS android_metadata (locale TEXT)", null, null);
+            execute("CREATE TABLE IF NOT EXISTS android_metadata (locale TEXT)", null, null);
 
             // Check whether the locale was actually changed.
-            final String oldLocale = executeForString(null, "SELECT locale FROM android_metadata "
+            final String oldLocale = executeForString("SELECT locale FROM android_metadata "
                     + "UNION SELECT NULL ORDER BY locale DESC LIMIT 1", null, null);
             if (oldLocale != null && oldLocale.equals(newLocale)) {
                 return;
             }
 
             // Go ahead and update the indexes using the new locale.
-            execute(null, "BEGIN", null, null);
+            execute("BEGIN", null, null);
             boolean success = false;
             try {
-                execute(null, "DELETE FROM android_metadata", null, null);
-                execute(null, "INSERT INTO android_metadata (locale) VALUES(?)",
+                execute("DELETE FROM android_metadata", null, null);
+                execute("INSERT INTO android_metadata (locale) VALUES(?)",
                         new Object[] { newLocale }, null);
-                execute(null, "REINDEX LOCALIZED", null, null);
+                execute("REINDEX LOCALIZED", null, null);
                 success = true;
             } finally {
-                execute(null, success ? "COMMIT" : "ROLLBACK", null, null);
+                execute(success ? "COMMIT" : "ROLLBACK", null, null);
             }
         } catch (SQLiteException ex) {
             throw ex;
@@ -525,10 +528,10 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             final int type = DatabaseUtils.getSqlStatementType(statement.first);
             switch (type) {
                 case DatabaseUtils.STATEMENT_SELECT:
-                    executeForString(null, statement.first, statement.second, null);
+                    executeForString(statement.first, statement.second, null);
                     break;
                 case DatabaseUtils.STATEMENT_PRAGMA:
-                    execute(null, statement.first, statement.second, null);
+                    execute(statement.first, statement.second, null);
                     break;
                 default:
                     throw new IllegalArgumentException(
@@ -545,10 +548,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             final File checkFile = new File(mConfiguration.path
                     + SQLiteGlobal.WIPE_CHECK_FILE_SUFFIX);
 
-            final boolean hasMetadataTable = executeForLong(null,
+            final boolean hasMetadataTable = executeForLong(
                     "SELECT count(*) FROM sqlite_master"
-                            + " WHERE type='table' AND name='android_metadata'",
-                    null, null) > 0;
+                            + " WHERE type='table' AND name='android_metadata'", null, null) > 0;
             final boolean hasCheckFile = checkFile.exists();
 
             if (!mIsReadOnlyConnection && !hasCheckFile) {
@@ -592,7 +594,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         mConfiguration.updateParametersFrom(configuration);
 
         // Update prepared statement cache size.
-        mPreparedStatementCache.resize(configuration.maxSqlCacheSize);
+        synchronized (mCacheLock) {
+            mPreparedStatementCache.resize(configuration.maxSqlCacheSize);
+        }
 
         if (foreignKeyModeChanged) {
             setForeignKeyModeFromConfiguration();
@@ -627,7 +631,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
     // Called by SQLiteConnectionPool only.
     // Returns true if the prepared statement cache contains the specified SQL.
     boolean isPreparedStatementInCache(String sql) {
-        return mPreparedStatementCache.get(sql) != null;
+        synchronized (mCacheLock) {
+            return mPreparedStatementCache.get(sql) != null;
+        }
     }
 
     /**
@@ -670,15 +676,14 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      *
      * @throws SQLiteException if an error occurs, such as a syntax error.
      */
-    public void prepare(@Nullable SQLiteAuthorizer authorizer, @NonNull String sql,
-            @Nullable SQLiteStatementInfo outStatementInfo) {
+    public void prepare(String sql, SQLiteStatementInfo outStatementInfo) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
 
         final int cookie = mRecentOperations.beginOperation("prepare", sql, null);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 if (outStatementInfo != null) {
                     outStatementInfo.numParameters = statement.mNumParameters;
@@ -718,9 +723,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public void execute(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql, @Nullable Object[] bindArgs,
-            @Nullable CancellationSignal cancellationSignal) {
+    public void execute(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
@@ -729,7 +733,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         try {
             final boolean isPragmaStmt =
                 DatabaseUtils.getSqlStatementType(sql) == DatabaseUtils.STATEMENT_PRAGMA;
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -764,15 +768,15 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public long executeForLong(@Nullable SQLiteAuthorizer authorizer, @NonNull String sql,
-            @Nullable Object[] bindArgs, @Nullable CancellationSignal cancellationSignal) {
+    public long executeForLong(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
 
         final int cookie = mRecentOperations.beginOperation("executeForLong", sql, bindArgs);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -809,15 +813,15 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public String executeForString(@Nullable SQLiteAuthorizer authorizer, @NonNull String sql,
-            @Nullable Object[] bindArgs, @Nullable CancellationSignal cancellationSignal) {
+    public String executeForString(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
 
         final int cookie = mRecentOperations.beginOperation("executeForString", sql, bindArgs);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -856,9 +860,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public ParcelFileDescriptor executeForBlobFileDescriptor(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql, @Nullable Object[] bindArgs,
-            @Nullable CancellationSignal cancellationSignal) {
+    public ParcelFileDescriptor executeForBlobFileDescriptor(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
@@ -866,7 +869,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         final int cookie = mRecentOperations.beginOperation("executeForBlobFileDescriptor",
                 sql, bindArgs);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -903,9 +906,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public int executeForChangedRowCount(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql, @Nullable Object[] bindArgs,
-            @Nullable CancellationSignal cancellationSignal) {
+    public int executeForChangedRowCount(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
@@ -914,7 +916,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         final int cookie = mRecentOperations.beginOperation("executeForChangedRowCount",
                 sql, bindArgs);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -953,9 +955,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public long executeForLastInsertedRowId(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql, @Nullable Object[] bindArgs,
-            @Nullable CancellationSignal cancellationSignal) {
+    public long executeForLastInsertedRowId(String sql, Object[] bindArgs,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
@@ -963,7 +964,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         final int cookie = mRecentOperations.beginOperation("executeForLastInsertedRowId",
                 sql, bindArgs);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             try {
                 throwIfStatementForbidden(statement);
                 bindArguments(statement, bindArgs);
@@ -1008,10 +1009,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * or invalid number of bind arguments.
      * @throws OperationCanceledException if the operation was canceled.
      */
-    public int executeForCursorWindow(@Nullable SQLiteAuthorizer authorizer, @NonNull String sql,
-            @Nullable Object[] bindArgs, @NonNull CursorWindow window,
-            int startPos, int requiredPos, boolean countAllRows,
-            @Nullable CancellationSignal cancellationSignal) {
+    public int executeForCursorWindow(String sql, Object[] bindArgs,
+            CursorWindow window, int startPos, int requiredPos, boolean countAllRows,
+            CancellationSignal cancellationSignal) {
         if (sql == null) {
             throw new IllegalArgumentException("sql must not be null.");
         }
@@ -1027,7 +1027,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             final int cookie = mRecentOperations.beginOperation("executeForCursorWindow",
                     sql, bindArgs);
             try {
-                final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+                final PreparedStatement statement = acquirePreparedStatement(sql);
                 try {
                     throwIfStatementForbidden(statement);
                     bindArguments(statement, bindArgs);
@@ -1065,21 +1065,17 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         }
     }
 
-
     /**
      * Return a {@link #PreparedStatement}, possibly from the cache.
      */
-    PreparedStatement acquirePreparedStatement(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql) {
+    @GuardedBy("mCacheLock")
+    private PreparedStatement acquirePreparedStatementLI(String sql) {
         ++mPool.mTotalPrepareStatements;
-        // Custom per-statement authorizers are typically used for incoming
-        // untrusted custom SQL, which is likely to have low cache hit ratios,
-        // so we compile them every time. This leaves the prepared statement
-        // cache for statements using the default authorizer.
-        boolean skipCache = (authorizer != null);
-        PreparedStatement statement = skipCache ? null : mPreparedStatementCache.get(sql);
+        PreparedStatement statement = mPreparedStatementCache.get(sql);
+        boolean skipCache = false;
         if (statement != null) {
             if (!statement.mInUse) {
+                statement.mInUse = true;
                 return statement;
             }
             // The statement is already in the cache but is in use (this statement appears
@@ -1088,12 +1084,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
             skipCache = true;
         }
         ++mPool.mTotalPrepareStatementCacheMiss;
-        if (authorizer != null) {
-            nativeSetAuthorizer(mConnectionPtr, authorizer);
-        }
-        long statementPtr = 0;
+        final long statementPtr = nativePrepareStatement(mConnectionPtr, sql);
         try {
-            statementPtr = nativePrepareStatement(mConnectionPtr, sql);
             final int numParameters = nativeGetParameterCount(mConnectionPtr, statementPtr);
             final int type = DatabaseUtils.getSqlStatementType(sql);
             final boolean readOnly = nativeIsReadOnly(mConnectionPtr, statementPtr);
@@ -1105,24 +1097,29 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         } catch (RuntimeException ex) {
             // Finalize the statement if an exception occurred and we did not add
             // it to the cache.  If it is already in the cache, then leave it there.
-            // It is safe to call finalize on a NULL, if nativePrepare failed.
             if (statement == null || !statement.mInCache) {
                 nativeFinalizeStatement(mConnectionPtr, statementPtr);
             }
             throw ex;
-        } finally {
-            if (authorizer != null) {
-                nativeSetAuthorizer(mConnectionPtr, null);
-            }
         }
         statement.mInUse = true;
         return statement;
     }
 
     /**
+     * Return a {@link #PreparedStatement}, possibly from the cache.
+     */
+    PreparedStatement acquirePreparedStatement(String sql) {
+        synchronized (mCacheLock) {
+            return acquirePreparedStatementLI(sql);
+        }
+    }
+
+    /**
      * Release a {@link #PreparedStatement} that was originally supplied by this connection.
      */
-    void releasePreparedStatement(PreparedStatement statement) {
+    @GuardedBy("mCacheLock")
+    private void releasePreparedStatementLI(PreparedStatement statement) {
         statement.mInUse = false;
         if (statement.mInCache) {
             try {
@@ -1145,6 +1142,15 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         }
     }
 
+    /**
+     * Release a {@link #PreparedStatement} that was originally supplied by this connection.
+     */
+    void releasePreparedStatement(PreparedStatement statement) {
+        synchronized (mCacheLock) {
+            releasePreparedStatementLI(statement);
+        }
+    }
+
     private void finalizePreparedStatement(PreparedStatement statement) {
         nativeFinalizeStatement(mConnectionPtr, statement.mStatementPtr);
         recyclePreparedStatement(statement);
@@ -1154,11 +1160,10 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
      * Return a prepared statement for use by {@link SQLiteRawStatement}.  This throws if the
      * prepared statement is incompatible with this connection.
      */
-    PreparedStatement acquirePersistentStatement(@Nullable SQLiteAuthorizer authorizer,
-            @NonNull String sql) {
+    PreparedStatement acquirePersistentStatement(@NonNull String sql) {
         final int cookie = mRecentOperations.beginOperation("prepare", sql, null);
         try {
-            final PreparedStatement statement = acquirePreparedStatement(authorizer, sql);
+            final PreparedStatement statement = acquirePreparedStatement(sql);
             throwIfStatementForbidden(statement);
             return statement;
         } catch (RuntimeException e) {
@@ -1320,7 +1325,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         mRecentOperations.dump(printer);
 
         if (verbose) {
-            mPreparedStatementCache.dump(printer);
+            synchronized (mCacheLock) {
+                mPreparedStatementCache.dump(printer);
+            }
         }
     }
 
@@ -1353,8 +1360,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         long pageCount = 0;
         long pageSize = 0;
         try {
-            pageCount = executeForLong(null, "PRAGMA page_count;", null, null);
-            pageSize = executeForLong(null, "PRAGMA page_size;", null, null);
+            pageCount = executeForLong("PRAGMA page_count;", null, null);
+            pageSize = executeForLong("PRAGMA page_size;", null, null);
         } catch (SQLiteException ex) {
             // Ignore.
         }
@@ -1365,15 +1372,15 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         // the main database which we have already described.
         CursorWindow window = new CursorWindow("collectDbStats");
         try {
-            executeForCursorWindow(null, "PRAGMA database_list;", null, window, 0, 0, false, null);
+            executeForCursorWindow("PRAGMA database_list;", null, window, 0, 0, false, null);
             for (int i = 1; i < window.getNumRows(); i++) {
                 String name = window.getString(i, 1);
                 String path = window.getString(i, 2);
                 pageCount = 0;
                 pageSize = 0;
                 try {
-                    pageCount = executeForLong(null, "PRAGMA " + name + ".page_count;", null, null);
-                    pageSize = executeForLong(null, "PRAGMA " + name + ".page_size;", null, null);
+                    pageCount = executeForLong("PRAGMA " + name + ".page_count;", null, null);
+                    pageSize = executeForLong("PRAGMA " + name + ".page_size;", null, null);
                 } catch (SQLiteException ex) {
                     // Ignore.
                 }
@@ -1452,6 +1459,12 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         return sql.replaceAll("[\\s]*\\n+[\\s]*", " ");
     }
 
+    void clearPreparedStatementCache() {
+        synchronized (mCacheLock) {
+            mPreparedStatementCache.evictAll();
+        }
+    }
+
     /**
      * Holder type for a prepared statement.
      *
@@ -1494,8 +1507,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
         public boolean mInUse;
     }
 
-    private final class PreparedStatementCache
-            extends LruCache<String, PreparedStatement> {
+    private final class PreparedStatementCache extends LruCache<String, PreparedStatement> {
         public PreparedStatementCache(int size) {
             super(size);
         }

@@ -3469,8 +3469,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
 
             revertTransferOwnershipIfNecessaryLocked();
+            if (!isPolicyEngineForFinanceFlagEnabled()) {
+                updateUsbDataSignal(mContext, isUsbDataSignalingEnabledInternalLocked());
+            }
         }
-        updateUsbDataSignal();
 
         // In case flag value has changed, we apply it during boot to avoid doing it concurrently
         // with user toggling quiet mode.
@@ -5728,20 +5730,17 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         final int callingUid = caller.getUid();
         final int userHandle = UserHandle.getUserId(callingUid);
         final boolean isPin = PasswordMetrics.isNumericOnly(password);
+        final LockscreenCredential newCredential;
+        if (isPin) {
+            newCredential = LockscreenCredential.createPin(password);
+        } else {
+            newCredential = LockscreenCredential.createPasswordOrNone(password);
+        }
         synchronized (getLockObject()) {
             final PasswordMetrics minMetrics = getPasswordMinimumMetricsUnchecked(userHandle);
-            final List<PasswordValidationError> validationErrors;
             final int complexity = getAggregatedPasswordComplexityLocked(userHandle);
-            // TODO: Consider changing validation API to take LockscreenCredential.
-            if (password.isEmpty()) {
-                validationErrors = PasswordMetrics.validatePasswordMetrics(
-                        minMetrics, complexity, new PasswordMetrics(CREDENTIAL_TYPE_NONE));
-            } else {
-                // TODO(b/120484642): remove getBytes() below
-                validationErrors = PasswordMetrics.validatePassword(
-                        minMetrics, complexity, isPin, password.getBytes());
-            }
-
+            final List<PasswordValidationError> validationErrors =
+                    PasswordMetrics.validateCredential(minMetrics, complexity, newCredential);
             if (!validationErrors.isEmpty()) {
                 Slogf.w(LOG_TAG, "Failed to reset password due to constraint violation: %s",
                         validationErrors.get(0));
@@ -5765,12 +5764,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         // Don't do this with the lock held, because it is going to call
         // back in to the service.
         final long ident = mInjector.binderClearCallingIdentity();
-        final LockscreenCredential newCredential;
-        if (isPin) {
-            newCredential = LockscreenCredential.createPin(password);
-        } else {
-            newCredential = LockscreenCredential.createPasswordOrNone(password);
-        }
         try {
             if (tokenHandle == 0 || token == null) {
                 if (!mLockPatternUtils.setLockCredential(newCredential,
@@ -16233,6 +16226,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         @Override
+        public ComponentName getDeviceOwnerComponent(boolean callingUserOnly) {
+            return DevicePolicyManagerService.this.getDeviceOwnerComponent(callingUserOnly);
+        }
+
+        @Override
         public int getDeviceOwnerUserId() {
             return DevicePolicyManagerService.this.getDeviceOwnerUserId();
         }
@@ -19509,8 +19507,9 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     public boolean isCurrentInputMethodSetByOwner() {
         final CallerIdentity caller = getCallerIdentity();
         Preconditions.checkCallAuthorization(isDefaultDeviceOwner(caller)
-                || isProfileOwner(caller) || isSystemUid(caller),
-                "Only profile owner, device owner and system may call this method.");
+                || isProfileOwner(caller) || canQueryAdminPolicy(caller) || isSystemUid(caller),
+                "Only profile owner, device owner, a caller with QUERY_ADMIN_POLICY "
+                        + "permission or system may call this method.");
         return getUserData(caller.getUserId()).mCurrentInputMethodSet;
     }
 
@@ -22364,7 +22363,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     public void setUsbDataSignalingEnabled(String packageName, boolean enabled) {
         Objects.requireNonNull(packageName, "Admin package name must be provided");
         final CallerIdentity caller = getCallerIdentity(packageName);
-        if (!isPermissionCheckFlagEnabled()) {
+        if (!isPolicyEngineForFinanceFlagEnabled()) {
             Preconditions.checkCallAuthorization(
                     isDefaultDeviceOwner(caller) || isProfileOwnerOfOrganizationOwnedDevice(caller),
                     "USB data signaling can only be controlled by a device owner or "
@@ -22373,22 +22372,25 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                     "USB data signaling cannot be disabled.");
         }
 
-
         synchronized (getLockObject()) {
-            ActiveAdmin admin;
-            if (isPermissionCheckFlagEnabled()) {
-                admin = enforcePermissionAndGetEnforcingAdmin(
+            if (isPolicyEngineForFinanceFlagEnabled()) {
+                EnforcingAdmin enforcingAdmin = enforcePermissionAndGetEnforcingAdmin(
                         /* admin= */ null, MANAGE_DEVICE_POLICY_USB_DATA_SIGNALLING,
                         caller.getPackageName(),
-                        caller.getUserId()).getActiveAdmin();
+                        caller.getUserId());
+                Preconditions.checkState(canUsbDataSignalingBeDisabled(),
+                        "USB data signaling cannot be disabled.");
+                mDevicePolicyEngine.setGlobalPolicy(
+                        PolicyDefinition.USB_DATA_SIGNALING,
+                        enforcingAdmin,
+                        new BooleanPolicyValue(enabled));
             } else {
-                admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
-            }
-
-            if (admin.mUsbDataSignalingEnabled != enabled) {
-                admin.mUsbDataSignalingEnabled = enabled;
-                saveSettingsLocked(caller.getUserId());
-                updateUsbDataSignal();
+                ActiveAdmin admin = getProfileOwnerOrDeviceOwnerLocked(caller.getUserId());
+                if (admin.mUsbDataSignalingEnabled != enabled) {
+                    admin.mUsbDataSignalingEnabled = enabled;
+                    saveSettingsLocked(caller.getUserId());
+                    updateUsbDataSignal(mContext, isUsbDataSignalingEnabledInternalLocked());
+                }
             }
         }
         DevicePolicyEventLogger
@@ -22398,16 +22400,12 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 .write();
     }
 
-    private void updateUsbDataSignal() {
-        if (!canUsbDataSignalingBeDisabled()) {
+    static void updateUsbDataSignal(Context context, boolean value) {
+        if (!canUsbDataSignalingBeDisabledInternal(context)) {
             return;
         }
-        final boolean usbEnabled;
-        synchronized (getLockObject()) {
-            usbEnabled = isUsbDataSignalingEnabledInternalLocked();
-        }
-        if (!mInjector.binderWithCleanCallingIdentity(
-                () -> mInjector.getUsbManager().enableUsbDataSignal(usbEnabled))) {
+        if (!Binder.withCleanCallingIdentity(
+                () -> context.getSystemService(UsbManager.class).enableUsbDataSignal(value))) {
             Slogf.w(LOG_TAG, "Failed to set usb data signaling state");
         }
     }
@@ -22415,25 +22413,23 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @Override
     public boolean isUsbDataSignalingEnabled(String packageName) {
         final CallerIdentity caller = getCallerIdentity(packageName);
-        synchronized (getLockObject()) {
-            // If the caller is an admin, return the policy set by itself. Otherwise
-            // return the device-wide policy.
-            if (isDefaultDeviceOwner(caller) || isProfileOwnerOfOrganizationOwnedDevice(caller)) {
-                return getProfileOwnerOrDeviceOwnerLocked(
-                        caller.getUserId()).mUsbDataSignalingEnabled;
-            } else {
-                return isUsbDataSignalingEnabledInternalLocked();
+        if (isPolicyEngineForFinanceFlagEnabled()) {
+            Boolean enabled = mDevicePolicyEngine.getResolvedPolicy(
+                    PolicyDefinition.USB_DATA_SIGNALING,
+                    caller.getUserId());
+            return enabled == null || enabled;
+        } else {
+            synchronized (getLockObject()) {
+                // If the caller is an admin, return the policy set by itself. Otherwise
+                // return the device-wide policy.
+                if (isDefaultDeviceOwner(caller) || isProfileOwnerOfOrganizationOwnedDevice(
+                        caller)) {
+                    return getProfileOwnerOrDeviceOwnerLocked(
+                            caller.getUserId()).mUsbDataSignalingEnabled;
+                } else {
+                    return isUsbDataSignalingEnabledInternalLocked();
+                }
             }
-        }
-    }
-
-    @Override
-    public boolean isUsbDataSignalingEnabledForUser(int userId) {
-        final CallerIdentity caller = getCallerIdentity();
-        Preconditions.checkCallAuthorization(isSystemUid(caller));
-
-        synchronized (getLockObject()) {
-            return isUsbDataSignalingEnabledInternalLocked();
         }
     }
 
@@ -22451,9 +22447,14 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
 
     @Override
     public boolean canUsbDataSignalingBeDisabled() {
-        return mInjector.binderWithCleanCallingIdentity(() ->
-                mInjector.getUsbManager() != null
-                        && mInjector.getUsbManager().getUsbHalVersion() >= UsbManager.USB_HAL_V1_3
+        return canUsbDataSignalingBeDisabledInternal(mContext);
+    }
+
+    private static boolean canUsbDataSignalingBeDisabledInternal(Context context) {
+        return Binder.withCleanCallingIdentity(() ->
+            context.getSystemService(UsbManager.class) != null
+                  && context.getSystemService(UsbManager.class).getUsbHalVersion()
+                  >= UsbManager.USB_HAL_V1_3
         );
     }
 

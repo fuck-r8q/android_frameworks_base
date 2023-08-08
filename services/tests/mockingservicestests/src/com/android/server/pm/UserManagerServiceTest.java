@@ -15,12 +15,18 @@
  */
 package com.android.server.pm;
 
+import static android.os.UserManager.DISALLOW_USER_SWITCH;
+
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -30,6 +36,7 @@ import android.app.ActivityManagerInternal;
 import android.content.Context;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.UserInfo;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.storage.StorageManager;
@@ -88,6 +95,7 @@ public final class UserManagerServiceTest {
     public final ExtendedMockitoRule mExtendedMockitoRule = new ExtendedMockitoRule.Builder(this)
             .spyStatic(UserManager.class)
             .spyStatic(LocalServices.class)
+            .spyStatic(SystemProperties.class)
             .mockStatic(Settings.Global.class)
             .build();
 
@@ -323,6 +331,192 @@ public final class UserManagerServiceTest {
 
         assertThrows(UserManager.CheckedUserOperationException.class,
                 () -> mUmi.getBootUser(/* waitUntilSet= */ false));
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        assertWithMessage("getPreviousFullUserToEnterForeground")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(OTHER_USER_ID);
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground_SkipsCurrentUser() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        mockCurrentUser(OTHER_USER_ID);
+        assertWithMessage("getPreviousFullUserToEnterForeground should skip current user")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground_SkipsNonFullUsers() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        mUsers.get(OTHER_USER_ID).info.flags &= ~UserInfo.FLAG_FULL;
+        assertWithMessage("getPreviousFullUserToEnterForeground should skip non-full users")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground_SkipsPartialUsers() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        mUsers.get(OTHER_USER_ID).info.partial = true;
+        assertWithMessage("getPreviousFullUserToEnterForeground should skip partial users")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground_SkipsDisabledUsers() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        mUsers.get(OTHER_USER_ID).info.flags |= UserInfo.FLAG_DISABLED;
+        assertWithMessage("getPreviousFullUserToEnterForeground should skip disabled users")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    public void testGetPreviousFullUserToEnterForeground_SkipsRemovingUsers() throws Exception {
+        addUser(USER_ID);
+        setLastForegroundTime(USER_ID, 1_000_000L);
+        addUser(OTHER_USER_ID);
+        setLastForegroundTime(OTHER_USER_ID, 2_000_000L);
+
+        mUms.addRemovingUserId(OTHER_USER_ID);
+        assertWithMessage("getPreviousFullUserToEnterForeground should skip removing users")
+                .that(mUms.getPreviousFullUserToEnterForeground())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabledOnMultiUserSettings() throws Exception {
+        resetUserSwitcherEnabled();
+
+        mockUserSwitcherEnabled(false);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isFalse();
+
+        mockUserSwitcherEnabled(true);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isTrue();
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabledOnMaxSupportedUsers()  throws Exception {
+        resetUserSwitcherEnabled();
+
+        mockMaxSupportedUsers(/* maxUsers= */ 1);
+        assertThat(UserManager.supportsMultipleUsers()).isFalse();
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isFalse();
+
+        mockMaxSupportedUsers(/* maxUsers= */ 8);
+        assertThat(UserManager.supportsMultipleUsers()).isTrue();
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isTrue();
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabled()  throws Exception {
+        resetUserSwitcherEnabled();
+
+        mockMaxSupportedUsers(/* maxUsers= */ 8);
+        assertThat(mUms.isUserSwitcherEnabled(true, USER_ID)).isTrue();
+
+        mockUserSwitcherEnabled(false);
+        assertThat(mUms.isUserSwitcherEnabled(true, USER_ID)).isFalse();
+
+        mockUserSwitcherEnabled(true);
+        assertThat(mUms.isUserSwitcherEnabled(false, USER_ID)).isTrue();
+
+        mUms.setUserRestriction(DISALLOW_USER_SWITCH, true, USER_ID);
+        assertThat(mUms.isUserSwitcherEnabled(false, USER_ID)).isFalse();
+
+        mUms.setUserRestriction(DISALLOW_USER_SWITCH, false, USER_ID);
+        mockMaxSupportedUsers(1);
+        assertThat(mUms.isUserSwitcherEnabled(true, USER_ID)).isFalse();
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabledOnShowMultiuserUI()  throws Exception {
+        resetUserSwitcherEnabled();
+
+        mockShowMultiuserUI(/* show= */ false);
+        assertThat(UserManager.supportsMultipleUsers()).isFalse();
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isFalse();
+
+        mockShowMultiuserUI(/* show= */ true);
+        assertThat(UserManager.supportsMultipleUsers()).isTrue();
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isTrue();
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabledOnUserRestrictions() throws Exception {
+        resetUserSwitcherEnabled();
+
+        mUms.setUserRestriction(DISALLOW_USER_SWITCH, true, USER_ID);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isFalse();
+
+        mUms.setUserRestriction(DISALLOW_USER_SWITCH, false, USER_ID);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isTrue();
+    }
+
+    @Test
+    public void assertIsUserSwitcherEnabledOnDemoMode() throws Exception {
+        resetUserSwitcherEnabled();
+
+        mockDeviceDemoMode(/* enabled= */ true);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isFalse();
+
+        mockDeviceDemoMode(/* enabled= */ false);
+        assertThat(mUms.isUserSwitcherEnabled(USER_ID)).isTrue();
+    }
+
+    private void resetUserSwitcherEnabled() {
+        mUms.putUserInfo(new UserInfo(USER_ID, "Test User", 0));
+        mUms.setUserRestriction(DISALLOW_USER_SWITCH, false, USER_ID);
+        mockUserSwitcherEnabled(/* enabled= */ true);
+        mockDeviceDemoMode(/* enabled= */ false);
+        mockMaxSupportedUsers(/* maxUsers= */ 8);
+        mockShowMultiuserUI(/* show= */ true);
+    }
+
+    private void mockUserSwitcherEnabled(boolean enabled) {
+        doReturn(enabled ? 1 : 0).when(() -> Settings.Global.getInt(
+                any(), eq(android.provider.Settings.Global.USER_SWITCHER_ENABLED), anyInt()));
+    }
+
+    private void mockDeviceDemoMode(boolean enabled) {
+        doReturn(enabled ? 1 : 0).when(() -> Settings.Global.getInt(
+                any(), eq(android.provider.Settings.Global.DEVICE_DEMO_MODE), anyInt()));
+    }
+
+    private void mockMaxSupportedUsers(int maxUsers) {
+        doReturn(maxUsers).when(() ->
+                SystemProperties.getInt(eq("fw.max_users"), anyInt()));
+    }
+
+    private void mockShowMultiuserUI(boolean show) {
+        doReturn(show).when(() ->
+                SystemProperties.getBoolean(eq("fw.show_multiuserui"), anyBoolean()));
     }
 
     private void mockCurrentUser(@UserIdInt int userId) {

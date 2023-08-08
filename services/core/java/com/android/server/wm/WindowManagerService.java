@@ -769,8 +769,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 Settings.Secure.getUriFor(Settings.Secure.IMMERSIVE_MODE_CONFIRMATIONS);
         private final Uri mPolicyControlUri =
                 Settings.Global.getUriFor(Settings.Global.POLICY_CONTROL);
-        private final Uri mPointerLocationUri =
-                Settings.System.getUriFor(Settings.System.POINTER_LOCATION);
         private final Uri mForceDesktopModeOnExternalDisplaysUri = Settings.Global.getUriFor(
                         Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS);
         private final Uri mFreeformWindowUri = Settings.Global.getUriFor(
@@ -798,7 +796,6 @@ public class WindowManagerService extends IWindowManager.Stub
             resolver.registerContentObserver(mImmersiveModeConfirmationsUri, false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mPolicyControlUri, false, this, UserHandle.USER_ALL);
-            resolver.registerContentObserver(mPointerLocationUri, false, this, UserHandle.USER_ALL);
             resolver.registerContentObserver(mForceDesktopModeOnExternalDisplaysUri, false, this,
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(mFreeformWindowUri, false, this, UserHandle.USER_ALL);
@@ -819,11 +816,6 @@ public class WindowManagerService extends IWindowManager.Stub
 
             if (mImmersiveModeConfirmationsUri.equals(uri) || mPolicyControlUri.equals(uri)) {
                 updateSystemUiSettings(true /* handleChange */);
-                return;
-            }
-
-            if (mPointerLocationUri.equals(uri)) {
-                updatePointerLocation();
                 return;
             }
 
@@ -875,7 +867,6 @@ public class WindowManagerService extends IWindowManager.Stub
 
         void loadSettings() {
             updateSystemUiSettings(false /* handleChange */);
-            updatePointerLocation();
             updateMaximumObscuringOpacityForTouch();
         }
 
@@ -903,21 +894,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 if (changed) {
                     mWindowPlacerLocked.requestTraversal();
                 }
-            }
-        }
-
-        void updatePointerLocation() {
-            ContentResolver resolver = mContext.getContentResolver();
-            final boolean enablePointerLocation = Settings.System.getIntForUser(resolver,
-                    Settings.System.POINTER_LOCATION, 0, UserHandle.USER_CURRENT) != 0;
-
-            if (mPointerLocationEnabled == enablePointerLocation) {
-                return;
-            }
-            mPointerLocationEnabled = enablePointerLocation;
-            synchronized (mGlobalLock) {
-                mRoot.forAllDisplayPolicies(
-                        p -> p.setPointerLocationEnabled(mPointerLocationEnabled));
             }
         }
 
@@ -2037,7 +2013,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         if (win.mActivityRecord != null) {
-            win.mActivityRecord.postWindowRemoveStartingWindowCleanup(win);
+            win.mActivityRecord.postWindowRemoveStartingWindowCleanup();
         }
 
         if (win.mAttrs.type == TYPE_WALLPAPER) {

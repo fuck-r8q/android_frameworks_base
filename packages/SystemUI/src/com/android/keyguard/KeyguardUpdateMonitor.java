@@ -18,10 +18,14 @@ package com.android.keyguard;
 
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.ACTION_USER_REMOVED;
 import static android.content.Intent.ACTION_USER_STOPPED;
 import static android.content.Intent.ACTION_USER_UNLOCKED;
+import static android.hardware.biometrics.BiometricAuthenticator.TYPE_FACE;
+import static android.hardware.biometrics.BiometricAuthenticator.TYPE_FINGERPRINT;
 import static android.hardware.biometrics.BiometricConstants.BIOMETRIC_LOCKOUT_NONE;
 import static android.hardware.biometrics.BiometricConstants.BIOMETRIC_LOCKOUT_PERMANENT;
 import static android.hardware.biometrics.BiometricConstants.BIOMETRIC_LOCKOUT_TIMED;
@@ -76,9 +80,9 @@ import static com.android.systemui.statusbar.policy.DevicePostureController.DEVI
 import android.annotation.AnyThread;
 import android.annotation.MainThread;
 import android.annotation.SuppressLint;
-import android.app.ActivityTaskManager;
 import android.app.ActivityTaskManager.RootTaskInfo;
 import android.app.AlarmManager;
+import android.app.IActivityTaskManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.trust.TrustManager;
 import android.content.BroadcastReceiver;
@@ -248,6 +252,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private static final int MSG_REQUIRE_NFC_UNLOCK = 345;
     private static final int MSG_KEYGUARD_DISMISS_ANIMATION_FINISHED = 346;
     private static final int MSG_SERVICE_PROVIDERS_UPDATED = 347;
+    private static final int MSG_BIOMETRIC_ENROLLMENT_STATE_CHANGED = 348;
 
     /** Biometric authentication state: Not listening. */
     private static final int BIOMETRIC_STATE_STOPPED = 0;
@@ -309,6 +314,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private final AuthController mAuthController;
     private final UiEventLogger mUiEventLogger;
     private final Set<Integer> mFaceAcquiredInfoIgnoreList;
+    private final Set<String> mAllowFingerprintOnOccludingActivitiesFromPackage;
     private final PackageManager mPackageManager;
     private int mStatusBarState;
     private final StatusBarStateController.StateListener mStatusBarStateControllerListener =
@@ -350,6 +356,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private boolean mSecureCameraLaunched;
     @VisibleForTesting
     protected boolean mTelephonyCapable;
+    private boolean mAllowFingerprintOnCurrentOccludingActivity;
 
     // Device provisioning state
     private boolean mDeviceProvisioned;
@@ -393,6 +400,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private final FaceManager mFaceManager;
     @Nullable
     private KeyguardFaceAuthInteractor mFaceAuthInteractor;
+    private final TaskStackChangeListeners mTaskStackChangeListeners;
+    private final IActivityTaskManager mActivityTaskManager;
     private final LockPatternUtils mLockPatternUtils;
     @VisibleForTesting
     @DevicePostureInt
@@ -2309,7 +2318,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             FaceWakeUpTriggersConfig faceWakeUpTriggersConfig,
             DevicePostureController devicePostureController,
             Optional<FingerprintInteractiveToAuthProvider> interactiveToAuthProvider,
-            FeatureFlags featureFlags) {
+            FeatureFlags featureFlags,
+            TaskStackChangeListeners taskStackChangeListeners,
+            IActivityTaskManager activityTaskManagerService) {
         mContext = context;
         mSubscriptionManager = subscriptionManager;
         mUserTracker = userTracker;
@@ -2351,6 +2362,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         mConfigFaceAuthSupportedPosture = mContext.getResources().getInteger(
                 R.integer.config_face_auth_supported_posture);
         mFaceWakeUpTriggersConfig = faceWakeUpTriggersConfig;
+        mAllowFingerprintOnOccludingActivitiesFromPackage = Arrays.stream(
+                mContext.getResources().getStringArray(
+                        R.array.config_fingerprint_listen_on_occluding_activity_packages))
+                .collect(Collectors.toSet());
+        mTaskStackChangeListeners = taskStackChangeListeners;
+        mActivityTaskManager = activityTaskManagerService;
 
         mHandler = new Handler(mainLooper) {
             @Override
@@ -2457,6 +2474,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                     case MSG_KEYGUARD_DISMISS_ANIMATION_FINISHED:
                         handleKeyguardDismissAnimationFinished();
                         break;
+                    case MSG_BIOMETRIC_ENROLLMENT_STATE_CHANGED:
+                        notifyAboutEnrollmentChange(msg.arg1);
+                        break;
                     default:
                         super.handleMessage(msg);
                         break;
@@ -2557,6 +2577,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
             @Override
             public void onEnrollmentsChanged(@BiometricAuthenticator.Modality int modality) {
+                mHandler.obtainMessage(MSG_BIOMETRIC_ENROLLMENT_STATE_CHANGED, modality, 0)
+                        .sendToTarget();
                 mainExecutor.execute(() -> updateBiometricListeningState(BIOMETRIC_ACTION_UPDATE,
                         FACE_AUTH_TRIGGERED_ENROLLMENTS_CHANGED));
             }
@@ -2566,7 +2588,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         }
         updateBiometricListeningState(BIOMETRIC_ACTION_UPDATE, FACE_AUTH_UPDATED_ON_KEYGUARD_INIT);
 
-        TaskStackChangeListeners.getInstance().registerTaskStackListener(mTaskStackListener);
+        mTaskStackChangeListeners.registerTaskStackListener(mTaskStackListener);
         mIsSystemUser = mUserManager.isSystemUser();
         int user = mUserTracker.getUserId();
         mUserIsUnlocked.put(user, mUserManager.isUserUnlocked(user));
@@ -3036,7 +3058,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                         && (mOccludingAppRequestingFp
                         || isUdfps
                         || mAlternateBouncerShowing
-                        || mFeatureFlags.isEnabled(Flags.FP_LISTEN_OCCLUDING_APPS)
+                        || mAllowFingerprintOnCurrentOccludingActivity
                 )
             );
 
@@ -3079,6 +3101,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
                     System.currentTimeMillis(),
                     user,
                     shouldListen,
+                    mAllowFingerprintOnCurrentOccludingActivity,
                     mAlternateBouncerShowing,
                     biometricEnabledForUser,
                     mPrimaryBouncerIsOrWillBeShowing,
@@ -3403,6 +3426,25 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         // TODO (b/242022358), make this rely on onEnrollmentChanged event and update it only once.
         updateFaceEnrolled(userId);
         return mIsFaceEnrolled;
+    }
+
+    private void notifyAboutEnrollmentChange(@BiometricAuthenticator.Modality int modality) {
+        BiometricSourceType biometricSourceType;
+        if (modality == TYPE_FINGERPRINT) {
+            biometricSourceType = FINGERPRINT;
+        } else if (modality == TYPE_FACE) {
+            biometricSourceType = FACE;
+        } else {
+            return;
+        }
+        mLogger.notifyAboutEnrollmentsChanged(biometricSourceType);
+        Assert.isMainThread();
+        for (int i = 0; i < mCallbacks.size(); i++) {
+            KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
+            if (cb != null) {
+                cb.onBiometricEnrollmentStateChanged(biometricSourceType);
+            }
+        }
     }
 
     private void stopListeningForFingerprint() {
@@ -4132,19 +4174,35 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         return mSimDatas.get(slotId).slotId;
     }
 
-    private final TaskStackChangeListener
-            mTaskStackListener = new TaskStackChangeListener() {
+    private final TaskStackChangeListener mTaskStackListener = new TaskStackChangeListener() {
         @Override
         public void onTaskStackChangedBackground() {
             try {
-                RootTaskInfo info = ActivityTaskManager.getService().getRootTaskInfo(
+                if (mFeatureFlags.isEnabled(Flags.FP_LISTEN_OCCLUDING_APPS)) {
+                    RootTaskInfo standardTask = mActivityTaskManager.getRootTaskInfo(
+                            WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD);
+                    final boolean previousState = mAllowFingerprintOnCurrentOccludingActivity;
+                    mAllowFingerprintOnCurrentOccludingActivity =
+                            standardTask.topActivity != null
+                                    && !TextUtils.isEmpty(standardTask.topActivity.getPackageName())
+                                    && mAllowFingerprintOnOccludingActivitiesFromPackage.contains(
+                                            standardTask.topActivity.getPackageName())
+                                    && standardTask.visible;
+                    if (mAllowFingerprintOnCurrentOccludingActivity != previousState) {
+                        mLogger.allowFingerprintOnCurrentOccludingActivityChanged(
+                                mAllowFingerprintOnCurrentOccludingActivity);
+                        updateFingerprintListeningState(BIOMETRIC_ACTION_UPDATE);
+                    }
+                }
+
+                RootTaskInfo assistantTask = mActivityTaskManager.getRootTaskInfo(
                         WINDOWING_MODE_UNDEFINED, ACTIVITY_TYPE_ASSISTANT);
-                if (info == null) {
+                if (assistantTask == null) {
                     return;
                 }
-                mLogger.logTaskStackChangedForAssistant(info.visible);
+                mLogger.logTaskStackChangedForAssistant(assistantTask.visible);
                 mHandler.sendMessage(mHandler.obtainMessage(MSG_ASSISTANT_STACK_CHANGED,
-                        info.visible));
+                        assistantTask.visible));
             } catch (RemoteException e) {
                 mLogger.logException(e, "unable to check task stack ");
             }
@@ -4359,7 +4417,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
         mUserTracker.removeCallback(mUserChangedCallback);
 
-        TaskStackChangeListeners.getInstance().unregisterTaskStackListener(mTaskStackListener);
+        mTaskStackChangeListeners.unregisterTaskStackListener(mTaskStackListener);
 
         mBroadcastDispatcher.unregisterReceiver(mBroadcastReceiver);
         mBroadcastDispatcher.unregisterReceiver(mBroadcastAllReceiver);
@@ -4444,6 +4502,8 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             pw.println("    enabledByUser=" + mBiometricEnabledForUser.get(userId));
             pw.println("    mKeyguardOccluded=" + mKeyguardOccluded);
             pw.println("    mIsDreaming=" + mIsDreaming);
+            pw.println("    mFingerprintListenOnOccludingActivitiesFromPackage="
+                    + mAllowFingerprintOnOccludingActivitiesFromPackage);
             if (isUdfpsSupported()) {
                 pw.println("        udfpsEnrolled=" + isUdfpsEnrolled());
                 pw.println("        shouldListenForUdfps=" + shouldListenForFingerprint(true));

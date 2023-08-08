@@ -24,7 +24,7 @@ import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
 import androidx.test.filters.RequiresDevice
 import com.android.wm.shell.flicker.splitscreen.SplitScreenBase
-import com.android.wm.shell.flicker.splitscreen.SplitScreenUtils
+import com.android.wm.shell.flicker.SplitScreenUtils
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -64,8 +64,7 @@ open class SwitchBetweenSplitPairsBenchmark(override val flicker: LegacyFlickerT
             thisTransition(this)
         }
 
-    @PlatinumTest(focusArea = "sysui")
-    @Presubmit @Test open fun cujCompleted() {}
+    @PlatinumTest(focusArea = "sysui") @Presubmit @Test open fun cujCompleted() {}
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

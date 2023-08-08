@@ -383,8 +383,10 @@ public final class SystemServiceRegistry {
         registerService(Context.SELECTION_TOOLBAR_SERVICE, SelectionToolbarManager.class,
                 new CachedServiceFetcher<SelectionToolbarManager>() {
                     @Override
-                    public SelectionToolbarManager createService(ContextImpl ctx) {
-                        IBinder b = ServiceManager.getService(Context.SELECTION_TOOLBAR_SERVICE);
+                    public SelectionToolbarManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        IBinder b = ServiceManager.getServiceOrThrow(
+                                Context.SELECTION_TOOLBAR_SERVICE);
                         return new SelectionToolbarManager(ctx.getOuterContext(),
                                 ISelectionToolbarManager.Stub.asInterface(b));
                     }});
@@ -1120,7 +1122,7 @@ public final class SystemServiceRegistry {
             @Override
             public SystemHealthManager createService(ContextImpl ctx) throws ServiceNotFoundException {
                 IBinder batteryStats = ServiceManager.getServiceOrThrow(BatteryStats.SERVICE_NAME);
-                IBinder powerStats = ServiceManager.getServiceOrThrow(Context.POWER_STATS_SERVICE);
+                IBinder powerStats = ServiceManager.getService(Context.POWER_STATS_SERVICE);
                 return new SystemHealthManager(IBatteryStats.Stub.asInterface(batteryStats),
                         IPowerStatsService.Stub.asInterface(powerStats));
             }});

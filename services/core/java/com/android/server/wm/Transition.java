@@ -78,6 +78,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.IRemoteCallback;
+import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -629,12 +630,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
         }
         if (mParticipants.contains(wc)) return;
-        // Wallpaper is like in a static drawn state unless display may have changes, so exclude
-        // the case to reduce transition latency waiting for the unchanged wallpaper to redraw.
-        final boolean needSync = (!isWallpaper(wc) || mParticipants.contains(wc.mDisplayContent))
-                // Transient-hide may be hidden later, so no need to request redraw.
-                && !isInTransientHide(wc);
-        if (needSync) {
+        // Transient-hide may be hidden later, so no need to request redraw.
+        if (!isInTransientHide(wc)) {
             mSyncEngine.addToSyncSet(mSyncId, wc);
         }
         ChangeInfo info = mChanges.get(wc);
@@ -1625,7 +1622,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Since we created root-leash but no longer reference it from core, release it now
         info.releaseAnimSurfaces();
 
-        mController.mLoggerHandler.post(mLogger::logOnSend);
+        mLogger.logOnSendAsync(mController.mLoggerHandler);
         if (mLogger.mInfo != null) {
             mController.mTransitionTracer.logSentTransition(this, mTargets);
         }
@@ -2714,6 +2711,26 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 change.mContainer.scheduleAnimation();
             }
         });
+    }
+
+    /**
+     * Returns {@code true} if the transition and the corresponding transaction should be applied
+     * on display thread. Currently, this only checks for display rotation change because the order
+     * of dispatching the new display info will be after requesting the windows to sync drawing.
+     * That avoids potential flickering of screen overlays (e.g. cutout, rounded corner). Also,
+     * because the display thread has a higher priority, it is faster to perform the configuration
+     * changes and window hierarchy traversal.
+     */
+    boolean shouldApplyOnDisplayThread() {
+        for (int i = mParticipants.size() - 1; i >= 0; --i) {
+            final DisplayContent dc = mParticipants.valueAt(i).asDisplayContent();
+            if (dc == null) continue;
+            final ChangeInfo changeInfo = mChanges.get(dc);
+            if (changeInfo != null && changeInfo.mRotation != dc.getRotation()) {
+                return Looper.myLooper() != mController.mAtm.mWindowManager.mH.getLooper();
+            }
+        }
+        return false;
     }
 
     /** Applies the new configuration for the changed displays. */

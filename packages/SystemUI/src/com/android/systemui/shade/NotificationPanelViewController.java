@@ -90,7 +90,6 @@ import android.widget.FrameLayout;
 
 import com.android.app.animation.Interpolators;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.policy.SystemBarUtils;
@@ -120,6 +119,7 @@ import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.classifier.Classifier;
 import com.android.systemui.classifier.FalsingCollector;
+import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.DisplayId;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.doze.DozeLog;
@@ -160,6 +160,7 @@ import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
 import com.android.systemui.shade.transition.ShadeTransitionController;
+import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
@@ -210,7 +211,6 @@ import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
 import com.android.systemui.statusbar.phone.StatusBarTouchableRegionManager;
 import com.android.systemui.statusbar.phone.TapAgainViewController;
 import com.android.systemui.statusbar.phone.UnlockedScreenOffAnimationController;
-import com.android.systemui.statusbar.phone.dagger.CentralSurfacesComponent;
 import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardQsUserSwitchController;
@@ -240,7 +240,7 @@ import kotlin.Unit;
 
 import kotlinx.coroutines.CoroutineDispatcher;
 
-@CentralSurfacesComponent.CentralSurfacesScope
+@SysUISingleton
 public final class NotificationPanelViewController implements ShadeSurface, Dumpable {
 
     public static final String TAG = NotificationPanelView.class.getSimpleName();
@@ -351,7 +351,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private final NotificationGutsManager mGutsManager;
     private final AlternateBouncerInteractor mAlternateBouncerInteractor;
     private final QuickSettingsController mQsController;
-    private final InteractionJankMonitor mInteractionJankMonitor;
     private final TouchHandler mTouchHandler = new TouchHandler();
 
     private long mDownTime;
@@ -364,6 +363,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     /** The current squish amount for the predictive back animation */
     private float mCurrentBackProgress = 0.0f;
     private boolean mTracking;
+    private boolean mIsTrackingExpansionFromStatusBar;
     private boolean mHintAnimationRunning;
     private KeyguardBottomAreaView mKeyguardBottomArea;
     private boolean mExpanding;
@@ -733,7 +733,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             NotificationStackSizeCalculator notificationStackSizeCalculator,
             UnlockedScreenOffAnimationController unlockedScreenOffAnimationController,
             ShadeTransitionController shadeTransitionController,
-            InteractionJankMonitor interactionJankMonitor,
             SystemClock systemClock,
             KeyguardBottomAreaViewModel keyguardBottomAreaViewModel,
             KeyguardBottomAreaInteractor keyguardBottomAreaInteractor,
@@ -753,7 +752,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             EmergencyButtonController.Factory emergencyButtonControllerFactory,
             KeyguardViewConfigurator keyguardViewConfigurator,
             KeyguardFaceAuthInteractor keyguardFaceAuthInteractor) {
-        mInteractionJankMonitor = interactionJankMonitor;
         keyguardStateController.addCallback(new KeyguardStateController.Callback() {
             @Override
             public void onKeyguardFadingAwayChanged() {
@@ -1423,11 +1421,13 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mKeyguardBottomArea = keyguardBottomArea;
     }
 
-    void setOpenCloseListener(OpenCloseListener openCloseListener) {
+    @Override
+    public void setOpenCloseListener(OpenCloseListener openCloseListener) {
         mOpenCloseListener = openCloseListener;
     }
 
-    void setTrackingStartedListener(TrackingStartedListener trackingStartedListener) {
+    @Override
+    public void setTrackingStartedListener(TrackingStartedListener trackingStartedListener) {
         mTrackingStartedListener = trackingStartedListener;
     }
 
@@ -1837,6 +1837,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
             // Set after notifyExpandingStarted, as notifyExpandingStarted resets the closing state.
             setClosing(true);
+            mUpdateFlingOnLayout = false;
             if (delayed) {
                 mNextCollapseSpeedUpFactor = speedUpFactor;
                 this.mView.postDelayed(mFlingCollapseRunnable, 120);
@@ -2680,6 +2681,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private void onTrackingStopped(boolean expand) {
         mFalsingCollector.onTrackingStopped();
         mTracking = false;
+        maybeStopTrackingExpansionFromStatusBar(expand);
+
         updateExpansionAndVisibility();
         if (expand) {
             mNotificationStackScrollLayoutController.setOverScrollAmount(0.0f, true /* onTop */,
@@ -3392,11 +3395,13 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         ViewGroupFadeHelper.reset(mView);
     }
 
-    void addOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener listener) {
+    @Override
+    public void addOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener listener) {
         mView.getViewTreeObserver().addOnGlobalLayoutListener(listener);
     }
 
-    void removeOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener listener) {
+    @Override
+    public void removeOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener listener) {
         mView.getViewTreeObserver().removeOnGlobalLayoutListener(listener);
     }
 
@@ -3866,8 +3871,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         return !isFullyCollapsed() && !mTracking && !mClosing;
     }
 
-    /** Collapses the shade instantly without animation. */
-    void instantCollapse() {
+    @Override
+    public void instantCollapse() {
         abortAnimations();
         setExpandedFraction(0f);
         if (mExpanding) {
@@ -4040,8 +4045,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mFixedDuration = NO_FIXED_DURATION;
     }
 
-    /** */
-    boolean postToView(Runnable action) {
+    @Override
+    public boolean postToView(Runnable action) {
         return mView.post(action);
     }
 
@@ -4053,6 +4058,42 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     @Override
     public boolean handleExternalTouch(MotionEvent event) {
         return mTouchHandler.onTouchEvent(event);
+    }
+
+    @Override
+    public void startTrackingExpansionFromStatusBar() {
+        mIsTrackingExpansionFromStatusBar = true;
+        InteractionJankMonitorWrapper.begin(
+                mView, InteractionJankMonitorWrapper.CUJ_SHADE_EXPAND_FROM_STATUS_BAR);
+    }
+
+    /**
+     * Stops tracking an expansion that originated from the status bar (if we had started tracking
+     * it).
+     *
+     * @param expand the expand boolean passed to {@link #onTrackingStopped(boolean)}.
+     */
+    private void maybeStopTrackingExpansionFromStatusBar(boolean expand) {
+        if (!mIsTrackingExpansionFromStatusBar) {
+            return;
+        }
+        mIsTrackingExpansionFromStatusBar = false;
+
+        // Determine whether the shade actually expanded due to the status bar touch:
+        // - If the user just taps on the status bar, then #isExpanded is false but
+        // #onTrackingStopped is called with `true`.
+        // - If the user drags down on the status bar but doesn't drag down far enough, then
+        // #onTrackingStopped is called with `false` but #isExpanded is true.
+        // So, we need *both* #onTrackingStopped called with `true` *and* #isExpanded to be true in
+        // order to confirm that the shade successfully opened.
+        boolean shadeExpansionFromStatusBarSucceeded = expand && isExpanded();
+        if (shadeExpansionFromStatusBarSucceeded) {
+            InteractionJankMonitorWrapper.end(
+                    InteractionJankMonitorWrapper.CUJ_SHADE_EXPAND_FROM_STATUS_BAR);
+        } else {
+            InteractionJankMonitorWrapper.cancel(
+                    InteractionJankMonitorWrapper.CUJ_SHADE_EXPAND_FROM_STATUS_BAR);
+        }
     }
 
     @Override
@@ -5099,19 +5140,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             }
             return super.performAccessibilityAction(host, action, args);
         }
-    }
-
-    /** Listens for when touch tracking begins. */
-    interface TrackingStartedListener {
-        void onTrackingStarted();
-    }
-
-    /** Listens for when shade begins opening of finishes closing. */
-    interface OpenCloseListener {
-        /** Called when the shade finishes closing. */
-        void onClosingFinished();
-        /** Called when the shade starts opening. */
-        void onOpenStarted();
     }
 }
 

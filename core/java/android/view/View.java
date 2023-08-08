@@ -8076,6 +8076,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @param rectangle The rectangle in the View's content coordinate space
      * @return Whether any parent scrolled.
+     * @see AccessibilityAction#ACTION_SHOW_ON_SCREEN
      */
     public boolean requestRectangleOnScreen(Rect rectangle) {
         return requestRectangleOnScreen(rectangle, false);
@@ -8663,15 +8664,43 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Dispatches an {@link AccessibilityEvent} to the {@link View} first and then
-     * to its children for adding their text content to the event. Note that the
-     * event text is populated in a separate dispatch path since we add to the
+     * Dispatches an {@link AccessibilityEvent} to the {@link View} to add the text content of the
+     * view and its children.
+     * <p>
+     * <b>Note:</b> This method should only be used with event.setText().
+     * Avoid mutating other event state in this method. In general, put UI metadata in the node for
+     * services to easily query.
+     * <ul>
+     *     <li> If you are modifying other event properties, you may be eliminating semantics
+     *     accessibility services may want. Instead, send a separate event using
+     *     {@link #sendAccessibilityEvent(int)} and override
+     *     {@link #onInitializeAccessibilityEvent(AccessibilityEvent)}.
+     *     </li>
+     *     <li>If you are checking for type {@link AccessibilityEvent#TYPE_WINDOW_STATE_CHANGED}
+     *     to generate window/title announcements, you may be causing disruptive announcements
+     *     (or making no announcements at all). Instead, follow the practices described in
+     *     {@link View#announceForAccessibility(CharSequence)}. <b>Note:</b> this does not suggest
+     *     calling announceForAccessibility(), but using the suggestions listed in its
+     *     documentation.
+     *     </li>
+     *     <li>If you are making changes based on the state of accessibility, such as checking for
+     *     an event type to trigger a UI update, while well-intentioned, you are creating brittle,
+     *     less well-maintained code that works for some users but not others. Instead, leverage
+     *     existing code for equitable experiences and less technical debt. See
+     *     {@link AccessibilityManager#isEnabled()} for an example.
+     *     </li>
+     * </ul>
+     * <p>
+     * Note that the event text is populated in a separate dispatch path
+     * ({@link #onPopulateAccessibilityEvent(AccessibilityEvent)}) since we add to the
      * event not only the text of the source but also the text of all its descendants.
+     * <p>
      * A typical implementation will call
-     * {@link #onPopulateAccessibilityEvent(AccessibilityEvent)} on the this view
+     * {@link #onPopulateAccessibilityEvent(AccessibilityEvent)} on this view
      * and then call the {@link #dispatchPopulateAccessibilityEvent(AccessibilityEvent)}
-     * on each child. Override this method if custom population of the event text
-     * content is required.
+     * on each child or the first child that is visible. Override this method if custom population
+     * of the event text content is required.
+     *
      * <p>
      * If an {@link AccessibilityDelegate} has been specified via calling
      * {@link #setAccessibilityDelegate(AccessibilityDelegate)} its
@@ -8715,9 +8744,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     /**
      * Called from {@link #dispatchPopulateAccessibilityEvent(AccessibilityEvent)}
      * giving a chance to this View to populate the accessibility event with its
-     * text content. While this method is free to modify event
-     * attributes other than text content, doing so should normally be performed in
-     * {@link #onInitializeAccessibilityEvent(AccessibilityEvent)}.
+     * text content.
+     * <p>
+     * <b>Note:</b> This method should only be used with event.setText().
+     * Avoid mutating other event state in this method. Instead, follow the practices described in
+     * {@link #dispatchPopulateAccessibilityEvent(AccessibilityEvent)}. In general, put UI
+     * metadata in the node for services to easily query, than in transient events.
      * <p>
      * Example: Adding formatted date string to an accessibility event in addition
      *          to the text added by the super implementation:
@@ -11191,6 +11223,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @param stateDescription The state description.
      * @see #getStateDescription()
+     * @see #setContentDescription(CharSequence) for the difference between content and
+     * state descriptions.
      */
     @RemotableViewMethod
     public void setStateDescription(@Nullable CharSequence stateDescription) {
@@ -11262,26 +11296,36 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets the id of a view before which this one is visited in accessibility traversal.
-     * A screen-reader must visit the content of this view before the content of the one
-     * it precedes. For example, if view B is set to be before view A, then a screen-reader
-     * will traverse the entire content of B before traversing the entire content of A,
-     * regardles of what traversal strategy it is using.
+     * Sets the id of a view that screen readers are requested to visit after this view.
+     *
      * <p>
-     * Views that do not have specified before/after relationships are traversed in order
-     * determined by the screen-reader.
-     * </p>
+     *
+     * For example, if view B should be visited before view A, with
+     * B.setAccessibilityTraversalBefore(A), this requests that screen readers visit and traverse
+     * view B before visiting view A.
+     *
      * <p>
-     * Setting that this view is before a view that is not important for accessibility
-     * or if this view is not important for accessibility will have no effect as the
-     * screen-reader is not aware of unimportant views.
-     * </p>
+     * <b>Note:</b> Views are visited in the order determined by the screen reader. Avoid
+     * explicitly manipulating focus order, as this may result in inconsistent user
+     * experiences between apps. Instead, use other semantics, such as restructuring the view
+     * hierarchy layout, to communicate order.
+     *
+     * <p>
+     * Setting this view to be after a view that is not important for accessibility,
+     * or if this view is not important for accessibility, means this method will have no effect if
+     * the service is not aware of unimportant views.
+     *
+     * <p>
+     * To avoid a risk of loops, set clear relationships between views. For example, if focus order
+     * should be B -> A, and B.setAccessibilityTraversalBefore(A), then also call
+     * A.setAccessibilityTraversalAfter(B).
      *
      * @param beforeId The id of a view this one precedes in accessibility traversal.
      *
      * @attr ref android.R.styleable#View_accessibilityTraversalBefore
      *
      * @see #setImportantForAccessibility(int)
+     * @see #setAccessibilityTraversalAfter(int)
      */
     @RemotableViewMethod
     public void setAccessibilityTraversalBefore(@IdRes int beforeId) {
@@ -11308,26 +11352,34 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
-     * Sets the id of a view after which this one is visited in accessibility traversal.
-     * A screen-reader must visit the content of the other view before the content of this
-     * one. For example, if view B is set to be after view A, then a screen-reader
-     * will traverse the entire content of A before traversing the entire content of B,
-     * regardles of what traversal strategy it is using.
-     * <p>
-     * Views that do not have specified before/after relationships are traversed in order
-     * determined by the screen-reader.
-     * </p>
-     * <p>
-     * Setting that this view is after a view that is not important for accessibility
-     * or if this view is not important for accessibility will have no effect as the
-     * screen-reader is not aware of unimportant views.
-     * </p>
+     * Sets the id of a view that screen readers are requested to visit before this view.
      *
-     * @param afterId The id of a view this one succedees in accessibility traversal.
+     * <p>
+     * For example, if view B should be visited after A, with B.setAccessibilityTraversalAfter(A),
+     * then this requests that screen readers visit and traverse view A before visiting view B.
+     *
+     * <p>
+     * <b>Note:</b> Views are visited in the order determined by the screen reader. Avoid
+     * explicitly manipulating focus order, as this may result in inconsistent user
+     * experiences between apps. Instead, use other semantics, such as restructuring the view
+     * hierarchy layout, to communicate order.
+     *
+     * <p>
+     * Setting this view to be after a view that is not important for accessibility,
+     * or if this view is not important for accessibility, means this method will have no effect if
+     * the service is not aware of unimportant views.
+     *
+     * <p>
+     * To avoid a risk of loops, set clear relationships between views. For example, if focus order
+     * should be B -> A, and B.setAccessibilityTraversalBefore(A), then also call
+     * A.setAccessibilityTraversalAfter(B).
+     *
+     * @param afterId The id of a view this one succeeds in accessibility traversal.
      *
      * @attr ref android.R.styleable#View_accessibilityTraversalAfter
      *
      * @see #setImportantForAccessibility(int)
+     * @see #setAccessibilityTraversalBefore(int)
      */
     @RemotableViewMethod
     public void setAccessibilityTraversalAfter(@IdRes int afterId) {
@@ -14625,19 +14677,31 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * to the view's content description or text, or to the content descriptions
      * or text of the view's children (where applicable).
      * <p>
-     * For example, in a login screen with a TextView that displays an "incorrect
-     * password" notification, that view should be marked as a live region with
-     * mode {@link #ACCESSIBILITY_LIVE_REGION_POLITE}.
+     * To indicate that the user should be notified of changes, use
+     * {@link #ACCESSIBILITY_LIVE_REGION_POLITE}. Announcements from this region are queued and
+     * do not disrupt ongoing speech.
+     * <p>
+     * For example, selecting an option in a dropdown menu may update a panel below with the updated
+     * content. This panel may be marked as a live region with
+     * {@link #ACCESSIBILITY_LIVE_REGION_POLITE} to notify users of the change.
+     * <p>
+     * For notifying users about errors, such as in a login screen with text that displays an
+     * "incorrect password" notification, that view should send an AccessibilityEvent of type
+     * {@link AccessibilityEvent#CONTENT_CHANGE_TYPE_ERROR} and set
+     * {@link AccessibilityNodeInfo#setError(CharSequence)} instead. Custom widgets should expose
+     * error-setting methods that support accessibility automatically. For example, instead of
+     * explicitly sending this event when using a TextView, use
+     * {@link android.widget.TextView#setError(CharSequence)}.
      * <p>
      * To disable change notifications for this view, use
      * {@link #ACCESSIBILITY_LIVE_REGION_NONE}. This is the default live region
      * mode for most views.
      * <p>
-     * To indicate that the user should be notified of changes, use
-     * {@link #ACCESSIBILITY_LIVE_REGION_POLITE}.
-     * <p>
      * If the view's changes should interrupt ongoing speech and notify the user
-     * immediately, use {@link #ACCESSIBILITY_LIVE_REGION_ASSERTIVE}.
+     * immediately, use {@link #ACCESSIBILITY_LIVE_REGION_ASSERTIVE}. This may result in disruptive
+     * announcements from an accessibility service, so it should generally be used only to convey
+     * information that is time-sensitive or critical for use of the application. Examples may
+     * include an incoming call or an emergency alert.
      * <p>
      * <b>Note:</b> Use {@link androidx.core.view.ViewCompat#setAccessibilityLiveRegion(View, int)}
      * for backwards-compatibility. </aside>
@@ -21200,19 +21264,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (mRoundScrollbarRenderer == null) {
             getStraightVerticalScrollBarBounds(bounds, touchBounds);
         } else {
-            getRoundVerticalScrollBarBounds(bounds != null ? bounds : touchBounds);
+            mRoundScrollbarRenderer.getRoundVerticalScrollBarBounds(
+                    bounds != null ? bounds : touchBounds);
         }
-    }
-
-    private void getRoundVerticalScrollBarBounds(Rect bounds) {
-        final int width = mRight - mLeft;
-        final int height = mBottom - mTop;
-        // Do not take padding into account as we always want the scrollbars
-        // to hug the screen for round wearable devices.
-        bounds.left = mScrollX;
-        bounds.top = mScrollY;
-        bounds.right = bounds.left + width;
-        bounds.bottom = mScrollY + height;
     }
 
     private void getStraightVerticalScrollBarBounds(@Nullable Rect drawBounds,
@@ -21324,8 +21378,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 if (drawVerticalScrollBar) {
                     final Rect bounds = cache.mScrollBarBounds;
                     getVerticalScrollBarBounds(bounds, null);
+                    boolean shouldDrawScrollbarAtLeft =
+                            (mVerticalScrollbarPosition == SCROLLBAR_POSITION_LEFT)
+                                    || (mVerticalScrollbarPosition == SCROLLBAR_POSITION_DEFAULT
+                                    && isLayoutRtl());
+
                     mRoundScrollbarRenderer.drawRoundScrollbars(
-                            canvas, (float) cache.scrollBar.getAlpha() / 255f, bounds);
+                            canvas, (float) cache.scrollBar.getAlpha() / 255f, bounds,
+                            shouldDrawScrollbarAtLeft);
                     if (invalidate) {
                         invalidate();
                     }
@@ -22476,6 +22536,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public void setRenderEffect(@Nullable RenderEffect renderEffect) {
         if (mRenderNode.setRenderEffect(renderEffect)) {
+            invalidateViewProperty(true, true);
+        }
+    }
+
+    /**
+     * Configure the {@link android.graphics.RenderEffect} to apply to the backdrop contents of this
+     * View. This will apply a visual effect to the result of the backdrop contents of this View
+     * before it is drawn. For example if
+     * {@link RenderEffect#createBlurEffect(float, float, RenderEffect, Shader.TileMode)}
+     * is provided, the previous content behind this View will be blurred before this View is drawn.
+     * @param renderEffect to be applied to the View. Passing null clears the previously configured
+     *                     {@link RenderEffect}
+     * @hide
+     */
+    public void setBackdropRenderEffect(@Nullable RenderEffect renderEffect) {
+        if (mRenderNode.setBackdropRenderEffect(renderEffect)) {
             invalidateViewProperty(true, true);
         }
     }

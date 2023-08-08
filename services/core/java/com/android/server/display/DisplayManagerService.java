@@ -24,7 +24,6 @@ import static android.Manifest.permission.INTERNAL_SYSTEM_WINDOW;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE;
 import static android.hardware.display.DisplayManager.EventsMask;
-import static android.hardware.display.DisplayManager.HDR_OUTPUT_CONTROL_FLAG;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_CAN_SHOW_WITH_INSECURE_KEYGUARD;
@@ -43,7 +42,6 @@ import static android.Manifest.permission.MANAGE_CROSS_DEVICE;
 import static android.hardware.display.HdrConversionMode.HDR_CONVERSION_UNSUPPORTED;
 import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.os.Process.ROOT_UID;
-import static android.provider.DeviceConfig.NAMESPACE_DISPLAY_MANAGER;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -119,7 +117,7 @@ import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.provider.DeviceConfig;
+import android.provider.DeviceConfigInterface;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -156,6 +154,7 @@ import com.android.server.SystemService;
 import com.android.server.UiThread;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.display.DisplayDeviceConfig.SensorData;
+import com.android.server.display.feature.DeviceConfigParameterProvider;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
 import com.android.server.display.utils.SensorUtils;
@@ -510,6 +509,8 @@ public final class DisplayManagerService extends SystemService {
 
     private final BrightnessSynchronizer mBrightnessSynchronizer;
 
+    private final DeviceConfigParameterProvider mConfigParameterProvider;
+
     /**
      * Applications use {@link android.view.Display#getRefreshRate} and
      * {@link android.view.Display.Mode#getRefreshRate} to know what is the display refresh rate.
@@ -570,6 +571,7 @@ public final class DisplayManagerService extends SystemService {
         mOverlayProperties = SurfaceControl.getOverlaySupport();
         mSystemReady = false;
         mDumpInProgress = false;
+        mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
     }
 
     public void setupSchedulerPolicies() {
@@ -706,11 +708,11 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             mSafeMode = safeMode;
             mSystemReady = true;
-            mIsHdrOutputControlEnabled = isDeviceConfigHdrOutputControlEnabled();
-            DeviceConfig.addOnPropertiesChangedListener(NAMESPACE_DISPLAY_MANAGER,
-                    BackgroundThread.getExecutor(),
+            mIsHdrOutputControlEnabled =
+                    mConfigParameterProvider.isHdrOutputControlFeatureEnabled();
+            mConfigParameterProvider.addOnPropertiesChangedListener(BackgroundThread.getExecutor(),
                     properties -> mIsHdrOutputControlEnabled =
-                            isDeviceConfigHdrOutputControlEnabled());
+                            mConfigParameterProvider.isHdrOutputControlFeatureEnabled());
             // Just in case the top inset changed before the system was ready. At this point, any
             // relevant configuration should be in place.
             recordTopInsetLocked(mLogicalDisplayMapper.getDisplayLocked(Display.DEFAULT_DISPLAY));
@@ -739,12 +741,6 @@ public final class DisplayManagerService extends SystemService {
         filter.addAction(Intent.ACTION_DOCK_EVENT);
 
         mContext.registerReceiver(mIdleModeReceiver, filter);
-    }
-
-    private boolean isDeviceConfigHdrOutputControlEnabled() {
-        return DeviceConfig.getBoolean(NAMESPACE_DISPLAY_MANAGER,
-                HDR_OUTPUT_CONTROL_FLAG,
-                true);
     }
 
     @VisibleForTesting
@@ -3173,8 +3169,7 @@ public final class DisplayManagerService extends SystemService {
                     + "display: " + display.getDisplayIdLocked());
             return null;
         }
-        if (DeviceConfig.getBoolean("display_manager",
-                "use_newly_structured_display_power_controller", true)) {
+        if (mConfigParameterProvider.isNewPowerControllerFeatureEnabled()) {
             displayPowerController = new DisplayPowerController2(
                     mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,
                     mSensorManager, mDisplayBlanker, display, mBrightnessTracker, brightnessSetting,

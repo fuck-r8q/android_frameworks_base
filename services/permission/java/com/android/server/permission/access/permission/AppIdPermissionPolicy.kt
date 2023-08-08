@@ -245,7 +245,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
         androidPackage.requestedPermissions.forEach { permissionName ->
             val permission = newState.systemState.permissions[permissionName]
                 ?: return@forEach
-            if (permission.isRemoved) {
+            if (!permission.isRuntime || permission.isRemoved) {
                 return@forEach
             }
             val isRequestedByOtherPackages = anyPackageInAppId(appId) {
@@ -519,9 +519,15 @@ class AppIdPermissionPolicy : SchemePolicy() {
                 val isPermissionChanged = oldPermission == null ||
                     newPackageName != oldPermission.packageName ||
                     newPermission.protectionLevel != oldPermission.protectionLevel || (
-                        oldPermission.isReconciled && newPermission.isRuntime &&
-                            newPermission.groupName != null &&
-                            newPermission.groupName != oldPermission.groupName
+                        oldPermission.isReconciled && (
+                            (
+                                newPermission.isKnownSigner &&
+                                    newPermission.knownCerts != oldPermission.knownCerts
+                            ) || (
+                                newPermission.isRuntime && newPermission.groupName != null &&
+                                    newPermission.groupName != oldPermission.groupName
+                            )
+                        )
                     )
                 if (isPermissionChanged) {
                     changedPermissionNames += permissionName

@@ -1066,7 +1066,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (obscuredChanged && w.isVisible() && mWallpaperController.isWallpaperTarget(w)) {
             // This is the wallpaper target and its obscured state changed... make sure the
             // current wallpaper's visibility has been updated accordingly.
-            mWallpaperController.updateWallpaperVisibility();
+            mWallpaperController.updateWallpaperTokens(mDisplayContent.isKeyguardLocked());
         }
 
         w.handleWindowMovedIfNeeded();
@@ -1714,9 +1714,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     private int getMinimalTaskSizeDp() {
-        final Context displayConfigurationContext =
-                mAtmService.mContext.createConfigurationContext(getConfiguration());
-        final Resources res = displayConfigurationContext.getResources();
+        final Resources res = getDisplayUiContext().getResources();
         final TypedValue value = new TypedValue();
         res.getValue(R.dimen.default_minimal_size_resizable_task, value, true /* resolveRefs */);
         final int valueUnit = ((value.data >> COMPLEX_UNIT_SHIFT) & COMPLEX_UNIT_MASK);
@@ -2717,6 +2715,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (mDisplayPolicy != null) {
             mDisplayPolicy.onConfigurationChanged();
             mPinnedTaskController.onPostDisplayConfigurationChanged();
+            mMinSizeOfResizeableTaskDp = getMinimalTaskSizeDp();
         }
         // Update IME parent if needed.
         updateImeParent();
@@ -2858,7 +2857,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     void onDisplayInfoChanged() {
         updateDisplayFrames(false /* notifyInsetsChange */);
-        mMinSizeOfResizeableTaskDp = getMinimalTaskSizeDp();
         mInputMonitor.layoutInputConsumers(mDisplayInfo.logicalWidth, mDisplayInfo.logicalHeight);
         mDisplayPolicy.onDisplayInfoChanged(mDisplayInfo);
     }
@@ -3704,6 +3702,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         mInputMonitor.dump(pw, "  ");
         pw.println();
         mInsetsStateController.dump(prefix, pw);
+        mInsetsPolicy.dump(prefix, pw);
         mDwpcHelper.dump(prefix, pw);
         pw.println();
     }

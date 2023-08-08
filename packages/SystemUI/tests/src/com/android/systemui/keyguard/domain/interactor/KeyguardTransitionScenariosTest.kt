@@ -19,13 +19,13 @@ package com.android.systemui.keyguard.domain.interactor
 import androidx.test.filters.SmallTest
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode.PIN
+import com.android.keyguard.TestScopeProvider
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
-import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
 import com.android.systemui.keyguard.shared.model.DozeStateModel
 import com.android.systemui.keyguard.shared.model.DozeTransitionModel
@@ -56,6 +56,7 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.reset
+import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
@@ -72,10 +73,10 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
     private lateinit var bouncerRepository: FakeKeyguardBouncerRepository
     private lateinit var shadeRepository: ShadeRepository
     private lateinit var transitionRepository: FakeKeyguardTransitionRepository
+    private lateinit var transitionInteractor: KeyguardTransitionInteractor
     private lateinit var featureFlags: FakeFeatureFlags
 
     // Used to verify transition requests for test output
-    @Mock private lateinit var mockTransitionRepository: KeyguardTransitionRepository
     @Mock private lateinit var keyguardSecurityModel: KeyguardSecurityModel
 
     private lateinit var fromLockscreenTransitionInteractor: FromLockscreenTransitionInteractor
@@ -92,97 +93,97 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
-        testScope = TestScope()
+        testScope = TestScopeProvider.getTestScope()
 
         keyguardRepository = FakeKeyguardRepository()
         bouncerRepository = FakeKeyguardBouncerRepository()
         shadeRepository = FakeShadeRepository()
-        transitionRepository = FakeKeyguardTransitionRepository()
+        transitionRepository = spy(FakeKeyguardTransitionRepository())
 
         whenever(keyguardSecurityModel.getSecurityMode(anyInt())).thenReturn(PIN)
 
         featureFlags = FakeFeatureFlags().apply { set(Flags.FACE_AUTH_REFACTOR, true) }
+
+        transitionInteractor =
+            KeyguardTransitionInteractorFactory.create(
+                    scope = testScope,
+                    repository = transitionRepository,
+                )
+                .keyguardTransitionInteractor
+
         fromLockscreenTransitionInteractor =
             FromLockscreenTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                shadeRepository = shadeRepository,
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromLockscreenTransitionInteractor.start()
-
-        fromDreamingTransitionInteractor =
-            FromDreamingTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromDreamingTransitionInteractor.start()
-
-        fromAodTransitionInteractor =
-            FromAodTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromAodTransitionInteractor.start()
-
-        fromGoneTransitionInteractor =
-            FromGoneTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromGoneTransitionInteractor.start()
-
-        fromDozingTransitionInteractor =
-            FromDozingTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromDozingTransitionInteractor.start()
-
-        fromOccludedTransitionInteractor =
-            FromOccludedTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromOccludedTransitionInteractor.start()
-
-        fromAlternateBouncerTransitionInteractor =
-            FromAlternateBouncerTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-            )
-        fromAlternateBouncerTransitionInteractor.start()
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                    shadeRepository = shadeRepository,
+                )
+                .apply { start() }
 
         fromPrimaryBouncerTransitionInteractor =
             FromPrimaryBouncerTransitionInteractor(
-                scope = testScope,
-                keyguardInteractor = createKeyguardInteractor(),
-                keyguardTransitionRepository = mockTransitionRepository,
-                keyguardTransitionInteractor =
-                    KeyguardTransitionInteractor(transitionRepository, testScope.backgroundScope),
-                keyguardSecurityModel = keyguardSecurityModel,
-            )
-        fromPrimaryBouncerTransitionInteractor.start()
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                    keyguardSecurityModel = keyguardSecurityModel,
+                )
+                .apply { start() }
+
+        fromDreamingTransitionInteractor =
+            FromDreamingTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
+
+        fromAodTransitionInteractor =
+            FromAodTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
+
+        fromGoneTransitionInteractor =
+            FromGoneTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
+
+        fromDozingTransitionInteractor =
+            FromDozingTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
+
+        fromOccludedTransitionInteractor =
+            FromOccludedTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
+
+        fromAlternateBouncerTransitionInteractor =
+            FromAlternateBouncerTransitionInteractor(
+                    scope = testScope,
+                    keyguardInteractor = createKeyguardInteractor(),
+                    transitionRepository = transitionRepository,
+                    transitionInteractor = transitionInteractor,
+                )
+                .apply { start() }
     }
 
     @Test
@@ -201,7 +202,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to PRIMARY_BOUNCER should occur
             assertThat(info.ownerName).isEqualTo("FromLockscreenTransitionInteractor")
@@ -228,7 +229,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromOccludedTransitionInteractor")
@@ -255,7 +256,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromOccludedTransitionInteractor")
@@ -286,7 +287,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DREAMING should occur
             assertThat(info.ownerName).isEqualTo("FromLockscreenTransitionInteractor")
@@ -313,7 +314,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromLockscreenTransitionInteractor")
@@ -340,7 +341,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromLockscreenTransitionInteractor")
@@ -363,7 +364,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromDozingTransitionInteractor")
@@ -388,14 +389,14 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
                 )
             )
             runCurrent()
-            reset(mockTransitionRepository)
+            reset(transitionRepository)
 
             // WHEN a signal comes that dreaming is enabled
             keyguardRepository.setDreamingWithOverlay(true)
             advanceUntilIdle()
 
             // THEN the transition is ignored
-            verify(mockTransitionRepository, never()).startTransition(any(), anyBoolean())
+            verify(transitionRepository, never()).startTransition(any(), anyBoolean())
 
             coroutineContext.cancelChildren()
         }
@@ -412,7 +413,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromDozingTransitionInteractor")
@@ -439,7 +440,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromGoneTransitionInteractor")
@@ -466,7 +467,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AOD should occur
             assertThat(info.ownerName).isEqualTo("FromGoneTransitionInteractor")
@@ -489,7 +490,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AOD should occur
             assertThat(info.ownerName).isEqualTo("FromGoneTransitionInteractor")
@@ -520,7 +521,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DREAMING should occur
             assertThat(info.ownerName).isEqualTo("FromGoneTransitionInteractor")
@@ -543,7 +544,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to PRIMARY_BOUNCER should occur
             assertThat(info.ownerName).isEqualTo("FromAlternateBouncerTransitionInteractor")
@@ -572,7 +573,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AOD should occur
             assertThat(info.ownerName).isEqualTo("FromAlternateBouncerTransitionInteractor")
@@ -602,7 +603,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromAlternateBouncerTransitionInteractor")
@@ -630,7 +631,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to LOCKSCREEN should occur
             assertThat(info.ownerName).isEqualTo("FromAlternateBouncerTransitionInteractor")
@@ -658,7 +659,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AOD should occur
             assertThat(info.ownerName).isEqualTo("FromPrimaryBouncerTransitionInteractor")
@@ -686,7 +687,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to DOZING should occur
             assertThat(info.ownerName).isEqualTo("FromPrimaryBouncerTransitionInteractor")
@@ -713,7 +714,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to LOCKSCREEN should occur
             assertThat(info.ownerName).isEqualTo("FromPrimaryBouncerTransitionInteractor")
@@ -744,7 +745,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to GONE should occur
             assertThat(info.ownerName).isEqualTo("FromOccludedTransitionInteractor")
@@ -773,7 +774,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to LOCKSCREEN should occur
             assertThat(info.ownerName).isEqualTo("FromOccludedTransitionInteractor")
@@ -799,7 +800,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AlternateBouncer should occur
             assertThat(info.ownerName).isEqualTo("FromOccludedTransitionInteractor")
@@ -828,7 +829,7 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
 
             val info =
                 withArgCaptor<TransitionInfo> {
-                    verify(mockTransitionRepository).startTransition(capture(), anyBoolean())
+                    verify(transitionRepository).startTransition(capture(), anyBoolean())
                 }
             // THEN a transition to AlternateBouncer should occur
             assertThat(info.ownerName).isEqualTo("FromPrimaryBouncerTransitionInteractor")
@@ -890,6 +891,6 @@ class KeyguardTransitionScenariosTest : SysuiTestCase() {
             )
         )
         runCurrent()
-        reset(mockTransitionRepository)
+        reset(transitionRepository)
     }
 }

@@ -390,9 +390,10 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             var latest: Int? = null
             val job = underTest.carrierId.onEach { latest = it }.launchIn(this)
 
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, carrierIdIntent(carrierId = 4321))
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(
+                context,
+                carrierIdIntent(carrierId = 4321),
+            )
 
             assertThat(latest).isEqualTo(4321)
 
@@ -664,10 +665,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             val job = underTest.networkName.onEach { latest = it }.launchIn(this)
 
             val intent = spnIntent()
-
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, intent)
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent)
 
             assertThat(latest).isEqualTo(intent.toNetworkNameModel(SEP))
 
@@ -681,17 +679,13 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             val job = underTest.networkName.onEach { latest = it }.launchIn(this)
 
             val intent = spnIntent()
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, intent)
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent)
             assertThat(latest).isEqualTo(intent.toNetworkNameModel(SEP))
 
             // WHEN an intent with a different subId is sent
             val wrongSubIntent = spnIntent(subId = 101)
 
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, wrongSubIntent)
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, wrongSubIntent)
 
             // THEN the previous intent's name is still used
             assertThat(latest).isEqualTo(intent.toNetworkNameModel(SEP))
@@ -706,9 +700,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             val job = underTest.networkName.onEach { latest = it }.launchIn(this)
 
             val intent = spnIntent()
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, intent)
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent)
             assertThat(latest).isEqualTo(intent.toNetworkNameModel(SEP))
 
             val intentWithoutInfo =
@@ -717,9 +709,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
                     showPlmn = false,
                 )
 
-            fakeBroadcastDispatcher.registeredReceivers.forEach { receiver ->
-                receiver.onReceive(context, intentWithoutInfo)
-            }
+            fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intentWithoutInfo)
 
             assertThat(latest).isEqualTo(DEFAULT_NAME)
 

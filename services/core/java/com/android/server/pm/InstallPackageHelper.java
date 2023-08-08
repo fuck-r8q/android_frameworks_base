@@ -1078,6 +1078,8 @@ final class InstallPackageHelper {
         final boolean isApex = ((installFlags & PackageManager.INSTALL_APEX) != 0);
         final boolean isRollback =
                 request.getInstallReason() == PackageManager.INSTALL_REASON_ROLLBACK;
+        final boolean extractProfile =
+                ((installFlags & PackageManager.INSTALL_DONT_EXTRACT_BASELINE_PROFILES) == 0);
         @PackageManagerService.ScanFlags int scanFlags = SCAN_NEW_INSTALL | SCAN_UPDATE_SIGNATURE;
         if (request.isInstallMove()) {
             // moving a complete application; perform an initial scan on the new install location
@@ -1113,7 +1115,9 @@ final class InstallPackageHelper {
         @ParsingPackageUtils.ParseFlags final int parseFlags =
                 mPm.getDefParseFlags() | ParsingPackageUtils.PARSE_CHATTY
                         | ParsingPackageUtils.PARSE_ENFORCE_CODE
-                        | (onExternal ? ParsingPackageUtils.PARSE_EXTERNAL_STORAGE : 0);
+                        | (onExternal ? ParsingPackageUtils.PARSE_EXTERNAL_STORAGE : 0)
+                        | (extractProfile
+                        ? ParsingPackageUtils.PARSE_EXTRACT_BASELINE_PROFILES_FROM_APK : 0);
 
         Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "parsePackage");
         final ParsedPackage parsedPackage;
@@ -2812,6 +2816,8 @@ final class InstallPackageHelper {
                     final String[] pkgNames = new String[]{
                             request.getRemovedInfo().mRemovedPackage};
                     final int[] uids = new int[]{request.getRemovedInfo().mUid};
+                    mPm.notifyResourcesChanged(false /* mediaStatus */,
+                            true /* replacing */, pkgNames, uids);
                     mBroadcastHelper.sendResourcesChangedBroadcast(mPm::snapshotComputer,
                             false /* mediaStatus */, true /* replacing */, pkgNames, uids);
                 }
@@ -3017,6 +3023,8 @@ final class InstallPackageHelper {
                     final int[] uids = new int[]{request.getPkg().getUid()};
                     mBroadcastHelper.sendResourcesChangedBroadcast(mPm::snapshotComputer,
                             true /* mediaStatus */, true /* replacing */, pkgNames, uids);
+                    mPm.notifyResourcesChanged(true /* mediaStatus */, true /* replacing */,
+                            pkgNames, uids);
                 }
             } else if (!ArrayUtils.isEmpty(request.getLibraryConsumers())) { // if static shared lib
                 // No need to kill consumers if it's installation of new version static shared lib.
@@ -3734,12 +3742,15 @@ final class InstallPackageHelper {
 
             if (throwable == null) {
                 try {
+                    Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "addForInitLI");
                     addForInitLI(parseResult.parsedPackage, parseFlags, scanFlags,
                             new UserHandle(UserHandle.USER_SYSTEM), apexInfo);
                 } catch (PackageManagerException e) {
                     errorCode = e.error;
                     errorMsg = "Failed to scan " + parseResult.scanFile + ": " + e.getMessage();
                     Slog.w(TAG, errorMsg);
+                } finally {
+                    Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
                 }
             } else if (throwable instanceof PackageManagerException) {
                 PackageManagerException e = (PackageManagerException) throwable;

@@ -78,7 +78,7 @@ class LockscreenSmartspaceController
 constructor(
         private val context: Context,
         private val featureFlags: FeatureFlags,
-        private val smartspaceManager: SmartspaceManager,
+        private val smartspaceManager: SmartspaceManager?,
         private val activityStarter: ActivityStarter,
         private val falsingManager: FalsingManager,
         private val systemClock: SystemClock,
@@ -178,7 +178,16 @@ constructor(
                     now.isBefore(Instant.ofEpochMilli(t.expiryTimeMillis))
         }
         if (weatherTarget != null) {
-            val weatherData = WeatherData.fromBundle(weatherTarget.baseAction.extras)
+            val clickIntent = weatherTarget.headerAction?.intent
+            val weatherData = WeatherData.fromBundle(weatherTarget.baseAction.extras, { v ->
+                if (!falsingManager.isFalseTap(FalsingManager.LOW_PENALTY)) {
+                    activityStarter.startActivity(
+                        clickIntent,
+                        true, /* dismissShade */
+                        null,
+                        false)
+                }
+            })
             if (weatherData != null) {
                 keyguardUpdateMonitor.sendWeatherData(weatherData)
             }
@@ -378,6 +387,7 @@ constructor(
     }
 
     private fun connectSession() {
+        if (smartspaceManager == null) return
         if (datePlugin == null && weatherPlugin == null && plugin == null) return
         if (session != null || smartspaceViews.isEmpty()) {
             return

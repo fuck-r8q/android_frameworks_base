@@ -2152,7 +2152,7 @@
   <java-symbol type="string" name="data_usage_rapid_body" />
   <java-symbol type="string" name="data_usage_rapid_app_body" />
   <java-symbol type="string" name="default_wallpaper_component" />
-  <java-symbol type="array" name="cmf_default_wallpaper_component" />
+  <java-symbol type="array" name="default_wallpaper_component_per_device_color" />
   <java-symbol type="string" name="device_storage_monitor_notification_channel" />
   <java-symbol type="string" name="dlg_ok" />
   <java-symbol type="string" name="dump_heap_notification" />
@@ -3086,6 +3086,7 @@
   <java-symbol type="id" name="header_text_secondary" />
   <java-symbol type="id" name="expand_button" />
   <java-symbol type="id" name="expand_button_pill" />
+  <java-symbol type="id" name="expand_button_pill_colorized_layer" />
   <java-symbol type="id" name="expand_button_number" />
   <java-symbol type="id" name="expand_button_icon" />
   <java-symbol type="id" name="alternate_expand_target" />
@@ -3135,6 +3136,7 @@
   <java-symbol type="string" name="status_bar_sync_failing" />
   <java-symbol type="string" name="status_bar_sync_active" />
   <java-symbol type="string" name="status_bar_cast" />
+  <java-symbol type="string" name="status_bar_connected_display" />
   <java-symbol type="string" name="status_bar_hotspot" />
   <java-symbol type="string" name="status_bar_location" />
   <java-symbol type="string" name="status_bar_bluetooth" />

@@ -4563,7 +4563,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     mTransitionChangeFlags |= FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
                 }
                 // Post cleanup after the visibility and animation are transferred.
-                fromActivity.postWindowRemoveStartingWindowCleanup(tStartingWindow);
+                fromActivity.postWindowRemoveStartingWindowCleanup();
                 fromActivity.mVisibleSetFromTransferredStartingWindow = false;
 
                 mWmService.updateFocusedWindowLocked(
@@ -4607,6 +4607,26 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         task.forAllActivities(fromActivity -> {
             if (fromActivity == this) return true;
+            // The snapshot starting window could remove itself when receive resized request without
+            // redraw, so transfer it to a different size activity could only cause flicker.
+            // By schedule remove snapshot starting window, the remove process will happen when
+            // transition ready, transition ready means the app window is drawn.
+            final StartingData tmpStartingData = fromActivity.mStartingData;
+            if (tmpStartingData != null && tmpStartingData.mAssociatedTask == null
+                    && mTransitionController.isCollecting(fromActivity)
+                    && tmpStartingData instanceof SnapshotStartingData) {
+                final Rect fromBounds = fromActivity.getBounds();
+                final Rect myBounds = getBounds();
+                if (!fromBounds.equals(myBounds)) {
+                    // Mark as no animation, so these changes won't merge into playing transition.
+                    if (mTransitionController.inPlayingTransition(fromActivity)) {
+                        mTransitionController.setNoAnimation(this);
+                        mTransitionController.setNoAnimation(fromActivity);
+                    }
+                    fromActivity.removeStartingWindow();
+                    return true;
+                }
+            }
             return !fromActivity.isVisibleRequested() && transferStartingWindow(fromActivity);
         });
     }
@@ -7583,27 +7603,12 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
     }
 
-    void postWindowRemoveStartingWindowCleanup(WindowState win) {
-        // TODO: Something smells about the code below...Is there a better way?
-        if (mStartingWindow == win) {
-            ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Notify removed startingWindow %s", win);
-            removeStartingWindow();
-        } else if (mChildren.size() == 0) {
-            // If this is the last window and we had requested a starting transition window,
-            // well there is no point now.
-            ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Nulling last startingData");
-            mStartingData = null;
-            if (mVisibleSetFromTransferredStartingWindow) {
-                // We set the visible state to true for the token from a transferred starting
-                // window. We now reset it back to false since the starting window was the last
-                // window in the token.
-                setVisible(false);
-            }
-        } else if (mChildren.size() == 1 && mStartingSurface != null && !isRelaunching()) {
-            // If this is the last window except for a starting transition window,
-            // we need to get rid of the starting transition.
-            ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Last window, removing starting window %s", win);
-            removeStartingWindow();
+    void postWindowRemoveStartingWindowCleanup() {
+        if (mChildren.size() == 0 && mVisibleSetFromTransferredStartingWindow) {
+            // We set the visible state to true for the token from a transferred starting
+            // window. We now reset it back to false since the starting window was the last
+            // window in the token.
+            setVisible(false);
         }
     }
 

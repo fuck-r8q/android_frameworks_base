@@ -12993,7 +12993,7 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by device owners or profile owners of an organization-owned managed profile to to set
+     * Called by device owners or profile owners of an organization-owned managed profile to set
      * a local system update policy. When a new policy is set,
      * {@link #ACTION_SYSTEM_UPDATE_POLICY_CHANGED} is broadcast.
      * <p>
@@ -14787,12 +14787,12 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by the system to find out whether the current user's IME was set by the device/profile
-     * owner or the user.
+     * Returns true if the current user's IME was set by an admin.
      *
-     * @return {@code true} if the user's IME was set by the device or profile owner, {@code false}
-     *         otherwise.
-     * @throws SecurityException if the caller is not the device owner/profile owner.
+     * <p>Requires the caller to be the system server, a device owner or profile owner, or a holder
+     * of the QUERY_ADMIN_POLICY permission.
+     *
+     * @throws SecurityException if the caller is not authorized
      *
      * @hide
      */
@@ -16585,10 +16585,28 @@ public class DevicePolicyManager {
      * {@link #canUsbDataSignalingBeDisabled()} to check whether enabling or disabling USB data
      * signaling is supported on the device.
      *
+     * Starting from {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, after the USB data signaling
+     * policy has been set, {@link PolicyUpdateReceiver#onPolicySetResult(Context, String,
+     * Bundle, TargetUser, PolicyUpdateResult)} will notify the admin on whether the policy was
+     * successfully set or not. This callback will contain:
+     * <ul>
+     * li> The policy identifier {@link DevicePolicyIdentifiers#USB_DATA_SIGNALING_POLICY}
+     * <li> The {@link TargetUser} that this policy relates to
+     * <li> The {@link PolicyUpdateResult}, which will be
+     * {@link PolicyUpdateResult#RESULT_POLICY_SET} if the policy was successfully set or the
+     * reason the policy failed to be set
+     * e.g. {@link PolicyUpdateResult#RESULT_FAILURE_CONFLICTING_ADMIN_POLICY})
+     * </ul>
+     * If there has been a change to the policy,
+     * {@link PolicyUpdateReceiver#onPolicyChanged(Context, String, Bundle, TargetUser,
+     * PolicyUpdateResult)} will notify the admin of this change. This callback will contain the
+     * same parameters as PolicyUpdateReceiver#onPolicySetResult and the {@link PolicyUpdateResult}
+     * will contain the reason why the policy changed.
+     *
      * @param enabled whether USB data signaling should be enabled or not.
      * @throws SecurityException if the caller is not permitted to set this policy
      * @throws IllegalStateException if disabling USB data signaling is not supported or
-     *         if USB data signaling fails to be enabled/disabled.
+     * if USB data signaling fails to be enabled/disabled.
      */
     @RequiresPermission(value = MANAGE_DEVICE_POLICY_USB_DATA_SIGNALLING, conditional = true)
     public void setUsbDataSignalingEnabled(boolean enabled) {
@@ -16616,25 +16634,6 @@ public class DevicePolicyManager {
         if (mService != null) {
             try {
                 return mService.isUsbDataSignalingEnabled(mContext.getPackageName());
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Called by the system to check whether USB data signaling is currently enabled for this user.
-     *
-     * @param userId which user to check for.
-     * @return {@code true} if USB data signaling is enabled, {@code false} otherwise.
-     * @hide
-     */
-    public boolean isUsbDataSignalingEnabledForUser(@UserIdInt int userId) {
-        throwIfParentInstance("isUsbDataSignalingEnabledForUser");
-        if (mService != null) {
-            try {
-                return mService.isUsbDataSignalingEnabledForUser(userId);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }

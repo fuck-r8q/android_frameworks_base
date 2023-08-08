@@ -91,6 +91,7 @@ import android.graphics.drawable.LayerDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IRemoteCallback;
 import android.os.Looper;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
@@ -939,6 +940,13 @@ public class ApplicationPackageManager extends PackageManager {
     @UnsupportedAppUsage
     public boolean shouldShowRequestPermissionRationale(String permName) {
         return getPermissionManager().shouldShowRequestPermissionRationale(permName);
+    }
+
+    @Override
+    public Intent buildRequestPermissionsIntent(@NonNull String[] permissions) {
+        Intent intent = super.buildRequestPermissionsIntent(permissions);
+        intent.putExtra(EXTRA_REQUEST_PERMISSIONS_DEVICE_ID, mContext.getDeviceId());
+        return intent;
     }
 
     @Override
@@ -3907,6 +3915,26 @@ public class ApplicationPackageManager extends PackageManager {
         Objects.requireNonNull(targetPackage);
         try {
             mPM.relinquishUpdateOwnership(targetPackage);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @Override
+    public void registerPackageMonitorCallback(@NonNull IRemoteCallback callback, int userId) {
+        Objects.requireNonNull(callback);
+        try {
+            mPM.registerPackageMonitorCallback(callback, userId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    @Override
+    public void unregisterPackageMonitorCallback(@NonNull IRemoteCallback callback) {
+        Objects.requireNonNull(callback);
+        try {
+            mPM.unregisterPackageMonitorCallback(callback);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

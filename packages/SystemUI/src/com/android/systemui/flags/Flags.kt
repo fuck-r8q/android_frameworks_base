@@ -91,6 +91,15 @@ object Flags {
     val NOTIFICATION_SHELF_REFACTOR =
         unreleasedFlag(271161129, "notification_shelf_refactor", teamfood = true)
 
+    // TODO(b/288326013): Tracking Bug
+    @JvmField
+    val NOTIFICATION_ASYNC_HYBRID_VIEW_INFLATION =
+            unreleasedFlag(
+                    288326013,
+                    "notification_async_hybrid_view_inflation",
+                    teamfood = false
+            )
+
     @JvmField
     val ANIMATED_NOTIFICATION_SHADE_INSETS =
         releasedFlag(270682168, "animated_notification_shade_insets")
@@ -150,12 +159,6 @@ object Flags {
      */
     // TODO(b/255607168): Tracking Bug
     @JvmField val DOZING_MIGRATION_1 = unreleasedFlag(213, "dozing_migration_1")
-
-    // TODO(b/252897742): Tracking Bug
-    @JvmField val NEW_ELLIPSE_DETECTION = unreleasedFlag(214, "new_ellipse_detection")
-
-    // TODO(b/252897742): Tracking Bug
-    @JvmField val NEW_UDFPS_OVERLAY = unreleasedFlag(215, "new_udfps_overlay")
 
     /**
      * Whether to enable the code powering customizable lock screen quick affordances.
@@ -257,11 +260,6 @@ object Flags {
     @JvmField
     val MIGRATE_INDICATION_AREA = unreleasedFlag(236, "migrate_indication_area", teamfood = true)
 
-    /** Migrate the lock icon view to the new keyguard root view. */
-    // TODO(b/286552209): Tracking bug.
-    @JvmField
-    val MIGRATE_LOCK_ICON = unreleasedFlag(238, "migrate_lock_icon")
-
     /** Whether to listen for fingerprint authentication over keyguard occluding activities. */
     // TODO(b/283260512): Tracking bug.
     @JvmField
@@ -275,6 +273,11 @@ object Flags {
     // TODO(b/287268101): Tracking bug.
     @JvmField
     val TRANSIT_CLOCK = unreleasedFlag(239, "lockscreen_custom_transit_clock")
+
+    /** Migrate the lock icon view to the new keyguard root view. */
+    // TODO(b/286552209): Tracking bug.
+    @JvmField
+    val MIGRATE_LOCK_ICON = unreleasedFlag(240, "migrate_lock_icon")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -675,13 +678,11 @@ object Flags {
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag(2300, "track_stylus_ever_used")
     @JvmField
-    val ENABLE_STYLUS_CHARGING_UI =
-        unreleasedFlag(2301, "enable_stylus_charging_ui", teamfood = true)
+    val ENABLE_STYLUS_CHARGING_UI = releasedFlag(2301, "enable_stylus_charging_ui")
     @JvmField
     val ENABLE_USI_BATTERY_NOTIFICATIONS =
-        unreleasedFlag(2302, "enable_usi_battery_notifications", teamfood = true)
-    @JvmField val ENABLE_STYLUS_EDUCATION =
-        unreleasedFlag(2303, "enable_stylus_education", teamfood = true)
+        releasedFlag(2302, "enable_usi_battery_notifications")
+    @JvmField val ENABLE_STYLUS_EDUCATION = releasedFlag(2303, "enable_stylus_education")
 
     // 2400 - performance tools and debugging info
     // TODO(b/238923086): Tracking Bug
@@ -731,6 +732,11 @@ object Flags {
     @JvmField
     val SPLIT_SHADE_SUBPIXEL_OPTIMIZATION =
             releasedFlag(2805, "split_shade_subpixel_optimization")
+
+    // TODO(b/288868056): Tracking Bug
+    @JvmField
+    val PARTIAL_SCREEN_SHARING_TASK_SWITCHER =
+            unreleasedFlag(288868056, "pss_task_switcher")
 
     // TODO(b/278761837): Tracking Bug
     @JvmField

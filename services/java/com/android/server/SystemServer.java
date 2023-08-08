@@ -51,7 +51,6 @@ import android.credentials.CredentialManager;
 import android.database.sqlite.SQLiteCompatibilityWalFlags;
 import android.database.sqlite.SQLiteGlobal;
 import android.graphics.GraphicsStatsService;
-import android.graphics.Typeface;
 import android.hardware.display.DisplayManagerInternal;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityModuleConnector;
@@ -344,6 +343,8 @@ public final class SystemServer implements Dumpable {
             "com.android.clockwork.time.WearTimeService";
     private static final String WEAR_SETTINGS_SERVICE_CLASS =
             "com.android.clockwork.settings.WearSettingsService";
+    private static final String WRIST_ORIENTATION_SERVICE_CLASS =
+            "com.android.clockwork.wristorientation.WristOrientationService";
     private static final String ACCOUNT_SERVICE_CLASS =
             "com.android.server.accounts.AccountManagerService$Lifecycle";
     private static final String CONTENT_SERVICE_CLASS =
@@ -913,13 +914,6 @@ public final class SystemServer implements Dumpable {
             // Prepare the thread pool for init tasks that can be parallelized
             SystemServerInitThreadPool tp = SystemServerInitThreadPool.start();
             mDumper.addDumpable(tp);
-
-            // Load preinstalled system fonts for system server, so that WindowManagerService, etc
-            // can start using Typeface. Note that fonts are required not only for text rendering,
-            // but also for some text operations (e.g. TextUtils.makeSafeForPresentation()).
-            if (Typeface.ENABLE_LAZY_TYPEFACE_INITIALIZATION) {
-                Typeface.loadPreinstalledSystemFontMap();
-            }
 
             // Attach JVMTI agent if this is a debuggable build and the system property is set.
             if (Build.IS_DEBUGGABLE) {
@@ -1572,9 +1566,11 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startService(ROLE_SERVICE_CLASS);
             t.traceEnd();
 
-            t.traceBegin("StartVibratorManagerService");
-            mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
-            t.traceEnd();
+            if (!isTv) {
+                t.traceBegin("StartVibratorManagerService");
+                mSystemServiceManager.startService(VibratorManagerService.Lifecycle.class);
+                t.traceEnd();
+            }
 
             t.traceBegin("StartDynamicSystemService");
             dynamicSystem = new DynamicSystemService(context);
@@ -1953,10 +1949,13 @@ public final class SystemServer implements Dumpable {
             }
 
             // Smartspace manager service
-            // TODO: add deviceHasConfigString(context, R.string.config_defaultSmartspaceService)
-            t.traceBegin("StartSmartspaceService");
-            mSystemServiceManager.startService(SMARTSPACE_MANAGER_SERVICE_CLASS);
-            t.traceEnd();
+            if (deviceHasConfigString(context, R.string.config_defaultSmartspaceService)) {
+                t.traceBegin("StartSmartspaceService");
+                mSystemServiceManager.startService(SMARTSPACE_MANAGER_SERVICE_CLASS);
+                t.traceEnd();
+            } else {
+                Slog.d(TAG, "SmartspaceManagerService not defined by OEM or disabled by flag");
+            }
 
             t.traceBegin("InitConnectivityModuleConnector");
             try {
@@ -2623,7 +2622,7 @@ public final class SystemServer implements Dumpable {
         mSystemServiceManager.startService(MediaProjectionManagerService.class);
         t.traceEnd();
 
-       if (isWatch) {
+        if (isWatch) {
             // Must be started before services that depend it, e.g. WearConnectivityService
             t.traceBegin("StartWearPowerService");
             mSystemServiceManager.startService(WEAR_POWER_SERVICE_CLASS);
@@ -2656,6 +2655,14 @@ public final class SystemServer implements Dumpable {
             t.traceBegin("StartWearModeService");
             mSystemServiceManager.startService(WEAR_MODE_SERVICE_CLASS);
             t.traceEnd();
+
+            boolean enableWristOrientationService = SystemProperties.getBoolean(
+                    "config.enable_wristorientation", false);
+            if (enableWristOrientationService) {
+                t.traceBegin("StartWristOrientationService");
+                mSystemServiceManager.startService(WRIST_ORIENTATION_SERVICE_CLASS);
+                t.traceEnd();
+            }
         }
 
         if (!mPackageManager.hasSystemFeature(PackageManager.FEATURE_SLICES_DISABLED)) {
@@ -2755,10 +2762,12 @@ public final class SystemServer implements Dumpable {
             Slog.d(TAG, "TranslationService not defined by OEM");
         }
 
-        // Selection toolbar service
-        t.traceBegin("StartSelectionToolbarManagerService");
-        mSystemServiceManager.startService(SELECTION_TOOLBAR_MANAGER_SERVICE_CLASS);
-        t.traceEnd();
+        if (!isTv) {
+            // Selection toolbar service
+            t.traceBegin("StartSelectionToolbarManagerService");
+            mSystemServiceManager.startService(SELECTION_TOOLBAR_MANAGER_SERVICE_CLASS);
+            t.traceEnd();
+        }
 
         // NOTE: ClipboardService depends on ContentCapture and Autofill
         t.traceBegin("StartClipboardService");

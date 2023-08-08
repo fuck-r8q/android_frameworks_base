@@ -256,7 +256,7 @@ public class LocalBluetoothLeBroadcastAssistant implements LocalBluetoothProfile
         }
         return mService.isSearchInProgress();
     }
-
+    
     /**
      * Get information about all Broadcast Sources that a Broadcast Sink knows about.
      *

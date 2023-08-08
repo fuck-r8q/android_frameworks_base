@@ -427,7 +427,7 @@ public class InfoMediaManagerTest {
         final MediaRoute2Info availableInfo4 = mock(MediaRoute2Info.class);
         when(availableInfo4.getId()).thenReturn(TEST_ID_1);
         when(availableInfo4.isSystemRoute()).thenReturn(true);
-        when(availableInfo4.getClientPackageName()).thenReturn(TEST_PACKAGE_NAME);
+        when(availableInfo4.getClientPackageName()).thenReturn(packageName);
         availableRoutes.add(availableInfo4);
 
         when(mRouterManager.getAvailableRoutes(packageName)).thenReturn(availableRoutes);

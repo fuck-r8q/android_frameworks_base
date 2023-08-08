@@ -131,6 +131,7 @@ constructor(
     private val date: TextView = header.findViewById(R.id.date)
     private val iconContainer: StatusIconContainer = header.findViewById(R.id.statusIcons)
     private val mShadeCarrierGroup: ShadeCarrierGroup = header.findViewById(R.id.carrier_group)
+    private val systemIcons: View = header.findViewById(R.id.shade_header_system_icons)
 
     private var roundedCorners = 0
     private var cutout: DisplayCutout? = null
@@ -195,7 +196,9 @@ constructor(
         set(value) {
             if (visible && field != value) {
                 field = value
+                iconContainer.setQsExpansionTransitioning(value > 0f && value < 1.0f)
                 updatePosition()
+                updateIgnoredSlots()
             }
         }
 
@@ -215,6 +218,8 @@ constructor(
 
             view.onApplyWindowInsets(insets)
         }
+
+    private var singleCarrier = false
 
     private val demoModeReceiver =
         object : DemoMode {
@@ -249,6 +254,14 @@ constructor(
                     header.paddingTop,
                     header.paddingRight,
                     header.paddingBottom
+                )
+                systemIcons.setPaddingRelative(
+                    resources.getDimensionPixelSize(
+                        R.dimen.shade_header_system_icons_padding_start
+                    ),
+                    systemIcons.paddingTop,
+                    resources.getDimensionPixelSize(R.dimen.shade_header_system_icons_padding_end),
+                    systemIcons.paddingBottom
                 )
             }
 
@@ -479,17 +492,20 @@ constructor(
     private fun updateListeners() {
         mShadeCarrierGroupController.setListening(visible)
         if (visible) {
-            updateSingleCarrier(mShadeCarrierGroupController.isSingleCarrier)
+            singleCarrier = mShadeCarrierGroupController.isSingleCarrier
+            updateIgnoredSlots()
             mShadeCarrierGroupController.setOnSingleCarrierChangedListener {
-                updateSingleCarrier(it)
+                singleCarrier = it
+                updateIgnoredSlots()
             }
         } else {
             mShadeCarrierGroupController.setOnSingleCarrierChangedListener(null)
         }
     }
 
-    private fun updateSingleCarrier(singleCarrier: Boolean) {
-        if (singleCarrier) {
+    private fun updateIgnoredSlots() {
+        // switching from QQS to QS state halfway through the transition
+        if (singleCarrier || qsExpandedFraction < 0.5) {
             iconContainer.removeIgnoredSlots(carrierIconSlots)
         } else {
             iconContainer.addIgnoredSlots(carrierIconSlots)

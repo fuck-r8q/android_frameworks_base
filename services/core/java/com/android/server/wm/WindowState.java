@@ -2477,6 +2477,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     if (allowExitAnimation && mWinAnimator.applyAnimationLocked(transit, false)) {
                         ProtoLog.v(WM_DEBUG_ANIM,
                                 "Set animatingExit: reason=remove/applyAnimation win=%s", this);
+                        if (startingWindow && mSurfaceAnimator.hasLeash()) {
+                            // Keep starting window on top during fade-out animation.
+                            getPendingTransaction().setLayer(mSurfaceAnimator.mLeash,
+                                    Integer.MAX_VALUE);
+                        }
                         mAnimatingExit = true;
 
                         // mAnimatingExit affects canAffectSystemUiFlags(). Run layout such that
@@ -3400,10 +3405,18 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // apps won't always be considered as foreground state.
         // Exclude private presentations as they can only be shown on private virtual displays and
         // shouldn't be the cause of an app be considered foreground.
-        if (mAttrs.type >= FIRST_SYSTEM_WINDOW && mAttrs.type != TYPE_TOAST
-                && mAttrs.type != TYPE_PRIVATE_PRESENTATION) {
+        // Exclude presentations on virtual displays as they are not actually visible.
+        if (mAttrs.type >= FIRST_SYSTEM_WINDOW
+                && mAttrs.type != TYPE_TOAST
+                && mAttrs.type != TYPE_PRIVATE_PRESENTATION
+                && !(mAttrs.type == TYPE_PRESENTATION && isOnVirtualDisplay())
+        ) {
             mWmService.mAtmService.mActiveUids.onNonAppSurfaceVisibilityChanged(mOwnerUid, shown);
         }
+    }
+
+    private boolean isOnVirtualDisplay() {
+        return getDisplayContent().mDisplay.getType() == Display.TYPE_VIRTUAL;
     }
 
     private void logExclusionRestrictions(int side) {
@@ -5664,7 +5677,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         if (mIsWallpaper) {
             // TODO(b/233286785): Add sync support to wallpaper.
-            return false;
+            return true;
         }
         // In the WindowContainer implementation we immediately mark ready
         // since a generic WindowContainer only needs to wait for its

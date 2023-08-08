@@ -65,6 +65,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.IRemoteCallback;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
@@ -1431,6 +1432,7 @@ public abstract class PackageManager {
             INSTALL_ALLOW_DOWNGRADE,
             INSTALL_STAGED,
             INSTALL_REQUEST_UPDATE_OWNERSHIP,
+            INSTALL_DONT_EXTRACT_BASELINE_PROFILES,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -1644,6 +1646,13 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_FROM_MANAGED_USER_OR_PROFILE = 1 << 26;
+
+    /**
+     * Flag parameter for {@link PackageInstaller.SessionParams} to indicate that do not extract
+     * the baseline profiles when parsing the apk
+     * @hide
+     */
+    public static final int INSTALL_DONT_EXTRACT_BASELINE_PROFILES = 1 << 27;
 
     /** @hide */
     @IntDef(flag = true, value = {
@@ -2342,6 +2351,64 @@ public abstract class PackageManager {
      */
     public static final int INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST = -130;
 
+    /**
+     * App minimum aspect ratio set by the user which will override app-defined aspect ratio.
+     *
+     * @hide
+     */
+    @IntDef(prefix = { "USER_MIN_ASPECT_RATIO_" }, value = {
+            USER_MIN_ASPECT_RATIO_UNSET,
+            USER_MIN_ASPECT_RATIO_SPLIT_SCREEN,
+            USER_MIN_ASPECT_RATIO_DISPLAY_SIZE,
+            USER_MIN_ASPECT_RATIO_4_3,
+            USER_MIN_ASPECT_RATIO_16_9,
+            USER_MIN_ASPECT_RATIO_3_2,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface UserMinAspectRatio {}
+
+    /**
+     * No aspect ratio override has been set by user.
+     *
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_UNSET = 0;
+
+    /**
+     * Aspect ratio override code: user forces app to split screen aspect ratio. This is adjusted to
+     * half of the screen without the split screen divider.
+     *
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_SPLIT_SCREEN = 1;
+
+    /**
+     * Aspect ratio override code: user forces app to the aspect ratio of the device display size.
+     * This will be the portrait aspect ratio of the device if the app is portrait or the landscape
+     * aspect ratio of the device if the app is landscape.
+     *
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_DISPLAY_SIZE = 2;
+
+    /**
+     * Aspect ratio override code: user forces app to 4:3 min aspect ratio
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_4_3 = 3;
+
+    /**
+     * Aspect ratio override code: user forces app to 16:9 min aspect ratio
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_16_9 = 4;
+
+    /**
+     * Aspect ratio override code: user forces app to 3:2 min aspect ratio
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_3_2 = 5;
+
     /** @hide */
     @IntDef(flag = true, prefix = { "DELETE_" }, value = {
             DELETE_KEEP_DATA,
@@ -2574,6 +2641,13 @@ public abstract class PackageManager {
 
     /** {@hide} */
     public static final String EXTRA_MOVE_ID = "android.content.pm.extra.MOVE_ID";
+
+    /**
+     * Extra field name for notifying package change event. Currently, it is used by PackageMonitor.
+     * @hide
+     */
+    public static final String EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT =
+            "android.content.pm.extra.EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT";
 
     /**
      * Usable by the required verifier as the {@code verificationCode} argument
@@ -4612,6 +4686,19 @@ public abstract class PackageManager {
             "android.content.pm.extra.REQUEST_PERMISSIONS_NAMES";
 
     /**
+     * The deviceId for which the permissions are requested, {@link Context#DEVICE_ID_DEFAULT}
+     * is the default device ID.
+     * <p>
+     * <strong>Type:</strong> int
+     * </p>
+     *
+     * @hide
+     */
+    @SystemApi
+    public static final String EXTRA_REQUEST_PERMISSIONS_DEVICE_ID =
+            "android.content.pm.extra.REQUEST_PERMISSIONS_DEVICE_ID";
+
+    /**
      * The results from the permissions request.
      * <p>
      * <strong>Type:</strong> int[] of #PermissionResult
@@ -6592,7 +6679,7 @@ public abstract class PackageManager {
     @UnsupportedAppUsage
     public Intent buildRequestPermissionsIntent(@NonNull String[] permissions) {
         if (ArrayUtils.isEmpty(permissions)) {
-           throw new IllegalArgumentException("permission cannot be null or empty");
+            throw new IllegalArgumentException("permission cannot be null or empty");
         }
         Intent intent = new Intent(ACTION_REQUEST_PERMISSIONS);
         intent.putExtra(EXTRA_REQUEST_PERMISSIONS_NAMES, permissions);
@@ -9487,7 +9574,8 @@ public abstract class PackageManager {
      * {@link PersistableBundle} objects to be shared with the apps being suspended and the
      * launcher to support customization that they might need to handle the suspended state.
      *
-     * <p>The caller must hold {@link Manifest.permission#SUSPEND_APPS} to use this API.
+     * <p>The caller must hold {@link Manifest.permission#SUSPEND_APPS} to use this API except for
+     * device owner and profile owner.
      *
      * @param packageNames The names of the packages to set the suspended status.
      * @param suspended If set to {@code true}, the packages will be suspended, if set to
@@ -9513,7 +9601,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
-    @RequiresPermission(Manifest.permission.SUSPEND_APPS)
+    @RequiresPermission(value=Manifest.permission.SUSPEND_APPS, conditional=true)
     @Nullable
     public String[] setPackagesSuspended(@Nullable String[] packageNames, boolean suspended,
             @Nullable PersistableBundle appExtras, @Nullable PersistableBundle launcherExtras,
@@ -11024,5 +11112,29 @@ public abstract class PackageManager {
     public void relinquishUpdateOwnership(@NonNull String targetPackage) {
         throw new UnsupportedOperationException(
                 "relinquishUpdateOwnership not implemented in subclass");
+    }
+
+    /**
+     * Register for notifications of package changes such as install, removal and other events.
+     *
+     * @param callback the callback to register for receiving the change events
+     * @param userId The id of registered user
+     * @hide
+     */
+    public void registerPackageMonitorCallback(@NonNull IRemoteCallback callback, int userId) {
+        throw new UnsupportedOperationException(
+                "registerPackageMonitorCallback not implemented in subclass");
+    }
+
+    /**
+     * Unregister for notifications of package changes such as install, removal and other events.
+     *
+     * @param callback the callback to unregister for receiving the change events
+     * @see #registerPackageMonitorCallback(IRemoteCallback, int)
+     * @hide
+     */
+    public void unregisterPackageMonitorCallback(@NonNull IRemoteCallback callback) {
+        throw new UnsupportedOperationException(
+                "unregisterPackageMonitorCallback not implemented in subclass");
     }
 }

@@ -17,6 +17,7 @@
 package com.android.keyguard;
 
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.hardware.biometrics.BiometricAuthenticator.TYPE_FINGERPRINT;
 import static android.hardware.biometrics.BiometricFingerprintConstants.FINGERPRINT_ERROR_LOCKOUT;
 import static android.hardware.biometrics.BiometricFingerprintConstants.FINGERPRINT_ERROR_LOCKOUT_PERMANENT;
@@ -65,6 +66,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.app.Activity;
+import android.app.ActivityTaskManager;
+import android.app.IActivityTaskManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.trust.IStrongAuthTracker;
 import android.app.trust.TrustManager;
@@ -80,6 +83,7 @@ import android.content.pm.ServiceInfo;
 import android.content.pm.UserInfo;
 import android.database.ContentObserver;
 import android.hardware.SensorPrivacyManager;
+import android.hardware.biometrics.BiometricAuthenticator;
 import android.hardware.biometrics.BiometricConstants;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.biometrics.BiometricSourceType;
@@ -116,6 +120,7 @@ import android.telephony.TelephonyManager;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 
@@ -139,6 +144,8 @@ import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.settings.UserTracker;
+import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.policy.DevicePostureController;
@@ -175,6 +182,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 public class KeyguardUpdateMonitorTest extends SysuiTestCase {
+    private static final String PKG_ALLOWING_FP_LISTEN_ON_OCCLUDING_ACTIVITY =
+            "test_app_fp_listen_on_occluding_activity";
     private static final String TEST_CARRIER = "TEST_CARRIER";
     private static final String TEST_CARRIER_2 = "TEST_CARRIER_2";
     private static final int TEST_CARRIER_ID = 1;
@@ -264,6 +273,10 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     private UsbPortStatus mUsbPortStatus;
     @Mock
     private Uri mURI;
+    @Mock
+    private TaskStackChangeListeners mTaskStackChangeListeners;
+    @Mock
+    private IActivityTaskManager mActivityTaskManager;
 
     private List<FaceSensorPropertiesInternal> mFaceSensorProperties;
     private List<FingerprintSensorPropertiesInternal> mFingerprintSensorProperties;
@@ -326,6 +339,10 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                 mGlobalSettings,
                 mDumpManager
         );
+
+        mContext.getOrCreateTestableResources().addOverride(com.android.systemui
+                        .R.array.config_fingerprint_listen_on_occluding_activity_packages,
+                new String[]{ PKG_ALLOWING_FP_LISTEN_ON_OCCLUDING_ACTIVITY });
 
         mTestableLooper = TestableLooper.get(this);
         allowTestableLooperAsMainThread();
@@ -1538,7 +1555,8 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
-    public void testOccludingAppFingerprintListeningState_featureFlagEnabled() {
+    public void listenForFingerprint_whenOccludingAppPkgOnAllowlist()
+            throws RemoteException {
         mFeatureFlags.set(FP_LISTEN_OCCLUDING_APPS, true);
 
         // GIVEN keyguard isn't visible (app occluding)
@@ -1546,10 +1564,36 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
         mKeyguardUpdateMonitor.setKeyguardShowing(true, true);
         when(mStrongAuthTracker.hasUserAuthenticatedSinceBoot()).thenReturn(true);
 
+        // GIVEN the top activity is from a package that allows fingerprint listening over its
+        // occluding activities
+        setTopStandardActivity(PKG_ALLOWING_FP_LISTEN_ON_OCCLUDING_ACTIVITY);
+        onTaskStackChanged();
+
         // THEN we SHOULD listen for non-UDFPS fingerprint
         assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(false)).isEqualTo(true);
 
-        // THEN we should listen for udfps (hiding of mechanism to actually auth is
+        // THEN we should listen for udfps (hiding mechanism to actually auth is
+        // controlled by UdfpsKeyguardViewController)
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(true);
+    }
+
+    @Test
+    public void doNotListenForFingerprint_whenOccludingAppPkgNotOnAllowlist()
+            throws RemoteException {
+        mFeatureFlags.set(FP_LISTEN_OCCLUDING_APPS, true);
+
+        // GIVEN keyguard isn't visible (app occluding)
+        mKeyguardUpdateMonitor.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mKeyguardUpdateMonitor.setKeyguardShowing(true, true);
+        when(mStrongAuthTracker.hasUserAuthenticatedSinceBoot()).thenReturn(true);
+
+        // GIVEN top activity is not in the allowlist for listening to fp over occluding activities
+        setTopStandardActivity("notInAllowList");
+
+        // THEN we should not listen for non-UDFPS fingerprint
+        assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(false)).isEqualTo(false);
+
+        // THEN we should listen for udfps (hiding mechanism to actually auth is
         // controlled by UdfpsKeyguardViewController)
         assertThat(mKeyguardUpdateMonitor.shouldListenForFingerprint(true)).isEqualTo(true);
     }
@@ -2945,6 +2989,25 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                 TelephonyManager.SIM_STATE_NOT_READY);
     }
 
+
+    @Test
+    public void onAuthEnrollmentChangesCallbacksAreNotified() {
+        KeyguardUpdateMonitorCallback callback = mock(KeyguardUpdateMonitorCallback.class);
+        ArgumentCaptor<AuthController.Callback> authCallback = ArgumentCaptor.forClass(
+                AuthController.Callback.class);
+        verify(mAuthController).addCallback(authCallback.capture());
+
+        mKeyguardUpdateMonitor.registerCallback(callback);
+
+        authCallback.getValue().onEnrollmentsChanged(TYPE_FINGERPRINT);
+        mTestableLooper.processAllMessages();
+        verify(callback).onBiometricEnrollmentStateChanged(BiometricSourceType.FINGERPRINT);
+
+        authCallback.getValue().onEnrollmentsChanged(BiometricAuthenticator.TYPE_FACE);
+        mTestableLooper.processAllMessages();
+        verify(callback).onBiometricEnrollmentStateChanged(BiometricSourceType.FACE);
+    }
+
     private void verifyFingerprintAuthenticateNeverCalled() {
         verify(mFingerprintManager, never()).authenticate(any(), any(), any(), any(), any());
         verify(mFingerprintManager, never()).authenticate(any(), any(), any(), any(), anyInt(),
@@ -3255,6 +3318,23 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                 BatteryManager.CHARGING_POLICY_ADAPTIVE_LONGLIFE);
     }
 
+    private void setTopStandardActivity(String pkgName) throws RemoteException {
+        final ActivityTaskManager.RootTaskInfo taskInfo = new ActivityTaskManager.RootTaskInfo();
+        taskInfo.visible = true;
+        taskInfo.topActivity = TextUtils.isEmpty(pkgName)
+                ? null : new ComponentName(pkgName, "testClass");
+        when(mActivityTaskManager.getRootTaskInfo(anyInt(), eq(ACTIVITY_TYPE_STANDARD)))
+                .thenReturn(taskInfo);
+    }
+
+    private void onTaskStackChanged() {
+        ArgumentCaptor<TaskStackChangeListener> taskStackChangeListenerCaptor =
+                ArgumentCaptor.forClass(TaskStackChangeListener.class);
+        verify(mTaskStackChangeListeners).registerTaskStackListener(
+                taskStackChangeListenerCaptor.capture());
+        taskStackChangeListenerCaptor.getValue().onTaskStackChangedBackground();
+    }
+
     private class TestableKeyguardUpdateMonitor extends KeyguardUpdateMonitor {
         AtomicBoolean mSimStateChanged = new AtomicBoolean(false);
         AtomicInteger mCachedSimState = new AtomicInteger(-1);
@@ -3272,7 +3352,8 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                     mDreamManager, mDevicePolicyManager, mSensorPrivacyManager, mTelephonyManager,
                     mPackageManager, mFaceManager, mFingerprintManager, mBiometricManager,
                     mFaceWakeUpTriggersConfig, mDevicePostureController,
-                    Optional.of(mInteractiveToAuthProvider), mFeatureFlags);
+                    Optional.of(mInteractiveToAuthProvider), mFeatureFlags,
+                    mTaskStackChangeListeners, mActivityTaskManager);
             setStrongAuthTracker(KeyguardUpdateMonitorTest.this.mStrongAuthTracker);
         }
 

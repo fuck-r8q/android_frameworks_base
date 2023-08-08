@@ -326,8 +326,16 @@
     <!-- opacity at which Notification icons will be drawn in the status bar -->
     <item type="dimen" name="status_bar_icon_drawing_alpha">90%</item>
 
+    <!-- paddings for container with status icons and battery -->
+    <!-- padding start is a bit smaller than end to account for status icon margin-->
+    <dimen name="status_bar_icons_padding_start">11dp</dimen>
+
+    <dimen name="status_bar_icons_padding_end">0dp</dimen>
+    <dimen name="status_bar_icons_padding_bottom">8dp</dimen>
+    <dimen name="status_bar_icons_padding_top">8dp</dimen>
+
     <!-- gap on either side of status bar notification icons -->
-    <dimen name="status_bar_icon_padding">0dp</dimen>
+    <dimen name="status_bar_icon_horizontal_margin">0dp</dimen>
 
     <!-- the padding on the start of the statusbar -->
     <dimen name="status_bar_padding_start">8dp</dimen>
@@ -462,6 +470,10 @@
     <dimen name="large_screen_shade_header_height">48dp</dimen>
     <dimen name="large_screen_shade_header_min_height">@dimen/qs_header_row_min_height</dimen>
     <dimen name="large_screen_shade_header_left_padding">@dimen/qs_horizontal_margin</dimen>
+    <dimen name="shade_header_system_icons_height">@dimen/large_screen_shade_header_min_height</dimen>
+    <dimen name="shade_header_system_icons_height_large_screen">32dp</dimen>
+    <dimen name="shade_header_system_icons_padding_start">0dp</dimen>
+    <dimen name="shade_header_system_icons_padding_end">0dp</dimen>
 
     <!-- The top margin of the panel that holds the list of notifications.
          On phones it's always 0dp but it's overridden in Car UI
@@ -1560,7 +1572,8 @@
 
     <!-- Status bar user chip -->
     <dimen name="status_bar_user_chip_avatar_size">16dp</dimen>
-    <dimen name="status_bar_user_chip_end_margin">12dp</dimen>
+    <!-- below also works as break between user chip and hover state of status icons -->
+    <dimen name="status_bar_user_chip_end_margin">4dp</dimen>
     <dimen name="status_bar_user_chip_text_size">12sp</dimen>
 
     <!-- System UI Dialog -->

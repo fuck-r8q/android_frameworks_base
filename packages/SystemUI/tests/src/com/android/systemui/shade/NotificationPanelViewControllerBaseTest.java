@@ -81,6 +81,7 @@ import com.android.keyguard.logging.KeyguardLogger;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.biometrics.AuthController;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
 import com.android.systemui.common.ui.view.LongPressHandlingView;
@@ -92,7 +93,6 @@ import com.android.systemui.fragments.FragmentService;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewConfigurator;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
-import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardBottomAreaInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
@@ -605,7 +605,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mNotificationStackSizeCalculator,
                 mUnlockedScreenOffAnimationController,
                 mShadeTransitionController,
-                mInteractionJankMonitor,
                 systemClock,
                 mKeyguardBottomAreaViewModel,
                 mKeyguardBottomAreaInteractor,
@@ -633,7 +632,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mHeadsUpManager);
         mNotificationPanelViewController.setTrackingStartedListener(() -> {});
         mNotificationPanelViewController.setOpenCloseListener(
-                new NotificationPanelViewController.OpenCloseListener() {
+                new OpenCloseListener() {
                     @Override
                     public void onClosingFinished() {}
 

@@ -49,7 +49,7 @@ import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags.FACE_AUTH_REFACTOR
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory
-import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractorFactory
 import com.android.systemui.keyguard.shared.model.AuthenticationStatus
 import com.android.systemui.keyguard.shared.model.DetectionStatus
 import com.android.systemui.keyguard.shared.model.ErrorAuthenticationStatus
@@ -216,7 +216,11 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             )
         keyguardTransitionRepository = FakeKeyguardTransitionRepository()
         val keyguardTransitionInteractor =
-            KeyguardTransitionInteractor(keyguardTransitionRepository, testScope.backgroundScope)
+            KeyguardTransitionInteractorFactory.create(
+                    scope = TestScope().backgroundScope,
+                    repository = keyguardTransitionRepository,
+                )
+                .keyguardTransitionInteractor
         return DeviceEntryFaceAuthRepositoryImpl(
             mContext,
             fmOverride,
@@ -260,6 +264,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             assertThat(authStatus()).isEqualTo(SuccessAuthenticationStatus(successResult))
             assertThat(authenticated()).isTrue()
             assertThat(authRunning()).isFalse()
+            assertThat(canFaceAuthRun()).isFalse()
         }
 
     private fun uiEventIsLogged(faceAuthUiEvent: FaceAuthUiEvent) {
@@ -417,13 +422,9 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
                 FACE_ERROR_CANCELED,
                 "First auth attempt cancellation completed"
             )
-            assertThat(authStatus())
-                .isEqualTo(
-                    ErrorAuthenticationStatus(
-                        FACE_ERROR_CANCELED,
-                        "First auth attempt cancellation completed"
-                    )
-                )
+            val value = authStatus() as ErrorAuthenticationStatus
+            assertThat(value.msgId).isEqualTo(FACE_ERROR_CANCELED)
+            assertThat(value.msg).isEqualTo("First auth attempt cancellation completed")
 
             faceAuthenticateIsCalled()
             uiEventIsLogged(FACE_AUTH_TRIGGERED_ALTERNATE_BIOMETRIC_BOUNCER_SHOWN)
@@ -507,6 +508,18 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun authenticateDoesNotRunIfKeyguardIsNotShowing() =
+        testScope.runTest {
+            testGatingCheckForFaceAuth { keyguardRepository.setKeyguardShowing(false) }
+        }
+
+    @Test
+    fun detectDoesNotRunIfKeyguardIsNotShowing() =
+        testScope.runTest {
+            testGatingCheckForDetect { keyguardRepository.setKeyguardShowing(false) }
+        }
+
+    @Test
     fun authenticateDoesNotRunWhenFpIsLockedOut() =
         testScope.runTest {
             testGatingCheckForFaceAuth { deviceEntryFingerprintAuthRepository.setLockedOut(true) }
@@ -539,20 +552,6 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    fun authenticateDoesNotRunWhenDeviceIsSleeping() =
-        testScope.runTest {
-            testGatingCheckForFaceAuth {
-                keyguardRepository.setWakefulnessModel(
-                    WakefulnessModel(
-                        state = WakefulnessState.ASLEEP,
-                        lastWakeReason = WakeSleepReason.OTHER,
-                        lastSleepReason = WakeSleepReason.OTHER,
-                    )
-                )
-            }
-        }
-
-    @Test
     fun authenticateDoesNotRunWhenNonStrongBiometricIsNotAllowed() =
         testScope.runTest {
             testGatingCheckForFaceAuth {
@@ -565,10 +564,35 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         testScope.runTest {
             testGatingCheckForFaceAuth {
                 bouncerRepository.setAlternateVisible(false)
+                // Keyguard is occluded when secure camera is active.
+                keyguardRepository.setKeyguardOccluded(true)
                 fakeCommandQueue.doForEachCallback {
                     it.onCameraLaunchGestureDetected(CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP)
                 }
             }
+        }
+
+    @Test
+    fun authenticateRunsWhenSecureCameraIsActiveIfBouncerIsShowing() =
+        testScope.runTest {
+            initCollectors()
+            allPreconditionsToRunFaceAuthAreTrue()
+            bouncerRepository.setAlternateVisible(false)
+            bouncerRepository.setPrimaryShow(false)
+
+            assertThat(canFaceAuthRun()).isTrue()
+
+            // launch secure camera
+            fakeCommandQueue.doForEachCallback {
+                it.onCameraLaunchGestureDetected(CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP)
+            }
+            keyguardRepository.setKeyguardOccluded(true)
+            runCurrent()
+            assertThat(canFaceAuthRun()).isFalse()
+
+            // but bouncer is shown after that.
+            bouncerRepository.setPrimaryShow(true)
+            assertThat(canFaceAuthRun()).isTrue()
         }
 
     @Test
@@ -591,6 +615,27 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             // Flip one precondition to false.
             biometricSettingsRepository.setIsNonStrongBiometricAllowed(false)
+            assertThat(canFaceAuthRun()).isFalse()
+            underTest.authenticate(
+                FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER,
+                fallbackToDetection = true
+            )
+            faceAuthenticateIsNotCalled()
+
+            faceDetectIsCalled()
+        }
+
+    @Test
+    fun authenticateFallbacksToDetectionWhenUserIsAlreadyTrustedByTrustManager() =
+        testScope.runTest {
+            whenever(faceManager.sensorPropertiesInternal)
+                .thenReturn(listOf(createFaceSensorProperties(supportsFaceDetection = true)))
+            whenever(bypassController.bypassEnabled).thenReturn(true)
+            underTest = createDeviceEntryFaceAuthRepositoryImpl()
+            initCollectors()
+            allPreconditionsToRunFaceAuthAreTrue()
+
+            trustRepository.setCurrentUserTrusted(true)
             assertThat(canFaceAuthRun()).isFalse()
             underTest.authenticate(
                 FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER,
@@ -774,6 +819,8 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         testScope.runTest {
             testGatingCheckForDetect {
                 bouncerRepository.setAlternateVisible(false)
+                // Keyguard is occluded when secure camera is active.
+                keyguardRepository.setKeyguardOccluded(true)
                 fakeCommandQueue.doForEachCallback {
                     it.onCameraLaunchGestureDetected(CAMERA_LAUNCH_SOURCE_POWER_DOUBLE_TAP)
                 }
@@ -1011,6 +1058,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         fakeUserRepository.setSelectedUserInfo(primaryUser)
         biometricSettingsRepository.setIsFaceAuthSupportedInCurrentPosture(true)
         bouncerRepository.setAlternateVisible(true)
+        keyguardRepository.setKeyguardShowing(true)
         runCurrent()
     }
 

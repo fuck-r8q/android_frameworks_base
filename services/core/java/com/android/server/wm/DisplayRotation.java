@@ -1048,6 +1048,8 @@ public class DisplayRotation {
                 return false;
             case IWindowManager.FIXED_TO_USER_ROTATION_ENABLED:
                 return true;
+            case IWindowManager.FIXED_TO_USER_ROTATION_IF_NO_AUTO_ROTATION:
+                return false;
             default:
                 return mDefaultFixedToUserRotation;
         }
@@ -1364,9 +1366,13 @@ public class DisplayRotation {
             // Application just wants to remain locked in the last rotation.
             preferredRotation = lastRotation;
         } else if (!mSupportAutoRotation) {
-            // If we don't support auto-rotation then bail out here and ignore
-            // the sensor and any rotation lock settings.
-            preferredRotation = -1;
+            if (mFixedToUserRotation == IWindowManager.FIXED_TO_USER_ROTATION_IF_NO_AUTO_ROTATION) {
+                preferredRotation = mUserRotation;
+            } else {
+                // If we don't support auto-rotation then bail out here and ignore
+                // the sensor and any rotation lock settings.
+                preferredRotation = -1;
+            }
         } else if (((mUserRotationMode == WindowManagerPolicy.USER_ROTATION_FREE
                             || isTabletopAutoRotateOverrideEnabled())
                         && (orientation == ActivityInfo.SCREEN_ORIENTATION_USER

@@ -588,15 +588,6 @@ class TransitionController {
     /** Sets the sync method for the display change. */
     private void setDisplaySyncMethod(@NonNull TransitionRequestInfo.DisplayChange displayChange,
             @NonNull Transition displayTransition, @NonNull DisplayContent displayContent) {
-        final int startRotation = displayChange.getStartRotation();
-        final int endRotation = displayChange.getEndRotation();
-        if (startRotation != endRotation && (startRotation + endRotation) % 2 == 0) {
-            // 180 degrees rotation change may not change screen size. So the clients may draw
-            // some frames before and after the display projection transaction is applied by the
-            // remote player. That may cause some buffers to show in different rotation. So use
-            // sync method to pause clients drawing until the projection transaction is applied.
-            mSyncEngine.setSyncMethod(displayTransition.getSyncId(), BLASTSyncEngine.METHOD_BLAST);
-        }
         final Rect startBounds = displayChange.getStartAbsBounds();
         final Rect endBounds = displayChange.getEndAbsBounds();
         if (startBounds == null || endBounds == null) return;
@@ -1443,7 +1434,7 @@ class TransitionController {
      * Beside `mCreateWallTimeMs`, all times are elapsed times and will all be reported relative
      * to when the transition was created.
      */
-    static class Logger {
+    static class Logger implements Runnable {
         long mCreateWallTimeMs;
         long mCreateTimeNs;
         long mRequestTimeNs;
@@ -1465,6 +1456,20 @@ class TransitionController {
                 sb.append(" via request=").append(mRequest);
             }
             return sb.toString();
+        }
+
+        void logOnSendAsync(Handler handler) {
+            handler.post(this);
+        }
+
+        @Override
+        public void run() {
+            try {
+                logOnSend();
+            } catch (Exception e) {
+                // In case TransitionRequestInfo#toString() accesses window container with race.
+                Slog.w(TAG, "Failed to log transition", e);
+            }
         }
 
         void logOnSend() {

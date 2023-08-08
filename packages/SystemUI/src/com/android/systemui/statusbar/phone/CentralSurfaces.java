@@ -40,6 +40,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.keyguard.AuthKeyguardMessageArea;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityLaunchAnimator;
+import com.android.systemui.display.data.repository.DisplayMetricsRepository;
 import com.android.systemui.navigationbar.NavigationBarView;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
 import com.android.systemui.qs.QSPanelController;
@@ -202,8 +203,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     int getStatusBarHeight();
 
-    boolean isShadeDisabled();
-
     boolean isLaunchingActivityOverLockscreen();
 
     void onKeyguardViewManagerStatesUpdated();
@@ -250,8 +249,12 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     @Override
     void dump(PrintWriter pwOriginal, String[] args);
 
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayWidth();
 
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayHeight();
 
     void readyForKeyguardDone();
@@ -375,14 +378,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     void resendMessage(Object msg);
 
-    int getDisabled1();
-
-    void setDisabled1(int disabled);
-
-    int getDisabled2();
-
-    void setDisabled2(int disabled);
-
     void setLastCameraLaunchSource(int source);
 
     void setLaunchCameraOnFinishedGoingToSleep(boolean launch);
@@ -394,6 +389,9 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     void setLaunchEmergencyActionOnFinishedWaking(boolean launch);
 
     QSPanelController getQSPanelController();
+
+    /** @deprecated Use {@link DisplayMetricsRepository} instead. */
+    @Deprecated
     float getDisplayDensity();
 
     void extendDozePulse();

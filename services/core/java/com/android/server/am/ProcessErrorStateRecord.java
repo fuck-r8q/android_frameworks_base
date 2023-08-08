@@ -52,12 +52,12 @@ import android.util.SparseBooleanArray;
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.modules.expresslog.Counter;
 import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.TimeoutRecord;
 import com.android.internal.os.anr.AnrLatencyTracker;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.am.trace.SmartTraceUtils;
+import com.android.modules.expresslog.Counter;
 import com.android.server.ResourcePressureUtil;
 import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.stats.pull.ProcfsMemoryUtil.MemorySnapshot;
@@ -473,6 +473,11 @@ class ProcessErrorStateRecord {
         String currentPsiState = ResourcePressureUtil.currentPsiState();
         latencyTracker.currentPsiStateReturned();
         report.append(currentPsiState);
+        // The 'processCpuTracker' variable is a shared resource that might be initialized and
+        // updated in a different thread. In order to prevent thread visibility issues, which
+        // can occur when one thread does not immediately see the changes made to
+        // 'processCpuTracker' by another thread, it is necessary to use synchronization whenever
+        // 'processCpuTracker' is accessed or modified.
         ProcessCpuTracker processCpuTracker = new ProcessCpuTracker(true);
 
         // We push the native pids collection task to the helper thread through
@@ -557,12 +562,16 @@ class ProcessErrorStateRecord {
             }
             mService.updateCpuStatsNow();
             mService.mAppProfiler.printCurrentCpuState(report, anrTime);
-            info.append(processCpuTracker.printCurrentLoad());
+            synchronized (processCpuTracker) {
+                info.append(processCpuTracker.printCurrentLoad());
+            }
             info.append(report);
         }
         report.append(tracesFileException.getBuffer());
 
-        info.append(processCpuTracker.printCurrentState(anrTime));
+        synchronized (processCpuTracker) {
+            info.append(processCpuTracker.printCurrentState(anrTime));
+        }
         if(shouldDeferAppNotResponding(isSilentAnr)) {
             if(!isDefered){
                 Slog.e(TAG, info.toString());

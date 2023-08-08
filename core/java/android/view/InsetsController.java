@@ -797,7 +797,7 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
             }
 
             WindowInsets insets = state.calculateInsets(mFrame, mState /* ignoringVisibilityState*/,
-                    mLastInsets.isRound(), mLastInsets.shouldAlwaysConsumeSystemBars(),
+                    mLastInsets.isRound(), false /* alwaysConsumeSystemBars */,
                     mLastLegacySoftInputMode, mLastLegacyWindowFlags, mLastLegacySystemUiFlags,
                     mWindowType, mLastWindowingMode, null /* idSideMap */);
             mHost.dispatchWindowInsetsAnimationProgress(insets,
@@ -841,7 +841,6 @@ public class InsetsController implements WindowInsetsController, InsetsAnimation
         return mLastDispatchedState;
     }
 
-    @VisibleForTesting
     public boolean onStateChanged(InsetsState state) {
         boolean stateChanged = false;
         if (!CAPTION_ON_SHELL) {

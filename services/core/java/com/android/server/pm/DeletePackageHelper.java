@@ -16,6 +16,7 @@
 
 package com.android.server.pm;
 
+import static android.Manifest.permission.CONTROL_KEYGUARD;
 import static android.Manifest.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
@@ -376,6 +377,12 @@ final class DeletePackageHelper {
         synchronized (mPm.mLock) {
             final PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
             final PackageSetting disabledPs = mPm.mSettings.getDisabledSystemPkgLPr(ps);
+            if (PackageManagerServiceUtils.isSystemApp(ps)
+                    && mPm.checkPermission(CONTROL_KEYGUARD, packageName, UserHandle.USER_SYSTEM)
+                    == PERMISSION_GRANTED) {
+                Slog.w(TAG, "Attempt to delete keyguard system package " + packageName);
+                return false;
+            }
             action = mayDeletePackageLocked(outInfo, ps, disabledPs, flags, user);
         }
         if (DEBUG_REMOVE) Slog.d(TAG, "deletePackageLI: " + packageName + " user " + user);
@@ -637,7 +644,8 @@ final class DeletePackageHelper {
                     PackageManager.UNINSTALL_REASON_UNKNOWN,
                     null /*harmfulAppWarning*/,
                     null /*splashScreenTheme*/,
-                    0 /*firstInstallTime*/);
+                    0 /*firstInstallTime*/,
+                    PackageManager.USER_MIN_ASPECT_RATIO_UNSET);
         }
         mPm.mSettings.writeKernelMappingLPr(ps);
     }

@@ -46,12 +46,14 @@ import com.android.systemui.controls.dagger.ControlsModule;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.SystemUser;
 import com.android.systemui.demomode.dagger.DemoModeModule;
+import com.android.systemui.display.DisplayModule;
 import com.android.systemui.doze.dagger.DozeComponent;
 import com.android.systemui.dreams.dagger.DreamModule;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.FlagsModule;
 import com.android.systemui.keyboard.KeyboardModule;
+import com.android.systemui.keyguard.ui.view.layout.LockscreenLayoutModule;
 import com.android.systemui.log.dagger.LogModule;
 import com.android.systemui.log.dagger.MonitorLog;
 import com.android.systemui.log.table.TableLogBuffer;
@@ -162,6 +164,7 @@ import javax.inject.Named;
             ClipboardOverlayModule.class,
             ClockRegistryModule.class,
             CommonRepositoryModule.class,
+            DisplayModule.class,
             ConnectivityModule.class,
             CoroutinesModule.class,
             DreamModule.class,
@@ -175,6 +178,7 @@ import javax.inject.Named;
             GarbageMonitorModule.class,
             KeyboardModule.class,
             LetterboxModule.class,
+            LockscreenLayoutModule.class,
             LogModule.class,
             MediaProjectionModule.class,
             MotionToolModule.class,
