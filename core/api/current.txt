@@ -9530,6 +9530,7 @@ package android.companion {
     method @Nullable public CharSequence getDisplayName();
     method public int getId();
     method public int getSystemDataSyncFlags();
+    method @Nullable public String getTag();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.AssociationInfo> CREATOR;
   }
@@ -9599,6 +9600,7 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void attachSystemDataTransport(int, @NonNull java.io.InputStream, @NonNull java.io.OutputStream) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public android.content.IntentSender buildAssociationCancellationIntent();
     method @Nullable public android.content.IntentSender buildPermissionTransferUserConsentIntent(int) throws android.companion.DeviceNotAssociatedException;
+    method public void clearAssociationTag(int);
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method public void disableSystemDataSyncForTypes(int, int);
     method @Deprecated public void disassociate(@NonNull String);
@@ -9608,6 +9610,7 @@ package android.companion {
     method @NonNull public java.util.List<android.companion.AssociationInfo> getMyAssociations();
     method @Deprecated public boolean hasNotificationAccess(android.content.ComponentName);
     method public void requestNotificationAccess(android.content.ComponentName);
+    method public void setAssociationTag(int, @NonNull String);
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
     method public void startSystemDataTransfer(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.companion.CompanionException>) throws android.companion.DeviceNotAssociatedException;
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void stopObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
@@ -11699,6 +11702,7 @@ package android.content.om {
     method @NonNull public void setResourceValue(@NonNull String, @IntRange(from=android.util.TypedValue.TYPE_FIRST_INT, to=android.util.TypedValue.TYPE_LAST_INT) int, int, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, int, @NonNull String, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, @NonNull android.os.ParcelFileDescriptor, @Nullable String);
+    method @NonNull public void setResourceValue(@NonNull String, @NonNull android.content.res.AssetFileDescriptor, @Nullable String);
     method public void setTargetOverlayable(@Nullable String);
   }
 
@@ -44999,6 +45003,7 @@ package android.telephony {
     field public static final int NR_STATE_RESTRICTED = 1; // 0x1
     field public static final int SERVICE_TYPE_DATA = 2; // 0x2
     field public static final int SERVICE_TYPE_EMERGENCY = 5; // 0x5
+    field public static final int SERVICE_TYPE_MMS = 6; // 0x6
     field public static final int SERVICE_TYPE_SMS = 3; // 0x3
     field public static final int SERVICE_TYPE_UNKNOWN = 0; // 0x0
     field public static final int SERVICE_TYPE_VIDEO = 4; // 0x4
