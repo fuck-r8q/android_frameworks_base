@@ -17,6 +17,7 @@
 package com.android.systemui.communal.ui.view.layout.blueprints
 
 import androidx.constraintlayout.widget.ConstraintSet
+import com.android.systemui.communal.ui.view.layout.sections.DefaultCommunalWidgetSection
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.data.repository.KeyguardBlueprint
 import javax.inject.Inject
@@ -24,10 +25,16 @@ import javax.inject.Inject
 /** Blueprint for communal mode. */
 @SysUISingleton
 @JvmSuppressWildcards
-class DefaultCommunalBlueprint @Inject constructor() : KeyguardBlueprint {
+class DefaultCommunalBlueprint
+@Inject
+constructor(
+    private val defaultCommunalWidgetSection: DefaultCommunalWidgetSection,
+) : KeyguardBlueprint {
     override val id: String = COMMUNAL
 
-    override fun apply(constraintSet: ConstraintSet) {}
+    override fun apply(constraintSet: ConstraintSet) {
+        defaultCommunalWidgetSection.apply(constraintSet)
+    }
 
     companion object {
         const val COMMUNAL = "communal"
