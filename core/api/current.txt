@@ -9410,8 +9410,8 @@ package android.appwidget {
     method @NonNull public java.util.List<android.appwidget.AppWidgetProviderInfo> getInstalledProvidersForProfile(@Nullable android.os.UserHandle);
     method public static android.appwidget.AppWidgetManager getInstance(android.content.Context);
     method public boolean isRequestPinAppWidgetSupported();
-    method public void notifyAppWidgetViewDataChanged(int[], int);
-    method public void notifyAppWidgetViewDataChanged(int, int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int[], int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int, int);
     method public void partiallyUpdateAppWidget(int[], android.widget.RemoteViews);
     method public void partiallyUpdateAppWidget(int, android.widget.RemoteViews);
     method public boolean requestPinAppWidget(@NonNull android.content.ComponentName, @Nullable android.os.Bundle, @Nullable android.app.PendingIntent);
@@ -14351,11 +14351,13 @@ package android.database.sqlite {
     method public void execSQL(String, Object[]) throws android.database.SQLException;
     method public static String findEditTable(String);
     method public java.util.List<android.util.Pair<java.lang.String,java.lang.String>> getAttachedDbs();
+    method public long getLastChangedRowCount();
     method public long getLastInsertRowId();
     method public long getMaximumSize();
     method public long getPageSize();
     method public String getPath();
     method @Deprecated public java.util.Map<java.lang.String,java.lang.String> getSyncedTables();
+    method public long getTotalChangedRowCount();
     method public int getVersion();
     method public boolean inTransaction();
     method public long insert(String, String, android.content.ContentValues);

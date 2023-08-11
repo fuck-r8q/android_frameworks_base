@@ -286,6 +286,19 @@ object Flags {
                 teamfood = true
             )
 
+    /**
+     * TODO(b/278086361): Tracking bug
+     * Complete rewrite of the interactions between System UI and Window Manager involving keyguard
+     * state. When enabled, calls to ActivityTaskManagerService from System UI will exclusively
+     * occur from [WmLockscreenVisibilityManager] rather than the legacy KeyguardViewMediator.
+     *
+     * This flag is under development; some types of unlock may not animate properly if you enable
+     * it.
+     */
+    @JvmField
+    val KEYGUARD_WM_STATE_REFACTOR: UnreleasedFlag =
+            unreleasedFlag("keyguard_wm_state_refactor")
+
     /** Stop running face auth when the display state changes to OFF. */
     // TODO(b/294221702): Tracking bug.
     @JvmField val STOP_FACE_AUTH_ON_DISPLAY_OFF = resourceBooleanFlag(
@@ -363,7 +376,7 @@ object Flags {
 
     // TODO(b/292533677): Tracking Bug
     val WIFI_TRACKER_LIB_FOR_WIFI_ICON =
-        unreleasedFlag("wifi_tracker_lib_for_wifi_icon")
+        unreleasedFlag("wifi_tracker_lib_for_wifi_icon", teamfood = true)
 
     // TODO(b/293863612): Tracking Bug
     @JvmField val INCOMPATIBLE_CHARGING_BATTERY_ICON =
@@ -371,6 +384,9 @@ object Flags {
 
     // TODO(b/293585143): Tracking Bug
     val INSTANT_TETHER = unreleasedFlag("instant_tether")
+
+    // TODO(b/294588085): Tracking Bug
+    val WIFI_SECONDARY_NETWORKS = unreleasedFlag("wifi_secondary_networks")
 
     // 700 - dialer/calls
     // TODO(b/254512734): Tracking Bug
@@ -750,4 +766,8 @@ object Flags {
     /** Enable the Compose implementation of the Quick Settings footer actions. */
     @JvmField
     val COMPOSE_QS_FOOTER_ACTIONS = unreleasedFlag("compose_qs_footer_actions")
+
+    /** Enable the share wifi button in Quick Settings internet dialog. */
+    @JvmField
+    val SHARE_WIFI_QS_BUTTON = unreleasedFlag("share_wifi_qs_button")
 }
