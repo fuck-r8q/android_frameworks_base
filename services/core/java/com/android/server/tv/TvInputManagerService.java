@@ -333,7 +333,6 @@ public final class TvInputManagerService extends SystemService {
                 PackageManager.GET_SERVICES | PackageManager.GET_META_DATA,
                 userId);
         List<TvInputInfo> inputList = new ArrayList<>();
-        List<ComponentName> hardwareComponents = new ArrayList<>();
         for (ResolveInfo ri : services) {
             ServiceInfo si = ri.serviceInfo;
             if (!android.Manifest.permission.BIND_TV_INPUT.equals(si.permission)) {
@@ -344,17 +343,16 @@ public final class TvInputManagerService extends SystemService {
 
             ComponentName component = new ComponentName(si.packageName, si.name);
             if (hasHardwarePermission(pm, component)) {
-                hardwareComponents.add(component);
                 ServiceState serviceState = userState.serviceStateMap.get(component);
                 if (serviceState == null) {
                     // New hardware input found. Create a new ServiceState and connect to the
                     // service to populate the hardware list.
                     serviceState = new ServiceState(component, userId);
                     userState.serviceStateMap.put(component, serviceState);
-                    updateServiceConnectionLocked(component, userId);
                 } else {
                     inputList.addAll(serviceState.hardwareInputMap.values());
                 }
+                updateServiceConnectionLocked(component, userId);
             } else {
                 try {
                     TvInputInfo info = new TvInputInfo.Builder(mContext, ri).build();
@@ -414,15 +412,6 @@ public final class TvInputManagerService extends SystemService {
                     abortPendingCreateSessionRequestsLocked(serviceState, inputId, userId);
                 }
                 notifyInputRemovedLocked(userState, inputId);
-            }
-        }
-
-        // Clean up ServiceState corresponding to the removed hardware inputs
-        Iterator<ServiceState> it = userState.serviceStateMap.values().iterator();
-        while (it.hasNext()) {
-            ServiceState serviceState = it.next();
-            if (serviceState.isHardware && !hardwareComponents.contains(serviceState.component)) {
-                it.remove();
             }
         }
 
@@ -890,10 +879,13 @@ public final class TvInputManagerService extends SystemService {
                 sessionState.session = null;
             }
         }
-        logExternalInputEvent(FrameworkStatsLog.EXTERNAL_TV_INPUT_EVENT__EVENT_TYPE__RELEASED,
-                mCurrentInputId, sessionState);
-        mCurrentInputId = null;
-        mCurrentSessionState = null;
+        if (mCurrentSessionState == sessionState) {
+            // only log when releasing the current on-screen session
+            logExternalInputEvent(FrameworkStatsLog.EXTERNAL_TV_INPUT_EVENT__EVENT_TYPE__RELEASED,
+                    mCurrentInputId, sessionState);
+            mCurrentInputId = null;
+            mCurrentSessionState = null;
+        }
         removeSessionStateLocked(sessionToken, userId);
         return sessionState;
     }
@@ -3057,6 +3049,7 @@ public final class TvInputManagerService extends SystemService {
     }
 
     private void logExternalInputEvent(int eventType, String inputId, SessionState sessionState) {
+        // TODO: handle recording sessions
         UserState userState = getOrCreateUserStateLocked(sessionState.userId);
         TvInputState tvInputState = userState.inputMap.get(inputId);
         TvInputInfo tvInputInfo = tvInputState.info;

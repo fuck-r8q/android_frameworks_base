@@ -33,7 +33,6 @@ import android.app.ActivityManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.Intent;
 import android.content.res.ColorStateList;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.hardware.biometrics.BiometricOverlayConstants;
 import android.media.AudioManager;
@@ -69,6 +68,7 @@ import com.android.keyguard.dagger.KeyguardBouncerScope;
 import com.android.settingslib.utils.ThreadUtils;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.R;
+import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor;
 import com.android.systemui.biometrics.FaceAuthAccessibilityDelegate;
 import com.android.systemui.biometrics.SideFpsController;
 import com.android.systemui.biometrics.SideFpsUiRequestSource;
@@ -82,8 +82,6 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInterac
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
-import com.android.systemui.scene.domain.interactor.SceneInteractor;
-import com.android.systemui.scene.shared.model.SceneKey;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -145,7 +143,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
     private Runnable mCancelAction;
     private boolean mWillRunDismissFromKeyguard;
 
-    private int mLastOrientation = Configuration.ORIENTATION_UNDEFINED;
+    private int mLastOrientation;
 
     private SecurityMode mCurrentSecurityMode = SecurityMode.Invalid;
     private UserSwitcherController.UserSwitchCallback mUserSwitchCallback =
@@ -355,7 +353,14 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
 
                 @Override
                 public void onDensityOrFontScaleChanged() {
-                    KeyguardSecurityContainerController.this.onDensityOrFontScaleChanged();
+                    KeyguardSecurityContainerController.this
+                            .onDensityOrFontScaleOrOrientationChanged();
+                }
+
+                @Override
+                public void onOrientationChanged(int orientation) {
+                    KeyguardSecurityContainerController.this
+                            .onDensityOrFontScaleOrOrientationChanged();
                 }
             };
     private final KeyguardUpdateMonitorCallback mKeyguardUpdateMonitorCallback =
@@ -394,7 +399,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
                 }
             };
     private final UserInteractor mUserInteractor;
-    private final Provider<SceneInteractor> mSceneInteractor;
+    private final Provider<AuthenticationInteractor> mAuthenticationInteractor;
     private final Provider<JavaAdapter> mJavaAdapter;
     @Nullable private Job mSceneTransitionCollectionJob;
 
@@ -425,8 +430,8 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
             Provider<JavaAdapter> javaAdapter,
             UserInteractor userInteractor,
             FaceAuthAccessibilityDelegate faceAuthAccessibilityDelegate,
-            Provider<SceneInteractor> sceneInteractor,
-            KeyguardTransitionInteractor keyguardTransitionInteractor
+            KeyguardTransitionInteractor keyguardTransitionInteractor,
+            Provider<AuthenticationInteractor> authenticationInteractor
     ) {
         super(view);
         view.setAccessibilityDelegate(faceAuthAccessibilityDelegate);
@@ -455,7 +460,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         mKeyguardFaceAuthInteractor = keyguardFaceAuthInteractor;
         mBouncerMessageInteractor = bouncerMessageInteractor;
         mUserInteractor = userInteractor;
-        mSceneInteractor = sceneInteractor;
+        mAuthenticationInteractor = authenticationInteractor;
         mJavaAdapter = javaAdapter;
         mKeyguardTransitionInteractor = keyguardTransitionInteractor;
     }
@@ -482,19 +487,21 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         showPrimarySecurityScreen(false);
 
         if (mFeatureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
-            // When the scene framework transitions from bouncer to gone, we dismiss the keyguard.
+            // When the scene framework says that the lockscreen has been dismissed, dismiss the
+            // keyguard here, revealing the underlying app or launcher:
             mSceneTransitionCollectionJob = mJavaAdapter.get().alwaysCollectFlow(
-                mSceneInteractor.get().finishedSceneTransitions(
-                    /* from= */ SceneKey.Bouncer.INSTANCE,
-                    /* to= */ SceneKey.Gone.INSTANCE),
-                unused -> {
-                    final int selectedUserId = mUserInteractor.getSelectedUserId();
-                    showNextSecurityScreenOrFinish(
+                mAuthenticationInteractor.get().isLockscreenDismissed(),
+                isLockscreenDismissed -> {
+                    if (isLockscreenDismissed) {
+                        final int selectedUserId = mUserInteractor.getSelectedUserId();
+                        showNextSecurityScreenOrFinish(
                             /* authenticated= */ true,
                             selectedUserId,
                             /* bypassSecondaryLockScreen= */ true,
                             mSecurityModel.getSecurityMode(selectedUserId));
-                });
+                    }
+                }
+            );
         }
     }
 
@@ -1162,7 +1169,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
     }
 
     /** Handles density or font scale changes. */
-    private void onDensityOrFontScaleChanged() {
+    private void onDensityOrFontScaleOrOrientationChanged() {
         reinflateViewFlipper(controller -> mView.onDensityOrFontScaleChanged());
     }
 
