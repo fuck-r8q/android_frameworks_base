@@ -52,6 +52,7 @@ android {
 }
 
 dependencies {
+    api(project(":SettingsLibColor"))
     api("androidx.appcompat:appcompat:1.7.0-alpha03")
     api("androidx.slice:slice-builders:1.1.0-alpha02")
     api("androidx.slice:slice-core:1.1.0-alpha02")
@@ -62,7 +63,7 @@ dependencies {
     api("androidx.compose.ui:ui-tooling-preview:$jetpackComposeVersion")
     api("androidx.lifecycle:lifecycle-livedata-ktx")
     api("androidx.lifecycle:lifecycle-runtime-compose")
-    api("androidx.navigation:navigation-compose:2.7.0-beta01")
+    api("androidx.navigation:navigation-compose:2.7.0-rc01")
     api("com.github.PhilJay:MPAndroidChart:v3.1.0-alpha")
     api("com.google.android.material:material:1.7.0-alpha03")
     debugApi("androidx.compose.ui:ui-tooling:$jetpackComposeVersion")

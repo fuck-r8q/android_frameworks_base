@@ -723,7 +723,8 @@ public class SettingsBackupTest {
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_ENABLED,
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_LAST_RUN,
                  Settings.Secure.AUTOMATIC_STORAGE_MANAGER_TURNED_OFF_BY_POLICY,
-                 Settings.Secure.AUDIO_DEVICE_INVENTORY, // setting not controllable by user
+                 Settings.Secure.AUDIO_DEVICE_INVENTORY, // not controllable by user
+                 Settings.Secure.AUDIO_SAFE_CSD_AS_A_FEATURE_ENABLED, // not controllable by user
                  Settings.Secure.BACKUP_AUTO_RESTORE,
                  Settings.Secure.BACKUP_ENABLED,
                  Settings.Secure.BACKUP_PROVISIONED,
@@ -859,7 +860,8 @@ public class SettingsBackupTest {
                  Settings.Secure.CREDENTIAL_SERVICE,
                  Settings.Secure.CREDENTIAL_SERVICE_PRIMARY,
                  Settings.Secure.ACCESSIBILITY_DISPLAY_MAGNIFICATION_EDGE_HAPTIC_ENABLED,
-                 Settings.Secure.DND_CONFIGS_MIGRATED);
+                 Settings.Secure.DND_CONFIGS_MIGRATED,
+                 Settings.Secure.NAVIGATION_MODE_RESTORE);
 
     @Test
     public void systemSettingsBackedUpOrDenied() {
