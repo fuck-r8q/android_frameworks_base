@@ -5627,12 +5627,20 @@ public final class Settings {
         public static final String SHOW_TOUCHES = "show_touches";
 
         /**
-         * Show key presses and other events dispatched to focused windows on the screen.
+         * Show key presses dispatched to focused windows on the screen.
          * 0 = no
          * 1 = yes
          * @hide
          */
         public static final String SHOW_KEY_PRESSES = "show_key_presses";
+
+        /**
+         * Show rotary input dispatched to focused windows on the screen.
+         * 0 = no
+         * 1 = yes
+         * @hide
+         */
+        public static final String SHOW_ROTARY_INPUT = "show_rotary_input";
 
         /**
          * Log raw orientation data from
@@ -10647,6 +10655,14 @@ public final class Settings {
          */
         public static final String ASSIST_LONG_PRESS_HOME_ENABLED =
                 "assist_long_press_home_enabled";
+
+        /**
+         * Whether press and hold on nav handle can trigger search.
+         *
+         * @hide
+         */
+        public static final String SEARCH_PRESS_HOLD_NAV_HANDLE_ENABLED =
+                "search_press_hold_nav_handle_enabled";
 
         /**
          * Control whether Trust Agents are in active unlock or extend unlock mode.
