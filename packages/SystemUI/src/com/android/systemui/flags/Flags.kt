@@ -33,7 +33,7 @@ import com.android.systemui.flags.FlagsFactory.unreleasedFlag
  * On public release builds, flags will always return their default value. There is no way to change
  * their value on release builds.
  *
- * See [FeatureFlagsDebug] for instructions on flipping the flags via adb.
+ * See [FeatureFlagsClassicDebug] for instructions on flipping the flags via adb.
  */
 object Flags {
     @JvmField val TEAMFOOD = unreleasedFlag("teamfood")
@@ -367,10 +367,6 @@ object Flags {
 
     // TODO(b/244064524): Tracking Bug
     @JvmField val QS_SECONDARY_DATA_SUB_INFO = releasedFlag("qs_secondary_data_sub_info")
-
-    /** Enables Font Scaling Quick Settings tile */
-    // TODO(b/269341316): Tracking Bug
-    @JvmField val ENABLE_FONT_SCALING_TILE = releasedFlag("enable_font_scaling_tile")
 
     /** Enables new QS Edit Mode visual refresh */
     // TODO(b/269787742): Tracking Bug

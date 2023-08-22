@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-package com.android.settingslib.spa.testutils
+package com.android.systemui.keyguard.shared.model
 
-import org.mockito.Mockito
+import androidx.constraintlayout.widget.ConstraintSet
 
 /**
- * Returns Mockito.any() as nullable type to avoid java.lang.IllegalStateException when null is
- * returned.
- *
- * Generic T is nullable because implicitly bounded by Any?.
+ * Lower level modules that determine constraints for a particular section in the lockscreen root
+ * view.
  */
-fun <T> any(type: Class<T>): T = Mockito.any(type)
-
-inline fun <reified T> any(): T = any(T::class.java)
+interface KeyguardSection {
+    fun apply(constraintSet: ConstraintSet)
+}

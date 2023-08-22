@@ -12,23 +12,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-package com.android.systemui.biometrics.ui.binder
+package com.android.server.power.stats;
 
-import com.android.systemui.biometrics.AuthBiometricFingerprintView
-import com.android.systemui.biometrics.ui.viewmodel.AuthBiometricFingerprintViewModel
+import android.os.BatteryConsumer;
 
-object AuthBiometricFingerprintViewBinder {
+import com.android.internal.os.MultiStateStats;
 
-    /**
-     * Binds a [AuthBiometricFingerprintView.mIconView] to a [AuthBiometricFingerprintViewModel].
-     */
-    @JvmStatic
-    fun bind(view: AuthBiometricFingerprintView, viewModel: AuthBiometricFingerprintViewModel) {
-        if (view.isSfps) {
-            AuthBiometricFingerprintIconViewBinder.bind(view.getIconView(), viewModel)
-        }
+class CpuAggregatedPowerStats extends PowerComponentAggregatedPowerStats {
+
+    CpuAggregatedPowerStats(MultiStateStats.States[] deviceStates,
+            MultiStateStats.States[] uidStates) {
+        super(BatteryConsumer.POWER_COMPONENT_CPU, deviceStates, uidStates);
     }
 }
