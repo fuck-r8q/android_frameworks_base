@@ -1688,11 +1688,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         return getNotificationShadeWindowViewController().getKeyguardMessageArea();
     }
 
-    @Override
-    public int getStatusBarHeight() {
-        return mStatusBarWindowController.getStatusBarHeight();
-    }
-
     private void updateReportRejectedTouchVisibility() {
         if (mReportRejectedTouch == null) {
             return;
@@ -1815,11 +1810,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public boolean getCommandQueuePanelsEnabled() {
         return mCommandQueue.panelsEnabled();
-    }
-
-    @Override
-    public int getStatusBarWindowState() {
-        return mStatusBarWindowState;
     }
 
     @Override
