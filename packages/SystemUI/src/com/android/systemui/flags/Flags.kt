@@ -70,8 +70,7 @@ object Flags {
 
     // TODO(b/260335638): Tracking Bug
     @JvmField
-    val NOTIFICATION_INLINE_REPLY_ANIMATION =
-        unreleasedFlag("notification_inline_reply_animation")
+    val NOTIFICATION_INLINE_REPLY_ANIMATION = releasedFlag("notification_inline_reply_animation")
 
     /** Makes sure notification panel is updated before the user switch is complete. */
     // TODO(b/278873737): Tracking Bug
@@ -285,11 +284,7 @@ object Flags {
     /** Enables preview loading animation in the wallpaper picker. */
     // TODO(b/274443705): Tracking Bug
     @JvmField
-    val WALLPAPER_PICKER_PREVIEW_ANIMATION =
-            unreleasedFlag(
-                    "wallpaper_picker_preview_animation",
-                teamfood = true
-            )
+    val WALLPAPER_PICKER_PREVIEW_ANIMATION = releasedFlag("wallpaper_picker_preview_animation")
 
     /**
      * TODO(b/278086361): Tracking bug
