@@ -18,8 +18,10 @@ java_defaults {
 
     // Add java_aconfig_libraries to here to add them to the core framework
     srcs: [
-        ":com.android.hardware.camera2-aconfig-java{.generated_srcjars}",
+        ":android.security.flags-aconfig-java{.generated_srcjars}",
+        ":camera_platform_flags_core_java_lib{.generated_srcjars}",
         ":com.android.window.flags.window-aconfig-java{.generated_srcjars}",
+        ":com.android.text.flags-aconfig-java{.generated_srcjars}",
     ],
 }
 
@@ -32,15 +34,9 @@ java_defaults {
 }
 
 // Camera
-aconfig_declarations {
-    name: "com.android.hardware.camera2-aconfig",
-    package: "com.android.hardware.camera2",
-    srcs: ["core/java/android/hardware/camera2/camera_platform.aconfig"],
-}
-
 java_aconfig_library {
-    name: "com.android.hardware.camera2-aconfig-java",
-    aconfig_declarations: "com.android.hardware.camera2-aconfig",
+    name: "camera_platform_flags_core_java_lib",
+    aconfig_declarations: "camera_platform_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -54,5 +50,31 @@ aconfig_declarations {
 java_aconfig_library {
     name: "com.android.window.flags.window-aconfig-java",
     aconfig_declarations: "com.android.window.flags.window-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Text
+aconfig_declarations {
+    name: "com.android.text.flags-aconfig",
+    package: "com.android.text.flags",
+    srcs: ["core/java/android/text/flags/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "com.android.text.flags-aconfig-java",
+    aconfig_declarations: "com.android.text.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Security
+aconfig_declarations {
+    name: "android.security.flags-aconfig",
+    package: "android.security",
+    srcs: ["core/java/android/security/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.security.flags-aconfig-java",
+    aconfig_declarations: "android.security.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

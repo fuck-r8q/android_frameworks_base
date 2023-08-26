@@ -496,15 +496,15 @@ package android.app {
     method public int compareTo(android.app.WindowConfiguration);
     method public int describeContents();
     method public int getActivityType();
-    method public android.graphics.Rect getAppBounds();
-    method public android.graphics.Rect getBounds();
+    method @Nullable public android.graphics.Rect getAppBounds();
+    method @NonNull public android.graphics.Rect getBounds();
     method @NonNull public android.graphics.Rect getMaxBounds();
     method public int getRotation();
     method public int getWindowingMode();
     method public static boolean isFloating(int);
     method public void setActivityType(int);
-    method public void setAppBounds(android.graphics.Rect);
-    method public void setBounds(android.graphics.Rect);
+    method public void setAppBounds(@Nullable android.graphics.Rect);
+    method public void setBounds(@Nullable android.graphics.Rect);
     method public void setMaxBounds(@Nullable android.graphics.Rect);
     method public void setRotation(int);
     method public void setTo(android.app.WindowConfiguration);
@@ -1181,6 +1181,7 @@ package android.credentials {
     method @Nullable public CharSequence getSettingsSubtitle();
     method @NonNull public boolean hasCapability(@NonNull String);
     method public boolean isEnabled();
+    method public boolean isPrimary();
     method public boolean isSystemProvider();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.credentials.CredentialProviderInfo> CREATOR;
@@ -2704,8 +2705,14 @@ package android.os.vibrator {
 
 package android.os.vibrator.persistence {
 
+  public class ParsedVibration {
+    method @NonNull public java.util.List<android.os.VibrationEffect> getVibrationEffectListForTesting();
+    method @Nullable public android.os.VibrationEffect resolve(@NonNull android.os.Vibrator);
+  }
+
   public final class VibrationXmlParser {
-    method @Nullable public static android.os.VibrationEffect parse(@NonNull java.io.Reader) throws java.io.IOException;
+    method @Nullable public static android.os.vibrator.persistence.ParsedVibration parseDocument(@NonNull java.io.Reader) throws java.io.IOException;
+    method @Nullable public static android.os.VibrationEffect parseVibrationEffect(@NonNull java.io.Reader) throws java.io.IOException;
   }
 
   public final class VibrationXmlSerializer {
