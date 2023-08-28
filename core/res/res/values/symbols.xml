@@ -422,6 +422,7 @@
   <java-symbol type="bool" name="config_localDisplaysMirrorContent" />
   <java-symbol type="bool" name="config_ignoreUdfpsVote" />
   <java-symbol type="bool" name="config_enableProximityService" />
+  <java-symbol type="bool" name="config_enableVirtualDeviceManager" />
   <java-symbol type="array" name="config_localPrivateDisplayPorts" />
   <java-symbol type="integer" name="config_defaultDisplayDefaultColorMode" />
   <java-symbol type="bool" name="config_enableAppWidgetService" />
@@ -665,6 +666,7 @@
   <java-symbol type="string" name="cfTemplateRegisteredTime" />
   <java-symbol type="string" name="chooseActivity" />
   <java-symbol type="string" name="checked" />
+  <java-symbol type="string" name="config_companionDeviceManagerPackage" />
   <java-symbol type="array" name="config_companionDevicePackages" />
   <java-symbol type="array" name="config_companionDeviceCerts" />
   <java-symbol type="string" name="config_default_dns_server" />
@@ -2061,7 +2063,9 @@
   <java-symbol type="integer" name="config_notificationsBatteryNearlyFullLevel" />
   <java-symbol type="integer" name="config_notificationServiceArchiveSize" />
   <java-symbol type="dimen" name="config_rotaryEncoderAxisScrollTickInterval" />
-  <java-symbol type="integer" name="config_previousVibrationsDumpLimit" />
+  <java-symbol type="integer" name="config_recentVibrationsDumpSizeLimit" />
+  <java-symbol type="integer" name="config_previousVibrationsDumpSizeLimit" />
+  <java-symbol type="integer" name="config_previousVibrationsDumpAggregationTimeMillisLimit" />
   <java-symbol type="integer" name="config_defaultVibrationAmplitude" />
   <java-symbol type="dimen" name="config_hapticChannelMaxVibrationAmplitude" />
   <java-symbol type="integer" name="config_vibrationWaveformRampStepDuration" />
@@ -2244,6 +2248,7 @@
   <java-symbol type="array" name="config_supportedDreamComplications" />
   <java-symbol type="array" name="config_disabledDreamComponents" />
   <java-symbol type="bool" name="config_dismissDreamOnActivityStart" />
+  <java-symbol type="bool" name="config_resetScreenTimeoutOnUnexpectedDreamExit" />
   <java-symbol type="integer" name="config_dreamOverlayReconnectTimeoutMs" />
   <java-symbol type="integer" name="config_dreamOverlayMaxReconnectAttempts" />
   <java-symbol type="integer" name="config_minDreamOverlayDurationMs" />
@@ -2333,6 +2338,7 @@
 
   <java-symbol type="bool" name="config_alwaysUseCdmaRssi" />
   <java-symbol type="dimen" name="status_bar_icon_size" />
+  <java-symbol type="dimen" name="status_bar_icon_size_sp" />
   <java-symbol type="dimen" name="status_bar_system_icon_size" />
   <java-symbol type="dimen" name="status_bar_system_icon_intrinsic_size" />
   <java-symbol type="drawable" name="list_selector_pressed_holo_dark" />
@@ -2606,6 +2612,8 @@
   <java-symbol type="string" name="biometric_or_screen_lock_app_setting_name" />
   <java-symbol type="string" name="biometric_dialog_default_title" />
   <java-symbol type="string" name="biometric_dialog_default_subtitle" />
+  <java-symbol type="string" name="biometric_dialog_face_subtitle" />
+  <java-symbol type="string" name="biometric_dialog_fingerprint_subtitle" />
   <java-symbol type="string" name="biometric_or_screen_lock_dialog_default_subtitle" />
   <java-symbol type="string" name="biometric_error_hw_unavailable" />
   <java-symbol type="string" name="biometric_error_user_canceled" />
@@ -3272,6 +3280,7 @@
   <!-- WallpaperManager config -->
   <java-symbol type="string" name="config_wallpaperCropperPackage" />
   <java-symbol type="string" name="expand_action_accessibility" />
+  <java-symbol type="bool" name="config_wallpaperTopApp" />
 
   <java-symbol type="id" name="textSpacerNoTitle" />
   <java-symbol type="id" name="titleDividerNoCustom" />
@@ -3888,6 +3897,7 @@
   <java-symbol type="bool" name="config_dozeSupportsAodWallpaper" />
   <java-symbol type="bool" name="config_displayBlanksAfterDoze" />
   <java-symbol type="bool" name="config_displayBrightnessBucketsInDoze" />
+  <java-symbol type="bool" name="config_displayColorFadeDisabled" />
   <java-symbol type="integer" name="config_storageManagerDaystoRetainDefault" />
   <java-symbol type="string" name="config_headlineFontFamily" />
   <java-symbol type="string" name="config_headlineFontFamilyMedium" />
@@ -4595,6 +4605,7 @@
 
   <!-- Whether per-app user aspect ratio override settings is enabled -->
   <java-symbol type="bool" name="config_appCompatUserAppAspectRatioSettingsIsEnabled" />
+  <java-symbol type="bool" name="config_appCompatUserAppAspectRatioFullscreenIsEnabled" />
 
   <java-symbol type="bool" name="config_isCompatFakeFocusEnabled" />
   <java-symbol type="bool" name="config_isWindowManagerCameraCompatTreatmentEnabled" />
@@ -4974,8 +4985,6 @@
   <java-symbol type="array" name="config_builtInDisplayIsRoundArray" />
   <java-symbol type="array" name="config_gnssParameters" />
 
-  <java-symbol type="integer" name="config_mashPressVibrateTimeOnPowerButton" />
-
   <java-symbol type="string" name="config_systemGameService" />
 
   <java-symbol type="string" name="config_supervisedUserCreationPackage"/>
@@ -5008,7 +5017,6 @@
   <!-- For VirtualDeviceManager -->
   <java-symbol type="string" name="vdm_camera_access_denied" />
   <java-symbol type="string" name="vdm_secure_window" />
-  <java-symbol type="string" name="vdm_pip_blocked" />
 
   <java-symbol type="color" name="camera_privacy_light_day"/>
   <java-symbol type="color" name="camera_privacy_light_night"/>
@@ -5209,4 +5217,8 @@
   <java-symbol type="drawable" name="focus_event_pressed_key_background" />
   <java-symbol type="string" name="config_defaultShutdownVibrationFile" />
   <java-symbol type="string" name="lockscreen_too_many_failed_attempts_countdown" />
+
+  <java-symbol type="bool" name="config_enable_a11y_magnification_single_panning" />
+
+  <java-symbol type="string" name="config_hapticFeedbackCustomizationFile" />
 </resources>

@@ -295,8 +295,8 @@ final class IInputMethodManagerGlobalInvoker {
 
     @AnyThread
     static boolean showSoftInput(@NonNull IInputMethodClient client, @Nullable IBinder windowToken,
-            @Nullable ImeTracker.Token statsToken, int flags, int lastClickToolType,
-            @Nullable ResultReceiver resultReceiver,
+            @Nullable ImeTracker.Token statsToken, @InputMethodManager.ShowFlags int flags,
+            int lastClickToolType, @Nullable ResultReceiver resultReceiver,
             @SoftInputShowHideReason int reason) {
         final IInputMethodManager service = getService();
         if (service == null) {
@@ -312,7 +312,7 @@ final class IInputMethodManagerGlobalInvoker {
 
     @AnyThread
     static boolean hideSoftInput(@NonNull IInputMethodClient client, @Nullable IBinder windowToken,
-            @Nullable ImeTracker.Token statsToken, int flags,
+            @Nullable ImeTracker.Token statsToken, @InputMethodManager.HideFlags int flags,
             @Nullable ResultReceiver resultReceiver, @SoftInputShowHideReason int reason) {
         final IInputMethodManager service = getService();
         if (service == null) {
@@ -447,20 +447,6 @@ final class IInputMethodManagerGlobalInvoker {
         }
         try {
             return service.getInputMethodWindowVisibleHeight(client);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    @AnyThread
-    static void reportVirtualDisplayGeometryAsync(@NonNull IInputMethodClient client,
-            int childDisplayId, @Nullable float[] matrixValues) {
-        final IInputMethodManager service = getService();
-        if (service == null) {
-            return;
-        }
-        try {
-            service.reportVirtualDisplayGeometryAsync(client, childDisplayId, matrixValues);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

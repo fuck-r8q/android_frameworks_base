@@ -35,6 +35,9 @@
         },
         {
             "exclude-annotation": "android.platform.test.annotations.FlakyTest"
+        },
+        {
+            "exclude-annotation": "androidx.test.filters.FlakyTest"
         }
       ]
     }
@@ -49,6 +52,20 @@
         },
         {
           "exclude-annotation": "androidx.test.filters.FlakyTest"
+        }
+      ]
+    },
+    {
+      "name": "SystemUIGoogleScreenshotTests",
+      "options": [
+        {
+          "exclude-annotation": "org.junit.Ignore"
+        },
+        {
+          "exclude-annotation": "androidx.test.filters.FlakyTest"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.Postsubmit"
         }
       ]
     },
@@ -72,7 +89,7 @@
           "exclude-annotation": "org.junit.Ignore"
         },
         {
-          "exclude-annotation": "androidx.test.filters.FlakyTest"
+          "exclude-annotation": "android.platform.test.annotations.FlakyTest"
         },
         {
           "include-filter": "android.permissionui.cts.CameraMicIndicatorsPermissionTest"
@@ -110,6 +127,17 @@
       ]
     }
   ],
+  "postsubmit": [
+    {
+      // Permission indicators
+      "name": "CtsPermissionUiTestCases",
+      "options": [
+        {
+          "include-filter": "android.permissionui.cts.CameraMicIndicatorsPermissionTest"
+        }
+      ]
+    }
+  ],
   "silver-sysui": [
    {
       "name": "PlatformScenarioTests",
@@ -128,6 +156,25 @@
         },
         {
             "exclude-annotation": "android.platform.test.annotations.FlakyTest"
+        },
+        {
+            "exclude-annotation": "androidx.test.filters.FlakyTest"
+        }
+      ]
+    }
+  ],
+  "postsubmit": [
+   {
+      "name": "SystemUIGoogleScreenshotTests",
+      "options": [
+        {
+            "exclude-annotation": "org.junit.Ignore"
+        },
+        {
+            "exclude-annotation": "android.platform.test.annotations.FlakyTest"
+        },
+        {
+            "include-annotation": "android.platform.test.annotations.Postsubmit"
         }
       ]
     }

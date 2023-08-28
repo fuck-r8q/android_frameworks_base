@@ -261,6 +261,8 @@ public final class OverlayManagerService extends SystemService {
 
     private final OverlayActorEnforcer mActorEnforcer;
 
+    private int mPrevStartedUserId = -1;
+
     public OverlayManagerService(@NonNull final Context context) {
         super(context);
         try {
@@ -338,6 +340,10 @@ public final class OverlayManagerService extends SystemService {
     }
 
     private void onStartUser(@UserIdInt int newUserId) {
+        // Do nothing when start a user that is the same as the one started previously.
+        if (newUserId == mPrevStartedUserId) {
+            return;
+        }
         try {
             traceBegin(TRACE_TAG_RRO, "OMS#onStartUser " + newUserId);
             // ensure overlays in the settings are up-to-date, and propagate
@@ -348,6 +354,7 @@ public final class OverlayManagerService extends SystemService {
         } finally {
             traceEnd(TRACE_TAG_RRO);
         }
+        mPrevStartedUserId = newUserId;
     }
 
     private static String[] getDefaultOverlayPackages() {
@@ -1120,6 +1127,21 @@ public final class OverlayManagerService extends SystemService {
             int callingUid = Binder.getCallingUid();
             mActorEnforcer.enforceActor(overlayInfo, methodName, callingUid, realUserId);
         }
+
+        /**
+         * @hide
+         */
+        public String getPartitionOrder() {
+            return mImpl.getOverlayConfig().getPartitionOrder();
+        }
+
+        /**
+         * @hide
+         */
+        public boolean isDefaultPartitionOrder() {
+            return mImpl.getOverlayConfig().isDefaultPartitionOrder();
+        }
+
     };
 
     private static final class PackageManagerHelperImpl implements PackageManagerHelper {

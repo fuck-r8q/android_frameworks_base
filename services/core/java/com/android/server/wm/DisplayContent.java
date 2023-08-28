@@ -34,7 +34,6 @@ import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.content.res.Configuration.ORIENTATION_UNDEFINED;
 import static android.os.Build.VERSION_CODES.N;
-import static android.os.Process.SYSTEM_UID;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.util.DisplayMetrics.DENSITY_DEFAULT;
 import static android.util.RotationUtils.deltaRotation;
@@ -523,7 +522,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     boolean mWaitingForConfig;
 
     // TODO(multi-display): remove some of the usages.
-    @VisibleForTesting
     boolean isDefaultDisplay;
 
     /** Detect user tapping outside of current focused task bounds .*/
@@ -1936,7 +1934,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         } else if (mFixedRotationLaunchingApp != null && r == null) {
             mWmService.mDisplayNotificationController.dispatchFixedRotationFinished(this);
             // Keep async rotation controller if the next transition of display is requested.
-            if (!mTransitionController.isCollecting(this)) {
+            if (!mTransitionController.hasCollectingRotationChange(this, getRotation())) {
                 finishAsyncRotationIfPossible();
             }
         }
@@ -2752,6 +2750,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     void onAppTransitionDone() {
         super.onAppTransitionDone();
         mWmService.mWindowsChanged = true;
+        onTransitionFinished();
+    }
+
+    void onTransitionFinished() {
         // If the transition finished callback cannot match the token for some reason, make sure the
         // rotated state is cleared if it is already invisible.
         if (mFixedRotationLaunchingApp != null && !mFixedRotationLaunchingApp.isVisibleRequested()
@@ -3359,6 +3361,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             mRootWindowContainer.mTaskSupervisor
                     .getKeyguardController().onDisplayRemoved(mDisplayId);
             mWallpaperController.resetLargestDisplay(mDisplay);
+            mWmService.mDisplayWindowSettings.onDisplayRemoved(this);
         } finally {
             mDisplayReady = false;
         }
@@ -3458,6 +3461,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 this, this, null /* remoteTransition */, displayChange);
         if (t != null) {
             mAtmService.startLaunchPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
+            if (mAsyncRotationController != null) {
+                // Give a chance to update the transform if the current rotation is changed when
+                // some windows haven't finished previous rotation.
+                mAsyncRotationController.updateRotation();
+            }
             if (mFixedRotationLaunchingApp != null) {
                 // A fixed-rotation transition is done, then continue to start a seamless display
                 // transition.
@@ -5411,8 +5419,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // Attach the SystemUiContext to this DisplayContent the get latest configuration.
             // Note that the SystemUiContext will be removed automatically if this DisplayContent
             // is detached.
+            final WindowProcessController wpc = mAtmService.getProcessController(
+                    getDisplayUiContext().getIApplicationThread());
             mWmService.mWindowContextListenerController.registerWindowContainerListener(
-                    getDisplayUiContext().getWindowContextToken(), this, SYSTEM_UID,
+                    wpc, getDisplayUiContext().getWindowContextToken(), this,
                     INVALID_WINDOW_TYPE, null /* options */);
         }
     }
@@ -6397,9 +6407,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // Don't do recursive work.
             return;
         }
-        mInEnsureActivitiesVisible = true;
         mAtmService.mTaskSupervisor.beginActivityVisibilityUpdate();
         try {
+            mInEnsureActivitiesVisible = true;
             forAllRootTasks(rootTask -> {
                 rootTask.ensureActivitiesVisible(starting, configChanges, preserveWindows,
                         notifyClients);
@@ -7033,5 +7043,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     int getRelativeDisplayRotation() {
         // Display is the root, so it's not rotated relative to anything.
         return Surface.ROTATION_0;
+    }
+
+    public void replaceContent(SurfaceControl sc) {
+        new Transaction().reparent(sc, getSurfaceControl())
+                .reparent(mWindowingLayer, null)
+                .reparent(mOverlayLayer, null)
+                .reparent(mA11yOverlayLayer, null)
+                .apply();
     }
 }

@@ -46,30 +46,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.android.compose.animation.scene.SceneScope
 import com.android.systemui.R
 import com.android.systemui.bouncer.ui.viewmodel.AuthMethodBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PasswordBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PatternBouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.scene.shared.model.UserAction
 import com.android.systemui.scene.ui.composable.ComposableScene
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** The bouncer scene displays authentication challenges like PIN, password, or pattern. */
-class BouncerScene(
+@SysUISingleton
+class BouncerScene
+@Inject
+constructor(
     private val viewModel: BouncerViewModel,
-    private val dialogFactory: () -> AlertDialog,
+    private val dialogFactory: BouncerSceneDialogFactory,
 ) : ComposableScene {
     override val key = SceneKey.Bouncer
 
-    override fun destinationScenes(
-        containerName: String,
-    ): StateFlow<Map<UserAction, SceneModel>> =
+    override fun destinationScenes(): StateFlow<Map<UserAction, SceneModel>> =
         MutableStateFlow<Map<UserAction, SceneModel>>(
                 mapOf(
                     UserAction.Back to SceneModel(SceneKey.Lockscreen),
@@ -78,8 +82,7 @@ class BouncerScene(
             .asStateFlow()
 
     @Composable
-    override fun Content(
-        containerName: String,
+    override fun SceneScope.Content(
         modifier: Modifier,
     ) = BouncerScene(viewModel, dialogFactory, modifier)
 }
@@ -87,7 +90,7 @@ class BouncerScene(
 @Composable
 private fun BouncerScene(
     viewModel: BouncerViewModel,
-    dialogFactory: () -> AlertDialog,
+    dialogFactory: BouncerSceneDialogFactory,
     modifier: Modifier = Modifier,
 ) {
     val message: BouncerViewModel.MessageViewModel by viewModel.message.collectAsState()
@@ -99,7 +102,10 @@ private fun BouncerScene(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(60.dp),
         modifier =
-            modifier.background(MaterialTheme.colorScheme.surface).fillMaxSize().padding(32.dp)
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(start = 32.dp, top = 92.dp, end = 32.dp, bottom = 32.dp)
     ) {
         Crossfade(
             targetState = message,
@@ -171,4 +177,8 @@ private fun BouncerScene(
             dialog = null
         }
     }
+}
+
+interface BouncerSceneDialogFactory {
+    operator fun invoke(): AlertDialog
 }

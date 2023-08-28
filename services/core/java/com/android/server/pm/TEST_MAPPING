@@ -18,7 +18,12 @@
       "name": "CtsCompilationTestCases"
     },
     {
-      "name": "CtsAppEnumerationTestCases"
+      "name": "CtsAppEnumerationTestCases",
+      "options": [
+        {
+          "exclude-annotation": "androidx.test.filters.LargeTest"
+        }
+      ]
     },
     {
       "name": "CtsMatchFlagTestCases"
@@ -88,20 +93,24 @@
           "include-filter": "android.uidmigration.cts"
         }
       ]
-    }
-  ],
-  "presubmit-large": [
+    },
     {
-      "name": "CtsContentTestCases",
+      "name": "CtsInstantAppsHostTestCases",
+      "file_patterns": ["(/|^)PackageMonitorCallbackHelper\\.java"],
+      "options": [
+        {
+          "include-filter": "android.appsecurity.cts.EphemeralTest#testGetSearchableInfo"
+        }
+      ]
+    },
+    {
+      "name": "CtsPackageManagerTestCases",
       "options": [
         {
           "exclude-annotation": "androidx.test.filters.FlakyTest"
         },
         {
           "exclude-annotation": "org.junit.Ignore"
-        },
-        {
-          "include-filter": "android.content.pm.cts"
         }
       ]
     }
@@ -116,10 +125,13 @@
       ]
     },
     {
-      "name": "CtsAppSecurityHostTestCases"
+      "name": "CtsPackageManagerHostTestCases"
     },
     {
       "name": "PackageManagerServiceHostTests"
+    },
+    {
+      "name": "CtsAppEnumerationTestCases"
     }
   ],
   "imports": [

@@ -116,6 +116,7 @@ import com.android.server.DisplayThread;
 import com.android.server.LocalServices;
 import com.android.server.Watchdog;
 import com.android.server.input.InputManagerInternal.LidSwitchCallback;
+import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.policy.WindowManagerPolicy;
 
 import libcore.io.IoUtils;
@@ -164,6 +165,8 @@ public class InputManagerService extends IInputManager.Stub
     private final Context mContext;
     private final InputManagerHandler mHandler;
     private DisplayManagerInternal mDisplayManagerInternal;
+
+    private InputMethodManagerInternal mInputMethodManagerInternal;
 
     // Context cache used for loading pointer resources.
     private Context mPointerIconDisplayContext;
@@ -510,6 +513,8 @@ public class InputManagerService extends IInputManager.Stub
         }
 
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
+        mInputMethodManagerInternal =
+                LocalServices.getService(InputMethodManagerInternal.class);
 
         mSettingsObserver.registerAndUpdate();
 
@@ -2725,11 +2730,12 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback.
     @SuppressWarnings("unused")
-    private String[] getKeyboardLayoutOverlay(InputDeviceIdentifier identifier) {
+    private String[] getKeyboardLayoutOverlay(InputDeviceIdentifier identifier, String languageTag,
+            String layoutType) {
         if (!mSystemReady) {
             return null;
         }
-        return mKeyboardLayoutManager.getKeyboardLayoutOverlay(identifier);
+        return mKeyboardLayoutManager.getKeyboardLayoutOverlay(identifier, languageTag, layoutType);
     }
 
     @EnforcePermission(Manifest.permission.REMAP_MODIFIER_KEYS)
@@ -2781,6 +2787,13 @@ public class InputManagerService extends IInputManager.Stub
         mHandler.obtainMessage(MSG_POINTER_DISPLAY_ID_CHANGED,
                 new PointerDisplayIdChangedArgs(pointerDisplayId, xPosition,
                         yPosition)).sendToTarget();
+    }
+
+    // Native callback.
+    @SuppressWarnings("unused")
+    boolean isInputMethodConnectionActive() {
+        return mInputMethodManagerInternal != null
+                && mInputMethodManagerInternal.isAnyInputConnectionActive();
     }
 
     /**

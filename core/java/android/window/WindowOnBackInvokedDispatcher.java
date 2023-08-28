@@ -16,6 +16,9 @@
 
 package android.window;
 
+import static java.lang.annotation.RetentionPolicy.SOURCE;
+
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Activity;
@@ -23,6 +26,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.res.TypedArray;
 import android.os.Handler;
 import android.os.RemoteException;
 import android.os.SystemProperties;
@@ -34,6 +38,7 @@ import android.view.IWindowSession;
 import androidx.annotation.VisibleForTesting;
 
 import java.io.PrintWriter;
+import java.lang.annotation.Retention;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,6 +60,18 @@ import java.util.TreeMap;
  * @hide
  */
 public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
+    @Retention(SOURCE)
+    @IntDef({
+        BACK_CALLBACK_ENABLED,
+        BACK_CALLBACK_DISABLED,
+        BACK_CALLBACK_DISABLED_LEGACY_WINDOW_SWIPE_TO_DISMISS
+    })
+    public @interface OnBackInvokedCallbackType {}
+
+    public static final int BACK_CALLBACK_ENABLED = 0;
+    public static final int BACK_CALLBACK_DISABLED = 1;
+    public static final int BACK_CALLBACK_DISABLED_LEGACY_WINDOW_SWIPE_TO_DISMISS = 2;
+
     private IWindowSession mWindowSession;
     private IWindow mWindow;
     private static final String TAG = "WindowOnBackDispatcher";
@@ -62,6 +79,9 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
             .getInt("persist.wm.debug.predictive_back", 1) != 0;
     private static final boolean ALWAYS_ENFORCE_PREDICTIVE_BACK = SystemProperties
             .getInt("persist.wm.debug.predictive_back_always_enforce", 0) != 0;
+    private static final boolean PREDICTIVE_BACK_FALLBACK_WINDOW_ATTRIBUTE =
+            SystemProperties.getInt("persist.wm.debug.predictive_back_fallback_window_attribute", 0)
+                    != 0;
     @Nullable
     private ImeOnBackInvokedDispatcher mImeDispatcher;
 
@@ -263,13 +283,6 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
     }
 
     /**
-     * Returns false if the legacy back behavior should be used.
-     */
-    public boolean isOnBackInvokedCallbackEnabled() {
-        return Checker.isOnBackInvokedCallbackEnabled(mChecker.getContext());
-    }
-
-    /**
      * Dump information about this WindowOnBackInvokedDispatcher
      * @param prefix the prefix that will be prepended to each line of the produced output
      * @param writer the writer that will receive the resulting text
@@ -382,6 +395,20 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
         }
     }
 
+    /** Returns false if the legacy back behavior should be used. */
+    public boolean isOnBackInvokedCallbackEnabled() {
+        return isOnBackInvokedCallbackEnabled(mChecker.getContext());
+    }
+
+    /**
+     * Returns true if system gesture exclusion is needed for global gesture compatibility with
+     * windowSwipeToDismiss styleable.
+     */
+    public boolean isSystemGestureExclusionNeeded() {
+        return Checker.getBackCallbackType(mChecker.getContext())
+                == BACK_CALLBACK_DISABLED_LEGACY_WINDOW_SWIPE_TO_DISMISS;
+    }
+
     /**
      * Returns false if the legacy back behavior should be used.
      * <p>
@@ -389,7 +416,7 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
      * {@link OnBackInvokedCallback}.
      */
     public static boolean isOnBackInvokedCallbackEnabled(@NonNull Context context) {
-        return Checker.isOnBackInvokedCallbackEnabled(context);
+        return Checker.getBackCallbackType(context) == BACK_CALLBACK_ENABLED;
     }
 
     @Override
@@ -441,22 +468,24 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
             return mContext.get();
         }
 
-        private static boolean isOnBackInvokedCallbackEnabled(@Nullable Context context) {
+        @OnBackInvokedCallbackType
+        private static int getBackCallbackType(@Nullable Context context) {
             // new back is enabled if the feature flag is enabled AND the app does not explicitly
             // request legacy back.
             boolean featureFlagEnabled = ENABLE_PREDICTIVE_BACK;
             if (!featureFlagEnabled) {
-                return false;
+                return BACK_CALLBACK_DISABLED;
             }
 
             if (ALWAYS_ENFORCE_PREDICTIVE_BACK) {
-                return true;
+                Log.i(TAG, "getBackCallbackType: always enable");
+                return BACK_CALLBACK_ENABLED;
             }
 
             // If the context is null, return false to use legacy back.
             if (context == null) {
                 Log.w(TAG, "OnBackInvokedCallback is not enabled because context is null.");
-                return false;
+                return BACK_CALLBACK_DISABLED;
             }
 
             boolean requestsPredictiveBack = false;
@@ -500,9 +529,38 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
                             applicationInfo.packageName,
                             requestsPredictiveBack));
                 }
+
+                if (PREDICTIVE_BACK_FALLBACK_WINDOW_ATTRIBUTE && !requestsPredictiveBack) {
+                    // Compatibility check for legacy window style flag used by Wear OS.
+                    // Note on compatibility behavior:
+                    // 1. windowSwipeToDismiss should be respected for all apps not opted in.
+                    // 2. windowSwipeToDismiss should be true for all apps not opted in, which
+                    //    enables the PB animation for them.
+                    // 3. windowSwipeToDismiss=false should be respected for apps not opted in,
+                    //    which disables PB & onBackPressed caused by BackAnimController's
+                    //    setTrigger(true)
+                    TypedArray windowAttr =
+                            context.obtainStyledAttributes(
+                                    new int[] {android.R.attr.windowSwipeToDismiss});
+                    boolean windowSwipeToDismiss = true;
+                    if (windowAttr.getIndexCount() > 0) {
+                        windowSwipeToDismiss = windowAttr.getBoolean(0, true);
+                    }
+                    windowAttr.recycle();
+
+                    if (DEBUG) {
+                        Log.i(TAG, "falling back to windowSwipeToDismiss: " + windowSwipeToDismiss);
+                    }
+
+                    if (!windowSwipeToDismiss) {
+                        return BACK_CALLBACK_DISABLED_LEGACY_WINDOW_SWIPE_TO_DISMISS;
+                    } else {
+                        return BACK_CALLBACK_ENABLED;
+                    }
+                }
             }
 
-            return requestsPredictiveBack;
+            return requestsPredictiveBack ? BACK_CALLBACK_ENABLED : BACK_CALLBACK_DISABLED;
         }
     }
 }

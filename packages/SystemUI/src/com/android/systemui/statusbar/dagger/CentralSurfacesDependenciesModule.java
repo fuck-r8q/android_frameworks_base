@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.dagger;
 import android.app.IActivityManager;
 import android.app.WallpaperManager;
 import android.content.Context;
+import android.hardware.display.DisplayManager;
 import android.os.RemoteException;
 import android.service.dreams.IDreamManager;
 import android.util.Log;
@@ -71,6 +72,7 @@ import com.android.systemui.statusbar.phone.ManagedProfileControllerImpl;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
 import com.android.systemui.statusbar.phone.StatusBarIconControllerImpl;
 import com.android.systemui.statusbar.phone.StatusBarIconList;
+import com.android.systemui.statusbar.phone.StatusBarNotificationPresenterModule;
 import com.android.systemui.statusbar.phone.StatusBarRemoteInputCallback;
 import com.android.systemui.statusbar.phone.ongoingcall.OngoingCallController;
 import com.android.systemui.statusbar.phone.ongoingcall.OngoingCallFlags;
@@ -78,7 +80,6 @@ import com.android.systemui.statusbar.phone.ongoingcall.OngoingCallLogger;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.RemoteInputUriController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
-import com.android.systemui.tracing.ProtoTracer;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 import com.android.systemui.util.time.SystemClock;
 
@@ -96,7 +97,7 @@ import java.util.concurrent.Executor;
  * their own version of CentralSurfaces can include just dependencies, without injecting
  * CentralSurfaces itself.
  */
-@Module
+@Module(includes = {StatusBarNotificationPresenterModule.class})
 public interface CentralSurfacesDependenciesModule {
     /** */
     @SysUISingleton
@@ -147,7 +148,8 @@ public interface CentralSurfacesDependenciesModule {
             SysuiColorExtractor colorExtractor,
             KeyguardStateController keyguardStateController,
             DumpManager dumpManager,
-            WallpaperManager wallpaperManager) {
+            WallpaperManager wallpaperManager,
+            DisplayManager displayManager) {
         return new NotificationMediaManager(
                 context,
                 centralSurfacesOptionalLazy,
@@ -163,7 +165,8 @@ public interface CentralSurfacesDependenciesModule {
                 colorExtractor,
                 keyguardStateController,
                 dumpManager,
-                wallpaperManager);
+                wallpaperManager,
+                displayManager);
     }
 
     /** */
@@ -195,11 +198,10 @@ public interface CentralSurfacesDependenciesModule {
     static CommandQueue provideCommandQueue(
             Context context,
             DisplayTracker displayTracker,
-            ProtoTracer protoTracer,
             CommandRegistry registry,
             DumpHandler dumpHandler
     ) {
-        return new CommandQueue(context, displayTracker, protoTracer, registry, dumpHandler);
+        return new CommandQueue(context, displayTracker, registry, dumpHandler);
     }
 
     /**

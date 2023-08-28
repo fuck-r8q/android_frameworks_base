@@ -18,10 +18,6 @@ package com.android.systemui.statusbar.connectivity;
 
 import static android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED;
 import static android.net.NetworkCapabilities.TRANSPORT_CELLULAR;
-import static android.net.wifi.WifiManager.TrafficStateCallback.DATA_ACTIVITY_IN;
-import static android.net.wifi.WifiManager.TrafficStateCallback.DATA_ACTIVITY_INOUT;
-import static android.net.wifi.WifiManager.TrafficStateCallback.DATA_ACTIVITY_NONE;
-import static android.net.wifi.WifiManager.TrafficStateCallback.DATA_ACTIVITY_OUT;
 import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 
 import android.annotation.Nullable;
@@ -90,8 +86,6 @@ import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.telephony.TelephonyListenerManager;
 import com.android.systemui.util.CarrierConfigTracker;
 
-import kotlin.Unit;
-
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -105,6 +99,8 @@ import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+
+import kotlin.Unit;
 
 /** Platform implementation of the network controller. **/
 @SysUISingleton
@@ -566,10 +562,6 @@ public class NetworkControllerImpl extends BroadcastReceiver
         return mFiveGServiceClient;
     }
 
-    public int getConnectedWifiLevel() {
-        return mWifiSignalController.getState().level;
-    }
-
     @Override
     public AccessPointController getAccessPointController() {
         return mAccessPoints;
@@ -661,14 +653,6 @@ public class NetworkControllerImpl extends BroadcastReceiver
 
     boolean isCarrierMergedWifi(int subId) {
         return mWifiSignalController.isCarrierMergedWifi(subId);
-    }
-
-    boolean hasDefaultNetwork() {
-        return !mNoDefaultNetwork;
-    }
-
-    boolean isNonCarrierWifiNetworkAvailable() {
-        return !mNoNetworksAvailable;
     }
 
     boolean isEthernetDefault() {
@@ -1253,15 +1237,12 @@ public class NetworkControllerImpl extends BroadcastReceiver
     }
 
     private boolean mDemoInetCondition;
-    private WifiState mDemoWifiState;
 
     @Override
     public void onDemoModeStarted() {
         if (DEBUG) Log.d(TAG, "Entering demo mode");
         unregisterListeners();
         mDemoInetCondition = mInetCondition;
-        mDemoWifiState = mWifiSignalController.getState();
-        mDemoWifiState.ssid = "DemoMode";
     }
 
     @Override
@@ -1311,43 +1292,8 @@ public class NetworkControllerImpl extends BroadcastReceiver
                 controller.updateConnectivity(connected, connected);
             }
         }
-        String wifi = args.getString("wifi");
-        if (wifi != null && !mStatusBarPipelineFlags.runNewWifiIconBackend()) {
-            boolean show = wifi.equals("show");
-            String level = args.getString("level");
-            if (level != null) {
-                mDemoWifiState.level = level.equals("null") ? -1
-                        : Math.min(Integer.parseInt(level), WifiIcons.WIFI_LEVEL_COUNT - 1);
-                mDemoWifiState.connected = mDemoWifiState.level >= 0;
-            }
-            String activity = args.getString("activity");
-            if (activity != null) {
-                switch (activity) {
-                    case "inout":
-                        mWifiSignalController.setActivity(DATA_ACTIVITY_INOUT);
-                        break;
-                    case "in":
-                        mWifiSignalController.setActivity(DATA_ACTIVITY_IN);
-                        break;
-                    case "out":
-                        mWifiSignalController.setActivity(DATA_ACTIVITY_OUT);
-                        break;
-                    default:
-                        mWifiSignalController.setActivity(DATA_ACTIVITY_NONE);
-                        break;
-                }
-            } else {
-                mWifiSignalController.setActivity(DATA_ACTIVITY_NONE);
-            }
-            String ssid = args.getString("ssid");
-            if (ssid != null) {
-                mDemoWifiState.ssid = ssid;
-            }
-            mDemoWifiState.enabled = show;
-            mWifiSignalController.notifyListeners();
-        }
         String sims = args.getString("sims");
-        if (sims != null && !mStatusBarPipelineFlags.useNewMobileIcons()) {
+        if (sims != null) {
             int num = MathUtils.constrain(Integer.parseInt(sims), 1, 8);
             List<SubscriptionInfo> subs = new ArrayList<>();
             if (num != mMobileSignalControllers.size()) {
@@ -1370,7 +1316,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
             mCallbackHandler.setNoSims(mHasNoSubs, mSimDetected);
         }
         String mobile = args.getString("mobile");
-        if (mobile != null && !mStatusBarPipelineFlags.useNewMobileIcons()) {
+        if (mobile != null) {
             boolean show = mobile.equals("show");
             String datatype = args.getString("datatype");
             String slotString = args.getString("slot");
@@ -1455,7 +1401,7 @@ public class NetworkControllerImpl extends BroadcastReceiver
             controller.notifyListeners();
         }
         String carrierNetworkChange = args.getString("carriernetworkchange");
-        if (carrierNetworkChange != null && !mStatusBarPipelineFlags.useNewMobileIcons()) {
+        if (carrierNetworkChange != null) {
             boolean show = carrierNetworkChange.equals("show");
             for (int i = 0; i < mMobileSignalControllers.size(); i++) {
                 MobileSignalController controller = mMobileSignalControllers.valueAt(i);

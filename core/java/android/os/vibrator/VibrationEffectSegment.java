@@ -76,13 +76,6 @@ public abstract class VibrationEffectSegment implements Parcelable {
     public abstract boolean isHapticFeedbackCandidate();
 
     /**
-     * Returns true if this segment plays at a non-zero amplitude at some point.
-     *
-     * @hide
-     */
-    public abstract boolean hasNonZeroAmplitude();
-
-    /**
      * Validates the segment, throwing exceptions if any parameter is invalid.
      *
      * @hide
@@ -121,6 +114,13 @@ public abstract class VibrationEffectSegment implements Parcelable {
      */
     @NonNull
     public abstract <T extends VibrationEffectSegment> T applyEffectStrength(int effectStrength);
+
+    /**
+     * Returns a compact version of the {@link #toString()} result for debugging purposes.
+     *
+     * @hide
+     */
+    public abstract String toDebugString();
 
     /**
      * Checks the given frequency argument is valid to represent a vibration effect frequency in

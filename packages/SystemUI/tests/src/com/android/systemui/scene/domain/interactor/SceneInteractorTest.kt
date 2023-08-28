@@ -22,10 +22,13 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.scene.shared.model.SceneTransitionModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,40 +39,86 @@ import org.junit.runners.JUnit4
 class SceneInteractorTest : SysuiTestCase() {
 
     private val utils = SceneTestUtils(this)
-    private val underTest = utils.sceneInteractor()
+    private val repository = utils.fakeSceneContainerRepository()
+    private val underTest = utils.sceneInteractor(repository = repository)
 
     @Test
     fun allSceneKeys() {
-        assertThat(underTest.allSceneKeys("container1")).isEqualTo(utils.fakeSceneKeys())
+        assertThat(underTest.allSceneKeys()).isEqualTo(utils.fakeSceneKeys())
     }
 
     @Test
-    fun sceneTransitions() = runTest {
-        val currentScene by collectLastValue(underTest.currentScene("container1"))
+    fun currentScene() = runTest {
+        val currentScene by collectLastValue(underTest.currentScene)
         assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
 
-        underTest.setCurrentScene("container1", SceneModel(SceneKey.Shade))
+        underTest.setCurrentScene(SceneModel(SceneKey.Shade))
         assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Shade))
     }
 
     @Test
     fun sceneTransitionProgress() = runTest {
-        val progress by collectLastValue(underTest.sceneTransitionProgress("container1"))
-        assertThat(progress).isEqualTo(1f)
+        val transitionProgress by collectLastValue(underTest.transitionProgress)
+        assertThat(transitionProgress).isEqualTo(1f)
 
-        underTest.setSceneTransitionProgress("container1", 0.55f)
-        assertThat(progress).isEqualTo(0.55f)
+        val progress = MutableStateFlow(0.55f)
+        repository.setTransitionState(
+            MutableStateFlow(
+                ObservableTransitionState.Transition(
+                    fromScene = SceneKey.Lockscreen,
+                    toScene = SceneKey.Shade,
+                    progress = progress,
+                ),
+            )
+        )
+        assertThat(transitionProgress).isEqualTo(0.55f)
     }
 
     @Test
     fun isVisible() = runTest {
-        val isVisible by collectLastValue(underTest.isVisible("container1"))
+        val isVisible by collectLastValue(underTest.isVisible)
         assertThat(isVisible).isTrue()
 
-        underTest.setVisible("container1", false)
+        underTest.setVisible(false)
         assertThat(isVisible).isFalse()
 
-        underTest.setVisible("container1", true)
+        underTest.setVisible(true)
         assertThat(isVisible).isTrue()
+    }
+
+    @Test
+    fun sceneTransitions() = runTest {
+        val transitions by collectLastValue(underTest.transitions)
+        assertThat(transitions).isNull()
+
+        val initialSceneKey = underTest.currentScene.value.key
+        underTest.setCurrentScene(SceneModel(SceneKey.Shade))
+        assertThat(transitions)
+            .isEqualTo(
+                SceneTransitionModel(
+                    from = initialSceneKey,
+                    to = SceneKey.Shade,
+                )
+            )
+
+        underTest.setCurrentScene(SceneModel(SceneKey.QuickSettings))
+        assertThat(transitions)
+            .isEqualTo(
+                SceneTransitionModel(
+                    from = SceneKey.Shade,
+                    to = SceneKey.QuickSettings,
+                )
+            )
+    }
+
+    @Test
+    fun remoteUserInput() = runTest {
+        val remoteUserInput by collectLastValue(underTest.remoteUserInput)
+        assertThat(remoteUserInput).isNull()
+
+        for (input in SceneTestUtils.REMOTE_INPUT_DOWN_GESTURE) {
+            underTest.onRemoteUserInput(input)
+            assertThat(remoteUserInput).isEqualTo(input)
+        }
     }
 }

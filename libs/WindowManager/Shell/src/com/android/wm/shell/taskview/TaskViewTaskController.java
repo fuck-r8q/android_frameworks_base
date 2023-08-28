@@ -33,6 +33,7 @@ import android.os.Binder;
 import android.util.CloseGuard;
 import android.util.Slog;
 import android.view.SurfaceControl;
+import android.view.WindowInsets;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -81,6 +82,10 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     private boolean mNotifiedForInitialized;
     private TaskView.Listener mListener;
     private Executor mListenerExecutor;
+
+    /** Used to inset the activity content to allow space for a caption bar. */
+    private final Binder mCaptionInsetsOwner = new Binder();
+    private Rect mCaptionInsets;
 
     public TaskViewTaskController(Context context, ShellTaskOrganizer organizer,
             TaskViewTransitions taskViewTransitions, SyncTransactionQueue syncQueue) {
@@ -312,18 +317,12 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
         // we know about -- so leave clean-up here even if shell transitions are enabled.
         if (mTaskToken == null || !mTaskToken.equals(taskInfo.token)) return;
 
-        if (mListener != null) {
-            final int taskId = taskInfo.taskId;
-            mListenerExecutor.execute(() -> {
-                mListener.onTaskRemovalStarted(taskId);
-            });
-        }
-        mTaskOrganizer.setInterceptBackPressedOnTaskRoot(mTaskToken, false);
+        final SurfaceControl taskLeash = mTaskLeash;
+        handleAndNotifyTaskRemoval(mTaskInfo);
 
         // Unparent the task when this surface is destroyed
-        mTransaction.reparent(mTaskLeash, null).apply();
+        mTransaction.reparent(taskLeash, null).apply();
         resetTaskInfo();
-        mTaskViewBase.onTaskVanished(taskInfo);
     }
 
     @Override
@@ -436,6 +435,32 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
         mTaskViewTransitions.closeTaskView(wct, this);
     }
 
+    /**
+     * Sets a region of the task to inset to allow for a caption bar.
+     *
+     * @param captionInsets the rect for the insets in screen coordinates.
+     */
+    void setCaptionInsets(Rect captionInsets) {
+        if (mCaptionInsets != null && mCaptionInsets.equals(captionInsets)) {
+            return;
+        }
+        mCaptionInsets = captionInsets;
+        applyCaptionInsetsIfNeeded();
+    }
+
+    void applyCaptionInsetsIfNeeded() {
+        if (mTaskToken == null) return;
+        WindowContainerTransaction wct = new WindowContainerTransaction();
+        if (mCaptionInsets != null) {
+            wct.addInsetsSource(mTaskToken, mCaptionInsetsOwner, 0,
+                    WindowInsets.Type.captionBar(), mCaptionInsets);
+        } else {
+            wct.removeInsetsSource(mTaskToken, mCaptionInsetsOwner, 0,
+                    WindowInsets.Type.captionBar());
+        }
+        mTaskOrganizer.applyTransaction(wct);
+    }
+
     /** Should be called when the client surface is destroyed. */
     public void surfaceDestroyed() {
         mSurfaceCreated = false;
@@ -467,6 +492,20 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
         }
     }
 
+    /** Notifies listeners of a task being removed and stops intercepting back presses on it. */
+    private void handleAndNotifyTaskRemoval(ActivityManager.RunningTaskInfo taskInfo) {
+        if (taskInfo != null) {
+            if (mListener != null) {
+                final int taskId = taskInfo.taskId;
+                mListenerExecutor.execute(() -> {
+                    mListener.onTaskRemovalStarted(taskId);
+                });
+            }
+            mTaskViewBase.onTaskVanished(taskInfo);
+            mTaskOrganizer.setInterceptBackPressedOnTaskRoot(taskInfo.token, false);
+        }
+    }
+
     /** Returns the task info for the task in the TaskView. */
     @Nullable
     public ActivityManager.RunningTaskInfo getTaskInfo() {
@@ -492,18 +531,12 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
      */
     void cleanUpPendingTask() {
         if (mPendingInfo != null) {
-            if (mListener != null) {
-                final int taskId = mPendingInfo.taskId;
-                mListenerExecutor.execute(() -> {
-                    mListener.onTaskRemovalStarted(taskId);
-                });
-            }
-            mTaskViewBase.onTaskVanished(mPendingInfo);
-            mTaskOrganizer.setInterceptBackPressedOnTaskRoot(mPendingInfo.token, false);
+            final ActivityManager.RunningTaskInfo pendingInfo = mPendingInfo;
+            handleAndNotifyTaskRemoval(pendingInfo);
 
             // Make sure the task is removed
             WindowContainerTransaction wct = new WindowContainerTransaction();
-            wct.removeTask(mPendingInfo.token);
+            wct.removeTask(pendingInfo.token);
             mTaskViewTransitions.closeTaskView(wct, this);
         }
         resetTaskInfo();
@@ -528,16 +561,7 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
      * is used instead.
      */
     void prepareCloseAnimation() {
-        if (mTaskToken != null) {
-            if (mListener != null) {
-                final int taskId = mTaskInfo.taskId;
-                mListenerExecutor.execute(() -> {
-                    mListener.onTaskRemovalStarted(taskId);
-                });
-            }
-            mTaskViewBase.onTaskVanished(mTaskInfo);
-            mTaskOrganizer.setInterceptBackPressedOnTaskRoot(mTaskToken, false);
-        }
+        handleAndNotifyTaskRemoval(mTaskInfo);
         resetTaskInfo();
     }
 
@@ -564,6 +588,7 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
             mTaskViewTransitions.updateBoundsState(this, boundsOnScreen);
             mTaskViewTransitions.updateVisibilityState(this, true /* visible */);
             wct.setBounds(mTaskToken, boundsOnScreen);
+            applyCaptionInsetsIfNeeded();
         } else {
             // The surface has already been destroyed before the task has appeared,
             // so go ahead and hide the task entirely

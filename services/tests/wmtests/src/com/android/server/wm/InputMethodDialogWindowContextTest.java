@@ -36,6 +36,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import android.app.ActivityThread;
+import android.app.IApplicationThread;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Rect;
@@ -46,6 +47,7 @@ import android.view.Display;
 import android.view.IWindowManager;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
+import android.window.WindowContextInfo;
 import android.window.WindowTokenClient;
 
 import com.android.server.inputmethod.InputMethodDialogWindowContext;
@@ -91,14 +93,15 @@ public class InputMethodDialogWindowContextTest extends WindowTestsBase {
         spyOn(mIWindowManager);
         doAnswer(invocation -> {
             Object[] args = invocation.getArguments();
-            IBinder clientToken = (IBinder) args[0];
-            int displayId = (int) args[2];
+            IApplicationThread appThread = (IApplicationThread) args[0];
+            IBinder clientToken = (IBinder) args[1];
+            int displayId = (int) args[3];
             DisplayContent dc = mWm.mRoot.getDisplayContent(displayId);
-            mWm.mWindowContextListenerController.registerWindowContainerListener(clientToken,
-                    dc.getImeContainer(), 1000 /* ownerUid */, TYPE_INPUT_METHOD_DIALOG,
-                    null /* options */);
-            return dc.getImeContainer().getConfiguration();
-        }).when(mIWindowManager).attachWindowContextToDisplayArea(any(),
+            final WindowProcessController wpc = mAtm.getProcessController(appThread);
+            mWm.mWindowContextListenerController.registerWindowContainerListener(wpc, clientToken,
+                    dc.getImeContainer(), TYPE_INPUT_METHOD_DIALOG, null /* options */);
+            return new WindowContextInfo(dc.getImeContainer().getConfiguration(), displayId);
+        }).when(mIWindowManager).attachWindowContextToDisplayArea(any(), any(),
                 eq(TYPE_INPUT_METHOD_DIALOG), anyInt(), any());
         mDisplayManagerGlobal = DisplayManagerGlobal.getInstance();
         spyOn(mDisplayManagerGlobal);

@@ -23,7 +23,10 @@ import android.tools.device.traces.parsers.WindowManagerStateHelper
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import com.android.launcher3.tapl.LauncherInstrumentation
+import com.android.wm.shell.flicker.service.Utils
+import com.android.wm.shell.flicker.utils.SplitScreenUtils
 import org.junit.After
+import org.junit.Assume
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Rule
@@ -40,12 +43,12 @@ constructor(val rotation: Rotation = Rotation.ROTATION_0) {
     private val primaryApp = SplitScreenUtils.getPrimary(instrumentation)
     private val secondaryApp = SplitScreenUtils.getSecondary(instrumentation)
 
-    @Rule
-    @JvmField
-    val testSetupRule = SplitScreenUtils.testSetupRule({ NavBar.MODE_GESTURAL }, { rotation })
+    @Rule @JvmField val testSetupRule = Utils.testSetupRule(NavBar.MODE_GESTURAL, rotation)
 
     @Before
     fun setup() {
+        Assume.assumeTrue(tapl.isTablet)
+
         tapl.setEnableRotation(true)
         tapl.setExpectedRotation(rotation.value)
 

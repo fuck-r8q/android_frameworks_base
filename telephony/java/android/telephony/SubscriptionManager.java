@@ -35,6 +35,9 @@ import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.app.PendingIntent;
 import android.app.PropertyInvalidatedCache;
+import android.compat.Compatibility;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.Intent;
@@ -85,6 +88,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -170,6 +174,15 @@ public class SubscriptionManager {
     /** @hide */
     public static final String RESTORE_SIM_SPECIFIC_SETTINGS_METHOD_NAME =
             "restoreSimSpecificSettings";
+
+    /**
+     * The key of the boolean flag indicating whether restoring subscriptions actually changes
+     * the subscription database or not.
+     *
+     * @hide
+     */
+    public static final String RESTORE_SIM_SPECIFIC_SETTINGS_DATABASE_UPDATED =
+            "restoreSimSpecificSettingsDatabaseUpdated";
 
     /**
      * Key to the backup & restore data byte array in the Bundle that is returned by {@link
@@ -1369,8 +1382,11 @@ public class SubscriptionManager {
     private final Context mContext;
 
     // Cache of Resource that has been created in getResourcesForSubId. Key is a Pair containing
-    // the Context and subId.
-    private static final Map<Pair<Context, Integer>, Resources> sResourcesCache =
+    // the Package Name and subId. Applications can create new contexts from
+    // {@link android.content.Context#createPackageContext} with the same resources for different
+    // purposes. Therefore, Cache can be wasted for resources from different contexts in the same
+    // package. Use the package name rather than the context itself as a key value of cache.
+    private static final Map<Pair<String, Integer>, Resources> sResourcesCache =
             new ConcurrentHashMap<>();
 
     /**
@@ -1385,41 +1401,61 @@ public class SubscriptionManager {
      * for #onSubscriptionsChanged to be invoked.
      */
     public static class OnSubscriptionsChangedListener {
-        private class OnSubscriptionsChangedListenerHandler extends Handler {
-            OnSubscriptionsChangedListenerHandler() {
-                super();
-            }
-
-            OnSubscriptionsChangedListenerHandler(Looper looper) {
-                super(looper);
-            }
-        }
 
         /**
-         * Posted executor callback on the handler associated with a given looper.
-         * The looper can be the calling thread's looper or the looper passed from the
-         * constructor {@link #OnSubscriptionsChangedListener(Looper)}.
+         * After {@link Build.VERSION_CODES.Q}, it is no longer necessary to instantiate a
+         * Handler inside of the OnSubscriptionsChangedListener in all cases, so it will only
+         * be done for callers that do not supply an Executor.
          */
-        private final HandlerExecutor mExecutor;
+        @ChangeId
+        @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.Q)
+        private static final long LAZY_INITIALIZE_SUBSCRIPTIONS_CHANGED_HANDLER = 278814050L;
+
+        /**
+         * For backwards compatibility reasons, stashes the Looper associated with the thread
+         * context in which this listener was created.
+         */
+        private final Looper mCreatorLooper;
 
         /**
          * @hide
          */
-        public HandlerExecutor getHandlerExecutor() {
-            return mExecutor;
+        public Looper getCreatorLooper() {
+            return mCreatorLooper;
         }
 
+        /**
+         * Create an OnSubscriptionsChangedListener.
+         *
+         * For callers targeting {@link Build.VERSION_CODES.P} or earlier, this can only be called
+         * on a thread that already has a prepared Looper. Callers targeting Q or later should
+         * subsequently use {@link SubscriptionManager#addOnSubscriptionsChangedListener(
+         * Executor, OnSubscriptionsChangedListener)}.
+         *
+         * On OS versions prior to {@link Build.VERSION_CODES.V} callers should assume that this
+         * call will fail if invoked on a thread that does not already have a prepared looper.
+         */
         public OnSubscriptionsChangedListener() {
-            mExecutor = new HandlerExecutor(new OnSubscriptionsChangedListenerHandler());
+            mCreatorLooper = Looper.myLooper();
+            if (mCreatorLooper == null
+                    && !Compatibility.isChangeEnabled(
+                            LAZY_INITIALIZE_SUBSCRIPTIONS_CHANGED_HANDLER)) {
+                // matches the implementation of Handler
+                throw new RuntimeException(
+                        "Can't create handler inside thread "
+                        + Thread.currentThread()
+                        + " that has not called Looper.prepare()");
+            }
         }
 
         /**
          * Allow a listener to be created with a custom looper
-         * @param looper the looper that the underlining handler should run on
+         * @param looper the non-null Looper that the underlining handler should run on
          * @hide
          */
-        public OnSubscriptionsChangedListener(Looper looper) {
-            mExecutor = new HandlerExecutor(new OnSubscriptionsChangedListenerHandler(looper));
+        public OnSubscriptionsChangedListener(@NonNull Looper looper) {
+            Objects.requireNonNull(looper);
+            mCreatorLooper = looper;
         }
 
         /**
@@ -1497,7 +1533,9 @@ public class SubscriptionManager {
     @Deprecated
     public void addOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {
         if (listener == null) return;
-        addOnSubscriptionsChangedListener(listener.mExecutor, listener);
+
+        addOnSubscriptionsChangedListener(
+                new HandlerExecutor(new Handler(listener.getCreatorLooper())), listener);
     }
 
     /**
@@ -2854,12 +2892,13 @@ public class SubscriptionManager {
             boolean useRootLocale) {
         // Check if resources for this context and subId already exist in the resource cache.
         // Resources that use the root locale are not cached.
-        Pair<Context, Integer> cacheKey = null;
+        Pair<String, Integer> cacheKey = null;
         if (isValidSubscriptionId(subId) && !useRootLocale) {
-            cacheKey = Pair.create(context, subId);
-            if (sResourcesCache.containsKey(cacheKey)) {
+            cacheKey = Pair.create(context.getPackageName(), subId);
+            Resources cached = sResourcesCache.get(cacheKey);
+            if (cached != null) {
                 // Cache hit. Use cached Resources.
-                return sResourcesCache.get(cacheKey);
+                return cached;
             }
         }
 

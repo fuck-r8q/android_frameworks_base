@@ -72,6 +72,7 @@ import android.util.SparseArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
+import com.android.internal.util.function.QuadFunction;
 import com.android.internal.util.function.TriFunction;
 import com.android.server.LocalServices;
 import com.android.server.pm.UserManagerInternal;
@@ -93,7 +94,6 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiFunction;
 
 /**
  * Manages all permissions and handles permissions related tasks.
@@ -218,9 +218,12 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         }
     }
 
-    private int checkPermission(String pkgName, String permName, @UserIdInt int userId) {
+    @Override
+    @PackageManager.PermissionResult
+    public int checkPermission(String packageName, String permissionName, int deviceId,
+            @UserIdInt int userId) {
         // Not using Objects.requireNonNull() here for compatibility reasons.
-        if (pkgName == null || permName == null) {
+        if (packageName == null || permissionName == null) {
             return PackageManager.PERMISSION_DENIED;
         }
 
@@ -230,15 +233,18 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         }
 
         if (checkPermissionDelegate == null) {
-            return mPermissionManagerServiceImpl.checkPermission(pkgName, permName, userId);
+            return mPermissionManagerServiceImpl.checkPermission(packageName, permissionName,
+                    deviceId, userId);
         }
-        return checkPermissionDelegate.checkPermission(pkgName, permName, userId,
-                mPermissionManagerServiceImpl::checkPermission);
+        return checkPermissionDelegate.checkPermission(packageName, permissionName,
+                deviceId, userId, mPermissionManagerServiceImpl::checkPermission);
     }
 
-    private int checkUidPermission(int uid, String permName) {
+    @Override
+    @PackageManager.PermissionResult
+    public int checkUidPermission(int uid, String permissionName, int deviceId) {
         // Not using Objects.requireNonNull() here for compatibility reasons.
-        if (permName == null) {
+        if (permissionName == null) {
             return PackageManager.PERMISSION_DENIED;
         }
 
@@ -248,10 +254,10 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         }
 
         if (checkPermissionDelegate == null)  {
-            return mPermissionManagerServiceImpl.checkUidPermission(uid, permName);
+            return mPermissionManagerServiceImpl.checkUidPermission(uid, permissionName, deviceId);
         }
-        return checkPermissionDelegate.checkUidPermission(uid, permName,
-                mPermissionManagerServiceImpl::checkUidPermission);
+        return checkPermissionDelegate.checkUidPermission(uid, permissionName,
+                deviceId, mPermissionManagerServiceImpl::checkUidPermission);
     }
 
     @Override
@@ -502,16 +508,17 @@ public class PermissionManagerService extends IPermissionManager.Stub {
     }
 
     @Override
-    public int getPermissionFlags(String packageName, String permissionName, int userId) {
+    public int getPermissionFlags(String packageName, String permissionName, int deviceId,
+            int userId) {
         return mPermissionManagerServiceImpl
-                .getPermissionFlags(packageName, permissionName, userId);
+                .getPermissionFlags(packageName, permissionName, deviceId, userId);
     }
 
     @Override
     public void updatePermissionFlags(String packageName, String permissionName, int flagMask,
-            int flagValues, boolean checkAdjustPolicyFlagPermission, int userId) {
+            int flagValues, boolean checkAdjustPolicyFlagPermission, int deviceId, int userId) {
         mPermissionManagerServiceImpl.updatePermissionFlags(packageName, permissionName, flagMask,
-                flagValues, checkAdjustPolicyFlagPermission, userId);
+                flagValues, checkAdjustPolicyFlagPermission, deviceId, userId);
     }
 
     @Override
@@ -551,15 +558,17 @@ public class PermissionManagerService extends IPermissionManager.Stub {
     }
 
     @Override
-    public void grantRuntimePermission(String packageName, String permissionName, int userId) {
-        mPermissionManagerServiceImpl.grantRuntimePermission(packageName, permissionName, userId);
+    public void grantRuntimePermission(String packageName, String permissionName, int deviceId,
+            int userId) {
+        mPermissionManagerServiceImpl.grantRuntimePermission(packageName, permissionName,
+                deviceId, userId);
     }
 
     @Override
-    public void revokeRuntimePermission(String packageName, String permissionName, int userId,
-            String reason) {
-        mPermissionManagerServiceImpl.revokeRuntimePermission(packageName, permissionName, userId,
-                reason);
+    public void revokeRuntimePermission(String packageName, String permissionName, int deviceId,
+            int userId, String reason) {
+        mPermissionManagerServiceImpl.revokeRuntimePermission(packageName, permissionName,
+                deviceId, userId, reason);
     }
 
     @Override
@@ -570,16 +579,16 @@ public class PermissionManagerService extends IPermissionManager.Stub {
 
     @Override
     public boolean shouldShowRequestPermissionRationale(String packageName, String permissionName,
-            int userId) {
+            int deviceId, int userId) {
         return mPermissionManagerServiceImpl.shouldShowRequestPermissionRationale(packageName,
-                permissionName, userId);
+                permissionName, deviceId, userId);
     }
 
     @Override
     public boolean isPermissionRevokedByPolicy(String packageName, String permissionName,
-            int userId) {
-        return mPermissionManagerServiceImpl
-                .isPermissionRevokedByPolicy(packageName, permissionName, userId);
+            int deviceId, int userId) {
+        return mPermissionManagerServiceImpl.isPermissionRevokedByPolicy(packageName,
+                permissionName, deviceId, userId);
     }
 
     @Override
@@ -592,14 +601,14 @@ public class PermissionManagerService extends IPermissionManager.Stub {
     private class PermissionManagerServiceInternalImpl implements PermissionManagerServiceInternal {
         @Override
         public int checkPermission(@NonNull String packageName, @NonNull String permissionName,
-                @UserIdInt int userId) {
+                int deviceId, @UserIdInt int userId) {
             return PermissionManagerService.this.checkPermission(packageName, permissionName,
-                    userId);
+                    deviceId, userId);
         }
 
         @Override
-        public int checkUidPermission(int uid, @NonNull String permissionName) {
-            return PermissionManagerService.this.checkUidPermission(uid, permissionName);
+        public int checkUidPermission(int uid, @NonNull String permissionName, int deviceId) {
+            return PermissionManagerService.this.checkUidPermission(uid, permissionName, deviceId);
         }
 
         @Override
@@ -805,6 +814,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
         public void resetRuntimePermissions(@NonNull AndroidPackage pkg, @UserIdInt int userId) {
             mPermissionManagerServiceImpl.resetRuntimePermissions(pkg, userId);
         }
+
         @Override
         public void resetRuntimePermissionsForUser(@UserIdInt int userId) {
             mPermissionManagerServiceImpl.resetRuntimePermissionsForUser(userId);
@@ -859,6 +869,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
          *
          * @param packageName the name of the package to be checked
          * @param permissionName the name of the permission to be checked
+         * @param deviceId The device ID
          * @param userId the user ID
          * @param superImpl the original implementation that can be delegated to
          * @return {@link android.content.pm.PackageManager#PERMISSION_GRANTED} if the package has
@@ -867,20 +878,21 @@ public class PermissionManagerService extends IPermissionManager.Stub {
          * @see android.content.pm.PackageManager#checkPermission(String, String)
          */
         int checkPermission(@NonNull String packageName, @NonNull String permissionName,
-                @UserIdInt int userId,
-                @NonNull TriFunction<String, String, Integer, Integer> superImpl);
+                int deviceId, @UserIdInt int userId,
+                @NonNull QuadFunction<String, String, Integer, Integer, Integer> superImpl);
 
         /**
          * Check whether the given UID has been granted the specified permission.
          *
          * @param uid the UID to be checked
          * @param permissionName the name of the permission to be checked
+         * @param deviceId The device ID
          * @param superImpl the original implementation that can be delegated to
          * @return {@link android.content.pm.PackageManager#PERMISSION_GRANTED} if the package has
          * the permission, or {@link android.content.pm.PackageManager#PERMISSION_DENIED} otherwise
          */
-        int checkUidPermission(int uid, @NonNull String permissionName,
-                BiFunction<Integer, String, Integer> superImpl);
+        int checkUidPermission(int uid, @NonNull String permissionName, int deviceId,
+                TriFunction<Integer, String, Integer, Integer> superImpl);
 
         /**
          * @return list of delegated permissions
@@ -909,31 +921,32 @@ public class PermissionManagerService extends IPermissionManager.Stub {
 
         @Override
         public int checkPermission(@NonNull String packageName, @NonNull String permissionName,
-                int userId, @NonNull TriFunction<String, String, Integer, Integer> superImpl) {
+                int deviceId, int userId,
+                @NonNull QuadFunction<String, String, Integer, Integer, Integer> superImpl) {
             if (mDelegatedPackageName.equals(packageName)
                     && isDelegatedPermission(permissionName)) {
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    return superImpl.apply("com.android.shell", permissionName, userId);
+                    return superImpl.apply("com.android.shell", permissionName, deviceId, userId);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(packageName, permissionName, userId);
+            return superImpl.apply(packageName, permissionName, deviceId, userId);
         }
 
         @Override
-        public int checkUidPermission(int uid, @NonNull String permissionName,
-                @NonNull BiFunction<Integer, String, Integer> superImpl) {
+        public int checkUidPermission(int uid, @NonNull String permissionName, int deviceId,
+                @NonNull TriFunction<Integer, String, Integer, Integer> superImpl) {
             if (uid == mDelegatedUid && isDelegatedPermission(permissionName)) {
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    return superImpl.apply(Process.SHELL_UID, permissionName);
+                    return superImpl.apply(Process.SHELL_UID, permissionName, deviceId);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(uid, permissionName);
+            return superImpl.apply(uid, permissionName, deviceId);
         }
 
         @Override
@@ -1221,8 +1234,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             }
 
             if (!fromDatasource && !checkPermission(context, permissionManagerServiceInt,
-                    permission, attributionSource.getUid(),
-                    attributionSource.getRenouncedPermissions())) {
+                    permission, attributionSource)) {
                 return PermissionChecker.PERMISSION_HARD_DENIED;
             }
 
@@ -1283,12 +1295,11 @@ public class PermissionManagerService extends IPermissionManager.Stub {
                     }
                     case AppOpsManager.MODE_DEFAULT: {
                         if (!skipCurrentChecks && !checkPermission(context,
-                                permissionManagerServiceInt, permission, attributionSource.getUid(),
-                                attributionSource.getRenouncedPermissions())) {
+                                permissionManagerServiceInt, permission, attributionSource)) {
                             return PermissionChecker.PERMISSION_HARD_DENIED;
                         }
                         if (next != null && !checkPermission(context, permissionManagerServiceInt,
-                                permission, next.getUid(), next.getRenouncedPermissions())) {
+                                permission, next)) {
                             return PermissionChecker.PERMISSION_HARD_DENIED;
                         }
                     }
@@ -1317,8 +1328,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             // We consider the chain trusted if the start node has UPDATE_APP_OPS_STATS, and
             // every attributionSource in the chain is registered with the system.
             final boolean isChainStartTrusted = !hasChain || checkPermission(context,
-                    permissionManagerServiceInt, UPDATE_APP_OPS_STATS, current.getUid(),
-                    current.getRenouncedPermissions());
+                    permissionManagerServiceInt, UPDATE_APP_OPS_STATS, current);
 
             while (true) {
                 final boolean skipCurrentChecks = (fromDatasource || next != null);
@@ -1333,12 +1343,12 @@ public class PermissionManagerService extends IPermissionManager.Stub {
 
                 // If we already checked the permission for this one, skip the work
                 if (!skipCurrentChecks && !checkPermission(context, permissionManagerServiceInt,
-                        permission, current.getUid(), current.getRenouncedPermissions())) {
+                        permission, current)) {
                     return PermissionChecker.PERMISSION_HARD_DENIED;
                 }
 
                 if (next != null && !checkPermission(context, permissionManagerServiceInt,
-                        permission, next.getUid(), next.getRenouncedPermissions())) {
+                        permission, next)) {
                     return PermissionChecker.PERMISSION_HARD_DENIED;
                 }
 
@@ -1406,9 +1416,13 @@ public class PermissionManagerService extends IPermissionManager.Stub {
 
         private static boolean checkPermission(@NonNull Context context,
                 @NonNull PermissionManagerServiceInternal permissionManagerServiceInt,
-                @NonNull String permission, int uid, @NonNull Set<String> renouncedPermissions) {
-            boolean permissionGranted = context.checkPermission(permission, /*pid*/ -1,
-                    uid) == PackageManager.PERMISSION_GRANTED;
+                @NonNull String permission, AttributionSource attributionSource) {
+            int uid = attributionSource.getUid();
+            int deviceId = attributionSource.getDeviceId();
+            final Context deviceContext = context.getDeviceId() == deviceId ? context
+                    : context.createDeviceContext(deviceId);
+            boolean permissionGranted = deviceContext.checkPermission(permission,
+                    Process.INVALID_PID, uid) == PackageManager.PERMISSION_GRANTED;
 
             // Override certain permissions checks for the shared isolated process for both
             // HotwordDetectionService and VisualQueryDetectionService, which ordinarily cannot hold
@@ -1424,10 +1438,10 @@ public class PermissionManagerService extends IPermissionManager.Stub {
                 permissionGranted = hotwordServiceProvider != null
                         && uid == hotwordServiceProvider.getUid();
             }
-
+            Set<String> renouncedPermissions = attributionSource.getRenouncedPermissions();
             if (permissionGranted && renouncedPermissions.contains(permission)
-                    && context.checkPermission(Manifest.permission.RENOUNCE_PERMISSIONS,
-                    /*pid*/ -1, uid) == PackageManager.PERMISSION_GRANTED) {
+                    && deviceContext.checkPermission(Manifest.permission.RENOUNCE_PERMISSIONS,
+                        Process.INVALID_PID, uid) == PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
             return permissionGranted;
@@ -1498,8 +1512,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             // We consider the chain trusted if the start node has UPDATE_APP_OPS_STATS, and
             // every attributionSource in the chain is registered with the system.
             final boolean isChainStartTrusted = !hasChain || checkPermission(context,
-                    permissionManagerServiceInt, UPDATE_APP_OPS_STATS, current.getUid(),
-                    current.getRenouncedPermissions());
+                    permissionManagerServiceInt, UPDATE_APP_OPS_STATS, current);
 
             while (true) {
                 final boolean skipCurrentChecks = (next != null);

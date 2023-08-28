@@ -27,14 +27,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.android.settingslib.development.DevelopmentSettingsEnabler
 import com.android.settingslib.spa.framework.compose.rememberDrawablePainter
 import com.android.settingslib.spa.framework.theme.SettingsDimension
 import com.android.settingslib.spa.widget.ui.SettingsBody
@@ -69,7 +72,7 @@ class AppInfoProvider(private val packageInfo: PackageInfo) {
     private fun InstallType(app: ApplicationInfo) {
         if (!app.isInstantApp) return
         Spacer(modifier = Modifier.height(4.dp))
-        SettingsBody(stringResource(R.string.install_type_instant))
+        SettingsBody(stringResource(com.android.settingslib.widget.R.string.install_type_instant))
     }
 
     @Composable
@@ -80,11 +83,22 @@ class AppInfoProvider(private val packageInfo: PackageInfo) {
     }
 
     @Composable
-    fun FooterAppVersion() {
+    fun FooterAppVersion(showPackageName: Boolean = rememberIsDevelopmentSettingsEnabled()) {
         if (packageInfo.versionName == null) return
-        Divider()
-        Box(modifier = Modifier.padding(SettingsDimension.itemPadding)) {
+        HorizontalDivider()
+        Column(modifier = Modifier.padding(SettingsDimension.itemPadding)) {
             SettingsBody(stringResource(R.string.version_text, packageInfo.versionNameBidiWrapped))
+            if (showPackageName) {
+                SettingsBody(packageInfo.packageName)
+            }
+        }
+    }
+
+    @Composable
+    private fun rememberIsDevelopmentSettingsEnabled(): Boolean {
+        val context = LocalContext.current
+        return remember {
+            DevelopmentSettingsEnabler.isDevelopmentSettingsEnabled(context)
         }
     }
 
@@ -108,5 +122,5 @@ internal fun AppIcon(app: ApplicationInfo, size: Dp) {
 @Composable
 internal fun AppLabel(app: ApplicationInfo, isClonedAppPage: Boolean = false) {
     val appRepository = rememberAppRepository()
-    SettingsTitle(title = appRepository.produceLabel(app, isClonedAppPage), useMediumWeight = true)
+    SettingsTitle(appRepository.produceLabel(app, isClonedAppPage).value, useMediumWeight = true)
 }

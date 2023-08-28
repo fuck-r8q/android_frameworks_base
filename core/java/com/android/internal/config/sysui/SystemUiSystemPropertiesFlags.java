@@ -66,10 +66,6 @@ public class SystemUiSystemPropertiesFlags {
         public static final Flag SHOW_STICKY_HUN_FOR_DENIED_FSI =
                 releasedFlag("persist.sysui.notification.show_sticky_hun_for_denied_fsi");
 
-        /** Gating the ability for users to dismiss ongoing event notifications */
-        public static final Flag ALLOW_DISMISS_ONGOING =
-                releasedFlag("persist.sysui.notification.ongoing_dismissal");
-
         /** Gating the redaction of OTP notifications on the lockscreen */
         public static final Flag OTP_REDACTION =
                 devFlag("persist.sysui.notification.otp_redaction");
@@ -84,11 +80,14 @@ public class SystemUiSystemPropertiesFlags {
 
         /** Gating the holding of WakeLocks until NLSes are told about a new notification. */
         public static final Flag WAKE_LOCK_FOR_POSTING_NOTIFICATION =
-                devFlag("persist.sysui.notification.wake_lock_for_posting_notification");
+                releasedFlag("persist.sysui.notification.wake_lock_for_posting_notification");
 
         /** Gating storing NotificationRankingUpdate ranking map in shared memory. */
         public static final Flag RANKING_UPDATE_ASHMEM = devFlag(
                 "persist.sysui.notification.ranking_update_ashmem");
+
+        public static final Flag PROPAGATE_CHANNEL_UPDATES_TO_CONVERSATIONS = devFlag(
+                "persist.sysui.notification.propagate_channel_updates_to_conversations");
     }
 
     //// == End of flags.  Everything below this line is the implementation. == ////

@@ -1942,7 +1942,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         final ActivityRecord atoken = mActivityRecord;
         if (atoken != null) {
-            return ((!isParentWindowHidden() && atoken.isVisible())
+            final boolean isVisible = isStartingWindowAssociatedToTask()
+                    ? mStartingData.mAssociatedTask.isVisible() : atoken.isVisible();
+            return ((!isParentWindowHidden() && isVisible)
                     || isAnimationRunningSelfOrParent());
         }
         final WallpaperWindowToken wtoken = mToken.asWallpaperToken();
@@ -2337,6 +2339,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // IME surface association. (e.g. Attach IME surface on the display instead of the
             // app when the app bounds being letterboxed.)
             mDisplayContent.updateImeControlTarget(isImeLayeringTarget() /* updateImeParent */);
+            // Fix the starting window to task when Activity has changed.
+            if (mStartingData != null && mStartingData.mAssociatedTask == null
+                    && !mTempConfiguration.windowConfiguration.getBounds().equals(getBounds())) {
+                mStartingData.mResizedFromTransfer = true;
+                // Lock the starting window to task, so it won't resize from transfer anymore.
+                mActivityRecord.associateStartingWindowWithTaskIfNeeded();
+            }
         }
     }
 
@@ -3914,7 +3923,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * LetterboxUiController#shouldShowLetterboxUi} for more context.
      */
     boolean areAppWindowBoundsLetterboxed() {
-        return mActivityRecord != null
+        return mActivityRecord != null && !isStartingWindowAssociatedToTask()
                 && (mActivityRecord.areBoundsLetterboxed() || isLetterboxedForDisplayCutout());
     }
 
@@ -5144,7 +5153,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     private void applyDims() {
         if (((mAttrs.flags & FLAG_DIM_BEHIND) != 0 || shouldDrawBlurBehind())
-                   && isVisibleNow() && !mHidden && mTransitionController.canApplyDim(getTask())) {
+                && mToken.isVisibleRequested() && isVisibleNow() && !mHidden
+                && mTransitionController.canApplyDim(getTask())) {
             // Only show the Dimmer when the following is satisfied:
             // 1. The window has the flag FLAG_DIM_BEHIND or blur behind is requested
             // 2. The WindowToken is not hidden so dims aren't shown when the window is exiting.
@@ -5154,7 +5164,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mIsDimming = true;
             final float dimAmount = (mAttrs.flags & FLAG_DIM_BEHIND) != 0 ? mAttrs.dimAmount : 0;
             final int blurRadius = shouldDrawBlurBehind() ? mAttrs.getBlurBehindRadius() : 0;
-            getDimmer().dimBelow(getSyncTransaction(), this, dimAmount, blurRadius);
+            getDimmer().dimBelow(this, dimAmount, blurRadius);
         }
     }
 
@@ -5679,6 +5689,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // TODO(b/233286785): Add sync support to wallpaper.
             return true;
         }
+        if (mActivityRecord != null && mViewVisibility != View.VISIBLE
+                && mWinAnimator.mAttrType != TYPE_BASE_APPLICATION
+                && mWinAnimator.mAttrType != TYPE_APPLICATION_STARTING) {
+            // Skip sync for invisible app windows which are not managed by activity lifecycle.
+            return false;
+        }
         // In the WindowContainer implementation we immediately mark ready
         // since a generic WindowContainer only needs to wait for its
         // children to finish and is immediately ready from its own
@@ -5714,8 +5730,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // window becomes visible while the sync group is still active.
             return true;
         }
-        if (mSyncState == SYNC_STATE_WAITING_FOR_DRAW && mWinAnimator.mDrawState == HAS_DRAWN
-                && !mRedrawForSyncReported && !mWmService.mResizingWindows.contains(this)) {
+        if (mSyncState == SYNC_STATE_WAITING_FOR_DRAW && mLastConfigReportedToClient && isDrawn()) {
             // Complete the sync state immediately for a drawn window that doesn't need to redraw.
             onSyncFinishedDrawing();
         }

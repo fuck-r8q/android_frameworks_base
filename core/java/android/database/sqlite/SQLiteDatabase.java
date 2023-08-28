@@ -2171,11 +2171,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
      * Return a {@link SQLiteRawStatement} connected to the database.  A transaction must be in
      * progress or an exception will be thrown.  The resulting object will be closed automatically
      * when the current transaction closes.
+     *
      * @param sql The SQL string to be compiled into a prepared statement.
      * @return A {@link SQLiteRawStatement} holding the compiled SQL.
      * @throws IllegalStateException if a transaction is not in progress.
      * @throws SQLiteException if the SQL cannot be compiled.
-     * @hide
      */
     @NonNull
     public SQLiteRawStatement createRawStatement(@NonNull String sql) {
@@ -2184,17 +2184,62 @@ public final class SQLiteDatabase extends SQLiteClosable {
     }
 
     /**
-     * Return the "rowid" of the last row to be inserted on the current connection.  See the
-     * SQLite documentation for the specific details.  This method must only be called when inside
-     * a transaction.  {@link IllegalStateException} is thrown if the method is called outside a
-     * transaction.  If the function is called before any inserts in the current transaction, the
-     * value returned will be from a previous transaction, which may be from a different thread.
+     * Return the "rowid" of the last row to be inserted on the current connection. This method must
+     * only be called when inside a transaction. {@link IllegalStateException} is thrown if the
+     * method is called outside a transaction. If the function is called before any inserts in the
+     * current transaction, the value returned will be from a previous transaction, which may be
+     * from a different thread. If no inserts have occurred on the current connection, the function
+     * returns 0. See the SQLite documentation for the specific details.
+     *
+     * @see <a href="https://sqlite.org/c3ref/last_insert_rowid.html">sqlite3_last_insert_rowid</a>
+     *
      * @return The ROWID of the last row to be inserted under this connection.
+     * @throws IllegalStateException if there is no current transaction.
+     */
+    public long getLastInsertRowId() {
+        return getThreadSession().getLastInsertRowId();
+    }
+
+    /**
+     * Return the number of database rows that were inserted, updated, or deleted by the most recent
+     * SQL statement within the current transaction.
+     *
+     * @see <a href="https://sqlite.org/c3ref/changes.html">sqlite3_changes64</a>
+     *
+     * @return The number of rows changed by the most recent sql statement
      * @throws IllegalStateException if there is no current transaction.
      * @hide
      */
-    public long lastInsertRowId() {
-        return getThreadSession().lastInsertRowId();
+    public long getLastChangedRowsCount() {
+        return getThreadSession().getLastChangedRowsCount();
+    }
+
+    /**
+     * Return the total number of database rows that have been inserted, updated, or deleted on
+     * the current connection since it was created.  Due to Android's internal management of
+     * SQLite connections, the value may, or may not, include changes made in earlier
+     * transactions. Best practice is to compare values returned within a single transaction.
+     *
+     * <code><pre>
+     *    database.beginTransaction();
+     *    try {
+     *        long initialValue = database.getTotalChangedRowsCount();
+     *        // Execute SQL statements
+     *        long changedRows = database.getTotalChangedRowsCount() - initialValue;
+     *        // changedRows counts the total number of rows updated in the transaction.
+     *    } finally {
+     *        database.endTransaction();
+     *    }
+     * </pre></code>
+     *
+     * @see <a href="https://sqlite.org/c3ref/changes.html">sqlite3_total_changes64</a>
+     *
+     * @return The number of rows changed on the current connection.
+     * @throws IllegalStateException if there is no current transaction.
+     * @hide
+     */
+    public long getTotalChangedRowsCount() {
+        return getThreadSession().getTotalChangedRowsCount();
     }
 
     /**

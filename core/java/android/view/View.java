@@ -12121,6 +12121,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * a precision touch gesture in a small area in either the X or Y dimension, such as
      * an edge swipe or dragging a <code>SeekBar</code> thumb.</p>
      *
+     * <p>On Wear OS, these rects control where system-level swipe-to-dismiss gesture can start. If
+     * the attribute {@code android:windowSwipeToDismiss} has been set to {@code false}, the system
+     * will create an exclusion rect with size equal to the window frame size. In order words, the
+     * system swipe-to-dismiss will not apply, and the app must handle gestural input within itself.
+     * </p>
+     *
      * <p>Note: the system will put a limit of <code>200dp</code> on the vertical extent of the
      * exclusions it takes into account. The limit does not apply while the navigation
      * bar is {@link #SYSTEM_UI_FLAG_IMMERSIVE_STICKY stickily} hidden, nor to the
@@ -14836,7 +14842,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * view satisfies any of the following:
      * <ul>
      * <li>Is actionable, e.g. {@link #isClickable()},
-     * {@link #isLongClickable()}, or {@link #isFocusable()}
+     * {@link #isLongClickable()}, {@link #isContextClickable()},
+     * {@link #isScreenReaderFocusable()}, or {@link #isFocusable()}
      * <li>Has an {@link AccessibilityDelegate}
      * <li>Has an interaction listener, e.g. {@link OnTouchListener},
      * {@link OnKeyListener}, etc.
@@ -14845,6 +14852,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * {@link #ACCESSIBILITY_LIVE_REGION_NONE}.
      * </ul>
      * <li>Has an accessibility pane title, see {@link #setAccessibilityPaneTitle}</li>
+     * <li>Is an accessibility heading, see {@link #setAccessibilityHeading(boolean)}.</li>
      * </ol>
      *
      * @return Whether the view is exposed for accessibility.
@@ -14871,7 +14879,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return mode == IMPORTANT_FOR_ACCESSIBILITY_YES || isActionableForAccessibility()
                 || hasListenersForAccessibility() || mAccessibilityDelegate != null
                 || getAccessibilityLiveRegion() != ACCESSIBILITY_LIVE_REGION_NONE
-                || isAccessibilityPane();
+                || isAccessibilityPane() || isAccessibilityHeading();
     }
 
     /**
@@ -15031,7 +15039,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @hide
      */
     public boolean isActionableForAccessibility() {
-        return (isClickable() || isLongClickable() || isFocusable());
+        return (isClickable() || isLongClickable() || isFocusable() || isContextClickable()
+                || isScreenReaderFocusable());
     }
 
     /**
@@ -21919,6 +21928,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         mCurrentAnimation = null;
 
         if ((mViewFlags & TOOLTIP) == TOOLTIP) {
+            removeCallbacks(mTooltipInfo.mShowTooltipRunnable);
+            removeCallbacks(mTooltipInfo.mHideTooltipRunnable);
             hideTooltip();
         }
 
@@ -32118,9 +32129,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             return false;
         }
 
-        getLocationInWindow(mAttachInfo.mTmpLocation);
-        return mAttachInfo.mTmpLocation[0] == insets.getStableInsetLeft()
-                && mAttachInfo.mTmpLocation[1] == insets.getStableInsetTop();
+        return true;
     }
 
     /**

@@ -115,8 +115,7 @@ genrule {
     name: "protolog.json.gz",
     srcs: [":generate-wm_shell_protolog.json"],
     out: ["wmshell.protolog.json.gz"],
-    cmd: "$(location minigzip) -c < $(in) > $(out)",
-    tools: ["minigzip"],
+    cmd: "gzip -c < $(in) > $(out)",
 }
 
 prebuilt_etc {
@@ -151,6 +150,7 @@ android_library {
     ],
     static_libs: [
         "androidx.appcompat_appcompat",
+        "androidx.core_core-animation",
         "androidx.arch.core_core-runtime",
         "androidx-constraintlayout_constraintlayout",
         "androidx.dynamicanimation_dynamicanimation",
@@ -158,7 +158,6 @@ android_library {
         "kotlinx-coroutines-android",
         "kotlinx-coroutines-core",
         "iconloader_base",
-        "protolog-lib",
         "WindowManager-Shell-proto",
         "dagger2",
         "jsr330",
@@ -168,7 +167,7 @@ android_library {
         // *.kt sources are inside a filegroup.
         "kotlin-annotations",
     ],
-    kotlincflags: ["-Xjvm-default=enable"],
+    kotlincflags: ["-Xjvm-default=all"],
     manifest: "AndroidManifest.xml",
     plugins: ["dagger2-compiler"],
 }

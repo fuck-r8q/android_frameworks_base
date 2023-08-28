@@ -2415,6 +2415,8 @@ public class PackageInstaller {
         public int requireUserAction = USER_ACTION_UNSPECIFIED;
         /** {@hide} */
         public boolean applicationEnabledSettingPersistent = false;
+        /** {@hide} */
+        public int developmentInstallFlags = 0;
 
         private final ArrayMap<String, Integer> mPermissionStates;
 
@@ -2464,6 +2466,7 @@ public class PackageInstaller {
             requireUserAction = source.readInt();
             packageSource = source.readInt();
             applicationEnabledSettingPersistent = source.readBoolean();
+            developmentInstallFlags = source.readInt();
         }
 
         /** {@hide} */
@@ -2495,6 +2498,7 @@ public class PackageInstaller {
             ret.requireUserAction = requireUserAction;
             ret.packageSource = packageSource;
             ret.applicationEnabledSettingPersistent = applicationEnabledSettingPersistent;
+            ret.developmentInstallFlags = developmentInstallFlags;
             return ret;
         }
 
@@ -3159,6 +3163,7 @@ public class PackageInstaller {
             pw.printPair("rollbackDataPolicy", rollbackDataPolicy);
             pw.printPair("applicationEnabledSettingPersistent",
                     applicationEnabledSettingPersistent);
+            pw.printHexPair("developmentInstallFlags", developmentInstallFlags);
             pw.println();
         }
 
@@ -3200,6 +3205,7 @@ public class PackageInstaller {
             dest.writeInt(requireUserAction);
             dest.writeInt(packageSource);
             dest.writeBoolean(applicationEnabledSettingPersistent);
+            dest.writeInt(developmentInstallFlags);
         }
 
         public static final Parcelable.Creator<SessionParams>
@@ -4132,7 +4138,8 @@ public class PackageInstaller {
          * @param label
          *   The label representing the app to be installed.
          * @param locale
-         *   The locale of the app label being used.
+         *   The locale is used to get the app label from the APKs (includes the base APK and
+         *   split APKs) related to the package to be installed.
          * @param packageName
          *   The package name of the app to be installed.
          * @hide
@@ -4239,7 +4246,10 @@ public class PackageInstaller {
             }
 
             /**
-             * The locale of the app label being used.
+             * The locale is used to get the app label from the APKs (includes the base APK and
+             * split APKs) related to the package to be installed. The caller needs to make sure
+             * the app label is consistent with the app label of {@link PreapprovalDetails} when
+             * validating the installation. Otherwise, the pre-approval install session will fail.
              */
             public @NonNull Builder setLocale(@NonNull ULocale value) {
                 checkNotUsed();

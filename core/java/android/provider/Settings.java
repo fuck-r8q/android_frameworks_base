@@ -2199,6 +2199,16 @@ public final class Settings {
             = "android.settings.APP_NOTIFICATION_BUBBLE_SETTINGS";
 
     /**
+     * Intent Extra: The value of {@link android.app.settings.SettingsEnums#EntryPointType} for
+     * settings metrics that logs the entry point about physical keyboard settings.
+     * <p>
+     * This must be passed as an extra field to the {@link #ACTION_HARD_KEYBOARD_SETTINGS}.
+     * @hide
+     */
+    public static final String EXTRA_ENTRYPOINT =
+            "com.android.settings.inputmethod.EXTRA_ENTRYPOINT";
+
+    /**
      * Activity Extra: The package owner of the notification channel settings to display.
      * <p>
      * This must be passed as an extra field to the {@link #ACTION_CHANNEL_NOTIFICATION_SETTINGS}.
@@ -2784,6 +2794,9 @@ public final class Settings {
 
     /** @hide - Private call() method to reset to defaults the 'configuration' table */
     public static final String CALL_METHOD_DELETE_CONFIG = "DELETE_config";
+
+    /** @hide - Private call() method to reset to defaults the 'system' table */
+    public static final String CALL_METHOD_RESET_SYSTEM = "RESET_system";
 
     /** @hide - Private call() method to reset to defaults the 'secure' table */
     public static final String CALL_METHOD_RESET_SECURE = "RESET_secure";
@@ -4001,6 +4014,26 @@ public final class Settings {
                    overrideableByRestore);
         }
 
+        /**
+         * Store a name/value pair into the database.
+         *
+         * @param resolver to access the database with
+         * @param name to store
+         * @param value to associate with the name
+         * @param makeDefault whether to make the value the default one
+         * @param overrideableByRestore whether restore can override this value
+         * @return true if the value was set, false on database errors
+         *
+         * @hide
+         */
+        @RequiresPermission(Manifest.permission.MODIFY_SETTINGS_OVERRIDEABLE_BY_RESTORE)
+        @SystemApi
+        public static boolean putString(@NonNull ContentResolver resolver, @NonNull String name,
+                @Nullable String value, boolean makeDefault, boolean overrideableByRestore) {
+            return putStringForUser(resolver, name, value, /* tag= */ null,
+                    makeDefault, resolver.getUserId(), overrideableByRestore);
+        }
+
         /** @hide */
         @UnsupportedAppUsage
         public static boolean putStringForUser(ContentResolver resolver, String name, String value,
@@ -4034,6 +4067,60 @@ public final class Settings {
             }
             return sNameValueCache.putStringForUser(resolver, name, value, tag, makeDefault,
                     userHandle, overrideableByRestore);
+        }
+
+        /**
+         * Reset the settings to their defaults. This would reset <strong>only</strong>
+         * settings set by the caller's package. Think of it of a way to undo your own
+         * changes to the system settings. Passing in the optional tag will reset only
+         * settings changed by your package and associated with this tag.
+         *
+         * @param resolver Handle to the content resolver.
+         * @param tag Optional tag which should be associated with the settings to reset.
+         *
+         * @see #putString(ContentResolver, String, String, boolean, boolean)
+         *
+         * @hide
+         */
+        @SystemApi
+        public static void resetToDefaults(@NonNull ContentResolver resolver,
+                @Nullable String tag) {
+            resetToDefaultsAsUser(resolver, tag, RESET_MODE_PACKAGE_DEFAULTS,
+                    resolver.getUserId());
+        }
+
+        /**
+         * Reset the settings to their defaults for a given user with a specific mode. The
+         * optional tag argument is valid only for {@link #RESET_MODE_PACKAGE_DEFAULTS}
+         * allowing resetting the settings made by a package and associated with the tag.
+         *
+         * @param resolver Handle to the content resolver.
+         * @param tag Optional tag which should be associated with the settings to reset.
+         * @param mode The reset mode.
+         * @param userHandle The user for which to reset to defaults.
+         *
+         * @see #RESET_MODE_PACKAGE_DEFAULTS
+         * @see #RESET_MODE_UNTRUSTED_DEFAULTS
+         * @see #RESET_MODE_UNTRUSTED_CHANGES
+         * @see #RESET_MODE_TRUSTED_DEFAULTS
+         *
+         * @hide
+         */
+        public static void resetToDefaultsAsUser(@NonNull ContentResolver resolver,
+                @Nullable String tag, @ResetMode int mode, @IntRange(from = 0) int userHandle) {
+            try {
+                Bundle arg = new Bundle();
+                arg.putInt(CALL_METHOD_USER_KEY, userHandle);
+                if (tag != null) {
+                    arg.putString(CALL_METHOD_TAG_KEY, tag);
+                }
+                arg.putInt(CALL_METHOD_RESET_MODE_KEY, mode);
+                IContentProvider cp = sProviderHolder.getProvider(resolver);
+                cp.call(resolver.getAttributionSource(),
+                        sProviderHolder.mUri.getAuthority(), CALL_METHOD_RESET_SYSTEM, null, arg);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Can't reset do defaults for " + CONTENT_URI, e);
+            }
         }
 
         /**
@@ -4767,6 +4854,15 @@ public final class Settings {
          */
         @Readable
         public static final String PEAK_REFRESH_RATE = "peak_refresh_rate";
+
+        /**
+         * Control whether to stay awake on fold
+         *
+         * If this isn't set, the system falls back to a device specific default.
+         * @hide
+         */
+        @Readable
+        public static final String STAY_AWAKE_ON_FOLD = "stay_awake_on_fold";
 
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
@@ -10017,6 +10113,13 @@ public final class Settings {
          * @hide
          */
         public static final String SPATIAL_AUDIO_ENABLED = "spatial_audio_enabled";
+
+        /**
+         * Internal collection of audio device inventory items
+         * The device item stored are {@link com.android.server.audio.AdiDeviceState}
+         * @hide
+         */
+        public static final String AUDIO_DEVICE_INVENTORY = "audio_device_inventory";
 
         /**
          * Indicates whether notification display on the lock screen is enabled.
@@ -19082,6 +19185,12 @@ public final class Settings {
              * @hide
              */
             public static final String WEAR_MEDIA_SESSIONS_PACKAGE = "wear_media_sessions_package";
+
+            /*
+             * Controls the launcher ui mode on wearable devices.
+             * @hide
+             */
+            public static final String WEAR_LAUNCHER_UI_MODE = "wear_launcher_ui_mode";
         }
     }
 

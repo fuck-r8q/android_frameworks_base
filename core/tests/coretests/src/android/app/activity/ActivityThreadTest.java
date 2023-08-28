@@ -21,6 +21,7 @@ import static android.content.Intent.ACTION_EDIT;
 import static android.content.Intent.ACTION_VIEW;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
+import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -29,6 +30,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import android.annotation.Nullable;
 import android.app.Activity;
@@ -61,6 +64,8 @@ import android.util.DisplayMetrics;
 import android.util.MergedConfiguration;
 import android.view.Display;
 import android.view.View;
+import android.window.WindowContextInfo;
+import android.window.WindowTokenClientController;
 
 import androidx.test.filters.MediumTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -70,6 +75,7 @@ import androidx.test.runner.AndroidJUnit4;
 import com.android.internal.content.ReferrerIntent;
 
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -83,7 +89,7 @@ import java.util.function.Consumer;
 /**
  * Test for verifying {@link android.app.ActivityThread} class.
  * Build/Install/Run:
- *  atest FrameworksCoreTests:android.app.activity.ActivityThreadTest
+ *  atest FrameworksCoreTests:ActivityThreadTest
  */
 @RunWith(AndroidJUnit4.class)
 @MediumTest
@@ -100,7 +106,19 @@ public class ActivityThreadTest {
             new ActivityTestRule<>(TestActivity.class, true /* initialTouchMode */,
                     false /* launchActivity */);
 
+    private WindowTokenClientController mOriginalWindowTokenClientController;
+    private Configuration mOriginalAppConfig;
+
     private ArrayList<VirtualDisplay> mCreatedVirtualDisplays;
+
+    @Before
+    public void setup() {
+        // Keep track of the original controller, so that it can be used to restore in tearDown()
+        // when there is override in some test cases.
+        mOriginalWindowTokenClientController = WindowTokenClientController.getInstance();
+        mOriginalAppConfig = new Configuration(ActivityThread.currentActivityThread()
+                .getConfiguration());
+    }
 
     @After
     public void tearDown() {
@@ -108,6 +126,9 @@ public class ActivityThreadTest {
             mCreatedVirtualDisplays.forEach(VirtualDisplay::release);
             mCreatedVirtualDisplays = null;
         }
+        WindowTokenClientController.overrideForTesting(mOriginalWindowTokenClientController);
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(
+                () -> restoreConfig(ActivityThread.currentActivityThread(), mOriginalAppConfig));
     }
 
     @Test
@@ -549,16 +570,10 @@ public class ActivityThreadTest {
             activityThread.updatePendingConfiguration(newAppConfig);
             activityThread.handleConfigurationChanged(newAppConfig, DEVICE_ID_INVALID);
 
-            try {
-                assertEquals("Virtual display orientation must not change when process"
-                                + " configuration orientation changes.",
-                        originalVirtualDisplayOrientation,
-                        virtualDisplayContext.getResources().getConfiguration().orientation);
-            } finally {
-                // Make sure to reset the process config to prevent side effects to other
-                // tests.
-                restoreConfig(activityThread, originalAppConfig);
-            }
+            assertEquals("Virtual display orientation must not change when process"
+                            + " configuration orientation changes.",
+                    originalVirtualDisplayOrientation,
+                    virtualDisplayContext.getResources().getConfiguration().orientation);
         });
     }
 
@@ -730,6 +745,38 @@ public class ActivityThreadTest {
         assertFalse(activity.enterPipSkipped());
     }
 
+    @Test
+    public void testHandleWindowContextConfigurationChanged() {
+        final Activity activity = mActivityTestRule.launchActivity(new Intent());
+        final ActivityThread activityThread = activity.getActivityThread();
+        final WindowTokenClientController windowTokenClientController =
+                mock(WindowTokenClientController.class);
+        WindowTokenClientController.overrideForTesting(windowTokenClientController);
+        final IBinder clientToken = mock(IBinder.class);
+        final Configuration configuration = new Configuration();
+        final WindowContextInfo info = new WindowContextInfo(configuration, DEFAULT_DISPLAY);
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> activityThread
+                .handleWindowContextInfoChanged(clientToken, info));
+
+        verify(windowTokenClientController).onWindowContextInfoChanged(clientToken, info);
+    }
+
+    @Test
+    public void testHandleWindowContextWindowRemoval() {
+        final Activity activity = mActivityTestRule.launchActivity(new Intent());
+        final ActivityThread activityThread = activity.getActivityThread();
+        final WindowTokenClientController windowTokenClientController =
+                mock(WindowTokenClientController.class);
+        WindowTokenClientController.overrideForTesting(windowTokenClientController);
+        final IBinder clientToken = mock(IBinder.class);
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> activityThread
+                .handleWindowContextWindowRemoval(clientToken));
+
+        verify(windowTokenClientController).onWindowContextWindowRemoved(clientToken);
+    }
+
     /**
      * Calls {@link ActivityThread#handleActivityConfigurationChanged(ActivityClientRecord,
      * Configuration, int)} to try to push activity configuration to the activity for the given
@@ -884,12 +931,13 @@ public class ActivityThreadTest {
             mConfig.setTo(config);
             ++mNumOfConfigChanges;
 
-            if (mConfigLatch != null) {
+            final CountDownLatch configLatch = mConfigLatch;
+            if (configLatch != null) {
                 if (mTestLatch != null) {
                     mTestLatch.countDown();
                 }
                 try {
-                    mConfigLatch.await(TIMEOUT_SEC, TimeUnit.SECONDS);
+                    configLatch.await(TIMEOUT_SEC, TimeUnit.SECONDS);
                 } catch (InterruptedException e) {
                     throw new IllegalStateException(e);
                 }

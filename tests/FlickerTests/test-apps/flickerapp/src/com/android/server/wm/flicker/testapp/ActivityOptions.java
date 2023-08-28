@@ -73,6 +73,18 @@ public class ActivityOptions {
                 FLICKER_APP_PACKAGE + ".NonResizeablePortraitActivity");
     }
 
+    public static class TransparentActivity {
+        public static final String LABEL = "TransparentActivity";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".TransparentActivity");
+    }
+
+    public static class LaunchTransparentActivity {
+        public static final String LABEL = "LaunchTransparentActivity";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".LaunchTransparentActivity");
+    }
+
     public static class DialogThemedActivity {
         public static final String LABEL = "DialogThemedActivity";
         public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
@@ -121,6 +133,12 @@ public class ActivityOptions {
             public static final String LABEL = "ActivityEmbeddingPlaceholderSecondaryActivity";
             public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
                     FLICKER_APP_PACKAGE + ".ActivityEmbeddingPlaceholderSecondaryActivity");
+        }
+
+        public static class TrampolineActivity {
+            public static final String LABEL = "ActivityEmbeddingTrampolineActivity";
+            public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                    FLICKER_APP_PACKAGE + ".ActivityEmbeddingTrampolineActivity");
         }
     }
 

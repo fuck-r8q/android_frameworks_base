@@ -2400,6 +2400,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 mLoggedInlineDatasetShown = true;
             }
             mService.logDatasetShown(this.id, mClientState, uiType);
+            Slog.d(TAG, "onShown(): " + uiType);
         }
     }
 
@@ -2460,6 +2461,21 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             // asked to go away after we get destroyed, so let it do that.
             try {
                 mClient.requestHideFillUi(this.id, id);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Error requesting to hide fill UI", e);
+            }
+
+            mInlineSessionController.hideInlineSuggestionsUiLocked(id);
+        }
+    }
+
+    @Override
+    public void requestHideFillUiWhenDestroyed(AutofillId id) {
+        synchronized (mLock) {
+            // NOTE: We allow this call in a destroyed state as the UI is
+            // asked to go away after we get destroyed, so let it do that.
+            try {
+                mClient.requestHideFillUiWhenDestroyed(this.id, id);
             } catch (RemoteException e) {
                 Slog.e(TAG, "Error requesting to hide fill UI", e);
             }

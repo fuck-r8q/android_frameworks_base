@@ -450,27 +450,27 @@ public final class MediaRoute2Info implements Parcelable {
     public static final String FEATURE_REMOTE_GROUP_PLAYBACK =
             "android.media.route.feature.REMOTE_GROUP_PLAYBACK";
 
-    final String mId;
-    final CharSequence mName;
-    final List<String> mFeatures;
+    private final String mId;
+    private final CharSequence mName;
+    private final List<String> mFeatures;
     @Type
-    final int mType;
-    final boolean mIsSystem;
-    final Uri mIconUri;
-    final CharSequence mDescription;
+    private final int mType;
+    private final boolean mIsSystem;
+    private final Uri mIconUri;
+    private final CharSequence mDescription;
     @ConnectionState
-    final int mConnectionState;
-    final String mClientPackageName;
-    final String mPackageName;
-    final int mVolumeHandling;
-    final int mVolumeMax;
-    final int mVolume;
-    final String mAddress;
-    final Set<String> mDeduplicationIds;
-    final Bundle mExtras;
-    final String mProviderId;
-    final boolean mIsVisibilityRestricted;
-    final Set<String> mAllowedPackages;
+    private final int mConnectionState;
+    private final String mClientPackageName;
+    private final String mPackageName;
+    private final int mVolumeHandling;
+    private final int mVolumeMax;
+    private final int mVolume;
+    private final String mAddress;
+    private final Set<String> mDeduplicationIds;
+    private final Bundle mExtras;
+    private final String mProviderId;
+    private final boolean mIsVisibilityRestricted;
+    private final Set<String> mAllowedPackages;
 
     MediaRoute2Info(@NonNull Builder builder) {
         mId = builder.mId;
@@ -949,28 +949,28 @@ public final class MediaRoute2Info implements Parcelable {
      * Builder for {@link MediaRoute2Info media route info}.
      */
     public static final class Builder {
-        final String mId;
-        final CharSequence mName;
-        final List<String> mFeatures;
+        private final String mId;
+        private final CharSequence mName;
+        private final List<String> mFeatures;
 
         @Type
-        int mType = TYPE_UNKNOWN;
-        boolean mIsSystem;
-        Uri mIconUri;
-        CharSequence mDescription;
+        private int mType = TYPE_UNKNOWN;
+        private boolean mIsSystem;
+        private Uri mIconUri;
+        private CharSequence mDescription;
         @ConnectionState
-        int mConnectionState;
-        String mClientPackageName;
-        String mPackageName;
-        int mVolumeHandling = PLAYBACK_VOLUME_FIXED;
-        int mVolumeMax;
-        int mVolume;
-        String mAddress;
-        Set<String> mDeduplicationIds;
-        Bundle mExtras;
-        String mProviderId;
-        boolean mIsVisibilityRestricted;
-        Set<String> mAllowedPackages;
+        private int mConnectionState;
+        private String mClientPackageName;
+        private String mPackageName;
+        private int mVolumeHandling = PLAYBACK_VOLUME_FIXED;
+        private int mVolumeMax;
+        private int mVolume;
+        private String mAddress;
+        private Set<String> mDeduplicationIds;
+        private Bundle mExtras;
+        private String mProviderId;
+        private boolean mIsVisibilityRestricted;
+        private Set<String> mAllowedPackages;
 
         /**
          * Constructor for builder to create {@link MediaRoute2Info}.

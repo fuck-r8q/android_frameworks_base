@@ -246,6 +246,7 @@ public class SettingsProvider extends ContentProvider {
     public static final String RESULT_ROWS_DELETED = "result_rows_deleted";
     public static final String RESULT_SETTINGS_LIST = "result_settings_list";
 
+    public static final String SETTINGS_PROVIDER_JOBS_NS = "SettingsProviderJobsNamespace";
     // Used for scheduling jobs to make a copy for the settings files
     public static final int WRITE_FALLBACK_SETTINGS_FILES_JOB_ID = 1;
     public static final long ONE_DAY_INTERVAL_MILLIS = 24 * 60 * 60 * 1000L;
@@ -517,6 +518,13 @@ public class SettingsProvider extends ContentProvider {
                 final int mode = getResetModeEnforcingPermission(args);
                 String tag = getSettingTag(args);
                 resetSecureSetting(requestingUserId, mode, tag);
+                break;
+            }
+
+            case Settings.CALL_METHOD_RESET_SYSTEM: {
+                final int mode = getResetModeEnforcingPermission(args);
+                String tag = getSettingTag(args);
+                resetSystemSetting(requestingUserId, mode, tag);
                 break;
             }
 
@@ -1875,8 +1883,8 @@ public class SettingsProvider extends ContentProvider {
                     + requestingUserId + ")");
         }
 
-        return mutateSystemSetting(name, value, requestingUserId, MUTATION_OPERATION_INSERT,
-                overrideableByRestore);
+        return mutateSystemSetting(name, value, /* tag= */ null, requestingUserId,
+                MUTATION_OPERATION_INSERT, /* mode= */ 0, overrideableByRestore);
     }
 
     private boolean deleteSystemSetting(String name, int requestingUserId) {
@@ -1896,15 +1904,25 @@ public class SettingsProvider extends ContentProvider {
         return mutateSystemSetting(name, value, requestingUserId, MUTATION_OPERATION_UPDATE);
     }
 
+    private void resetSystemSetting(int requestingUserId, int mode, String tag) {
+        if (DEBUG) {
+            Slog.v(LOG_TAG, "resetSystemSetting(" + requestingUserId + ", "
+                    + mode + ", " + tag + ")");
+        }
+
+        mutateSystemSetting(null, null, tag, requestingUserId, MUTATION_OPERATION_RESET, mode,
+                false);
+    }
+
     private boolean mutateSystemSetting(String name, String value, int runAsUserId, int operation) {
         // overrideableByRestore = false as by default settings values shouldn't be overrideable by
         // restore.
-        return mutateSystemSetting(name, value, runAsUserId, operation,
-                /* overrideableByRestore */ false);
+        return mutateSystemSetting(name, value, /* tag= */ null, runAsUserId, operation,
+                /* mode= */ 0, /* overrideableByRestore */ false);
     }
 
-    private boolean mutateSystemSetting(String name, String value, int runAsUserId, int operation,
-            boolean overrideableByRestore) {
+    private boolean mutateSystemSetting(String name, String value, String tag, int runAsUserId,
+            int operation, int mode, boolean overrideableByRestore) {
         final String callingPackage = getCallingPackage();
         if (!hasWriteSecureSettingsPermission()) {
             // If the caller doesn't hold WRITE_SECURE_SETTINGS, we verify whether this
@@ -1975,6 +1993,12 @@ public class SettingsProvider extends ContentProvider {
                     return mSettingsRegistry.updateSettingLocked(SETTINGS_TYPE_SYSTEM,
                             owningUserId, name, value, null, false, callingPackage,
                             false, null);
+                }
+
+                case MUTATION_OPERATION_RESET: {
+                    mSettingsRegistry.resetSettingsLocked(SETTINGS_TYPE_SYSTEM,
+                            runAsUserId, callingPackage, mode, tag);
+                    return true;
                 }
             }
             Slog.e(LOG_TAG, "Unknown operation code: " + operation);
@@ -2762,12 +2786,13 @@ public class SettingsProvider extends ContentProvider {
      */
     public void scheduleWriteFallbackFilesJob() {
         final Context context = getContext();
-        final JobScheduler jobScheduler =
+        JobScheduler jobScheduler =
                 (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
         if (jobScheduler == null) {
             // Might happen: SettingsProvider is created before JobSchedulerService in system server
             return;
         }
+        jobScheduler = jobScheduler.forNamespace(SETTINGS_PROVIDER_JOBS_NS);
         // Check if the job is already scheduled. If so, skip scheduling another one
         if (jobScheduler.getPendingJob(WRITE_FALLBACK_SETTINGS_FILES_JOB_ID) != null) {
             return;
@@ -3229,6 +3254,15 @@ public class SettingsProvider extends ContentProvider {
             return settingsState.getSettingLocked(name);
         }
 
+        private static boolean shouldExcludeSettingFromReset(Setting setting, String prefix) {
+            // If a prefix was specified, exclude settings whose names don't start with it.
+            if (prefix != null && !setting.getName().startsWith(prefix)) {
+                return true;
+            }
+            // Never reset SECURE_FRP_MODE, as it could be abused to bypass FRP via RescueParty.
+            return Global.SECURE_FRP_MODE.equals(setting.getName());
+        }
+
         public void resetSettingsLocked(int type, int userId, String packageName, int mode,
                 String tag) {
             resetSettingsLocked(type, userId, packageName, mode, tag, /*prefix=*/
@@ -3251,7 +3285,7 @@ public class SettingsProvider extends ContentProvider {
                         Setting setting = settingsState.getSettingLocked(name);
                         if (packageName.equals(setting.getPackageName())) {
                             if ((tag != null && !tag.equals(setting.getTag()))
-                                    || (prefix != null && !setting.getName().startsWith(prefix))) {
+                                    || shouldExcludeSettingFromReset(setting, prefix)) {
                                 continue;
                             }
                             if (settingsState.resetSettingLocked(name)) {
@@ -3272,7 +3306,7 @@ public class SettingsProvider extends ContentProvider {
                         Setting setting = settingsState.getSettingLocked(name);
                         if (!SettingsState.isSystemPackage(getContext(),
                                 setting.getPackageName())) {
-                            if (prefix != null && !setting.getName().startsWith(prefix)) {
+                            if (shouldExcludeSettingFromReset(setting, prefix)) {
                                 continue;
                             }
                             if (settingsState.resetSettingLocked(name)) {
@@ -3293,7 +3327,7 @@ public class SettingsProvider extends ContentProvider {
                         Setting setting = settingsState.getSettingLocked(name);
                         if (!SettingsState.isSystemPackage(getContext(),
                                 setting.getPackageName())) {
-                            if (prefix != null && !setting.getName().startsWith(prefix)) {
+                            if (shouldExcludeSettingFromReset(setting, prefix)) {
                                 continue;
                             }
                             if (setting.isDefaultFromSystem()) {
@@ -3318,7 +3352,7 @@ public class SettingsProvider extends ContentProvider {
                     for (String name : settingsState.getSettingNamesLocked()) {
                         Setting setting = settingsState.getSettingLocked(name);
                         boolean someSettingChanged = false;
-                        if (prefix != null && !setting.getName().startsWith(prefix)) {
+                        if (shouldExcludeSettingFromReset(setting, prefix)) {
                             continue;
                         }
                         if (setting.isDefaultFromSystem()) {
@@ -3750,7 +3784,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 220;
+            private static final int SETTINGS_VERSION = 221;
 
             private final int mUserId;
 
@@ -5852,6 +5886,21 @@ public class SettingsProvider extends ContentProvider {
                         }
                     }
                     currentVersion = 220;
+                }
+
+                if (currentVersion == 220) {
+                    final SettingsState globalSettings = getGlobalSettingsLocked();
+                    final Setting enableBackAnimation =
+                            globalSettings.getSettingLocked(Global.ENABLE_BACK_ANIMATION);
+                    if (enableBackAnimation.isNull()) {
+                        final boolean defEnableBackAnimation =
+                                getContext()
+                                        .getResources()
+                                        .getBoolean(R.bool.def_enable_back_animation);
+                        initGlobalSettingsDefaultValLocked(
+                                Settings.Global.ENABLE_BACK_ANIMATION, defEnableBackAnimation);
+                    }
+                    currentVersion = 221;
                 }
 
                 // vXXX: Add new settings above this point.

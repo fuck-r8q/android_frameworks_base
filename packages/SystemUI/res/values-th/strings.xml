@@ -69,7 +69,7 @@
     <string name="usb_disable_contaminant_detection" msgid="3827082183595978641">"เปิดใช้ USB"</string>
     <string name="learn_more" msgid="4690632085667273811">"ดูข้อมูลเพิ่มเติม"</string>
     <string name="global_action_screenshot" msgid="2760267567509131654">"ภาพหน้าจอ"</string>
-    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"ปิดใช้ฟีเจอร์ขยายเวลาปลดล็อกอยู่"</string>
+    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"ปิดใช้ฟีเจอร์ปลดล็อกต่อเนื่องอยู่"</string>
     <string name="remote_input_image_insertion_text" msgid="4850791636452521123">"ส่งรูปภาพ"</string>
     <string name="screenshot_saving_title" msgid="2298349784913287333">"กำลังบันทึกภาพหน้าจอ..."</string>
     <string name="screenshot_saving_work_profile_title" msgid="5332829607308450880">"กำลังบันทึกภาพหน้าจอไปยังโปรไฟล์งาน…"</string>
@@ -118,6 +118,9 @@
     <string name="screenrecord_save_text" msgid="3008973099800840163">"แตะเพื่อดู"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"เกิดข้อผิดพลาดในการบันทึกหน้าจอ"</string>
     <string name="screenrecord_start_error" msgid="2200660692479682368">"เกิดข้อผิดพลาดขณะเริ่มบันทึกหน้าจอ"</string>
+    <string name="immersive_cling_title" msgid="8372056499315585941">"กำลังดูแบบเต็มหน้าจอ"</string>
+    <string name="immersive_cling_description" msgid="6913958856085185775">"หากต้องการออก ให้ปัดลงจากด้านบน"</string>
+    <string name="immersive_cling_positive" msgid="3076681691468978568">"รับทราบ"</string>
     <string name="accessibility_back" msgid="6530104400086152611">"กลับ"</string>
     <string name="accessibility_home" msgid="5430449841237966217">"หน้าแรก"</string>
     <string name="accessibility_menu" msgid="2701163794470513040">"เมนู"</string>
@@ -147,6 +150,8 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_2" msgid="8586608186457385108">"จดจำใบหน้าได้ กดเพื่อดำเนินการต่อ"</string>
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"จดจำใบหน้าได้ กดไอคอนปลดล็อกเพื่อดำเนินการต่อ"</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"ตรวจสอบสิทธิ์แล้ว"</string>
+    <!-- no translation found for biometric_dialog_cancel_authentication (981316588773442637) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"ใช้ PIN"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"ใช้รูปแบบ"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"ใช้รหัสผ่าน"</string>
@@ -359,6 +364,8 @@
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"ปลดล็อกด้วยใบหน้าแล้ว"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"จดจำใบหน้าได้"</string>
     <string name="keyguard_retry" msgid="886802522584053523">"เลื่อนขึ้นเพื่อลองอีกครั้ง"</string>
+    <!-- no translation found for accesssibility_keyguard_retry (8880238862712870676) -->
+    <skip />
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"ปลดล็อกเพื่อใช้ NFC"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"องค์กรของคุณเป็นเจ้าของอุปกรณ์นี้"</string>
     <string name="do_disclosure_with_name" msgid="2091641464065004091">"<xliff:g id="ORGANIZATION_NAME">%s</xliff:g> เป็นเจ้าของอุปกรณ์นี้"</string>
@@ -412,6 +419,10 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_entire_screen" msgid="5407906851409410209">"เมื่อกำลังแชร์ บันทึก หรือแคสต์ Android จะมีสิทธิ์เข้าถึงทุกสิ่งที่ปรากฏบนหน้าจอหรือเล่นอยู่ในอุปกรณ์ ดังนั้นโปรดระวังสิ่งต่างๆ อย่างเช่นรหัสผ่าน รายละเอียดการชำระเงิน ข้อความ รูปภาพ รวมถึงเสียงและวิดีโอ"</string>
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app" msgid="3454859977888159495">"เมื่อกำลังแชร์ บันทึก หรือแคสต์แอป Android จะมีสิทธิ์เข้าถึงทุกสิ่งที่แสดงหรือเล่นอยู่ในแอปดังกล่าว ดังนั้นโปรดระวังสิ่งต่างๆ อย่างเช่นรหัสผ่าน รายละเอียดการชำระเงิน ข้อความ รูปภาพ รวมถึงเสียงและวิดีโอ"</string>
     <string name="media_projection_entry_generic_permission_dialog_continue" msgid="8640381403048097116">"เริ่ม"</string>
+    <string name="media_projection_task_switcher_text" msgid="590885489897412359">"การแชร์จะหยุดชั่วคราวเมื่อสลับแอป"</string>
+    <string name="media_projection_task_switcher_action_switch" msgid="8682258717291921123">"แชร์แอปนี้แทน"</string>
+    <string name="media_projection_task_switcher_action_back" msgid="5324164224147845282">"เปลี่ยนกลับ"</string>
+    <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"เปลี่ยนแอป"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"ผู้ดูแลระบบไอทีบล็อกไว้"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"การจับภาพหน้าจอปิดใช้โดยนโยบายด้านอุปกรณ์"</string>
     <string name="clear_all_notifications_text" msgid="348312370303046130">"ล้างทั้งหมด"</string>
@@ -759,13 +770,7 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"เมนูเปิด/ปิด"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"หน้า <xliff:g id="ID_1">%1$d</xliff:g> จาก <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"หน้าจอล็อก"</string>
-    <string name="thermal_shutdown_title" msgid="2702966892682930264">"โทรศัพท์ปิดไปเพราะร้อนมาก"</string>
-    <string name="thermal_shutdown_message" msgid="6142269839066172984">"ขณะนี้โทรศัพท์ทำงานเป็นปกติ\nแตะเพื่อดูข้อมูลเพิ่มเติม"</string>
-    <string name="thermal_shutdown_dialog_message" msgid="6745684238183492031">"โทรศัพท์ร้อนเกินไปจึงปิดเครื่องเพื่อให้เย็นลง ขณะนี้โทรศัพท์ทำงานเป็นปกติ\n\nโทรศัพท์อาจร้อนเกินไปหากคุณ\n	• ใช้แอปที่ใช้ทรัพยากรมาก (เช่น เกม วิดีโอ หรือแอปการนำทาง)\n	• ดาวน์โหลดหรืออัปโหลดไฟล์ขนาดใหญ่\n	• ใช้โทรศัพท์ในอุณหภูมิที่สูง"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"ดูขั้นตอนในการดูแลรักษา"</string>
-    <string name="high_temp_title" msgid="2218333576838496100">"โทรศัพท์เริ่มเครื่องร้อน"</string>
-    <string name="high_temp_notif_message" msgid="1277346543068257549">"ฟีเจอร์บางอย่างจะใช้งานได้จำกัดขณะโทรศัพท์เย็นลง\nแตะเพื่อดูข้อมูลเพิ่มเติม"</string>
-    <string name="high_temp_dialog_message" msgid="3793606072661253968">"โทรศัพท์จะพยายามลดอุณหภูมิลงโดยอัตโนมัติ คุณยังสามารถใช้โทรศัพท์ได้ แต่โทรศัพท์อาจทำงานช้าลง\n\nโทรศัพท์จะทำงานตามปกติเมื่อเย็นลงแล้ว"</string>
     <string name="high_temp_dialog_help_text" msgid="7380171287943345858">"ดูขั้นตอนในการดูแลรักษา"</string>
     <string name="high_temp_alarm_title" msgid="8654754369605452169">"ถอดปลั๊กอุปกรณ์"</string>
     <string name="high_temp_alarm_notify_message" msgid="3917622943609118956">"บริเวณพอร์ตชาร์จของอุปกรณ์เริ่มจะร้อนแล้ว หากมีที่ชาร์จหรืออุปกรณ์เสริม USB เสียบอยู่ ให้ถอดออกอย่างระมัดระวังเพราะสายเส้นนั้นก็อาจจะร้อนด้วยเช่นกัน"</string>
@@ -935,6 +940,8 @@
     <string name="controls_pin_instructions_retry" msgid="1566667581012131046">"ลองใช้ PIN อื่น"</string>
     <string name="controls_confirmation_message" msgid="7744104992609594859">"ยืนยันการเปลี่ยนแปลงสำหรับ<xliff:g id="DEVICE">%s</xliff:g>"</string>
     <string name="controls_structure_tooltip" msgid="4355922222944447867">"เลื่อนเพื่อดูเพิ่มเติม"</string>
+    <!-- no translation found for retry_face (416380073082560186) -->
+    <skip />
     <string name="controls_seeding_in_progress" msgid="3033855341410264148">"กำลังโหลดคำแนะนำ"</string>
     <string name="controls_media_title" msgid="1746947284862928133">"สื่อ"</string>
     <string name="controls_media_close_session" msgid="4780485355795635052">"ซ่อนตัวควบคุมสื่อนี้สำหรับ <xliff:g id="APP_NAME">%1$s</xliff:g> ไหม"</string>
@@ -1161,4 +1168,40 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"การเรียกใช้งาน Assistant เปิดอยู่"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"กำหนดแอปการจดบันทึกเริ่มต้นในการตั้งค่า"</string>
     <string name="install_app" msgid="5066668100199613936">"ติดตั้งแอป"</string>
+    <!-- no translation found for privacy_dialog_title (7839968133469098311) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_summary (2458769652125995409) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_more_button (7610604080293562345) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_done_button (4504330708531434263) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_expand_action (9129262348628331377) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_collapse_action (277419962019466347) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_button (8006250171305878606) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_message (1316408652526310985) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_service (8320590856621823604) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_permissions (2543451567190470413) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_call_usage (7858746847946397562) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_call_usage (1214810644978167344) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage (631997836335929880) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage (4883417856848222450) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_1 (9047570143069220911) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_1 (2551340497722370109) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_2 (2770926061339921767) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_2 (2874689735085367167) -->
+    <skip />
 </resources>

@@ -618,6 +618,8 @@
     <string name="biometric_or_screen_lock_app_setting_name" msgid="5348462421758257752">"ബയോമെട്രിക്‌സ് അല്ലെങ്കിൽ സ്‌ക്രീൻ ലോക്ക് ഉപയോഗിക്കുക"</string>
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"ഇത് നിങ്ങളാണെന്ന് പരിശോധിച്ചുറപ്പിക്കുക"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"തുടരാൻ ബയോമെട്രിക് ഉപയോഗിക്കുക"</string>
+    <string name="biometric_dialog_fingerprint_subtitle" msgid="2520227942533751342">"തുടരാൻ നിങ്ങളുടെ ഫിംഗർപ്രിന്റ് ഉപയോഗിക്കുക"</string>
+    <string name="biometric_dialog_face_subtitle" msgid="5269284162191087084">"തുടരാൻ നിങ്ങളുടെ മുഖം ഉപയോഗിക്കുക"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"തുടരാൻ നിങ്ങളുടെ ബയോമെട്രിക്‌ അല്ലെങ്കിൽ സ്‌ക്രീൻ ലോക്ക് ഉപയോഗിക്കുക"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"ബയോമെട്രിക് ഹാർ‌ഡ്‌വെയർ ലഭ്യമല്ല"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"പരിശോധിച്ചുറപ്പിക്കൽ റദ്ദാക്കി"</string>
@@ -1396,7 +1398,7 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"നിരസിക്കുക"</string>
     <string name="select_input_method" msgid="3971267998568587025">"ഇൻപുട്ട് രീതി തിരഞ്ഞെടുക്കുക"</string>
     <string name="show_ime" msgid="6406112007347443383">"ഫിസിക്കൽ കീബോർഡ് സജീവമായിരിക്കുമ്പോൾ സ്ക്രീനിൽ നിലനിർത്തുക"</string>
-    <string name="hardware" msgid="1800597768237606953">"വെർച്വൽ കീബോർഡ് കാണിക്കുക"</string>
+    <string name="hardware" msgid="3611039921284836033">"ഓൺ-സ്ക്രീൻ കീബോർഡ് ഉപയോഗിക്കൂ"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"<xliff:g id="DEVICE_NAME">%s</xliff:g> കോൺഫിഗർ ചെയ്യുക"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"യഥാർത്ഥ കീബോർഡുകൾ കോൺഫിഗർ ചെയ്യുക"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"ഭാഷയും ലേഔട്ടും തിരഞ്ഞെടുക്കുന്നതിന് ടാപ്പ് ചെയ്യുക"</string>

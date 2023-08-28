@@ -30,13 +30,11 @@ import android.os.IBinder
 import android.os.ResultReceiver
 import android.os.UserHandle
 import android.view.ViewGroup
+import com.android.intentresolver.AbstractMultiProfilePagerAdapter.EmptyStateProvider
+import com.android.intentresolver.AbstractMultiProfilePagerAdapter.MyUserIdProvider
+import com.android.intentresolver.ChooserActivity
+import com.android.intentresolver.chooser.TargetInfo
 import com.android.internal.annotations.VisibleForTesting
-import com.android.internal.app.AbstractMultiProfilePagerAdapter.EmptyStateProvider
-import com.android.internal.app.AbstractMultiProfilePagerAdapter.MyUserIdProvider
-import com.android.internal.app.ChooserActivity
-import com.android.internal.app.ResolverListController
-import com.android.internal.app.chooser.NotSelectableTargetInfo
-import com.android.internal.app.chooser.TargetInfo
 import com.android.systemui.R
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorComponent
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorController
@@ -53,7 +51,7 @@ class MediaProjectionAppSelectorActivity(
     private val activityLauncher: AsyncActivityLauncher,
     /** This is used to override the dependency in a screenshot test */
     @VisibleForTesting
-    private val listControllerFactory: ((userHandle: UserHandle) -> ResolverListController)?
+    private val listControllerFactory: ((userHandle: UserHandle) -> ChooserListController)?
 ) : ChooserActivity(), MediaProjectionAppSelectorView, MediaProjectionAppSelectorResultHandler {
 
     @Inject
@@ -75,7 +73,8 @@ class MediaProjectionAppSelectorActivity(
     override fun getLayoutResource() = R.layout.media_projection_app_selector
 
     public override fun onCreate(bundle: Bundle?) {
-        component = componentFactory.create(activity = this, view = this, resultHandler = this)
+        component = componentFactory.create(view = this, resultHandler = this)
+        component.lifecycleObservers.forEach { lifecycle.addObserver(it) }
 
         // Create a separate configuration controller for this activity as the configuration
         // might be different from the global one
@@ -106,13 +105,13 @@ class MediaProjectionAppSelectorActivity(
     override fun createBlockerEmptyStateProvider(): EmptyStateProvider =
         component.emptyStateProvider
 
-    override fun createListController(userHandle: UserHandle): ResolverListController =
+    override fun createListController(userHandle: UserHandle): ChooserListController =
         listControllerFactory?.invoke(userHandle) ?: super.createListController(userHandle)
 
     override fun startSelected(which: Int, always: Boolean, filtered: Boolean) {
         val currentListAdapter = mChooserMultiProfilePagerAdapter.activeListAdapter
         val targetInfo = currentListAdapter.targetInfoForPosition(which, filtered) ?: return
-        if (targetInfo is NotSelectableTargetInfo) return
+        if (targetInfo.isNotSelectableTargetInfo) return
 
         val intent = createIntent(targetInfo)
 
@@ -152,6 +151,7 @@ class MediaProjectionAppSelectorActivity(
     }
 
     override fun onDestroy() {
+        component.lifecycleObservers.forEach { lifecycle.removeObserver(it) }
         // onDestroy is also called when an app is selected, in that case we only want to send
         // RECORD_CONTENT_TASK but not RECORD_CANCEL
         if (!taskSelected) {

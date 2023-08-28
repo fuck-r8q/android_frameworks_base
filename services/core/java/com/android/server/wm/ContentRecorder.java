@@ -172,7 +172,7 @@ final class ContentRecorder implements WindowContainerListener {
                                     + "%d to new bounds %s and/or orientation %d.",
                             mDisplayContent.getDisplayId(), recordedContentBounds,
                             recordedContentOrientation);
-                    updateMirroredSurface(mDisplayContent.mWmService.mTransactionFactory.get(),
+                    updateMirroredSurface(mRecordedWindowContainer.getSyncTransaction(),
                             recordedContentBounds, surfaceSize);
                 } else {
                     // If the surface removed, do nothing. We will handle this via onDisplayChanged
@@ -331,6 +331,7 @@ final class ContentRecorder implements WindowContainerListener {
                         .reparent(mDisplayContent.getOverlayLayer(), null);
         // Retrieve the size of the DisplayArea to mirror.
         updateMirroredSurface(transaction, mRecordedWindowContainer.getBounds(), surfaceSize);
+        transaction.apply();
 
         // Notify the client about the visibility of the mirrored region, now that we have begun
         // capture.
@@ -487,8 +488,7 @@ final class ContentRecorder implements WindowContainerListener {
                 .setMatrix(mRecordedSurface, scale, 0 /* dtdx */, 0 /* dtdy */, scale)
                 // Position needs to be updated when the mirrored DisplayArea has changed, since
                 // the content will no longer be centered in the output surface.
-                .setPosition(mRecordedSurface, shiftedX /* x */, shiftedY /* y */)
-                .apply();
+                .setPosition(mRecordedSurface, shiftedX /* x */, shiftedY /* y */);
         mLastRecordedBounds = new Rect(recordedContentBounds);
         if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION) {
             mLastSurfaceSize = surfaceSize;

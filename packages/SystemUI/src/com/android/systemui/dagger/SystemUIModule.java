@@ -58,6 +58,7 @@ import com.android.systemui.log.dagger.LogModule;
 import com.android.systemui.log.dagger.MonitorLog;
 import com.android.systemui.log.table.TableLogBuffer;
 import com.android.systemui.mediaprojection.appselector.MediaProjectionModule;
+import com.android.systemui.mediaprojection.taskswitcher.MediaProjectionTaskSwitcherModule;
 import com.android.systemui.model.SysUiState;
 import com.android.systemui.motiontool.MotionToolModule;
 import com.android.systemui.navigationbar.NavigationBarComponent;
@@ -80,7 +81,6 @@ import com.android.systemui.screenshot.dagger.ScreenshotModule;
 import com.android.systemui.security.data.repository.SecurityRepositoryModule;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.shade.ShadeController;
-import com.android.systemui.shade.ShadeModule;
 import com.android.systemui.shade.transition.LargeScreenShadeInterpolator;
 import com.android.systemui.shade.transition.LargeScreenShadeInterpolatorImpl;
 import com.android.systemui.shared.condition.Monitor;
@@ -181,6 +181,7 @@ import javax.inject.Named;
             LockscreenLayoutModule.class,
             LogModule.class,
             MediaProjectionModule.class,
+            MediaProjectionTaskSwitcherModule.class,
             MotionToolModule.class,
             PeopleHubModule.class,
             PeopleModule.class,
@@ -196,7 +197,6 @@ import javax.inject.Named;
             SecurityRepositoryModule.class,
             ScreenRecordModule.class,
             SettingsUtilModule.class,
-            ShadeModule.class,
             SmartRepliesInflationModule.class,
             SmartspaceModule.class,
             StatusBarPipelineModule.class,

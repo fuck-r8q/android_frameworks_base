@@ -28,10 +28,8 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.settingslib.bluetooth.CachedBluetoothDevice;
 import com.android.settingslib.bluetooth.LocalBluetoothManager;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -78,6 +76,11 @@ public class ManagerInfoMediaManager extends InfoMediaManager {
             mRouterManager.unregisterScanRequest();
             mIsScanning = false;
         }
+    }
+
+    @Override
+    protected void transferToRoute(@NonNull MediaRoute2Info route) {
+        mRouterManager.transfer(mPackageName, route);
     }
 
     @Override
@@ -129,6 +132,11 @@ public class ManagerInfoMediaManager extends InfoMediaManager {
     }
 
     @Override
+    protected void setRouteVolume(@NonNull MediaRoute2Info route, int volume) {
+        mRouterManager.setRouteVolume(route, volume);
+    }
+
+    @Override
     @Nullable
     protected RouteListingPreference getRouteListingPreference() {
         return mRouterManager.getRouteListingPreference(mPackageName);
@@ -142,11 +150,22 @@ public class ManagerInfoMediaManager extends InfoMediaManager {
 
     @Override
     @NonNull
-    protected List<RoutingSessionInfo> getActiveRoutingSessions() {
-        List<RoutingSessionInfo> infos = new ArrayList<>();
-        infos.add(mRouterManager.getSystemRoutingSession(null));
-        infos.addAll(mRouterManager.getRemoteSessions());
-        return infos;
+    protected List<RoutingSessionInfo> getRemoteSessions() {
+        return mRouterManager.getRemoteSessions();
+    }
+
+    @Nullable
+    @Override
+    protected RoutingSessionInfo getRoutingSessionById(@NonNull String sessionId) {
+        for (RoutingSessionInfo sessionInfo : getRemoteSessions()) {
+            if (TextUtils.equals(sessionInfo.getId(), sessionId)) {
+                return sessionInfo;
+            }
+        }
+
+        RoutingSessionInfo systemSession = mRouterManager.getSystemRoutingSession(null);
+
+        return TextUtils.equals(systemSession.getId(), sessionId) ? systemSession : null;
     }
 
     @Override
@@ -165,40 +184,6 @@ public class ManagerInfoMediaManager extends InfoMediaManager {
     @NonNull
     protected List<MediaRoute2Info> getTransferableRoutes(@NonNull String packageName) {
         return mRouterManager.getTransferableRoutes(packageName);
-    }
-
-    @Override
-    @NonNull
-    protected ComplexMediaDevice createComplexMediaDevice(
-            MediaRoute2Info route, RouteListingPreference.Item routeListingPreferenceItem) {
-        return new ComplexMediaDevice(
-                mContext, mRouterManager, route, mPackageName, routeListingPreferenceItem);
-    }
-
-    @Override
-    @NonNull
-    protected InfoMediaDevice createInfoMediaDevice(
-            MediaRoute2Info route, RouteListingPreference.Item routeListingPreferenceItem) {
-        return new InfoMediaDevice(
-                mContext, mRouterManager, route, mPackageName, routeListingPreferenceItem);
-    }
-
-    @Override
-    @NonNull
-    protected PhoneMediaDevice createPhoneMediaDevice(MediaRoute2Info route,
-            RouteListingPreference.Item routeListingPreferenceItem) {
-        return new PhoneMediaDevice(mContext, mRouterManager, route, mPackageName,
-                routeListingPreferenceItem);
-    }
-
-    @Override
-    @NonNull
-    protected BluetoothMediaDevice createBluetoothMediaDevice(
-            MediaRoute2Info route, CachedBluetoothDevice cachedDevice,
-            RouteListingPreference.Item routeListingPreferenceItem) {
-        return new BluetoothMediaDevice(
-                mContext, cachedDevice, mRouterManager, route, mPackageName,
-                routeListingPreferenceItem);
     }
 
     @VisibleForTesting

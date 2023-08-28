@@ -54,13 +54,14 @@ import com.android.systemui.shade.ShadeHeaderController.Companion.LARGE_SCREEN_H
 import com.android.systemui.shade.ShadeHeaderController.Companion.LARGE_SCREEN_HEADER_TRANSITION_ID
 import com.android.systemui.shade.ShadeHeaderController.Companion.QQS_HEADER_CONSTRAINT
 import com.android.systemui.shade.ShadeHeaderController.Companion.QS_HEADER_CONSTRAINT
-import com.android.systemui.shade.ShadeModule.Companion.SHADE_HEADER
+import com.android.systemui.shade.ShadeViewProviderModule.Companion.SHADE_HEADER
 import com.android.systemui.shade.carrier.ShadeCarrierGroup
 import com.android.systemui.shade.carrier.ShadeCarrierGroupController
 import com.android.systemui.statusbar.phone.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.StatusBarIconController
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.StatusIconContainer
+import com.android.systemui.statusbar.phone.StatusOverlayHoverListenerFactory
 import com.android.systemui.statusbar.policy.Clock
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.NextAlarmController
@@ -99,6 +100,7 @@ constructor(
     private val qsBatteryModeController: QsBatteryModeController,
     private val nextAlarmController: NextAlarmController,
     private val activityStarter: ActivityStarter,
+    private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
 ) : ViewController<View>(header), Dumpable {
 
     companion object {
@@ -121,6 +123,8 @@ constructor(
                 else -> "Unknown state $this"
             }
     }
+
+    var shadeCollapseAction: Runnable? = null
 
     private lateinit var iconManager: StatusBarIconController.TintedIconManager
     private lateinit var carrierIconSlots: List<String>
@@ -275,6 +279,7 @@ constructor(
                 lastInsets?.let { updateConstraintsForInsets(header, it) }
                 updateResources()
                 updateCarrierGroupPadding()
+                clock.onDensityOrFontScaleChanged()
             }
         }
 
@@ -323,6 +328,9 @@ constructor(
         demoModeController.addCallback(demoModeReceiver)
         statusBarIconController.addIconGroup(iconManager)
         nextAlarmController.addCallback(nextAlarmCallback)
+        systemIcons.setOnHoverListener(
+            statusOverlayHoverListenerFactory.createListener(systemIcons)
+        )
     }
 
     override fun onViewDetached() {
@@ -333,6 +341,7 @@ constructor(
         demoModeController.removeCallback(demoModeReceiver)
         statusBarIconController.removeIconGroup(iconManager)
         nextAlarmController.removeCallback(nextAlarmCallback)
+        systemIcons.setOnHoverListener(null)
     }
 
     fun disable(state1: Int, state2: Int, animate: Boolean) {
@@ -468,9 +477,11 @@ constructor(
         if (largeScreenActive) {
             logInstantEvent("Large screen constraints set")
             header.setTransition(LARGE_SCREEN_HEADER_TRANSITION_ID)
+            systemIcons.setOnClickListener { shadeCollapseAction?.run() }
         } else {
             logInstantEvent("Small screen constraints set")
             header.setTransition(HEADER_TRANSITION_ID)
+            systemIcons.setOnClickListener(null)
         }
         header.jumpToState(header.startState)
         updatePosition()

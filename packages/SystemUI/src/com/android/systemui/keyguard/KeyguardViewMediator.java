@@ -100,6 +100,7 @@ import android.view.WindowManagerPolicyConstants;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 
+import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -164,14 +165,18 @@ import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.util.DeviceConfigProxy;
+import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.SecureSettings;
 import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
 import dagger.Lazy;
 
 import java.io.PrintWriter;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
@@ -256,6 +261,22 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private static final int SYSTEM_READY = 18;
     private static final int CANCEL_KEYGUARD_EXIT_ANIM = 19;
 
+    /** Enum for reasons behind updating wakeAndUnlock state. */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(
+            value = {
+                    WakeAndUnlockUpdateReason.HIDE,
+                    WakeAndUnlockUpdateReason.SHOW,
+                    WakeAndUnlockUpdateReason.FULFILL,
+                    WakeAndUnlockUpdateReason.WAKE_AND_UNLOCK,
+            })
+    @interface WakeAndUnlockUpdateReason {
+        int HIDE = 0;
+        int SHOW = 1;
+        int FULFILL = 2;
+        int WAKE_AND_UNLOCK = 3;
+    }
+
     /**
      * The default amount of time we stay awake (used for all key input)
      */
@@ -291,6 +312,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     public static final String SYS_BOOT_REASON_PROP = "sys.boot.reason.last";
     public static final String REBOOT_MAINLINE_UPDATE = "reboot,mainline_update";
     private final DreamOverlayStateController mDreamOverlayStateController;
+    private final JavaAdapter mJavaAdapter;
+    private final WallpaperRepository mWallpaperRepository;
 
     /** The stream type that the lock sounds are tied to. */
     private int mUiSoundsStreamType;
@@ -443,6 +466,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private final LockPatternUtils mLockPatternUtils;
     private final BroadcastDispatcher mBroadcastDispatcher;
     private boolean mKeyguardDonePending = false;
+    private boolean mUnlockingAndWakingFromDream = false;
     private boolean mHideAnimationRun = false;
     private boolean mHideAnimationRunning = false;
 
@@ -801,6 +825,25 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             mKeyguardViewControllerLazy.get().setKeyguardGoingAwayState(false);
             mKeyguardDisplayManager.hide();
             mUpdateMonitor.startBiometricWatchdog();
+
+            // It's possible that the device was unlocked (via BOUNCER or Fingerprint) while
+            // dreaming. It's time to wake up.
+            if (mUnlockingAndWakingFromDream) {
+                Log.d(TAG, "waking from dream after unlock");
+                setUnlockAndWakeFromDream(false, WakeAndUnlockUpdateReason.FULFILL);
+
+                if (mKeyguardStateController.isShowing()) {
+                    Log.d(TAG, "keyguard showing after keyguardGone, dismiss");
+                    mKeyguardViewControllerLazy.get()
+                            .notifyKeyguardAuthenticated(!mWakeAndUnlocking);
+                } else {
+                    Log.d(TAG, "keyguard gone, waking up from dream");
+                    mPM.wakeUp(mSystemClock.uptimeMillis(),
+                            mWakeAndUnlocking ? PowerManager.WAKE_REASON_BIOMETRIC
+                            : PowerManager.WAKE_REASON_GESTURE,
+                            "com.android.systemui:UNLOCK_DREAMING");
+                }
+            }
             Trace.endSection();
         }
 
@@ -1322,6 +1365,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             KeyguardTransitions keyguardTransitions,
             InteractionJankMonitor interactionJankMonitor,
             DreamOverlayStateController dreamOverlayStateController,
+            JavaAdapter javaAdapter,
+            WallpaperRepository wallpaperRepository,
             Lazy<ShadeController> shadeControllerLazy,
             Lazy<NotificationShadeWindowController> notificationShadeWindowControllerLazy,
             Lazy<ActivityLaunchAnimator> activityLaunchAnimator,
@@ -1383,6 +1428,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mScreenOffAnimationController = screenOffAnimationController;
         mInteractionJankMonitor = interactionJankMonitor;
         mDreamOverlayStateController = dreamOverlayStateController;
+        mJavaAdapter = javaAdapter;
+        mWallpaperRepository = wallpaperRepository;
 
         mActivityLaunchAnimator = activityLaunchAnimator;
         mScrimControllerLazy = scrimControllerLazy;
@@ -1486,6 +1533,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 com.android.internal.R.anim.lock_screen_behind_enter);
 
         mWorkLockController = new WorkLockActivityController(mContext, mUserTracker);
+
+        mJavaAdapter.alwaysCollectFlow(
+                mWallpaperRepository.getWallpaperSupportsAmbientMode(),
+                this::setWallpaperSupportsAmbientMode);
     }
 
     // TODO(b/273443374) remove, temporary util to get a feature flag
@@ -2665,6 +2716,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
             mKeyguardExitAnimationRunner = null;
             mWakeAndUnlocking = false;
+            setUnlockAndWakeFromDream(false, WakeAndUnlockUpdateReason.SHOW);
             setPendingLock(false);
 
             // Force if we we're showing in the middle of hiding, to ensure we end up in the correct
@@ -2770,6 +2822,51 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         tryKeyguardDone();
     };
 
+    private void setUnlockAndWakeFromDream(boolean updatedValue,
+            @WakeAndUnlockUpdateReason int reason) {
+        if (updatedValue == mUnlockingAndWakingFromDream) {
+            return;
+        }
+
+        final String reasonDescription;
+
+        switch(reason) {
+            case WakeAndUnlockUpdateReason.FULFILL:
+                reasonDescription = "fulfilling existing request";
+                break;
+            case WakeAndUnlockUpdateReason.HIDE:
+                reasonDescription = "hiding keyguard";
+                break;
+            case WakeAndUnlockUpdateReason.SHOW:
+                reasonDescription = "showing keyguard";
+                break;
+            case WakeAndUnlockUpdateReason.WAKE_AND_UNLOCK:
+                reasonDescription = "waking to unlock";
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + reason);
+        }
+
+        final boolean unsetUnfulfilled = !updatedValue
+                && reason != WakeAndUnlockUpdateReason.FULFILL;
+
+        mUnlockingAndWakingFromDream = updatedValue;
+
+        final String description;
+
+        if (unsetUnfulfilled) {
+            description = "Interrupting request to wake and unlock";
+        } else if (mUnlockingAndWakingFromDream) {
+            description = "Initiating request to wake and unlock";
+        } else {
+            description = "Fulfilling request to wake and unlock";
+        }
+
+        Log.d(TAG, String.format(
+                "Updating waking and unlocking request to %b. description:[%s]. reason:[%s]",
+                mUnlockingAndWakingFromDream,  description, reasonDescription));
+    }
+
     /**
      * Handle message sent by {@link #hideLocked()}
      * @see #HIDE
@@ -2787,7 +2884,16 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         synchronized (KeyguardViewMediator.this) {
             if (DEBUG) Log.d(TAG, "handleHide");
 
-            if (mShowing && !mOccluded) {
+            // If waking and unlocking, waking from dream has been set properly.
+            if (!mWakeAndUnlocking) {
+                setUnlockAndWakeFromDream(mStatusBarStateController.isDreaming()
+                        && mPM.isInteractive(), WakeAndUnlockUpdateReason.HIDE);
+            }
+
+            if ((mShowing && !mOccluded) || mUnlockingAndWakingFromDream) {
+                if (mUnlockingAndWakingFromDream) {
+                    Log.d(TAG, "hiding keyguard before waking from dream");
+                }
                 mHiding = true;
                 mKeyguardGoingAwayRunnable.run();
             } else {
@@ -2797,13 +2903,6 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                         mSystemClock.uptimeMillis() + mHideAnimation.getStartOffset(),
                         mHideAnimation.getDuration());
                 onKeyguardExitFinished();
-            }
-
-            // It's possible that the device was unlocked (via BOUNCER or Fingerprint) while
-            // dreaming. It's time to wake up.
-            if (mDreamOverlayShowing || mUpdateMonitor.isDreaming()) {
-                mPM.wakeUp(mSystemClock.uptimeMillis(), PowerManager.WAKE_REASON_GESTURE,
-                        "com.android.systemui:UNLOCK_DREAMING");
             }
         }
         Trace.endSection();
@@ -2974,6 +3073,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     }
 
     private void onKeyguardExitFinished() {
+        if (DEBUG) Log.d(TAG, "onKeyguardExitFinished()");
         // only play "unlock" noises if not on a call (since the incall UI
         // disables the keyguard)
         if (TelephonyManager.EXTRA_STATE_IDLE.equals(mPhoneState)) {
@@ -3195,13 +3295,15 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 flags |= StatusBarManager.DISABLE_RECENT;
             }
 
-            if (mPowerGestureIntercepted) {
+            if (mPowerGestureIntercepted && mOccluded && isSecure()
+                    && mUpdateMonitor.isFaceEnrolled()) {
                 flags |= StatusBarManager.DISABLE_RECENT;
             }
 
             if (DEBUG) {
                 Log.d(TAG, "adjustStatusBarLocked: mShowing=" + mShowing + " mOccluded=" + mOccluded
                         + " isSecure=" + isSecure() + " force=" + forceHideHomeRecentsButtons
+                        + " mPowerGestureIntercepted=" + mPowerGestureIntercepted
                         +  " --> flags=0x" + Integer.toHexString(flags));
             }
 
@@ -3289,9 +3391,14 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         }
     }
 
-    public void onWakeAndUnlocking() {
+    /**
+     * Informs the keyguard view mediator that the device is waking and unlocking.
+     * @param fromDream Whether waking and unlocking is happening over an interactive dream.
+     */
+    public void onWakeAndUnlocking(boolean fromDream) {
         Trace.beginSection("KeyguardViewMediator#onWakeAndUnlocking");
         mWakeAndUnlocking = true;
+        setUnlockAndWakeFromDream(fromDream, WakeAndUnlockUpdateReason.WAKE_AND_UNLOCK);
 
         mKeyguardViewControllerLazy.get().notifyKeyguardAuthenticated(/* primaryAuth */ false);
         userActivity();
@@ -3428,6 +3535,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         pw.print("  mPendingReset: "); pw.println(mPendingReset);
         pw.print("  mPendingLock: "); pw.println(mPendingLock);
         pw.print("  wakeAndUnlocking: "); pw.println(mWakeAndUnlocking);
+        pw.print("  mPowerGestureIntercepted: "); pw.println(mPowerGestureIntercepted);
     }
 
     /**
@@ -3467,7 +3575,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      * In case it does support it, we have to fade in the incoming app, otherwise we'll reveal it
      * with the light reveal scrim.
      */
-    public void setWallpaperSupportsAmbientMode(boolean supportsAmbientMode) {
+    private void setWallpaperSupportsAmbientMode(boolean supportsAmbientMode) {
         mWallpaperSupportsAmbientMode = supportsAmbientMode;
     }
 

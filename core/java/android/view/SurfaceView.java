@@ -1360,7 +1360,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             mSurfaceControl = new SurfaceControl.Builder(mSurfaceSession)
                     .setName(name)
                     .setLocalOwnerView(this)
-                    .setParent(viewRoot.getBoundsLayer())
+                    .setParent(viewRoot.updateAndGetBoundsLayer(surfaceUpdateTransaction))
                     .setCallsite("SurfaceView.updateSurface")
                     .setContainerLayer()
                     .build();

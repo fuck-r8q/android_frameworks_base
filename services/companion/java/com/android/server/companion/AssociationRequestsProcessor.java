@@ -19,7 +19,6 @@ package com.android.server.companion;
 import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.app.PendingIntent.FLAG_IMMUTABLE;
 import static android.app.PendingIntent.FLAG_ONE_SHOT;
-import static android.companion.CompanionDeviceManager.COMPANION_DEVICE_DISCOVERY_PACKAGE_NAME;
 import static android.companion.CompanionDeviceManager.REASON_INTERNAL_ERROR;
 import static android.companion.CompanionDeviceManager.RESULT_INTERNAL_ERROR;
 import static android.content.ComponentName.createRelative;
@@ -48,7 +47,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManagerInternal;
-import android.content.pm.Signature;
 import android.net.MacAddress;
 import android.os.Binder;
 import android.os.Bundle;
@@ -56,16 +54,11 @@ import android.os.Handler;
 import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.UserHandle;
-import android.util.Log;
-import android.util.PackageUtils;
 import android.util.Slog;
 
-import com.android.internal.util.ArrayUtils;
+import com.android.internal.R;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Class responsible for handling incoming {@link AssociationRequest}s.
@@ -114,9 +107,6 @@ import java.util.Set;
 class AssociationRequestsProcessor {
     private static final String TAG = "CDM_AssociationRequestsProcessor";
 
-    private static final ComponentName ASSOCIATION_REQUEST_APPROVAL_ACTIVITY =
-            createRelative(COMPANION_DEVICE_DISCOVERY_PACKAGE_NAME, ".CompanionDeviceActivity");
-
     // AssociationRequestsProcessor <-> UI
     private static final String EXTRA_APPLICATION_CALLBACK = "application_callback";
     private static final String EXTRA_ASSOCIATION_REQUEST = "association_request";
@@ -138,6 +128,8 @@ class AssociationRequestsProcessor {
     private final @NonNull CompanionDeviceManagerService mService;
     private final @NonNull PackageManagerInternal mPackageManager;
     private final @NonNull AssociationStoreImpl mAssociationStore;
+    @NonNull
+    private final ComponentName mCompanionDeviceActivity;
 
     AssociationRequestsProcessor(@NonNull CompanionDeviceManagerService service,
             @NonNull AssociationStoreImpl associationStore) {
@@ -145,6 +137,9 @@ class AssociationRequestsProcessor {
         mService = service;
         mPackageManager = service.mPackageManagerInternal;
         mAssociationStore = associationStore;
+        mCompanionDeviceActivity = createRelative(
+                mContext.getString(R.string.config_companionDeviceManagerPackage),
+                ".CompanionDeviceActivity");
     }
 
     /**
@@ -197,7 +192,7 @@ class AssociationRequestsProcessor {
         extras.putParcelable(EXTRA_RESULT_RECEIVER, prepareForIpc(mOnRequestConfirmationReceiver));
 
         final Intent intent = new Intent();
-        intent.setComponent(ASSOCIATION_REQUEST_APPROVAL_ACTIVITY);
+        intent.setComponent(mCompanionDeviceActivity);
         intent.putExtras(extras);
 
         // 2b.3. Create a PendingIntent.
@@ -224,7 +219,7 @@ class AssociationRequestsProcessor {
         extras.putBoolean(EXTRA_FORCE_CANCEL_CONFIRMATION, true);
 
         final Intent intent = new Intent();
-        intent.setComponent(ASSOCIATION_REQUEST_APPROVAL_ACTIVITY);
+        intent.setComponent(mCompanionDeviceActivity);
         intent.putExtras(extras);
 
         return createPendingIntent(packageUid, intent);
@@ -447,31 +442,6 @@ class AssociationRequestsProcessor {
     };
 
     private boolean mayAssociateWithoutPrompt(@NonNull String packageName, @UserIdInt int userId) {
-        // Below we check if the requesting package is allowlisted (usually by the OEM) for creating
-        // CDM associations without user confirmation (prompt).
-        // For this we'll check to config arrays:
-        // - com.android.internal.R.array.config_companionDevicePackages
-        // and
-        // - com.android.internal.R.array.config_companionDeviceCerts.
-        // Both arrays are expected to contain similar number of entries.
-        // config_companionDevicePackages contains package names of the allowlisted packages.
-        // config_companionDeviceCerts contains SHA256 digests of the signatures of the
-        // corresponding packages.
-        // If a package may be signed with one of several certificates, its package name would
-        // appear multiple times in the config_companionDevicePackages, with different entries
-        // (one for each of the valid signing certificates) at the corresponding positions in
-        // config_companionDeviceCerts.
-        final String[] allowlistedPackages = mContext.getResources()
-                .getStringArray(com.android.internal.R.array.config_companionDevicePackages);
-        if (!ArrayUtils.contains(allowlistedPackages, packageName)) {
-            if (DEBUG) {
-                Log.d(TAG, packageName + " is not allowlisted for creating associations "
-                        + "without user confirmation (prompt)");
-                Log.v(TAG, "Allowlisted packages=" + Arrays.toString(allowlistedPackages));
-            }
-            return false;
-        }
-
         // Throttle frequent associations
         final long now = System.currentTimeMillis();
         final List<AssociationInfo> associationForPackage =
@@ -491,40 +461,6 @@ class AssociationRequestsProcessor {
             }
         }
 
-        final String[] allowlistedPackagesSignatureDigests = mContext.getResources()
-                .getStringArray(com.android.internal.R.array.config_companionDeviceCerts);
-        final Set<String> allowlistedSignatureDigestsForRequestingPackage = new HashSet<>();
-        for (int i = 0; i < allowlistedPackages.length; i++) {
-            if (allowlistedPackages[i].equals(packageName)) {
-                final String digest = allowlistedPackagesSignatureDigests[i].replaceAll(":", "");
-                allowlistedSignatureDigestsForRequestingPackage.add(digest);
-            }
-        }
-
-        final Signature[] requestingPackageSignatures = mPackageManager.getPackage(packageName)
-                .getSigningDetails().getSignatures();
-        final String[] requestingPackageSignatureDigests =
-                PackageUtils.computeSignaturesSha256Digests(requestingPackageSignatures);
-
-        boolean requestingPackageSignatureAllowlisted = false;
-        for (String signatureDigest : requestingPackageSignatureDigests) {
-            if (allowlistedSignatureDigestsForRequestingPackage.contains(signatureDigest)) {
-                requestingPackageSignatureAllowlisted = true;
-                break;
-            }
-        }
-
-        if (!requestingPackageSignatureAllowlisted) {
-            Slog.w(TAG, "Certificate mismatch for allowlisted package " + packageName);
-            if (DEBUG) {
-                Log.d(TAG, "  > allowlisted signatures for " + packageName + ": ["
-                        + String.join(", ", allowlistedSignatureDigestsForRequestingPackage)
-                        + "]");
-                Log.d(TAG, "  > actual signatures for " + packageName + ": "
-                        + Arrays.toString(requestingPackageSignatureDigests));
-            }
-        }
-
-        return requestingPackageSignatureAllowlisted;
+        return PackageUtils.isPackageAllowlisted(mContext, mPackageManager, packageName);
     }
 }

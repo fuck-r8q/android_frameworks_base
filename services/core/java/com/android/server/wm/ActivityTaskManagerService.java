@@ -18,6 +18,7 @@ package com.android.server.wm;
 
 import static android.Manifest.permission.BIND_VOICE_INTERACTION;
 import static android.Manifest.permission.CHANGE_CONFIGURATION;
+import static android.Manifest.permission.CONTROL_KEYGUARD;
 import static android.Manifest.permission.CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS;
 import static android.Manifest.permission.DETECT_SCREEN_CAPTURE;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
@@ -314,6 +315,7 @@ import java.util.Set;
  * {@hide}
  */
 public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
+    private static final String GRAMMATICAL_GENDER_PROPERTY = "persist.sys.grammatical_gender";
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityTaskManagerService" : TAG_ATM;
     static final String TAG_ROOT_TASK = TAG + POSTFIX_ROOT_TASK;
     static final String TAG_SWITCH = TAG + POSTFIX_SWITCH;
@@ -942,6 +944,14 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         if (forceRtl) {
             // This will take care of setting the correct layout direction flags
             configuration.setLayoutDirection(configuration.locale);
+        }
+
+        // Retrieve the grammatical gender from system property, set it into configuration which
+        // will get updated later if the grammatical gender raw value of current configuration is
+        // {@link Configuration#GRAMMATICAL_GENDER_UNDEFINED}.
+        if (configuration.getGrammaticalGenderRaw() == Configuration.GRAMMATICAL_GENDER_UNDEFINED) {
+            configuration.setGrammaticalGender(SystemProperties.getInt(GRAMMATICAL_GENDER_PROPERTY,
+                    Configuration.GRAMMATICAL_GENDER_UNDEFINED));
         }
 
         synchronized (mGlobalLock) {
@@ -3560,6 +3570,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
     @Override
     public void keyguardGoingAway(int flags) {
+        mAmInternal.enforceCallingPermission(CONTROL_KEYGUARD, "unlock keyguard");
         enforceNotIsolatedCaller("keyguardGoingAway");
         final long token = Binder.clearCallingIdentity();
         try {

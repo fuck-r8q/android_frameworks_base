@@ -9479,6 +9479,54 @@ public class CarrierConfigManager {
             "missed_incoming_call_sms_pattern_string_array";
 
     /**
+     * A PersistableBundle that contains a list of key-value pairs, where the values are integer
+     * arrays.
+     * <p>
+     * Keys are the PLMNs of satellite providers as strings and values are integer arrays of
+     * supported services with the following value:
+     * <ul>
+     * <li>1 = {@link android.telephony.NetworkRegistrationInfo#SERVICE_TYPE_VOICE}</li>
+     * <li>2 = {@link android.telephony.NetworkRegistrationInfo#SERVICE_TYPE_DATA}</li>
+     * <li>3 = {@link android.telephony.NetworkRegistrationInfo#SERVICE_TYPE_SMS}</li>
+     * <li>4 = {@link android.telephony.NetworkRegistrationInfo#SERVICE_TYPE_VIDEO}</li>
+     * <li>5 = {@link android.telephony.NetworkRegistrationInfo#SERVICE_TYPE_EMERGENCY}</li>
+     * </ul>
+     * <p>
+     * An example config for two PLMNs "123411" and "123412":
+     * <pre>{@code
+     * <carrier_config>
+     *   <pbundle_as_map name="carrier_supported_satellite_services_per_provider_bundle">
+     *     <int-array name = "123411" num = "2">
+     *       <item value = "3"/>
+     *       <item value = "5"/>
+     *     </int-array>
+     *     <int-array name = "123412" num = "1">
+     *       <item value = "3"/>
+     *     </int-array>
+     *   </pbundle_as_map>
+     * </carrier_config>
+     * }</pre>
+     * <p>
+     * If this carrier config is not present, the device overlay config
+     * {@code config_satellite_services_supported_by_providers} will be used. If the carrier config
+     * is present, the supported services associated with the PLMNs listed in the carrier config
+     * will override that of the device overlay config. The supported satellite services will be
+     * identified as follows:
+     * <ul>
+     * <li>For each PLMN that exists only in the carrier provided satellite services, use the
+     * carrier provided services as the supported services.</li>
+     * <li>For each PLMN that is present only in the device provided satellite services, use the
+     * device provided services as the supported services.</li>
+     * <li>For each PLMN that is present in both the carrier provided and device provided satellite
+     * services, use the carrier provided services as the supported services.</li>
+     * </ul>
+     * <p>
+     * This config is empty by default.
+     */
+    public static final String KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE =
+            "carrier_supported_satellite_services_per_provider_bundle";
+
+    /**
      * Indicating whether DUN APN should be disabled when the device is roaming. In that case,
      * the default APN (i.e. internet) will be used for tethering.
      *
@@ -9700,6 +9748,7 @@ public class CarrierConfigManager {
      *
      * @see TelephonyManager#PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_CANCELED
      * @see TelephonyManager#PURCHASE_PREMIUM_CAPABILITY_RESULT_TIMEOUT
+     * @see TelephonyManager#PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED
      */
     public static final String
             KEY_PREMIUM_CAPABILITY_NOTIFICATION_BACKOFF_HYSTERESIS_TIME_MILLIS_LONG =
@@ -10622,6 +10671,9 @@ public class CarrierConfigManager {
                 });
         sDefaults.putBoolean(KEY_DELAY_IMS_TEAR_DOWN_UNTIL_CALL_END_BOOL, false);
         sDefaults.putStringArray(KEY_MISSED_INCOMING_CALL_SMS_PATTERN_STRING_ARRAY, new String[0]);
+        sDefaults.putPersistableBundle(
+                KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE,
+                PersistableBundle.EMPTY);
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);
         sDefaults.putString(KEY_DEFAULT_PREFERRED_APN_NAME_STRING, "");
         sDefaults.putBoolean(KEY_SUPPORTS_CALL_COMPOSER_BOOL, false);

@@ -39,6 +39,7 @@ import android.Manifest;
 import android.annotation.DisplayContext;
 import android.annotation.DrawableRes;
 import android.annotation.DurationMillisLong;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
@@ -50,6 +51,7 @@ import android.annotation.TestApi;
 import android.annotation.UiThread;
 import android.annotation.UserIdInt;
 import android.app.ActivityThread;
+import android.app.PropertyInvalidatedCache;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -58,7 +60,6 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.inputmethodservice.InputMethodService;
@@ -122,6 +123,8 @@ import com.android.internal.view.IInputMethodManager;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Collections;
@@ -542,6 +545,13 @@ public final class InputMethodManager {
     @UnsupportedAppUsage
     Rect mCursorRect = new Rect();
 
+    /** Cached value for {@link #isStylusHandwritingAvailable} for userId. */
+    @GuardedBy("mH")
+    private PropertyInvalidatedCache<Integer, Boolean> mStylusHandwritingAvailableCache;
+
+    private static final String CACHE_KEY_STYLUS_HANDWRITING_PROPERTY =
+            "cache_key.system_server.stylus_handwriting";
+
     @GuardedBy("mH")
     private int mCursorSelStart;
     @GuardedBy("mH")
@@ -566,18 +576,6 @@ public final class InputMethodManager {
      */
     @GuardedBy("mH")
     private CursorAnchorInfo mCursorAnchorInfo = null;
-
-    /**
-     * A special {@link Matrix} that can be provided by the system when this instance is running
-     * inside a virtual display.
-     *
-     * <p>If this is non-{@code null}, {@link #updateCursorAnchorInfo(View, CursorAnchorInfo)}
-     * should be adjusted with this {@link Matrix}.</p>
-     *
-     * <p>{@code null} when not used.</p>
-     */
-    @GuardedBy("mH")
-    private Matrix mVirtualDisplayToScreenMatrix = null;
 
     // -----------------------------------------------------------
 
@@ -665,8 +663,16 @@ public final class InputMethodManager {
     private static final int MSG_BIND_ACCESSIBILITY_SERVICE = 11;
     private static final int MSG_UNBIND_ACCESSIBILITY_SERVICE = 12;
     private static final int MSG_SET_INTERACTIVE = 13;
-    private static final int MSG_UPDATE_VIRTUAL_DISPLAY_TO_SCREEN_MATRIX = 30;
     private static final int MSG_ON_SHOW_REQUESTED = 31;
+
+    /**
+     * Calling this will invalidate Local stylus handwriting availability Cache which
+     * forces the next query in any process to recompute the cache.
+     * @hide
+     */
+    public static void invalidateLocalStylusHandwritingAvailabilityCaches() {
+        PropertyInvalidatedCache.invalidateCache(CACHE_KEY_STYLUS_HANDWRITING_PROPERTY);
+    }
 
     private static boolean isAutofillUIShowing(View servedView) {
         AutofillManager afm = servedView.getContext().getSystemService(AutofillManager.class);
@@ -1023,7 +1029,6 @@ public final class InputMethodManager {
                         mCurMethod = res.method; // for @UnsupportedAppUsage
                         mCurBindState = new BindState(res);
                         mCurId = res.id; // for @UnsupportedAppUsage
-                        mVirtualDisplayToScreenMatrix = res.getVirtualDisplayToScreenMatrix();
                     }
                     startInputInner(StartInputReason.BOUND_TO_IMMS, null, 0, 0, 0);
                     return;
@@ -1231,43 +1236,6 @@ public final class InputMethodManager {
                     }
                     return;
                 }
-                case MSG_UPDATE_VIRTUAL_DISPLAY_TO_SCREEN_MATRIX: {
-                    final float[] matrixValues = (float[]) msg.obj;
-                    final int bindSequence = msg.arg1;
-                    synchronized (mH) {
-                        if (getBindSequenceLocked() != bindSequence) {
-                            return;
-                        }
-                        if (matrixValues == null || mVirtualDisplayToScreenMatrix == null) {
-                            // Either InputBoundResult#mVirtualDisplayToScreenMatrixValues is null
-                            // OR this app is unbound from the parent VirtualDisplay. In this case,
-                            // calling updateCursorAnchorInfo() isn't safe. Only clear the matrix.
-                            mVirtualDisplayToScreenMatrix = null;
-                            return;
-                        }
-
-                        final float[] currentValues = new float[9];
-                        mVirtualDisplayToScreenMatrix.getValues(currentValues);
-                        if (Arrays.equals(currentValues, matrixValues)) {
-                            return;
-                        }
-                        mVirtualDisplayToScreenMatrix.setValues(matrixValues);
-
-                        if (mCursorAnchorInfo == null || !isImeSessionAvailableLocked()
-                                || mServedInputConnection == null) {
-                            return;
-                        }
-                        if (!mServedInputConnection.isCursorAnchorInfoMonitoring()) {
-                            return;
-                        }
-                        // Since the host VirtualDisplay is moved, we need to issue
-                        // IMS#updateCursorAnchorInfo() again.
-                        mCurBindState.mImeSession.updateCursorAnchorInfo(
-                                CursorAnchorInfo.createForAdditionalParentMatrix(
-                                        mCursorAnchorInfo, mVirtualDisplayToScreenMatrix));
-                    }
-                    return;
-                }
                 case MSG_ON_SHOW_REQUESTED: {
                     synchronized (mH) {
                         if (mImeInsetsConsumer != null) {
@@ -1343,12 +1311,6 @@ public final class InputMethodManager {
         public void reportFullscreenMode(boolean fullscreen) {
             mH.obtainMessage(MSG_REPORT_FULLSCREEN_MODE, fullscreen ? 1 : 0, 0)
                     .sendToTarget();
-        }
-
-        @Override
-        public void updateVirtualDisplayToScreenMatrix(int bindSequence, float[] matrixValues) {
-            mH.obtainMessage(MSG_UPDATE_VIRTUAL_DISPLAY_TO_SCREEN_MATRIX, bindSequence, 0,
-                    matrixValues).sendToTarget();
         }
 
         @Override
@@ -1583,8 +1545,21 @@ public final class InputMethodManager {
         if (fallbackContext == null) {
             return false;
         }
-
-        return IInputMethodManagerGlobalInvoker.isStylusHandwritingAvailableAsUser(userId);
+        boolean isAvailable;
+        synchronized (mH) {
+            if (mStylusHandwritingAvailableCache == null) {
+                mStylusHandwritingAvailableCache = new PropertyInvalidatedCache<>(
+                        4 /* maxEntries */, CACHE_KEY_STYLUS_HANDWRITING_PROPERTY) {
+                    @Override
+                    public Boolean recompute(Integer userId) {
+                        return IInputMethodManagerGlobalInvoker.isStylusHandwritingAvailableAsUser(
+                                userId);
+                    }
+                };
+            }
+            isAvailable = mStylusHandwritingAvailableCache.query(userId);
+        }
+        return isAvailable;
     }
 
     /**
@@ -1931,7 +1906,6 @@ public final class InputMethodManager {
     @UnsupportedAppUsage
     @GuardedBy("mH")
     void finishInputLocked() {
-        mVirtualDisplayToScreenMatrix = null;
         View clearedView = null;
         mNextServedView = null;
         if (mServedView != null) {
@@ -2010,6 +1984,14 @@ public final class InputMethodManager {
         }
     }
 
+    /** @hide */
+    @IntDef(flag = true, prefix = { "SHOW_" }, value = {
+            SHOW_IMPLICIT,
+            SHOW_FORCED,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ShowFlags {}
+
     /**
      * Flag for {@link #showSoftInput} to indicate that this is an implicit
      * request to show the input window, not as the result of a direct request
@@ -2041,10 +2023,8 @@ public final class InputMethodManager {
      *             {@link View#isFocused view focus}, and its containing window has
      *             {@link View#hasWindowFocus window focus}. Otherwise the call fails and
      *             returns {@code false}.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #SHOW_IMPLICIT} bit set.
      */
-    public boolean showSoftInput(View view, int flags) {
+    public boolean showSoftInput(View view, @ShowFlags int flags) {
         // Re-dispatch if there is a context mismatch.
         final InputMethodManager fallbackImm = getFallbackInputMethodManagerIfNecessary(view);
         if (fallbackImm != null) {
@@ -2107,21 +2087,20 @@ public final class InputMethodManager {
      *             {@link View#isFocused view focus}, and its containing window has
      *             {@link View#hasWindowFocus window focus}. Otherwise the call fails and
      *             returns {@code false}.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #SHOW_IMPLICIT} bit set.
      * @param resultReceiver If non-null, this will be called by the IME when
      * it has processed your request to tell you what it has done.  The result
      * code you receive may be either {@link #RESULT_UNCHANGED_SHOWN},
      * {@link #RESULT_UNCHANGED_HIDDEN}, {@link #RESULT_SHOWN}, or
      * {@link #RESULT_HIDDEN}.
      */
-    public boolean showSoftInput(View view, int flags, ResultReceiver resultReceiver) {
+    public boolean showSoftInput(View view, @ShowFlags int flags, ResultReceiver resultReceiver) {
         return showSoftInput(view, null /* statsToken */, flags, resultReceiver,
                 SoftInputShowHideReason.SHOW_SOFT_INPUT);
     }
 
-    private boolean showSoftInput(View view, @Nullable ImeTracker.Token statsToken, int flags,
-            ResultReceiver resultReceiver, @SoftInputShowHideReason int reason) {
+    private boolean showSoftInput(View view, @Nullable ImeTracker.Token statsToken,
+            @ShowFlags int flags, ResultReceiver resultReceiver,
+            @SoftInputShowHideReason int reason) {
         if (statsToken == null) {
             statsToken = ImeTracker.forLogging().onRequestShow(null /* component */,
                     Process.myUid(), ImeTracker.ORIGIN_CLIENT_SHOW_SOFT_INPUT, reason);
@@ -2175,7 +2154,7 @@ public final class InputMethodManager {
      */
     @Deprecated
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 123768499)
-    public void showSoftInputUnchecked(int flags, ResultReceiver resultReceiver) {
+    public void showSoftInputUnchecked(@ShowFlags int flags, ResultReceiver resultReceiver) {
         synchronized (mH) {
             final ImeTracker.Token statsToken = ImeTracker.forLogging().onRequestShow(
                     null /* component */, Process.myUid(), ImeTracker.ORIGIN_CLIENT_SHOW_SOFT_INPUT,
@@ -2206,6 +2185,14 @@ public final class InputMethodManager {
         }
     }
 
+    /** @hide */
+    @IntDef(flag = true, prefix = { "HIDE_" }, value = {
+            HIDE_IMPLICIT_ONLY,
+            HIDE_NOT_ALWAYS,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface HideFlags {}
+
     /**
      * Flag for {@link #hideSoftInputFromWindow} and {@link InputMethodService#requestHideSelf(int)}
      * to indicate that the soft input window should only be hidden if it was not explicitly shown
@@ -2227,10 +2214,8 @@ public final class InputMethodManager {
      *
      * @param windowToken The token of the window that is making the request,
      * as returned by {@link View#getWindowToken() View.getWindowToken()}.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #HIDE_IMPLICIT_ONLY} bit set.
      */
-    public boolean hideSoftInputFromWindow(IBinder windowToken, int flags) {
+    public boolean hideSoftInputFromWindow(IBinder windowToken, @HideFlags int flags) {
         return hideSoftInputFromWindow(windowToken, flags, null);
     }
 
@@ -2252,21 +2237,19 @@ public final class InputMethodManager {
      *
      * @param windowToken The token of the window that is making the request,
      * as returned by {@link View#getWindowToken() View.getWindowToken()}.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #HIDE_IMPLICIT_ONLY} bit set.
      * @param resultReceiver If non-null, this will be called by the IME when
      * it has processed your request to tell you what it has done.  The result
      * code you receive may be either {@link #RESULT_UNCHANGED_SHOWN},
      * {@link #RESULT_UNCHANGED_HIDDEN}, {@link #RESULT_SHOWN}, or
      * {@link #RESULT_HIDDEN}.
      */
-    public boolean hideSoftInputFromWindow(IBinder windowToken, int flags,
+    public boolean hideSoftInputFromWindow(IBinder windowToken, @HideFlags int flags,
             ResultReceiver resultReceiver) {
         return hideSoftInputFromWindow(windowToken, flags, resultReceiver,
                 SoftInputShowHideReason.HIDE_SOFT_INPUT);
     }
 
-    private boolean hideSoftInputFromWindow(IBinder windowToken, int flags,
+    private boolean hideSoftInputFromWindow(IBinder windowToken, @HideFlags int flags,
             ResultReceiver resultReceiver, @SoftInputShowHideReason int reason) {
         final ImeTracker.Token statsToken = ImeTracker.forLogging().onRequestHide(
                 null /* component */, Process.myUid(),
@@ -2469,12 +2452,6 @@ public final class InputMethodManager {
      * If not the input window will be displayed.
      * @param windowToken The token of the window that is making the request,
      * as returned by {@link View#getWindowToken() View.getWindowToken()}.
-     * @param showFlags Provides additional operating flags.  May be
-     * 0 or have the {@link #SHOW_IMPLICIT},
-     * {@link #SHOW_FORCED} bit set.
-     * @param hideFlags Provides additional operating flags.  May be
-     * 0 or have the {@link #HIDE_IMPLICIT_ONLY},
-     * {@link #HIDE_NOT_ALWAYS} bit set.
      *
      * @deprecated Use {@link #showSoftInput(View, int)} or
      * {@link #hideSoftInputFromWindow(IBinder, int)} explicitly instead.
@@ -2483,7 +2460,8 @@ public final class InputMethodManager {
      * has an effect if the calling app is the current IME focus.
      */
     @Deprecated
-    public void toggleSoftInputFromWindow(IBinder windowToken, int showFlags, int hideFlags) {
+    public void toggleSoftInputFromWindow(IBinder windowToken, @ShowFlags int showFlags,
+            @HideFlags int hideFlags) {
         ImeTracing.getInstance().triggerClientDump(
                 "InputMethodManager#toggleSoftInputFromWindow", InputMethodManager.this,
                 null /* icProto */);
@@ -2501,12 +2479,6 @@ public final class InputMethodManager {
      *
      * If the input window is already displayed, it gets hidden.
      * If not the input window will be displayed.
-     * @param showFlags Provides additional operating flags.  May be
-     * 0 or have the {@link #SHOW_IMPLICIT},
-     * {@link #SHOW_FORCED} bit set.
-     * @param hideFlags Provides additional operating flags.  May be
-     * 0 or have the {@link #HIDE_IMPLICIT_ONLY},
-     * {@link #HIDE_NOT_ALWAYS} bit set.
      *
      * @deprecated Use {@link #showSoftInput(View, int)} or
      * {@link #hideSoftInputFromWindow(IBinder, int)} explicitly instead.
@@ -2515,7 +2487,7 @@ public final class InputMethodManager {
      * has an effect if the calling app is the current IME focus.
      */
     @Deprecated
-    public void toggleSoftInput(int showFlags, int hideFlags) {
+    public void toggleSoftInput(@ShowFlags int showFlags, @HideFlags int hideFlags) {
         ImeTracing.getInstance().triggerClientDump(
                 "InputMethodManager#toggleSoftInput", InputMethodManager.this,
                 null /* icProto */);
@@ -2814,7 +2786,6 @@ public final class InputMethodManager {
                         + InputMethodDebug.startInputFlagsToString(startInputFlags));
                 return false;
             }
-            mVirtualDisplayToScreenMatrix = res.getVirtualDisplayToScreenMatrix();
             if (res.id != null) {
                 updateInputChannelLocked(res.channel);
                 mCurMethod = res.method; // for @UnsupportedAppUsage
@@ -3375,13 +3346,7 @@ public final class InputMethodManager {
                 return;
             }
             if (DEBUG) Log.v(TAG, "updateCursorAnchorInfo: " + cursorAnchorInfo);
-            if (mVirtualDisplayToScreenMatrix != null) {
-                mCurBindState.mImeSession.updateCursorAnchorInfo(
-                        CursorAnchorInfo.createForAdditionalParentMatrix(
-                                cursorAnchorInfo, mVirtualDisplayToScreenMatrix));
-            } else {
-                mCurBindState.mImeSession.updateCursorAnchorInfo(cursorAnchorInfo);
-            }
+            mCurBindState.mImeSession.updateCursorAnchorInfo(cursorAnchorInfo);
             mCursorAnchorInfo = cursorAnchorInfo;
         }
     }
@@ -3528,15 +3493,12 @@ public final class InputMethodManager {
      * @param token Supplies the identifying token given to an input method
      * when it was started, which allows it to perform this operation on
      * itself.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #HIDE_IMPLICIT_ONLY},
-     * {@link #HIDE_NOT_ALWAYS} bit set.
      * @deprecated Use {@link InputMethodService#requestHideSelf(int)} instead. This method was
      * intended for IME developers who should be accessing APIs through the service. APIs in this
      * class are intended for app developers interacting with the IME.
      */
     @Deprecated
-    public void hideSoftInputFromInputMethod(IBinder token, int flags) {
+    public void hideSoftInputFromInputMethod(IBinder token, @HideFlags int flags) {
         InputMethodPrivilegedOperationsRegistry.get(token).hideMySoftInput(
                 flags, SoftInputShowHideReason.HIDE_SOFT_INPUT_IMM_DEPRECATION);
     }
@@ -3550,15 +3512,12 @@ public final class InputMethodManager {
      * @param token Supplies the identifying token given to an input method
      * when it was started, which allows it to perform this operation on
      * itself.
-     * @param flags Provides additional operating flags.  Currently may be
-     * 0 or have the {@link #SHOW_IMPLICIT} or
-     * {@link #SHOW_FORCED} bit set.
      * @deprecated Use {@link InputMethodService#requestShowSelf(int)} instead. This method was
      * intended for IME developers who should be accessing APIs through the service. APIs in this
      * class are intended for app developers interacting with the IME.
      */
     @Deprecated
-    public void showSoftInputFromInputMethod(IBinder token, int flags) {
+    public void showSoftInputFromInputMethod(IBinder token, @ShowFlags int flags) {
         InputMethodPrivilegedOperationsRegistry.get(token).showMySoftInput(flags);
     }
 
@@ -3998,40 +3957,6 @@ public final class InputMethodManager {
      */
     public void setRequestCursorUpdateDisplayIdCheck(boolean enabled) {
         mRequestCursorUpdateDisplayIdCheck.set(enabled);
-    }
-
-    /**
-     * An internal API for {@link android.hardware.display.VirtualDisplay} to report where its
-     * embedded virtual display is placed.
-     *
-     * @param childDisplayId Display ID of the embedded virtual display.
-     * @param matrix         {@link Matrix} to convert virtual display screen coordinates to
-     *                       the host screen coordinates. {@code null} to clear the relationship.
-     * @hide
-     */
-    public void reportVirtualDisplayGeometry(int childDisplayId, @Nullable Matrix matrix) {
-        final float[] matrixValues;
-        if (matrix == null) {
-            matrixValues = null;
-        } else {
-            matrixValues = new float[9];
-            matrix.getValues(matrixValues);
-        }
-        IInputMethodManagerGlobalInvoker.reportVirtualDisplayGeometryAsync(mClient, childDisplayId,
-                matrixValues);
-    }
-
-    /**
-     * An internal API that returns if the current display has a transformation matrix to apply.
-     *
-     * @return {@code true} if {@link Matrix} to convert virtual display screen coordinates to
-     * the host screen coordinates is set.
-     * @hide
-     */
-    public boolean hasVirtualDisplayToScreenMatrix() {
-        synchronized (mH) {
-            return mVirtualDisplayToScreenMatrix != null;
-        }
     }
 
     /**

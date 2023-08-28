@@ -58,6 +58,10 @@ import android.widget.ScrollView;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 
+import androidx.core.view.AccessibilityDelegateCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
+
 import com.android.app.animation.Interpolators;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.jank.InteractionJankMonitor;
@@ -250,7 +254,7 @@ public class AuthContainerView extends LinearLayout
                 .setMessage(messageBody)
                 .setPositiveButton(android.R.string.ok, null)
                 .create();
-        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_STATUS_BAR_SUB_PANEL);
+        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
         alertDialog.show();
     }
 
@@ -263,7 +267,7 @@ public class AuthContainerView extends LinearLayout
                 .setOnDismissListener(
                         dialog -> animateAway(AuthDialogCallback.DISMISSED_ERROR))
                 .create();
-        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_STATUS_BAR_SUB_PANEL);
+        alertDialog.getWindow().setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
         alertDialog.show();
     }
 
@@ -333,6 +337,20 @@ public class AuthContainerView extends LinearLayout
         addView(mFrameLayout);
         mBiometricScrollView = mFrameLayout.findViewById(R.id.biometric_scrollview);
         mBackgroundView = mFrameLayout.findViewById(R.id.background);
+        ViewCompat.setAccessibilityDelegate(mBackgroundView, new AccessibilityDelegateCompat() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(View host,
+                    AccessibilityNodeInfoCompat info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.addAction(
+                        new AccessibilityNodeInfoCompat.AccessibilityActionCompat(
+                                AccessibilityNodeInfoCompat.ACTION_CLICK,
+                                mContext.getString(R.string.biometric_dialog_cancel_authentication)
+                        )
+                );
+            }
+        });
+
         mPanelView = mFrameLayout.findViewById(R.id.panel);
         mPanelController = new AuthPanelController(mContext, mPanelView);
         mBackgroundExecutor = bgExecutor;
@@ -801,9 +819,9 @@ public class AuthContainerView extends LinearLayout
     }
 
     @Override
-    public void animateToCredentialUI() {
+    public void animateToCredentialUI(boolean isError) {
         if (mBiometricView != null) {
-            mBiometricView.startTransitionToCredentialUI();
+            mBiometricView.startTransitionToCredentialUI(isError);
         } else {
             Log.e(TAG, "animateToCredentialUI(): mBiometricView is null");
         }

@@ -16,20 +16,24 @@
 
 package com.android.wm.shell.flicker.splitscreen
 
+import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Postsubmit
+import android.platform.test.annotations.Presubmit
 import android.tools.common.NavBar
+import android.tools.common.flicker.subject.layers.LayersTraceSubject
 import android.tools.common.flicker.subject.region.RegionSubject
+import android.tools.common.traces.component.ComponentNameMatcher.Companion.WALLPAPER_BBQ_WRAPPER
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
 import androidx.test.filters.RequiresDevice
-import com.android.wm.shell.flicker.ICommonAssertions
-import com.android.wm.shell.flicker.SPLIT_SCREEN_DIVIDER_COMPONENT
-import com.android.wm.shell.flicker.appWindowIsVisibleAtEnd
-import com.android.wm.shell.flicker.layerIsVisibleAtEnd
-import com.android.wm.shell.flicker.splitAppLayerBoundsIsVisibleAtEnd
 import com.android.wm.shell.flicker.splitscreen.benchmark.UnlockKeyguardToSplitScreenBenchmark
+import com.android.wm.shell.flicker.utils.ICommonAssertions
+import com.android.wm.shell.flicker.utils.SPLIT_SCREEN_DIVIDER_COMPONENT
+import com.android.wm.shell.flicker.utils.appWindowIsVisibleAtEnd
+import com.android.wm.shell.flicker.utils.layerIsVisibleAtEnd
+import com.android.wm.shell.flicker.utils.splitAppLayerBoundsIsVisibleAtEnd
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +58,22 @@ class UnlockKeyguardToSplitScreen(override val flicker: LegacyFlickerTest) :
         get() = {
             defaultTeardown(this)
             thisTransition(this)
+        }
+
+    @Test
+    @FlakyTest(bugId = 293578017)
+    override fun visibleLayersShownMoreThanOneConsecutiveEntry() =
+        super.visibleLayersShownMoreThanOneConsecutiveEntry()
+
+    // TODO(b/293578017) remove once that bug is resolve
+    @Test
+    @Presubmit
+    fun visibleLayersShownMoreThanOneConsecutiveEntry_withoutWallpaper() =
+        flicker.assertLayers {
+            this.visibleLayersShownMoreThanOneConsecutiveEntry(
+                LayersTraceSubject.VISIBLE_FOR_MORE_THAN_ONE_ENTRY_IGNORE_LAYERS +
+                    listOf(WALLPAPER_BBQ_WRAPPER)
+            )
         }
 
     @Test

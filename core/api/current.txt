@@ -4617,7 +4617,9 @@ package android.app {
 
   public class ActivityManager {
     method public int addAppTask(@NonNull android.app.Activity, @NonNull android.content.Intent, @Nullable android.app.ActivityManager.TaskDescription, @NonNull android.graphics.Bitmap);
+    method public void addStartInfoTimestamp(@IntRange(from=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER_START, to=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER) int, long);
     method public void appNotResponding(@NonNull String);
+    method public void clearApplicationStartInfoCompletionListener();
     method public boolean clearApplicationUserData();
     method public void clearWatchHeapLimit();
     method @RequiresPermission(android.Manifest.permission.DUMP) public void dumpPackageState(java.io.FileDescriptor, String);
@@ -4625,6 +4627,7 @@ package android.app {
     method public java.util.List<android.app.ActivityManager.AppTask> getAppTasks();
     method public android.content.pm.ConfigurationInfo getDeviceConfigurationInfo();
     method @NonNull public java.util.List<android.app.ApplicationExitInfo> getHistoricalProcessExitReasons(@Nullable String, @IntRange(from=0) int, @IntRange(from=0) int);
+    method @NonNull public java.util.List<android.app.ApplicationStartInfo> getHistoricalProcessStartReasons(@IntRange(from=0) int);
     method public int getLargeMemoryClass();
     method public int getLauncherLargeIconDensity();
     method public int getLauncherLargeIconSize();
@@ -4651,6 +4654,7 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int, android.os.Bundle);
     method @Deprecated public void restartPackage(String);
+    method public void setApplicationStartInfoCompletionListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.app.ApplicationStartInfo>);
     method public void setProcessStateSummary(@Nullable byte[]);
     method public static void setVrThread(int);
     method public void setWatchHeapLimit(long);
@@ -5229,6 +5233,57 @@ package android.app {
     field public static final int REASON_UNKNOWN = 0; // 0x0
     field public static final int REASON_USER_REQUESTED = 10; // 0xa
     field public static final int REASON_USER_STOPPED = 11; // 0xb
+  }
+
+  public final class ApplicationStartInfo implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getDefiningUid();
+    method @Nullable public android.content.Intent getIntent();
+    method public int getLaunchMode();
+    method public int getPackageUid();
+    method public int getPid();
+    method @NonNull public String getProcessName();
+    method public int getRealUid();
+    method public int getReason();
+    method public int getStartType();
+    method public int getStartupState();
+    method @NonNull public java.util.Map<java.lang.Integer,java.lang.Long> getStartupTimestamps();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.ApplicationStartInfo> CREATOR;
+    field public static final int LAUNCH_MODE_SINGLE_INSTANCE = 2; // 0x2
+    field public static final int LAUNCH_MODE_SINGLE_INSTANCE_PER_TASK = 4; // 0x4
+    field public static final int LAUNCH_MODE_SINGLE_TASK = 3; // 0x3
+    field public static final int LAUNCH_MODE_SINGLE_TOP = 1; // 0x1
+    field public static final int LAUNCH_MODE_STANDARD = 0; // 0x0
+    field public static final int STARTUP_STATE_ERROR = 1; // 0x1
+    field public static final int STARTUP_STATE_FIRST_FRAME_DRAWN = 2; // 0x2
+    field public static final int STARTUP_STATE_STARTED = 0; // 0x0
+    field public static final int START_REASON_ALARM = 0; // 0x0
+    field public static final int START_REASON_BACKUP = 1; // 0x1
+    field public static final int START_REASON_BOOT_COMPLETE = 2; // 0x2
+    field public static final int START_REASON_BROADCAST = 3; // 0x3
+    field public static final int START_REASON_CONTENT_PROVIDER = 4; // 0x4
+    field public static final int START_REASON_JOB = 5; // 0x5
+    field public static final int START_REASON_LAUNCHER = 6; // 0x6
+    field public static final int START_REASON_LAUNCHER_RECENTS = 7; // 0x7
+    field public static final int START_REASON_OTHER = 8; // 0x8
+    field public static final int START_REASON_PUSH = 9; // 0x9
+    field public static final int START_REASON_SERVICE = 10; // 0xa
+    field public static final int START_REASON_START_ACTIVITY = 11; // 0xb
+    field public static final int START_TIMESTAMP_APPLICATION_ONCREATE = 2; // 0x2
+    field public static final int START_TIMESTAMP_BIND_APPLICATION = 3; // 0x3
+    field public static final int START_TIMESTAMP_FIRST_FRAME = 4; // 0x4
+    field public static final int START_TIMESTAMP_FORK = 1; // 0x1
+    field public static final int START_TIMESTAMP_FULLY_DRAWN = 5; // 0x5
+    field public static final int START_TIMESTAMP_INITIAL_RENDERTHREAD_FRAME = 6; // 0x6
+    field public static final int START_TIMESTAMP_LAUNCH = 0; // 0x0
+    field public static final int START_TIMESTAMP_RESERVED_RANGE_DEVELOPER = 30; // 0x1e
+    field public static final int START_TIMESTAMP_RESERVED_RANGE_DEVELOPER_START = 21; // 0x15
+    field public static final int START_TIMESTAMP_RESERVED_RANGE_SYSTEM = 20; // 0x14
+    field public static final int START_TIMESTAMP_SURFACEFLINGER_COMPOSITION_COMPLETE = 7; // 0x7
+    field public static final int START_TYPE_COLD = 0; // 0x0
+    field public static final int START_TYPE_HOT = 2; // 0x2
+    field public static final int START_TYPE_WARM = 1; // 0x1
   }
 
   public final class AsyncNotedAppOp implements android.os.Parcelable {
@@ -9663,9 +9718,16 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public final void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public final android.os.IBinder onBind(@NonNull android.content.Intent);
     method @Deprecated @MainThread public void onDeviceAppeared(@NonNull String);
-    method @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
+    method @Deprecated @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull String);
-    method @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
+    method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
+    method @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
+    field public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
+    field public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
+    field public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
+    field public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
+    field public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
+    field public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
     field public static final String SERVICE_INTERFACE = "android.companion.CompanionDeviceService";
   }
 
@@ -9777,6 +9839,7 @@ package android.content {
     method public int describeContents();
     method public void enforceCallingUid();
     method @Nullable public String getAttributionTag();
+    method public int getDeviceId();
     method @Nullable public android.content.AttributionSource getNext();
     method @Nullable public String getPackageName();
     method public int getPid();
@@ -9792,6 +9855,7 @@ package android.content {
     ctor public AttributionSource.Builder(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource build();
     method @NonNull public android.content.AttributionSource.Builder setAttributionTag(@Nullable String);
+    method @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
     method @Deprecated @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setPackageName(@Nullable String);
@@ -12845,6 +12909,7 @@ package android.content.pm {
     field public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
     field public static final String FEATURE_TELEPHONY_SUBSCRIPTION = "android.hardware.telephony.subscription";
     field @Deprecated public static final String FEATURE_TELEVISION = "android.hardware.type.television";
+    field public static final String FEATURE_THREADNETWORK = "android.hardware.threadnetwork";
     field public static final String FEATURE_TOUCHSCREEN = "android.hardware.touchscreen";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH = "android.hardware.touchscreen.multitouch";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT = "android.hardware.touchscreen.multitouch.distinct";
@@ -14354,6 +14419,7 @@ package android.database.sqlite {
     method public android.database.sqlite.SQLiteStatement compileStatement(String) throws android.database.SQLException;
     method @NonNull public static android.database.sqlite.SQLiteDatabase create(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method @NonNull public static android.database.sqlite.SQLiteDatabase createInMemory(@NonNull android.database.sqlite.SQLiteDatabase.OpenParams);
+    method @NonNull public android.database.sqlite.SQLiteRawStatement createRawStatement(@NonNull String);
     method public int delete(String, String, String[]);
     method public static boolean deleteDatabase(@NonNull java.io.File);
     method public void disableWriteAheadLogging();
@@ -14364,6 +14430,7 @@ package android.database.sqlite {
     method public void execSQL(String, Object[]) throws android.database.SQLException;
     method public static String findEditTable(String);
     method public java.util.List<android.util.Pair<java.lang.String,java.lang.String>> getAttachedDbs();
+    method public long getLastInsertRowId();
     method public long getMaximumSize();
     method public long getPageSize();
     method public String getPath();
@@ -14587,6 +14654,39 @@ package android.database.sqlite {
     method public void setStrictGrammar(boolean);
     method public void setTables(@Nullable String);
     method public int update(@NonNull android.database.sqlite.SQLiteDatabase, @NonNull android.content.ContentValues, @Nullable String, @Nullable String[]);
+  }
+
+  public final class SQLiteRawStatement implements java.io.Closeable {
+    method public void bindBlob(int, @NonNull byte[]) throws android.database.sqlite.SQLiteException;
+    method public void bindBlob(int, @NonNull byte[], int, int) throws android.database.sqlite.SQLiteException;
+    method public void bindDouble(int, double) throws android.database.sqlite.SQLiteException;
+    method public void bindInt(int, int) throws android.database.sqlite.SQLiteException;
+    method public void bindLong(int, long) throws android.database.sqlite.SQLiteException;
+    method public void bindNull(int) throws android.database.sqlite.SQLiteException;
+    method public void bindText(int, @NonNull String) throws android.database.sqlite.SQLiteException;
+    method public void clearBindings();
+    method public void close();
+    method @Nullable public byte[] getColumnBlob(int) throws android.database.sqlite.SQLiteException;
+    method public double getColumnDouble(int) throws android.database.sqlite.SQLiteException;
+    method public int getColumnInt(int) throws android.database.sqlite.SQLiteException;
+    method public int getColumnLength(int) throws android.database.sqlite.SQLiteException;
+    method public long getColumnLong(int) throws android.database.sqlite.SQLiteException;
+    method @NonNull public String getColumnName(int) throws android.database.sqlite.SQLiteException;
+    method @NonNull public String getColumnText(int) throws android.database.sqlite.SQLiteException;
+    method public int getColumnType(int) throws android.database.sqlite.SQLiteException;
+    method public int getParameterCount();
+    method public int getParameterIndex(@NonNull String);
+    method @Nullable public String getParameterName(int);
+    method public int getResultColumnCount();
+    method public boolean isOpen();
+    method public int readColumnBlob(int, @NonNull byte[], int, int, int) throws android.database.sqlite.SQLiteException;
+    method public void reset();
+    method public boolean step() throws android.database.sqlite.SQLiteException;
+    field public static final int SQLITE_DATA_TYPE_BLOB = 4; // 0x4
+    field public static final int SQLITE_DATA_TYPE_FLOAT = 2; // 0x2
+    field public static final int SQLITE_DATA_TYPE_INTEGER = 1; // 0x1
+    field public static final int SQLITE_DATA_TYPE_NULL = 5; // 0x5
+    field public static final int SQLITE_DATA_TYPE_TEXT = 3; // 0x3
   }
 
   public class SQLiteReadOnlyDatabaseException extends android.database.sqlite.SQLiteException {
@@ -26436,6 +26536,17 @@ package android.media.midi {
     method public void disconnect(android.media.midi.MidiReceiver);
     method public abstract void onConnect(android.media.midi.MidiReceiver);
     method public abstract void onDisconnect(android.media.midi.MidiReceiver);
+  }
+
+  public abstract class MidiUmpDeviceService extends android.app.Service {
+    ctor public MidiUmpDeviceService();
+    method @Nullable public final android.media.midi.MidiDeviceInfo getDeviceInfo();
+    method @NonNull public final java.util.List<android.media.midi.MidiReceiver> getOutputPortReceivers();
+    method @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
+    method public void onClose();
+    method public void onDeviceStatusChanged(@NonNull android.media.midi.MidiDeviceStatus);
+    method @NonNull public abstract java.util.List<android.media.midi.MidiReceiver> onGetInputPortReceivers();
+    field public static final String SERVICE_INTERFACE = "android.media.midi.MidiUmpDeviceService";
   }
 
 }
@@ -42190,6 +42301,7 @@ package android.telecom {
     method public android.telecom.GatewayInfo getGatewayInfo();
     method public android.net.Uri getHandle();
     method public int getHandlePresentation();
+    method @NonNull public String getId();
     method public android.os.Bundle getIntentExtras();
     method public final int getState();
     method public android.telecom.StatusHints getStatusHints();
@@ -43543,6 +43655,7 @@ package android.telephony {
     field public static final String KEY_CARRIER_SERVICE_NUMBER_STRING_ARRAY = "carrier_service_number_array";
     field public static final String KEY_CARRIER_SETTINGS_ACTIVITY_COMPONENT_NAME_STRING = "carrier_settings_activity_component_name_string";
     field public static final String KEY_CARRIER_SETTINGS_ENABLE_BOOL = "carrier_settings_enable_bool";
+    field public static final String KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE = "carrier_supported_satellite_services_per_provider_bundle";
     field public static final String KEY_CARRIER_SUPPORTS_OPP_DATA_AUTO_PROVISIONING_BOOL = "carrier_supports_opp_data_auto_provisioning_bool";
     field public static final String KEY_CARRIER_SUPPORTS_SS_OVER_UT_BOOL = "carrier_supports_ss_over_ut_bool";
     field public static final String KEY_CARRIER_SUPPORTS_TETHERING_BOOL = "carrier_supports_tethering_bool";
@@ -44954,6 +45067,7 @@ package android.telephony {
     method public boolean isNetworkRegistered();
     method public boolean isNetworkRoaming();
     method public boolean isNetworkSearching();
+    method public boolean isNonTerrestrialNetwork();
     method @Deprecated public boolean isRegistered();
     method @Deprecated public boolean isRoaming();
     method @Deprecated public boolean isSearching();
@@ -45183,6 +45297,7 @@ package android.telephony {
     method public boolean getRoaming();
     method public int getState();
     method public boolean isSearching();
+    method public boolean isUsingNonTerrestrialNetwork();
     method public void setIsManualSelection(boolean);
     method public void setOperatorName(String, String, String);
     method public void setRoaming(boolean);
@@ -46064,6 +46179,7 @@ package android.telephony {
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_THROTTLED = 2; // 0x2
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_TIMEOUT = 9; // 0x9
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_CANCELED = 6; // 0x6
+    field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED = 16; // 0x10
     field public static final int SET_OPPORTUNISTIC_SUB_INACTIVE_SUBSCRIPTION = 2; // 0x2
     field public static final int SET_OPPORTUNISTIC_SUB_NO_OPPORTUNISTIC_SUB_AVAILABLE = 3; // 0x3
     field public static final int SET_OPPORTUNISTIC_SUB_REMOTE_SERVICE_EXCEPTION = 4; // 0x4

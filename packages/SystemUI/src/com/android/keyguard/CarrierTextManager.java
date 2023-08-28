@@ -324,7 +324,7 @@ public class CarrierTextManager {
         boolean anySimReadyAndInService = false;
         boolean missingSimsWithSubs = false;
         boolean showCustomizeName = getContext().getResources().getBoolean(
-                com.android.systemui.R.bool.config_show_customize_carrier_name);
+                com.android.settingslib.R.bool.config_show_customize_carrier_name);
         CharSequence displayText = null;
         List<SubscriptionInfo> subs = getSubscriptionInfo();
 
@@ -814,8 +814,8 @@ public class CarrierTextManager {
             String[] names = originCarrierName.toString().split(mSeparator.toString(), 2);
             for (int j = 0; j < names.length; j++) {
                 names[j] = getLocalString(
-                        names[j], com.android.systemui.R.array.origin_carrier_names,
-                        com.android.systemui.R.array.locale_carrier_names);
+                        names[j], com.android.settingslib.R.array.origin_carrier_names,
+                        com.android.settingslib.R.array.locale_carrier_names);
                 if (!TextUtils.isEmpty(names[j])) {
                     if (!TextUtils.isEmpty(networkClass)) {
                         names[j] = new StringBuilder().append(names[j]).append(" ")
@@ -868,14 +868,14 @@ public class CarrierTextManager {
     }
 
     private String networkTypeToString(int networkType) {
-        int classId = com.android.systemui.R.string.config_rat_unknown;
+        int classId = com.android.settingslib.R.string.config_rat_unknown;
         long mask = TelephonyManager.getBitMaskForNetworkType(networkType);
         if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_2G) != 0) {
-          classId = com.android.systemui.R.string.config_rat_2g;
+          classId = com.android.settingslib.R.string.config_rat_2g;
         } else if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_3G) != 0) {
-          classId = com.android.systemui.R.string.config_rat_3g;
+          classId = com.android.settingslib.R.string.config_rat_3g;
         } else if ((mask & TelephonyManager.NETWORK_CLASS_BITMASK_4G) != 0) {
-          classId = com.android.systemui.R.string.config_rat_4g;
+          classId = com.android.settingslib.R.string.config_rat_4g;
         }
         return getContext().getResources().getString(classId);
     }
@@ -883,7 +883,7 @@ public class CarrierTextManager {
 
     private String get5GNetworkClass(SubscriptionInfo sub, int networkType) {
         if ( networkType == TelephonyManager.NETWORK_TYPE_NR ) {
-            return mContext.getResources().getString(R.string.data_connection_5g);
+            return mContext.getResources().getString(com.android.settingslib.R.string.data_connection_5g);
         }
 
         int slotIndex = sub.getSimSlotIndex();
@@ -896,7 +896,7 @@ public class CarrierTextManager {
         FiveGServiceState fiveGServiceState =
                 mFiveGServiceClient.getCurrentServiceState(slotIndex);
         if ( fiveGServiceState.isNrIconTypeValid() && isDataRegisteredOnLte(subId)) {
-            return mContext.getResources().getString(R.string.data_connection_5g);
+            return mContext.getResources().getString(com.android.settingslib.R.string.data_connection_5g);
         }
 
         return null;

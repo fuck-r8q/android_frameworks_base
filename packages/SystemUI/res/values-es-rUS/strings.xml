@@ -118,6 +118,9 @@
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Presiona para ver"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"Se produjo un error al guardar la grabación de pantalla"</string>
     <string name="screenrecord_start_error" msgid="2200660692479682368">"Error al iniciar la grabación de pantalla"</string>
+    <string name="immersive_cling_title" msgid="8372056499315585941">"Visualización en pantalla completa"</string>
+    <string name="immersive_cling_description" msgid="6913958856085185775">"Para salir, desliza el dedo hacia abajo desde la parte superior."</string>
+    <string name="immersive_cling_positive" msgid="3076681691468978568">"Entendido"</string>
     <string name="accessibility_back" msgid="6530104400086152611">"Atrás"</string>
     <string name="accessibility_home" msgid="5430449841237966217">"Página principal"</string>
     <string name="accessibility_menu" msgid="2701163794470513040">"Menú"</string>
@@ -147,6 +150,7 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_2" msgid="8586608186457385108">"Rostro reconocido. Presiona para continuar."</string>
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"Rostro reconocido. Presiona el desbloqueo para continuar."</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"Autenticado"</string>
+    <string name="biometric_dialog_cancel_authentication" msgid="981316588773442637">"Cancelar autenticación"</string>
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"Usar PIN"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Usar patrón"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Usar contraseña"</string>
@@ -359,6 +363,7 @@
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"Se desbloqueó con el rostro"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"Se reconoció el rostro"</string>
     <string name="keyguard_retry" msgid="886802522584053523">"Desliza el dedo hacia arriba para volver a intentarlo"</string>
+    <string name="accesssibility_keyguard_retry" msgid="8880238862712870676">"Desliza hacia arriba para volver a probar Desbloqueo facial"</string>
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"Desbloquea el dispositivo para usar NFC"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"Este dispositivo pertenece a tu organización"</string>
     <string name="do_disclosure_with_name" msgid="2091641464065004091">"Este dispositivo pertenece a <xliff:g id="ORGANIZATION_NAME">%s</xliff:g>"</string>
@@ -412,9 +417,13 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_entire_screen" msgid="5407906851409410209">"Cuando compartas, grabes o transmitas contenido, Android podrá acceder a todo lo que sea visible en la pantalla o que reproduzcas en el dispositivo. Por lo tanto, debes tener cuidado con contraseñas, detalles de pagos, mensajes, fotos, audios y videos."</string>
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app" msgid="3454859977888159495">"Cuando compartas, grabes o transmitas una app, Android podrá acceder a todo el contenido que se muestre o que reproduzcas en ella. Por lo tanto, debes tener cuidado con contraseñas, detalles de pagos, mensajes, fotos, audios y videos."</string>
     <string name="media_projection_entry_generic_permission_dialog_continue" msgid="8640381403048097116">"Iniciar"</string>
+    <string name="media_projection_task_switcher_text" msgid="590885489897412359">"El uso compartido se detiene al cambiar de app"</string>
+    <string name="media_projection_task_switcher_action_switch" msgid="8682258717291921123">"Compartir esta app en su lugar"</string>
+    <string name="media_projection_task_switcher_action_back" msgid="5324164224147845282">"Cambiar de cuenta"</string>
+    <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"Cambio de app"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"Bloqueada por tu administrador de TI"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"La captura de pantalla está inhabilitada debido a la política del dispositivo"</string>
-    <string name="clear_all_notifications_text" msgid="348312370303046130">"Borrar todo"</string>
+    <string name="clear_all_notifications_text" msgid="348312370303046130">"Cerrar todo"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"Administrar"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"Historial"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"Nuevo"</string>
@@ -759,13 +768,7 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Menú de encendido"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Página <xliff:g id="ID_1">%1$d</xliff:g> de <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Pantalla de bloqueo"</string>
-    <string name="thermal_shutdown_title" msgid="2702966892682930264">"El teléfono se apagó por calor"</string>
-    <string name="thermal_shutdown_message" msgid="6142269839066172984">"Tu teléfono ahora se ejecuta con normalidad.\nPresiona para obtener más información"</string>
-    <string name="thermal_shutdown_dialog_message" msgid="6745684238183492031">"Tu teléfono estaba muy caliente y se apagó para enfriarse. Ya funciona correctamente.\n\nTu teléfono puede calentarse en estos casos:\n	• Usas apps que consumen muchos recursos (como juegos, videos o navegación).\n	• Subes o descargas archivos grandes.\n	• Usas el teléfono en condiciones de temperatura alta."</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Ver pasos de mantenimiento"</string>
-    <string name="high_temp_title" msgid="2218333576838496100">"El teléfono se está calentando"</string>
-    <string name="high_temp_notif_message" msgid="1277346543068257549">"Algunas funciones se limitan durante el enfriamiento del teléfono.\nPresiona para obtener más información"</string>
-    <string name="high_temp_dialog_message" msgid="3793606072661253968">"Tu teléfono intentará enfriarse automáticamente. Podrás usarlo, pero es posible que funcione más lento.\n\nUna vez que se haya enfriado, volverá a funcionar correctamente."</string>
     <string name="high_temp_dialog_help_text" msgid="7380171287943345858">"Ver pasos de mantenimiento"</string>
     <string name="high_temp_alarm_title" msgid="8654754369605452169">"Desenchufa el dispositivo"</string>
     <string name="high_temp_alarm_notify_message" msgid="3917622943609118956">"El puerto de carga del dispositivo se está calentando. Si está conectado a un cargador o accesorio USB, desenchúfalo con cuidado, ya que el cable también puede estar caliente."</string>
@@ -935,6 +938,7 @@
     <string name="controls_pin_instructions_retry" msgid="1566667581012131046">"Prueba con otro PIN"</string>
     <string name="controls_confirmation_message" msgid="7744104992609594859">"Confirmar cambio para <xliff:g id="DEVICE">%s</xliff:g>"</string>
     <string name="controls_structure_tooltip" msgid="4355922222944447867">"Desliza el dedo para ver más elementos"</string>
+    <string name="retry_face" msgid="416380073082560186">"Vuelve a intentar la autenticación facial"</string>
     <string name="controls_seeding_in_progress" msgid="3033855341410264148">"Cargando recomendaciones"</string>
     <string name="controls_media_title" msgid="1746947284862928133">"Contenido multimedia"</string>
     <string name="controls_media_close_session" msgid="4780485355795635052">"¿Ocultar control multimedia para <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
@@ -1161,4 +1165,22 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"Asistente está prestando atención"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Configura la app de notas predeterminada en Configuración"</string>
     <string name="install_app" msgid="5066668100199613936">"Instalar app"</string>
+    <string name="privacy_dialog_title" msgid="7839968133469098311">"Micrófono y cámara"</string>
+    <string name="privacy_dialog_summary" msgid="2458769652125995409">"Uso reciente de una app"</string>
+    <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Ver accesos recientes"</string>
+    <string name="privacy_dialog_done_button" msgid="4504330708531434263">"Listo"</string>
+    <string name="privacy_dialog_expand_action" msgid="9129262348628331377">"Expandir y mostrar opciones"</string>
+    <string name="privacy_dialog_collapse_action" msgid="277419962019466347">"Contraer"</string>
+    <string name="privacy_dialog_close_app_button" msgid="8006250171305878606">"Cerrar esta app"</string>
+    <string name="privacy_dialog_close_app_message" msgid="1316408652526310985">"<xliff:g id="APP_NAME">%1$s</xliff:g> cerrada"</string>
+    <string name="privacy_dialog_manage_service" msgid="8320590856621823604">"Administrar servicio"</string>
+    <string name="privacy_dialog_manage_permissions" msgid="2543451567190470413">"Administrar acceso"</string>
+    <string name="privacy_dialog_active_call_usage" msgid="7858746847946397562">"En uso por una llamada telefónica"</string>
+    <string name="privacy_dialog_recent_call_usage" msgid="1214810644978167344">"Uso reciente en una llamada telefónica"</string>
+    <string name="privacy_dialog_active_app_usage" msgid="631997836335929880">"En uso por <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="privacy_dialog_recent_app_usage" msgid="4883417856848222450">"Uso reciente en <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="privacy_dialog_active_app_usage_1" msgid="9047570143069220911">"En uso por <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g>)"</string>
+    <string name="privacy_dialog_recent_app_usage_1" msgid="2551340497722370109">"Uso reciente en <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g>)"</string>
+    <string name="privacy_dialog_active_app_usage_2" msgid="2770926061339921767">"En uso por <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
+    <string name="privacy_dialog_recent_app_usage_2" msgid="2874689735085367167">"Uso reciente en <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
 </resources>

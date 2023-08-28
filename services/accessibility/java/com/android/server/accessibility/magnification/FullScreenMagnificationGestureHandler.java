@@ -33,6 +33,7 @@ import static java.util.Arrays.asList;
 import static java.util.Arrays.copyOfRange;
 
 import android.accessibilityservice.MagnificationConfig;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UiContext;
@@ -41,6 +42,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.PointF;
+import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.Handler;
 import android.os.Looper;
@@ -137,6 +139,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
     @VisibleForTesting final DetectingState mDetectingState;
     @VisibleForTesting final PanningScalingState mPanningScalingState;
     @VisibleForTesting final ViewportDraggingState mViewportDraggingState;
+    @VisibleForTesting final SinglePanningState mSinglePanningState;
 
     private final ScreenStateReceiver mScreenStateReceiver;
     private final WindowMagnificationPromptController mPromptController;
@@ -147,6 +150,20 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
     private PointerCoords[] mTempPointerCoords;
     private PointerProperties[] mTempPointerProperties;
 
+    @VisibleForTesting static final int OVERSCROLL_NONE = 0;
+    @VisibleForTesting static final int OVERSCROLL_LEFT_EDGE = 1;
+    @VisibleForTesting static final int OVERSCROLL_RIGHT_EDGE = 2;
+    @VisibleForTesting static final int OVERSCROLL_VERTICAL_EDGE = 3;
+
+    @IntDef({
+        OVERSCROLL_NONE,
+        OVERSCROLL_LEFT_EDGE,
+        OVERSCROLL_RIGHT_EDGE,
+        OVERSCROLL_VERTICAL_EDGE
+    })
+    public @interface OverscrollState {}
+
+    @VisibleForTesting boolean mIsSinglePanningEnabled;
     public FullScreenMagnificationGestureHandler(@UiContext Context context,
             FullScreenMagnificationController fullScreenMagnificationController,
             AccessibilityTraceManager trace,
@@ -154,7 +171,8 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             boolean detectTripleTap,
             boolean detectShortcutTrigger,
             @NonNull WindowMagnificationPromptController promptController,
-            int displayId) {
+            int displayId,
+            FullScreenMagnificationVibrationHelper fullScreenMagnificationVibrationHelper) {
         super(displayId, detectTripleTap, detectShortcutTrigger, trace, callback);
         if (DEBUG_ALL) {
             Log.i(mLogTag,
@@ -202,6 +220,11 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         mDetectingState = new DetectingState(context);
         mViewportDraggingState = new ViewportDraggingState();
         mPanningScalingState = new PanningScalingState(context);
+        mSinglePanningState = new SinglePanningState(context,
+                fullScreenMagnificationVibrationHelper);
+        setSinglePanningEnabled(
+                context.getResources()
+                        .getBoolean(R.bool.config_enable_a11y_magnification_single_panning));
 
         if (mDetectShortcutTrigger) {
             mScreenStateReceiver = new ScreenStateReceiver(context, this);
@@ -211,6 +234,11 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         }
 
         transitionTo(mDetectingState);
+    }
+
+    @VisibleForTesting
+    void setSinglePanningEnabled(boolean isEnabled) {
+        mIsSinglePanningEnabled = isEnabled;
     }
 
     @Override
@@ -223,6 +251,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         // To keep InputEventConsistencyVerifiers within GestureDetectors happy
         mPanningScalingState.mScrollGestureDetector.onTouchEvent(event);
         mPanningScalingState.mScaleGestureDetector.onTouchEvent(event);
+        mSinglePanningState.mScrollGestureDetector.onTouchEvent(event);
 
         try {
             stateHandler.onMotionEvent(event, rawEvent, policyFlags);
@@ -669,7 +698,6 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
         @Override
         public void onMotionEvent(MotionEvent event, MotionEvent rawEvent, int policyFlags) {
-
             // Ensures that the state at the end of delegation is consistent with the last delegated
             // UP/DOWN event in queue: still delegating if pointer is down, detecting otherwise
             switch (event.getActionMasked()) {
@@ -726,6 +754,8 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
         @VisibleForTesting Handler mHandler = new Handler(Looper.getMainLooper(), this);
 
+        private PointF mFirstPointerDownLocation = new PointF(Float.NaN, Float.NaN);
+
         DetectingState(Context context) {
             mLongTapMinDelay = ViewConfiguration.getLongPressTimeout();
             mMultiTapMaxDelay = ViewConfiguration.getDoubleTapTimeout()
@@ -765,9 +795,10 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             cacheDelayedMotionEvent(event, rawEvent, policyFlags);
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: {
-
                     mLastDetectingDownEventTime = event.getDownTime();
                     mHandler.removeMessages(MESSAGE_TRANSITION_TO_DELEGATING_STATE);
+
+                    mFirstPointerDownLocation.set(event.getX(), event.getY());
 
                     if (!mFullScreenMagnificationController.magnificationRegionContains(
                             mDisplayId, event.getX(), event.getY())) {
@@ -800,7 +831,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 break;
                 case ACTION_POINTER_DOWN: {
                     if (isActivated() && event.getPointerCount() == 2) {
-                        storeSecondPointerDownLocation(event);
+                        storePointerDownLocation(mSecondPointerDownLocation, event);
                         mHandler.sendEmptyMessageDelayed(MESSAGE_TRANSITION_TO_PANNINGSCALING_STATE,
                                 ViewConfiguration.getTapTimeout());
                     } else {
@@ -815,7 +846,6 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 case ACTION_MOVE: {
                     if (isFingerDown()
                             && distance(mLastDown, /* move */ event) > mSwipeMinDistance) {
-
                         // Swipe detected - transition immediately
 
                         // For convenience, viewport dragging takes precedence
@@ -826,10 +856,18 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                         } else if (isActivated() && event.getPointerCount() == 2) {
                             //Primary pointer is swiping, so transit to PanningScalingState
                             transitToPanningScalingStateAndClear();
+                        } else if (mIsSinglePanningEnabled
+                                && isActivated()
+                                && event.getPointerCount() == 1) {
+                            if (overscrollState(event, mFirstPointerDownLocation)
+                                    == OVERSCROLL_VERTICAL_EDGE) {
+                                transitionToDelegatingStateAndClear();
+                            }
+                            transitToSinglePanningStateAndClear();
                         } else {
                             transitionToDelegatingStateAndClear();
                         }
-                    } else if (isActivated() && secondPointerDownValid()
+                    } else if (isActivated() && pointerDownValid(mSecondPointerDownLocation)
                             && distanceClosestPointerToPoint(
                             mSecondPointerDownLocation, /* move */ event) > mSwipeMinDistance) {
                         //Second pointer is swiping, so transit to PanningScalingState
@@ -843,11 +881,9 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
                     if (!mFullScreenMagnificationController.magnificationRegionContains(
                             mDisplayId, event.getX(), event.getY())) {
-
                         transitionToDelegatingStateAndClear();
 
                     } else if (isMultiTapTriggered(3 /* taps */)) {
-
                         onTripleTap(/* up */ event);
 
                     } else if (
@@ -856,7 +892,6 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                             //TODO long tap should never happen here
                             && ((timeBetween(mLastDown, mLastUp) >= mLongTapMinDelay)
                                     || (distance(mLastDown, mLastUp) >= mSwipeMinDistance))) {
-
                         transitionToDelegatingStateAndClear();
 
                     }
@@ -865,18 +900,23 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             }
         }
 
-        private void storeSecondPointerDownLocation(MotionEvent event) {
+        private void storePointerDownLocation(PointF pointerDownLocation, MotionEvent event) {
             final int index = event.getActionIndex();
-            mSecondPointerDownLocation.set(event.getX(index), event.getY(index));
+            pointerDownLocation.set(event.getX(index), event.getY(index));
         }
 
-        private boolean secondPointerDownValid() {
-            return !(Float.isNaN(mSecondPointerDownLocation.x) && Float.isNaN(
-                    mSecondPointerDownLocation.y));
+        private boolean pointerDownValid(PointF pointerDownLocation) {
+            return !(Float.isNaN(pointerDownLocation.x) && Float.isNaN(
+                    pointerDownLocation.y));
         }
 
         private void transitToPanningScalingStateAndClear() {
             transitionTo(mPanningScalingState);
+            clear();
+        }
+
+        private void transitToSinglePanningStateAndClear() {
+            transitionTo(mSinglePanningState);
             clear();
         }
 
@@ -947,6 +987,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
             setShortcutTriggered(false);
             removePendingDelayedMessages();
             clearDelayedMotionEvents();
+            mFirstPointerDownLocation.set(Float.NaN, Float.NaN);
             mSecondPointerDownLocation.set(Float.NaN, Float.NaN);
         }
 
@@ -1061,7 +1102,7 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
 
             mViewportDraggingState.prepareForZoomInTemporary(shortcutTriggered);
 
-            zoomInTemporary(down.getX(), down.getY());
+            zoomInTemporary(down.getX(), down.getY(), shortcutTriggered);
 
             transitionTo(mViewportDraggingState);
         }
@@ -1118,19 +1159,27 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
         }
     }
 
-    private void zoomInTemporary(float centerX, float centerY) {
+    private void zoomInTemporary(float centerX, float centerY, boolean shortcutTriggered) {
         final float currentScale = mFullScreenMagnificationController.getScale(mDisplayId);
         final float persistedScale = MathUtils.constrain(
                 mFullScreenMagnificationController.getPersistedScale(mDisplayId),
                 MIN_SCALE, MAX_SCALE);
 
         final boolean isActivated = mFullScreenMagnificationController.isActivated(mDisplayId);
-        final float scale = isActivated ? (currentScale + 1.0f) : persistedScale;
+        final boolean isShortcutTriggered = shortcutTriggered;
+        final boolean isZoomedOutFromService =
+                mFullScreenMagnificationController.isZoomedOutFromService(mDisplayId);
+
+        boolean zoomInWithPersistedScale =
+                !isActivated || isShortcutTriggered || isZoomedOutFromService;
+        final float scale = zoomInWithPersistedScale ?  persistedScale : (currentScale + 1.0f);
         zoomToScale(scale, centerX, centerY);
     }
 
     private void zoomOn(float centerX, float centerY) {
-        if (DEBUG_DETECTING) Slog.i(mLogTag, "zoomOn(" + centerX + ", " + centerY + ")");
+        if (DEBUG_DETECTING) {
+            Slog.i(mLogTag, "zoomOn(" + centerX + ", " + centerY + ")");
+        }
 
         final float scale = MathUtils.constrain(
                 mFullScreenMagnificationController.getPersistedScale(mDisplayId),
@@ -1147,7 +1196,9 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
     }
 
     private void zoomOff() {
-        if (DEBUG_DETECTING) Slog.i(mLogTag, "zoomOff()");
+        if (DEBUG_DETECTING) {
+            Slog.i(mLogTag, "zoomOff()");
+        }
         mFullScreenMagnificationController.reset(mDisplayId, /* animate */ true);
     }
 
@@ -1165,14 +1216,38 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
                 + ", mDelegatingState=" + mDelegatingState
                 + ", mMagnifiedInteractionState=" + mPanningScalingState
                 + ", mViewportDraggingState=" + mViewportDraggingState
+                + ", mSinglePanningState=" + mSinglePanningState
                 + ", mDetectTripleTap=" + mDetectTripleTap
                 + ", mDetectShortcutTrigger=" + mDetectShortcutTrigger
                 + ", mCurrentState=" + State.nameOf(mCurrentState)
                 + ", mPreviousState=" + State.nameOf(mPreviousState)
                 + ", mMagnificationController=" + mFullScreenMagnificationController
                 + ", mDisplayId=" + mDisplayId
+                + ", mIsSinglePanningEnabled=" + mIsSinglePanningEnabled
                 + '}';
     }
+
+    private int overscrollState(MotionEvent event, PointF firstPointerDownLocation) {
+        if (!pointerValid(firstPointerDownLocation)) {
+            return OVERSCROLL_NONE;
+        }
+        float dX = event.getX() - firstPointerDownLocation.x;
+        float dY = event.getY() - firstPointerDownLocation.y;
+        if (mFullScreenMagnificationController.isAtLeftEdge(mDisplayId) && dX > 0) {
+            return OVERSCROLL_LEFT_EDGE;
+        } else if (mFullScreenMagnificationController.isAtRightEdge(mDisplayId) && dX < 0) {
+            return OVERSCROLL_RIGHT_EDGE;
+        } else if (mFullScreenMagnificationController.isAtTopEdge(mDisplayId) && dY > 0
+                || mFullScreenMagnificationController.isAtBottomEdge(mDisplayId) && dY < 0) {
+            return OVERSCROLL_VERTICAL_EDGE;
+        }
+        return OVERSCROLL_NONE;
+    }
+
+    private boolean pointerValid(PointF pointerDownLocation) {
+        return !(Float.isNaN(pointerDownLocation.x) && Float.isNaN(pointerDownLocation.y));
+    }
+
 
     private static final class MotionEventInfo {
 
@@ -1285,8 +1360,232 @@ public class FullScreenMagnificationGestureHandler extends MagnificationGestureH
      * Indicates an error with a gesture handler or state.
      */
     private static class GestureException extends Exception {
+
         GestureException(String message) {
             super(message);
+        }
+    }
+
+    final class SinglePanningState extends SimpleOnGestureListener implements State {
+
+
+        private final GestureDetector mScrollGestureDetector;
+        private MotionEventInfo mEvent;
+        private final FullScreenMagnificationVibrationHelper
+                mFullScreenMagnificationVibrationHelper;
+
+        @VisibleForTesting int mOverscrollState;
+
+        // mPivotEdge is the point on the edge of the screen when the magnified view hits the edge
+        // This point sets the center of magnified view when warp/scale effect is triggered
+        private final PointF mPivotEdge;
+
+        // mReachedEdgeCoord is the user's pointer location on the screen when the magnified view
+        // has hit the edge
+        private final PointF mReachedEdgeCoord;
+        // mEdgeCooldown value will be set to true when user hits the edge and will be set to false
+        // once the user moves x distance away from the edge. This is so that vibrating haptic
+        // doesn't get triggered by slight movements
+        private boolean mEdgeCooldown;
+
+        SinglePanningState(
+                Context context,
+                FullScreenMagnificationVibrationHelper fullScreenMagnificationVibrationHelper) {
+            mScrollGestureDetector = new GestureDetector(context, this, Handler.getMain());
+            mFullScreenMagnificationVibrationHelper = fullScreenMagnificationVibrationHelper;
+            mOverscrollState = OVERSCROLL_NONE;
+            mPivotEdge = new PointF(Float.NaN, Float.NaN);
+            mReachedEdgeCoord = new PointF(Float.NaN, Float.NaN);
+            mEdgeCooldown = false;
+        }
+
+        @Override
+        public void onMotionEvent(MotionEvent event, MotionEvent rawEvent, int policyFlags) {
+            int action = event.getActionMasked();
+            switch (action) {
+                case ACTION_UP:
+                case ACTION_CANCEL:
+                    if (mOverscrollState == OVERSCROLL_LEFT_EDGE
+                            || mOverscrollState == OVERSCROLL_RIGHT_EDGE) {
+                        mFullScreenMagnificationController.setScaleAndCenter(
+                                mDisplayId,
+                                mFullScreenMagnificationController.getPersistedScale(mDisplayId),
+                                mPivotEdge.x,
+                                mPivotEdge.y,
+                                true,
+                                AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
+                    }
+                    clear();
+                    transitionTo(mDetectingState);
+                    break;
+            }
+        }
+
+        @Override
+        public boolean onScroll(
+                MotionEvent first, MotionEvent second, float distanceX, float distanceY) {
+            if (mCurrentState != mSinglePanningState) {
+                return true;
+            }
+            mFullScreenMagnificationController.offsetMagnifiedRegion(
+                    mDisplayId,
+                    distanceX,
+                    distanceY,
+                    AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
+            if (DEBUG_PANNING_SCALING) {
+                Slog.i(
+                        mLogTag,
+                        "SinglePanningState Panned content by scrollX: "
+                                + distanceX
+                                + " scrollY: "
+                                + distanceY
+                                + " isAtEdge: "
+                                + mFullScreenMagnificationController.isAtEdge(mDisplayId));
+            }
+            if (mFullScreenMagnificationController.isAtEdge(mDisplayId)) {
+                playEdgeVibration(second);
+                setPivotEdge();
+            }
+            if (mOverscrollState == OVERSCROLL_NONE) {
+                mOverscrollState = overscrollState(second, new PointF(first.getX(), first.getY()));
+            } else if (mOverscrollState == OVERSCROLL_VERTICAL_EDGE) {
+                clear();
+                transitionTo(mDelegatingState);
+            } else {
+                boolean reset = warpEffectReset(second);
+                if (reset) {
+                    mFullScreenMagnificationController.reset(mDisplayId, /* animate */ true);
+                    clear();
+                    transitionTo(mDetectingState);
+                }
+            }
+            return /* event consumed: */ true;
+        }
+
+        private void vibrateIfNeeded() {
+            if ((mFullScreenMagnificationController.isAtLeftEdge(mDisplayId)
+                    || mFullScreenMagnificationController.isAtRightEdge(mDisplayId))) {
+                mFullScreenMagnificationVibrationHelper.vibrateIfSettingEnabled();
+            }
+        }
+
+
+
+        @Override
+        public String toString() {
+            return "SinglePanningState{"
+                    + "isEdgeOfView="
+                    + mFullScreenMagnificationController.isAtEdge(mDisplayId)
+                    + "overscrollStatus="
+                    + mOverscrollState
+                    + "}";
+        }
+
+        private void playEdgeVibration(MotionEvent event) {
+            if (mOverscrollState == OVERSCROLL_NONE) {
+                vibrateIfNeeded(event);
+            }
+        }
+
+        private void setPivotEdge() {
+            if (!pointerValid(mPivotEdge)) {
+                Rect bounds = new Rect();
+                mFullScreenMagnificationController.getMagnificationBounds(mDisplayId, bounds);
+                if (mOverscrollState == OVERSCROLL_LEFT_EDGE) {
+                    mPivotEdge.set(
+                            bounds.left,
+                            mFullScreenMagnificationController.getCenterY(mDisplayId));
+                } else if (mOverscrollState == OVERSCROLL_RIGHT_EDGE) {
+                    mPivotEdge.set(
+                            bounds.right,
+                            mFullScreenMagnificationController.getCenterY(mDisplayId));
+                }
+            }
+        }
+
+        private boolean warpEffectReset(MotionEvent second) {
+            float scale = calculateOverscrollScale(second);
+            if (scale < 0) return false;
+            mFullScreenMagnificationController.setScaleAndCenter(
+                    /* displayId= */ mDisplayId,
+                    /* scale= */ scale,
+                    /* centerX= */ mPivotEdge.x,
+                    /* centerY= */ mPivotEdge.y,
+                    /* animate= */ true,
+                    /* id= */ AccessibilityManagerService.MAGNIFICATION_GESTURE_HANDLER_ID);
+            if (scale == 1.0f) {
+                return true;
+            }
+            return false;
+        }
+
+        private float calculateOverscrollScale(MotionEvent second) {
+            // if at left and overshootDistX is negative or if at right and overshootDistX is
+            // positive then user is not in overscroll state anymore overscroll state. Reset
+            // overscroll values by clearing
+            float overshootDistX = second.getX() - mReachedEdgeCoord.x;
+            if ((mOverscrollState == OVERSCROLL_LEFT_EDGE && overshootDistX < 0)
+                    || (mOverscrollState == OVERSCROLL_RIGHT_EDGE && overshootDistX > 0)) {
+                clear();
+                return -1.0f;
+            }
+            float overshootDistY = second.getY() - mReachedEdgeCoord.y;
+            float overshootDist = (float) (Math.hypot(abs(overshootDistX), abs(overshootDistY)));
+            Rect bounds = new Rect();
+            mFullScreenMagnificationController.getMagnificationBounds(mDisplayId, bounds);
+            float overShootFraction = overshootDist / (float) bounds.width();
+            float minDist = 0.05f * bounds.width();
+            if (mEdgeCooldown && (overshootDist > minDist)) {
+                mEdgeCooldown = false;
+            }
+            float scale = (1 - overShootFraction) * getSensitivityScale();
+            scale =
+                    MathUtils.constrain(
+                            /* amount= */ scale,
+                            /* low= */ 1.0f,
+                            /* high= */ mFullScreenMagnificationController.getPersistedScale(
+                                    mDisplayId));
+            return scale;
+        }
+
+        private float getSensitivityScale() {
+            float magnificationScale =
+                    mFullScreenMagnificationController.getPersistedScale(mDisplayId);
+            float sensitivityFactor = 0.0f;
+            if (magnificationScale < 1.7f) {
+                sensitivityFactor = 1.0f;
+            } else if (magnificationScale < 2.0f) {
+                sensitivityFactor = 1.0f;
+            } else if (magnificationScale < 2.2f) {
+                sensitivityFactor = 0.95f;
+            } else if (magnificationScale < 2.5f) {
+                sensitivityFactor = 1.1f;
+            } else if (magnificationScale < 2.7f) {
+                sensitivityFactor = 1.3f;
+            } else if (magnificationScale < 3.0f) {
+                sensitivityFactor = 1.0f;
+            } else {
+                sensitivityFactor = 1.0f;
+            }
+            return magnificationScale * sensitivityFactor;
+        }
+
+        private void vibrateIfNeeded(MotionEvent event) {
+            if ((mFullScreenMagnificationController.isAtLeftEdge(mDisplayId)
+                            || mFullScreenMagnificationController.isAtRightEdge(mDisplayId))
+                    && !mEdgeCooldown) {
+                mFullScreenMagnificationVibrationHelper.vibrateIfSettingEnabled();
+                mReachedEdgeCoord.set(event.getX(), event.getY());
+                mEdgeCooldown = true;
+            }
+        }
+
+        @Override
+        public void clear() {
+            mOverscrollState = OVERSCROLL_NONE;
+            mPivotEdge.set(Float.NaN, Float.NaN);
+            mReachedEdgeCoord.set(Float.NaN, Float.NaN);
+            mEdgeCooldown = false;
         }
     }
 }

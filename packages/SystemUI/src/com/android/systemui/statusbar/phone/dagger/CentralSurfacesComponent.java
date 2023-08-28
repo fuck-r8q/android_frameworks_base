@@ -21,16 +21,12 @@ import static com.android.systemui.statusbar.phone.dagger.StatusBarViewModule.ST
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import com.android.systemui.scene.ui.view.WindowRootView;
-import com.android.systemui.shade.NotificationShadeWindowView;
-import com.android.systemui.shade.NotificationShadeWindowViewController;
 import com.android.systemui.shade.ShadeHeaderController;
-import com.android.systemui.statusbar.NotificationPresenter;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.phone.CentralSurfacesCommandQueueCallbacks;
 import com.android.systemui.statusbar.phone.CentralSurfacesImpl;
 import com.android.systemui.statusbar.phone.StatusBarHeadsUpChangeListener;
 import com.android.systemui.statusbar.phone.StatusBarNotificationActivityStarterModule;
-import com.android.systemui.statusbar.phone.StatusBarNotificationPresenterModule;
 import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment;
 
 import dagger.Subcomponent;
@@ -53,7 +49,6 @@ import javax.inject.Scope;
 @Subcomponent(modules = {
         StatusBarViewModule.class,
         StatusBarNotificationActivityStarterModule.class,
-        StatusBarNotificationPresenterModule.class,
 })
 @CentralSurfacesComponent.CentralSurfacesScope
 public interface CentralSurfacesComponent {
@@ -75,16 +70,6 @@ public interface CentralSurfacesComponent {
 
     /** Creates the root view of the main SysUI window}. */
     WindowRootView getWindowRootView();
-
-    /**
-     * Creates or returns a {@link NotificationShadeWindowView}.
-     */
-    NotificationShadeWindowView getNotificationShadeWindowView();
-
-    /**
-     * Creates a NotificationShadeWindowViewController.
-     */
-    NotificationShadeWindowViewController getNotificationShadeWindowViewController();
 
     /**
      * Creates a StatusBarHeadsUpChangeListener.
@@ -109,6 +94,4 @@ public interface CentralSurfacesComponent {
     CollapsedStatusBarFragment createCollapsedStatusBarFragment();
 
     NotificationActivityStarter getNotificationActivityStarter();
-
-    NotificationPresenter getNotificationPresenter();
 }

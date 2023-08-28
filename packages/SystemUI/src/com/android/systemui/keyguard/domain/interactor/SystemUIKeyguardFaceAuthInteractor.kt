@@ -30,10 +30,12 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthRepository
-import com.android.systemui.keyguard.shared.model.AuthenticationStatus
-import com.android.systemui.keyguard.shared.model.ErrorAuthenticationStatus
+import com.android.systemui.keyguard.data.repository.DeviceEntryFingerprintAuthRepository
+import com.android.systemui.keyguard.shared.model.ErrorFaceAuthenticationStatus
+import com.android.systemui.keyguard.shared.model.FaceAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.log.FaceAuthenticationLogger
+import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.kotlin.pairwise
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -48,6 +50,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Encapsulates business logic related face authentication being triggered for device entry from
@@ -67,6 +70,8 @@ constructor(
     private val featureFlags: FeatureFlags,
     private val faceAuthenticationLogger: FaceAuthenticationLogger,
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
+    private val deviceEntryFingerprintAuthRepository: DeviceEntryFingerprintAuthRepository,
+    private val userRepository: UserRepository,
 ) : CoreStartable, KeyguardFaceAuthInteractor {
 
     private val listeners: MutableList<FaceAuthenticationListener> = mutableListOf()
@@ -117,6 +122,32 @@ constructor(
                 )
             }
             .launchIn(applicationScope)
+
+        deviceEntryFingerprintAuthRepository.isLockedOut
+            .onEach {
+                if (it) {
+                    faceAuthenticationLogger.faceLockedOut("Fingerprint locked out")
+                    repository.lockoutFaceAuth()
+                }
+            }
+            .launchIn(applicationScope)
+
+        // User switching should stop face auth and then when it is complete we should trigger face
+        // auth so that the switched user can unlock the device with face auth.
+        userRepository.userSwitchingInProgress
+            .pairwise(false)
+            .onEach { (wasSwitching, isSwitching) ->
+                if (!wasSwitching && isSwitching) {
+                    repository.pauseFaceAuth()
+                } else if (wasSwitching && !isSwitching) {
+                    repository.resumeFaceAuth()
+                    runFaceAuth(
+                        FaceAuthUiEvent.FACE_AUTH_UPDATED_USER_SWITCHING,
+                        fallbackToDetect = true
+                    )
+                }
+            }
+            .launchIn(applicationScope)
     }
 
     override fun onSwipeUpOnBouncer() {
@@ -143,6 +174,10 @@ constructor(
         runFaceAuth(FaceAuthUiEvent.FACE_AUTH_TRIGGERED_UDFPS_POINTER_DOWN, false)
     }
 
+    override fun onAccessibilityAction() {
+        runFaceAuth(FaceAuthUiEvent.FACE_AUTH_ACCESSIBILITY_ACTION, false)
+    }
+
     override fun registerListener(listener: FaceAuthenticationListener) {
         listeners.add(listener)
     }
@@ -165,10 +200,10 @@ constructor(
         repository.cancel()
     }
 
-    private val _authenticationStatusOverride = MutableStateFlow<AuthenticationStatus?>(null)
+    private val faceAuthenticationStatusOverride = MutableStateFlow<FaceAuthenticationStatus?>(null)
     /** Provide the status of face authentication */
     override val authenticationStatus =
-        merge(_authenticationStatusOverride.filterNotNull(), repository.authenticationStatus)
+        merge(faceAuthenticationStatusOverride.filterNotNull(), repository.authenticationStatus)
 
     /** Provide the status of face detection */
     override val detectionStatus = repository.detectionStatus
@@ -176,16 +211,18 @@ constructor(
     private fun runFaceAuth(uiEvent: FaceAuthUiEvent, fallbackToDetect: Boolean) {
         if (featureFlags.isEnabled(Flags.FACE_AUTH_REFACTOR)) {
             if (repository.isLockedOut.value) {
-                _authenticationStatusOverride.value =
-                    ErrorAuthenticationStatus(
+                faceAuthenticationStatusOverride.value =
+                    ErrorFaceAuthenticationStatus(
                         BiometricFaceConstants.FACE_ERROR_LOCKOUT_PERMANENT,
                         context.resources.getString(R.string.keyguard_face_unlock_unavailable)
                     )
             } else {
-                _authenticationStatusOverride.value = null
+                faceAuthenticationStatusOverride.value = null
                 applicationScope.launch {
-                    faceAuthenticationLogger.authRequested(uiEvent)
-                    repository.authenticate(uiEvent, fallbackToDetection = fallbackToDetect)
+                    withContext(mainDispatcher) {
+                        faceAuthenticationLogger.authRequested(uiEvent)
+                        repository.authenticate(uiEvent, fallbackToDetection = fallbackToDetect)
+                    }
                 }
             }
         } else {

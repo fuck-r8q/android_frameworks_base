@@ -72,7 +72,6 @@ import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.policy.KeyguardStateController
@@ -279,7 +278,7 @@ class ControlsUiControllerImpl @Inject constructor (
 
         controlsListingController.get().removeCallback(listingCallback)
         controlsController.get().unsubscribe()
-        taskViewController?.dismiss()
+        taskViewController?.removeTask()
         taskViewController = null
 
         val fadeAnim = ObjectAnimator.ofFloat(parent, "alpha", 1.0f, 0.0f)
@@ -506,32 +505,22 @@ class ControlsUiControllerImpl @Inject constructor (
         val isPanel = selectedItem is SelectedItem.PanelItem
         val selectedStructure = (selectedItem as? SelectedItem.StructureItem)?.structure
                 ?: EMPTY_STRUCTURE
-        val newFlows = featureFlags.isEnabled(Flags.CONTROLS_MANAGEMENT_NEW_FLOWS)
 
         val items = buildList {
             add(OverflowMenuAdapter.MenuItem(
                     context.getText(R.string.controls_open_app),
                     OPEN_APP_ID
             ))
-            if (newFlows || isPanel) {
-                if (extraApps) {
-                    add(OverflowMenuAdapter.MenuItem(
-                            context.getText(R.string.controls_menu_add_another_app),
-                            ADD_APP_ID
-                    ))
-                }
-                if (featureFlags.isEnabled(Flags.APP_PANELS_REMOVE_APPS_ALLOWED)) {
-                    add(OverflowMenuAdapter.MenuItem(
-                            context.getText(R.string.controls_menu_remove),
-                            REMOVE_APP_ID,
-                    ))
-                }
-            } else {
+            if (extraApps) {
                 add(OverflowMenuAdapter.MenuItem(
-                        context.getText(R.string.controls_menu_add),
-                        ADD_CONTROLS_ID
+                        context.getText(R.string.controls_menu_add_another_app),
+                        ADD_APP_ID
                 ))
             }
+            add(OverflowMenuAdapter.MenuItem(
+                    context.getText(R.string.controls_menu_remove),
+                    REMOVE_APP_ID,
+            ))
             if (!isPanel) {
                 add(OverflowMenuAdapter.MenuItem(
                         context.getText(R.string.controls_menu_edit),
@@ -665,7 +654,7 @@ class ControlsUiControllerImpl @Inject constructor (
 
         val maxColumns = ControlAdapter.findMaxColumns(activityContext.resources)
 
-        val listView = parent.requireViewById(R.id.global_actions_controls_list) as ViewGroup
+        val listView = parent.requireViewById(R.id.controls_list) as ViewGroup
         listView.removeAllViews()
         var lastRow: ViewGroup = createRow(inflater, listView)
         selectedStructure.controls.forEach {
@@ -690,7 +679,8 @@ class ControlsUiControllerImpl @Inject constructor (
                     bgExecutor,
                     controlActionCoordinator,
                     controlsMetricsLogger,
-                    selected.uid
+                    selected.uid,
+                    controlsController.get().currentUserId,
                 )
                 cvh.bindData(it, false /* isLocked, will be ignored on initial load */)
                 controlViewsById.put(key, cvh)
@@ -777,7 +767,7 @@ class ControlsUiControllerImpl @Inject constructor (
 
             closeDialogs(true)
             controlsController.get().unsubscribe()
-            taskViewController?.dismiss()
+            taskViewController?.removeTask()
             taskViewController = null
 
             controlsById.clear()

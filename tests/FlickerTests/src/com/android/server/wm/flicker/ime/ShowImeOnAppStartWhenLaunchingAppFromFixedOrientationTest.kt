@@ -19,15 +19,13 @@ package com.android.server.wm.flicker.ime
 import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.Presubmit
 import android.tools.common.Rotation
-import android.tools.common.Timestamp
-import android.tools.common.flicker.subject.exceptions.ExceptionMessageBuilder
-import android.tools.common.flicker.subject.exceptions.InvalidPropertyException
+import android.tools.common.flicker.subject.layers.LayerTraceEntrySubject
 import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
-import androidx.test.filters.RequiresDevice
+import androidx.test.filters.FlakyTest
 import com.android.server.wm.flicker.BaseTest
 import com.android.server.wm.flicker.helpers.ImeShownOnAppStartHelper
 import com.android.server.wm.flicker.helpers.setRotation
@@ -43,11 +41,10 @@ import org.junit.runners.Parameterized
  * (e.g. Launcher activity). To run this test: `atest
  * FlickerTests:ShowImeOnAppStartWhenLaunchingAppFromFixedOrientationTest`
  */
-@RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class ShowImeOnAppStartWhenLaunchingAppFromFixedOrientationTest(flicker: LegacyFlickerTest) :
+class ShowImeOnAppStartWhenLaunchingAppFromFixedOrientationTest(flicker: LegacyFlickerTest) :
     BaseTest(flicker) {
     private val imeTestApp =
         ImeShownOnAppStartHelper(instrumentation, flicker.scenario.startRotation)
@@ -82,47 +79,43 @@ open class ShowImeOnAppStartWhenLaunchingAppFromFixedOrientationTest(flicker: Le
         flicker.snapshotStartingWindowLayerCoversExactlyOnApp(imeTestApp)
     }
 
+    @FlakyTest(bugId = 290767483)
     @Postsubmit
     @Test
     fun imeLayerAlphaOneAfterSnapshotStartingWindowRemoval() {
-        // Check if the snapshot appeared during the trace
-        var imeSnapshotRemovedTimestamp: Timestamp? = null
+        val layerTrace = flicker.reader.readLayersTrace() ?: error("Unable to read layers trace")
 
-        val layerTrace = flicker.reader.readLayersTrace()
-        val layerTraceEntries = layerTrace?.entries?.toList() ?: emptyList()
+        // Find the entries immediately after the IME snapshot has disappeared
+        val imeSnapshotRemovedEntries =
+            layerTrace.entries
+                .asSequence()
+                .zipWithNext { prev, next ->
+                    if (
+                        ComponentNameMatcher.SNAPSHOT.layerMatchesAnyOf(prev.visibleLayers) &&
+                            !ComponentNameMatcher.SNAPSHOT.layerMatchesAnyOf(next.visibleLayers)
+                    ) {
+                        next
+                    } else {
+                        null
+                    }
+                }
+                .filterNotNull()
 
-        layerTraceEntries.zipWithNext { prev, next ->
-            val prevSnapshotLayerVisible =
-                ComponentNameMatcher.SNAPSHOT.layerMatchesAnyOf(prev.visibleLayers)
-            val nextSnapshotLayerVisible =
-                ComponentNameMatcher.SNAPSHOT.layerMatchesAnyOf(next.visibleLayers)
+        // If we find it, make sure the IME is visible and fully animated in.
+        imeSnapshotRemovedEntries.forEach { entry ->
+            val entrySubject = LayerTraceEntrySubject(entry)
+            val imeLayerSubjects =
+                entrySubject.subjects.filter {
+                    ComponentNameMatcher.IME.layerMatchesAnyOf(it.layer) && it.isVisible
+                }
 
-            if (
-                imeSnapshotRemovedTimestamp == null &&
-                    (prevSnapshotLayerVisible && !nextSnapshotLayerVisible)
-            ) {
-                imeSnapshotRemovedTimestamp = next.timestamp
-            }
-        }
+            entrySubject
+                .check { "InputMethod must exist and be visible" }
+                .that(imeLayerSubjects.isNotEmpty())
+                .isEqual(true)
 
-        // if so, make an assertion
-        imeSnapshotRemovedTimestamp?.let { timestamp ->
-            val stateAfterSnapshot =
-                layerTrace?.getEntryAt(timestamp) ?: error("State not found for $timestamp")
-
-            val imeLayers =
-                ComponentNameMatcher.IME.filterLayers(stateAfterSnapshot.visibleLayers.toList())
-
-            require(imeLayers.isNotEmpty()) { "IME layer not found" }
-            if (imeLayers.any { it.color.a != 1.0f }) {
-                val errorMsgBuilder =
-                    ExceptionMessageBuilder()
-                        .setTimestamp(timestamp)
-                        .forInvalidProperty("IME layer alpha")
-                        .setExpected("is 1.0")
-                        .setActual("not 1.0")
-                        .addExtraDescription("Filter", ComponentNameMatcher.IME.toLayerIdentifier())
-                throw InvalidPropertyException(errorMsgBuilder)
+            imeLayerSubjects.forEach { imeLayerSubject ->
+                imeLayerSubject.check { "alpha" }.that(imeLayerSubject.layer.color.a).isEqual(1.0f)
             }
         }
     }

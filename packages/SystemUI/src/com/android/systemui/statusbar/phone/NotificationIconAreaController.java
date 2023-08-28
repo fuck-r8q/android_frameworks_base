@@ -24,6 +24,8 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.demomode.DemoMode;
 import com.android.systemui.demomode.DemoModeController;
 import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.Flags;
+import com.android.systemui.flags.ViewRefactorFlag;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -33,14 +35,11 @@ import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.NotificationShelfController;
 import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.StatusBarState;
-import com.android.systemui.statusbar.notification.AnimatableProperty;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
-import com.android.systemui.statusbar.notification.PropertyAnimator;
 import com.android.systemui.statusbar.notification.collection.ListEntry;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.provider.SectionStyleProvider;
-import com.android.systemui.statusbar.notification.stack.AnimationProperties;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.wm.shell.bubbles.Bubbles;
 
@@ -91,9 +90,7 @@ public class NotificationIconAreaController implements
     private final ArrayList<Rect> mTintAreas = new ArrayList<>();
     private final Context mContext;
 
-    private final DemoModeController mDemoModeController;
-
-    private final FeatureFlags mFeatureFlags;
+    private final ViewRefactorFlag mShelfRefactor;
 
     private int mAodIconAppearTranslation;
 
@@ -125,12 +122,13 @@ public class NotificationIconAreaController implements
             Optional<Bubbles> bubblesOptional,
             DemoModeController demoModeController,
             DarkIconDispatcher darkIconDispatcher,
-            FeatureFlags featureFlags, StatusBarWindowController statusBarWindowController,
+            FeatureFlags featureFlags,
+            StatusBarWindowController statusBarWindowController,
             ScreenOffAnimationController screenOffAnimationController) {
         mContrastColorUtil = ContrastColorUtil.getInstance(context);
         mContext = context;
         mStatusBarStateController = statusBarStateController;
-        mFeatureFlags = featureFlags;
+        mShelfRefactor = new ViewRefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
         mStatusBarStateController.addCallback(this);
         mMediaManager = notificationMediaManager;
         mDozeParameters = dozeParameters;
@@ -139,8 +137,7 @@ public class NotificationIconAreaController implements
         wakeUpCoordinator.addListener(this);
         mBypassController = keyguardBypassController;
         mBubblesOptional = bubblesOptional;
-        mDemoModeController = demoModeController;
-        mDemoModeController.addCallback(this);
+        demoModeController.addCallback(this);
         mStatusBarWindowController = statusBarWindowController;
         mScreenOffAnimationController = screenOffAnimationController;
         notificationListener.addNotificationSettingsListener(mSettingsListener);
@@ -163,7 +160,6 @@ public class NotificationIconAreaController implements
         LayoutInflater layoutInflater = LayoutInflater.from(context);
         mNotificationIconArea = inflateIconArea(layoutInflater);
         mNotificationIcons = mNotificationIconArea.findViewById(R.id.notificationIcons);
-
     }
 
     /**
@@ -185,23 +181,13 @@ public class NotificationIconAreaController implements
         updateIconLayoutParams(mContext);
     }
 
-    /**
-     * Update position of the view, with optional animation
-     */
-    public void updatePosition(int x, AnimationProperties props, boolean animate) {
-        if (mAodIcons != null) {
-            PropertyAnimator.setProperty(mAodIcons, AnimatableProperty.TRANSLATION_X, x, props,
-                    animate);
-        }
-    }
-
     public void setupShelf(NotificationShelfController notificationShelfController) {
-        NotificationShelfController.assertRefactorFlagDisabled(mFeatureFlags);
+        mShelfRefactor.assertDisabled();
         mShelfIcons = notificationShelfController.getShelfIcons();
     }
 
     public void setShelfIcons(NotificationIconContainer icons) {
-        if (NotificationShelfController.checkRefactorFlagEnabled(mFeatureFlags)) {
+        if (mShelfRefactor.expectEnabled()) {
             mShelfIcons = icons;
         }
     }
@@ -239,7 +225,7 @@ public class NotificationIconAreaController implements
 
     private void reloadDimens(Context context) {
         Resources res = context.getResources();
-        mIconSize = res.getDimensionPixelSize(com.android.internal.R.dimen.status_bar_icon_size);
+        mIconSize = res.getDimensionPixelSize(com.android.internal.R.dimen.status_bar_icon_size_sp);
         mIconHPadding = res.getDimensionPixelSize(R.dimen.status_bar_icon_horizontal_margin);
         mAodIconAppearTranslation = res.getDimensionPixelSize(
                 R.dimen.shelf_appear_translation);
@@ -303,6 +289,7 @@ public class NotificationIconAreaController implements
         }
         return true;
     }
+
     /**
      * Updates the notifications with the given list of notifications to display.
      */

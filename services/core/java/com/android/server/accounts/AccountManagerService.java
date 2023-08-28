@@ -357,15 +357,25 @@ public class AccountManagerService
             @Override
             public void onPackageAdded(String packageName, int uid) {
                 // Called on a handler, and running as the system
-                UserAccounts accounts = getUserAccounts(UserHandle.getUserId(uid));
-                cancelAccountAccessRequestNotificationIfNeeded(uid, true, accounts);
+                try {
+                    UserAccounts accounts = getUserAccounts(UserHandle.getUserId(uid));
+                    cancelAccountAccessRequestNotificationIfNeeded(uid, true, accounts);
+                } catch (SQLiteCantOpenDatabaseException e) {
+                    Log.w(TAG, "Can't read accounts database", e);
+                    return;
+                }
             }
 
             @Override
             public void onPackageUpdateFinished(String packageName, int uid) {
                 // Called on a handler, and running as the system
-                UserAccounts accounts = getUserAccounts(UserHandle.getUserId(uid));
-                cancelAccountAccessRequestNotificationIfNeeded(uid, true, accounts);
+                try {
+                    UserAccounts accounts = getUserAccounts(UserHandle.getUserId(uid));
+                    cancelAccountAccessRequestNotificationIfNeeded(uid, true, accounts);
+                } catch (SQLiteCantOpenDatabaseException e) {
+                    Log.w(TAG, "Can't read accounts database", e);
+                    return;
+                }
             }
         }.register(mContext, mHandler.getLooper(), UserHandle.ALL, true);
 
@@ -391,6 +401,9 @@ public class AccountManagerService
                     }
                 } catch (NameNotFoundException e) {
                     /* ignore */
+                } catch (SQLiteCantOpenDatabaseException e) {
+                    Log.w(TAG, "Can't read accounts database", e);
+                    return;
                 }
             }
         });
@@ -417,7 +430,7 @@ public class AccountManagerService
                                 }
 
                         if (accounts == null) {
-                            accounts = getAccountsAsUser(null, userId, "android");
+                            accounts = getAccountsOrEmptyArray(null, userId, "android");
                             if (ArrayUtils.isEmpty(accounts)) {
                                 return;
                             }
@@ -446,7 +459,7 @@ public class AccountManagerService
 
     private void cancelAccountAccessRequestNotificationIfNeeded(int uid,
             boolean checkAccess, UserAccounts userAccounts) {
-        Account[] accounts = getAccountsAsUser(null, UserHandle.getUserId(uid), "android");
+        Account[] accounts = getAccountsOrEmptyArray(null, UserHandle.getUserId(uid), "android");
         for (Account account : accounts) {
             cancelAccountAccessRequestNotificationIfNeeded(account, uid, checkAccess, userAccounts);
         }
@@ -454,7 +467,7 @@ public class AccountManagerService
 
     private void cancelAccountAccessRequestNotificationIfNeeded(String packageName, int uid,
             boolean checkAccess, UserAccounts userAccounts) {
-        Account[] accounts = getAccountsAsUser(null, UserHandle.getUserId(uid), "android");
+        Account[] accounts = getAccountsOrEmptyArray(null, UserHandle.getUserId(uid), "android");
         for (Account account : accounts) {
             cancelAccountAccessRequestNotificationIfNeeded(account,
                     uid, packageName, checkAccess, userAccounts);
@@ -4488,6 +4501,16 @@ public class AccountManagerService
     }
 
     @NonNull
+    private Account[] getAccountsOrEmptyArray(String type, int userId, String opPackageName) {
+        try {
+            return getAccountsAsUser(type, userId, opPackageName);
+        } catch (SQLiteCantOpenDatabaseException e) {
+            Log.w(TAG, "Could not get accounts for user " + userId, e);
+            return new Account[]{};
+        }
+    }
+
+    @NonNull
     private Account[] getAccountsAsUserForPackage(
             String type,
             int userId,
@@ -4576,7 +4599,7 @@ public class AccountManagerService
     public void addSharedAccountsFromParentUser(int parentUserId, int userId,
             String opPackageName) {
         checkManageOrCreateUsersPermission("addSharedAccountsFromParentUser");
-        Account[] accounts = getAccountsAsUser(null, parentUserId, opPackageName);
+        Account[] accounts = getAccountsOrEmptyArray(null, parentUserId, opPackageName);
         for (Account account : accounts) {
             addSharedAccountAsUser(account, userId);
         }
@@ -4916,7 +4939,6 @@ public class AccountManagerService
             if (accountType == null) throw new IllegalArgumentException("accountType is null");
             mAccounts = accounts;
             mStripAuthTokenFromResult = stripAuthTokenFromResult;
-            mResponse = response;
             mAccountType = accountType;
             mExpectActivityLaunch = expectActivityLaunch;
             mCreationTime = SystemClock.elapsedRealtime();
@@ -4930,8 +4952,8 @@ public class AccountManagerService
             if (response != null) {
                 try {
                     response.asBinder().linkToDeath(this, 0 /* flags */);
+                    mResponse = response;
                 } catch (RemoteException e) {
-                    mResponse = null;
                     binderDied();
                 }
             }
@@ -5008,7 +5030,10 @@ public class AccountManagerService
             p.setDataPosition(0);
             Bundle simulateBundle = p.readBundle();
             p.recycle();
-            Intent intent = bundle.getParcelable(AccountManager.KEY_INTENT, Intent.class);
+            Intent intent = bundle.getParcelable(AccountManager.KEY_INTENT);
+            if (intent != null && intent.getClass() != Intent.class) {
+                return false;
+            }
             Intent simulateIntent = simulateBundle.getParcelable(AccountManager.KEY_INTENT,
                     Intent.class);
             if (intent == null) {

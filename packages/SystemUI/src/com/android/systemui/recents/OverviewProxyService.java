@@ -25,11 +25,9 @@ import static android.view.MotionEvent.ACTION_UP;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 
 import static com.android.internal.accessibility.common.ShortcutConstants.CHOOSER_PACKAGE_NAME;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SUPPORTS_WINDOW_CORNERS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_WINDOW_CORNER_RADIUS;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BOUNCER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DOZING;
@@ -80,13 +78,14 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.AssistUtils;
 import com.android.internal.app.IVoiceInteractionSessionListener;
 import com.android.internal.logging.UiEventLogger;
-import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.util.ScreenshotRequest;
 import com.android.systemui.Dumpable;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
+import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
@@ -97,6 +96,7 @@ import com.android.systemui.navigationbar.NavigationBarView;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.navigationbar.buttons.KeyButtonView;
 import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeViewController;
@@ -123,6 +123,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 
 /**
  * Class to send information from overview to launcher with a binder.
@@ -142,13 +143,17 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private static final long MAX_BACKOFF_MILLIS = 10 * 60 * 1000;
 
     private final Context mContext;
+    private final FeatureFlags mFeatureFlags;
     private final Executor mMainExecutor;
     private final ShellInterface mShellInterface;
     private final Lazy<Optional<CentralSurfaces>> mCentralSurfacesOptionalLazy;
+    private final Lazy<ShadeViewController> mShadeViewControllerLazy;
     private SysUiState mSysUiState;
     private final Handler mHandler;
     private final Lazy<NavigationBarController> mNavBarControllerLazy;
     private final NotificationShadeWindowController mStatusBarWinController;
+    private final Provider<SceneInteractor> mSceneInteractor;
+
     private final Runnable mConnectionRunnable = () ->
             internalConnectToCurrentUser("runnable: startConnectionToCurrentUser");
     private final ComponentName mRecentsComponentName;
@@ -173,8 +178,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private boolean mInputFocusTransferStarted;
     private float mInputFocusTransferStartY;
     private long mInputFocusTransferStartMillis;
-    private float mWindowCornerRadius;
-    private boolean mSupportsRoundedCornersOnWindows;
     private int mNavBarMode = NAV_BAR_MODE_3BUTTON;
 
     @VisibleForTesting
@@ -205,11 +208,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                 // TODO move this logic to message queue
                 mCentralSurfacesOptionalLazy.get().ifPresent(centralSurfaces -> {
                     if (event.getActionMasked() == ACTION_DOWN) {
-                        ShadeViewController shadeViewController =
-                                centralSurfaces.getShadeViewController();
-                        if (shadeViewController != null) {
-                            shadeViewController.startExpandLatencyTracking();
-                        }
+                        mShadeViewControllerLazy.get().startExpandLatencyTracking();
                     }
                     mHandler.post(() -> {
                         int action = event.getActionMasked();
@@ -217,17 +216,27 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                             mInputFocusTransferStarted = true;
                             mInputFocusTransferStartY = event.getY();
                             mInputFocusTransferStartMillis = event.getEventTime();
-                            centralSurfaces.onInputFocusTransfer(
-                                    mInputFocusTransferStarted, false /* cancel */,
-                                    0 /* velocity */);
+
+                            // If scene framework is enabled, set the scene container window to
+                            // visible and let the touch "slip" into that window.
+                            if (mFeatureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+                                mSceneInteractor.get().setVisible(true);
+                            } else {
+                                centralSurfaces.onInputFocusTransfer(
+                                        mInputFocusTransferStarted, false /* cancel */,
+                                        0 /* velocity */);
+                            }
                         }
                         if (action == ACTION_UP || action == ACTION_CANCEL) {
                             mInputFocusTransferStarted = false;
-                            float velocity = (event.getY() - mInputFocusTransferStartY)
-                                    / (event.getEventTime() - mInputFocusTransferStartMillis);
-                            centralSurfaces.onInputFocusTransfer(mInputFocusTransferStarted,
-                                    action == ACTION_CANCEL,
-                                    velocity);
+
+                            if (!mFeatureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+                                float velocity = (event.getY() - mInputFocusTransferStartY)
+                                        / (event.getEventTime() - mInputFocusTransferStartMillis);
+                                centralSurfaces.onInputFocusTransfer(mInputFocusTransferStarted,
+                                        action == ACTION_CANCEL,
+                                        velocity);
+                            }
                         }
                         event.recycle();
                     });
@@ -454,8 +463,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
 
             Bundle params = new Bundle();
             params.putBinder(KEY_EXTRA_SYSUI_PROXY, mSysUiProxy.asBinder());
-            params.putFloat(KEY_EXTRA_WINDOW_CORNER_RADIUS, mWindowCornerRadius);
-            params.putBoolean(KEY_EXTRA_SUPPORTS_WINDOW_CORNERS, mSupportsRoundedCornersOnWindows);
             params.putBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER,
                     mSysuiUnlockAnimationController.asBinder());
             mUnfoldTransitionProgressForwarder.ifPresent(
@@ -558,8 +565,11 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             ShellInterface shellInterface,
             Lazy<NavigationBarController> navBarControllerLazy,
             Lazy<Optional<CentralSurfaces>> centralSurfacesOptionalLazy,
+            Lazy<ShadeViewController> shadeViewControllerLazy,
             NavigationModeController navModeController,
-            NotificationShadeWindowController statusBarWinController, SysUiState sysUiState,
+            NotificationShadeWindowController statusBarWinController,
+            SysUiState sysUiState,
+            Provider<SceneInteractor> sceneInteractor,
             UserTracker userTracker,
             ScreenLifecycle screenLifecycle,
             WakefulnessLifecycle wakefulnessLifecycle,
@@ -567,6 +577,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             DisplayTracker displayTracker,
             KeyguardUnlockAnimationController sysuiUnlockAnimationController,
             AssistUtils assistUtils,
+            FeatureFlags featureFlags,
             DumpManager dumpManager,
             Optional<UnfoldTransitionProgressForwarder> unfoldTransitionProgressForwarder
     ) {
@@ -576,21 +587,21 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         }
 
         mContext = context;
+        mFeatureFlags = featureFlags;
         mMainExecutor = mainExecutor;
         mShellInterface = shellInterface;
         mCentralSurfacesOptionalLazy = centralSurfacesOptionalLazy;
+        mShadeViewControllerLazy = shadeViewControllerLazy;
         mHandler = new Handler();
         mNavBarControllerLazy = navBarControllerLazy;
         mStatusBarWinController = statusBarWinController;
+        mSceneInteractor = sceneInteractor;
         mUserTracker = userTracker;
         mConnectionBackoffAttempts = 0;
         mRecentsComponentName = ComponentName.unflattenFromString(context.getString(
                 com.android.internal.R.string.config_recentsComponentName));
         mQuickStepIntent = new Intent(ACTION_QUICKSTEP)
                 .setPackage(mRecentsComponentName.getPackageName());
-        mWindowCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(mContext);
-        mSupportsRoundedCornersOnWindows = ScreenDecorationsUtils
-                .supportsRoundedCornersOnWindows(mContext.getResources());
         mSysUiState = sysUiState;
         mSysUiState.addCallback(this::notifySystemUiStateFlags);
         mUiEventLogger = uiEventLogger;
@@ -686,13 +697,10 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                 mNavBarControllerLazy.get().getDefaultNavigationBar();
         final NavigationBarView navBarView =
                 mNavBarControllerLazy.get().getNavigationBarView(mContext.getDisplayId());
-        final ShadeViewController panelController =
-                mCentralSurfacesOptionalLazy.get()
-                        .map(CentralSurfaces::getShadeViewController)
-                        .orElse(null);
         if (SysUiState.DEBUG) {
             Log.d(TAG_OPS, "Updating sysui state flags: navBarFragment=" + navBarFragment
-                    + " navBarView=" + navBarView + " panelController=" + panelController);
+                    + " navBarView=" + navBarView
+                    + " shadeViewController=" + mShadeViewControllerLazy.get());
         }
 
         if (navBarFragment != null) {
@@ -701,9 +709,7 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         if (navBarView != null) {
             navBarView.updateDisabledSystemUiStateFlags(mSysUiState);
         }
-        if (panelController != null) {
-            panelController.updateSystemUiStateFlags();
-        }
+        mShadeViewControllerLazy.get().updateSystemUiStateFlags();
         if (mStatusBarWinController != null) {
             mStatusBarWinController.notifyStateChangedCallbacks();
         }
@@ -1084,8 +1090,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         pw.print("  mInputFocusTransferStarted="); pw.println(mInputFocusTransferStarted);
         pw.print("  mInputFocusTransferStartY="); pw.println(mInputFocusTransferStartY);
         pw.print("  mInputFocusTransferStartMillis="); pw.println(mInputFocusTransferStartMillis);
-        pw.print("  mWindowCornerRadius="); pw.println(mWindowCornerRadius);
-        pw.print("  mSupportsRoundedCornersOnWindows="); pw.println(mSupportsRoundedCornersOnWindows);
         pw.print("  mActiveNavBarRegion="); pw.println(mActiveNavBarRegion);
         pw.print("  mNavigationBarSurface="); pw.println(mNavigationBarSurface);
         pw.print("  mNavBarMode="); pw.println(mNavBarMode);

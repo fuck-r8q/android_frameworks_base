@@ -43,8 +43,6 @@ import com.android.systemui.rotationlock.RotationLockModule;
 import com.android.systemui.screenshot.ReferenceScreenshotModule;
 import com.android.systemui.settings.dagger.MultiUserUtilsModule;
 import com.android.systemui.shade.NotificationShadeWindowControllerImpl;
-import com.android.systemui.shade.ShadeController;
-import com.android.systemui.shade.ShadeControllerImpl;
 import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.KeyboardShortcutsModule;
@@ -71,6 +69,7 @@ import com.android.systemui.statusbar.policy.IndividualSensorPrivacyControllerIm
 import com.android.systemui.statusbar.policy.SensorPrivacyController;
 import com.android.systemui.statusbar.policy.SensorPrivacyControllerImpl;
 import com.android.systemui.volume.dagger.VolumeModule;
+import com.android.systemui.wallpapers.dagger.WallpaperModule;
 
 import dagger.Binds;
 import dagger.Module;
@@ -106,6 +105,7 @@ import javax.inject.Named;
         StatusBarEventsModule.class,
         StartCentralSurfacesModule.class,
         VolumeModule.class,
+        WallpaperModule.class,
         KeyboardShortcutsModule.class
 })
 public abstract class ReferenceSystemUIModule {
@@ -147,9 +147,6 @@ public abstract class ReferenceSystemUIModule {
 
     @Binds
     abstract DockManager bindDockManager(DockManagerImpl dockManager);
-
-    @Binds
-    abstract ShadeController provideShadeController(ShadeControllerImpl shadeController);
 
     @SysUISingleton
     @Provides

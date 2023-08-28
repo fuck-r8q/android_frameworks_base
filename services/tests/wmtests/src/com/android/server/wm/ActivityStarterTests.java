@@ -1337,6 +1337,10 @@ public class ActivityStarterTests extends WindowTestsBase {
         starter.setReason("testNoActivityInfo").setIntent(intent)
                 .setActivityInfo(null).execute();
         verify(starter.mRequest).resolveActivity(any());
+
+        // Also verifies the value of Request#componentSpecified should be true even the
+        // ActivityStarter#setComponentSpecified is not explicitly set.
+        assertTrue(starter.mRequest.componentSpecified);
     }
 
     @Test
@@ -1427,6 +1431,30 @@ public class ActivityStarterTests extends WindowTestsBase {
         startActivityInner(starter, outActivity[0], top, options, null /* inTask */,
                 null /* taskFragment*/);
         assertThat(outActivity[0].inMultiWindowMode()).isTrue();
+    }
+
+    @Test
+    public void testTransientLaunchWithKeyguard() {
+        final ActivityStarter starter = prepareStarter(0 /* flags */);
+        final ActivityRecord target = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final ActivityRecord top = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final KeyguardController keyguard = mSupervisor.getKeyguardController();
+        doReturn(true).when(keyguard).isKeyguardLocked(anyInt());
+        doReturn(true).when(keyguard).isDisplayOccluded(anyInt());
+        registerTestTransitionPlayer();
+        starter.setReason("testTransientLaunchWithKeyguard")
+                .setActivityOptions(ActivityOptions.makeBasic().setTransientLaunch().toBundle())
+                .setIntent(target.intent)
+                .execute();
+        final TransitionController controller = mRootWindowContainer.mTransitionController;
+        final Transition transition = controller.getCollectingTransition();
+        final Transition.ChangeInfo targetChangeInfo = transition.mChanges.get(target);
+
+        assertThat(targetChangeInfo).isNotNull();
+        assertThat(targetChangeInfo.hasChanged()).isTrue();
+        assertThat(controller.isCollecting(top.getTask())).isTrue();
+        assertThat(transition.isTransientLaunch(target)).isTrue();
+        assertThat(transition.isInTransientHide(top.getTask())).isTrue();
     }
 
     @Test
@@ -1750,8 +1778,7 @@ public class ActivityStarterTests extends WindowTestsBase {
     public void testLaunchActivityWithoutDisplayCategory() {
         final ActivityInfo info = new ActivityInfo();
         info.applicationInfo = new ApplicationInfo();
-        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID,
-                0 /* launchMode */, null /* componentName */);
+        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID);
         info.requiredDisplayCategory = "automotive";
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).setActivityInfo(info)
                 .build();
@@ -1776,8 +1803,7 @@ public class ActivityStarterTests extends WindowTestsBase {
     public void testLaunchActivityWithDifferentDisplayCategory() {
         final ActivityInfo info = new ActivityInfo();
         info.applicationInfo = new ApplicationInfo();
-        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID,
-                0 /* launchMode */, null /* componentName */);
+        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID);
         info.requiredDisplayCategory = "automotive";
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).setActivityInfo(info)
                 .build();
@@ -1802,8 +1828,7 @@ public class ActivityStarterTests extends WindowTestsBase {
     public void testLaunchActivityWithSameDisplayCategory() {
         final ActivityInfo info = new ActivityInfo();
         info.applicationInfo = new ApplicationInfo();
-        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID,
-                0 /* launchMode */, null /* componentName */);
+        info.taskAffinity = ActivityRecord.computeTaskAffinity("test", DEFAULT_FAKE_UID);
         info.requiredDisplayCategory = "automotive";
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).setActivityInfo(info)
                 .build();

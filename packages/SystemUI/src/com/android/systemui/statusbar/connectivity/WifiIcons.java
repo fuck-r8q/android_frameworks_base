@@ -21,7 +21,7 @@
 package com.android.systemui.statusbar.connectivity;
 
 import com.android.settingslib.AccessibilityContentDescriptions;
-import com.android.settingslib.R;
+import com.android.systemui.R;
 import com.android.settingslib.SignalIcon.IconGroup;
 
 /** */
@@ -36,11 +36,11 @@ public class WifiIcons {
     };
 
     public static final int[] WIFI_NO_INTERNET_ICONS = {
-            R.drawable.ic_no_internet_wifi_signal_0,
-            R.drawable.ic_no_internet_wifi_signal_1,
-            R.drawable.ic_no_internet_wifi_signal_2,
-            R.drawable.ic_no_internet_wifi_signal_3,
-            R.drawable.ic_no_internet_wifi_signal_4
+            com.android.settingslib.R.drawable.ic_no_internet_wifi_signal_0,
+            com.android.settingslib.R.drawable.ic_no_internet_wifi_signal_1,
+            com.android.settingslib.R.drawable.ic_no_internet_wifi_signal_2,
+            com.android.settingslib.R.drawable.ic_no_internet_wifi_signal_3,
+            com.android.settingslib.R.drawable.ic_no_internet_wifi_signal_4
     };
 
     static final int[] WIFI_4_FULL_ICONS = {

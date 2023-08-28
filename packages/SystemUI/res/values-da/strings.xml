@@ -69,7 +69,7 @@
     <string name="usb_disable_contaminant_detection" msgid="3827082183595978641">"Aktivér USB"</string>
     <string name="learn_more" msgid="4690632085667273811">"Få flere oplysninger"</string>
     <string name="global_action_screenshot" msgid="2760267567509131654">"Screenshot"</string>
-    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"Hold oplåst er deaktiveret"</string>
+    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"Hold ulåst er deaktiveret"</string>
     <string name="remote_input_image_insertion_text" msgid="4850791636452521123">"sendte et billede"</string>
     <string name="screenshot_saving_title" msgid="2298349784913287333">"Gemmer screenshot..."</string>
     <string name="screenshot_saving_work_profile_title" msgid="5332829607308450880">"Gemmer screenshot på din arbejdsprofil…"</string>
@@ -118,6 +118,9 @@
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Tryk for at se"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"Skærmoptagelsen kunne ikke gemmes"</string>
     <string name="screenrecord_start_error" msgid="2200660692479682368">"Skærmoptagelsen kunne ikke startes"</string>
+    <string name="immersive_cling_title" msgid="8372056499315585941">"Visning i fuld skærm"</string>
+    <string name="immersive_cling_description" msgid="6913958856085185775">"Stryg ned fra toppen for at afslutte."</string>
+    <string name="immersive_cling_positive" msgid="3076681691468978568">"OK"</string>
     <string name="accessibility_back" msgid="6530104400086152611">"Tilbage"</string>
     <string name="accessibility_home" msgid="5430449841237966217">"Hjem"</string>
     <string name="accessibility_menu" msgid="2701163794470513040">"Menu"</string>
@@ -147,6 +150,8 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_2" msgid="8586608186457385108">"Ansigt genkendt. Tryk for at fortsætte."</string>
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"Ansigt genkendt. Tryk på oplåsningsikonet for at fortsætte."</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"Godkendt"</string>
+    <!-- no translation found for biometric_dialog_cancel_authentication (981316588773442637) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"Brug pinkode"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Brug mønster"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Brug adgangskode"</string>
@@ -359,6 +364,8 @@
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"Låst op via ansigtsgenkendelse"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"Ansigtet er genkendt"</string>
     <string name="keyguard_retry" msgid="886802522584053523">"Stryg opad for at prøve igen"</string>
+    <!-- no translation found for accesssibility_keyguard_retry (8880238862712870676) -->
+    <skip />
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"Lås op for at bruge NFC"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"Denne enhed tilhører din organisation"</string>
     <string name="do_disclosure_with_name" msgid="2091641464065004091">"Denne enhed tilhører <xliff:g id="ORGANIZATION_NAME">%s</xliff:g>"</string>
@@ -412,6 +419,10 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_entire_screen" msgid="5407906851409410209">"Når du deler, optager eller caster, har Android adgang til alt, der er synligt på din skærm eller afspilles på din enhed. Vær derfor forsigtig med ting såsom adgangskoder, betalingsoplysninger, beskeder, billeder, lyd og video."</string>
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app" msgid="3454859977888159495">"Når du deler, optager eller caster en app, har Android adgang til alt, der vises eller afspilles i den pågældende app. Vær derfor forsigtig med ting såsom adgangskoder, betalingsoplysninger, beskeder, billeder, lyd og video."</string>
     <string name="media_projection_entry_generic_permission_dialog_continue" msgid="8640381403048097116">"Start"</string>
+    <string name="media_projection_task_switcher_text" msgid="590885489897412359">"Delingen sættes på pause, når du skifter apps"</string>
+    <string name="media_projection_task_switcher_action_switch" msgid="8682258717291921123">"Del denne app i stedet"</string>
+    <string name="media_projection_task_switcher_action_back" msgid="5324164224147845282">"Skift tilbage"</string>
+    <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"Skift app"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"Blokeret af din it-administrator"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"Screenshots er deaktiveret af enhedspolitikken"</string>
     <string name="clear_all_notifications_text" msgid="348312370303046130">"Ryd alle"</string>
@@ -661,12 +672,12 @@
     <string name="group_system_access_system_settings" msgid="7961639365383008053">"Åbn systemindstillinger"</string>
     <string name="group_system_access_google_assistant" msgid="1186152943161483864">"Åbn Google Assistent"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Lås skærm"</string>
-    <string name="group_system_quick_memo" msgid="2914234890158583919">"Hent appen Notes for at skrive et hurtigt notat"</string>
+    <string name="group_system_quick_memo" msgid="2914234890158583919">"Åbn appen Notes for at skrive et hurtigt notat"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="1065232949510862593">"Systemmultitasking"</string>
     <string name="system_multitasking_rhs" msgid="6593269428880305699">"Start opdelt skærm med aktuel app til højre"</string>
     <string name="system_multitasking_lhs" msgid="8839380725557952846">"Start opdelt skærm med aktuel app til venstre"</string>
     <string name="system_multitasking_full_screen" msgid="1962084334200006297">"Skift fra opdelt skærm til fuld skærm"</string>
-    <string name="system_multitasking_replace" msgid="844285282472557186">"Ved opdelt skærm: Erstat en app med én app ad gangen"</string>
+    <string name="system_multitasking_replace" msgid="844285282472557186">"Ved opdelt skærm: Erstat en app med en anden app"</string>
     <string name="keyboard_shortcut_group_input" msgid="6888282716546625610">"Input"</string>
     <string name="input_switch_input_language_next" msgid="3394291576873633793">"Skift inputsprog (næste sprog)"</string>
     <string name="input_switch_input_language_previous" msgid="8823659252918609216">"Skift inputsprog (forrige sprog)"</string>
@@ -759,13 +770,7 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Menu for afbryderknappen"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Side <xliff:g id="ID_1">%1$d</xliff:g> af <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Låseskærm"</string>
-    <string name="thermal_shutdown_title" msgid="2702966892682930264">"Telefonen slukkede pga. varme"</string>
-    <string name="thermal_shutdown_message" msgid="6142269839066172984">"Din telefon kører nu normalt.\nTryk for at få flere oplysninger"</string>
-    <string name="thermal_shutdown_dialog_message" msgid="6745684238183492031">"Din telefon var blevet for varm, så den slukkede for at køle ned. Din telefon kører nu igen normalt. \n\nDin telefon kan blive for varm, hvis du:\n	• Bruger ressourcekrævende apps (f.eks. spil, video eller navigation)\n	• Downloader eller uploader store filer\n	• Bruger din telefon i varme omgivelser"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Se håndteringsvejledning"</string>
-    <string name="high_temp_title" msgid="2218333576838496100">"Telefonen er ved at blive varm"</string>
-    <string name="high_temp_notif_message" msgid="1277346543068257549">"Nogle funktioner er begrænsede, mens telefonen køler ned.\nTryk for at få flere oplysninger"</string>
-    <string name="high_temp_dialog_message" msgid="3793606072661253968">"Din telefon forsøger automatisk at køle ned. Du kan stadig bruge telefonen, men den kører muligvis langsommere.\n\nNår din telefon er kølet ned, fungerer den normalt igen."</string>
     <string name="high_temp_dialog_help_text" msgid="7380171287943345858">"Se håndteringsvejledning"</string>
     <string name="high_temp_alarm_title" msgid="8654754369605452169">"Træk stikket ud af din enhed"</string>
     <string name="high_temp_alarm_notify_message" msgid="3917622943609118956">"Din enhed er ved at blive varm i nærheden af opladningsporten. Hvis enheden er tilsluttet en oplader eller USB-enhed, skal du trække stikket ud. Vær opmærksom på, at stikket også kan være varmt."</string>
@@ -935,6 +940,8 @@
     <string name="controls_pin_instructions_retry" msgid="1566667581012131046">"Prøv en anden pinkode"</string>
     <string name="controls_confirmation_message" msgid="7744104992609594859">"Bekræft ændring på <xliff:g id="DEVICE">%s</xliff:g>"</string>
     <string name="controls_structure_tooltip" msgid="4355922222944447867">"Stryg for at se mere"</string>
+    <!-- no translation found for retry_face (416380073082560186) -->
+    <skip />
     <string name="controls_seeding_in_progress" msgid="3033855341410264148">"Indlæser anbefalinger"</string>
     <string name="controls_media_title" msgid="1746947284862928133">"Medie"</string>
     <string name="controls_media_close_session" msgid="4780485355795635052">"Vil du skjule denne mediefunktion for <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
@@ -1161,4 +1168,40 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"Assistent lytter"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Angiv standardapp til noter i Indstillinger"</string>
     <string name="install_app" msgid="5066668100199613936">"Installer app"</string>
+    <!-- no translation found for privacy_dialog_title (7839968133469098311) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_summary (2458769652125995409) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_more_button (7610604080293562345) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_done_button (4504330708531434263) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_expand_action (9129262348628331377) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_collapse_action (277419962019466347) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_button (8006250171305878606) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_message (1316408652526310985) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_service (8320590856621823604) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_permissions (2543451567190470413) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_call_usage (7858746847946397562) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_call_usage (1214810644978167344) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage (631997836335929880) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage (4883417856848222450) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_1 (9047570143069220911) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_1 (2551340497722370109) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_2 (2770926061339921767) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_2 (2874689735085367167) -->
+    <skip />
 </resources>

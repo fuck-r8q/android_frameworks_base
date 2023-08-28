@@ -19,20 +19,22 @@ package com.android.server.pm;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IRemoteCallback;
 import android.os.Looper;
+import android.os.Process;
+import android.util.SparseArray;
 
 import org.junit.After;
 import org.junit.Before;
@@ -52,6 +54,7 @@ public class PackageMonitorCallbackHelperTest {
 
     private static final String FAKE_PACKAGE_NAME = "com.android.server.pm.fakeapp";
     private static final int FAKE_PACKAGE_UID = 123;
+    private static final int WAIT_CALLBACK_CALLED_IN_MS = 300;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     PackageMonitorCallbackHelper mPackageMonitorCallbackHelper;
@@ -77,43 +80,46 @@ public class PackageMonitorCallbackHelperTest {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
         mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
-                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */);
-        Thread.sleep(300);
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, null /* broadcastAllowList */);
 
-        verify(callback, never()).sendResult(any());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).never()).sendResult(any());
     }
 
     @Test
     public void testUnregisterPackageMonitorCallback_callbackShouldNotCalled() throws Exception {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
-                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0});
-        Thread.sleep(300);
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0}, null /* instantUserIds */,
+                null /* broadcastAllowList */);
 
-        verify(callback, times(1)).sendResult(any());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(any());
 
         reset(callback);
         mPackageMonitorCallbackHelper.unregisterPackageMonitorCallback(callback);
         mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
-                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */);
-        Thread.sleep(300);
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, null /* broadcastAllowList */);
 
-        verify(callback, never()).sendResult(any());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).never()).sendResult(any());
     }
 
     @Test
     public void testRegisterPackageMonitorCallback_callbackCalled() throws Exception {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
-                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */);
-        Thread.sleep(300);
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, null /* broadcastAllowList */);
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        verify(callback, times(1)).sendResult(bundleCaptor.capture());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(
+                bundleCaptor.capture());
         Bundle bundle = bundleCaptor.getValue();
         Intent intent = bundle.getParcelable(
                 PackageManager.EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT, Intent.class);
@@ -128,13 +134,14 @@ public class PackageMonitorCallbackHelperTest {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
         // Register for user 0
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         // Notify for user 10
         mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
-                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{10} /* userIds */);
-        Thread.sleep(300);
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{10} /* userIds */,
+                null /* instantUserIds */, null /* broadcastAllowList */);
 
-        verify(callback, never()).sendResult(any());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).never()).sendResult(any());
     }
 
     @Test
@@ -144,14 +151,16 @@ public class PackageMonitorCallbackHelperTest {
         ArrayList<String> components = new ArrayList<>();
         String component1 = FAKE_PACKAGE_NAME + "/.Component1";
         components.add(component1);
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         mPackageMonitorCallbackHelper.notifyPackageChanged(FAKE_PACKAGE_NAME,
                 false /* dontKillApp */, components, FAKE_PACKAGE_UID, null /* reason */,
-                new int[]{0} /* userIds */);
-        Thread.sleep(300);
+                new int[]{0} /* userIds */, null /* instantUserIds */,
+                null /* broadcastAllowList */);
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        verify(callback, times(1)).sendResult(bundleCaptor.capture());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(
+                bundleCaptor.capture());
         Bundle bundle = bundleCaptor.getValue();
         Intent intent = bundle.getParcelable(
                 PackageManager.EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT, Intent.class);
@@ -171,14 +180,15 @@ public class PackageMonitorCallbackHelperTest {
     public void testNotifyPackageAddedForNewUsers_callbackCalled() throws Exception {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         mPackageMonitorCallbackHelper.notifyPackageAddedForNewUsers(FAKE_PACKAGE_NAME,
                 FAKE_PACKAGE_UID, new int[]{0} /* userIds */, new int[0],
-                PackageInstaller.DATA_LOADER_TYPE_STREAMING);
-        Thread.sleep(300);
+                PackageInstaller.DATA_LOADER_TYPE_STREAMING, null /* broadcastAllowList */);
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        verify(callback, times(1)).sendResult(bundleCaptor.capture());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(
+                bundleCaptor.capture());
         Bundle bundle = bundleCaptor.getValue();
         Intent intent = bundle.getParcelable(
                 PackageManager.EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT, Intent.class);
@@ -194,14 +204,15 @@ public class PackageMonitorCallbackHelperTest {
     public void testNotifyResourcesChanged_callbackCalled() throws Exception {
         IRemoteCallback callback = createMockPackageMonitorCallback();
 
-        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */);
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
         mPackageMonitorCallbackHelper.notifyResourcesChanged(true /* mediaStatus */,
                 true /* replacing */, new String[]{FAKE_PACKAGE_NAME},
                 new int[]{FAKE_PACKAGE_UID} /* uids */);
-        Thread.sleep(300);
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        verify(callback, times(1)).sendResult(bundleCaptor.capture());
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(
+                bundleCaptor.capture());
         Bundle bundle = bundleCaptor.getValue();
         Intent intent = bundle.getParcelable(
                 PackageManager.EXTRA_PACKAGE_MONITOR_CALLBACK_RESULT, Intent.class);
@@ -219,6 +230,68 @@ public class PackageMonitorCallbackHelperTest {
         assertThat(pkgNames).isNotNull();
         assertThat(pkgNames.length).isEqualTo(1);
         assertThat(pkgNames[0]).isEqualTo(FAKE_PACKAGE_NAME);
+    }
+
+    @Test
+    public void testPackageMonitorCallback_onUserRemoved_callbackNotCalled() throws Exception {
+        IRemoteCallback callback = createMockPackageMonitorCallback();
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 10 /* userId */,
+                Binder.getCallingUid());
+
+        mPackageMonitorCallbackHelper.onUserRemoved(10);
+        mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{10} /* userIds */,
+                null /* instantUserIds */, null /* broadcastAllowList */);
+
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).never()).sendResult(any());
+    }
+
+    @Test
+    public void testRegisterPackageMonitorCallbackInAllowList_callbackShouldCalled()
+            throws Exception {
+        IRemoteCallback callback = createMockPackageMonitorCallback();
+        SparseArray<int[]> broadcastAllowList = new SparseArray<>();
+        broadcastAllowList.put(0, new int[] {Binder.getCallingUid()});
+
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
+        mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, broadcastAllowList);
+
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(any());
+    }
+
+    @Test
+    public void testRegisterPackageMonitorCallbackNotInAllowList_callbackShouldNotCalled()
+            throws Exception {
+        IRemoteCallback callback = createMockPackageMonitorCallback();
+        SparseArray<int[]> broadcastAllowList = new SparseArray<>();
+        broadcastAllowList.put(0, new int[] {12345});
+
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Binder.getCallingUid());
+        mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, broadcastAllowList);
+
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).never()).sendResult(any());
+    }
+
+    @Test
+    public void testRegisterPackageMonitorCallbackNotInAllowListSystemUid_callbackShouldCalled()
+            throws Exception {
+        IRemoteCallback callback = createMockPackageMonitorCallback();
+        SparseArray<int[]> broadcastAllowList = new SparseArray<>();
+        broadcastAllowList.put(0, new int[] {12345});
+
+        mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, 0 /* userId */,
+                Process.SYSTEM_UID);
+        mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED,
+                FAKE_PACKAGE_NAME, createFakeBundle(), new int[]{0} /* userIds */,
+                null /* instantUserIds */, broadcastAllowList);
+
+        verify(callback, after(WAIT_CALLBACK_CALLED_IN_MS).times(1)).sendResult(any());
     }
 
     private IRemoteCallback createMockPackageMonitorCallback() {

@@ -26,6 +26,7 @@ import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
+import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.TextView
@@ -46,9 +47,9 @@ import com.android.systemui.biometrics.AuthIconController
 import com.android.systemui.biometrics.AuthPanelController
 import com.android.systemui.biometrics.Utils
 import com.android.systemui.biometrics.domain.model.BiometricModalities
-import com.android.systemui.biometrics.domain.model.BiometricModality
-import com.android.systemui.biometrics.domain.model.asBiometricModality
+import com.android.systemui.biometrics.shared.model.BiometricModality
 import com.android.systemui.biometrics.shared.model.PromptKind
+import com.android.systemui.biometrics.shared.model.asBiometricModality
 import com.android.systemui.biometrics.ui.BiometricPromptLayout
 import com.android.systemui.biometrics.ui.viewmodel.FingerprintStartMode
 import com.android.systemui.biometrics.ui.viewmodel.PromptMessage
@@ -92,9 +93,11 @@ object BiometricViewBinder {
         val subtitleView = view.findViewById<TextView>(R.id.subtitle)
         val descriptionView = view.findViewById<TextView>(R.id.description)
 
-        // set selected for marquee
-        titleView.isSelected = true
-        subtitleView.isSelected = true
+        // set selected to enable marquee unless a screen reader is enabled
+        titleView.isSelected =
+            !accessibilityManager.isEnabled || !accessibilityManager.isTouchExplorationEnabled
+        subtitleView.isSelected =
+            !accessibilityManager.isEnabled || !accessibilityManager.isTouchExplorationEnabled
         descriptionView.movementMethod = ScrollingMovementMethod()
 
         val iconViewOverlay = view.findViewById<LottieAnimationView>(R.id.biometric_icon_overlay)
@@ -305,6 +308,10 @@ object BiometricViewBinder {
                         .collect { onClick ->
                             iconViewOverlay.setOnClickListener(onClick)
                             iconView.setOnClickListener(onClick)
+                            if (onClick == null) {
+                                iconViewOverlay.isClickable = false
+                                iconView.isClickable = false
+                            }
                         }
                 }
 
@@ -331,6 +338,13 @@ object BiometricViewBinder {
                 // dismiss prompt when authenticated and confirmed
                 launch {
                     viewModel.isAuthenticated.collect { authState ->
+                        // Disable background view for cancelling authentication once authenticated,
+                        // and remove from talkback
+                        if (authState.isAuthenticated) {
+                            backgroundView.setOnClickListener(null)
+                            backgroundView.importantForAccessibility =
+                                IMPORTANT_FOR_ACCESSIBILITY_NO
+                        }
                         if (authState.isAuthenticatedAndConfirmed) {
                             view.announceForAccessibility(
                                 view.resources.getString(R.string.biometric_dialog_authenticated)
@@ -396,7 +410,6 @@ private class Spaghetti(
 
     private var lifecycleScope: CoroutineScope? = null
     private var modalities: BiometricModalities = BiometricModalities()
-    private var faceFailedAtLeastOnce = false
     private var legacyCallback: Callback? = null
 
     override var legacyIconController: AuthIconController? = null
@@ -476,19 +489,15 @@ private class Spaghetti(
         viewModel.ensureFingerprintHasStarted(isDelayed = true)
 
         applicationScope.launch {
-            val suppress =
-                modalities.hasFaceAndFingerprint &&
-                    (failedModality == BiometricModality.Face) &&
-                    faceFailedAtLeastOnce
-            if (failedModality == BiometricModality.Face) {
-                faceFailedAtLeastOnce = true
-            }
-
             viewModel.showTemporaryError(
                 failureReason,
                 messageAfterError = modalities.asDefaultHelpMessage(applicationContext),
                 authenticateAfterError = modalities.hasFingerprint,
-                suppressIfErrorShowing = suppress,
+                suppressIf = { currentMessage, history ->
+                    modalities.hasFaceAndFingerprint &&
+                        failedModality == BiometricModality.Face &&
+                        (currentMessage.isError || history.faceFailed)
+                },
                 failedModality = failedModality,
             )
         }
@@ -501,11 +510,10 @@ private class Spaghetti(
         }
 
         applicationScope.launch {
-            val suppress =
-                modalities.hasFaceAndFingerprint && (errorModality == BiometricModality.Face)
             viewModel.showTemporaryError(
                 error,
-                suppressIfErrorShowing = suppress,
+                messageAfterError = modalities.asDefaultHelpMessage(applicationContext),
+                authenticateAfterError = modalities.hasFingerprint,
             )
             delay(BiometricPrompt.HIDE_DIALOG_DELAY.toLong())
             legacyCallback?.onAction(Callback.ACTION_ERROR)
@@ -522,6 +530,8 @@ private class Spaghetti(
             viewModel.showTemporaryError(
                 help,
                 messageAfterError = modalities.asDefaultHelpMessage(applicationContext),
+                authenticateAfterError = modalities.hasFingerprint,
+                hapticFeedback = false,
             )
         }
     }
@@ -534,7 +544,7 @@ private class Spaghetti(
             else -> false
         }
 
-    override fun startTransitionToCredentialUI() {
+    override fun startTransitionToCredentialUI(isError: Boolean) {
         applicationScope.launch {
             viewModel.onSwitchToCredential()
             legacyCallback?.onAction(Callback.ACTION_USE_DEVICE_CREDENTIAL)

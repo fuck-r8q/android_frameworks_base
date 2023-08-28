@@ -16,13 +16,12 @@
 
 package com.android.server.wm.flicker.testapp;
 
-
+import androidx.annotation.NonNull;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 
-import com.android.server.wm.flicker.helpers.ActivityEmbeddingAppHelper;
 import androidx.annotation.NonNull;
 import androidx.window.embedding.ActivityFilter;
 import androidx.window.embedding.ActivityRule;
@@ -57,6 +56,15 @@ public class ActivityEmbeddingMainActivity extends Activity {
                             + "splitSupportStatus = " + status);
         }
         mRuleController = RuleController.getInstance(this);
+    }
+
+    /** R.id.launch_trampoline_button onClick */
+    public void launchTrampolineActivity(View view) {
+        final String layoutDirection = view.getTag().toString();
+        mRuleController.clearRules();
+        mRuleController.addRule(createSplitPairRules(layoutDirection));
+        startActivity(new Intent().setComponent(
+                ActivityOptions.ActivityEmbedding.TrampolineActivity.COMPONENT));
     }
 
     /** R.id.launch_secondary_activity_button onClick */
@@ -144,6 +152,9 @@ public class ActivityEmbeddingMainActivity extends Activity {
     private static LayoutDirection parseLayoutDirection(@NonNull String layoutDirectionStr) {
         if (layoutDirectionStr.equals(LayoutDirection.LEFT_TO_RIGHT.toString())) {
             return LayoutDirection.LEFT_TO_RIGHT;
+        }
+        if (layoutDirectionStr.equals(LayoutDirection.BOTTOM_TO_TOP.toString())) {
+            return LayoutDirection.BOTTOM_TO_TOP;
         }
         if (layoutDirectionStr.equals(LayoutDirection.RIGHT_TO_LEFT.toString())) {
             return LayoutDirection.RIGHT_TO_LEFT;

@@ -17,23 +17,18 @@
 package com.android.wm.shell.flicker.splitscreen
 
 import android.platform.test.annotations.FlakyTest
-import android.platform.test.annotations.PlatinumTest
 import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
 import androidx.test.filters.RequiresDevice
-import com.android.wm.shell.flicker.ICommonAssertions
-import com.android.wm.shell.flicker.SPLIT_SCREEN_DIVIDER_COMPONENT
-import com.android.wm.shell.flicker.appWindowIsVisibleAtEnd
-import com.android.wm.shell.flicker.appWindowIsVisibleAtStart
-import com.android.wm.shell.flicker.appWindowKeepVisible
-import com.android.wm.shell.flicker.layerKeepVisible
-import com.android.wm.shell.flicker.splitAppLayerBoundsChanges
-import com.android.wm.shell.flicker.splitScreenDividerIsVisibleAtEnd
-import com.android.wm.shell.flicker.splitScreenDividerIsVisibleAtStart
 import com.android.wm.shell.flicker.splitscreen.benchmark.DragDividerToResizeBenchmark
+import com.android.wm.shell.flicker.utils.ICommonAssertions
+import com.android.wm.shell.flicker.utils.SPLIT_SCREEN_DIVIDER_COMPONENT
+import com.android.wm.shell.flicker.utils.appWindowKeepVisible
+import com.android.wm.shell.flicker.utils.layerKeepVisible
+import com.android.wm.shell.flicker.utils.splitAppLayerBoundsChanges
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,24 +53,11 @@ class DragDividerToResize(override val flicker: LegacyFlickerTest) :
             thisTransition(this)
         }
 
-    @PlatinumTest(focusArea = "sysui")
-    @Presubmit
-    @Test
-    override fun cujCompleted() {
-        flicker.appWindowIsVisibleAtStart(primaryApp)
-        flicker.appWindowIsVisibleAtStart(secondaryApp)
-        flicker.splitScreenDividerIsVisibleAtStart()
-
-        flicker.appWindowIsVisibleAtEnd(primaryApp)
-        flicker.appWindowIsVisibleAtEnd(secondaryApp)
-        flicker.splitScreenDividerIsVisibleAtEnd()
-    }
-
     @Presubmit
     @Test
     fun splitScreenDividerKeepVisible() = flicker.layerKeepVisible(SPLIT_SCREEN_DIVIDER_COMPONENT)
 
-    @Presubmit
+    @FlakyTest(bugId = 291678271)
     @Test
     fun primaryAppLayerVisibilityChanges() {
         flicker.assertLayers {
@@ -87,7 +69,7 @@ class DragDividerToResize(override val flicker: LegacyFlickerTest) :
         }
     }
 
-    @Presubmit
+    @FlakyTest(bugId = 291678271)
     @Test
     fun secondaryAppLayerVisibilityChanges() {
         flicker.assertLayers {
@@ -105,7 +87,7 @@ class DragDividerToResize(override val flicker: LegacyFlickerTest) :
     @Test
     fun secondaryAppWindowKeepVisible() = flicker.appWindowKeepVisible(secondaryApp)
 
-    @FlakyTest(bugId = 245472831)
+    @FlakyTest(bugId = 291678271)
     @Test
     fun primaryAppBoundsChanges() {
         flicker.splitAppLayerBoundsChanges(
@@ -115,7 +97,7 @@ class DragDividerToResize(override val flicker: LegacyFlickerTest) :
         )
     }
 
-    @Presubmit
+    @FlakyTest(bugId = 291678271)
     @Test
     fun secondaryAppBoundsChanges() =
         flicker.splitAppLayerBoundsChanges(
@@ -123,6 +105,12 @@ class DragDividerToResize(override val flicker: LegacyFlickerTest) :
             landscapePosLeft = false,
             portraitPosTop = true
         )
+
+    @FlakyTest(bugId = 291678271)
+    @Test
+    override fun visibleLayersShownMoreThanOneConsecutiveEntry() {
+        super.visibleLayersShownMoreThanOneConsecutiveEntry()
+    }
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

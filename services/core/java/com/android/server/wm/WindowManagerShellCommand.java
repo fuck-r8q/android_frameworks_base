@@ -41,6 +41,7 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Pair;
+import android.util.TypedValue;
 import android.view.Display;
 import android.view.IWindow;
 import android.view.IWindowManager;
@@ -728,7 +729,7 @@ public class WindowManagerShellCommand extends ShellCommand {
             return -1;
         }
         synchronized (mInternal.mGlobalLock) {
-            mLetterboxConfiguration.setLetterboxBackgroundType(backgroundType);
+            mLetterboxConfiguration.setLetterboxBackgroundTypeOverride(backgroundType);
         }
         return 0;
     }
@@ -770,10 +771,10 @@ public class WindowManagerShellCommand extends ShellCommand {
 
     private int runSetLetterboxBackgroundWallpaperBlurRadius(PrintWriter pw)
             throws RemoteException {
-        final int radius;
+        final int radiusDp;
         try {
             String arg = getNextArgRequired();
-            radius = Integer.parseInt(arg);
+            radiusDp = Integer.parseInt(arg);
         } catch (NumberFormatException  e) {
             getErrPrintWriter().println("Error: blur radius format " + e);
             return -1;
@@ -783,7 +784,9 @@ public class WindowManagerShellCommand extends ShellCommand {
             return -1;
         }
         synchronized (mInternal.mGlobalLock) {
-            mLetterboxConfiguration.setLetterboxBackgroundWallpaperBlurRadius(radius);
+            final int radiusPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                    radiusDp, mInternal.mContext.getResources().getDisplayMetrics());
+            mLetterboxConfiguration.setLetterboxBackgroundWallpaperBlurRadiusPx(radiusPx);
         }
         return 0;
     }
@@ -1010,6 +1013,10 @@ public class WindowManagerShellCommand extends ShellCommand {
                     runSetBooleanFlag(pw, mLetterboxConfiguration
                             ::setUserAppAspectRatioSettingsOverrideEnabled);
                     break;
+                case "--isUserAppAspectRatioFullscreenEnabled":
+                    runSetBooleanFlag(pw, mLetterboxConfiguration
+                            ::setUserAppAspectRatioFullscreenOverrideEnabled);
+                    break;
                 case "--isCameraCompatRefreshEnabled":
                     runSetBooleanFlag(pw, mLetterboxConfiguration::setCameraCompatRefreshEnabled);
                     break;
@@ -1050,7 +1057,7 @@ public class WindowManagerShellCommand extends ShellCommand {
                         mLetterboxConfiguration.resetLetterboxBackgroundColor();
                         break;
                     case "wallpaperBlurRadius":
-                        mLetterboxConfiguration.resetLetterboxBackgroundWallpaperBlurRadius();
+                        mLetterboxConfiguration.resetLetterboxBackgroundWallpaperBlurRadiusPx();
                         break;
                     case "wallpaperDarkScrimAlpha":
                         mLetterboxConfiguration.resetLetterboxBackgroundWallpaperDarkScrimAlpha();
@@ -1089,6 +1096,9 @@ public class WindowManagerShellCommand extends ShellCommand {
                         break;
                     case "isUserAppAspectRatioSettingsEnabled":
                         mLetterboxConfiguration.resetUserAppAspectRatioSettingsEnabled();
+                        break;
+                    case "isUserAppAspectRatioFullscreenEnabled":
+                        mLetterboxConfiguration.resetUserAppAspectRatioFullscreenEnabled();
                         break;
                     case "isCameraCompatRefreshEnabled":
                         mLetterboxConfiguration.resetCameraCompatRefreshEnabled();
@@ -1188,7 +1198,7 @@ public class WindowManagerShellCommand extends ShellCommand {
             mLetterboxConfiguration.resetLetterboxActivityCornersRadius();
             mLetterboxConfiguration.resetLetterboxBackgroundType();
             mLetterboxConfiguration.resetLetterboxBackgroundColor();
-            mLetterboxConfiguration.resetLetterboxBackgroundWallpaperBlurRadius();
+            mLetterboxConfiguration.resetLetterboxBackgroundWallpaperBlurRadiusPx();
             mLetterboxConfiguration.resetLetterboxBackgroundWallpaperDarkScrimAlpha();
             mLetterboxConfiguration.resetLetterboxHorizontalPositionMultiplier();
             mLetterboxConfiguration.resetIsHorizontalReachabilityEnabled();
@@ -1201,6 +1211,7 @@ public class WindowManagerShellCommand extends ShellCommand {
             mLetterboxConfiguration.resetIsDisplayAspectRatioEnabledForFixedOrientationLetterbox();
             mLetterboxConfiguration.resetTranslucentLetterboxingEnabled();
             mLetterboxConfiguration.resetUserAppAspectRatioSettingsEnabled();
+            mLetterboxConfiguration.resetUserAppAspectRatioFullscreenEnabled();
             mLetterboxConfiguration.resetCameraCompatRefreshEnabled();
             mLetterboxConfiguration.resetCameraCompatRefreshCycleThroughStopEnabled();
         }
@@ -1262,13 +1273,15 @@ public class WindowManagerShellCommand extends ShellCommand {
             pw.println("    Background color: " + Integer.toHexString(
                     mLetterboxConfiguration.getLetterboxBackgroundColor().toArgb()));
             pw.println("    Wallpaper blur radius: "
-                    + mLetterboxConfiguration.getLetterboxBackgroundWallpaperBlurRadius());
+                    + mLetterboxConfiguration.getLetterboxBackgroundWallpaperBlurRadiusPx());
             pw.println("    Wallpaper dark scrim alpha: "
                     + mLetterboxConfiguration.getLetterboxBackgroundWallpaperDarkScrimAlpha());
             pw.println("Is letterboxing for translucent activities enabled: "
                     + mLetterboxConfiguration.isTranslucentLetterboxingEnabled());
             pw.println("Is the user aspect ratio settings enabled: "
                     + mLetterboxConfiguration.isUserAppAspectRatioSettingsEnabled());
+            pw.println("Is the fullscreen option in user aspect ratio settings enabled: "
+                    + mLetterboxConfiguration.isUserAppAspectRatioFullscreenEnabled());
         }
         return 0;
     }
@@ -1468,6 +1481,8 @@ public class WindowManagerShellCommand extends ShellCommand {
         pw.println("        Whether letterboxing for translucent activities is enabled.");
         pw.println("      --isUserAppAspectRatioSettingsEnabled [true|1|false|0]");
         pw.println("        Whether user aspect ratio settings are enabled.");
+        pw.println("      --isUserAppAspectRatioFullscreenEnabled [true|1|false|0]");
+        pw.println("        Whether user aspect ratio fullscreen option is enabled.");
         pw.println("      --isCameraCompatRefreshEnabled [true|1|false|0]");
         pw.println("        Whether camera compatibility refresh is enabled.");
         pw.println("      --isCameraCompatRefreshCycleThroughStopEnabled [true|1|false|0]");

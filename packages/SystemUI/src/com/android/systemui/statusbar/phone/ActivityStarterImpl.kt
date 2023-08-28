@@ -37,6 +37,7 @@ import com.android.systemui.animation.DelegateLaunchAnimatorController
 import com.android.systemui.assist.AssistManager
 import com.android.systemui.camera.CameraIntents.Companion.isInsecureCameraIntent
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.DisplayId
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.WakefulnessLifecycle
@@ -44,6 +45,7 @@ import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.shade.ShadeController
+import com.android.systemui.shade.ShadeViewController
 import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.SysuiStatusBarStateController
@@ -68,10 +70,12 @@ constructor(
     private val biometricUnlockControllerLazy: Lazy<BiometricUnlockController>,
     private val keyguardViewMediatorLazy: Lazy<KeyguardViewMediator>,
     private val shadeControllerLazy: Lazy<ShadeController>,
+    private val shadeViewControllerLazy: Lazy<ShadeViewController>,
     private val statusBarKeyguardViewManagerLazy: Lazy<StatusBarKeyguardViewManager>,
     private val notifShadeWindowControllerLazy: Lazy<NotificationShadeWindowController>,
     private val activityLaunchAnimator: ActivityLaunchAnimator,
     private val context: Context,
+    @DisplayId private val displayId: Int,
     private val lockScreenUserManager: NotificationLockscreenUserManager,
     private val statusBarWindowController: StatusBarWindowController,
     private val wakefulnessLifecycle: WakefulnessLifecycle,
@@ -471,9 +475,7 @@ constructor(
                     intent.getPackage()
                 ) { adapter: RemoteAnimationAdapter? ->
                     val options =
-                        ActivityOptions(
-                            CentralSurfaces.getActivityOptions(centralSurfaces!!.displayId, adapter)
-                        )
+                        ActivityOptions(CentralSurfaces.getActivityOptions(displayId, adapter))
 
                     // We know that the intent of the caller is to dismiss the keyguard and
                     // this runnable is called right after the keyguard is solved, so we tell
@@ -596,7 +598,7 @@ constructor(
                                     val options =
                                         ActivityOptions(
                                             CentralSurfaces.getActivityOptions(
-                                                centralSurfaces!!.displayId,
+                                                displayId,
                                                 animationAdapter
                                             )
                                         )
@@ -762,7 +764,7 @@ constructor(
                 TaskStackBuilder.create(context)
                     .addNextIntent(intent)
                     .startActivities(
-                        CentralSurfaces.getActivityOptions(centralSurfaces!!.displayId, adapter),
+                        CentralSurfaces.getActivityOptions(displayId, adapter),
                         userHandle
                     )
             }
@@ -896,7 +898,7 @@ constructor(
                 if (dismissShade) {
                     return StatusBarLaunchAnimatorController(
                         animationController,
-                        it.shadeViewController,
+                        shadeViewControllerLazy.get(),
                         shadeControllerLazy.get(),
                         notifShadeWindowControllerLazy.get(),
                         isLaunchForActivity

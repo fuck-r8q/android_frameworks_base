@@ -33,9 +33,11 @@ import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.keyguard.shared.model.WakeSleepReason
 import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.keyguard.shared.model.WakefulnessState
+import com.android.systemui.shade.data.repository.FakeShadeRepository
+import com.android.systemui.statusbar.phone.SystemUIDialogManager
+import com.android.systemui.util.mockito.argumentCaptor
 import com.android.systemui.util.mockito.eq
 import com.android.systemui.util.mockito.whenever
-import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -46,6 +48,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
+import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
 @ExperimentalCoroutinesApi
@@ -63,45 +66,47 @@ class UdfpsKeyguardInteractorTest : SysuiTestCase() {
     private lateinit var fakeCommandQueue: FakeCommandQueue
     private lateinit var featureFlags: FakeFeatureFlags
     private lateinit var burnInInteractor: BurnInInteractor
+    private lateinit var shadeRepository: FakeShadeRepository
+    private lateinit var keyguardInteractor: KeyguardInteractor
 
     @Mock private lateinit var burnInHelper: BurnInHelperWrapper
+    @Mock private lateinit var dialogManager: SystemUIDialogManager
 
     private lateinit var underTest: UdfpsKeyguardInteractor
 
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
-
         testScope = TestScope()
         configRepository = FakeConfigurationRepository()
-        keyguardRepository = FakeKeyguardRepository()
-        bouncerRepository = FakeKeyguardBouncerRepository()
-        fakeCommandQueue = FakeCommandQueue()
         featureFlags =
             FakeFeatureFlags().apply {
                 set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, true)
                 set(Flags.FACE_AUTH_REFACTOR, false)
             }
+        KeyguardInteractorFactory.create(featureFlags = featureFlags).let {
+            keyguardInteractor = it.keyguardInteractor
+            keyguardRepository = it.repository
+        }
+        bouncerRepository = FakeKeyguardBouncerRepository()
+        shadeRepository = FakeShadeRepository()
+        fakeCommandQueue = FakeCommandQueue()
         burnInInteractor =
             BurnInInteractor(
                 context,
                 burnInHelper,
                 testScope.backgroundScope,
                 configRepository,
-                FakeSystemClock(),
+                keyguardInteractor
             )
 
         underTest =
             UdfpsKeyguardInteractor(
                 configRepository,
                 burnInInteractor,
-                KeyguardInteractor(
-                    keyguardRepository,
-                    fakeCommandQueue,
-                    featureFlags,
-                    bouncerRepository,
-                    configRepository,
-                ),
+                keyguardInteractor,
+                shadeRepository,
+                dialogManager,
             )
     }
 
@@ -142,6 +147,61 @@ class UdfpsKeyguardInteractorTest : SysuiTestCase() {
             assertThat(burnInOffsets?.burnInXOffset).isEqualTo(burnInXOffset)
         }
 
+    @Test
+    fun dialogHideAffordances() =
+        testScope.runTest {
+            val dialogHideAffordancesRequest by
+                collectLastValue(underTest.dialogHideAffordancesRequest)
+            runCurrent()
+            val captor = argumentCaptor<SystemUIDialogManager.Listener>()
+            verify(dialogManager).registerListener(captor.capture())
+
+            captor.value.shouldHideAffordances(false)
+            assertThat(dialogHideAffordancesRequest).isEqualTo(false)
+
+            captor.value.shouldHideAffordances(true)
+            assertThat(dialogHideAffordancesRequest).isEqualTo(true)
+
+            captor.value.shouldHideAffordances(false)
+            assertThat(dialogHideAffordancesRequest).isEqualTo(false)
+        }
+
+    @Test
+    fun shadeExpansion_updates() =
+        testScope.runTest {
+            keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
+            val shadeExpansion by collectLastValue(underTest.shadeExpansion)
+            assertThat(shadeExpansion).isEqualTo(0f)
+
+            shadeRepository.setUdfpsTransitionToFullShadeProgress(.5f)
+            assertThat(shadeExpansion).isEqualTo(.5f)
+
+            shadeRepository.setUdfpsTransitionToFullShadeProgress(.7f)
+            assertThat(shadeExpansion).isEqualTo(.7f)
+
+            shadeRepository.setUdfpsTransitionToFullShadeProgress(.22f)
+            assertThat(shadeExpansion).isEqualTo(.22f)
+
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE_LOCKED)
+            assertThat(shadeExpansion).isEqualTo(1f)
+        }
+
+    @Test
+    fun qsProgress_updates() =
+        testScope.runTest {
+            val qsProgress by collectLastValue(underTest.qsProgress)
+            assertThat(qsProgress).isEqualTo(0f)
+
+            shadeRepository.setQsExpansion(.22f)
+            assertThat(qsProgress).isEqualTo(.44f)
+
+            shadeRepository.setQsExpansion(.5f)
+            assertThat(qsProgress).isEqualTo(1f)
+
+            shadeRepository.setQsExpansion(.7f)
+            assertThat(qsProgress).isEqualTo(1f)
+        }
+
     private fun initializeBurnInOffsets() {
         whenever(burnInHelper.burnInProgressOffset()).thenReturn(burnInProgress)
         whenever(burnInHelper.burnInOffset(anyInt(), /* xAxis */ eq(true)))
@@ -152,7 +212,7 @@ class UdfpsKeyguardInteractorTest : SysuiTestCase() {
 
     private fun setAwake() {
         keyguardRepository.setDozeAmount(0f)
-        burnInInteractor.dozeTimeTick()
+        keyguardRepository.dozeTimeTick()
 
         bouncerRepository.setAlternateVisible(false)
         keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)

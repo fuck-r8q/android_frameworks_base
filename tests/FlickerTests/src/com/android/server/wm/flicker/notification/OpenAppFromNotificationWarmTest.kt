@@ -26,7 +26,6 @@ import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
 import android.tools.device.helpers.wakeUpAndGoToHomeScreen
 import android.view.WindowInsets
 import android.view.WindowManager
-import androidx.test.filters.RequiresDevice
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import com.android.server.wm.flicker.helpers.NotificationAppHelper
@@ -49,7 +48,6 @@ import org.junit.runners.Parameterized
  *
  * To run this test: `atest FlickerTests:OpenAppFromNotificationWarm`
  */
-@RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -69,7 +67,10 @@ open class OpenAppFromNotificationWarmTest(flicker: LegacyFlickerTest) :
                 wmHelper.StateSyncBuilder().withFullScreenApp(testApp).waitForAndVerify()
                 testApp.postNotification(wmHelper)
                 device.pressHome()
-                wmHelper.StateSyncBuilder().withHomeActivityVisible().waitForAndVerify()
+                wmHelper.StateSyncBuilder()
+                    .withHomeActivityVisible()
+                    .withWindowSurfaceDisappeared(ComponentNameMatcher.NOTIFICATION_SHADE)
+                    .waitForAndVerify()
             }
 
             transitions {

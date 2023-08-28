@@ -48,18 +48,17 @@ import com.android.keyguard.BouncerPanelExpansionCalculator;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.settingslib.Utils;
+import com.android.systemui.CoreStartable;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
 import com.android.systemui.animation.ShadeInterpolation;
+import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dock.DockManager;
-import com.android.systemui.flags.FeatureFlags;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
-import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.keyguard.shared.model.ScrimAlpha;
 import com.android.systemui.keyguard.shared.model.TransitionState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
@@ -71,8 +70,10 @@ import com.android.systemui.statusbar.notification.stack.ViewState;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.AlarmTimeout;
+import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.wakelock.DelayedWakeLock;
 import com.android.systemui.util.wakelock.WakeLock;
+import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -89,7 +90,8 @@ import kotlinx.coroutines.CoroutineDispatcher;
  * security method gets shown).
  */
 @SysUISingleton
-public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dumpable {
+public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dumpable,
+        CoreStartable {
 
     static final String TAG = "ScrimController";
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
@@ -207,6 +209,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     private final KeyguardVisibilityCallback mKeyguardVisibilityCallback;
     private final Handler mHandler;
     private final Executor mMainExecutor;
+    private final JavaAdapter mJavaAdapter;
     private final ScreenOffAnimationController mScreenOffAnimationController;
     private final KeyguardUnlockAnimationController mKeyguardUnlockAnimationController;
     private final StatusBarKeyguardViewManager mStatusBarKeyguardViewManager;
@@ -249,8 +252,6 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     private int mScrimsVisibility;
     private final TriConsumer<ScrimState, Float, GradientColors> mScrimStateListener;
     private final LargeScreenShadeInterpolator mLargeScreenShadeInterpolator;
-    private final FeatureFlags mFeatureFlags;
-    private final boolean mUseNewLightBarLogic;
     private Consumer<Integer> mScrimVisibleListener;
     private boolean mBlankScreen;
     private boolean mScreenBlankingCallbackCalled;
@@ -268,6 +269,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     private boolean mKeyguardOccluded;
 
     private KeyguardTransitionInteractor mKeyguardTransitionInteractor;
+    private final WallpaperRepository mWallpaperRepository;
     private CoroutineDispatcher mMainDispatcher;
     private boolean mIsBouncerToGoneTransitionRunning = false;
     private PrimaryBouncerToGoneTransitionViewModel mPrimaryBouncerToGoneTransitionViewModel;
@@ -297,18 +299,17 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             DockManager dockManager,
             ConfigurationController configurationController,
             @Main Executor mainExecutor,
+            JavaAdapter javaAdapter,
             ScreenOffAnimationController screenOffAnimationController,
             KeyguardUnlockAnimationController keyguardUnlockAnimationController,
             StatusBarKeyguardViewManager statusBarKeyguardViewManager,
             PrimaryBouncerToGoneTransitionViewModel primaryBouncerToGoneTransitionViewModel,
             KeyguardTransitionInteractor keyguardTransitionInteractor,
+            WallpaperRepository wallpaperRepository,
             @Main CoroutineDispatcher mainDispatcher,
-            LargeScreenShadeInterpolator largeScreenShadeInterpolator,
-            FeatureFlags featureFlags) {
+            LargeScreenShadeInterpolator largeScreenShadeInterpolator) {
         mScrimStateListener = lightBarController::setScrimState;
         mLargeScreenShadeInterpolator = largeScreenShadeInterpolator;
-        mFeatureFlags = featureFlags;
-        mUseNewLightBarLogic = featureFlags.isEnabled(Flags.NEW_LIGHT_BAR_LOGIC);
         mDefaultScrimAlpha = BUSY_SCRIM_ALPHA;
 
         mKeyguardStateController = keyguardStateController;
@@ -317,6 +318,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         mKeyguardVisibilityCallback = new KeyguardVisibilityCallback();
         mHandler = handler;
         mMainExecutor = mainExecutor;
+        mJavaAdapter = javaAdapter;
         mScreenOffAnimationController = screenOffAnimationController;
         mTimeTicker = new AlarmTimeout(alarmManager, this::onHideWallpaperTimeout,
                 "hide_aod_wallpaper", mHandler);
@@ -348,7 +350,15 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         mColors = new GradientColors();
         mPrimaryBouncerToGoneTransitionViewModel = primaryBouncerToGoneTransitionViewModel;
         mKeyguardTransitionInteractor = keyguardTransitionInteractor;
+        mWallpaperRepository = wallpaperRepository;
         mMainDispatcher = mainDispatcher;
+    }
+
+    @Override
+    public void start() {
+        mJavaAdapter.alwaysCollectFlow(
+                mWallpaperRepository.getWallpaperSupportsAmbientMode(),
+                this::setWallpaperSupportsAmbientMode);
     }
 
     /**
@@ -1153,13 +1163,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         if (mClipsQsScrim && mQsBottomVisible) {
             alpha = mNotificationsAlpha;
         }
-        if (mUseNewLightBarLogic) {
-            mScrimStateListener.accept(mState, alpha, mColors);
-        } else {
-            // NOTE: This wasn't wrong, but it implied that each scrim might have different colors,
-            //  when in fact they all share the same GradientColors instance, which we own.
-            mScrimStateListener.accept(mState, alpha, mScrimInFront.getColors());
-        }
+        mScrimStateListener.accept(mState, alpha, mColors);
     }
 
     private void dispatchScrimsVisible() {
@@ -1483,15 +1487,15 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         int accent = Utils.getColorAccent(mScrimBehind.getContext()).getDefaultColor();
         mColors.setMainColor(background);
         mColors.setSecondaryColor(accent);
-        if (mUseNewLightBarLogic) {
-            final boolean isBackgroundLight = !ContrastColorUtil.isColorDark(background);
-            mColors.setSupportsDarkText(isBackgroundLight);
-        } else {
-            // NOTE: This was totally backward, but LightBarController was flipping it back.
-            // There may be other consumers of this which would struggle though
-            mColors.setSupportsDarkText(
-                    ColorUtils.calculateContrast(mColors.getMainColor(), Color.WHITE) > 4.5);
+        final boolean isBackgroundLight = !ContrastColorUtil.isColorDark(background);
+        mColors.setSupportsDarkText(isBackgroundLight);
+
+        int surface = Utils.getColorAttr(mScrimBehind.getContext(),
+                com.android.internal.R.attr.materialColorSurface).getDefaultColor();
+        for (ScrimState state : ScrimState.values()) {
+            state.setSurfaceColor(surface);
         }
+
         mNeedsDrawableColorUpdate = true;
     }
 
@@ -1544,7 +1548,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         pw.println(mState.getMaxLightRevealScrimAlpha());
     }
 
-    public void setWallpaperSupportsAmbientMode(boolean wallpaperSupportsAmbientMode) {
+    private void setWallpaperSupportsAmbientMode(boolean wallpaperSupportsAmbientMode) {
         mWallpaperSupportsAmbientMode = wallpaperSupportsAmbientMode;
         ScrimState[] states = ScrimState.values();
         for (int i = 0; i < states.length; i++) {

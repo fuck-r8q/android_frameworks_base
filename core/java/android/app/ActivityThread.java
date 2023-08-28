@@ -204,7 +204,9 @@ import android.webkit.WebView;
 import android.window.SizeConfigurationBuckets;
 import android.window.SplashScreen;
 import android.window.SplashScreenView;
+import android.window.WindowContextInfo;
 import android.window.WindowProviderService;
+import android.window.WindowTokenClientController;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -1111,6 +1113,10 @@ public final class ActivityThread extends ClientTransactionHandler
             s.token = token;
             s.info = info;
 
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleCreateService. token="
+                        + token);
+            }
             sendMessage(H.CREATE_SERVICE, s);
         }
 
@@ -1126,6 +1132,11 @@ public final class ActivityThread extends ClientTransactionHandler
             if (DEBUG_SERVICE)
                 Slog.v(TAG, "scheduleBindService token=" + token + " intent=" + intent + " uid="
                         + Binder.getCallingUid() + " pid=" + Binder.getCallingPid());
+
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleBindService. token="
+                        + token + " bindSeq=" + bindSeq);
+            }
             sendMessage(H.BIND_SERVICE, s);
         }
 
@@ -1135,6 +1146,10 @@ public final class ActivityThread extends ClientTransactionHandler
             s.intent = intent;
             s.bindSeq = -1;
 
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleUnbindService. token="
+                        + token);
+            }
             sendMessage(H.UNBIND_SERVICE, s);
         }
 
@@ -1150,16 +1165,28 @@ public final class ActivityThread extends ClientTransactionHandler
                 s.flags = ssa.flags;
                 s.args = ssa.args;
 
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                    Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleServiceArgs. token="
+                            + token + " startId=" + s.startId);
+                }
                 sendMessage(H.SERVICE_ARGS, s);
             }
         }
 
         public final void scheduleStopService(IBinder token) {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleStopService. token="
+                        + token);
+            }
             sendMessage(H.STOP_SERVICE, token);
         }
 
         @Override
         public final void scheduleTimeoutService(IBinder token, int startId) {
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+                Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "scheduleTimeoutService. token="
+                        + token);
+            }
             sendMessage(H.TIMEOUT_SERVICE, token, startId);
         }
 
@@ -4249,21 +4276,22 @@ public final class ActivityThread extends ClientTransactionHandler
         decorView.addView(view);
         view.requestLayout();
 
-        view.getViewTreeObserver().addOnDrawListener(new ViewTreeObserver.OnDrawListener() {
+        view.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
             private boolean mHandled = false;
             @Override
-            public void onDraw() {
+            public boolean onPreDraw() {
                 if (mHandled) {
-                    return;
+                    return true;
                 }
                 mHandled = true;
                 // Transfer the splash screen view from shell to client.
-                // Call syncTransferSplashscreenViewTransaction at the first onDraw so we can ensure
-                // the client view is ready to show and we can use applyTransactionOnDraw to make
-                // all transitions happen at the same frame.
+                // Call syncTransferSplashscreenViewTransaction at the first onPreDraw, so we can
+                // ensure the client view is ready to show, and can use applyTransactionOnDraw to
+                // make all transitions happen at the same frame.
                 syncTransferSplashscreenViewTransaction(
                         view, r.token, decorView, startingWindowLeash);
-                view.post(() -> view.getViewTreeObserver().removeOnDrawListener(this));
+                view.post(() -> view.getViewTreeObserver().removeOnPreDrawListener(this));
+                return true;
             }
         });
     }
@@ -6219,6 +6247,17 @@ public final class ActivityThread extends ClientTransactionHandler
         mConfiguration = mConfigurationController.getConfiguration();
         mPendingConfiguration = mConfigurationController.getPendingConfiguration(
                 false /* clearPending */);
+    }
+
+    @Override
+    public void handleWindowContextInfoChanged(@NonNull IBinder clientToken,
+            @NonNull WindowContextInfo info) {
+        WindowTokenClientController.getInstance().onWindowContextInfoChanged(clientToken, info);
+    }
+
+    @Override
+    public void handleWindowContextWindowRemoval(@NonNull IBinder clientToken) {
+        WindowTokenClientController.getInstance().onWindowContextWindowRemoved(clientToken);
     }
 
     /**

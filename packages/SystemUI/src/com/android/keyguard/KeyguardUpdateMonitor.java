@@ -164,13 +164,13 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.domain.interactor.FaceAuthenticationListener;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.shared.constants.TrustAgentUiEvent;
-import com.android.systemui.keyguard.shared.model.AcquiredAuthenticationStatus;
-import com.android.systemui.keyguard.shared.model.AuthenticationStatus;
-import com.android.systemui.keyguard.shared.model.DetectionStatus;
-import com.android.systemui.keyguard.shared.model.ErrorAuthenticationStatus;
-import com.android.systemui.keyguard.shared.model.FailedAuthenticationStatus;
-import com.android.systemui.keyguard.shared.model.HelpAuthenticationStatus;
-import com.android.systemui.keyguard.shared.model.SuccessAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.AcquiredFaceAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.ErrorFaceAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.FaceAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.FaceDetectionStatus;
+import com.android.systemui.keyguard.shared.model.FailedFaceAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.HelpFaceAuthenticationStatus;
+import com.android.systemui.keyguard.shared.model.SuccessFaceAuthenticationStatus;
 import com.android.systemui.keyguard.shared.model.SysUiFaceAuthenticateOptions;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.WeatherData;
@@ -1451,28 +1451,32 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     private FaceAuthenticationListener mFaceAuthenticationListener =
             new FaceAuthenticationListener() {
                 @Override
-                public void onAuthenticationStatusChanged(@NonNull AuthenticationStatus status) {
-                    if (status instanceof AcquiredAuthenticationStatus) {
+                public void onAuthenticationStatusChanged(
+                        @NonNull FaceAuthenticationStatus status
+                ) {
+                    if (status instanceof AcquiredFaceAuthenticationStatus) {
                         handleFaceAcquired(
-                                ((AcquiredAuthenticationStatus) status).getAcquiredInfo());
-                    } else if (status instanceof ErrorAuthenticationStatus) {
-                        ErrorAuthenticationStatus error = (ErrorAuthenticationStatus) status;
+                                ((AcquiredFaceAuthenticationStatus) status).getAcquiredInfo());
+                    } else if (status instanceof ErrorFaceAuthenticationStatus) {
+                        ErrorFaceAuthenticationStatus error =
+                                (ErrorFaceAuthenticationStatus) status;
                         handleFaceError(error.getMsgId(), error.getMsg());
-                    } else if (status instanceof FailedAuthenticationStatus) {
+                    } else if (status instanceof FailedFaceAuthenticationStatus) {
                         handleFaceAuthFailed();
-                    } else if (status instanceof HelpAuthenticationStatus) {
-                        HelpAuthenticationStatus helpMsg = (HelpAuthenticationStatus) status;
+                    } else if (status instanceof HelpFaceAuthenticationStatus) {
+                        HelpFaceAuthenticationStatus helpMsg =
+                                (HelpFaceAuthenticationStatus) status;
                         handleFaceHelp(helpMsg.getMsgId(), helpMsg.getMsg());
-                    } else if (status instanceof SuccessAuthenticationStatus) {
+                    } else if (status instanceof SuccessFaceAuthenticationStatus) {
                         FaceManager.AuthenticationResult result =
-                                ((SuccessAuthenticationStatus) status).getSuccessResult();
+                                ((SuccessFaceAuthenticationStatus) status).getSuccessResult();
                         handleFaceAuthenticated(result.getUserId(), result.isStrongBiometric());
                     }
                 }
 
                 @Override
-                public void onDetectionStatusChanged(@NonNull DetectionStatus status) {
-                    handleFaceAuthenticated(status.getUserId(), status.isStrongBiometric());
+                public void onDetectionStatusChanged(@NonNull FaceDetectionStatus status) {
+                    handleBiometricDetected(status.getUserId(), FACE, status.isStrongBiometric());
                 }
             };
 
@@ -3136,6 +3140,10 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             return false;
         }
 
+        if (isFaceAuthInteractorEnabled()) {
+            return mFaceAuthInteractor.canFaceAuthRun();
+        }
+
         final boolean statusBarShadeLocked = mStatusBarState == StatusBarState.SHADE_LOCKED;
         final boolean awakeKeyguard = isKeyguardVisible() && mDeviceInteractive
                 && !statusBarShadeLocked;
@@ -3537,6 +3545,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      */
     @VisibleForTesting
     void handleUserSwitching(int userId, CountDownLatch latch) {
+        mLogger.logUserSwitching(userId, "from UserTracker");
         Assert.isMainThread();
         clearBiometricRecognized();
         boolean trustUsuallyManaged = mTrustManager.isTrustUsuallyManaged(userId);
@@ -3557,6 +3566,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      */
     @VisibleForTesting
     void handleUserSwitchComplete(int userId) {
+        mLogger.logUserSwitchComplete(userId, "from UserTracker");
         Assert.isMainThread();
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
@@ -4034,6 +4044,11 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
     @AnyThread
     public void setSwitchingUser(boolean switching) {
+        if (switching) {
+            mLogger.logUserSwitching(getCurrentUser(), "from setSwitchingUser");
+        } else {
+            mLogger.logUserSwitchComplete(getCurrentUser(), "from setSwitchingUser");
+        }
         mSwitchingUser = switching;
         // Since this comes in on a binder thread, we need to post it first
         mHandler.post(() -> updateBiometricListeningState(BIOMETRIC_ACTION_UPDATE,
@@ -4600,13 +4615,18 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
      * Cancels all operations in the scheduler if it is hung for 10 seconds.
      */
     public void startBiometricWatchdog() {
-        if (mFaceManager != null && !isFaceAuthInteractorEnabled()) {
-            mLogger.scheduleWatchdog("face");
-            mFaceManager.scheduleWatchdog();
-        }
-        if (mFpm != null) {
-            mLogger.scheduleWatchdog("fingerprint");
-            mFpm.scheduleWatchdog();
-        }
+        final boolean isFaceAuthInteractorEnabled = isFaceAuthInteractorEnabled();
+        mBackgroundExecutor.execute(() -> {
+            Trace.beginSection("#startBiometricWatchdog");
+            if (mFaceManager != null && !isFaceAuthInteractorEnabled) {
+                mLogger.scheduleWatchdog("face");
+                mFaceManager.scheduleWatchdog();
+            }
+            if (mFpm != null) {
+                mLogger.scheduleWatchdog("fingerprint");
+                mFpm.scheduleWatchdog();
+            }
+            Trace.endSection();
+        });
     }
 }

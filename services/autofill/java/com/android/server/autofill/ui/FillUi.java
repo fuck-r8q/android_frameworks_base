@@ -91,6 +91,7 @@ final class FillUi {
         void requestShowFillUi(int width, int height,
                 IAutofillWindowPresenter windowPresenter);
         void requestHideFillUi();
+        void requestHideFillUiWhenDestroyed();
         void startIntentSender(IntentSender intentSender);
         void dispatchUnhandledKey(KeyEvent keyEvent);
         void cancelSession();
@@ -148,8 +149,9 @@ final class FillUi {
 
         final LayoutInflater inflater = LayoutInflater.from(mContext);
 
-        final RemoteViews headerPresentation = response.getHeader();
-        final RemoteViews footerPresentation = response.getFooter();
+        final RemoteViews headerPresentation = Helper.sanitizeRemoteView(response.getHeader());
+        final RemoteViews footerPresentation = Helper.sanitizeRemoteView(response.getFooter());
+
         final ViewGroup decor;
         if (mFullScreen) {
             decor = (ViewGroup) inflater.inflate(R.layout.autofill_dataset_picker_fullscreen, null);
@@ -227,6 +229,9 @@ final class FillUi {
             ViewGroup container = decor.findViewById(R.id.autofill_dataset_picker);
             final View content;
             try {
+                if (Helper.sanitizeRemoteView(response.getPresentation()) == null) {
+                    throw new RuntimeException("Permission error accessing RemoteView");
+                }
                 content = response.getPresentation().applyWithTheme(
                         mContext, decor, interceptionHandler, mThemeId);
                 container.addView(content);
@@ -306,7 +311,8 @@ final class FillUi {
                 final Dataset dataset = response.getDatasets().get(i);
                 final int index = dataset.getFieldIds().indexOf(focusedViewId);
                 if (index >= 0) {
-                    final RemoteViews presentation = dataset.getFieldPresentation(index);
+                    final RemoteViews presentation = Helper.sanitizeRemoteView(
+                            dataset.getFieldPresentation(index));
                     if (presentation == null) {
                         Slog.w(TAG, "not displaying UI on field " + focusedViewId + " because "
                                 + "service didn't provide a presentation for it on " + dataset);
@@ -477,7 +483,7 @@ final class FillUi {
         }
         mCallback.onDestroy();
         if (notifyClient) {
-            mCallback.requestHideFillUi();
+            mCallback.requestHideFillUiWhenDestroyed();
         }
         mDestroyed = true;
     }

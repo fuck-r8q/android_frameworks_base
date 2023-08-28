@@ -305,6 +305,13 @@
     <!-- A toast message shown when the screen recording cannot be started due to a generic error [CHAR LIMIT=NONE] -->
     <string name="screenrecord_start_error">Error starting screen recording</string>
 
+    <!-- Cling help message title when hiding the navigation bar entering immersive mode [CHAR LIMIT=none] -->
+    <string name="immersive_cling_title">Viewing full screen</string>
+    <!-- Cling help message description when hiding the navigation bar entering immersive mode [CHAR LIMIT=none] -->
+    <string name="immersive_cling_description">To exit, swipe down from the top.</string>
+    <!-- Cling help message confirmation button when hiding the navigation bar entering immersive mode [CHAR LIMIT=30] -->
+    <string name="immersive_cling_positive">Got it</string>
+
     <!-- Content description of the back button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
     <string name="accessibility_back">Back</string>
     <!-- Content description of the home button for accessibility (not shown on the screen). [CHAR LIMIT=NONE] -->
@@ -367,6 +374,8 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_3">Face recognized. Press the unlock icon to continue.</string>
     <!-- Talkback string when a biometric is authenticated [CHAR LIMIT=NONE] -->
     <string name="biometric_dialog_authenticated">Authenticated</string>
+    <!-- Talkback string when a canceling authentication [CHAR LIMIT=NONE] -->
+    <string name="biometric_dialog_cancel_authentication">Cancel Authentication</string>
 
     <!-- Button text shown on BiometricPrompt giving the user the option to use an alternate form of authentication (Pin) [CHAR LIMIT=30] -->
     <string name="biometric_dialog_use_pin">Use PIN</string>
@@ -435,6 +444,8 @@
     <string name="face_reenroll_failure_dialog_content">Couldn\u2019t set up face unlock. Go to Settings to try again.</string>
     <!-- Message shown when the system-provided fingerprint dialog is shown, asking for authentication -->
     <string name="fingerprint_dialog_touch_sensor">Touch the fingerprint sensor</string>
+    <!-- Content description after successful auth when confirmation required -->
+    <string name="fingerprint_dialog_authenticated_confirmation">Press the unlock icon to continue</string>
     <!-- Message shown to inform the user a face cannot be recognized and fingerprint should instead be used.[CHAR LIMIT=50] -->
     <string name="fingerprint_dialog_use_fingerprint_instead">Can\u2019t recognize face. Use fingerprint instead.</string>
     <!-- Message shown to inform the user a face cannot be recognized and fingerprint should instead be used.[CHAR LIMIT=50] -->
@@ -951,6 +962,8 @@
 
     <!-- Message shown when face authentication fails and the pin pad is visible. [CHAR LIMIT=60] -->
     <string name="keyguard_retry">Swipe up to try again</string>
+    <!-- Message shown when face authentication fails and the pin pad is visible. [CHAR LIMIT=60] -->
+    <string name="accesssibility_keyguard_retry">Swipe up to try Face Unlock again</string>
 
     <!-- Message shown when notifying user to unlock in order to use NFC. [CHAR LIMIT=60] -->
     <string name="require_unlock_for_nfc">Unlock to use NFC</string>
@@ -1111,6 +1124,16 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app">When you’re sharing, recording, or casting an app, Android has access to anything shown or played on that app. So be careful with things like passwords, payment details, messages, photos, and audio and video.</string>
     <!-- System sharing media projection permission button to continue. [CHAR LIMIT=60] -->
     <string name="media_projection_entry_generic_permission_dialog_continue">Start</string>
+
+    <!-- Task switcher notification -->
+    <!-- Task switcher notification text. [CHAR LIMIT=100] -->
+    <string name="media_projection_task_switcher_text">Sharing pauses when you switch apps</string>
+    <!-- The action for switching to the foreground task. [CHAR LIMIT=40] -->
+    <string name="media_projection_task_switcher_action_switch">Share this app instead</string>
+    <!-- The action for switching back to the projected task. [CHAR LIMIT=40] -->
+    <string name="media_projection_task_switcher_action_back">Switch back</string>
+    <!-- Task switcher notification channel name. [CHAR LIMIT=40] -->
+    <string name="media_projection_task_switcher_notification_channel">App switch</string>
 
     <!-- Title for the dialog that is shown when screen capturing is disabled by enterprise policy. [CHAR LIMIT=100] -->
     <string name="screen_capturing_disabled_by_policy_dialog_title">Blocked by your IT admin</string>
@@ -2581,6 +2604,9 @@
     <!-- Tooltip to show in management screen when there are multiple structures [CHAR_LIMIT=50] -->
     <string name="controls_structure_tooltip">Swipe to see more</string>
 
+    <!-- Accessibility action informing the user how they can retry face authentication [CHAR LIMIT=NONE] -->
+    <string name="retry_face">Retry face authentication</string>
+
     <!-- Message to tell the user to wait while systemui attempts to load a set of
          recommended controls [CHAR_LIMIT=60] -->
     <string name="controls_seeding_in_progress">Loading recommendations</string>
@@ -3166,10 +3192,43 @@
     <!--- Content of toast triggered when the notes app entry point is triggered without setting a default notes app. [CHAR LIMIT=NONE] -->
     <string name="set_default_notes_app_toast_content">Set default notes app in Settings</string>
 
-    <!--
-    Label for a button that, when clicked, sends the user to the app store to install an app.
-
-    [CHAR LIMIT=64].
-    -->
+    <!-- Label for a button that, when clicked, sends the user to the app store to install an app. [CHAR LIMIT=64]. -->
     <string name="install_app">Install app</string>
+
+    <!-- Title of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=30] -->
+    <string name="privacy_dialog_title">Microphone &amp; Camera</string>
+    <!-- Subtitle of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_summary">Recent app use</string>
+    <!-- Label of the secondary button of the privacy dialog, used to check recent app usage of phone sensors [CHAR LIMIT=30] -->
+    <string name="privacy_dialog_more_button">See recent access</string>
+    <!-- Label of the primary button to dismiss the privacy dialog [CHAR LIMIT=20] -->
+    <string name="privacy_dialog_done_button">Done</string>
+    <!-- Description for expanding a collapsible widget in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_expand_action">Expand and show options</string>
+    <!-- Description for collapsing a collapsible widget in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_collapse_action">Collapse</string>
+    <!-- Label of a button of the privacy dialog to close an app actively using a phone sensor [CHAR LIMIT=50] -->
+    <string name="privacy_dialog_close_app_button">Close this app</string>
+    <!-- Message shown in the privacy dialog when an app actively using a phone sensor is closed [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_close_app_message"><xliff:g id="app_name" example="Gmail">%1$s</xliff:g> closed</string>
+    <!-- Label of a button of the privacy dialog to learn more of a service actively or recently using a phone sensor [CHAR LIMIT=50] -->
+    <string name="privacy_dialog_manage_service">Manage service</string>
+    <!-- Label of a button of the privacy dialog to manage permissions of an app actively or recently using a phone sensor [CHAR LIMIT=50] -->
+    <string name="privacy_dialog_manage_permissions">Manage access</string>
+    <!-- Label for active usage of a phone sensor by phone call in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_active_call_usage">In use by phone call</string>
+    <!-- Label for recent usage of a phone sensor by phone call in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_recent_call_usage">Recently used in phone call</string>
+    <!-- Label for active app usage of a phone sensor in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_active_app_usage">In use by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g></string>
+    <!-- Label for recent app usage of a phone sensor in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_recent_app_usage">Recently used by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g></string>
+    <!-- Label for active app usage of a phone sensor with sub-attribution or proxy label in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_active_app_usage_1">In use by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> (<xliff:g id="attribution_label" example="For Wallet">%2$s</xliff:g>)</string>
+    <!-- Label for recent app usage of a phone sensor with sub-attribution or proxy label in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_recent_app_usage_1">Recently used by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> (<xliff:g id="attribution_label" example="For Wallet">%2$s</xliff:g>)</string>
+    <!-- Label for active app usage of a phone sensor with sub-attribution and proxy label in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_active_app_usage_2">In use by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> (<xliff:g id="attribution_label" example="For Wallet">%2$s</xliff:g> \u2022 <xliff:g id="proxy_label" example="Speech services">%3$s</xliff:g>)</string>
+    <!-- Label for recent app usage of a phone sensor with sub-attribution and proxy label in the privacy dialog [CHAR LIMIT=NONE] -->
+    <string name="privacy_dialog_recent_app_usage_2">Recently used by <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> (<xliff:g id="attribution_label" example="For Wallet">%2$s</xliff:g> \u2022 <xliff:g id="proxy_label" example="Speech services">%3$s</xliff:g>)</string>
 </resources>

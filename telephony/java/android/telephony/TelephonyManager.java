@@ -5366,7 +5366,11 @@ public class TelephonyManager {
         try {
             ITelephony telephony = getITelephony();
             if (telephony != null) {
-                return telephony.getMergedImsisFromGroup(getSubId(), getOpPackageName());
+                String[] mergedImsisFromGroup =
+                        telephony.getMergedImsisFromGroup(getSubId(), getOpPackageName());
+                if (mergedImsisFromGroup != null) {
+                    return mergedImsisFromGroup;
+                }
             }
         } catch (RemoteException ex) {
         }
@@ -17700,6 +17704,15 @@ public class TelephonyManager {
     public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_PENDING_NETWORK_SETUP = 15;
 
     /**
+     * Purchase premium capability failed because the user disabled the feature.
+     * Subsequent attempts will be throttled for the amount of time specified by
+     * {@link CarrierConfigManager
+     * #KEY_PREMIUM_CAPABILITY_NOTIFICATION_BACKOFF_HYSTERESIS_TIME_MILLIS_LONG}
+     * and return {@link #PURCHASE_PREMIUM_CAPABILITY_RESULT_THROTTLED}.
+     */
+    public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED = 16;
+
+    /**
      * Results of the purchase premium capability request.
      * @hide
      */
@@ -17718,7 +17731,8 @@ public class TelephonyManager {
             PURCHASE_PREMIUM_CAPABILITY_RESULT_NETWORK_NOT_AVAILABLE,
             PURCHASE_PREMIUM_CAPABILITY_RESULT_ENTITLEMENT_CHECK_FAILED,
             PURCHASE_PREMIUM_CAPABILITY_RESULT_NOT_DEFAULT_DATA_SUBSCRIPTION,
-            PURCHASE_PREMIUM_CAPABILITY_RESULT_PENDING_NETWORK_SETUP})
+            PURCHASE_PREMIUM_CAPABILITY_RESULT_PENDING_NETWORK_SETUP,
+            PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED})
     public @interface PurchasePremiumCapabilityResult {}
 
     /**

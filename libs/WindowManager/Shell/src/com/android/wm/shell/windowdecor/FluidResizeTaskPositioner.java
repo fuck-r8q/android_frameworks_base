@@ -63,8 +63,6 @@ class FluidResizeTaskPositioner implements DragPositioningCallback {
         mDragStartListener = dragStartListener;
         mTransactionSupplier = supplier;
         mDisallowedAreaForEndBoundsHeight = disallowedAreaForEndBoundsHeight;
-        mDisplayController.getDisplayLayout(windowDecoration.mDisplay.getDisplayId())
-                .getStableBounds(mStableBounds);
     }
 
     @Override
@@ -80,10 +78,14 @@ class FluidResizeTaskPositioner implements DragPositioningCallback {
             mTaskOrganizer.applyTransaction(wct);
         }
         mRepositionTaskBounds.set(mTaskBoundsAtDragStart);
+        if (mStableBounds.isEmpty()) {
+            mDisplayController.getDisplayLayout(mWindowDecoration.mDisplay.getDisplayId())
+                    .getStableBounds(mStableBounds);
+        }
     }
 
     @Override
-    public void onDragPositioningMove(float x, float y) {
+    public Rect onDragPositioningMove(float x, float y) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         PointF delta = DragPositioningCallbackUtility.calculateDelta(x, y, mRepositionStartPoint);
         if (isResizing() && DragPositioningCallbackUtility.changeBounds(mCtrlType,
@@ -104,10 +106,11 @@ class FluidResizeTaskPositioner implements DragPositioningCallback {
                     mRepositionTaskBounds, mTaskBoundsAtDragStart, mRepositionStartPoint, t, x, y);
             t.apply();
         }
+        return new Rect(mRepositionTaskBounds);
     }
 
     @Override
-    public void onDragPositioningEnd(float x, float y) {
+    public Rect onDragPositioningEnd(float x, float y) {
         // If task has been resized or task was dragged into area outside of
         // mDisallowedAreaForEndBounds, apply WCT to finish it.
         if (isResizing() && mHasDragResized) {
@@ -134,6 +137,7 @@ class FluidResizeTaskPositioner implements DragPositioningCallback {
         mRepositionStartPoint.set(0, 0);
         mCtrlType = CTRL_TYPE_UNDEFINED;
         mHasDragResized = false;
+        return new Rect(mRepositionTaskBounds);
     }
 
     private boolean isResizing() {

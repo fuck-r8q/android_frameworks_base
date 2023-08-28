@@ -159,6 +159,7 @@ import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
 import com.android.server.display.utils.SensorUtils;
 import com.android.server.input.InputManagerInternal;
+import com.android.server.utils.FoldSettingWrapper;
 import com.android.server.wm.SurfaceAnimationThread;
 import com.android.server.wm.WindowManagerInternal;
 
@@ -551,7 +552,8 @@ public final class DisplayManagerService extends SystemService {
         mUiHandler = UiThread.getHandler();
         mDisplayDeviceRepo = new DisplayDeviceRepository(mSyncRoot, mPersistentDataStore);
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, mDisplayDeviceRepo,
-                new LogicalDisplayListener(), mSyncRoot, mHandler);
+                new LogicalDisplayListener(), mSyncRoot, mHandler,
+                new FoldSettingWrapper(mContext.getContentResolver()));
         mDisplayModeDirector = new DisplayModeDirector(context, mHandler);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext);
         Resources resources = mContext.getResources();
@@ -3164,11 +3166,6 @@ public final class DisplayManagerService extends SystemService {
         // with the corresponding displaydevice.
         HighBrightnessModeMetadata hbmMetadata =
                 mHighBrightnessModeMetadataMapper.getHighBrightnessModeMetadataLocked(display);
-        if (hbmMetadata == null) {
-            Slog.wtf(TAG, "High Brightness Mode Metadata is null in DisplayManagerService for "
-                    + "display: " + display.getDisplayIdLocked());
-            return null;
-        }
         if (mConfigParameterProvider.isNewPowerControllerFeatureEnabled()) {
             displayPowerController = new DisplayPowerController2(
                     mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,

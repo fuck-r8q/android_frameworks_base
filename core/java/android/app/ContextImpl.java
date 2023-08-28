@@ -96,6 +96,7 @@ import android.view.DisplayAdjustments;
 import android.view.autofill.AutofillManager.AutofillClient;
 import android.window.WindowContext;
 import android.window.WindowTokenClient;
+import android.window.WindowTokenClientController;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.Preconditions;
@@ -2262,7 +2263,7 @@ class ContextImpl extends Context {
             Log.v(TAG, "Treating renounced permission " + permission + " as denied");
             return PERMISSION_DENIED;
         }
-        return PermissionManager.checkPermission(permission, pid, uid);
+        return PermissionManager.checkPermission(permission, pid, uid, getDeviceId());
     }
 
     /** @hide */
@@ -3276,7 +3277,8 @@ class ContextImpl extends Context {
         // if this Context is not a WindowContext. WindowContext finalization is handled in
         // WindowContext class.
         if (mToken instanceof WindowTokenClient && mOwnsToken) {
-            ((WindowTokenClient) mToken).detachFromWindowContainerIfNeeded();
+            WindowTokenClientController.getInstance().detachIfNeeded(
+                    (WindowTokenClient) mToken);
         }
         super.finalize();
     }
@@ -3304,7 +3306,7 @@ class ContextImpl extends Context {
         final WindowTokenClient token = new WindowTokenClient();
         final ContextImpl context = systemContext.createWindowContextBase(token, displayId);
         token.attachContext(context);
-        token.attachToDisplayContent(displayId);
+        WindowTokenClientController.getInstance().attachToDisplayContent(token, displayId);
         context.mContextType = CONTEXT_TYPE_SYSTEM_OR_SYSTEM_UI;
         context.mOwnsToken = true;
 
@@ -3463,7 +3465,7 @@ class ContextImpl extends Context {
         AttributionSource attributionSource = new AttributionSource(Process.myUid(),
                 Process.myPid(), mOpPackageName, attributionTag,
                 (renouncedPermissions != null) ? renouncedPermissions.toArray(new String[0]) : null,
-                nextAttributionSource);
+                getDeviceId(), nextAttributionSource);
         // If we want to access protected data on behalf of another app we need to
         // tell the OS that we opt in to participate in the attribution chain.
         if (nextAttributionSource != null) {

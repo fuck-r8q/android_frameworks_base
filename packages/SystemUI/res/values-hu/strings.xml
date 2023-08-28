@@ -69,7 +69,7 @@
     <string name="usb_disable_contaminant_detection" msgid="3827082183595978641">"USB engedélyezése"</string>
     <string name="learn_more" msgid="4690632085667273811">"Részletek"</string>
     <string name="global_action_screenshot" msgid="2760267567509131654">"Képernyőkép"</string>
-    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"Extend Unlock letiltva"</string>
+    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"Tartós feloldás letiltva"</string>
     <string name="remote_input_image_insertion_text" msgid="4850791636452521123">"képet küldött"</string>
     <string name="screenshot_saving_title" msgid="2298349784913287333">"Képernyőkép mentése..."</string>
     <string name="screenshot_saving_work_profile_title" msgid="5332829607308450880">"Képernyőkép mentése a munkaprofilba…"</string>
@@ -118,6 +118,9 @@
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Koppintson a megtekintéshez"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"Hiba történt a képernyőrögzítés mentése során"</string>
     <string name="screenrecord_start_error" msgid="2200660692479682368">"Hiba a képernyőrögzítés indításakor"</string>
+    <string name="immersive_cling_title" msgid="8372056499315585941">"Megtekintése teljes képernyőn"</string>
+    <string name="immersive_cling_description" msgid="6913958856085185775">"Kilépéshez csúsztassa ujját fentről lefelé."</string>
+    <string name="immersive_cling_positive" msgid="3076681691468978568">"Értem"</string>
     <string name="accessibility_back" msgid="6530104400086152611">"Vissza"</string>
     <string name="accessibility_home" msgid="5430449841237966217">"Főoldal"</string>
     <string name="accessibility_menu" msgid="2701163794470513040">"Menü"</string>
@@ -147,6 +150,8 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_2" msgid="8586608186457385108">"Arc felismerve. Koppintson a folytatáshoz."</string>
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"Arc felismerve. A folytatáshoz koppintson a Feloldásra."</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"Hitelesítve"</string>
+    <!-- no translation found for biometric_dialog_cancel_authentication (981316588773442637) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"PIN-kód használata"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"Minta használata"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"Jelszó használata"</string>
@@ -359,6 +364,8 @@
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"Zárolás arccal feloldva"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"Arc felismerve"</string>
     <string name="keyguard_retry" msgid="886802522584053523">"Az újrapróbálkozáshoz csúsztassa felfelé az ujját"</string>
+    <!-- no translation found for accesssibility_keyguard_retry (8880238862712870676) -->
+    <skip />
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"Az NFC használatához oldja fel a képernyőzárat"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"Ez az eszköz az Ön szervezetének tulajdonában van"</string>
     <string name="do_disclosure_with_name" msgid="2091641464065004091">"Ez az eszköz a(z) <xliff:g id="ORGANIZATION_NAME">%s</xliff:g> tulajdonában van"</string>
@@ -412,6 +419,10 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_entire_screen" msgid="5407906851409410209">"Amikor Ön megosztást, rögzítést vagy átküldést végez, az Android a képernyőn látható vagy az eszközön lejátszott minden tartalomhoz hozzáfér. Ezért legyen elővigyázatos a jelszavakkal, a fizetési adatokkal, az üzenetekkel, a fotókkal, valamint a hang- és videófelvételekkel."</string>
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app" msgid="3454859977888159495">"Amikor Ön megoszt, rögzít vagy átküld egy alkalmazást, az Android az adott alkalmazásban látható vagy lejátszott minden tartalomhoz hozzáfér. Ezért legyen elővigyázatos a jelszavakkal, a fizetési adatokkal, az üzenetekkel, a fotókkal, valamint a hang- és videófelvételekkel."</string>
     <string name="media_projection_entry_generic_permission_dialog_continue" msgid="8640381403048097116">"Indítás"</string>
+    <string name="media_projection_task_switcher_text" msgid="590885489897412359">"A megosztás szünetel alkalmazásváltáskor"</string>
+    <string name="media_projection_task_switcher_action_switch" msgid="8682258717291921123">"Inkább ennek az appnak a megosztása"</string>
+    <string name="media_projection_task_switcher_action_back" msgid="5324164224147845282">"Visszaváltás"</string>
+    <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"Alkalmazásváltás"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"Rendszergazda által letiltva"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"A képernyőfelvételt eszközszabályzat tiltja"</string>
     <string name="clear_all_notifications_text" msgid="348312370303046130">"Az összes törlése"</string>
@@ -759,13 +770,7 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Bekapcsológombhoz tartozó menü"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"<xliff:g id="ID_1">%1$d</xliff:g>. oldal, összesen: <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Lezárási képernyő"</string>
-    <string name="thermal_shutdown_title" msgid="2702966892682930264">"A meleg miatt kikapcsolt"</string>
-    <string name="thermal_shutdown_message" msgid="6142269839066172984">"Telefonja most már megfelelően működik.\nKoppintson, ha további információra van szüksége."</string>
-    <string name="thermal_shutdown_dialog_message" msgid="6745684238183492031">"Telefonja túlmelegedett, így kikapcsolt, hogy lehűlhessen. Most már megfelelően működik.\n\nA telefon akkor melegedhet túl, ha Ön:\n	• Energiaigényes alkalmazásokat használ (például játékokat, videókat vagy navigációs alkalmazásokat)\n	• Nagy fájlokat tölt le vagy fel\n	• Melegben használja a telefonját"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Olvassa el a kímélő használat lépéseit"</string>
-    <string name="high_temp_title" msgid="2218333576838496100">"A telefon melegszik"</string>
-    <string name="high_temp_notif_message" msgid="1277346543068257549">"Bizonyos funkciók korlátozottan működnek a telefon lehűlése közben.\nKoppintson, ha további információra van szüksége."</string>
-    <string name="high_temp_dialog_message" msgid="3793606072661253968">"A telefon automatikusan megpróbál lehűlni. Továbbra is tudja használni a telefont, de elképzelhető, hogy működése lelassul.\n\nAmint a telefon lehűl, újra a szokásos módon működik majd."</string>
     <string name="high_temp_dialog_help_text" msgid="7380171287943345858">"Olvassa el a kímélő használat lépéseit"</string>
     <string name="high_temp_alarm_title" msgid="8654754369605452169">"Húzza ki az eszközt"</string>
     <string name="high_temp_alarm_notify_message" msgid="3917622943609118956">"Eszköze kezd melegedni a töltőport közelében. Ha töltő vagy USB-s kiegészítő van csatlakoztatva hozzá, húzza ki, és legyen óvatos, mert a kábel is meleg lehet."</string>
@@ -935,6 +940,8 @@
     <string name="controls_pin_instructions_retry" msgid="1566667581012131046">"Próbálkozzon másik kóddal"</string>
     <string name="controls_confirmation_message" msgid="7744104992609594859">"A(z) <xliff:g id="DEVICE">%s</xliff:g> módosításának megerősítése"</string>
     <string name="controls_structure_tooltip" msgid="4355922222944447867">"Továbbiak megtekintéséhez csúsztasson"</string>
+    <!-- no translation found for retry_face (416380073082560186) -->
+    <skip />
     <string name="controls_seeding_in_progress" msgid="3033855341410264148">"Javaslatok betöltése…"</string>
     <string name="controls_media_title" msgid="1746947284862928133">"Média"</string>
     <string name="controls_media_close_session" msgid="4780485355795635052">"Elrejti ezt a(z) <xliff:g id="APP_NAME">%1$s</xliff:g>-médiavezérlőt?"</string>
@@ -1161,4 +1168,40 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"A Segéd figyel"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Állítson be alapértelmezett jegyzetkészítő alkalmazást a Beállításokban"</string>
     <string name="install_app" msgid="5066668100199613936">"Alkalmazás telepítése"</string>
+    <!-- no translation found for privacy_dialog_title (7839968133469098311) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_summary (2458769652125995409) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_more_button (7610604080293562345) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_done_button (4504330708531434263) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_expand_action (9129262348628331377) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_collapse_action (277419962019466347) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_button (8006250171305878606) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_message (1316408652526310985) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_service (8320590856621823604) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_permissions (2543451567190470413) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_call_usage (7858746847946397562) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_call_usage (1214810644978167344) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage (631997836335929880) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage (4883417856848222450) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_1 (9047570143069220911) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_1 (2551340497722370109) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_2 (2770926061339921767) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_2 (2874689735085367167) -->
+    <skip />
 </resources>

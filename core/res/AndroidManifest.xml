@@ -5687,6 +5687,12 @@
                 android:description="@string/permdesc_deliverCompanionMessages"
                 android:protectionLevel="normal" />
 
+    <!-- @hide @SystemApi(client=android.annotation.SystemApi.Client.MODULE_LIBRARIES)
+         Allows an application to send and receive messages via CDM transports.
+    -->
+    <permission android:name="android.permission.USE_COMPANION_TRANSPORTS"
+        android:protectionLevel="signature|module" />
+
     <!-- Allows an application to create new companion device associations.
          @SystemApi
          @hide -->
@@ -7718,6 +7724,24 @@
     -->
     <permission android:name="android.permission.GET_ANY_PROVIDER_TYPE"
                 android:protectionLevel="signature" />
+
+
+    <!-- @hide Allows internal applications to read and synchronize non-core flags.
+         Apps without this permission can only read a subset of flags specifically intended
+         for use in "core", (i.e. third party apps). Apps with this permission can define their
+         own flags, and federate those values with other system-level apps.
+         <p>Not for use by third-party applications.
+         <p>Protection level: signature
+    -->
+    <permission android:name="android.permission.SYNC_FLAGS"
+        android:protectionLevel="signature" />
+
+    <!-- @hide Allows internal applications to override flags in the FeatureFlags service.
+         <p>Not for use by third-party applications.
+         <p>Protection level: signature
+    -->
+    <permission android:name="android.permission.WRITE_FLAGS"
+        android:protectionLevel="signature" />
 
     <!-- Attribution for Geofencing service. -->
     <attribution android:tag="GeofencingService" android:label="@string/geofencing_service"/>

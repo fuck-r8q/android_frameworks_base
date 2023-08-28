@@ -16,24 +16,28 @@
 
 package com.android.systemui.shade.ui.composable
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.android.compose.animation.scene.SceneScope
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.notifications.ui.composable.Notifications
+import com.android.systemui.qs.footer.ui.compose.QuickSettings
 import com.android.systemui.scene.shared.model.Direction
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.scene.shared.model.UserAction
 import com.android.systemui.scene.ui.composable.ComposableScene
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,15 +45,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /** The shade scene shows scrolling list of notifications and some of the quick setting tiles. */
-class ShadeScene(
+@SysUISingleton
+class ShadeScene
+@Inject
+constructor(
     @Application private val applicationScope: CoroutineScope,
     private val viewModel: ShadeSceneViewModel,
 ) : ComposableScene {
     override val key = SceneKey.Shade
 
-    override fun destinationScenes(
-        containerName: String,
-    ): StateFlow<Map<UserAction, SceneModel>> =
+    override fun destinationScenes(): StateFlow<Map<UserAction, SceneModel>> =
         viewModel.upDestinationSceneKey
             .map { sceneKey -> destinationScenes(up = sceneKey) }
             .stateIn(
@@ -59,15 +64,9 @@ class ShadeScene(
             )
 
     @Composable
-    override fun Content(
-        containerName: String,
+    override fun SceneScope.Content(
         modifier: Modifier,
-    ) {
-        ShadeScene(
-            viewModel = viewModel,
-            modifier = modifier,
-        )
-    }
+    ) = ShadeScene(viewModel, modifier)
 
     private fun destinationScenes(
         up: SceneKey,
@@ -84,23 +83,16 @@ private fun ShadeScene(
     viewModel: ShadeSceneViewModel,
     modifier: Modifier = Modifier,
 ) {
-    // TODO(b/280887022): implement the real UI.
-
-    Box(modifier = modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.align(Alignment.Center)
-        ) {
-            Text("Shade", style = MaterialTheme.typography.headlineMedium)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = { viewModel.onContentClicked() },
-                ) {
-                    Text("Open some content")
-                }
-            }
-        }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .clickable(onClick = { viewModel.onContentClicked() })
+                .padding(horizontal = 16.dp, vertical = 48.dp)
+    ) {
+        QuickSettings(modifier = Modifier.height(160.dp))
+        Notifications(modifier = Modifier.weight(1f))
     }
 }

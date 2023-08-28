@@ -439,14 +439,7 @@ public final class MediaRouter2 {
      * call is ignored because the app is in the background.
      */
     public boolean showSystemOutputSwitcher() {
-        synchronized (mLock) {
-            try {
-                return mMediaRouterService.showMediaOutputSwitcher(mImpl.getPackageName());
-            } catch (RemoteException ex) {
-                ex.rethrowFromSystemServer();
-            }
-        }
-        return false;
+        return mImpl.showSystemOutputSwitcher();
     }
 
     /**
@@ -459,6 +452,9 @@ public final class MediaRouter2 {
      * callbacks} and immediately after receiving any {@link RouteCallback#onRoutesUpdated route
      * updates} in order to keep the system UI in a consistent state. You can also call this method
      * at any other point to update the listing preference dynamically.
+     *
+     * <p>Any calls to this method from a privileged router will throw an {@link
+     * UnsupportedOperationException}.
      *
      * <p>Notes:
      *
@@ -476,24 +472,7 @@ public final class MediaRouter2 {
      *     route listing. When null, the system uses its default listing criteria.
      */
     public void setRouteListingPreference(@Nullable RouteListingPreference routeListingPreference) {
-        synchronized (mLock) {
-            if (Objects.equals(mRouteListingPreference, routeListingPreference)) {
-                // Nothing changed. We return early to save a call to the system server.
-                return;
-            }
-            mRouteListingPreference = routeListingPreference;
-            try {
-                if (mStub == null) {
-                    MediaRouter2Stub stub = new MediaRouter2Stub();
-                    mMediaRouterService.registerRouter2(stub, mImpl.getPackageName());
-                    mStub = stub;
-                }
-                mMediaRouterService.setRouteListingPreference(mStub, mRouteListingPreference);
-            } catch (RemoteException ex) {
-                ex.rethrowFromSystemServer();
-            }
-            notifyRouteListingPreferenceUpdated(routeListingPreference);
-        }
+        mImpl.setRouteListingPreference(routeListingPreference);
     }
 
     /**
@@ -1084,6 +1063,16 @@ public final class MediaRouter2 {
         return filteredRoutes;
     }
 
+    @NonNull
+    private List<MediaRoute2Info> getRoutesWithIds(@NonNull List<String> routeIds) {
+        synchronized (mLock) {
+            return routeIds.stream()
+                    .map(mRoutes::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+    }
+
     private void notifyRoutesAdded(List<MediaRoute2Info> routes) {
         for (RouteCallbackRecord record : mRouteCallbackRecords) {
             List<MediaRoute2Info> filteredRoutes =
@@ -1388,7 +1377,7 @@ public final class MediaRouter2 {
             synchronized (mControllerLock) {
                 selectedRouteIds = mSessionInfo.getSelectedRoutes();
             }
-            return mImpl.getRoutesWithIds(selectedRouteIds);
+            return getRoutesWithIds(selectedRouteIds);
         }
 
         /**
@@ -1400,7 +1389,7 @@ public final class MediaRouter2 {
             synchronized (mControllerLock) {
                 selectableRouteIds = mSessionInfo.getSelectableRoutes();
             }
-            return mImpl.getRoutesWithIds(selectableRouteIds);
+            return getRoutesWithIds(selectableRouteIds);
         }
 
         /**
@@ -1412,7 +1401,7 @@ public final class MediaRouter2 {
             synchronized (mControllerLock) {
                 deselectableRouteIds = mSessionInfo.getDeselectableRoutes();
             }
-            return mImpl.getRoutesWithIds(deselectableRouteIds);
+            return getRoutesWithIds(deselectableRouteIds);
         }
 
         /**
@@ -1952,6 +1941,10 @@ public final class MediaRouter2 {
 
         void unregisterRouteCallback();
 
+        void setRouteListingPreference(@Nullable RouteListingPreference preference);
+
+        boolean showSystemOutputSwitcher();
+
         List<MediaRoute2Info> getAllRoutes();
 
         void setOnGetControllerHintsListener(OnGetControllerHintsListener listener);
@@ -1981,7 +1974,6 @@ public final class MediaRouter2 {
                 boolean shouldNotifyStop,
                 RoutingController controller);
 
-        List<MediaRoute2Info> getRoutesWithIds(List<String> routeIds);
     }
 
     /**
@@ -2091,6 +2083,18 @@ public final class MediaRouter2 {
         @Override
         public void unregisterRouteCallback() {
             // Do nothing.
+        }
+
+        @Override
+        public void setRouteListingPreference(@Nullable RouteListingPreference preference) {
+            throw new UnsupportedOperationException(
+                    "RouteListingPreference cannot be set by a privileged MediaRouter2 instance.");
+        }
+
+        @Override
+        public boolean showSystemOutputSwitcher() {
+            throw new UnsupportedOperationException(
+                    "Cannot show system output switcher from a privileged router.");
         }
 
         /** Gets the list of all discovered routes. */
@@ -2410,13 +2414,6 @@ public final class MediaRouter2 {
                 boolean shouldNotifyStop,
                 RoutingController controller) {
             releaseSession(controller.getRoutingSessionInfo());
-        }
-
-        @Override
-        public List<MediaRoute2Info> getRoutesWithIds(List<String> routeIds) {
-            return getRoutes().stream()
-                    .filter(r -> routeIds.contains(r.getId()))
-                    .collect(Collectors.toList());
         }
 
         /**
@@ -2890,6 +2887,40 @@ public final class MediaRouter2 {
             }
         }
 
+        @Override
+        public void setRouteListingPreference(@Nullable RouteListingPreference preference) {
+            synchronized (mLock) {
+                if (Objects.equals(mRouteListingPreference, preference)) {
+                    // Nothing changed. We return early to save a call to the system server.
+                    return;
+                }
+                mRouteListingPreference = preference;
+                try {
+                    if (mStub == null) {
+                        MediaRouter2Stub stub = new MediaRouter2Stub();
+                        mMediaRouterService.registerRouter2(stub, mImpl.getPackageName());
+                        mStub = stub;
+                    }
+                    mMediaRouterService.setRouteListingPreference(mStub, mRouteListingPreference);
+                } catch (RemoteException ex) {
+                    ex.rethrowFromSystemServer();
+                }
+                notifyRouteListingPreferenceUpdated(preference);
+            }
+        }
+
+        @Override
+        public boolean showSystemOutputSwitcher() {
+            synchronized (mLock) {
+                try {
+                    return mMediaRouterService.showMediaOutputSwitcher(mImpl.getPackageName());
+                } catch (RemoteException ex) {
+                    ex.rethrowFromSystemServer();
+                }
+            }
+            return false;
+        }
+
         /**
          * Returns {@link Collections#emptyList()}. Local routes can only access routes related to
          * their {@link RouteDiscoveryPreference} through {@link #getRoutes()}.
@@ -3065,14 +3096,5 @@ public final class MediaRouter2 {
             }
         }
 
-        @Override
-        public List<MediaRoute2Info> getRoutesWithIds(List<String> routeIds) {
-            synchronized (mLock) {
-                return routeIds.stream()
-                        .map(mRoutes::get)
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-            }
-        }
     }
 }

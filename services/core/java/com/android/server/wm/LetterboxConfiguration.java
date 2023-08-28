@@ -85,6 +85,18 @@ final class LetterboxConfiguration {
     // TODO(b/288142656): Enable user aspect ratio settings by default.
     private static final boolean DEFAULT_VALUE_ENABLE_USER_ASPECT_RATIO_SETTINGS = false;
 
+    // Whether per-app fullscreen user aspect ratio override option is enabled
+    private static final String KEY_ENABLE_USER_ASPECT_RATIO_FULLSCREEN =
+            "enable_app_compat_user_aspect_ratio_fullscreen";
+    private static final boolean DEFAULT_VALUE_ENABLE_USER_ASPECT_RATIO_FULLSCREEN = true;
+
+    // Whether the letterbox wallpaper style is enabled by default
+    private static final String KEY_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER =
+            "enable_letterbox_background_wallpaper";
+
+    // TODO(b/290048978): Enable wallpaper as default letterbox background.
+    private static final boolean DEFAULT_VALUE_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER = false;
+
     /**
      * Override of aspect ratio for fixed orientation letterboxing that is set via ADB with
      * set-fixed-orientation-letterbox-aspect-ratio or via {@link
@@ -101,9 +113,16 @@ final class LetterboxConfiguration {
 
     /** Enum for Letterbox background type. */
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef({LETTERBOX_BACKGROUND_SOLID_COLOR, LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND,
-            LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING, LETTERBOX_BACKGROUND_WALLPAPER})
+    @IntDef({LETTERBOX_BACKGROUND_OVERRIDE_UNSET,
+            LETTERBOX_BACKGROUND_SOLID_COLOR,
+            LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND,
+            LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING,
+            LETTERBOX_BACKGROUND_WALLPAPER})
     @interface LetterboxBackgroundType {};
+
+    /** No letterbox background style set. Using the one defined by DeviceConfig. */
+    static final int LETTERBOX_BACKGROUND_OVERRIDE_UNSET = -1;
+
     /** Solid background using color specified in R.color.config_letterboxBackgroundColor. */
     static final int LETTERBOX_BACKGROUND_SOLID_COLOR = 0;
 
@@ -183,14 +202,14 @@ final class LetterboxConfiguration {
     @Nullable private Integer mLetterboxBackgroundColorResourceIdOverride;
 
     @LetterboxBackgroundType
-    private int mLetterboxBackgroundType;
+    private final int mLetterboxBackgroundType;
 
-    // Blur radius for LETTERBOX_BACKGROUND_WALLPAPER option in mLetterboxBackgroundType.
+    // Blur radius for LETTERBOX_BACKGROUND_WALLPAPER option from getLetterboxBackgroundType().
     // Values <= 0 are ignored and 0 is used instead.
-    private int mLetterboxBackgroundWallpaperBlurRadius;
+    private int mLetterboxBackgroundWallpaperBlurRadiusPx;
 
     // Alpha of a black scrim shown over wallpaper letterbox background when
-    // LETTERBOX_BACKGROUND_WALLPAPER option is selected for mLetterboxBackgroundType.
+    // LETTERBOX_BACKGROUND_WALLPAPER option is returned from getLetterboxBackgroundType().
     // Values < 0 or >= 1 are ignored and 0.0 (transparent) is used instead.
     private float mLetterboxBackgroundWallpaperDarkScrimAlpha;
 
@@ -252,6 +271,14 @@ final class LetterboxConfiguration {
     // Allows to enable user aspect ratio settings ignoring flags.
     private boolean mUserAppAspectRatioSettingsOverrideEnabled;
 
+    // Allows to enable fullscreen option in user aspect ratio settings ignoring flags.
+    private boolean mUserAppAspectRatioFullscreenOverrideEnabled;
+
+    // The override for letterbox background type in case it's different from
+    // LETTERBOX_BACKGROUND_OVERRIDE_UNSET
+    @LetterboxBackgroundType
+    private int mLetterboxBackgroundTypeOverride = LETTERBOX_BACKGROUND_OVERRIDE_UNSET;
+
     // Whether we should use split screen aspect ratio for the activity when camera compat treatment
     // is enabled and activity is connected to the camera in fullscreen.
     private final boolean mIsCameraCompatSplitScreenAspectRatioEnabled;
@@ -275,16 +302,15 @@ final class LetterboxConfiguration {
     @NonNull private final SynchedDeviceConfig mDeviceConfig;
 
     LetterboxConfiguration(@NonNull final Context systemUiContext) {
-        this(systemUiContext,
-                new LetterboxConfigurationPersister(systemUiContext,
-                        () -> readLetterboxHorizontalReachabilityPositionFromConfig(
-                                systemUiContext, /* forBookMode */ false),
-                        () -> readLetterboxVerticalReachabilityPositionFromConfig(
-                                systemUiContext, /* forTabletopMode */ false),
-                        () -> readLetterboxHorizontalReachabilityPositionFromConfig(
-                                systemUiContext, /* forBookMode */ true),
-                        () -> readLetterboxVerticalReachabilityPositionFromConfig(
-                                systemUiContext, /* forTabletopMode */ true)));
+        this(systemUiContext, new LetterboxConfigurationPersister(
+                () -> readLetterboxHorizontalReachabilityPositionFromConfig(
+                        systemUiContext, /* forBookMode */ false),
+                () -> readLetterboxVerticalReachabilityPositionFromConfig(
+                        systemUiContext, /* forTabletopMode */ false),
+                () -> readLetterboxHorizontalReachabilityPositionFromConfig(
+                        systemUiContext, /* forBookMode */ true),
+                () -> readLetterboxVerticalReachabilityPositionFromConfig(
+                        systemUiContext, /* forTabletopMode */ true)));
     }
 
     @VisibleForTesting
@@ -294,10 +320,10 @@ final class LetterboxConfiguration {
 
         mFixedOrientationLetterboxAspectRatio = mContext.getResources().getFloat(
                 R.dimen.config_fixedOrientationLetterboxAspectRatio);
+        mLetterboxBackgroundType = readLetterboxBackgroundTypeFromConfig(mContext);
         mLetterboxActivityCornersRadius = mContext.getResources().getInteger(
                 R.integer.config_letterboxActivityCornersRadius);
-        mLetterboxBackgroundType = readLetterboxBackgroundTypeFromConfig(mContext);
-        mLetterboxBackgroundWallpaperBlurRadius = mContext.getResources().getDimensionPixelSize(
+        mLetterboxBackgroundWallpaperBlurRadiusPx = mContext.getResources().getDimensionPixelSize(
                 R.dimen.config_letterboxBackgroundWallpaperBlurRadius);
         mLetterboxBackgroundWallpaperDarkScrimAlpha = mContext.getResources().getFloat(
                 R.dimen.config_letterboxBackgroundWallaperDarkScrimAlpha);
@@ -359,6 +385,12 @@ final class LetterboxConfiguration {
                         DEFAULT_VALUE_ENABLE_USER_ASPECT_RATIO_SETTINGS,
                         mContext.getResources().getBoolean(
                                 R.bool.config_appCompatUserAppAspectRatioSettingsIsEnabled))
+                .addDeviceConfigEntry(KEY_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER,
+                        DEFAULT_VALUE_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER, /* enabled */ true)
+                .addDeviceConfigEntry(KEY_ENABLE_USER_ASPECT_RATIO_FULLSCREEN,
+                        DEFAULT_VALUE_ENABLE_USER_ASPECT_RATIO_FULLSCREEN,
+                        mContext.getResources().getBoolean(
+                                R.bool.config_appCompatUserAppAspectRatioFullscreenIsEnabled))
                 .build();
     }
 
@@ -497,25 +529,39 @@ final class LetterboxConfiguration {
     }
 
     /**
-     * Gets {@link LetterboxBackgroundType} specified in {@link
-     * com.android.internal.R.integer.config_letterboxBackgroundType} or over via ADB command.
+     * Gets {@link LetterboxBackgroundType} specified via ADB command or the default one.
      */
     @LetterboxBackgroundType
     int getLetterboxBackgroundType() {
-        return mLetterboxBackgroundType;
+        return mLetterboxBackgroundTypeOverride != LETTERBOX_BACKGROUND_OVERRIDE_UNSET
+                ? mLetterboxBackgroundTypeOverride
+                : getDefaultLetterboxBackgroundType();
     }
 
-    /** Sets letterbox background type. */
-    void setLetterboxBackgroundType(@LetterboxBackgroundType int backgroundType) {
-        mLetterboxBackgroundType = backgroundType;
+    /** Overrides the letterbox background type. */
+    void setLetterboxBackgroundTypeOverride(@LetterboxBackgroundType int backgroundType) {
+        mLetterboxBackgroundTypeOverride = backgroundType;
     }
 
     /**
-     * Resets cletterbox background type to {@link
-     * com.android.internal.R.integer.config_letterboxBackgroundType}.
+     * Resets letterbox background type value depending on the
+     * {@link #KEY_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER} built time and runtime flags.
+     *
+     * <p>If enabled, the letterbox background type value is set toZ
+     * {@link #LETTERBOX_BACKGROUND_WALLPAPER}. When disabled the letterbox background type value
+     * comes from {@link R.integer.config_letterboxBackgroundType}.
      */
     void resetLetterboxBackgroundType() {
-        mLetterboxBackgroundType = readLetterboxBackgroundTypeFromConfig(mContext);
+        mLetterboxBackgroundTypeOverride = LETTERBOX_BACKGROUND_OVERRIDE_UNSET;
+    }
+
+    // Returns KEY_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER if the DeviceConfig flag is enabled
+    // or the value in com.android.internal.R.integer.config_letterboxBackgroundType if the flag
+    // is disabled.
+    @LetterboxBackgroundType
+    private int getDefaultLetterboxBackgroundType() {
+        return mDeviceConfig.getFlagValue(KEY_ENABLE_LETTERBOX_BACKGROUND_WALLPAPER)
+                ? LETTERBOX_BACKGROUND_WALLPAPER : mLetterboxBackgroundType;
     }
 
     /** Returns a string representing the given {@link LetterboxBackgroundType}. */
@@ -548,7 +594,7 @@ final class LetterboxConfiguration {
 
     /**
      * Overrides alpha of a black scrim shown over wallpaper for {@link
-     * #LETTERBOX_BACKGROUND_WALLPAPER} option in {@link mLetterboxBackgroundType}.
+     * #LETTERBOX_BACKGROUND_WALLPAPER} option returned from {@link getLetterboxBackgroundType()}.
      *
      * <p>If given value is < 0 or >= 1, both it and a value of {@link
      * com.android.internal.R.dimen.config_letterboxBackgroundWallaperDarkScrimAlpha} are ignored
@@ -575,33 +621,33 @@ final class LetterboxConfiguration {
     }
 
     /**
-     * Overrides blur radius for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option in
-     * {@link mLetterboxBackgroundType}.
+     * Overrides blur radius for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option from
+     * {@link getLetterboxBackgroundType()}.
      *
      * <p> If given value <= 0, both it and a value of {@link
      * com.android.internal.R.dimen.config_letterboxBackgroundWallpaperBlurRadius} are ignored
      * and 0 is used instead.
      */
-    void setLetterboxBackgroundWallpaperBlurRadius(int radius) {
-        mLetterboxBackgroundWallpaperBlurRadius = radius;
+    void setLetterboxBackgroundWallpaperBlurRadiusPx(int radius) {
+        mLetterboxBackgroundWallpaperBlurRadiusPx = radius;
     }
 
     /**
-     * Resets blur raidus for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option in {@link
-     * mLetterboxBackgroundType} to {@link
+     * Resets blur raidus for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option returned by {@link
+     * getLetterboxBackgroundType()} to {@link
      * com.android.internal.R.dimen.config_letterboxBackgroundWallpaperBlurRadius}.
      */
-    void resetLetterboxBackgroundWallpaperBlurRadius() {
-        mLetterboxBackgroundWallpaperBlurRadius = mContext.getResources().getDimensionPixelSize(
+    void resetLetterboxBackgroundWallpaperBlurRadiusPx() {
+        mLetterboxBackgroundWallpaperBlurRadiusPx = mContext.getResources().getDimensionPixelSize(
                 com.android.internal.R.dimen.config_letterboxBackgroundWallpaperBlurRadius);
     }
 
     /**
-     * Gets blur raidus for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option in {@link
-     * mLetterboxBackgroundType}.
+     * Gets blur raidus for {@link #LETTERBOX_BACKGROUND_WALLPAPER} option returned by {@link
+     * getLetterboxBackgroundType()}.
      */
-    int getLetterboxBackgroundWallpaperBlurRadius() {
-        return mLetterboxBackgroundWallpaperBlurRadius;
+    int getLetterboxBackgroundWallpaperBlurRadiusPx() {
+        return mLetterboxBackgroundWallpaperBlurRadiusPx;
     }
 
     /*
@@ -1240,5 +1286,22 @@ final class LetterboxConfiguration {
      */
     void resetUserAppAspectRatioSettingsEnabled() {
         setUserAppAspectRatioSettingsOverrideEnabled(false);
+    }
+
+    /**
+     * Whether fullscreen option in per-app user aspect ratio settings is enabled
+     */
+    boolean isUserAppAspectRatioFullscreenEnabled() {
+        return isUserAppAspectRatioSettingsEnabled()
+                && (mUserAppAspectRatioFullscreenOverrideEnabled
+                    || mDeviceConfig.getFlagValue(KEY_ENABLE_USER_ASPECT_RATIO_FULLSCREEN));
+    }
+
+    void setUserAppAspectRatioFullscreenOverrideEnabled(boolean enabled) {
+        mUserAppAspectRatioFullscreenOverrideEnabled = enabled;
+    }
+
+    void resetUserAppAspectRatioFullscreenEnabled() {
+        setUserAppAspectRatioFullscreenOverrideEnabled(false);
     }
 }

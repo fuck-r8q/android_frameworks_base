@@ -1625,7 +1625,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 (i, pm) -> new SharedLibrariesImpl(pm, i),
                 (i, pm) -> new CrossProfileIntentFilterHelper(i.getSettings(),
                         i.getUserManagerService(), i.getLock(), i.getUserManagerInternal(),
-                        context));
+                        context),
+                (i, pm) -> new UpdateOwnershipHelper());
 
         if (Build.VERSION.SDK_INT <= 0) {
             Slog.w(TAG, "**** ro.build.version.sdk not set!");
@@ -2124,8 +2125,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 // Save the names of pre-existing packages prior to scanning, so we can determine
                 // which system packages are completely new due to an upgrade.
                 mExistingPackages = new ArraySet<>(packageSettings.size());
-                for (PackageSetting ps : packageSettings.values()) {
-                    mExistingPackages.add(ps.getPackageName());
+                for (int i = 0; i < packageSettings.size(); i++) {
+                    mExistingPackages.add(packageSettings.valueAt(i).getPackageName());
                 }
 
                 // Triggering {@link com.android.server.pm.crossprofile.
@@ -2252,8 +2253,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             // If this is the first boot or an update from pre-M, then we need to initialize the
             // default preferred apps across all defined users.
             if (mPromoteSystemApps || mFirstBoot) {
-                for (UserInfo user : mInjector.getUserManagerInternal().getUsers(true)) {
-                    mSettings.applyDefaultPreferredAppsLPw(user.id);
+                final List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(true);
+                for (int i = 0; i < users.size(); i++) {
+                    mSettings.applyDefaultPreferredAppsLPw(users.get(i).id);
+
                 }
             }
 
@@ -2849,7 +2852,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     // NOTE: Can't remove due to unsupported app usage
     public int checkPermission(String permName, String pkgName, int userId) {
-        return mPermissionManager.checkPermission(pkgName, permName, userId);
+        return mPermissionManager.checkPermission(pkgName, permName, Context.DEVICE_ID_DEFAULT,
+                userId);
     }
 
     public String getSdkSandboxPackageName() {
@@ -3022,12 +3026,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             // action. When the targetPkg is set, it sends the broadcast to specific app, e.g.
             // installer app or null for registered apps. The callback only need to send back to the
             // registered apps so we check the null condition here.
-            notifyPackageMonitor(action, pkg, extras, userIds);
+            notifyPackageMonitor(action, pkg, extras, userIds, instantUserIds, broadcastAllowList);
         }
     }
 
-    void notifyPackageMonitor(String action, String pkg, Bundle extras, int[] userIds) {
-        mPackageMonitorCallbackHelper.notifyPackageMonitor(action, pkg, extras, userIds);
+    void notifyPackageMonitor(String action, String pkg, Bundle extras, int[] userIds,
+            int[] instantUserIds, SparseArray<int[]> broadcastAllowList) {
+        mPackageMonitorCallbackHelper.notifyPackageMonitor(action, pkg, extras, userIds,
+                instantUserIds, broadcastAllowList);
     }
 
     void notifyResourcesChanged(boolean mediaStatus, boolean replacing,
@@ -3083,7 +3089,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mHandler.post(() -> mBroadcastHelper.sendPackageAddedForNewUsers(
                 packageName, appId, userIds, instantUserIds, dataLoaderType, broadcastAllowList));
         mPackageMonitorCallbackHelper.notifyPackageAddedForNewUsers(packageName, appId, userIds,
-                instantUserIds, dataLoaderType);
+                instantUserIds, dataLoaderType, broadcastAllowList);
         if (sendBootCompleted && !ArrayUtils.isEmpty(userIds)) {
             mHandler.post(() -> {
                         for (int userId : userIds) {
@@ -3446,6 +3452,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         // We may also need to apply pending (restored) runtime permission grants
         // within these users.
         mPermissionManager.restoreDelayedRuntimePermissions(packageName, userId);
+
+        // Restore default browser setting if it is now installed.
+        String defaultBrowser;
+        synchronized (mLock) {
+            defaultBrowser = mSettings.getPendingDefaultBrowserLPr(userId);
+        }
+        if (Objects.equals(packageName, defaultBrowser)) {
+            mDefaultAppProvider.setDefaultBrowser(packageName, userId);
+            synchronized (mLock) {
+                mSettings.removePendingDefaultBrowserLPw(userId);
+            }
+        }
 
         // Persistent preferred activity might have came into effect due to this
         // install.
@@ -4077,7 +4095,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 packageName, dontKillApp, componentNames, packageUid, reason, userIds,
                 instantUserIds, broadcastAllowList));
         mPackageMonitorCallbackHelper.notifyPackageChanged(packageName, dontKillApp, componentNames,
-                packageUid, reason, userIds);
+                packageUid, reason, userIds, instantUserIds, broadcastAllowList);
     }
 
     /**
@@ -4288,8 +4306,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         final Computer snapshot = snapshotComputer();
         for (String packageName : apkList) {
             setSystemAppHiddenUntilInstalled(snapshot, packageName, true);
-            for (UserInfo user : mInjector.getUserManagerInternal().getUsers(false)) {
-                setSystemAppInstallState(snapshot, packageName, false, user.id);
+            final List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(false);
+            for (int i = 0; i < users.size(); i++) {
+                setSystemAppInstallState(snapshot, packageName, false, users.get(i).id);
             }
         }
     }
@@ -4322,6 +4341,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mAppsFilter.onUserDeleted(snapshotComputer(), userId);
         }
         mInstantAppRegistry.onUserRemoved(userId);
+        mPackageMonitorCallbackHelper.onUserRemoved(userId);
     }
 
     /**
@@ -4733,7 +4753,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
                 ArraySet<CrossProfileIntentFilter> set =
                         new ArraySet<>(resolver.filterSet());
-                for (CrossProfileIntentFilter filter : set) {
+                for (int i = 0; i < set.size(); i++) {
+                    final CrossProfileIntentFilter filter = set.valueAt(i);
                     if (IntentFilter.filterEquals(filter.mFilter, intentFilter)
                             && filter.getOwnerPackage().equals(ownerPackage)
                             && filter.getTargetUserId() == targetUserId
@@ -6075,8 +6096,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final Computer snapshot = snapshotComputer();
             enforceOwnerRights(snapshot, packageName, Binder.getCallingUid());
             mimeTypes = CollectionUtils.emptyIfNull(mimeTypes);
-            for (String mimeType : mimeTypes) {
-                if (mimeType.length() > 255) {
+            for (int i = 0; i < mimeTypes.size(); i++) {
+                if (mimeTypes.get(i).length() > 255) {
                     throw new IllegalArgumentException("MIME type length exceeds 255 characters");
                 }
             }
@@ -6247,7 +6268,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         @Override
         public void registerPackageMonitorCallback(@NonNull IRemoteCallback callback, int userId) {
-            mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, userId);
+            int uid = Binder.getCallingUid();
+            mPackageMonitorCallbackHelper.registerPackageMonitorCallback(callback, userId, uid);
         }
 
         @Override
@@ -6669,7 +6691,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @Override
         public String removeLegacyDefaultBrowserPackageName(int userId) {
             synchronized (mLock) {
-                return mSettings.removeDefaultBrowserPackageNameLPw(userId);
+                return mSettings.removePendingDefaultBrowserLPw(userId);
             }
         }
 
@@ -6949,7 +6971,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
                 if (targetPkg.getLibraryNames() != null) {
                     // Set the overlay paths for dependencies of the shared library.
-                    for (final String libName : targetPkg.getLibraryNames()) {
+                    List<String> libraryNames = targetPkg.getLibraryNames();
+                    for (int j = 0; j < libraryNames.size(); j++) {
+                        final String libName = libraryNames.get(j);
                         ArraySet<String> modifiedDependents = null;
 
                         final SharedLibraryInfo info = computer.getSharedLibraryInfo(libName,
@@ -6963,7 +6987,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         if (dependents == null) {
                             continue;
                         }
-                        for (final VersionedPackage dependent : dependents) {
+                        for (int k = 0; k < dependents.size(); k++) {
+                            final VersionedPackage dependent = dependents.get(k);
                             final PackageStateInternal dependentState =
                                     computer.getPackageStateInternal(dependent.getPackageName());
                             if (dependentState == null) {
@@ -7545,8 +7570,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         return mDefaultAppProvider.getDefaultBrowser(userId);
     }
 
-    void setDefaultBrowser(@Nullable String packageName, boolean async, @UserIdInt int userId) {
-        mDefaultAppProvider.setDefaultBrowser(packageName, async, userId);
+    void setDefaultBrowser(@Nullable String packageName, @UserIdInt int userId) {
+        mDefaultAppProvider.setDefaultBrowser(packageName, userId);
     }
 
     PackageUsage getPackageUsage() {

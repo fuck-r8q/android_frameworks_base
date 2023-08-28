@@ -89,6 +89,7 @@ import com.android.systemui.ExpandHelper;
 import com.android.systemui.R;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
+import com.android.systemui.flags.ViewRefactorFlag;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
 import com.android.systemui.shade.ShadeController;
@@ -198,7 +199,8 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private Set<Integer> mDebugTextUsedYPositions;
     private final boolean mDebugRemoveAnimation;
     private final boolean mSensitiveRevealAnimEndabled;
-    private boolean mAnimatedInsets;
+    private final ViewRefactorFlag mAnimatedInsets;
+    private final ViewRefactorFlag mShelfRefactor;
 
     private int mContentHeight;
     private float mIntrinsicContentHeight;
@@ -621,7 +623,9 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mDebugLines = featureFlags.isEnabled(Flags.NSSL_DEBUG_LINES);
         mDebugRemoveAnimation = featureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
         mSensitiveRevealAnimEndabled = featureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
-        setAnimatedInsetsEnabled(featureFlags.isEnabled(Flags.ANIMATED_NOTIFICATION_SHADE_INSETS));
+        mAnimatedInsets =
+                new ViewRefactorFlag(featureFlags, Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
+        mShelfRefactor = new ViewRefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
         mSectionsManager = Dependency.get(NotificationSectionsManager.class);
         mScreenOffAnimationController =
                 Dependency.get(ScreenOffAnimationController.class);
@@ -660,7 +664,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mGroupMembershipManager = Dependency.get(GroupMembershipManager.class);
         mGroupExpansionManager = Dependency.get(GroupExpansionManager.class);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
-        if (mAnimatedInsets) {
+        if (mAnimatedInsets.isEnabled()) {
             setWindowInsetsAnimationCallback(mInsetsCallback);
         }
     }
@@ -727,11 +731,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     void setHasFilteredOutSeenNotifications(boolean hasFilteredOutSeenNotifications) {
         mHasFilteredOutSeenNotifications = hasFilteredOutSeenNotifications;
-    }
-
-    @VisibleForTesting
-    void setAnimatedInsetsEnabled(boolean enabled) {
-        mAnimatedInsets = enabled;
     }
 
     @VisibleForTesting
@@ -1773,7 +1772,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             return;
         }
         mForcedScroll = v;
-        if (mAnimatedInsets) {
+        if (mAnimatedInsets.isEnabled()) {
             updateForcedScroll();
         } else {
             scrollTo(v);
@@ -1822,7 +1821,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @Override
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
-        if (!mAnimatedInsets) {
+        if (!mAnimatedInsets.isEnabled()) {
             mBottomInset = insets.getInsets(WindowInsets.Type.ime()).bottom;
         }
         mWaterfallTopInset = 0;
@@ -1830,11 +1829,11 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         if (cutout != null) {
             mWaterfallTopInset = cutout.getWaterfallInsets().top;
         }
-        if (mAnimatedInsets && !mIsInsetAnimationRunning) {
+        if (mAnimatedInsets.isEnabled() && !mIsInsetAnimationRunning) {
             // update bottom inset e.g. after rotation
             updateBottomInset(insets);
         }
-        if (!mAnimatedInsets) {
+        if (!mAnimatedInsets.isEnabled()) {
             int range = getScrollRange();
             if (mOwnScrollY > range) {
                 // HACK: We're repeatedly getting staggered insets here while the IME is
@@ -2714,7 +2713,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
      * @param listener callback for notification removed
      */
     public void setOnNotificationRemovedListener(OnNotificationRemovedListener listener) {
-        NotificationShelfController.assertRefactorFlagDisabled(mAmbientState.getFeatureFlags());
+        mShelfRefactor.assertDisabled();
         mOnNotificationRemovedListener = listener;
     }
 
@@ -2727,7 +2726,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         if (!mChildTransferInProgress) {
             onViewRemovedInternal(expandableView, this);
         }
-        if (mAmbientState.getFeatureFlags().isEnabled(Flags.NOTIFICATION_SHELF_REFACTOR)) {
+        if (mShelfRefactor.isEnabled()) {
             mShelf.requestRoundnessResetFor(expandableView);
         } else {
             if (mOnNotificationRemovedListener != null) {
@@ -3758,20 +3757,20 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             case MotionEvent.ACTION_UP:
                 if (mStatusBarState != StatusBarState.KEYGUARD && mTouchIsClick &&
                         isBelowLastNotification(mInitialTouchX, mInitialTouchY)) {
-                    debugLog("handleEmptySpaceClick: touch event propagated further");
+                    debugShadeLog("handleEmptySpaceClick: touch event propagated further");
                     mOnEmptySpaceClickListener.onEmptySpaceClicked(mInitialTouchX, mInitialTouchY);
                 }
                 break;
             default:
-                debugLog("handleEmptySpaceClick: MotionEvent ignored");
+                debugShadeLog("handleEmptySpaceClick: MotionEvent ignored");
         }
     }
 
-    private void debugLog(@CompileTimeConstant final String s) {
+    private void debugShadeLog(@CompileTimeConstant final String s) {
         if (mLogger == null) {
             return;
         }
-        mLogger.d(s);
+        mLogger.logShadeDebugEvent(s);
     }
 
     private void logEmptySpaceClick(MotionEvent ev, boolean isTouchBelowLastNotification,
@@ -4943,18 +4942,12 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @Nullable
     public ExpandableView getShelf() {
-        if (NotificationShelfController.checkRefactorFlagEnabled(mAmbientState.getFeatureFlags())) {
-            return mShelf;
-        } else {
-            return null;
-        }
+        if (!mShelfRefactor.expectEnabled()) return null;
+        return mShelf;
     }
 
     public void setShelf(NotificationShelf shelf) {
-        if (!NotificationShelfController.checkRefactorFlagEnabled(
-                mAmbientState.getFeatureFlags())) {
-            return;
-        }
+        if (!mShelfRefactor.expectEnabled()) return;
         int index = -1;
         if (mShelf != null) {
             index = indexOfChild(mShelf);
@@ -4968,7 +4961,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     }
 
     public void setShelfController(NotificationShelfController notificationShelfController) {
-        NotificationShelfController.assertRefactorFlagDisabled(mAmbientState.getFeatureFlags());
+        mShelfRefactor.assertDisabled();
         int index = -1;
         if (mShelf != null) {
             index = indexOfChild(mShelf);
@@ -5919,7 +5912,17 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         Trace.beginSection("NSSL.resetAllSwipeState()");
         mSwipeHelper.resetTouchState();
         for (int i = 0; i < getChildCount(); i++) {
-            mSwipeHelper.forceResetSwipeState(getChildAt(i));
+            View child = getChildAt(i);
+            mSwipeHelper.forceResetSwipeState(child);
+            if (child instanceof ExpandableNotificationRow) {
+                ExpandableNotificationRow childRow = (ExpandableNotificationRow) child;
+                List<ExpandableNotificationRow> grandchildren = childRow.getAttachedChildren();
+                if (grandchildren != null) {
+                    for (ExpandableNotificationRow grandchild : grandchildren) {
+                        mSwipeHelper.forceResetSwipeState(grandchild);
+                    }
+                }
+            }
         }
         updateContinuousShadowDrawing();
         Trace.endSection();

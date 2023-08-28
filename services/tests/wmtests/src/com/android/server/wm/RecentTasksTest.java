@@ -27,8 +27,6 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static android.content.pm.ActivityInfo.LAUNCH_MULTIPLE;
-import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.os.Process.NOBODY_UID;
 
@@ -451,24 +449,14 @@ public class RecentTasksTest extends WindowTestsBase {
         final int uid = 10123;
         final Task task1 = createTaskBuilder(".Task1").build();
         final ComponentName componentName = getUniqueComponentName();
-        task1.affinity = ActivityRecord.computeTaskAffinity(taskAffinity, uid, LAUNCH_MULTIPLE,
-                componentName);
+        task1.affinity = ActivityRecord.computeTaskAffinity(taskAffinity, uid);
         mRecentTasks.add(task1);
 
         // Add another task to recents, and make sure the previous task was removed.
         final Task task2 = createTaskBuilder(".Task2").build();
-        task2.affinity = ActivityRecord.computeTaskAffinity(taskAffinity, uid, LAUNCH_MULTIPLE,
-                componentName);
+        task2.affinity = ActivityRecord.computeTaskAffinity(taskAffinity, uid);
         mRecentTasks.add(task2);
         assertEquals(1, mRecentTasks.getRecentTasks(MAX_VALUE, 0 /* flags */,
-                true /* getTasksAllowed */, TEST_USER_0_ID, 0).getList().size());
-
-        // Add another single-instance task to recents, and make sure no task is removed.
-        final Task task3 = createTaskBuilder(".Task3").build();
-        task3.affinity = ActivityRecord.computeTaskAffinity(taskAffinity, uid,
-                LAUNCH_SINGLE_INSTANCE, componentName);
-        mRecentTasks.add(task3);
-        assertEquals(2, mRecentTasks.getRecentTasks(MAX_VALUE, 0 /* flags */,
                 true /* getTasksAllowed */, TEST_USER_0_ID, 0).getList().size());
     }
 
@@ -1050,6 +1038,13 @@ public class RecentTasksTest extends WindowTestsBase {
         top.setState(ActivityRecord.State.DESTROYING, "test");
         top.destroyed("test");
         assertFalse(task.mKillProcessesOnDestroyed);
+
+        // If the process is died, the state should be cleared.
+        final Task lastTask = tasks.get(0);
+        lastTask.addChild(top);
+        lastTask.mKillProcessesOnDestroyed = true;
+        top.handleAppDied();
+        assertFalse(lastTask.mKillProcessesOnDestroyed);
     }
 
     @Test
@@ -1313,6 +1308,26 @@ public class RecentTasksTest extends WindowTestsBase {
                 true /* getTasksAllowed */);
 
         assertTrue(info.supportsMultiWindow);
+    }
+
+    @Test
+    public void testRemoveCompatibleRecentTask() {
+        final Task task1 = createTaskBuilder(".Task").setWindowingMode(
+                WINDOWING_MODE_FULLSCREEN).build();
+        mRecentTasks.add(task1);
+        final Task task2 = createTaskBuilder(".Task").setWindowingMode(
+                WINDOWING_MODE_MULTI_WINDOW).build();
+        mRecentTasks.add(task2);
+        assertEquals(2, mRecentTasks.getRecentTasks(MAX_VALUE, 0 /* flags */,
+                true /* getTasksAllowed */, TEST_USER_0_ID, 0).getList().size());
+
+        // Set windowing mode and ensure the same fullscreen task that created earlier is removed.
+        task2.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+        mRecentTasks.removeCompatibleRecentTask(task2);
+        assertEquals(1, mRecentTasks.getRecentTasks(MAX_VALUE, 0 /* flags */,
+                true /* getTasksAllowed */, TEST_USER_0_ID, 0).getList().size());
+        assertEquals(task2.mTaskId, mRecentTasks.getRecentTasks(MAX_VALUE, 0 /* flags */,
+                true /* getTasksAllowed */, TEST_USER_0_ID, 0).getList().get(0).taskId);
     }
 
     private TaskSnapshot createSnapshot(Point taskSize, Point bufferSize) {

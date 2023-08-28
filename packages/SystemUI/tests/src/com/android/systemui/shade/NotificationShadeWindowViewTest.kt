@@ -34,20 +34,14 @@ import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
 import com.android.systemui.bouncer.domain.interactor.CountDownTimerUtil
 import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel
 import com.android.systemui.classifier.FalsingCollectorFake
-import com.android.systemui.classifier.FalsingManagerFake
 import com.android.systemui.dock.DockManager
 import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
-import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractorFactory
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel
 import com.android.systemui.log.BouncerLogger
-import com.android.systemui.multishade.data.remoteproxy.MultiShadeInputProxy
-import com.android.systemui.multishade.data.repository.MultiShadeRepository
-import com.android.systemui.multishade.domain.interactor.MultiShadeInteractor
-import com.android.systemui.multishade.domain.interactor.MultiShadeMotionEventInteractor
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.shade.NotificationShadeWindowView.InteractionEventHandler
 import com.android.systemui.statusbar.DragDownHelper
@@ -70,7 +64,6 @@ import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -85,7 +78,6 @@ import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidTestingRunner::class)
 @RunWithLooper(setAsMainLooper = true)
 @SmallTest
@@ -113,6 +105,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock private lateinit var keyguardUnlockAnimationController: KeyguardUnlockAnimationController
     @Mock private lateinit var ambientState: AmbientState
     @Mock private lateinit var pulsingGestureListener: PulsingGestureListener
+    @Mock
+    private lateinit var mLockscreenHostedDreamGestureListener: LockscreenHostedDreamGestureListener
     @Mock private lateinit var keyguardBouncerViewModel: KeyguardBouncerViewModel
     @Mock private lateinit var keyguardBouncerComponentFactory: KeyguardBouncerComponent.Factory
     @Mock private lateinit var keyguardBouncerComponent: KeyguardBouncerComponent
@@ -158,21 +152,10 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         val featureFlags = FakeFeatureFlags()
         featureFlags.set(Flags.TRACKPAD_GESTURE_COMMON, true)
         featureFlags.set(Flags.TRACKPAD_GESTURE_FEATURES, false)
-        featureFlags.set(Flags.DUAL_SHADE, false)
         featureFlags.set(Flags.SPLIT_SHADE_SUBPIXEL_OPTIMIZATION, true)
         featureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
-        val inputProxy = MultiShadeInputProxy()
+        featureFlags.set(Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false)
         testScope = TestScope()
-        val multiShadeInteractor =
-            MultiShadeInteractor(
-                applicationScope = testScope.backgroundScope,
-                repository =
-                    MultiShadeRepository(
-                        applicationContext = context,
-                        inputProxy = inputProxy,
-                    ),
-                inputProxy = inputProxy,
-            )
         controller =
             NotificationShadeWindowViewController(
                 lockscreenShadeTransitionController,
@@ -196,29 +179,14 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 notificationInsetsController,
                 ambientState,
                 pulsingGestureListener,
+                mLockscreenHostedDreamGestureListener,
                 keyguardBouncerViewModel,
                 keyguardBouncerComponentFactory,
                 Mockito.mock(KeyguardMessageAreaController.Factory::class.java),
                 keyguardTransitionInteractor,
                 primaryBouncerToGoneTransitionViewModel,
                 featureFlags,
-                { multiShadeInteractor },
                 FakeSystemClock(),
-                {
-                    MultiShadeMotionEventInteractor(
-                        applicationContext = context,
-                        applicationScope = testScope.backgroundScope,
-                        multiShadeInteractor = multiShadeInteractor,
-                        featureFlags = featureFlags,
-                        keyguardTransitionInteractor =
-                            KeyguardTransitionInteractorFactory.create(
-                                    scope = TestScope().backgroundScope,
-                                )
-                                .keyguardTransitionInteractor,
-                        falsingManager = FalsingManagerFake(),
-                        shadeController = shadeController,
-                    )
-                },
                 BouncerMessageInteractor(
                     FakeBouncerMessageRepository(),
                     Mockito.mock(BouncerMessageFactory::class.java),

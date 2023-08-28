@@ -61,6 +61,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -1243,6 +1244,27 @@ public class TransitionTests extends WindowTestsBase {
     }
 
     @Test
+    public void testFinishRotationControllerWithFixedRotation() {
+        final ActivityRecord app = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        mDisplayContent.setFixedRotationLaunchingAppUnchecked(app);
+        registerTestTransitionPlayer();
+        mDisplayContent.setLastHasContent();
+        mDisplayContent.requestChangeTransitionIfNeeded(1 /* changes */, null /* displayChange */);
+        assertNotNull(mDisplayContent.getAsyncRotationController());
+        mDisplayContent.setFixedRotationLaunchingAppUnchecked(null);
+        assertNull("Clear rotation controller if rotation is not changed",
+                mDisplayContent.getAsyncRotationController());
+
+        mDisplayContent.setFixedRotationLaunchingAppUnchecked(app);
+        assertNotNull(mDisplayContent.getAsyncRotationController());
+        mDisplayContent.getDisplayRotation().setRotation(
+                mDisplayContent.getWindowConfiguration().getRotation() + 1);
+        mDisplayContent.setFixedRotationLaunchingAppUnchecked(null);
+        assertNotNull("Keep rotation controller if rotation will be changed",
+                mDisplayContent.getAsyncRotationController());
+    }
+
+    @Test
     public void testDeferRotationForTransientLaunch() {
         final TestTransitionPlayer player = registerTestTransitionPlayer();
         assumeFalse(mDisplayContent.mTransitionController.useShellTransitionsRotation());
@@ -1383,7 +1405,8 @@ public class TransitionTests extends WindowTestsBase {
                 .mTaskSnapshotController;
         final ITransitionPlayer player = new ITransitionPlayer.Default();
         controller.registerTransitionPlayer(player, null /* playerProc */);
-        final Transition openTransition = controller.createTransition(TRANSIT_OPEN);
+        final Transition openTransition = createTestTransition(TRANSIT_OPEN, controller);
+        controller.moveToCollecting(openTransition);
 
         // Start out with task2 visible and set up a transition that closes task2 and opens task1
         final Task task1 = createTask(mDisplayContent);
@@ -1415,7 +1438,8 @@ public class TransitionTests extends WindowTestsBase {
         controller.finishTransition(openTransition);
 
         // We are now going to simulate closing task1 to return back to (open) task2.
-        final Transition closeTransition = controller.createTransition(TRANSIT_CLOSE);
+        final Transition closeTransition = createTestTransition(TRANSIT_CLOSE, controller);
+        controller.moveToCollecting(closeTransition);
 
         closeTransition.collectExistenceChange(task2);
         closeTransition.collectExistenceChange(activity2);
@@ -1428,6 +1452,15 @@ public class TransitionTests extends WindowTestsBase {
         assertNull(activity1ChangeInfo);
         // No need to wait for the activity in transient hide task.
         assertEquals(WindowContainer.SYNC_STATE_NONE, activity1.mSyncState);
+
+        // An active transient launch overrides idle state to avoid clearing power mode before the
+        // transition is finished.
+        spyOn(mRootWindowContainer.mTransitionController);
+        doAnswer(invocation -> controller.isTransientLaunch(invocation.getArgument(0))).when(
+                mRootWindowContainer.mTransitionController).isTransientLaunch(any());
+        activity2.getTask().setResumedActivity(activity2, "test");
+        activity2.idle = true;
+        assertFalse(mRootWindowContainer.allResumedActivitiesIdle());
 
         activity1.setVisibleRequested(false);
         activity2.setVisibleRequested(true);
@@ -1475,6 +1508,47 @@ public class TransitionTests extends WindowTestsBase {
 
         verify(taskSnapshotController, times(1)).recordSnapshot(eq(task1), eq(false));
         assertTrue(enteringAnimReports.contains(activity2));
+    }
+
+    @Test
+    public void testIsTransientVisible() {
+        final ActivityRecord appB = new ActivityBuilder(mAtm).setCreateTask(true)
+                .setVisible(false).build();
+        final ActivityRecord recent = new ActivityBuilder(mAtm).setCreateTask(true)
+                .setVisible(false).build();
+        final ActivityRecord appA = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final Task taskA = appA.getTask();
+        final Task taskB = appB.getTask();
+        final Task taskRecent = recent.getTask();
+        registerTestTransitionPlayer();
+        final TransitionController controller = mRootWindowContainer.mTransitionController;
+        final Transition transition = createTestTransition(TRANSIT_OPEN, controller);
+        controller.moveToCollecting(transition);
+        transition.collect(recent);
+        transition.collect(taskA);
+        transition.setTransientLaunch(recent, taskA);
+        taskRecent.moveToFront("move-recent-to-front");
+
+        // During collecting and playing, the recent is on top so it is visible naturally.
+        // While B needs isTransientVisible to keep visibility because it is occluded by recents.
+        assertFalse(controller.isTransientVisible(taskB));
+        assertTrue(controller.isTransientVisible(taskA));
+        assertFalse(controller.isTransientVisible(taskRecent));
+        // Switch to playing state.
+        transition.onTransactionReady(transition.getSyncId(), mMockT);
+        assertTrue(controller.isTransientVisible(taskA));
+
+        // Switch to another task. For example, use gesture navigation to switch tasks.
+        taskB.moveToFront("move-b-to-front");
+        // The previous app (taskA) should be paused first so it loses transient visible. Because
+        // visually it is taskA -> taskB, the pause -> resume order should be the same.
+        assertFalse(controller.isTransientVisible(taskA));
+        // Keep the recent visible so there won't be 2 activities pausing at the same time. It is
+        // to avoid the latency to resume the current top, i.e. appB.
+        assertTrue(controller.isTransientVisible(taskRecent));
+        // The recent is paused after the transient transition is finished.
+        controller.finishTransition(transition);
+        assertFalse(controller.isTransientVisible(taskRecent));
     }
 
     @Test

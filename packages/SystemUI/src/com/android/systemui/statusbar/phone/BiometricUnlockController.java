@@ -18,6 +18,8 @@ package com.android.systemui.statusbar.phone;
 
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
 
+import static com.android.systemui.flags.Flags.FP_LISTEN_OCCLUDING_APPS;
+import static com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION;
 import static com.android.systemui.keyguard.WakefulnessLifecycle.UNKNOWN_LAST_WAKE_TIME;
 
 import android.annotation.IntDef;
@@ -30,6 +32,7 @@ import android.metrics.LogMaker;
 import android.os.Handler;
 import android.os.PowerManager;
 import android.os.Trace;
+import android.view.HapticFeedbackConstants;
 
 import androidx.annotation.Nullable;
 
@@ -51,6 +54,7 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
+import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
@@ -177,6 +181,8 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
     private long mLastFpFailureUptimeMillis;
     private int mNumConsecutiveFpFailures;
 
+    private final FeatureFlags mFeatureFlags;
+
     private static final class PendingAuthenticated {
         public final int userId;
         public final BiometricSourceType biometricSourceType;
@@ -280,7 +286,8 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
             LatencyTracker latencyTracker,
             ScreenOffAnimationController screenOffAnimationController,
             VibratorHelper vibrator,
-            SystemClock systemClock
+            SystemClock systemClock,
+            FeatureFlags featureFlags
     ) {
         mPowerManager = powerManager;
         mUpdateMonitor = keyguardUpdateMonitor;
@@ -308,6 +315,7 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
         mVibratorHelper = vibrator;
         mLogger = biometricUnlockLogger;
         mSystemClock = systemClock;
+        mFeatureFlags = featureFlags;
 
         dumpManager.registerDumpable(this);
     }
@@ -462,7 +470,10 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
             Trace.endSection();
         };
 
-        if (mMode != MODE_NONE) {
+        final boolean wakingFromDream = mMode == MODE_WAKE_AND_UNLOCK_FROM_DREAM
+                && mPowerManager.isInteractive();
+
+        if (mMode != MODE_NONE && !wakingFromDream) {
             wakeUp.run();
         }
         switch (mMode) {
@@ -498,7 +509,7 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
                     // later to awaken.
                 }
                 mNotificationShadeWindowController.setNotificationShadeFocusable(false);
-                mKeyguardViewMediator.onWakeAndUnlocking();
+                mKeyguardViewMediator.onWakeAndUnlocking(wakingFromDream);
                 Trace.endSection();
                 break;
             case MODE_ONLY_WAKE:
@@ -686,8 +697,9 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
             mLatencyTracker.onActionCancel(action);
         }
 
-        if (!mVibratorHelper.hasVibrator()
-                && (!mUpdateMonitor.isDeviceInteractive() || mUpdateMonitor.isDreaming())) {
+        final boolean screenOff = !mUpdateMonitor.isDeviceInteractive();
+        if (!mVibratorHelper.hasVibrator() && (screenOff || (mUpdateMonitor.isDreaming()
+                && !mFeatureFlags.isEnabled(FP_LISTEN_OCCLUDING_APPS)))) {
             mLogger.d("wakeup device on authentication failure (device doesn't have a vibrator)");
             startWakeAndUnlock(MODE_ONLY_WAKE);
         } else if (biometricSourceType == BiometricSourceType.FINGERPRINT
@@ -747,8 +759,15 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
             mLogger.d("Skip auth success haptic. Power button was recently pressed.");
             return;
         }
-        mVibratorHelper.vibrateAuthSuccess(
-                getClass().getSimpleName() + ", type =" + type + "device-entry::success");
+        if (mFeatureFlags.isEnabled(ONE_WAY_HAPTICS_API_MIGRATION)) {
+            mVibratorHelper.performHapticFeedback(
+                    mKeyguardViewController.getViewRootImpl().getView(),
+                    HapticFeedbackConstants.CONFIRM
+            );
+        } else {
+            mVibratorHelper.vibrateAuthSuccess(
+                    getClass().getSimpleName() + ", type =" + type + "device-entry::success");
+        }
     }
 
     private boolean lastWakeupFromPowerButtonWithinHapticThreshold() {
@@ -761,8 +780,15 @@ public class BiometricUnlockController extends KeyguardUpdateMonitorCallback imp
     }
 
     private void vibrateError(BiometricSourceType type) {
-        mVibratorHelper.vibrateAuthError(
-                getClass().getSimpleName() + ", type =" + type + "device-entry::error");
+        if (mFeatureFlags.isEnabled(ONE_WAY_HAPTICS_API_MIGRATION)) {
+            mVibratorHelper.performHapticFeedback(
+                    mKeyguardViewController.getViewRootImpl().getView(),
+                    HapticFeedbackConstants.REJECT
+            );
+        } else {
+            mVibratorHelper.vibrateAuthError(
+                    getClass().getSimpleName() + ", type =" + type + "device-entry::error");
+        }
     }
 
     private void cleanup() {

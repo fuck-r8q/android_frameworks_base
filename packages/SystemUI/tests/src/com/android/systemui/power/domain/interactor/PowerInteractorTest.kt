@@ -21,6 +21,10 @@ import android.os.PowerManager
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.classifier.FalsingCollector
+import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
+import com.android.systemui.keyguard.shared.model.WakeSleepReason
+import com.android.systemui.keyguard.shared.model.WakefulnessModel
+import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.power.data.repository.FakePowerRepository
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController
@@ -44,6 +48,7 @@ class PowerInteractorTest : SysuiTestCase() {
 
     private lateinit var underTest: PowerInteractor
     private lateinit var repository: FakePowerRepository
+    private val keyguardRepository = FakeKeyguardRepository()
     @Mock private lateinit var falsingCollector: FalsingCollector
     @Mock private lateinit var screenOffAnimationController: ScreenOffAnimationController
     @Mock private lateinit var statusBarStateController: StatusBarStateController
@@ -59,6 +64,7 @@ class PowerInteractorTest : SysuiTestCase() {
         underTest =
             PowerInteractor(
                 repository,
+                keyguardRepository,
                 falsingCollector,
                 screenOffAnimationController,
                 statusBarStateController,
@@ -123,6 +129,83 @@ class PowerInteractorTest : SysuiTestCase() {
         assertThat(repository.lastWakeWhy).isEqualTo("testReason")
         assertThat(repository.lastWakeReason).isEqualTo(PowerManager.WAKE_REASON_GESTURE)
         verify(falsingCollector).onScreenOnFromTouch()
+    }
+
+    @Test
+    fun wakeUpForFullScreenIntent_notGoingToSleepAndNotDozing_notWoken() {
+        keyguardRepository.setWakefulnessModel(
+            WakefulnessModel(
+                state = WakefulnessState.AWAKE,
+                lastWakeReason = WakeSleepReason.OTHER,
+                lastSleepReason = WakeSleepReason.OTHER,
+            )
+        )
+        whenever(statusBarStateController.isDozing).thenReturn(false)
+
+        underTest.wakeUpForFullScreenIntent()
+
+        assertThat(repository.lastWakeWhy).isNull()
+        assertThat(repository.lastWakeReason).isNull()
+    }
+
+    @Test
+    fun wakeUpForFullScreenIntent_startingToSleep_woken() {
+        keyguardRepository.setWakefulnessModel(
+            WakefulnessModel(
+                state = WakefulnessState.STARTING_TO_SLEEP,
+                lastWakeReason = WakeSleepReason.OTHER,
+                lastSleepReason = WakeSleepReason.OTHER,
+            )
+        )
+        whenever(statusBarStateController.isDozing).thenReturn(false)
+
+        underTest.wakeUpForFullScreenIntent()
+
+        assertThat(repository.lastWakeWhy).isNotNull()
+        assertThat(repository.lastWakeReason).isEqualTo(PowerManager.WAKE_REASON_APPLICATION)
+    }
+
+    @Test
+    fun wakeUpForFullScreenIntent_dozing_woken() {
+        whenever(statusBarStateController.isDozing).thenReturn(true)
+        keyguardRepository.setWakefulnessModel(
+            WakefulnessModel(
+                state = WakefulnessState.AWAKE,
+                lastWakeReason = WakeSleepReason.OTHER,
+                lastSleepReason = WakeSleepReason.OTHER,
+            )
+        )
+
+        underTest.wakeUpForFullScreenIntent()
+
+        assertThat(repository.lastWakeWhy).isNotNull()
+        assertThat(repository.lastWakeReason).isEqualTo(PowerManager.WAKE_REASON_APPLICATION)
+    }
+
+    @Test
+    fun wakeUpIfDreaming_dreaming_woken() {
+        // GIVEN device is dreaming
+        whenever(statusBarStateController.isDreaming).thenReturn(true)
+
+        // WHEN wakeUpIfDreaming is called
+        underTest.wakeUpIfDreaming("testReason", PowerManager.WAKE_REASON_GESTURE)
+
+        // THEN device is woken up
+        assertThat(repository.lastWakeWhy).isEqualTo("testReason")
+        assertThat(repository.lastWakeReason).isEqualTo(PowerManager.WAKE_REASON_GESTURE)
+    }
+
+    @Test
+    fun wakeUpIfDreaming_notDreaming_notWoken() {
+        // GIVEN device is not dreaming
+        whenever(statusBarStateController.isDreaming).thenReturn(false)
+
+        // WHEN wakeUpIfDreaming is called
+        underTest.wakeUpIfDreaming("why", PowerManager.WAKE_REASON_TAP)
+
+        // THEN device is not woken
+        assertThat(repository.lastWakeWhy).isNull()
+        assertThat(repository.lastWakeReason).isNull()
     }
 
     companion object {

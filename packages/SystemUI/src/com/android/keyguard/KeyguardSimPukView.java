@@ -48,7 +48,7 @@ public class KeyguardSimPukView extends KeyguardSimInputView {
 
     void updateWrongPukMessageMap(Context context) {
         String[] customizationConfigs = context.getResources().
-                getStringArray(R.array.kg_wrong_puk_code_message_list);
+                getStringArray(com.android.settingslib.R.array.kg_wrong_puk_code_message_list);
         if ( customizationConfigs.length == 0 ){
             Log.d(TAG, "There is no customization PUK prompt");
             return;

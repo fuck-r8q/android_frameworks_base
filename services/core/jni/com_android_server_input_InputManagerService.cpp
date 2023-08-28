@@ -108,6 +108,7 @@ static struct {
     jmethodID notifySensorEvent;
     jmethodID notifySensorAccuracy;
     jmethodID notifyStylusGestureStarted;
+    jmethodID isInputMethodConnectionActive;
     jmethodID notifyVibratorState;
     jmethodID filterInputEvent;
     jmethodID interceptKeyBeforeQueueing;
@@ -313,13 +314,15 @@ public:
     std::shared_ptr<PointerControllerInterface> obtainPointerController(int32_t deviceId) override;
     void notifyInputDevicesChanged(const std::vector<InputDeviceInfo>& inputDevices) override;
     std::shared_ptr<KeyCharacterMap> getKeyboardLayoutOverlay(
-            const InputDeviceIdentifier& identifier) override;
+            const InputDeviceIdentifier& identifier,
+            const std::optional<KeyboardLayoutInfo> keyboardLayoutInfo) override;
     std::string getDeviceAlias(const InputDeviceIdentifier& identifier) override;
     TouchAffineTransformation getTouchAffineTransformation(const std::string& inputDeviceDescriptor,
                                                            ui::Rotation surfaceRotation) override;
 
     TouchAffineTransformation getTouchAffineTransformation(JNIEnv* env, jfloatArray matrixArr);
     void notifyStylusGestureStarted(int32_t deviceId, nsecs_t eventTime) override;
+    bool isInputMethodConnectionActive() override;
 
     /* --- InputDispatcherPolicyInterface implementation --- */
 
@@ -779,17 +782,32 @@ void NativeInputManager::notifyInputDevicesChanged(const std::vector<InputDevice
 }
 
 std::shared_ptr<KeyCharacterMap> NativeInputManager::getKeyboardLayoutOverlay(
-        const InputDeviceIdentifier& identifier) {
+        const InputDeviceIdentifier& identifier,
+        const std::optional<KeyboardLayoutInfo> keyboardLayoutInfo) {
     ATRACE_CALL();
     JNIEnv* env = jniEnv();
 
     std::shared_ptr<KeyCharacterMap> result;
     ScopedLocalRef<jstring> descriptor(env, env->NewStringUTF(identifier.descriptor.c_str()));
+    ScopedLocalRef<jstring> languageTag(env,
+                                        keyboardLayoutInfo
+                                                ? env->NewStringUTF(
+                                                          keyboardLayoutInfo->languageTag.c_str())
+                                                : nullptr);
+    ScopedLocalRef<jstring> layoutType(env,
+                                       keyboardLayoutInfo
+                                               ? env->NewStringUTF(
+                                                         keyboardLayoutInfo->layoutType.c_str())
+                                               : nullptr);
     ScopedLocalRef<jobject> identifierObj(env, env->NewObject(gInputDeviceIdentifierInfo.clazz,
             gInputDeviceIdentifierInfo.constructor, descriptor.get(),
             identifier.vendor, identifier.product));
-    ScopedLocalRef<jobjectArray> arrayObj(env, jobjectArray(env->CallObjectMethod(mServiceObj,
-                gServiceClassInfo.getKeyboardLayoutOverlay, identifierObj.get())));
+    ScopedLocalRef<jobjectArray>
+            arrayObj(env,
+                     jobjectArray(env->CallObjectMethod(mServiceObj,
+                                                        gServiceClassInfo.getKeyboardLayoutOverlay,
+                                                        identifierObj.get(), languageTag.get(),
+                                                        layoutType.get())));
     if (arrayObj.get()) {
         ScopedLocalRef<jstring> filenameObj(env,
                 jstring(env->GetObjectArrayElement(arrayObj.get(), 0)));
@@ -968,7 +986,7 @@ void NativeInputManager::notifyDropWindow(const sp<IBinder>& token, float x, flo
 void NativeInputManager::notifyDeviceInteraction(int32_t deviceId, nsecs_t timestamp,
                                                  const std::set<gui::Uid>& uids) {
     static const bool ENABLE_INPUT_DEVICE_USAGE_METRICS =
-            sysprop::InputProperties::enable_input_device_usage_metrics().value_or(false);
+            sysprop::InputProperties::enable_input_device_usage_metrics().value_or(true);
     if (!ENABLE_INPUT_DEVICE_USAGE_METRICS) return;
 
     mInputManager->getMetricsCollector().notifyDeviceInteraction(deviceId, timestamp, uids);
@@ -1289,6 +1307,14 @@ void NativeInputManager::notifyStylusGestureStarted(int32_t deviceId, nsecs_t ev
     env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyStylusGestureStarted, deviceId,
                         eventTime);
     checkAndClearExceptionFromCallback(env, "notifyStylusGestureStarted");
+}
+
+bool NativeInputManager::isInputMethodConnectionActive() {
+    JNIEnv* env = jniEnv();
+    const jboolean result =
+            env->CallBooleanMethod(mServiceObj, gServiceClassInfo.isInputMethodConnectionActive);
+    checkAndClearExceptionFromCallback(env, "isInputMethodConnectionActive");
+    return result;
 }
 
 bool NativeInputManager::filterInputEvent(const InputEvent& inputEvent, uint32_t policyFlags) {
@@ -2733,6 +2759,9 @@ int register_android_server_InputManager(JNIEnv* env) {
     GET_METHOD_ID(gServiceClassInfo.notifyStylusGestureStarted, clazz, "notifyStylusGestureStarted",
                   "(IJ)V");
 
+    GET_METHOD_ID(gServiceClassInfo.isInputMethodConnectionActive, clazz,
+                  "isInputMethodConnectionActive", "()Z");
+
     GET_METHOD_ID(gServiceClassInfo.notifyVibratorState, clazz, "notifyVibratorState", "(IZ)V");
 
     GET_METHOD_ID(gServiceClassInfo.notifyNoFocusedWindowAnr, clazz, "notifyNoFocusedWindowAnr",
@@ -2803,9 +2832,9 @@ int register_android_server_InputManager(JNIEnv* env) {
     GET_METHOD_ID(gServiceClassInfo.getPointerIcon, clazz,
             "getPointerIcon", "(I)Landroid/view/PointerIcon;");
 
-    GET_METHOD_ID(gServiceClassInfo.getKeyboardLayoutOverlay, clazz,
-            "getKeyboardLayoutOverlay",
-            "(Landroid/hardware/input/InputDeviceIdentifier;)[Ljava/lang/String;");
+    GET_METHOD_ID(gServiceClassInfo.getKeyboardLayoutOverlay, clazz, "getKeyboardLayoutOverlay",
+                  "(Landroid/hardware/input/InputDeviceIdentifier;Ljava/lang/String;Ljava/lang/"
+                  "String;)[Ljava/lang/String;");
 
     GET_METHOD_ID(gServiceClassInfo.getDeviceAlias, clazz,
             "getDeviceAlias", "(Ljava/lang/String;)Ljava/lang/String;");

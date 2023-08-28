@@ -135,6 +135,7 @@ import com.android.server.display.DisplayManagerService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
 import com.android.server.emergency.EmergencyAffordanceService;
+import com.android.server.flags.FeatureFlagsService;
 import com.android.server.gpu.GpuService;
 import com.android.server.grammaticalinflection.GrammaticalInflectionService;
 import com.android.server.graphics.fonts.FontManagerService;
@@ -447,6 +448,10 @@ public final class SystemServer implements Dumpable {
                     + "OnDevicePersonalizationSystemService$Lifecycle";
     private static final String UPDATABLE_DEVICE_CONFIG_SERVICE_CLASS =
             "com.android.server.deviceconfig.DeviceConfigInit$Lifecycle";
+    private static final String DEVICE_LOCK_SERVICE_CLASS =
+            "com.android.server.devicelock.DeviceLockService";
+    private static final String DEVICE_LOCK_APEX_PATH =
+            "/apex/com.android.devicelock/javalib/service-devicelock.jar";
 
     private static final String TETHERING_CONNECTOR_CLASS = "android.net.ITetheringConnector";
 
@@ -1115,6 +1120,12 @@ public final class SystemServer implements Dumpable {
         // therefore register the device identifier policy before the activity manager.
         t.traceBegin("DeviceIdentifiersPolicyService");
         mSystemServiceManager.startService(DeviceIdentifiersPolicyService.class);
+        t.traceEnd();
+
+        // Starts a service for reading runtime flag overrides, and keeping processes
+        // in sync with one another.
+        t.traceBegin("StartFeatureFlagsService");
+        mSystemServiceManager.startService(FeatureFlagsService.class);
         t.traceEnd();
 
         // Uri Grants Manager.
@@ -2472,8 +2483,9 @@ public final class SystemServer implements Dumpable {
                 t.traceBegin("StartCompanionDeviceManager");
                 mSystemServiceManager.startService(COMPANION_DEVICE_MANAGER_SERVICE_CLASS);
                 t.traceEnd();
+            }
 
-                // VirtualDeviceManager depends on CDM to control the associations.
+            if (context.getResources().getBoolean(R.bool.config_enableVirtualDeviceManager)) {
                 t.traceBegin("StartVirtualDeviceManager");
                 mSystemServiceManager.startService(VIRTUAL_DEVICE_MANAGER_SERVICE_CLASS);
                 t.traceEnd();
@@ -2805,11 +2817,23 @@ public final class SystemServer implements Dumpable {
         final HsumBootUserInitializer hsumBootUserInitializer =
                 HsumBootUserInitializer.createInstance(
                         mActivityManagerService, mPackageManagerService, mContentResolver,
-                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin),
-                        UserManager.isCommunalProfileEnabled());
+                        context.getResources().getBoolean(R.bool.config_isMainUserPermanentAdmin));
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);
+            t.traceEnd();
+        }
+
+        CommunalProfileInitializer communalProfileInitializer = null;
+        if (UserManager.isCommunalProfileEnabled()) {
+            t.traceBegin("CommunalProfileInitializer.init");
+            communalProfileInitializer =
+                    new CommunalProfileInitializer(mActivityManagerService);
+            communalProfileInitializer.init(t);
+            t.traceEnd();
+        } else {
+            t.traceBegin("CommunalProfileInitializer.removeCommunalProfileIfPresent");
+            CommunalProfileInitializer.removeCommunalProfileIfPresent();
             t.traceEnd();
         }
 
@@ -2958,6 +2982,13 @@ public final class SystemServer implements Dumpable {
         t.traceBegin("HealthConnectManagerService");
         mSystemServiceManager.startService(HEALTHCONNECT_MANAGER_SERVICE_CLASS);
         t.traceEnd();
+
+        if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_DEVICE_LOCK)) {
+            t.traceBegin("DeviceLockService");
+            mSystemServiceManager.startServiceFromJar(DEVICE_LOCK_SERVICE_CLASS,
+                    DEVICE_LOCK_APEX_PATH);
+            t.traceEnd();
+        }
 
         // These are needed to propagate to the runnable below.
         final NetworkManagementService networkManagementF = networkManagement;
@@ -3248,12 +3279,6 @@ public final class SystemServer implements Dumpable {
             }
             t.traceEnd();
         }, t);
-
-        if (hsumBootUserInitializer != null) {
-            t.traceBegin("HsumBootUserInitializer.postSystemReady");
-            hsumBootUserInitializer.postSystemReady(t);
-            t.traceEnd();
-        }
 
         t.traceBegin("LockSettingsThirdPartyAppsStarted");
         LockSettingsInternal lockSettingsInternal =

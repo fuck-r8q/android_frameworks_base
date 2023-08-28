@@ -416,6 +416,36 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         return false;
     }
 
+    /** Returns {@code true} if the task should keep visible if this is a transient transition. */
+    boolean isTransientVisible(@NonNull Task task) {
+        if (mTransientLaunches == null) return false;
+        int occludedCount = 0;
+        final int numTransient = mTransientLaunches.size();
+        for (int i = numTransient - 1; i >= 0; --i) {
+            final Task transientRoot = mTransientLaunches.keyAt(i).getRootTask();
+            if (transientRoot == null) continue;
+            final WindowContainer<?> rootParent = transientRoot.getParent();
+            if (rootParent == null || rootParent.getTopChild() == transientRoot) continue;
+            final ActivityRecord topOpaque = mController.mAtm.mTaskSupervisor
+                    .mOpaqueActivityHelper.getOpaqueActivity(rootParent);
+            if (transientRoot.compareTo(topOpaque.getRootTask()) < 0) {
+                occludedCount++;
+            }
+        }
+        if (occludedCount == numTransient) {
+            for (int i = mTransientLaunches.size() - 1; i >= 0; --i) {
+                if (mTransientLaunches.keyAt(i).isDescendantOf(task)) {
+                    // Keep transient activity visible until transition finished, so it won't pause
+                    // with transient-hide tasks that may delay resuming the next top.
+                    return true;
+                }
+            }
+            // Let transient-hide activities pause before transition is finished.
+            return false;
+        }
+        return isInTransientHide(task);
+    }
+
     boolean canApplyDim(@NonNull Task task) {
         if (mTransientLaunches == null) return true;
         final Dimmer dimmer = task.getDimmer();
@@ -634,6 +664,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (!isInTransientHide(wc)) {
             mSyncEngine.addToSyncSet(mSyncId, wc);
         }
+        if (wc.asWindowToken() != null && wc.asWindowToken().mRoundedCornerOverlay) {
+            // Only need to sync the transaction (SyncSet) without ChangeInfo because cutout and
+            // rounded corner overlay never need animations. Especially their surfaces may be put
+            // in root (null, see WindowToken#makeSurface()) that cannot reparent.
+            return;
+        }
         ChangeInfo info = mChanges.get(wc);
         if (info == null) {
             info = new ChangeInfo(wc);
@@ -731,6 +767,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 || wc.mDisplayContent.getDisplayInfo().state == Display.STATE_OFF) {
             mFlags |= WindowManager.TRANSIT_FLAG_INVISIBLE;
             return;
+        }
+        // Activity doesn't need to capture snapshot if the starting window has associated to task.
+        if (wc.asActivityRecord() != null) {
+            final ActivityRecord activityRecord = wc.asActivityRecord();
+            if (activityRecord.mStartingData != null
+                    && activityRecord.mStartingData.mAssociatedTask != null) {
+                return;
+            }
         }
 
         if (mContainerFreezer == null) {
@@ -1192,16 +1236,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 hasParticipatedDisplay = true;
                 continue;
             }
-            final WallpaperWindowToken wt = participant.asWallpaperToken();
-            if (wt != null) {
-                final boolean visibleAtTransitionEnd = mVisibleAtTransitionEndTokens.contains(wt);
-                if (!visibleAtTransitionEnd && !wt.isVisibleRequested()) {
-                    ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS,
-                            "  Commit wallpaper becoming invisible: %s", wt);
-                    wt.commitVisibility(false /* visible */);
-                }
-                continue;
-            }
             final Task tr = participant.asTask();
             if (tr != null && tr.isVisibleRequested() && tr.inPinnedWindowingMode()) {
                 final ActivityRecord top = tr.getTopNonFinishingActivity();
@@ -1219,6 +1253,20 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         tr.abortPipEnter(currTop);
                     });
                 }
+            }
+        }
+        // Commit wallpaper visibility after activity, because usually the wallpaper target token is
+        // an activity, and wallpaper's visibility is depends on activity's visibility.
+        for (int i = mParticipants.size() - 1; i >= 0; --i) {
+            final WallpaperWindowToken wt = mParticipants.valueAt(i).asWallpaperToken();
+            if (wt == null) continue;
+            final WindowState target = wt.mDisplayContent.mWallpaperController.getWallpaperTarget();
+            final boolean isTargetInvisible = target == null || !target.mToken.isVisible();
+            if (isTargetInvisible || (!wt.isVisibleRequested()
+                    && !mVisibleAtTransitionEndTokens.contains(wt))) {
+                ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS,
+                        "  Commit wallpaper becoming invisible: %s", wt);
+                wt.commitVisibility(false /* visible */);
             }
         }
         if (committedSomeInvisible) {
@@ -1295,6 +1343,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (asyncRotationController != null && containsChangeFor(dc, mTargets)) {
                 asyncRotationController.onTransitionFinished();
             }
+            dc.onTransitionFinished();
             if (hasParticipatedDisplay && dc.mDisplayRotationCompatPolicy != null) {
                 final ChangeInfo changeInfo = mChanges.get(dc);
                 if (changeInfo != null
@@ -1469,7 +1518,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mTargets = calculateTargets(mParticipants, mChanges);
 
         // Check whether the participants were animated from back navigation.
-        mController.mAtm.mBackNavigationController.onTransactionReady(this, mTargets);
+        mController.mAtm.mBackNavigationController.onTransactionReady(this, mTargets,
+                transaction);
         final TransitionInfo info = calculateTransitionInfo(mType, mFlags, mTargets, transaction);
         info.setDebugId(mSyncId);
         mController.assignTrack(this, info);

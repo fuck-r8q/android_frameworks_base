@@ -80,8 +80,6 @@ public class VeiledResizeTaskPositioner implements DragPositioningCallback,
         mTransactionSupplier = supplier;
         mTransitions = transitions;
         mDisallowedAreaForEndBoundsHeight = disallowedAreaForEndBoundsHeight;
-        mDisplayController.getDisplayLayout(windowDecoration.mDisplay.getDisplayId())
-                .getStableBounds(mStableBounds);
     }
 
     @Override
@@ -100,10 +98,14 @@ public class VeiledResizeTaskPositioner implements DragPositioningCallback,
         }
         mDragStartListener.onDragStart(mDesktopWindowDecoration.mTaskInfo.taskId);
         mRepositionTaskBounds.set(mTaskBoundsAtDragStart);
+        if (mStableBounds.isEmpty()) {
+            mDisplayController.getDisplayLayout(mDesktopWindowDecoration.mDisplay.getDisplayId())
+                    .getStableBounds(mStableBounds);
+        }
     }
 
     @Override
-    public void onDragPositioningMove(float x, float y) {
+    public Rect onDragPositioningMove(float x, float y) {
         PointF delta = DragPositioningCallbackUtility.calculateDelta(x, y, mRepositionStartPoint);
         if (isResizing() && DragPositioningCallbackUtility.changeBounds(mCtrlType,
                 mRepositionTaskBounds, mTaskBoundsAtDragStart, mStableBounds, delta,
@@ -115,10 +117,11 @@ public class VeiledResizeTaskPositioner implements DragPositioningCallback,
                     mRepositionTaskBounds, mTaskBoundsAtDragStart, mRepositionStartPoint, t, x, y);
             t.apply();
         }
+        return new Rect(mRepositionTaskBounds);
     }
 
     @Override
-    public void onDragPositioningEnd(float x, float y) {
+    public Rect onDragPositioningEnd(float x, float y) {
         PointF delta = DragPositioningCallbackUtility.calculateDelta(x, y,
                 mRepositionStartPoint);
         if (isResizing()) {
@@ -149,6 +152,7 @@ public class VeiledResizeTaskPositioner implements DragPositioningCallback,
         mCtrlType = CTRL_TYPE_UNDEFINED;
         mTaskBoundsAtDragStart.setEmpty();
         mRepositionStartPoint.set(0, 0);
+        return new Rect(mRepositionTaskBounds);
     }
 
     private boolean isResizing() {

@@ -21,6 +21,8 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 import static com.android.keyguard.KeyguardClockSwitch.LARGE;
 import static com.android.keyguard.KeyguardClockSwitch.SMALL;
+import static com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED;
+import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.annotation.Nullable;
 import android.database.ContentObserver;
@@ -33,12 +35,15 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
+import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.log.LogBuffer;
 import com.android.systemui.log.core.LogLevel;
 import com.android.systemui.log.dagger.KeyguardClockLog;
@@ -58,6 +63,7 @@ import com.android.systemui.util.settings.SecureSettings;
 
 import java.io.PrintWriter;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 import javax.inject.Inject;
 
@@ -99,8 +105,20 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
     private final KeyguardUnlockAnimationController mKeyguardUnlockAnimationController;
 
     private boolean mOnlyClock = false;
+    private boolean mIsActiveDreamLockscreenHosted = false;
+    private FeatureFlags mFeatureFlags;
+    private KeyguardInteractor mKeyguardInteractor;
     private final DelayableExecutor mUiExecutor;
     private boolean mCanShowDoubleLineClock = true;
+    @VisibleForTesting
+    final Consumer<Boolean> mIsActiveDreamLockscreenHostedCallback =
+            (Boolean isLockscreenHosted) -> {
+                if (mIsActiveDreamLockscreenHosted == isLockscreenHosted) {
+                    return;
+                }
+                mIsActiveDreamLockscreenHosted = isLockscreenHosted;
+                updateKeyguardStatusAreaVisibility();
+            };
     private final ContentObserver mDoubleLineClockObserver = new ContentObserver(null) {
         @Override
         public void onChange(boolean change) {
@@ -137,7 +155,9 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
             @Main DelayableExecutor uiExecutor,
             DumpManager dumpManager,
             ClockEventController clockEventController,
-            @KeyguardClockLog LogBuffer logBuffer) {
+            @KeyguardClockLog LogBuffer logBuffer,
+            KeyguardInteractor keyguardInteractor,
+            FeatureFlags featureFlags) {
         super(keyguardClockSwitch);
         mStatusBarStateController = statusBarStateController;
         mClockRegistry = clockRegistry;
@@ -151,6 +171,8 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mClockEventController = clockEventController;
         mLogBuffer = logBuffer;
         mView.setLogBuffer(mLogBuffer);
+        mFeatureFlags = featureFlags;
+        mKeyguardInteractor = keyguardInteractor;
 
         mClockChangedListener = new ClockRegistry.ClockChangeListener() {
             @Override
@@ -191,6 +213,12 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
 
         mDumpManager.unregisterDumpable(getClass().getSimpleName()); // unregister previous clocks
         mDumpManager.registerDumpable(getClass().getSimpleName(), this);
+
+        if (mFeatureFlags.isEnabled(LOCKSCREEN_WALLPAPER_DREAM_ENABLED)) {
+            mStatusArea = mView.findViewById(R.id.keyguard_status_area);
+            collectFlow(mStatusArea, mKeyguardInteractor.isActiveDreamLockscreenHosted(),
+                    mIsActiveDreamLockscreenHostedCallback);
+        }
     }
 
     @Override
@@ -201,7 +229,8 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mKeyguardSmallClockTopMargin =
                 mView.getResources().getDimensionPixelSize(R.dimen.keyguard_clock_top_margin);
         mKeyguardLargeClockTopMargin =
-                mView.getResources().getDimensionPixelSize(R.dimen.keyguard_large_clock_top_margin);
+                mView.getResources().getDimensionPixelSize(
+                        com.android.systemui.customization.R.dimen.keyguard_large_clock_top_margin);
         mKeyguardDateWeatherViewInvisibility =
                 mView.getResources().getInteger(R.integer.keyguard_date_weather_view_invisibility);
 
@@ -337,7 +366,8 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mKeyguardSmallClockTopMargin =
                 mView.getResources().getDimensionPixelSize(R.dimen.keyguard_clock_top_margin);
         mKeyguardLargeClockTopMargin =
-                mView.getResources().getDimensionPixelSize(R.dimen.keyguard_large_clock_top_margin);
+                mView.getResources().getDimensionPixelSize(
+                        com.android.systemui.customization.R.dimen.keyguard_large_clock_top_margin);
         mKeyguardDateWeatherViewInvisibility =
                 mView.getResources().getInteger(R.integer.keyguard_date_weather_view_invisibility);
         mView.updateClockTargetRegions();
@@ -393,6 +423,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
      * Refresh clock. Called in response to TIME_TICK broadcasts.
      */
     void refresh() {
+        mLogBuffer.log(TAG, LogLevel.INFO, "refresh");
         if (mSmartspaceController != null) {
             mSmartspaceController.requestSmartspaceUpdate();
         }
@@ -520,6 +551,15 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
             mUiExecutor.execute(() -> {
                 mWeatherView.setVisibility(
                         mSmartspaceController.isWeatherEnabled() ? View.VISIBLE : View.GONE);
+            });
+        }
+    }
+
+    private void updateKeyguardStatusAreaVisibility() {
+        if (mStatusArea != null) {
+            mUiExecutor.execute(() -> {
+                mStatusArea.setVisibility(
+                        mIsActiveDreamLockscreenHosted ? View.INVISIBLE : View.VISIBLE);
             });
         }
     }

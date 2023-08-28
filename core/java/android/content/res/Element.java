@@ -16,19 +16,15 @@
 
 package android.content.res;
 
+import static android.os.SystemProperties.PROP_VALUE_MAX;
+
 import android.annotation.NonNull;
-import android.util.ArrayMap;
 import android.util.Pools.SimplePool;
+import android.util.Slog;
 
 import androidx.annotation.StyleableRes;
 
 import com.android.internal.R;
-
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  * Defines the string attribute length and child tag count restrictions for a xml element.
@@ -38,9 +34,15 @@ import java.util.Map;
 public class Element {
     private static final int DEFAULT_MAX_STRING_ATTR_LENGTH = 32_768;
     private static final int MAX_POOL_SIZE = 128;
+    private static final int MAX_ATTR_LEN_URL_COMPONENT = 256;
+    private static final int MAX_ATTR_LEN_PERMISSION_GROUP = 256;
+    private static final int MAX_ATTR_LEN_PACKAGE = 256;
+    private static final int MAX_ATTR_LEN_MIMETYPE = 512;
+    public static final int MAX_ATTR_LEN_NAME = 1024;
+    public static final int MAX_ATTR_LEN_PATH = 4000;
+    public static final int MAX_ATTR_LEN_DATA_VALUE = 4000;
 
-    private static final String ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android";
-
+    private static final String TAG = "PackageParsing";
     protected static final String TAG_ACTION = "action";
     protected static final String TAG_ACTIVITY = "activity";
     protected static final String TAG_ADOPT_PERMISSIONS = "adopt-permissions";
@@ -127,43 +129,11 @@ public class Element {
     protected static final String TAG_ATTR_VERSION_NAME = "versionName";
     protected static final String TAG_ATTR_WRITE_PERMISSION = "writePermission";
 
-    private static final String[] ACTIVITY_STR_ATTR_NAMES = {TAG_ATTR_NAME,
-            TAG_ATTR_PARENT_ACTIVITY_NAME, TAG_ATTR_PERMISSION, TAG_ATTR_PROCESS,
-            TAG_ATTR_TASK_AFFINITY};
-    private static final String[] ACTIVITY_ALIAS_STR_ATTR_NAMES = {TAG_ATTR_NAME,
-            TAG_ATTR_PERMISSION, TAG_ATTR_TARGET_ACTIVITY};
-    private static final String[] APPLICATION_STR_ATTR_NAMES = {TAG_ATTR_BACKUP_AGENT,
-            TAG_ATTR_MANAGE_SPACE_ACTIVITY, TAG_ATTR_NAME, TAG_ATTR_PERMISSION, TAG_ATTR_PROCESS,
-            TAG_ATTR_REQUIRED_ACCOUNT_TYPE, TAG_ATTR_RESTRICTED_ACCOUNT_TYPE,
-            TAG_ATTR_TASK_AFFINITY};
-    private static final String[] DATA_STR_ATTR_NAMES = {TAG_ATTR_SCHEME, TAG_ATTR_HOST,
-            TAG_ATTR_PORT, TAG_ATTR_PATH, TAG_ATTR_PATH_PATTERN, TAG_ATTR_PATH_PREFIX,
-            TAG_ATTR_PATH_SUFFIX, TAG_ATTR_PATH_ADVANCED_PATTERN, TAG_ATTR_MIMETYPE};
-    private static final String[] GRANT_URI_PERMISSION_STR_ATTR_NAMES = {TAG_ATTR_PATH,
-            TAG_ATTR_PATH_PATTERN, TAG_ATTR_PATH_PREFIX};
-    private static final String[] INSTRUMENTATION_STR_ATTR_NAMES = {TAG_ATTR_NAME,
-            TAG_ATTR_TARGET_PACKAGE, TAG_ATTR_TARGET_PROCESSES};
-    private static final String[] MANIFEST_STR_ATTR_NAMES = {TAG_ATTR_PACKAGE,
-            TAG_ATTR_SHARED_USER_ID, TAG_ATTR_VERSION_NAME};
-    private static final String[] OVERLAY_STR_ATTR_NAMES = {TAG_ATTR_CATEGORY,
-            TAG_ATTR_REQUIRED_SYSTEM_PROPERTY_NAME, TAG_ATTR_REQUIRED_SYSTEM_PROPERTY_VALUE,
-            TAG_ATTR_TARGET_PACKAGE, TAG_ATTR_TARGET_NAME};
-    private static final String[] PATH_PERMISSION_STR_ATTR_NAMES = {TAG_ATTR_PATH,
-            TAG_ATTR_PATH_PREFIX, TAG_ATTR_PATH_PATTERN, TAG_ATTR_PERMISSION,
-            TAG_ATTR_READ_PERMISSION, TAG_ATTR_WRITE_PERMISSION};
-    private static final String[] PERMISSION_STR_ATTR_NAMES = {TAG_ATTR_NAME,
-            TAG_ATTR_PERMISSION_GROUP};
-    private static final String[] PROVIDER_STR_ATTR_NAMES = {TAG_ATTR_NAME, TAG_ATTR_PERMISSION,
-            TAG_ATTR_PROCESS, TAG_ATTR_READ_PERMISSION, TAG_ATTR_WRITE_PERMISSION};
-    private static final String[] RECEIVER_SERVICE_STR_ATTR_NAMES = {TAG_ATTR_NAME,
-            TAG_ATTR_PERMISSION, TAG_ATTR_PROCESS};
-    private static final String[] NAME_ATTR = {TAG_ATTR_NAME};
-    private static final String[] NAME_VALUE_ATTRS = {TAG_ATTR_NAME, TAG_ATTR_VALUE};
+    // The length of mTagCounters corresponds to the number of tags defined in getCounterIdx. If new
+    // tags are added then the size here should be increased to match.
+    private final TagCounter[] mTagCounters = new TagCounter[34];
 
-    private String[] mStringAttrNames = new String[0];
-    private final Map<String, TagCounter> mTagCounters = new ArrayMap<>();
-
-    private String mTag;
+    String mTag;
 
     private static final ThreadLocal<SimplePool<Element>> sPool =
             ThreadLocal.withInitial(() -> new SimplePool<>(MAX_POOL_SIZE));
@@ -179,151 +149,214 @@ public class Element {
     }
 
     void recycle() {
-        mStringAttrNames = new String[0];
-        Iterator<Map.Entry<String, TagCounter>> it = mTagCounters.entrySet().iterator();
-        while (it.hasNext()) {
-            it.next().getValue().recycle();
-            it.remove();
-        }
         mTag = null;
         sPool.get().release(this);
     }
 
-    private void init(String tag) {
-        this.mTag = tag;
+    private long mChildTagMask = 0;
+
+    private static int getCounterIdx(String tag) {
+        switch(tag) {
+            case TAG_LAYOUT:
+                return 0;
+            case TAG_META_DATA:
+                return 1;
+            case TAG_INTENT_FILTER:
+                return 2;
+            case TAG_PROFILEABLE:
+                return 3;
+            case TAG_USES_NATIVE_LIBRARY:
+                return 4;
+            case TAG_RECEIVER:
+                return 5;
+            case TAG_SERVICE:
+                return 6;
+            case TAG_ACTIVITY_ALIAS:
+                return 7;
+            case TAG_USES_LIBRARY:
+                return 8;
+            case TAG_PROVIDER:
+                return 9;
+            case TAG_ACTIVITY:
+                return 10;
+            case TAG_ACTION:
+                return 11;
+            case TAG_CATEGORY:
+                return 12;
+            case TAG_DATA:
+                return 13;
+            case TAG_APPLICATION:
+                return 14;
+            case TAG_OVERLAY:
+                return 15;
+            case TAG_INSTRUMENTATION:
+                return 16;
+            case TAG_PERMISSION_GROUP:
+                return 17;
+            case TAG_PERMISSION_TREE:
+                return 18;
+            case TAG_SUPPORTS_GL_TEXTURE:
+                return 19;
+            case TAG_SUPPORTS_SCREENS:
+                return 20;
+            case TAG_USES_CONFIGURATION:
+                return 21;
+            case TAG_USES_SDK:
+                return 22;
+            case TAG_COMPATIBLE_SCREENS:
+                return 23;
+            case TAG_QUERIES:
+                return 24;
+            case TAG_ATTRIBUTION:
+                return 25;
+            case TAG_USES_FEATURE:
+                return 26;
+            case TAG_PERMISSION:
+                return 27;
+            case TAG_USES_PERMISSION:
+            case TAG_USES_PERMISSION_SDK_23:
+            case TAG_USES_PERMISSION_SDK_M:
+                return 28;
+            case TAG_GRANT_URI_PERMISSION:
+                return 29;
+            case TAG_PATH_PERMISSION:
+                return 30;
+            case TAG_PACKAGE:
+                return 31;
+            case TAG_INTENT:
+                return 32;
+            default:
+                // The size of the mTagCounters array should be equal to this value+1
+                return 33;
+        }
+    }
+
+    static boolean shouldValidate(String tag) {
         switch (tag) {
             case TAG_ACTION:
+            case TAG_ACTIVITY:
+            case TAG_ACTIVITY_ALIAS:
+            case TAG_APPLICATION:
+            case TAG_ATTRIBUTION:
             case TAG_CATEGORY:
+            case TAG_COMPATIBLE_SCREENS:
+            case TAG_DATA:
+            case TAG_GRANT_URI_PERMISSION:
+            case TAG_INSTRUMENTATION:
+            case TAG_INTENT:
+            case TAG_INTENT_FILTER:
+            case TAG_LAYOUT:
+            case TAG_MANIFEST:
+            case TAG_META_DATA:
+            case TAG_OVERLAY:
             case TAG_PACKAGE:
+            case TAG_PATH_PERMISSION:
+            case TAG_PERMISSION:
             case TAG_PERMISSION_GROUP:
             case TAG_PERMISSION_TREE:
+            case TAG_PROFILEABLE:
+            case TAG_PROPERTY:
+            case TAG_PROVIDER:
+            case TAG_QUERIES:
+            case TAG_RECEIVER:
+            case TAG_SCREEN:
+            case TAG_SERVICE:
             case TAG_SUPPORTS_GL_TEXTURE:
+            case TAG_SUPPORTS_SCREENS:
+            case TAG_USES_CONFIGURATION:
             case TAG_USES_FEATURE:
             case TAG_USES_LIBRARY:
             case TAG_USES_NATIVE_LIBRARY:
             case TAG_USES_PERMISSION:
             case TAG_USES_PERMISSION_SDK_23:
+            case TAG_USES_PERMISSION_SDK_M:
             case TAG_USES_SDK:
-                setStringAttrNames(NAME_ATTR);
-                break;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void init(String tag) {
+        this.mTag = tag;
+        mChildTagMask = 0;
+        switch (tag) {
             case TAG_ACTIVITY:
-                setStringAttrNames(ACTIVITY_STR_ATTR_NAMES);
-                addTagCounter(1000, TAG_LAYOUT);
-                addTagCounter(8000, TAG_META_DATA);
-                addTagCounter(20000, TAG_INTENT_FILTER);
+                initializeCounter(TAG_LAYOUT, 1000);
+                initializeCounter(TAG_META_DATA, 1000);
+                initializeCounter(TAG_INTENT_FILTER, 20000);
                 break;
             case TAG_ACTIVITY_ALIAS:
-                setStringAttrNames(ACTIVITY_ALIAS_STR_ATTR_NAMES);
-                addTagCounter(8000, TAG_META_DATA);
-                addTagCounter(20000, TAG_INTENT_FILTER);
+            case TAG_RECEIVER:
+            case TAG_SERVICE:
+                initializeCounter(TAG_META_DATA, 1000);
+                initializeCounter(TAG_INTENT_FILTER, 20000);
                 break;
             case TAG_APPLICATION:
-                setStringAttrNames(APPLICATION_STR_ATTR_NAMES);
-                addTagCounter(100, TAG_PROFILEABLE);
-                addTagCounter(100, TAG_USES_NATIVE_LIBRARY);
-                addTagCounter(1000, TAG_RECEIVER);
-                addTagCounter(1000, TAG_SERVICE);
-                addTagCounter(4000, TAG_ACTIVITY_ALIAS);
-                addTagCounter(4000, TAG_USES_LIBRARY);
-                addTagCounter(8000, TAG_PROVIDER);
-                addTagCounter(8000, TAG_META_DATA);
-                addTagCounter(40000, TAG_ACTIVITY);
+                initializeCounter(TAG_PROFILEABLE, 100);
+                initializeCounter(TAG_USES_NATIVE_LIBRARY, 100);
+                initializeCounter(TAG_RECEIVER, 1000);
+                initializeCounter(TAG_SERVICE, 1000);
+                initializeCounter(TAG_META_DATA, 1000);
+                initializeCounter(TAG_USES_LIBRARY, 1000);
+                initializeCounter(TAG_ACTIVITY_ALIAS, 4000);
+                initializeCounter(TAG_PROVIDER, 8000);
+                initializeCounter(TAG_ACTIVITY, 40000);
                 break;
             case TAG_COMPATIBLE_SCREENS:
-                addTagCounter(4000, TAG_SCREEN);
-                break;
-            case TAG_DATA:
-                setStringAttrNames(DATA_STR_ATTR_NAMES);
-                break;
-            case TAG_GRANT_URI_PERMISSION:
-                setStringAttrNames(GRANT_URI_PERMISSION_STR_ATTR_NAMES);
-                break;
-            case TAG_INSTRUMENTATION:
-                setStringAttrNames(INSTRUMENTATION_STR_ATTR_NAMES);
+                initializeCounter(TAG_SCREEN, 4000);
                 break;
             case TAG_INTENT:
             case TAG_INTENT_FILTER:
-                addTagCounter(20000, TAG_ACTION);
-                addTagCounter(40000, TAG_CATEGORY);
-                addTagCounter(40000, TAG_DATA);
+                initializeCounter(TAG_ACTION, 20000);
+                initializeCounter(TAG_CATEGORY, 40000);
+                initializeCounter(TAG_DATA, 40000);
                 break;
             case TAG_MANIFEST:
-                setStringAttrNames(MANIFEST_STR_ATTR_NAMES);
-                addTagCounter(100, TAG_APPLICATION);
-                addTagCounter(100, TAG_OVERLAY);
-                addTagCounter(100, TAG_INSTRUMENTATION);
-                addTagCounter(100, TAG_PERMISSION_GROUP);
-                addTagCounter(100, TAG_PERMISSION_TREE);
-                addTagCounter(100, TAG_SUPPORTS_GL_TEXTURE);
-                addTagCounter(100, TAG_SUPPORTS_SCREENS);
-                addTagCounter(100, TAG_USES_CONFIGURATION);
-                addTagCounter(100, TAG_USES_PERMISSION_SDK_23);
-                addTagCounter(100, TAG_USES_SDK);
-                addTagCounter(200, TAG_COMPATIBLE_SCREENS);
-                addTagCounter(200, TAG_QUERIES);
-                addTagCounter(400, TAG_ATTRIBUTION);
-                addTagCounter(400, TAG_USES_FEATURE);
-                addTagCounter(2000, TAG_PERMISSION);
-                addTagCounter(20000, TAG_USES_PERMISSION);
-                break;
-            case TAG_META_DATA:
-            case TAG_PROPERTY:
-                setStringAttrNames(NAME_VALUE_ATTRS);
-                break;
-            case TAG_OVERLAY:
-                setStringAttrNames(OVERLAY_STR_ATTR_NAMES);
-                break;
-            case TAG_PATH_PERMISSION:
-                setStringAttrNames(PATH_PERMISSION_STR_ATTR_NAMES);
-                break;
-            case TAG_PERMISSION:
-                setStringAttrNames(PERMISSION_STR_ATTR_NAMES);
+                initializeCounter(TAG_APPLICATION, 100);
+                initializeCounter(TAG_OVERLAY, 100);
+                initializeCounter(TAG_INSTRUMENTATION, 100);
+                initializeCounter(TAG_PERMISSION_GROUP, 100);
+                initializeCounter(TAG_PERMISSION_TREE, 100);
+                initializeCounter(TAG_SUPPORTS_GL_TEXTURE, 100);
+                initializeCounter(TAG_SUPPORTS_SCREENS, 100);
+                initializeCounter(TAG_USES_CONFIGURATION, 100);
+                initializeCounter(TAG_USES_SDK, 100);
+                initializeCounter(TAG_COMPATIBLE_SCREENS, 200);
+                initializeCounter(TAG_QUERIES, 200);
+                initializeCounter(TAG_ATTRIBUTION, 400);
+                initializeCounter(TAG_USES_FEATURE, 400);
+                initializeCounter(TAG_PERMISSION, 2000);
+                initializeCounter(TAG_USES_PERMISSION, 20000);
                 break;
             case TAG_PROVIDER:
-                setStringAttrNames(PROVIDER_STR_ATTR_NAMES);
-                addTagCounter(100, TAG_GRANT_URI_PERMISSION);
-                addTagCounter(100, TAG_PATH_PERMISSION);
-                addTagCounter(8000, TAG_META_DATA);
-                addTagCounter(20000, TAG_INTENT_FILTER);
+                initializeCounter(TAG_GRANT_URI_PERMISSION, 100);
+                initializeCounter(TAG_PATH_PERMISSION, 100);
+                initializeCounter(TAG_META_DATA, 1000);
+                initializeCounter(TAG_INTENT_FILTER, 20000);
                 break;
             case TAG_QUERIES:
-                addTagCounter(1000, TAG_PACKAGE);
-                addTagCounter(2000, TAG_INTENT);
-                addTagCounter(8000, TAG_PROVIDER);
-                break;
-            case TAG_RECEIVER:
-            case TAG_SERVICE:
-                setStringAttrNames(RECEIVER_SERVICE_STR_ATTR_NAMES);
-                addTagCounter(8000, TAG_META_DATA);
-                addTagCounter(20000, TAG_INTENT_FILTER);
+                initializeCounter(TAG_PACKAGE, 1000);
+                initializeCounter(TAG_INTENT, 2000);
+                initializeCounter(TAG_PROVIDER, 8000);
                 break;
         }
     }
 
-    private void setStringAttrNames(String[] attrNames) {
-        mStringAttrNames = attrNames;
-    }
-
-    private static String getAttrNamespace(String attrName) {
-        if (attrName.equals(TAG_ATTR_PACKAGE)) {
-            return null;
-        }
-        return ANDROID_NAMESPACE;
-    }
-
-    private static int getAttrStringMaxLength(String attrName) {
+    private static int getAttrStrMaxLen(String attrName) {
         switch (attrName) {
             case TAG_ATTR_HOST:
-            case TAG_ATTR_PACKAGE:
-            case TAG_ATTR_PERMISSION_GROUP:
             case TAG_ATTR_PORT:
-            case TAG_ATTR_REQUIRED_SYSTEM_PROPERTY_VALUE:
             case TAG_ATTR_SCHEME:
+                return MAX_ATTR_LEN_URL_COMPONENT;
+            case TAG_ATTR_PERMISSION_GROUP:
+                return MAX_ATTR_LEN_PERMISSION_GROUP;
             case TAG_ATTR_SHARED_USER_ID:
+            case TAG_ATTR_PACKAGE:
             case TAG_ATTR_TARGET_PACKAGE:
-                return 256;
+                return MAX_ATTR_LEN_PACKAGE;
             case TAG_ATTR_MIMETYPE:
-                return 512;
+                return MAX_ATTR_LEN_MIMETYPE;
             case TAG_ATTR_BACKUP_AGENT:
             case TAG_ATTR_CATEGORY:
             case TAG_ATTR_MANAGE_SPACE_ACTIVITY:
@@ -333,71 +366,480 @@ public class Element {
             case TAG_ATTR_PROCESS:
             case TAG_ATTR_READ_PERMISSION:
             case TAG_ATTR_REQUIRED_ACCOUNT_TYPE:
+            case TAG_ATTR_REQUIRED_SYSTEM_PROPERTY_NAME:
             case TAG_ATTR_RESTRICTED_ACCOUNT_TYPE:
             case TAG_ATTR_TARGET_ACTIVITY:
             case TAG_ATTR_TARGET_NAME:
             case TAG_ATTR_TARGET_PROCESSES:
             case TAG_ATTR_TASK_AFFINITY:
             case TAG_ATTR_WRITE_PERMISSION:
-                return 1024;
+            case TAG_ATTR_VERSION_NAME:
+                return MAX_ATTR_LEN_NAME;
             case TAG_ATTR_PATH:
             case TAG_ATTR_PATH_ADVANCED_PATTERN:
             case TAG_ATTR_PATH_PATTERN:
             case TAG_ATTR_PATH_PREFIX:
             case TAG_ATTR_PATH_SUFFIX:
-            case TAG_ATTR_VERSION_NAME:
-                return 4000;
+                return MAX_ATTR_LEN_PATH;
+            case TAG_ATTR_VALUE:
+                return MAX_ATTR_LEN_DATA_VALUE;
+            case TAG_ATTR_REQUIRED_SYSTEM_PROPERTY_VALUE:
+                return PROP_VALUE_MAX;
             default:
                 return DEFAULT_MAX_STRING_ATTR_LENGTH;
         }
     }
 
-    private static int getResStringMaxLength(@StyleableRes int index) {
+    private int getResStrMaxLen(@StyleableRes int index) {
+        switch (mTag) {
+            case TAG_ACTION:
+                return getActionResStrMaxLen(index);
+            case TAG_ACTIVITY:
+                return getActivityResStrMaxLen(index);
+            case TAG_ACTIVITY_ALIAS:
+                return getActivityAliasResStrMaxLen(index);
+            case TAG_APPLICATION:
+                return getApplicationResStrMaxLen(index);
+            case TAG_DATA:
+                return getDataResStrMaxLen(index);
+            case TAG_CATEGORY:
+                return getCategoryResStrMaxLen(index);
+            case TAG_GRANT_URI_PERMISSION:
+                return getGrantUriPermissionResStrMaxLen(index);
+            case TAG_INSTRUMENTATION:
+                return getInstrumentationResStrMaxLen(index);
+            case TAG_MANIFEST:
+                return getManifestResStrMaxLen(index);
+            case TAG_META_DATA:
+                return getMetaDataResStrMaxLen(index);
+            case TAG_OVERLAY:
+                return getOverlayResStrMaxLen(index);
+            case TAG_PATH_PERMISSION:
+                return getPathPermissionResStrMaxLen(index);
+            case TAG_PERMISSION:
+                return getPermissionResStrMaxLen(index);
+            case TAG_PERMISSION_GROUP:
+                return getPermissionGroupResStrMaxLen(index);
+            case TAG_PERMISSION_TREE:
+                return getPermissionTreeResStrMaxLen(index);
+            case TAG_PROPERTY:
+                return getPropertyResStrMaxLen(index);
+            case TAG_PROVIDER:
+                return getProviderResStrMaxLen(index);
+            case TAG_RECEIVER:
+                return getReceiverResStrMaxLen(index);
+            case TAG_SERVICE:
+                return getServiceResStrMaxLen(index);
+            case TAG_USES_FEATURE:
+                return getUsesFeatureResStrMaxLen(index);
+            case TAG_USES_LIBRARY:
+                return getUsesLibraryResStrMaxLen(index);
+            case TAG_USES_NATIVE_LIBRARY:
+                return getUsesNativeLibraryResStrMaxLen(index);
+            case TAG_USES_PERMISSION:
+            case TAG_USES_PERMISSION_SDK_23:
+            case TAG_USES_PERMISSION_SDK_M:
+                return getUsesPermissionResStrMaxLen(index);
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getActionResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestAction_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getActivityResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestActivity_name:
+            case R.styleable.AndroidManifestActivity_parentActivityName:
+            case R.styleable.AndroidManifestActivity_permission:
+            case R.styleable.AndroidManifestActivity_process:
+            case R.styleable.AndroidManifestActivity_taskAffinity:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getActivityAliasResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestActivityAlias_name:
+            case R.styleable.AndroidManifestActivityAlias_permission:
+            case R.styleable.AndroidManifestActivityAlias_targetActivity:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getApplicationResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestApplication_backupAgent:
+            case R.styleable.AndroidManifestApplication_manageSpaceActivity:
+            case R.styleable.AndroidManifestApplication_name:
+            case R.styleable.AndroidManifestApplication_permission:
+            case R.styleable.AndroidManifestApplication_process:
+            case R.styleable.AndroidManifestApplication_requiredAccountType:
+            case R.styleable.AndroidManifestApplication_restrictedAccountType:
+            case R.styleable.AndroidManifestApplication_taskAffinity:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getCategoryResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestCategory_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getDataResStrMaxLen(@StyleableRes int index) {
         switch (index) {
             case R.styleable.AndroidManifestData_host:
             case R.styleable.AndroidManifestData_port:
             case R.styleable.AndroidManifestData_scheme:
-                return 255;
+                return MAX_ATTR_LEN_URL_COMPONENT;
             case R.styleable.AndroidManifestData_mimeType:
-                return 512;
+                return MAX_ATTR_LEN_MIMETYPE;
+            case R.styleable.AndroidManifestData_path:
+            case R.styleable.AndroidManifestData_pathPattern:
+            case R.styleable.AndroidManifestData_pathPrefix:
+            case R.styleable.AndroidManifestData_pathSuffix:
+            case R.styleable.AndroidManifestData_pathAdvancedPattern:
+                return MAX_ATTR_LEN_PATH;
             default:
                 return DEFAULT_MAX_STRING_ATTR_LENGTH;
         }
     }
 
-    private void addTagCounter(int max, String tag) {
-        mTagCounters.put(tag, TagCounter.obtain(max));
+    private static int getGrantUriPermissionResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestGrantUriPermission_path:
+            case R.styleable.AndroidManifestGrantUriPermission_pathPattern:
+            case R.styleable.AndroidManifestGrantUriPermission_pathPrefix:
+                return MAX_ATTR_LEN_PATH;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getInstrumentationResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestInstrumentation_targetPackage:
+                return MAX_ATTR_LEN_PACKAGE;
+            case R.styleable.AndroidManifestInstrumentation_name:
+            case R.styleable.AndroidManifestInstrumentation_targetProcesses:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getManifestResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifest_sharedUserId:
+                return MAX_ATTR_LEN_PACKAGE;
+            case R.styleable.AndroidManifest_versionName:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getMetaDataResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestMetaData_name:
+                return MAX_ATTR_LEN_NAME;
+            case R.styleable.AndroidManifestMetaData_value:
+                return MAX_ATTR_LEN_DATA_VALUE;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getOverlayResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestResourceOverlay_targetPackage:
+                return MAX_ATTR_LEN_PACKAGE;
+            case R.styleable.AndroidManifestResourceOverlay_category:
+            case R.styleable.AndroidManifestResourceOverlay_requiredSystemPropertyName:
+            case R.styleable.AndroidManifestResourceOverlay_targetName:
+                return MAX_ATTR_LEN_NAME;
+            case R.styleable.AndroidManifestResourceOverlay_requiredSystemPropertyValue:
+                return PROP_VALUE_MAX;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getPathPermissionResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestPathPermission_permission:
+            case R.styleable.AndroidManifestPathPermission_readPermission:
+            case R.styleable.AndroidManifestPathPermission_writePermission:
+                return MAX_ATTR_LEN_NAME;
+            case R.styleable.AndroidManifestPathPermission_path:
+            case R.styleable.AndroidManifestPathPermission_pathPattern:
+            case R.styleable.AndroidManifestPathPermission_pathPrefix:
+                return MAX_ATTR_LEN_PATH;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getPermissionResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestPermission_permissionGroup:
+                return MAX_ATTR_LEN_PERMISSION_GROUP;
+            case R.styleable.AndroidManifestPermission_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getPermissionGroupResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestPermissionGroup_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getPermissionTreeResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestPermissionTree_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getPropertyResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestProperty_name:
+                return MAX_ATTR_LEN_NAME;
+            case R.styleable.AndroidManifestProperty_value:
+                return MAX_ATTR_LEN_DATA_VALUE;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getProviderResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestProvider_name:
+            case R.styleable.AndroidManifestProvider_permission:
+            case R.styleable.AndroidManifestProvider_process:
+            case R.styleable.AndroidManifestProvider_readPermission:
+            case R.styleable.AndroidManifestProvider_writePermission:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getReceiverResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestReceiver_name:
+            case R.styleable.AndroidManifestReceiver_permission:
+            case R.styleable.AndroidManifestReceiver_process:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getServiceResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestReceiver_name:
+            case R.styleable.AndroidManifestReceiver_permission:
+            case R.styleable.AndroidManifestReceiver_process:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getUsesFeatureResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestUsesFeature_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getUsesLibraryResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestUsesLibrary_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getUsesNativeLibraryResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestUsesNativeLibrary_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private static int getUsesPermissionResStrMaxLen(@StyleableRes int index) {
+        switch (index) {
+            case R.styleable.AndroidManifestUsesPermission_name:
+                return MAX_ATTR_LEN_NAME;
+            default:
+                return DEFAULT_MAX_STRING_ATTR_LENGTH;
+        }
+    }
+
+    private void initializeCounter(String tag, int max) {
+        int idx = getCounterIdx(tag);
+        if (mTagCounters[idx] == null) {
+            mTagCounters[idx] = new TagCounter();
+        }
+        mTagCounters[idx].reset(max);
+        mChildTagMask |= 1 << idx;
+    }
+
+    private boolean isComponentNameAttr(String name) {
+        switch (mTag) {
+            case TAG_ACTIVITY:
+                switch (name) {
+                    case TAG_ATTR_NAME:
+                    case TAG_ATTR_PARENT_ACTIVITY_NAME:
+                        return true;
+                    default:
+                        return false;
+                }
+            case TAG_ACTIVITY_ALIAS:
+                switch (name) {
+                    case TAG_ATTR_TARGET_ACTIVITY:
+                        return true;
+                    default:
+                        return false;
+                }
+            case TAG_APPLICATION:
+                switch (name) {
+                    case TAG_ATTR_BACKUP_AGENT:
+                    case TAG_ATTR_NAME:
+                        return true;
+                    default:
+                        return false;
+                }
+            case TAG_INSTRUMENTATION:
+            case TAG_PROVIDER:
+            case TAG_RECEIVER:
+            case TAG_SERVICE:
+                switch (name) {
+                    case TAG_ATTR_NAME:
+                        return true;
+                    default:
+                        return false;
+                }
+            default:
+                return false;
+        }
+    }
+
+    private boolean isComponentNameAttr(@StyleableRes int index) {
+        switch (mTag) {
+            case TAG_ACTIVITY:
+                return index == R.styleable.AndroidManifestActivity_name
+                        || index == R.styleable.AndroidManifestActivity_parentActivityName;
+            case TAG_ACTIVITY_ALIAS:
+                return index == R.styleable.AndroidManifestActivityAlias_targetActivity;
+            case TAG_APPLICATION:
+                return index == R.styleable.AndroidManifestApplication_backupAgent
+                        || index == R.styleable.AndroidManifestApplication_name;
+            case TAG_INSTRUMENTATION:
+                return index ==  R.styleable.AndroidManifestInstrumentation_name;
+            case TAG_PROVIDER:
+                return index ==  R.styleable.AndroidManifestProvider_name;
+            case TAG_RECEIVER:
+                return index ==  R.styleable.AndroidManifestReceiver_name;
+            case TAG_SERVICE:
+                return index ==  R.styleable.AndroidManifestService_name;
+            default:
+                return false;
+        }
     }
 
     boolean hasChild(String tag) {
-        return mTagCounters.containsKey(tag);
+        return (mChildTagMask & (1 << getCounterIdx(tag))) != 0;
     }
 
-    void validateStringAttrs(@NonNull XmlPullParser attrs) throws XmlPullParserException {
-        for (int i = 0; i < mStringAttrNames.length; i++) {
-            String attrName = mStringAttrNames[i];
-            String val = attrs.getAttributeValue(getAttrNamespace(attrName), attrName);
-            if (val != null && val.length() > getAttrStringMaxLength(attrName)) {
-                throw new XmlPullParserException("String length limit exceeded for "
-                        + "attribute " + attrName + " in " + mTag);
+    void validateComponentName(CharSequence name) {
+        int i = 0;
+        if (name.charAt(0) == '.') {
+            i = 1;
+        }
+        boolean isStart = true;
+        for (; i < name.length(); i++) {
+            if (name.charAt(i) == '.') {
+                if (isStart) {
+                    break;
+                }
+                isStart = true;
+            } else {
+                if (isStart) {
+                    if (Character.isJavaIdentifierStart(name.charAt(i))) {
+                        isStart = false;
+                    } else {
+                        break;
+                    }
+                } else if (!Character.isJavaIdentifierPart(name.charAt(i))) {
+                    break;
+                }
             }
         }
-    }
-
-    void validateResStringAttr(@StyleableRes int index, CharSequence stringValue)
-            throws XmlPullParserException {
-        if (stringValue != null && stringValue.length() > getResStringMaxLength(index)) {
-            throw new XmlPullParserException("String length limit exceeded for "
-                    + "attribute in " + mTag);
+        if ((i < name.length()) || (name.charAt(name.length() - 1) == '.')) {
+            Slog.e(TAG, name + " is not a valid Java class name");
+            throw new SecurityException(name + " is not a valid Java class name");
         }
     }
 
-    void seen(@NonNull Element element) throws XmlPullParserException {
-        if (mTagCounters.containsKey(element.mTag)) {
-            TagCounter counter = mTagCounters.get(element.mTag);
+    void validateStrAttr(String attrName, String attrValue) {
+        if (attrValue != null && attrValue.length() > getAttrStrMaxLen(attrName)) {
+            throw new SecurityException("String length limit exceeded for attribute " + attrName
+                    + " in " + mTag);
+        }
+        if (isComponentNameAttr(attrName)) {
+            validateComponentName(attrValue);
+        }
+    }
+
+    void validateResStrAttr(@StyleableRes int index, CharSequence stringValue) {
+        if (stringValue != null && stringValue.length() > getResStrMaxLen(index)) {
+            throw new SecurityException("String length limit exceeded for attribute in " + mTag);
+        }
+        if (isComponentNameAttr(index)) {
+            validateComponentName(stringValue);
+        }
+    }
+
+
+    void seen(@NonNull Element element) {
+        TagCounter counter = mTagCounters[getCounterIdx(element.mTag)];
+        if (counter != null) {
             counter.increment();
             if (!counter.isValid()) {
-                throw new XmlPullParserException("The number of child " + element.mTag
+                throw new SecurityException("The number of child " + element.mTag
                         + " elements exceeded the max allowed in " + this.mTag);
             }
         }

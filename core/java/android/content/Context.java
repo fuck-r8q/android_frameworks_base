@@ -5306,6 +5306,13 @@ public abstract class Context {
     public static final String APP_PREDICTION_SERVICE = "app_prediction";
 
     /**
+     * Used for reading system-wide, overridable flags.
+     *
+     * @hide
+     */
+    public static final String FEATURE_FLAGS_SERVICE = "feature_flags";
+
+    /**
      * Official published name of the search ui service.
      *
      * <p><b>NOTE: </b> this service is optional; callers of
@@ -6339,6 +6346,18 @@ public abstract class Context {
      */
     @SystemApi
     public static final String NEARBY_SERVICE = "nearby";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.remoteauth.RemoteAuthManager} to discover,
+     * register and authenticate via remote authenticator  devices.
+     *
+     * @see #getSystemService(String)
+     * @see android.remoteauth.RemoteAuthManager
+     * @hide
+     */
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    public static final String REMOTE_AUTH_SERVICE = "remote_auth";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

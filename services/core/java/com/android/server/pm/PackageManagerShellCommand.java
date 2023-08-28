@@ -319,6 +319,8 @@ class PackageManagerShellCommand extends ShellCommand {
                     return runCreateUser();
                 case "remove-user":
                     return runRemoveUser();
+                case "mark-guest-for-deletion":
+                    return runMarkGuestForDeletion();
                 case "rename-user":
                     return runRenameUser();
                 case "set-user-restriction":
@@ -1639,8 +1641,8 @@ class PackageManagerShellCommand extends ShellCommand {
         // broadcast only if packageInstallerName is "android". We can't always force
         // "android" as packageIntallerName, e.g, rollback auto implies
         // "-i com.android.shell".
-        while (currentTime < endTime) {
-            if (si != null && (si.isStagedSessionReady() || si.isStagedSessionFailed())) {
+        while (si != null && currentTime < endTime) {
+            if (si.isStagedSessionReady() || si.isStagedSessionFailed()) {
                 break;
             }
             SystemClock.sleep(Math.min(endTime - currentTime, 100));
@@ -3203,6 +3205,24 @@ class PackageManagerShellCommand extends ShellCommand {
         }
     }
 
+    private int runMarkGuestForDeletion() throws RemoteException {
+        String arg = getNextArg();
+        if (arg == null) {
+            getErrPrintWriter().println("Error: no user id specified.");
+            return 1;
+        }
+        int userId = resolveUserId(UserHandle.parseUserArg(arg));
+
+        IUserManager um = IUserManager.Stub.asInterface(
+                ServiceManager.getService(Context.USER_SERVICE));
+        if (!um.markGuestForDeletion(userId)) {
+            getErrPrintWriter().println("Error: could not mark guest for deletion");
+            return 1;
+        }
+
+        return 0;
+    }
+
     private int runRenameUser() throws RemoteException {
         String arg = getNextArg();
         if (arg == null) {
@@ -3287,6 +3307,13 @@ class PackageManagerShellCommand extends ShellCommand {
         sessionParams.installFlags |= PackageManager.INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS;
         // Set package source to other by default
         sessionParams.setPackageSource(PackageInstaller.PACKAGE_SOURCE_OTHER);
+
+        // Encodes one of the states:
+        //  1. Install request explicitly specified --staged, then value will be true.
+        //  2. Install request explicitly specified --non-staged, then value will be false.
+        //  3. Install request did not specify either --staged or --non-staged, then for APEX
+        //      installs the value will be true, and for apk installs it will be false.
+        Boolean staged = null;
 
         String opt;
         boolean replaceExisting = true;
@@ -3396,7 +3423,6 @@ class PackageManagerShellCommand extends ShellCommand {
                     break;
                 case "--apex":
                     sessionParams.setInstallAsApex();
-                    sessionParams.setStaged();
                     break;
                 case "--force-non-staged":
                     forceNonStaged = true;
@@ -3405,7 +3431,10 @@ class PackageManagerShellCommand extends ShellCommand {
                     sessionParams.setMultiPackage();
                     break;
                 case "--staged":
-                    sessionParams.setStaged();
+                    staged = true;
+                    break;
+                case "--non-staged":
+                    staged = false;
                     break;
                 case "--force-queryable":
                     sessionParams.setForceQueryable();
@@ -3436,19 +3465,22 @@ class PackageManagerShellCommand extends ShellCommand {
                     sessionParams.installFlags |=
                             PackageManager.INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK;
                     break;
-                case "--no-profile":
-                    sessionParams.installFlags |=
-                            PackageManager.INSTALL_DONT_EXTRACT_BASELINE_PROFILES;
-                    break;
                 default:
                     throw new IllegalArgumentException("Unknown option " + opt);
             }
+        }
+        if (staged == null) {
+            staged = (sessionParams.installFlags & PackageManager.INSTALL_APEX) != 0;
         }
         if (replaceExisting) {
             sessionParams.installFlags |= PackageManager.INSTALL_REPLACE_EXISTING;
         }
         if (forceNonStaged) {
             sessionParams.isStaged = false;
+            sessionParams.developmentInstallFlags |=
+                    PackageManager.INSTALL_DEVELOPMENT_FORCE_NON_STAGED_APEX_UPDATE;
+        } else if (staged) {
+            sessionParams.setStaged();
         }
         return params;
     }
@@ -4328,9 +4360,10 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("       [--install-reason 0/1/2/3/4] [--originating-uri URI]");
         pw.println("       [--referrer URI] [--abi ABI_NAME] [--force-sdk]");
         pw.println("       [--preload] [--instant] [--full] [--dont-kill]");
-        pw.println("       [--enable-rollback] [--no-profile]");
+        pw.println("       [--enable-rollback]");
         pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [-S BYTES]");
-        pw.println("       [--apex] [--force-non-staged] [--staged-ready-timeout TIMEOUT]");
+        pw.println("       [--apex] [--non-staged] [--force-non-staged]");
+        pw.println("       [--staged-ready-timeout TIMEOUT]");
         pw.println("       [PATH [SPLIT...]|-]");
         pw.println("    Install an application.  Must provide the apk data to install, either as");
         pw.println("    file path(s) or '-' to read from stdin.  Options are:");
@@ -4359,9 +4392,12 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --update-ownership: request the update ownership enforcement");
         pw.println("      --force-uuid: force install on to disk volume with given UUID");
         pw.println("      --apex: install an .apex file, not an .apk");
+        pw.println("      --non-staged: explicitly set this installation to be non-staged.");
+        pw.println("          This flag is only useful for APEX installs that are implicitly");
+        pw.println("          assumed to be staged.");
         pw.println("      --force-non-staged: force the installation to run under a non-staged");
-        pw.println("          session, which may complete without requiring a reboot");
-        pw.println("      --no-profile: don't extract the profiles from the apk");
+        pw.println("          session, which may complete without requiring a reboot. This will");
+        pw.println("          force a rebootless update even for APEXes that don't support it");
         pw.println("      --staged-ready-timeout: By default, staged sessions wait "
                 + DEFAULT_STAGED_READY_TIMEOUT_MS);
         pw.println("          milliseconds for pre-reboot verification to complete when");
@@ -4383,7 +4419,7 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("       [--referrer URI] [--abi ABI_NAME] [--force-sdk]");
         pw.println("       [--preload] [--instant] [--full] [--dont-kill]");
         pw.println("       [--force-uuid internal|UUID] [--pkg PACKAGE] [--apex] [-S BYTES]");
-        pw.println("       [--multi-package] [--staged] [--no-profile] [--update-ownership]");
+        pw.println("       [--multi-package] [--staged] [--update-ownership]");
         pw.println("    Like \"install\", but starts an install session.  Use \"install-write\"");
         pw.println("    to push data into the session, and \"install-commit\" to finish.");
         pw.println("");
@@ -4515,6 +4551,11 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("        so that it will be automatically removed when possible (after user");
         pw.println("        switch or reboot)");
         pw.println("      --wait: Wait until user is removed. Ignored if set-ephemeral-if-in-use");
+        pw.println("");
+        pw.println("  mark-guest-for-deletion USER_ID");
+        pw.println("    Mark the guest user for deletion. After this, it is possible to create a");
+        pw.println("    new guest user and switch to it. This allows resetting the guest user");
+        pw.println("    without switching to another user.");
         pw.println("");
         pw.println("  rename-user USER_ID [USER_NAME]");
         pw.println("    Rename USER_ID with USER_NAME (or null when [USER_NAME] is not set)");

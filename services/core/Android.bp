@@ -203,6 +203,12 @@ java_library_static {
         "-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
         "-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
     ],
+    visibility: [
+      "//frameworks/base/services",
+      "//frameworks/base/tests/Input",
+      "//packages/modules/AdServices/adservices/tests/unittest/system-service",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core",
+    ],
 }
 
 java_genrule {
@@ -237,8 +243,7 @@ genrule {
     name: "services.core.json.gz",
     srcs: [":checked-protolog.json"],
     out: ["services.core.protolog.json.gz"],
-    cmd: "$(location minigzip) -c < $(in) > $(out)",
-    tools: ["minigzip"],
+    cmd: "gzip -c < $(in) > $(out)",
 }
 
 prebuilt_etc {

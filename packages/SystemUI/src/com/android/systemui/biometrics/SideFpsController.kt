@@ -50,7 +50,9 @@ import androidx.annotation.RawRes
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.model.KeyPath
+import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
+import com.android.keyguard.KeyguardPINView
 import com.android.systemui.Dumpable
 import com.android.systemui.R
 import com.android.systemui.biometrics.domain.interactor.DisplayStateInteractor
@@ -112,21 +114,33 @@ constructor(
     private val isReverseDefaultRotation =
         context.resources.getBoolean(com.android.internal.R.bool.config_reverseDefaultRotation)
 
-    private var overlayHideAnimator: ViewPropertyAnimator? = null
+    private var overlayShowAnimator: ViewPropertyAnimator? = null
 
     private var overlayView: View? = null
         set(value) {
             field?.let { oldView ->
+                val lottie = oldView.findViewById(R.id.sidefps_animation) as LottieAnimationView
+                lottie.pauseAnimation()
                 windowManager.removeView(oldView)
                 orientationListener.disable()
             }
-            overlayHideAnimator?.cancel()
-            overlayHideAnimator = null
+            overlayShowAnimator?.cancel()
+            overlayShowAnimator = null
 
             field = value
             field?.let { newView ->
+                if (requests.contains(SideFpsUiRequestSource.PRIMARY_BOUNCER)) {
+                    newView.alpha = 0f
+                    overlayShowAnimator =
+                        newView
+                            .animate()
+                            .alpha(1f)
+                            .setDuration(KeyguardPINView.ANIMATION_DURATION)
+                            .setInterpolator(Interpolators.ALPHA_IN)
+                }
                 windowManager.addView(newView, overlayViewParams)
                 orientationListener.enable()
+                overlayShowAnimator?.start()
             }
         }
     @VisibleForTesting var overlayOffsets: SensorLocationInternal = SensorLocationInternal.DEFAULT
@@ -193,7 +207,9 @@ constructor(
             requests.add(request)
             mainExecutor.execute {
                 if (overlayView == null) {
-                    traceSection("SideFpsController#show(request=${request.name}, reason=$reason") {
+                    traceSection(
+                        "SideFpsController#show(request=${request.name}, reason=$reason)"
+                    ) {
                         createOverlayForDisplay(reason)
                     }
                 } else {
@@ -208,7 +224,7 @@ constructor(
         requests.remove(request)
         mainExecutor.execute {
             if (requests.isEmpty()) {
-                traceSection("SideFpsController#hide(${request.name}") { overlayView = null }
+                traceSection("SideFpsController#hide(${request.name})") { overlayView = null }
             }
         }
     }
@@ -430,7 +446,7 @@ private fun LottieAnimationView.addOverlayDynamicColor(
             for (key in listOf(".blue600", ".blue400")) {
                 addValueCallback(KeyPath(key, "**"), LottieProperty.COLOR_FILTER) {
                     PorterDuffColorFilter(
-                        context.getColor(R.color.settingslib_color_blue400),
+                        context.getColor(com.android.settingslib.R.color.settingslib_color_blue400),
                         PorterDuff.Mode.SRC_ATOP
                     )
                 }

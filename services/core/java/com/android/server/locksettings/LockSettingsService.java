@@ -118,7 +118,6 @@ import android.system.keystore2.Domain;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
-import android.util.EventLog;
 import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.Slog;
@@ -314,8 +313,9 @@ public class LockSettingsService extends ILockSettings.Stub {
             super.onBootPhase(phase);
             if (phase == PHASE_ACTIVITY_MANAGER_READY) {
                 mLockSettingsService.migrateOldDataAfterSystemReady();
-                mLockSettingsService.loadEscrowData();
                 mLockSettingsService.deleteRepairModePersistentDataIfNeeded();
+            } else if (phase == PHASE_BOOT_COMPLETED) {
+                mLockSettingsService.loadEscrowData();
             }
         }
 
@@ -838,17 +838,17 @@ public class LockSettingsService extends ILockSettings.Stub {
 
     @Override // binder interface
     public void systemReady() {
-        if (mContext.checkCallingOrSelfPermission(PERMISSION) != PERMISSION_GRANTED) {
-            EventLog.writeEvent(0x534e4554, "28251513", getCallingUid(), "");  // SafetyNet
-        }
         checkWritePermission();
 
         mHasSecureLockScreen = mContext.getPackageManager()
                 .hasSystemFeature(PackageManager.FEATURE_SECURE_LOCK_SCREEN);
         migrateOldData();
-        getGateKeeperService();
         getAuthSecretHal();
         mDeviceProvisionedObserver.onSystemReady();
+
+        // Work around an issue in PropertyInvalidatedCache where the cache doesn't work until the
+        // first invalidation.  This can be removed if PropertyInvalidatedCache is fixed.
+        LockPatternUtils.invalidateCredentialTypeCache();
 
         // TODO: maybe skip this for split system user mode.
         mStorage.prefetchUser(UserHandle.USER_SYSTEM);
@@ -1092,9 +1092,6 @@ public class LockSettingsService extends ILockSettings.Stub {
     }
 
     private final void checkPasswordHavePermission() {
-        if (mContext.checkCallingOrSelfPermission(PERMISSION) != PERMISSION_GRANTED) {
-            EventLog.writeEvent(0x534e4554, "28251513", getCallingUid(), "");  // SafetyNet
-        }
         mContext.enforceCallingOrSelfPermission(PERMISSION, "LockSettingsHave");
     }
 
@@ -2649,7 +2646,7 @@ public class LockSettingsService extends ILockSettings.Stub {
             return mGateKeeperService;
         }
 
-        final IBinder service = ServiceManager.getService(Context.GATEKEEPER_SERVICE);
+        final IBinder service = ServiceManager.waitForService(Context.GATEKEEPER_SERVICE);
         if (service != null) {
             try {
                 service.linkToDeath(new GateKeeperDiedRecipient(), 0);

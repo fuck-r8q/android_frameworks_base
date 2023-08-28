@@ -119,12 +119,6 @@ public final class PrebakedSegment extends VibrationEffectSegment {
     }
 
     /** @hide */
-    @Override
-    public boolean hasNonZeroAmplitude() {
-        return true;
-    }
-
-    /** @hide */
     @NonNull
     @Override
     public PrebakedSegment resolve(int defaultAmplitude) {
@@ -207,6 +201,15 @@ public final class PrebakedSegment extends VibrationEffectSegment {
                 + ", strength=" + VibrationEffect.effectStrengthToString(mEffectStrength)
                 + ", fallback=" + mFallback
                 + "}";
+    }
+
+    /** @hide */
+    @Override
+    public String toDebugString() {
+        return String.format("Prebaked=%s(%s, %s fallback)",
+                VibrationEffect.effectIdToString(mEffectId),
+                VibrationEffect.effectStrengthToString(mEffectStrength),
+                mFallback ? "with" : "no");
     }
 
     @Override

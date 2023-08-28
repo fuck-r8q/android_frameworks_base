@@ -28,8 +28,11 @@ import com.android.systemui.Gefingerpoken
 import com.android.systemui.R
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.shared.model.RemoteUserInput
 import com.android.systemui.shade.ShadeController
 import com.android.systemui.shade.ShadeLogger
+import com.android.systemui.shade.ShadeViewController
 import com.android.systemui.shared.animation.UnfoldMoveFromCenterAnimator
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.unfold.SysUIUnfoldComponent
@@ -42,6 +45,7 @@ import com.android.systemui.util.view.ViewUtil
 import java.util.Optional
 import javax.inject.Inject
 import javax.inject.Named
+import javax.inject.Provider
 
 private const val TAG = "PhoneStatusBarViewController"
 
@@ -51,12 +55,18 @@ class PhoneStatusBarViewController private constructor(
     @Named(UNFOLD_STATUS_BAR) private val progressProvider: ScopedUnfoldTransitionProgressProvider?,
     private val centralSurfaces: CentralSurfaces,
     private val shadeController: ShadeController,
+    private val shadeViewController: ShadeViewController,
+    private val sceneInteractor: Provider<SceneInteractor>,
     private val shadeLogger: ShadeLogger,
     private val moveFromCenterAnimationController: StatusBarMoveFromCenterAnimationController?,
     private val userChipViewModel: StatusBarUserChipViewModel,
     private val viewUtil: ViewUtil,
-    private val configurationController: ConfigurationController
+    private val featureFlags: FeatureFlags,
+    private val configurationController: ConfigurationController,
+    private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
 ) : ViewController<PhoneStatusBarView>(view) {
+
+    private lateinit var statusContainer: View
 
     private val configurationListener = object : ConfigurationController.ConfigurationListener {
         override fun onConfigChanged(newConfig: Configuration?) {
@@ -65,6 +75,9 @@ class PhoneStatusBarViewController private constructor(
     }
 
     override fun onViewAttached() {
+        statusContainer = mView.findViewById(R.id.system_icons)
+        statusContainer.setOnHoverListener(
+            statusOverlayHoverListenerFactory.createDarkAwareListener(statusContainer))
         if (moveFromCenterAnimationController == null) return
 
         val statusBarLeftSide: View = mView.findViewById(R.id.status_bar_start_side_except_heads_up)
@@ -96,6 +109,7 @@ class PhoneStatusBarViewController private constructor(
     }
 
     override fun onViewDetached() {
+        statusContainer.setOnHoverListener(null)
         progressProvider?.setReadyToHandleTransition(false)
         moveFromCenterAnimationController?.onViewDetached()
         configurationController.removeCallback(configurationListener)
@@ -162,23 +176,33 @@ class PhoneStatusBarViewController private constructor(
                 return false
             }
 
+            // If scene framework is enabled, route the touch to it and
+            // ignore the rest of the gesture.
+            if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+                sceneInteractor.get()
+                    .onRemoteUserInput(RemoteUserInput.translateMotionEvent(event))
+                // TODO(b/291965119): remove once view is expanded to cover the status bar
+                sceneInteractor.get().setVisible(true)
+                return false
+            }
+
             if (event.action == MotionEvent.ACTION_DOWN) {
                 // If the view that would receive the touch is disabled, just have status
                 // bar eat the gesture.
-                if (!centralSurfaces.shadeViewController.isViewEnabled) {
+                if (!shadeViewController.isViewEnabled) {
                     shadeLogger.logMotionEvent(event,
                             "onTouchForwardedFromStatusBar: panel view disabled")
                     return true
                 }
-                if (centralSurfaces.shadeViewController.isFullyCollapsed &&
+                if (shadeViewController.isFullyCollapsed &&
                         event.y < 1f) {
                     // b/235889526 Eat events on the top edge of the phone when collapsed
                     shadeLogger.logMotionEvent(event, "top edge touch ignored")
                     return true
                 }
-                centralSurfaces.shadeViewController.startTrackingExpansionFromStatusBar()
+                shadeViewController.startTrackingExpansionFromStatusBar()
             }
-            return centralSurfaces.shadeViewController.handleExternalTouch(event)
+            return shadeViewController.handleExternalTouch(event)
         }
     }
 
@@ -222,9 +246,12 @@ class PhoneStatusBarViewController private constructor(
         private val userChipViewModel: StatusBarUserChipViewModel,
         private val centralSurfaces: CentralSurfaces,
         private val shadeController: ShadeController,
+        private val shadeViewController: ShadeViewController,
+        private val sceneInteractor: Provider<SceneInteractor>,
         private val shadeLogger: ShadeLogger,
         private val viewUtil: ViewUtil,
         private val configurationController: ConfigurationController,
+        private val statusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory,
     ) {
         fun create(
             view: PhoneStatusBarView
@@ -241,11 +268,15 @@ class PhoneStatusBarViewController private constructor(
                     progressProvider.getOrNull(),
                     centralSurfaces,
                     shadeController,
+                    shadeViewController,
+                    sceneInteractor,
                     shadeLogger,
                     statusBarMoveFromCenterAnimationController,
                     userChipViewModel,
                     viewUtil,
-                    configurationController
+                    featureFlags,
+                    configurationController,
+                    statusOverlayHoverListenerFactory,
             )
         }
     }

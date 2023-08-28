@@ -479,8 +479,8 @@ public class ForegroundServiceTypeLoggerModule {
                 r.appInfo.uid,
                 r.shortInstanceName,
                 fgsState, // FGS State
-                r.mAllowWhileInUsePermissionInFgs, // allowWhileInUsePermissionInFgs
-                r.mAllowStartForeground, // fgsStartReasonCode
+                r.isFgsAllowedWIU(), // allowWhileInUsePermissionInFgs
+                r.getFgsAllowStart(), // fgsStartReasonCode
                 r.appInfo.targetSdkVersion,
                 r.mRecentCallingUid,
                 0, // callerTargetSdkVersion
@@ -506,7 +506,13 @@ public class ForegroundServiceTypeLoggerModule {
                 ActivityManager.PROCESS_STATE_UNKNOWN,
                 ActivityManager.PROCESS_CAPABILITY_NONE,
                 apiDurationBeforeFgsStart,
-                apiDurationAfterFgsEnd);
+                apiDurationAfterFgsEnd,
+                r.mAllowWhileInUsePermissionInFgsReasonNoBinding,
+                r.mAllowWIUInBindService,
+                r.mAllowWIUByBindings,
+                r.mAllowStartForegroundNoBinding,
+                r.mAllowStartInBindService,
+                r.mAllowStartByBindings);
     }
 
     /**
@@ -557,7 +563,13 @@ public class ForegroundServiceTypeLoggerModule {
                 ActivityManager.PROCESS_STATE_UNKNOWN,
                 ActivityManager.PROCESS_CAPABILITY_NONE,
                 0,
-                apiDurationAfterFgsEnd);
+                apiDurationAfterFgsEnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
     }
 
     /**

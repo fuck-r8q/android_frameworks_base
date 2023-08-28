@@ -97,23 +97,37 @@
                     "include-filter":"android.incrementalinstall.cts.IncrementalFeatureTest"
                 }
             ]
-        }
-    ],
-    "presubmit-large":[
+        },
         {
-            "name":"CtsContentTestCases",
+            "name":"CtsPackageManagerHostTestCases",
+            "options":[
+                {
+                    "include-annotation":"android.platform.test.annotations.Presubmit"
+                },
+                {
+                    "exclude-annotation":"android.platform.test.annotations.Postsubmit"
+                },
+                {
+                    "exclude-annotation":"androidx.test.filters.FlakyTest"
+                },
+                {
+                    "exclude-annotation":"org.junit.Ignore"
+                }
+            ]
+        },
+        {
+            "name":"CtsPackageManagerTestCases",
             "options":[
                 {
                     "exclude-annotation":"androidx.test.filters.FlakyTest"
                 },
                 {
                     "exclude-annotation":"org.junit.Ignore"
-                },
-                {
-                    "include-filter":"android.content.pm.cts"
                 }
             ]
-        },
+        }
+    ],
+    "presubmit-large":[
         {
             "name":"CtsUsesNativeLibraryTest",
             "options":[
@@ -128,23 +142,6 @@
         {
             "name":"CtsSuspendAppsPermissionTestCases",
             "options":[
-                {
-                    "exclude-annotation":"androidx.test.filters.FlakyTest"
-                },
-                {
-                    "exclude-annotation":"org.junit.Ignore"
-                }
-            ]
-        },
-        {
-            "name":"CtsAppSecurityHostTestCases",
-            "options":[
-                {
-                    "include-annotation":"android.platform.test.annotations.Presubmit"
-                },
-                {
-                    "exclude-annotation":"android.platform.test.annotations.Postsubmit"
-                },
                 {
                     "exclude-annotation":"androidx.test.filters.FlakyTest"
                 },

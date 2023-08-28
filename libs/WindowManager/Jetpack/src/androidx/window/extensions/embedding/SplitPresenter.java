@@ -336,10 +336,6 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
         // value.
         final SplitRule rule = splitContainer.getSplitRule();
         final TaskFragmentContainer primaryContainer = splitContainer.getPrimaryContainer();
-        final Activity activity = primaryContainer.getTopNonFinishingActivity();
-        if (activity == null) {
-            return;
-        }
         final TaskContainer taskContainer = splitContainer.getTaskContainer();
         final TaskProperties taskProperties = taskContainer.getTaskProperties();
         final SplitAttributes splitAttributes = splitContainer.getCurrentSplitAttributes();
@@ -424,6 +420,14 @@ class SplitPresenter extends JetpackTaskFragmentOrganizer {
         container.setLastRequestedBounds(fragmentOptions.getInitialRelativeBounds());
         container.setLastRequestedWindowingMode(fragmentOptions.getWindowingMode());
         super.createTaskFragment(wct, fragmentOptions);
+
+        // Reorders the pinned TaskFragment to front to ensure it is the front-most TaskFragment.
+        final SplitPinContainer pinnedContainer =
+                container.getTaskContainer().getSplitPinContainer();
+        if (pinnedContainer != null) {
+            reorderTaskFragmentToFront(wct,
+                    pinnedContainer.getSecondaryContainer().getTaskFragmentToken());
+        }
     }
 
     @Override

@@ -21,9 +21,11 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.graphics.PointF;
+import android.graphics.Point;
 import android.util.Log;
 import android.widget.FrameLayout;
+
+import androidx.annotation.Nullable;
 
 import com.android.wm.shell.animation.Interpolators;
 import com.android.wm.shell.animation.PhysicsAnimator;
@@ -111,7 +113,8 @@ public class BubbleBarAnimationHelper {
     /**
      * Animates the provided bubble's expanded view to the expanded state.
      */
-    public void animateExpansion(BubbleViewProvider expandedBubble) {
+    public void animateExpansion(BubbleViewProvider expandedBubble,
+            @Nullable Runnable afterAnimation) {
         mExpandedBubble = expandedBubble;
         if (mExpandedBubble == null) {
             return;
@@ -133,7 +136,7 @@ public class BubbleBarAnimationHelper {
         bev.setVisibility(VISIBLE);
 
         // Set the pivot point for the scale, so the view animates out from the bubble bar.
-        PointF bubbleBarPosition = mPositioner.getBubbleBarPosition();
+        Point bubbleBarPosition = mPositioner.getBubbleBarPosition();
         mExpandedViewContainerMatrix.setScale(
                 1f - EXPANDED_VIEW_ANIMATE_SCALE_AMOUNT,
                 1f - EXPANDED_VIEW_ANIMATE_SCALE_AMOUNT,
@@ -160,6 +163,9 @@ public class BubbleBarAnimationHelper {
                     bev.setAnimationMatrix(null);
                     updateExpandedView();
                     bev.setSurfaceZOrderedOnTop(false);
+                    if (afterAnimation != null) {
+                        afterAnimation.run();
+                    }
                 })
                 .start();
     }
@@ -207,6 +213,14 @@ public class BubbleBarAnimationHelper {
                 })
                 .start();
         mExpandedViewAlphaAnimator.reverse();
+    }
+
+    /**
+     * Cancel current animations
+     */
+    public void cancelAnimations() {
+        PhysicsAnimator.getInstance(mExpandedViewContainerMatrix).cancel();
+        mExpandedViewAlphaAnimator.cancel();
     }
 
     private void updateExpandedView() {

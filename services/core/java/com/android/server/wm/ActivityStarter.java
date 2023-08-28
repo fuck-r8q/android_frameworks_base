@@ -709,6 +709,10 @@ class ActivityStarter {
                         mRequest.intent, caller, callingUid);
             }
 
+            if (mRequest.intent != null) {
+                mRequest.componentSpecified |= mRequest.intent.getComponent() != null;
+            }
+
             // If the caller hasn't already resolved the activity, we're willing
             // to do so here. If the caller is already holding the WM lock here,
             // and we need to check dynamic Uri permissions, then we're forced
@@ -1601,6 +1605,9 @@ class ActivityStarter {
         if (forceTransientTransition) {
             transitionController.collect(mLastStartActivityRecord);
             transitionController.collect(mPriorAboveTask);
+            // If keyguard is active and occluded, the transient target won't be moved to front
+            // to be collected, so set transient again after it is collected.
+            transitionController.setTransientLaunch(mLastStartActivityRecord, mPriorAboveTask);
             final DisplayContent dc = mLastStartActivityRecord.getDisplayContent();
             // update wallpaper target to TransientHide
             dc.mWallpaperController.adjustWallpaperWindows();
@@ -2029,11 +2036,7 @@ class ActivityStarter {
             }
         }
 
-        boolean shouldBlockActivityStart = true;
-        // Used for logging/toasts. Would we block the start if target sdk was U and feature was
-        // enabled?
-        boolean wouldBlockActivityStartIgnoringFlags = true;
-
+        Pair<Boolean, Boolean> pair = null;
         if (mSourceRecord != null) {
             boolean passesAsmChecks = true;
             Task sourceTask = mSourceRecord.getTask();
@@ -2049,20 +2052,38 @@ class ActivityStarter {
 
             if (passesAsmChecks) {
                 Task taskToCheck = taskToFront ? sourceTask : targetTask;
-                // first == false means Should Block
-                // second == false means Would Block disregarding flags
-                Pair<Boolean, Boolean> pair = ActivityTaskSupervisor
+                pair = ActivityTaskSupervisor
                         .doesTopActivityMatchingUidExistForAsm(taskToCheck, mSourceRecord.getUid(),
                                 mSourceRecord);
-                shouldBlockActivityStart = !pair.first;
-                wouldBlockActivityStartIgnoringFlags = !pair.second;
             }
+        } else if (!taskToFront) {
+            // We don't have a sourceRecord, and we're launching into an existing task.
+            // Allow if callingUid is top of stack.
+            pair = ActivityTaskSupervisor
+                    .doesTopActivityMatchingUidExistForAsm(targetTask, mCallingUid,
+                            /*sourceRecord*/null);
+        }
+
+        boolean shouldBlockActivityStart = true;
+        if (pair != null) {
+            // We block if feature flag is enabled
+            shouldBlockActivityStart = !pair.first;
+            // Used for logging/toasts. Would we block if target sdk was U and feature was
+            // enabled? If so, we can't return here but we also might not block at the end
+            boolean wouldBlockActivityStartIgnoringFlags = !pair.second;
 
             if (!wouldBlockActivityStartIgnoringFlags) {
                 return true;
             }
         }
 
+        // ASM rules have failed. Log why
+        return logAsmFailureAndCheckFeatureEnabled(r, newTask, targetTask, shouldBlockActivityStart,
+                taskToFront);
+    }
+
+    private boolean logAsmFailureAndCheckFeatureEnabled(ActivityRecord r, boolean newTask,
+            Task targetTask, boolean shouldBlockActivityStart, boolean taskToFront) {
         // ASM rules have failed. Log why
         ActivityRecord targetTopActivity = targetTask == null ? null
                 : targetTask.getActivity(ar -> !ar.finishing && !ar.isAlwaysOnTop());
@@ -2072,6 +2093,13 @@ class ActivityStarter {
                 : (mSourceRecord.getTask().equals(targetTask)
                         ? FrameworkStatsLog.ACTIVITY_ACTION_BLOCKED__ACTION__ACTIVITY_START_SAME_TASK
                         :  FrameworkStatsLog.ACTIVITY_ACTION_BLOCKED__ACTION__ACTIVITY_START_DIFFERENT_TASK);
+
+        boolean blockActivityStartAndFeatureEnabled = ActivitySecurityModelFeatureFlags
+                .shouldRestrictActivitySwitch(mCallingUid)
+                && shouldBlockActivityStart;
+
+        String asmDebugInfo = getDebugInfoForActivitySecurity("Launch", r, targetTask,
+                targetTopActivity, blockActivityStartAndFeatureEnabled, /*taskToFront*/taskToFront);
 
         FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_ACTION_BLOCKED,
                 /* caller_uid */
@@ -2101,24 +2129,21 @@ class ActivityStarter {
                 targetTask != null && mSourceRecord != null
                         && !targetTask.equals(mSourceRecord.getTask()) && targetTask.isVisible(),
                 /* bal_code */
-                mBalCode
+                mBalCode,
+                /* task_stack */
+                asmDebugInfo
         );
-
-        boolean blockActivityStartAndFeatureEnabled = ActivitySecurityModelFeatureFlags
-                    .shouldRestrictActivitySwitch(mCallingUid)
-                && shouldBlockActivityStart;
 
         String launchedFromPackageName = r.launchedFromPackage;
         if (ActivitySecurityModelFeatureFlags.shouldShowToast(mCallingUid)) {
             String toastText = ActivitySecurityModelFeatureFlags.DOC_LINK
                     + (blockActivityStartAndFeatureEnabled ? " blocked " : " would block ")
                     + getApplicationLabel(mService.mContext.getPackageManager(),
-                        launchedFromPackageName);
+                    launchedFromPackageName);
             UiThread.getHandler().post(() -> Toast.makeText(mService.mContext,
                     toastText, Toast.LENGTH_LONG).show());
 
-            logDebugInfoForActivitySecurity("Launch", r, targetTask, targetTopActivity,
-                    blockActivityStartAndFeatureEnabled, /* taskToFront */ taskToFront);
+            Slog.i(TAG, asmDebugInfo);
         }
 
         if (blockActivityStartAndFeatureEnabled) {
@@ -2136,7 +2161,7 @@ class ActivityStarter {
     }
 
     /** Only called when an activity launch may be blocked, which should happen very rarely */
-    private void logDebugInfoForActivitySecurity(String action, ActivityRecord r, Task targetTask,
+    private String getDebugInfoForActivitySecurity(String action, ActivityRecord r, Task targetTask,
             ActivityRecord targetTopActivity, boolean blockActivityStartAndFeatureEnabled,
             boolean taskToFront) {
         final String prefix = "[ASM] ";
@@ -2197,7 +2222,7 @@ class ActivityStarter {
         joiner.add(prefix + "BalCode: " + balCodeToString(mBalCode));
 
         joiner.add(prefix + "------ Activity Security " + action + " Debug Logging End ------");
-        Slog.i(TAG, joiner.toString());
+        return joiner.toString();
     }
 
     /**
@@ -2371,7 +2396,7 @@ class ActivityStarter {
                             + ActivitySecurityModelFeatureFlags.DOC_LINK,
                     Toast.LENGTH_LONG).show());
 
-            logDebugInfoForActivitySecurity("Clear Top", mStartActivity, targetTask, targetTaskTop,
+            getDebugInfoForActivitySecurity("Clear Top", mStartActivity, targetTask, targetTaskTop,
                     shouldBlockActivityStart, /* taskToFront */ true);
         }
     }
@@ -3177,7 +3202,18 @@ class ActivityStarter {
         } else {
             TaskFragment candidateTf = mAddingToTaskFragment != null ? mAddingToTaskFragment : null;
             if (candidateTf == null) {
-                final ActivityRecord top = task.topRunningActivity(false /* focusableOnly */);
+                // Puts the activity on the top-most non-isolated navigation TF, unless the
+                // activity is launched from the same TF.
+                final TaskFragment sourceTaskFragment =
+                        mSourceRecord != null ? mSourceRecord.getTaskFragment() : null;
+                final ActivityRecord top = task.getActivity(r -> {
+                    if (!r.canBeTopRunning()) {
+                        return false;
+                    }
+                    final TaskFragment taskFragment = r.getTaskFragment();
+                    return !taskFragment.isIsolatedNav() || (sourceTaskFragment != null
+                            && sourceTaskFragment == taskFragment);
+                });
                 if (top != null) {
                     candidateTf = top.getTaskFragment();
                 }

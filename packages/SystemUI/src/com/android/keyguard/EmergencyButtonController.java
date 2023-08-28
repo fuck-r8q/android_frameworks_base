@@ -217,7 +217,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     }
 
     private void requestCellInfoUpdate(){
-        if(!getContext().getResources().getBoolean(R.bool.kg_hide_emgcy_btn_when_oos)) {
+        if(!getContext().getResources().getBoolean(com.android.settingslib.R.bool.kg_hide_emgcy_btn_when_oos)) {
             return;
         }
         TelephonyManager tmWithoutSim = mTelephonyManager

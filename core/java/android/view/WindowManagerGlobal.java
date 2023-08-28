@@ -165,6 +165,7 @@ public final class WindowManagerGlobal {
         }
     }
 
+    @Nullable
     @UnsupportedAppUsage
     public static IWindowManager getWindowManagerService() {
         synchronized (WindowManagerGlobal.class) {
@@ -172,6 +173,7 @@ public final class WindowManagerGlobal {
                 sWindowManagerService = IWindowManager.Stub.asInterface(
                         ServiceManager.getService("window"));
                 try {
+                    // Can be null if this is called before WindowManagerService is initialized.
                     if (sWindowManagerService != null) {
                         ValueAnimator.setDurationScale(
                                 sWindowManagerService.getCurrentAnimatorScale());

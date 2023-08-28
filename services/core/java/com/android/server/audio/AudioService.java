@@ -77,6 +77,8 @@ import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.hardware.SensorPrivacyManager;
 import android.hardware.SensorPrivacyManagerInternal;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.DisplayManager.DisplayListener;
 import android.hardware.hdmi.HdmiAudioSystemClient;
 import android.hardware.hdmi.HdmiClient;
 import android.hardware.hdmi.HdmiControlManager;
@@ -185,6 +187,7 @@ import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
@@ -391,7 +394,6 @@ public class AudioService extends IAudioService.Stub
     private static final int MSG_DISPATCH_AUDIO_MODE = 40;
     private static final int MSG_ROUTING_UPDATED = 41;
     private static final int MSG_INIT_HEADTRACKING_SENSORS = 42;
-    private static final int MSG_PERSIST_SPATIAL_AUDIO_DEVICE_SETTINGS = 43;
     private static final int MSG_ADD_ASSISTANT_SERVICE_UID = 44;
     private static final int MSG_REMOVE_ASSISTANT_SERVICE_UID = 45;
     private static final int MSG_UPDATE_ACTIVE_ASSISTANT_SERVICE_UID = 46;
@@ -988,6 +990,36 @@ public class AudioService extends IAudioService.Stub
 
     private AtomicBoolean mMasterMute = new AtomicBoolean(false);
 
+    private DisplayManager mDisplayManager;
+
+    private DisplayListener mDisplayListener =
+      new DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) {}
+
+        @Override
+        public void onDisplayRemoved(int displayId) {}
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+            if (displayId != Display.DEFAULT_DISPLAY) {
+                return;
+            }
+            int displayState = mDisplayManager.getDisplay(Display.DEFAULT_DISPLAY).getState();
+            if (displayState == Display.STATE_ON) {
+                if (mMonitorRotation) {
+                    RotationHelper.enable();
+                }
+                AudioSystem.setParameters("screen_state=on");
+            } else {
+                if (mMonitorRotation) {
+                    //reduce wakeups (save current) by only listening when display is on
+                    RotationHelper.disable();
+                }
+                AudioSystem.setParameters("screen_state=off");
+            }
+        }
+      };
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
@@ -1035,6 +1067,8 @@ public class AudioService extends IAudioService.Stub
         mAudioPolicy = audioPolicy;
         mPlatformType = AudioSystem.getPlatformType(context);
 
+        mDeviceBroker = new AudioDeviceBroker(mContext, this, mAudioSystem);
+
         mIsSingleVolume = AudioSystem.isSingleVolume(context);
 
         mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
@@ -1047,13 +1081,14 @@ public class AudioService extends IAudioService.Stub
 
         mSfxHelper = new SoundEffectsHelper(mContext, playerBase -> ignorePlayerLogs(playerBase));
 
-        final boolean binauralEnabledDefault = SystemProperties.getBoolean(
+        boolean binauralEnabledDefault = SystemProperties.getBoolean(
                 "ro.audio.spatializer_binaural_enabled_default", true);
-        final boolean transauralEnabledDefault = SystemProperties.getBoolean(
+        boolean transauralEnabledDefault = SystemProperties.getBoolean(
                 "ro.audio.spatializer_transaural_enabled_default", true);
-        final boolean headTrackingEnabledDefault = mContext.getResources().getBoolean(
+        boolean headTrackingEnabledDefault = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_spatial_audio_head_tracking_enabled_default);
-        mSpatializerHelper = new SpatializerHelper(this, mAudioSystem,
+
+        mSpatializerHelper = new SpatializerHelper(this, mAudioSystem, mDeviceBroker,
                 binauralEnabledDefault, transauralEnabledDefault, headTrackingEnabledDefault);
 
         mVibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
@@ -1221,8 +1256,6 @@ public class AudioService extends IAudioService.Stub
         mUseFixedVolume = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_useFixedVolume);
 
-        mDeviceBroker = new AudioDeviceBroker(mContext, this, mAudioSystem);
-
         mRecordMonitor = new RecordingActivityMonitor(mContext);
         mRecordMonitor.registerRecordingCallback(mVoiceRecordingActivityMonitor, true);
 
@@ -1275,6 +1308,8 @@ public class AudioService extends IAudioService.Stub
         mCachedParams.put("hdr_audio_sampling_rate", "0");
         queueMsgUnderWakeLock(mAudioHandler, MSG_INIT_SPATIALIZER,
                 0 /* arg1 */, 0 /* arg2 */, null /* obj */, 0 /* delay */);
+
+        mDisplayManager = context.getSystemService(DisplayManager.class);
     }
 
     private void initVolumeStreamStates() {
@@ -1371,8 +1406,10 @@ public class AudioService extends IAudioService.Stub
                 new IntentFilter(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED);
         intentFilter.addAction(BluetoothHeadset.ACTION_ACTIVE_DEVICE_CHANGED);
         intentFilter.addAction(Intent.ACTION_DOCK_EVENT);
-        intentFilter.addAction(Intent.ACTION_SCREEN_ON);
-        intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        if (mDisplayManager == null) {
+            intentFilter.addAction(Intent.ACTION_SCREEN_ON);
+            intentFilter.addAction(Intent.ACTION_SCREEN_OFF);
+        }
         intentFilter.addAction(Intent.ACTION_USER_SWITCHED);
         intentFilter.addAction(Intent.ACTION_USER_BACKGROUND);
         intentFilter.addAction(Intent.ACTION_USER_FOREGROUND);
@@ -1401,6 +1438,10 @@ public class AudioService extends IAudioService.Stub
             Log.e(TAG, "initExternalEventReceivers cannot create SubscriptionManager!");
         } else {
             subscriptionManager.addOnSubscriptionsChangedListener(mSubscriptionChangedListener);
+        }
+
+        if (mDisplayManager != null) {
+            mDisplayManager.registerDisplayListener(mDisplayListener, mAudioHandler);
         }
     }
 
@@ -3647,8 +3688,14 @@ public class AudioService extends IAudioService.Stub
                         hdmiClient = mHdmiTvClient;
                     }
 
-                    if (((mHdmiPlaybackClient != null && isFullVolumeDevice(device))
-                            || (mHdmiTvClient != null && mHdmiSystemAudioSupported))
+                    boolean playbackDeviceConditions = mHdmiPlaybackClient != null
+                            && isFullVolumeDevice(device);
+                    boolean tvConditions = mHdmiTvClient != null
+                            && mHdmiSystemAudioSupported
+                            && !isAbsoluteVolumeDevice(device)
+                            && !isA2dpAbsoluteVolumeDevice(device);
+
+                    if ((playbackDeviceConditions || tvConditions)
                             && mHdmiCecVolumeControlEnabled
                             && streamTypeAlias == AudioSystem.STREAM_MUSIC) {
                         int keyCode = KeyEvent.KEYCODE_UNKNOWN;
@@ -6626,6 +6673,10 @@ public class AudioService extends IAudioService.Stub
         return mContentResolver;
     }
 
+    /*package*/ SettingsAdapter getSettings() {
+        return mSettings;
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Internal methods
     ///////////////////////////////////////////////////////////////////////////
@@ -9287,10 +9338,6 @@ public class AudioService extends IAudioService.Stub
                     mSpatializerHelper.onInitSensors();
                     break;
 
-                case MSG_PERSIST_SPATIAL_AUDIO_DEVICE_SETTINGS:
-                    onPersistSpatialAudioDeviceSettings();
-                    break;
-
                 case MSG_RESET_SPATIALIZER:
                     mSpatializerHelper.reset(/* featureEnabled */ mHasSpatializerEffect);
                     break;
@@ -10351,39 +10398,9 @@ public class AudioService extends IAudioService.Stub
     }
 
     void onInitSpatializer() {
-        final String settings = mSettings.getSecureStringForUser(mContentResolver,
-                Settings.Secure.SPATIAL_AUDIO_ENABLED, UserHandle.USER_CURRENT);
-        if (settings == null) {
-            Log.e(TAG, "error reading spatial audio device settings");
-        }
-        mSpatializerHelper.init(/*effectExpected*/ mHasSpatializerEffect, settings);
+        mDeviceBroker.onReadAudioDeviceSettings();
+        mSpatializerHelper.init(/*effectExpected*/ mHasSpatializerEffect);
         mSpatializerHelper.setFeatureEnabled(mHasSpatializerEffect);
-    }
-
-    /**
-     * post a message to persist the spatial audio device settings.
-     * Message is delayed by 1s on purpose in case of successive changes in quick succession (at
-     * init time for instance)
-     * Note this method is made public to work around a Mockito bug where it needs to be public
-     * in order to be mocked by a test a the same package
-     * (see https://code.google.com/archive/p/mockito/issues/127)
-     */
-    public void persistSpatialAudioDeviceSettings() {
-        sendMsg(mAudioHandler,
-                MSG_PERSIST_SPATIAL_AUDIO_DEVICE_SETTINGS,
-                SENDMSG_REPLACE, /*arg1*/ 0, /*arg2*/ 0, TAG,
-                /*delay*/ 1000);
-    }
-
-    void onPersistSpatialAudioDeviceSettings() {
-        final String settings = mSpatializerHelper.getSADeviceSettings();
-        Log.v(TAG, "saving spatial audio device settings: " + settings);
-        boolean res = mSettings.putSecureStringForUser(mContentResolver,
-                Settings.Secure.SPATIAL_AUDIO_ENABLED,
-                settings, UserHandle.USER_CURRENT);
-        if (!res) {
-            Log.e(TAG, "error saving spatial audio device settings: " + settings);
-        }
     }
 
     //==========================================================================================

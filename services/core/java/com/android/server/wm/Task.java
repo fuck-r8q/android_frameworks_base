@@ -4543,6 +4543,10 @@ class Task extends TaskFragment {
         return mForceHiddenFlags != 0;
     }
 
+    boolean isForceHiddenForPinnedTask() {
+        return (mForceHiddenFlags & FLAG_FORCE_HIDDEN_FOR_PINNED_TASK) != 0;
+    }
+
     @Override
     protected boolean isForceTranslucent() {
         return mForceTranslucent;
@@ -5292,17 +5296,21 @@ class Task extends TaskFragment {
             // Ensure that we do not trigger entering PiP an activity on the root pinned task.
             return;
         }
-        final boolean isTransient = opts != null && opts.getTransientLaunch();
-        final Task targetRootTask = toFrontTask != null
-                ? toFrontTask.getRootTask() : toFrontActivity.getRootTask();
-        if (targetRootTask != null && (targetRootTask.isActivityTypeAssistant() || isTransient)) {
-            // Ensure the task/activity being brought forward is not the assistant and is not
-            // transient. In the case of transient-launch, we want to wait until the end of the
-            // transition and only allow switch if the transient launch was committed.
+        final Task targetRootTask = toFrontTask != null ? toFrontTask.getRootTask()
+                : toFrontActivity != null ? toFrontActivity.getRootTask() : null;
+        if (targetRootTask == null) {
+            Slog.e(TAG, "No root task for enter pip, both to front task and activity are null?");
             return;
         }
-        pipCandidate.supportsEnterPipOnTaskSwitch = true;
+        final boolean isTransient = opts != null && opts.getTransientLaunch()
+                || (targetRootTask.mTransitionController.isTransientHide(targetRootTask));
 
+        // Ensure the task/activity being brought forward is not the assistant and is not transient
+        // nor transient hide target. In the case of transient-launch, we want to wait until the end
+        // of the transition and only allow to enter pip on task switch after the transient launch
+        // was committed.
+        pipCandidate.supportsEnterPipOnTaskSwitch = !targetRootTask.isActivityTypeAssistant()
+                && !isTransient;
     }
 
     /**
@@ -5447,8 +5455,7 @@ class Task extends TaskFragment {
         // Basic case: for simple app-centric recents, we need to recreate
         // the task if the affinity has changed.
 
-        final String affinity = ActivityRecord.computeTaskAffinity(destAffinity, srec.getUid(),
-                srec.launchMode, srec.mActivityComponent);
+        final String affinity = ActivityRecord.computeTaskAffinity(destAffinity, srec.getUid());
         if (srec == null || srec.getTask().affinity == null
                 || !srec.getTask().affinity.equals(affinity)) {
             return true;

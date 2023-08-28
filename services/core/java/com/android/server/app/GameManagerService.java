@@ -40,6 +40,7 @@ import android.app.GameModeInfo;
 import android.app.GameState;
 import android.app.IGameManagerService;
 import android.app.IGameModeListener;
+import android.app.IGameStateListener;
 import android.app.StatsManager;
 import android.app.UidObserver;
 import android.content.BroadcastReceiver;
@@ -148,6 +149,7 @@ public final class GameManagerService extends IGameManagerService.Stub {
     private final Object mLock = new Object();
     private final Object mDeviceConfigLock = new Object();
     private final Object mGameModeListenerLock = new Object();
+    private final Object mGameStateListenerLock = new Object();
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     final Handler mHandler;
     private final PackageManager mPackageManager;
@@ -164,6 +166,8 @@ public final class GameManagerService extends IGameManagerService.Stub {
     // listener to caller uid map
     @GuardedBy("mGameModeListenerLock")
     private final ArrayMap<IGameModeListener, Integer> mGameModeListeners = new ArrayMap<>();
+    @GuardedBy("mGameStateListenerLock")
+    private final ArrayMap<IGameStateListener, Integer> mGameStateListeners = new ArrayMap<>();
     @Nullable
     private final GameServiceController mGameServiceController;
     private final Object mUidObserverLock = new Object();
@@ -342,6 +346,9 @@ public final class GameManagerService extends IGameManagerService.Stub {
                         if (mHandler.hasMessages(CANCEL_GAME_LOADING_MODE)) {
                             mHandler.removeMessages(CANCEL_GAME_LOADING_MODE);
                         }
+                        Slog.v(TAG, String.format(
+                                "Game loading power mode %s (game state change isLoading=%b)",
+                                        isLoading ? "ON" : "OFF", isLoading));
                         mPowerManagerInternal.setPowerMode(Mode.GAME_LOADING, isLoading);
                         if (isLoading) {
                             int loadingBoostDuration = getLoadingBoostDuration(packageName, userId);
@@ -352,9 +359,20 @@ public final class GameManagerService extends IGameManagerService.Stub {
                                     loadingBoostDuration);
                         }
                     }
+                    synchronized (mGameStateListenerLock) {
+                        for (IGameStateListener listener : mGameStateListeners.keySet()) {
+                            try {
+                                listener.onGameStateChanged(packageName, gameState, userId);
+                            } catch (RemoteException ex) {
+                                Slog.w(TAG, "Cannot notify game state change for listener added by "
+                                        + mGameStateListeners.get(listener));
+                            }
+                        }
+                    }
                     break;
                 }
                 case CANCEL_GAME_LOADING_MODE: {
+                    Slog.v(TAG, "Game loading power mode OFF (loading boost ended)");
                     mPowerManagerInternal.setPowerMode(Mode.GAME_LOADING, false);
                     break;
                 }
@@ -1265,6 +1283,7 @@ public final class GameManagerService extends IGameManagerService.Stub {
                 // instruction.
                 mHandler.removeMessages(CANCEL_GAME_LOADING_MODE);
             } else {
+                Slog.v(TAG, "Game loading power mode ON (loading boost on game start)");
                 mPowerManagerInternal.setPowerMode(Mode.GAME_LOADING, true);
             }
 
@@ -1474,6 +1493,43 @@ public final class GameManagerService extends IGameManagerService.Stub {
     }
 
     /**
+     * Adds a game state listener.
+     */
+    @Override
+    public void addGameStateListener(@NonNull IGameStateListener listener) {
+        try {
+            final IBinder listenerBinder = listener.asBinder();
+            listenerBinder.linkToDeath(new DeathRecipient() {
+                @Override public void binderDied() {
+                    removeGameStateListenerUnchecked(listener);
+                    listenerBinder.unlinkToDeath(this, 0 /*flags*/);
+                }
+            }, 0 /*flags*/);
+            synchronized (mGameStateListenerLock) {
+                mGameStateListeners.put(listener, Binder.getCallingUid());
+            }
+        } catch (RemoteException ex) {
+            Slog.e(TAG,
+                    "Failed to link death recipient for IGameStateListener from caller "
+                            + Binder.getCallingUid() + ", abandoned its listener registration", ex);
+        }
+    }
+
+    /**
+     * Removes a game state listener.
+     */
+    @Override
+    public void removeGameStateListener(@NonNull IGameStateListener listener) {
+        removeGameStateListenerUnchecked(listener);
+    }
+
+    private void removeGameStateListenerUnchecked(IGameStateListener listener) {
+        synchronized (mGameStateListenerLock) {
+            mGameStateListeners.remove(listener);
+        }
+    }
+
+    /**
      * Notified when boot is completed.
      */
     @VisibleForTesting
@@ -1504,6 +1560,10 @@ public final class GameManagerService extends IGameManagerService.Stub {
                 }
             }
         }, new IntentFilter(Intent.ACTION_SHUTDOWN));
+        Slog.v(TAG, "Game loading power mode OFF (game manager service start/restart)");
+        mPowerManagerInternal.setPowerMode(Mode.GAME_LOADING, false);
+        Slog.v(TAG, "Game power mode OFF (game manager service start/restart)");
+        mPowerManagerInternal.setPowerMode(Mode.GAME, false);
     }
 
     private void sendUserMessage(int userId, int what, String eventForLog, int delayMillis) {

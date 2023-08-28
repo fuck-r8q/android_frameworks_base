@@ -460,7 +460,7 @@ public class Watchdog implements Dumpable {
         mInterestingJavaPids.add(Process.myPid());
 
         // See the notes on DEFAULT_TIMEOUT.
-        assert DB ||
+        assert DB || Build.IS_USERDEBUG ||
                 DEFAULT_TIMEOUT > ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS;
 
         mTraceErrorLogger = new TraceErrorLogger();
@@ -534,7 +534,8 @@ public class Watchdog implements Dumpable {
      */
     void updateWatchdogTimeout(long timeoutMillis) {
         // See the notes on DEFAULT_TIMEOUT.
-        if (!DB && timeoutMillis <= ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS) {
+        if (!DB && !Build.IS_USERDEBUG
+                && timeoutMillis <= ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS) {
             timeoutMillis = ZygoteConnectionConstants.WRAPPED_PID_TIMEOUT_MILLIS + 1;
         }
         mWatchdogTimeoutMillis = timeoutMillis;
@@ -953,7 +954,7 @@ public class Watchdog implements Dumpable {
         // The system's been hanging for a whlie, another second or two won't hurt much.
         SystemClock.sleep(5000);
         processCpuTracker.update();
-        report.append(processCpuTracker.printCurrentState(anrTime));
+        report.append(processCpuTracker.printCurrentState(anrTime, 10));
         report.append(tracesFileException.getBuffer());
         File watchdogTraces;
         String newTracesPath = "traces_SystemServer_WDT"

@@ -14,19 +14,23 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.android.systemui.bouncer.ui.viewmodel
 
 import android.content.Context
 import com.android.systemui.R
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
-import com.android.systemui.bouncer.shared.model.AuthenticationThrottledModel
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.flags.FeatureFlags
+import com.android.systemui.flags.Flags
 import com.android.systemui.util.kotlin.pairwise
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
-import dagger.assisted.AssistedInject
+import javax.inject.Inject
+import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,23 +44,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Holds UI state and handles user input on bouncer UIs. */
+@SysUISingleton
 class BouncerViewModel
-@AssistedInject
+@Inject
 constructor(
     @Application private val applicationContext: Context,
     @Application private val applicationScope: CoroutineScope,
-    interactorFactory: BouncerInteractor.Factory,
-    @Assisted containerName: String,
+    private val interactor: BouncerInteractor,
+    featureFlags: FeatureFlags,
 ) {
-    private val interactor: BouncerInteractor = interactorFactory.create(containerName)
-
     private val isInputEnabled: StateFlow<Boolean> =
-        interactor.throttling
-            .map { it == null }
+        interactor.isThrottled
+            .map { !it }
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.WhileSubscribed(),
-                initialValue = interactor.throttling.value == null,
+                initialValue = !interactor.isThrottled.value,
             )
 
     private val pin: PinBouncerViewModel by lazy {
@@ -99,15 +102,48 @@ constructor(
         )
 
     init {
-        applicationScope.launch {
-            _authMethod.subscriptionCount
-                .pairwise()
-                .map { (previousCount, currentCount) -> currentCount > previousCount }
-                .collect { subscriberAdded ->
-                    if (subscriberAdded) {
-                        reloadAuthMethod()
+        if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+            applicationScope.launch {
+                interactor.isThrottled
+                    .map { isThrottled ->
+                        if (isThrottled) {
+                            when (interactor.getAuthenticationMethod()) {
+                                is AuthenticationMethodModel.Pin ->
+                                    R.string.kg_too_many_failed_pin_attempts_dialog_message
+                                is AuthenticationMethodModel.Password ->
+                                    R.string.kg_too_many_failed_password_attempts_dialog_message
+                                is AuthenticationMethodModel.Pattern ->
+                                    R.string.kg_too_many_failed_pattern_attempts_dialog_message
+                                else -> null
+                            }?.let { stringResourceId ->
+                                applicationContext.getString(
+                                    stringResourceId,
+                                    interactor.throttling.value.failedAttemptCount,
+                                    ceil(interactor.throttling.value.remainingMs / 1000f).toInt(),
+                                )
+                            }
+                        } else {
+                            null
+                        }
                     }
-                }
+                    .distinctUntilChanged()
+                    .collect { dialogMessageOrNull ->
+                        if (dialogMessageOrNull != null) {
+                            _throttlingDialogMessage.value = dialogMessageOrNull
+                        }
+                    }
+            }
+
+            applicationScope.launch {
+                _authMethod.subscriptionCount
+                    .pairwise()
+                    .map { (previousCount, currentCount) -> currentCount > previousCount }
+                    .collect { subscriberAdded ->
+                        if (subscriberAdded) {
+                            reloadAuthMethod()
+                        }
+                    }
+            }
         }
     }
 
@@ -115,9 +151,9 @@ constructor(
     val message: StateFlow<MessageViewModel> =
         combine(
                 interactor.message,
-                interactor.throttling,
-            ) { message, throttling ->
-                toMessageViewModel(message, throttling)
+                interactor.isThrottled,
+            ) { message, isThrottled ->
+                toMessageViewModel(message, isThrottled)
             }
             .stateIn(
                 scope = applicationScope,
@@ -125,7 +161,7 @@ constructor(
                 initialValue =
                     toMessageViewModel(
                         message = interactor.message.value,
-                        throttling = interactor.throttling.value,
+                        isThrottled = interactor.isThrottled.value,
                     ),
             )
 
@@ -141,37 +177,6 @@ constructor(
      */
     val throttlingDialogMessage: StateFlow<String?> = _throttlingDialogMessage.asStateFlow()
 
-    init {
-        applicationScope.launch {
-            interactor.throttling
-                .map { model ->
-                    model?.let {
-                        when (interactor.getAuthenticationMethod()) {
-                            is AuthenticationMethodModel.Pin ->
-                                R.string.kg_too_many_failed_pin_attempts_dialog_message
-                            is AuthenticationMethodModel.Password ->
-                                R.string.kg_too_many_failed_password_attempts_dialog_message
-                            is AuthenticationMethodModel.Pattern ->
-                                R.string.kg_too_many_failed_pattern_attempts_dialog_message
-                            else -> null
-                        }?.let { stringResourceId ->
-                            applicationContext.getString(
-                                stringResourceId,
-                                model.failedAttemptCount,
-                                model.totalDurationSec,
-                            )
-                        }
-                    }
-                }
-                .distinctUntilChanged()
-                .collect { dialogMessageOrNull ->
-                    if (dialogMessageOrNull != null) {
-                        _throttlingDialogMessage.value = dialogMessageOrNull
-                    }
-                }
-        }
-    }
-
     /** Notifies that the emergency services button was clicked. */
     fun onEmergencyServicesButtonClicked() {
         // TODO(b/280877228): implement this
@@ -184,11 +189,11 @@ constructor(
 
     private fun toMessageViewModel(
         message: String?,
-        throttling: AuthenticationThrottledModel?,
+        isThrottled: Boolean,
     ): MessageViewModel {
         return MessageViewModel(
             text = message ?: "",
-            isUpdateAnimated = throttling == null,
+            isUpdateAnimated = !isThrottled,
         )
     }
 
@@ -214,11 +219,4 @@ constructor(
          */
         val isUpdateAnimated: Boolean,
     )
-
-    @AssistedFactory
-    interface Factory {
-        fun create(
-            containerName: String,
-        ): BouncerViewModel
-    }
 }

@@ -63,6 +63,7 @@ import com.android.wm.shell.sysui.ShellSharedConstants
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.util.KtProtoLog
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
+import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
 import java.io.PrintWriter
 import java.util.concurrent.Executor
 import java.util.function.Consumer
@@ -149,20 +150,24 @@ class DesktopTasksController(
      * back to front during the launch.
      */
     fun stashDesktopApps(displayId: Int) {
-        KtProtoLog.v(WM_SHELL_DESKTOP_MODE, "DesktopTasksController: stashDesktopApps")
-        desktopModeTaskRepository.setStashed(displayId, true)
+        if (DesktopModeStatus.isStashingEnabled()) {
+            KtProtoLog.v(WM_SHELL_DESKTOP_MODE, "DesktopTasksController: stashDesktopApps")
+            desktopModeTaskRepository.setStashed(displayId, true)
+        }
     }
 
     /**
      * Clear the stashed state for the given display
      */
     fun hideStashedDesktopApps(displayId: Int) {
-        KtProtoLog.v(
-                WM_SHELL_DESKTOP_MODE,
-                "DesktopTasksController: hideStashedApps displayId=%d",
-                displayId
-        )
-        desktopModeTaskRepository.setStashed(displayId, false)
+        if (DesktopModeStatus.isStashingEnabled()) {
+            KtProtoLog.v(
+                    WM_SHELL_DESKTOP_MODE,
+                    "DesktopTasksController: hideStashedApps displayId=%d",
+                    displayId
+            )
+            desktopModeTaskRepository.setStashed(displayId, false)
+        }
     }
 
     /** Get number of tasks that are marked as visible */
@@ -171,9 +176,13 @@ class DesktopTasksController(
     }
 
     /** Move a task with given `taskId` to desktop */
-    fun moveToDesktop(taskId: Int, wct: WindowContainerTransaction = WindowContainerTransaction()) {
+    fun moveToDesktop(
+            decor: DesktopModeWindowDecoration,
+            taskId: Int,
+            wct: WindowContainerTransaction = WindowContainerTransaction()
+    ) {
         shellTaskOrganizer.getRunningTaskInfo(taskId)?.let {
-            task -> moveToDesktop(task, wct)
+            task -> moveToDesktop(decor, task, wct)
         }
     }
 
@@ -181,6 +190,7 @@ class DesktopTasksController(
      * Move a task to desktop
      */
     fun moveToDesktop(
+            decor: DesktopModeWindowDecoration,
             task: RunningTaskInfo,
             wct: WindowContainerTransaction = WindowContainerTransaction()
     ) {
@@ -194,20 +204,25 @@ class DesktopTasksController(
         addMoveToDesktopChanges(wct, task)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
+            enterDesktopTaskTransitionHandler.moveToDesktop(wct, decor)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
     }
 
     /**
-     * Moves a single task to freeform and sets the taskBounds to the passed in bounds,
-     * startBounds
+     * The first part of the animated move to desktop transition. Applies the changes to move task
+     * to desktop mode and sets the taskBounds to the passed in bounds, startBounds. This is
+     * followed with a call to {@link finishMoveToDesktop} or {@link cancelMoveToDesktop}.
      */
-    fun moveToFreeform(taskInfo: RunningTaskInfo, startBounds: Rect) {
+    fun startMoveToDesktop(
+            taskInfo: RunningTaskInfo,
+            startBounds: Rect,
+            dragToDesktopValueAnimator: MoveToDesktopAnimator
+    ) {
         KtProtoLog.v(
             WM_SHELL_DESKTOP_MODE,
-            "DesktopTasksController: moveToFreeform with bounds taskId=%d",
+            "DesktopTasksController: startMoveToDesktop taskId=%d",
             taskInfo.taskId
         )
         val wct = WindowContainerTransaction()
@@ -216,18 +231,21 @@ class DesktopTasksController(
         wct.setBounds(taskInfo.token, startBounds)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.startTransition(
-                    Transitions.TRANSIT_ENTER_FREEFORM, wct, mOnAnimationFinishedCallback)
+            enterDesktopTaskTransitionHandler.startMoveToDesktop(wct, dragToDesktopValueAnimator,
+                    mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
     }
 
-    /** Brings apps to front and sets freeform task bounds */
-    private fun moveToDesktopWithAnimation(taskInfo: RunningTaskInfo, freeformBounds: Rect) {
+    /**
+     * The second part of the animated move to desktop transition, called after
+     * {@link startMoveToDesktop}. Brings apps to front and sets freeform task bounds.
+     */
+    private fun finalizeMoveToDesktop(taskInfo: RunningTaskInfo, freeformBounds: Rect) {
         KtProtoLog.v(
             WM_SHELL_DESKTOP_MODE,
-            "DesktopTasksController: moveToDesktop with animation taskId=%d",
+            "DesktopTasksController: finalizeMoveToDesktop taskId=%d",
             taskInfo.taskId
         )
         val wct = WindowContainerTransaction()
@@ -236,8 +254,8 @@ class DesktopTasksController(
         wct.setBounds(taskInfo.token, freeformBounds)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.startTransition(
-                Transitions.TRANSIT_ENTER_DESKTOP_MODE, wct, mOnAnimationFinishedCallback)
+            enterDesktopTaskTransitionHandler.finalizeMoveToDesktop(wct,
+                    mOnAnimationFinishedCallback)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
             releaseVisualIndicator()
@@ -267,26 +285,27 @@ class DesktopTasksController(
     }
 
     /**
-     * Move a task to fullscreen after being dragged from fullscreen and released back into
-     * status bar area
+     * The second part of the animated move to desktop transition, called after
+     * {@link startMoveToDesktop}. Move a task to fullscreen after being dragged from fullscreen
+     * and released back into status bar area.
      */
-    fun cancelMoveToFreeform(task: RunningTaskInfo, position: Point) {
+    fun cancelMoveToDesktop(task: RunningTaskInfo, moveToDesktopAnimator: MoveToDesktopAnimator) {
         KtProtoLog.v(
             WM_SHELL_DESKTOP_MODE,
-            "DesktopTasksController: cancelMoveToFreeform taskId=%d",
+            "DesktopTasksController: cancelMoveToDesktop taskId=%d",
             task.taskId
         )
         val wct = WindowContainerTransaction()
         wct.setBounds(task.token, null)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(
-                wct, position) { t ->
+            enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct,
+                    moveToDesktopAnimator) { t ->
                 val callbackWCT = WindowContainerTransaction()
                 visualIndicator?.releaseVisualIndicator(t)
                 visualIndicator = null
                 addMoveToFullscreenChanges(callbackWCT, task)
-                shellTaskOrganizer.applyTransaction(callbackWCT)
+                transitions.startTransition(TRANSIT_CHANGE, callbackWCT, null /* handler */)
             }
         } else {
             addMoveToFullscreenChanges(wct, task)
@@ -720,7 +739,7 @@ class DesktopTasksController(
      *
      * @param taskInfo the task being dragged.
      * @param position position of surface when drag ends.
-     * @param y the Y position of the motion event.
+     * @param y the Y position of the top edge of the task
      * @param windowDecor the window decoration for the task being dragged
      */
     fun onDragPositioningEnd(
@@ -779,7 +798,7 @@ class DesktopTasksController(
             taskInfo: RunningTaskInfo,
             freeformBounds: Rect
     ) {
-        moveToDesktopWithAnimation(taskInfo, freeformBounds)
+        finalizeMoveToDesktop(taskInfo, freeformBounds)
     }
 
     private fun getStatusBarHeight(taskInfo: RunningTaskInfo): Int {

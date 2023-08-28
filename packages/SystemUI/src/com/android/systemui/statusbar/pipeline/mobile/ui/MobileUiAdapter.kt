@@ -27,7 +27,6 @@ import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.phone.StatusBarIconController
-import com.android.systemui.statusbar.pipeline.StatusBarPipelineFlags
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import java.io.PrintWriter
@@ -53,7 +52,6 @@ constructor(
     val mobileIconsViewModel: MobileIconsViewModel,
     private val logger: MobileViewLogger,
     @Application private val scope: CoroutineScope,
-    private val statusBarPipelineFlags: StatusBarPipelineFlags,
     private val telephonyManager: TelephonyManager,
 ) : CoreStartable {
     private var isCollecting: Boolean = false
@@ -61,24 +59,13 @@ constructor(
     private var isMultiSimEnabled: Boolean = telephonyManager.isMultiSimEnabled()
 
     override fun start() {
-        // Only notify the icon controller if we want to *render* the new icons.
-        // Note that this flow may still run if
-        // [statusBarPipelineFlags.runNewMobileIconsBackend] is true because we may want to
-        // get the logging data without rendering.
-        if (statusBarPipelineFlags.useNewMobileIcons()) {
-            scope.launch {
-                isCollecting = true
-                mobileIconsViewModel.subscriptionIdsFlow.collectLatest {
-                    logger.logUiAdapterSubIdsSentToIconController(it)
-                    if (isMultiSimConfigChanged()) {
-                        isMultiSimEnabled = telephonyManager.isMultiSimEnabled()
-                        if (lastValue != null && lastValue!!.size != it.size) {
-                            iconController.setNewMobileIconSubIds(emptyList())
-                        }
-                    }
-                    lastValue = it
-                    iconController.setNewMobileIconSubIds(it)
-                }
+        // Start notifying the icon controller of subscriptions
+        scope.launch {
+            isCollecting = true
+            mobileIconsViewModel.subscriptionIdsFlow.collectLatest {
+                logger.logUiAdapterSubIdsSentToIconController(it)
+                lastValue = it
+                iconController.setNewMobileIconSubIds(it)
             }
         }
     }

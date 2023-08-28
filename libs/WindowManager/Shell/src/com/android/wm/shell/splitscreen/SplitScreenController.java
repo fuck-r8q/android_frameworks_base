@@ -31,6 +31,7 @@ import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSIT
 import static com.android.wm.shell.common.split.SplitScreenUtils.isValidToSplit;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.samePackage;
+import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
 import static com.android.wm.shell.splitscreen.SplitScreen.STAGE_TYPE_UNDEFINED;
 import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_SPLIT_SCREEN;
 import static com.android.wm.shell.transition.Transitions.ENABLE_SHELL_TRANSITIONS;
@@ -50,6 +51,7 @@ import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.ArrayMap;
+import android.util.Log;
 import android.util.Slog;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.IRemoteAnimationRunner;
@@ -551,6 +553,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             } else {
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startShortcut",
+                        "app package " + packageName + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
                 return;
@@ -580,6 +584,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                 taskId = INVALID_TASK_ID;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startShortcutAndTaskWithLegacyTransition",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
@@ -612,12 +618,14 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                 taskId = INVALID_TASK_ID;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startShortcutAndTask",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
         }
-        mStageCoordinator.startShortcutAndTask(shortcutInfo, options1, taskId, options2,
-                splitPosition, splitRatio, remoteTransition, instanceId);
+        mStageCoordinator.startShortcutAndTask(shortcutInfo, activityOptions.toBundle(), taskId,
+                options2, splitPosition, splitRatio, remoteTransition, instanceId);
     }
 
     /**
@@ -647,6 +655,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                 taskId = INVALID_TASK_ID;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startIntentAndTaskWithLegacyTransition",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
@@ -677,6 +687,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                 taskId = INVALID_TASK_ID;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startIntentAndTask",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
@@ -705,6 +717,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                 pendingIntent2 = null;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startIntentsWithLegacyTransition",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
@@ -723,24 +737,38 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         Intent fillInIntent2 = null;
         final String packageName1 = SplitScreenUtils.getPackageName(pendingIntent1);
         final String packageName2 = SplitScreenUtils.getPackageName(pendingIntent2);
+        final ActivityOptions activityOptions1 = options1 != null
+                ? ActivityOptions.fromBundle(options1) : ActivityOptions.makeBasic();
+        final ActivityOptions activityOptions2 = options2 != null
+                ? ActivityOptions.fromBundle(options2) : ActivityOptions.makeBasic();
         if (samePackage(packageName1, packageName2, userId1, userId2)) {
             if (supportMultiInstancesSplit(packageName1)) {
                 fillInIntent1 = new Intent();
                 fillInIntent1.addFlags(FLAG_ACTIVITY_MULTIPLE_TASK);
                 fillInIntent2 = new Intent();
                 fillInIntent2.addFlags(FLAG_ACTIVITY_MULTIPLE_TASK);
+
+                if (shortcutInfo1 != null) {
+                    activityOptions1.setApplyMultipleTaskFlagForShortcut(true);
+                }
+                if (shortcutInfo2 != null) {
+                    activityOptions2.setApplyMultipleTaskFlagForShortcut(true);
+                }
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN, "Adding MULTIPLE_TASK");
             } else {
                 pendingIntent2 = null;
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startIntents",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
             }
         }
-        mStageCoordinator.startIntents(pendingIntent1, fillInIntent1, shortcutInfo1, options1,
-                pendingIntent2, fillInIntent2, shortcutInfo2, options2, splitPosition, splitRatio,
-                remoteTransition, instanceId);
+        mStageCoordinator.startIntents(pendingIntent1, fillInIntent1, shortcutInfo1,
+                activityOptions1.toBundle(), pendingIntent2, fillInIntent2, shortcutInfo2,
+                activityOptions2.toBundle(), splitPosition, splitRatio, remoteTransition,
+                instanceId);
     }
 
     @Override
@@ -780,6 +808,8 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
             } else {
                 ProtoLog.v(ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN,
                         "Cancel entering split as not supporting multi-instances");
+                Log.w(TAG, splitFailureMessage("startIntent",
+                        "app package " + packageName1 + " does not support multi-instance"));
                 Toast.makeText(mContext, R.string.dock_multi_instances_not_supported_text,
                         Toast.LENGTH_SHORT).show();
                 return;

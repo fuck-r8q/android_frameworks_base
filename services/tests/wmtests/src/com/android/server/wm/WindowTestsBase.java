@@ -85,6 +85,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
+import android.util.MergedConfiguration;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.DisplayInfo;
@@ -102,6 +103,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowManager.DisplayImePolicy;
 import android.view.inputmethod.ImeTracker;
+import android.window.ClientWindowFrames;
 import android.window.ITransitionPlayer;
 import android.window.ScreenCapture;
 import android.window.StartingWindowInfo;
@@ -624,6 +626,11 @@ class WindowTestsBase extends SystemServiceTestsBase {
         }
     }
 
+    static void makeLastConfigReportedToClient(WindowState w, boolean visible) {
+        w.fillClientWindowFramesAndConfiguration(new ClientWindowFrames(),
+                new MergedConfiguration(), true /* useLatestConfig */, visible);
+    }
+
     /**
      * Gets the order of the given {@link Task} as its z-order in the hierarchy below this TDA.
      * The Task can be a direct child of a child TaskDisplayArea. {@code -1} if not found.
@@ -894,6 +901,7 @@ class WindowTestsBase extends SystemServiceTestsBase {
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.copyFrom(mDisplayInfo);
         displayInfo.type = Display.TYPE_VIRTUAL;
+        displayInfo.state = Display.STATE_ON;
         displayInfo.ownerUid = SYSTEM_UID;
         return createNewDisplay(displayInfo, DISPLAY_IME_POLICY_FALLBACK_DISPLAY, overrideSettings);
     }

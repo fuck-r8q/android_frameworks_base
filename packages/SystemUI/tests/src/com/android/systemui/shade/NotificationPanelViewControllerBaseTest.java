@@ -98,18 +98,20 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteracto
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
+import com.android.systemui.keyguard.ui.view.KeyguardRootView;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
+import com.android.systemui.keyguard.ui.viewmodel.GoneToDreamingLockscreenHostedTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.GoneToDreamingTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardBottomAreaViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardLongPressViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenToDreamingTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenToOccludedTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.OccludedToLockscreenTransitionViewModel;
+import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.media.controls.pipeline.MediaDataManager;
 import com.android.systemui.media.controls.ui.KeyguardMediaController;
 import com.android.systemui.media.controls.ui.MediaHierarchyManager;
 import com.android.systemui.model.SysUiState;
-import com.android.systemui.multishade.domain.interactor.MultiShadeInteractor;
 import com.android.systemui.navigationbar.NavigationBarController;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.plugins.ActivityStarter;
@@ -299,9 +301,11 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected LockscreenToOccludedTransitionViewModel
             mLockscreenToOccludedTransitionViewModel;
     @Mock protected GoneToDreamingTransitionViewModel mGoneToDreamingTransitionViewModel;
-
+    @Mock protected GoneToDreamingLockscreenHostedTransitionViewModel
+            mGoneToDreamingLockscreenHostedTransitionViewModel;
+    @Mock protected PrimaryBouncerToGoneTransitionViewModel
+            mPrimaryBouncerToGoneTransitionViewModel;
     @Mock protected KeyguardTransitionInteractor mKeyguardTransitionInteractor;
-    @Mock protected MultiShadeInteractor mMultiShadeInteractor;
     @Mock protected KeyguardLongPressViewModel mKeyuardLongPressViewModel;
     @Mock protected AlternateBouncerInteractor mAlternateBouncerInteractor;
     @Mock protected MotionEvent mDownMotionEvent;
@@ -318,6 +322,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock private ShadeInteractor mShadeInteractor;
     @Mock private JavaAdapter mJavaAdapter;
     @Mock private CastController mCastController;
+    @Mock private KeyguardRootView mKeyguardRootView;
 
     protected final int mMaxUdfpsBurnInOffsetY = 5;
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
@@ -372,7 +377,9 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mScreenOffAnimationController,
                 mKeyguardLogger,
                 mFeatureFlags,
-                mInteractionJankMonitor));
+                mInteractionJankMonitor,
+                mKeyguardInteractor,
+                mDumpManager));
 
         when(mAuthController.isUdfpsEnrolled(anyInt())).thenReturn(false);
         when(mHeadsUpCallback.getContext()).thenReturn(mContext);
@@ -478,12 +485,30 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         when(mGoneToDreamingTransitionViewModel.lockscreenTranslationY(anyInt()))
                 .thenReturn(emptyFlow());
 
+        // Gone->Dreaming lockscreen hosted
+        when(mKeyguardTransitionInteractor.getGoneToDreamingLockscreenHostedTransition())
+                .thenReturn(emptyFlow());
+        when(mGoneToDreamingLockscreenHostedTransitionViewModel.getLockscreenAlpha())
+                .thenReturn(emptyFlow());
+
+        // Dreaming lockscreen hosted->Lockscreen
+        when(mKeyguardTransitionInteractor.getDreamingLockscreenHostedToLockscreenTransition())
+                .thenReturn(emptyFlow());
+
+        // Lockscreen->Dreaming lockscreen hosted
+        when(mKeyguardTransitionInteractor.getLockscreenToDreamingLockscreenHostedTransition())
+                .thenReturn(emptyFlow());
+
         // Lockscreen->Occluded
         when(mKeyguardTransitionInteractor.getLockscreenToOccludedTransition())
                 .thenReturn(emptyFlow());
         when(mLockscreenToOccludedTransitionViewModel.getLockscreenAlpha())
                 .thenReturn(emptyFlow());
         when(mLockscreenToOccludedTransitionViewModel.lockscreenTranslationY(anyInt()))
+                .thenReturn(emptyFlow());
+
+        // Primary Bouncer->Gone
+        when(mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha())
                 .thenReturn(emptyFlow());
 
         NotificationWakeUpCoordinator coordinator =
@@ -613,17 +638,19 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mOccludedToLockscreenTransitionViewModel,
                 mLockscreenToDreamingTransitionViewModel,
                 mGoneToDreamingTransitionViewModel,
+                mGoneToDreamingLockscreenHostedTransitionViewModel,
                 mLockscreenToOccludedTransitionViewModel,
+                mPrimaryBouncerToGoneTransitionViewModel,
                 mMainDispatcher,
                 mKeyguardTransitionInteractor,
-                () -> mMultiShadeInteractor,
                 mDumpManager,
                 mKeyuardLongPressViewModel,
                 mKeyguardInteractor,
                 mActivityStarter,
                 mEmergencyButtonControllerFactory,
                 mKeyguardViewConfigurator,
-                mKeyguardFaceAuthInteractor);
+                mKeyguardFaceAuthInteractor,
+                mKeyguardRootView);
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,

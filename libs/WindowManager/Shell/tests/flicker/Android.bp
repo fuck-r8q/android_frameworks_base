@@ -24,6 +24,11 @@ package {
 }
 
 filegroup {
+    name: "WMShellFlickerTestsUtils-src",
+    srcs: ["src/com/android/wm/shell/flicker/utils/*.kt"],
+}
+
+filegroup {
     name: "WMShellFlickerTestsBase-src",
     srcs: ["src/com/android/wm/shell/flicker/*.kt"],
 }
@@ -39,10 +44,27 @@ filegroup {
 }
 
 filegroup {
-    name: "WMShellFlickerTestsSplitScreen-src",
+    name: "WMShellFlickerTestsSplitScreenBase-src",
+    srcs: [
+        "src/com/android/wm/shell/flicker/splitscreen/benchmark/*.kt",
+    ],
+}
+
+filegroup {
+    name: "WMShellFlickerTestsSplitScreenGroup1-src",
+    srcs: [
+        "src/com/android/wm/shell/flicker/splitscreen/A*.kt",
+        "src/com/android/wm/shell/flicker/splitscreen/B*.kt",
+        "src/com/android/wm/shell/flicker/splitscreen/C*.kt",
+        "src/com/android/wm/shell/flicker/splitscreen/D*.kt",
+        "src/com/android/wm/shell/flicker/splitscreen/E*.kt",
+    ],
+}
+
+filegroup {
+    name: "WMShellFlickerTestsSplitScreenGroup2-src",
     srcs: [
         "src/com/android/wm/shell/flicker/splitscreen/*.kt",
-        "src/com/android/wm/shell/flicker/splitscreen/benchmark/*.kt",
     ],
 }
 
@@ -50,6 +72,28 @@ filegroup {
     name: "WMShellFlickerServiceTests-src",
     srcs: [
         "src/com/android/wm/shell/flicker/service/**/*.kt",
+    ],
+}
+
+java_library {
+    name: "wm-shell-flicker-utils",
+    platform_apis: true,
+    optimize: {
+        enabled: false,
+    },
+    srcs: [
+        ":WMShellFlickerTestsUtils-src",
+    ],
+    static_libs: [
+        "androidx.test.ext.junit",
+        "flickertestapplib",
+        "flickerlib",
+        "flickerlib-helpers",
+        "platform-test-annotations",
+        "wm-flicker-common-app-helpers",
+        "wm-flicker-common-assertions",
+        "launcher-helper-lib",
+        "launcher-aosp-tapl",
     ],
 }
 
@@ -65,6 +109,7 @@ java_defaults {
     test_suites: ["device-tests"],
     libs: ["android.test.runner"],
     static_libs: [
+        "wm-shell-flicker-utils",
         "androidx.test.ext.junit",
         "flickertestapplib",
         "flickerlib",
@@ -94,7 +139,9 @@ android_test {
     exclude_srcs: [
         ":WMShellFlickerTestsBubbles-src",
         ":WMShellFlickerTestsPip-src",
-        ":WMShellFlickerTestsSplitScreen-src",
+        ":WMShellFlickerTestsSplitScreenGroup1-src",
+        ":WMShellFlickerTestsSplitScreenGroup2-src",
+        ":WMShellFlickerTestsSplitScreenBase-src",
         ":WMShellFlickerServiceTests-src",
     ],
 }
@@ -124,21 +171,38 @@ android_test {
 }
 
 android_test {
-    name: "WMShellFlickerTestsSplitScreen",
+    name: "WMShellFlickerTestsSplitScreenGroup1",
     defaults: ["WMShellFlickerTestsDefault"],
     additional_manifests: ["manifests/AndroidManifestSplitScreen.xml"],
     package_name: "com.android.wm.shell.flicker.splitscreen",
     instrumentation_target_package: "com.android.wm.shell.flicker.splitscreen",
     srcs: [
         ":WMShellFlickerTestsBase-src",
-        ":WMShellFlickerTestsSplitScreen-src",
+        ":WMShellFlickerTestsSplitScreenBase-src",
+        ":WMShellFlickerTestsSplitScreenGroup1-src",
+    ],
+}
+
+android_test {
+    name: "WMShellFlickerTestsSplitScreenGroup2",
+    defaults: ["WMShellFlickerTestsDefault"],
+    additional_manifests: ["manifests/AndroidManifestSplitScreen.xml"],
+    package_name: "com.android.wm.shell.flicker.splitscreen",
+    instrumentation_target_package: "com.android.wm.shell.flicker.splitscreen",
+    srcs: [
+        ":WMShellFlickerTestsBase-src",
+        ":WMShellFlickerTestsSplitScreenBase-src",
+        ":WMShellFlickerTestsSplitScreenGroup2-src",
+    ],
+    exclude_srcs: [
+        ":WMShellFlickerTestsSplitScreenGroup1-src",
     ],
 }
 
 android_test {
     name: "WMShellFlickerServiceTests",
     defaults: ["WMShellFlickerTestsDefault"],
-    additional_manifests: ["manifests/AndroidManifestSplitScreen.xml"],
+    additional_manifests: ["manifests/AndroidManifestService.xml"],
     package_name: "com.android.wm.shell.flicker.service",
     instrumentation_target_package: "com.android.wm.shell.flicker.service",
     srcs: [

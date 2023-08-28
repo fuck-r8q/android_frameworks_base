@@ -106,7 +106,7 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
         TypedArray atts = context.obtainStyledAttributes(attrs, R.styleable.BatteryMeterView,
                 defStyle, 0);
         final int frameColor = atts.getColor(R.styleable.BatteryMeterView_frameColor,
-                context.getColor(R.color.meter_background_color));
+                context.getColor(com.android.settingslib.R.color.meter_background_color));
         mPercentageStyleId = atts.getResourceId(R.styleable.BatteryMeterView_textAppearance, 0);
         mDrawable = new AccessorizedBatteryDrawable(context, frameColor);
         atts.recycle();
@@ -466,9 +466,11 @@ public class BatteryMeterView extends LinearLayout implements DarkReceiver {
 
     public void dump(PrintWriter pw, String[] args) {
         String powerSave = mDrawable == null ? null : mDrawable.getPowerSaveEnabled() + "";
+        String displayShield = mDrawable == null ? null : mDrawable.getDisplayShield() + "";
         CharSequence percent = mBatteryPercentView == null ? null : mBatteryPercentView.getText();
         pw.println("  BatteryMeterView:");
         pw.println("    mDrawable.getPowerSave: " + powerSave);
+        pw.println("    mDrawable.getDisplayShield: " + displayShield);
         pw.println("    mBatteryPercentView.getText(): " + percent);
         pw.println("    mTextColor: #" + Integer.toHexString(mTextColor));
         pw.println("    mBatteryStateUnknown: " + mBatteryStateUnknown);

@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -91,7 +92,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dump.DumpManager;
-import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.model.SysUiState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
@@ -153,6 +154,7 @@ import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.taskview.TaskViewTransitions;
+import com.android.wm.shell.transition.Transitions;
 
 import org.junit.After;
 import org.junit.Before;
@@ -276,13 +278,11 @@ public class BubblesTest extends SysuiTestCase {
     @Mock
     private TaskStackListenerImpl mTaskStackListener;
     @Mock
-    private ShellTaskOrganizer mShellTaskOrganizer;
-    @Mock
     private KeyguardStateController mKeyguardStateController;
     @Mock
     private ScreenOffAnimationController mScreenOffAnimationController;
     @Mock
-    private TaskViewTransitions mTaskViewTransitions;
+    Transitions mTransitions;
     @Mock
     private Optional<OneHandedController> mOneHandedOptional;
     @Mock
@@ -294,6 +294,9 @@ public class BubblesTest extends SysuiTestCase {
     @Mock
     private Icon mAppBubbleIcon;
 
+    private ShellTaskOrganizer mShellTaskOrganizer;
+    private TaskViewTransitions mTaskViewTransitions;
+
     private TestableBubblePositioner mPositioner;
 
     private BubbleData mBubbleData;
@@ -301,6 +304,7 @@ public class BubblesTest extends SysuiTestCase {
     private TestableLooper mTestableLooper;
 
     private FakeDisplayTracker mDisplayTracker = new FakeDisplayTracker(mContext);
+    private final FakeFeatureFlags mFeatureFlags = new FakeFeatureFlags();
 
     private UserHandle mUser0;
 
@@ -309,6 +313,12 @@ public class BubblesTest extends SysuiTestCase {
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
+
+        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
+            doReturn(true).when(mTransitions).isRegistered();
+        }
+        mTaskViewTransitions = new TaskViewTransitions(mTransitions);
+
         mTestableLooper = TestableLooper.get(this);
 
         // For the purposes of this test, just run everything synchronously
@@ -366,7 +376,13 @@ public class BubblesTest extends SysuiTestCase {
                         mock(UiEventLogger.class),
                         mock(UserTracker.class)
                 );
-        when(mShellTaskOrganizer.getExecutor()).thenReturn(syncExecutor);
+
+        mShellTaskOrganizer = new ShellTaskOrganizer(mock(ShellInit.class),
+                mock(ShellCommandHandler.class),
+                null,
+                Optional.empty(),
+                Optional.empty(),
+                syncExecutor);
         mBubbleProperties = new FakeBubbleProperties();
         mBubbleController = new TestableBubbleController(
                 mContext,
@@ -413,7 +429,7 @@ public class BubblesTest extends SysuiTestCase {
                 mCommonNotifCollection,
                 mNotifPipeline,
                 mSysUiState,
-                mock(FeatureFlags.class),
+                mFeatureFlags,
                 mNotifPipelineFlags,
                 syncExecutor);
         mBubblesManager.addNotifCallback(mNotifCallback);
@@ -422,7 +438,8 @@ public class BubblesTest extends SysuiTestCase {
         mNotificationTestHelper = new NotificationTestHelper(
                 mContext,
                 mDependency,
-                TestableLooper.get(this));
+                TestableLooper.get(this),
+                mFeatureFlags);
         mRow = mNotificationTestHelper.createBubble(mDeleteIntent);
         mRow2 = mNotificationTestHelper.createBubble(mDeleteIntent);
         mNonBubbleNotifRow = mNotificationTestHelper.createRow();
@@ -1834,8 +1851,7 @@ public class BubblesTest extends SysuiTestCase {
     }
 
     @Test
-    public void testCreateBubbleFromOngoingNotification_OngoingDismissalEnabled() {
-        when(mNotifPipelineFlags.allowDismissOngoing()).thenReturn(true);
+    public void testCreateBubbleFromOngoingNotification() {
         NotificationEntry notif = new NotificationEntryBuilder()
                 .setFlag(mContext, Notification.FLAG_ONGOING_EVENT, true)
                 .setCanBubble(true)
@@ -1848,8 +1864,7 @@ public class BubblesTest extends SysuiTestCase {
 
 
     @Test
-    public void testCreateBubbleFromNoDismissNotification_OngoingDismissalEnabled() {
-        when(mNotifPipelineFlags.allowDismissOngoing()).thenReturn(true);
+    public void testCreateBubbleFromNoDismissNotification() {
         NotificationEntry notif = new NotificationEntryBuilder()
                 .setFlag(mContext, Notification.FLAG_NO_DISMISS, true)
                 .setCanBubble(true)
@@ -1858,37 +1873,6 @@ public class BubblesTest extends SysuiTestCase {
         BubbleEntry bubble = mBubblesManager.notifToBubbleEntry(notif);
 
         assertFalse("FLAG_NO_DISMISS Notifs should be non-dismissable", bubble.isDismissable());
-    }
-
-    @Test
-    public void testCreateBubbleFromOngoingNotification_OngoingDismissalDisabled() {
-        NotificationEntry notif = new NotificationEntryBuilder()
-                .setFlag(mContext, Notification.FLAG_ONGOING_EVENT, true)
-                .setCanBubble(true)
-                .build();
-
-        BubbleEntry bubble = mBubblesManager.notifToBubbleEntry(notif);
-
-        assertFalse(
-                "Ongoing Notifis should be dismissable, if the feature is off",
-                bubble.isDismissable()
-        );
-    }
-
-
-    @Test
-    public void testCreateBubbleFromNoDismissNotification_OngoingDismissalDisabled() {
-        NotificationEntry notif = new NotificationEntryBuilder()
-                .setFlag(mContext, Notification.FLAG_NO_DISMISS, true)
-                .setCanBubble(true)
-                .build();
-
-        BubbleEntry bubble = mBubblesManager.notifToBubbleEntry(notif);
-
-        assertTrue(
-                "FLAG_NO_DISMISS should be ignored, if the feature is off",
-                bubble.isDismissable()
-        );
     }
 
     @Test
@@ -1986,7 +1970,7 @@ public class BubblesTest extends SysuiTestCase {
 
         FakeBubbleStateListener bubbleStateListener = new FakeBubbleStateListener();
         mBubbleController.registerBubbleStateListener(bubbleStateListener);
-        mBubbleController.expandStackAndSelectBubbleFromLauncher(mBubbleEntry.getKey(), true);
+        mBubbleController.expandStackAndSelectBubbleFromLauncher(mBubbleEntry.getKey(), 500, 1000);
 
         assertThat(mBubbleController.getLayerView().isExpanded()).isTrue();
 

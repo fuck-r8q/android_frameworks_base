@@ -18,12 +18,24 @@ package com.android.systemui.scene.domain.interactor
 
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.scene.data.repository.SceneContainerRepository
+import com.android.systemui.scene.shared.model.ObservableTransitionState
+import com.android.systemui.scene.shared.model.RemoteUserInput
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.scene.shared.model.SceneTransitionModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-/** Business logic and app state accessors for the scene framework. */
+/**
+ * Generic business logic and app state accessors for the scene framework.
+ *
+ * Note that this class should not depend on state or logic of other modules or features. Instead,
+ * other feature modules should depend on and call into this class when their parts of the
+ * application state change.
+ */
 @SysUISingleton
 class SceneInteractor
 @Inject
@@ -37,37 +49,54 @@ constructor(
      * The scenes will be sorted in z-order such that the last one is the one that should be
      * rendered on top of all previous ones.
      */
-    fun allSceneKeys(containerName: String): List<SceneKey> {
-        return repository.allSceneKeys(containerName)
+    fun allSceneKeys(): List<SceneKey> {
+        return repository.allSceneKeys()
     }
 
     /** Sets the scene in the container with the given name. */
-    fun setCurrentScene(containerName: String, scene: SceneModel) {
-        repository.setCurrentScene(containerName, scene)
+    fun setCurrentScene(scene: SceneModel) {
+        val currentSceneKey = repository.currentScene.value.key
+        repository.setCurrentScene(scene)
+        repository.setSceneTransition(from = currentSceneKey, to = scene.key)
     }
 
     /** The current scene in the container with the given name. */
-    fun currentScene(containerName: String): StateFlow<SceneModel> {
-        return repository.currentScene(containerName)
-    }
+    val currentScene: StateFlow<SceneModel> = repository.currentScene
 
     /** Sets the visibility of the container with the given name. */
-    fun setVisible(containerName: String, isVisible: Boolean) {
-        return repository.setVisible(containerName, isVisible)
+    fun setVisible(isVisible: Boolean) {
+        return repository.setVisible(isVisible)
     }
 
     /** Whether the container with the given name is visible. */
-    fun isVisible(containerName: String): StateFlow<Boolean> {
-        return repository.isVisible(containerName)
-    }
+    val isVisible: StateFlow<Boolean> = repository.isVisible
 
-    /** Sets scene transition progress to the current scene in the container with the given name. */
-    fun setSceneTransitionProgress(containerName: String, progress: Float) {
-        repository.setSceneTransitionProgress(containerName, progress)
+    /**
+     * Binds the given flow so the system remembers it.
+     *
+     * Note that you must call is with `null` when the UI is done or risk a memory leak.
+     */
+    fun setTransitionState(transitionState: Flow<ObservableTransitionState>?) {
+        repository.setTransitionState(transitionState)
     }
 
     /** Progress of the transition into the current scene in the container with the given name. */
-    fun sceneTransitionProgress(containerName: String): StateFlow<Float> {
-        return repository.sceneTransitionProgress(containerName)
+    val transitionProgress: Flow<Float> = repository.transitionProgress
+
+    /**
+     * Scene transitions as pairs of keys. A new value is emitted exactly once, each time a scene
+     * transition occurs. The flow begins with a `null` value at first, because the initial scene is
+     * not something that we transition to from another scene.
+     */
+    val transitions: StateFlow<SceneTransitionModel?> = repository.transitions
+
+    private val _remoteUserInput: MutableStateFlow<RemoteUserInput?> = MutableStateFlow(null)
+
+    /** A flow of motion events originating from outside of the scene framework. */
+    val remoteUserInput: StateFlow<RemoteUserInput?> = _remoteUserInput.asStateFlow()
+
+    /** Handles a remote user input. */
+    fun onRemoteUserInput(input: RemoteUserInput) {
+        _remoteUserInput.value = input
     }
 }

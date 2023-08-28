@@ -19,6 +19,7 @@ package com.android.keyguard;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.systemui.flags.Flags.DOZING_MIGRATION_1;
 import static com.android.systemui.flags.Flags.FACE_AUTH_REFACTOR;
+import static com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED;
 import static com.android.systemui.flags.Flags.MIGRATE_LOCK_ICON;
 
 import static org.mockito.Mockito.any;
@@ -42,6 +43,7 @@ import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.AuthRippleController;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.doze.util.BurnInHelperKt;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
@@ -93,6 +95,7 @@ public class LockIconViewControllerBaseTest extends SysuiTestCase {
     protected @Mock KeyguardTransitionRepository mTransitionRepository;
     protected FakeExecutor mDelayableExecutor = new FakeExecutor(new FakeSystemClock());
     protected FakeFeatureFlags mFeatureFlags;
+    protected @Mock PrimaryBouncerInteractor mPrimaryBouncerInteractor;
 
     protected LockIconViewController mUnderTest;
 
@@ -145,6 +148,7 @@ public class LockIconViewControllerBaseTest extends SysuiTestCase {
         mFeatureFlags = new FakeFeatureFlags();
         mFeatureFlags.set(FACE_AUTH_REFACTOR, false);
         mFeatureFlags.set(MIGRATE_LOCK_ICON, false);
+        mFeatureFlags.set(LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false);
         mUnderTest = new LockIconViewController(
                 mLockIconView,
                 mStatusBarStateController,
@@ -163,7 +167,8 @@ public class LockIconViewControllerBaseTest extends SysuiTestCase {
                 new KeyguardTransitionInteractor(mTransitionRepository,
                         TestScopeProvider.getTestScope().getBackgroundScope()),
                 KeyguardInteractorFactory.create(mFeatureFlags).getKeyguardInteractor(),
-                mFeatureFlags
+                mFeatureFlags,
+                mPrimaryBouncerInteractor
         );
     }
 

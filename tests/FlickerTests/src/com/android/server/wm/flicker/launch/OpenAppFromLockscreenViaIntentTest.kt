@@ -71,7 +71,7 @@ open class OpenAppFromLockscreenViaIntentTest(flicker: LegacyFlickerTest) :
      * Checks that the [ComponentNameMatcher.NAV_BAR] layer starts invisible, becomes visible during
      * unlocking animation and remains visible at the end
      */
-    @Presubmit
+    @FlakyTest(bugId = 288341660)
     @Test
     fun navBarLayerVisibilityChanges() {
         Assume.assumeFalse(flicker.scenario.isTablet)
@@ -93,7 +93,7 @@ open class OpenAppFromLockscreenViaIntentTest(flicker: LegacyFlickerTest) :
      * Checks that the [ComponentNameMatcher.NAV_BAR] starts the transition invisible, then becomes
      * visible during the unlocking animation and remains visible at the end of the transition
      */
-    @Presubmit
+    @FlakyTest(bugId = 293581770)
     @Test
     fun navBarWindowsVisibilityChanges() {
         Assume.assumeFalse(flicker.scenario.isTablet)
@@ -200,7 +200,7 @@ open class OpenAppFromLockscreenViaIntentTest(flicker: LegacyFlickerTest) :
     override fun visibleWindowsShownMoreThanOneConsecutiveEntry() =
         super.visibleWindowsShownMoreThanOneConsecutiveEntry()
 
-    @FlakyTest(bugId = 251217585)
+    @FlakyTest(bugId = 285980483)
     @Test
     override fun focusChanges() {
         super.focusChanges()

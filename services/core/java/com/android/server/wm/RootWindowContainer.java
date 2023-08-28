@@ -1858,9 +1858,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Don't do recursive work.
             return;
         }
-
+        mTaskSupervisor.beginActivityVisibilityUpdate();
         try {
-            mTaskSupervisor.beginActivityVisibilityUpdate();
             // First the front root tasks. In case any are not fullscreen and are in front of home.
             for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
                 final DisplayContent display = getChildAt(displayNdx);
@@ -3348,6 +3347,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (resumedActivity == null || !resumedActivity.idle) {
                 ProtoLog.d(WM_DEBUG_STATES, "allResumedActivitiesIdle: rootTask=%d %s "
                         + "not idle", rootTask.getRootTaskId(), resumedActivity);
+                return false;
+            }
+            if (mTransitionController.isTransientLaunch(resumedActivity)) {
+                // Not idle if the transient transition animation is running.
                 return false;
             }
         }

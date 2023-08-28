@@ -312,6 +312,16 @@ public final class ViewRootImpl implements ViewParent,
             SystemProperties.getBoolean("persist.wm.debug.client_transient", false);
 
     /**
+     * Whether the client (system UI) is handling the immersive confirmation window. If
+     * {@link CLIENT_TRANSIENT} is set to true, the immersive confirmation window will always be the
+     * client instance and this flag will be ignored. Otherwise, the immersive confirmation window
+     * can be switched freely by this flag.
+     * @hide
+     */
+    public static final boolean CLIENT_IMMERSIVE_CONFIRMATION =
+            SystemProperties.getBoolean("persist.wm.debug.client_immersive_confirmation", false);
+
+    /**
      * Whether the client should compute the window frame on its own.
      * @hide
      */
@@ -717,9 +727,9 @@ public final class ViewRootImpl implements ViewParent,
 
     /**
      * Child container layer of {@code mSurface} with the same bounds as its parent, and cropped to
-     * the surface insets. This surface is created only if a client requests it via {@link
-     * #getBoundsLayer()}. By parenting to this bounds surface, child surfaces can ensure they do
-     * not draw into the surface inset region set by the parent window.
+     * the surface insets. This surface is created only if a client requests it via
+     * {@link #updateAndGetBoundsLayer(Transaction)}. By parenting to this bounds surface, child
+     * surfaces can ensure they do not draw into the surface inset region set by the parent window.
      */
     private SurfaceControl mBoundsLayer;
     private final SurfaceSession mSurfaceSession = new SurfaceSession();
@@ -2200,7 +2210,9 @@ public final class ViewRootImpl implements ViewParent,
             mStopped = stopped;
             final ThreadedRenderer renderer = mAttachInfo.mThreadedRenderer;
             if (renderer != null) {
-                if (DEBUG_DRAW) Log.d(mTag, "WindowStopped on " + getTitle() + " set to " + mStopped);
+                if (DEBUG_DRAW) {
+                    Log.d(mTag, "WindowStopped on " + getTitle() + " set to " + mStopped);
+                }
                 renderer.setStopped(mStopped);
             }
             if (!mStopped) {
@@ -2278,7 +2290,7 @@ public final class ViewRootImpl implements ViewParent,
      * <p>Parenting to this layer will ensure that its children are cropped by the view's surface
      * insets.
      */
-    public SurfaceControl getBoundsLayer() {
+    public SurfaceControl updateAndGetBoundsLayer(Transaction t) {
         if (mBoundsLayer == null) {
             mBoundsLayer = new SurfaceControl.Builder(mSurfaceSession)
                     .setContainerLayer()
@@ -2286,8 +2298,8 @@ public final class ViewRootImpl implements ViewParent,
                     .setParent(getSurfaceControl())
                     .setCallsite("ViewRootImpl.getBoundsLayer")
                     .build();
-            setBoundsLayerCrop(mTransaction);
-            mTransaction.show(mBoundsLayer).apply();
+            setBoundsLayerCrop(t);
+            t.show(mBoundsLayer);
         }
        return mBoundsLayer;
     }
@@ -8443,6 +8455,10 @@ public final class ViewRootImpl implements ViewParent,
             mLastLayoutFrame.set(frame);
         }
 
+        if (mOnBackInvokedDispatcher.isSystemGestureExclusionNeeded()) {
+            setRootSystemGestureExclusionRects(List.of(frame));
+        }
+
         final WindowConfiguration winConfig = getCompatWindowConfiguration();
         mPendingBackDropFrame.set(mPendingDragResizing && !winConfig.useWindowFrameForBackdrop()
                 ? winConfig.getMaxBounds()
@@ -11269,7 +11285,8 @@ public final class ViewRootImpl implements ViewParent,
     @Nullable public SurfaceControl.Transaction buildReparentTransaction(
         @NonNull SurfaceControl child) {
         if (mSurfaceControl.isValid()) {
-          return new SurfaceControl.Transaction().reparent(child, getBoundsLayer());
+            Transaction t = new Transaction();
+            return t.reparent(child, updateAndGetBoundsLayer(t));
         }
         return null;
     }

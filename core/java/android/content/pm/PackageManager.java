@@ -235,6 +235,24 @@ public abstract class PackageManager {
             "android.camera.PROPERTY_COMPAT_OVERRIDE_LANDSCAPE_TO_PORTRAIT";
 
     /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager
+     * .Property} for a privileged system installer to define a list of up to 500 packages that
+     * should not have their updates owned by any installer. The list must be provided via a default
+     * XML resource with the following format:
+     *
+     * <pre>
+     * &lt;deny-ownership&gt;PACKAGE_NAME&lt;/deny-ownership&gt;
+     * &lt;deny-ownership&gt;PACKAGE_NAME&lt;/deny-ownership&gt;
+     * </pre>
+     *
+     * <b>NOTE:</b> Installers that provide this property will not granted update ownership for any
+     * packages that they request update ownership of.
+     * @hide
+     */
+    public static final String PROPERTY_LEGACY_UPDATE_OWNERSHIP_DENYLIST =
+            "android.app.PROPERTY_LEGACY_UPDATE_OWNERSHIP_DENYLIST";
+
+    /**
      * A property value set within the manifest.
      * <p>
      * The value of a property will only have a single type, as defined by
@@ -1432,10 +1450,19 @@ public abstract class PackageManager {
             INSTALL_ALLOW_DOWNGRADE,
             INSTALL_STAGED,
             INSTALL_REQUEST_UPDATE_OWNERSHIP,
-            INSTALL_DONT_EXTRACT_BASELINE_PROFILES,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
+
+    /**
+     * Install flags that can only be used in development workflows (e.g. {@code adb install}).
+     * @hide
+     */
+    @IntDef(flag = true, prefix = { "INSTALL_DEVELOPMENT_" }, value = {
+            INSTALL_DEVELOPMENT_FORCE_NON_STAGED_APEX_UPDATE,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface DevelopmentInstallFlags {}
 
     /**
      * Flag parameter for {@link #installPackage} to indicate that you want to
@@ -1648,11 +1675,12 @@ public abstract class PackageManager {
     public static final int INSTALL_FROM_MANAGED_USER_OR_PROFILE = 1 << 26;
 
     /**
-     * Flag parameter for {@link PackageInstaller.SessionParams} to indicate that do not extract
-     * the baseline profiles when parsing the apk
+     * Flag parameter for {@link #installPackage} to force a non-staged update of an APEX. This is
+     * a development-only feature and should not be used on end user devices.
+     *
      * @hide
      */
-    public static final int INSTALL_DONT_EXTRACT_BASELINE_PROFILES = 1 << 27;
+    public static final int INSTALL_DEVELOPMENT_FORCE_NON_STAGED_APEX_UPDATE = 1;
 
     /** @hide */
     @IntDef(flag = true, value = {
@@ -2363,6 +2391,7 @@ public abstract class PackageManager {
             USER_MIN_ASPECT_RATIO_4_3,
             USER_MIN_ASPECT_RATIO_16_9,
             USER_MIN_ASPECT_RATIO_3_2,
+            USER_MIN_ASPECT_RATIO_FULLSCREEN,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserMinAspectRatio {}
@@ -2384,8 +2413,9 @@ public abstract class PackageManager {
 
     /**
      * Aspect ratio override code: user forces app to the aspect ratio of the device display size.
-     * This will be the portrait aspect ratio of the device if the app is portrait or the landscape
-     * aspect ratio of the device if the app is landscape.
+     * This will be the portrait aspect ratio of the device if the app has fixed portrait
+     * orientation or the landscape aspect ratio of the device if the app has fixed landscape
+     * orientation.
      *
      * @hide
      */
@@ -2408,6 +2438,12 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int USER_MIN_ASPECT_RATIO_3_2 = 5;
+
+    /**
+     * Aspect ratio override code: user forces app to fullscreen
+     * @hide
+     */
+    public static final int USER_MIN_ASPECT_RATIO_FULLSCREEN = 6;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "DELETE_" }, value = {
@@ -3670,6 +3706,14 @@ public abstract class PackageManager {
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_TELEPHONY_SUBSCRIPTION =
             "android.hardware.telephony.subscription";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device is capable of communicating with
+     * other devices via Thread network.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_THREADNETWORK = "android.hardware.threadnetwork";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and

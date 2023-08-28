@@ -20,6 +20,7 @@ package com.android.systemui.keyguard.domain.interactor
 import android.app.admin.DevicePolicyManager
 import android.content.Intent
 import android.os.UserHandle
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
 import com.android.systemui.SysuiTestCase
@@ -40,7 +41,6 @@ import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanc
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardQuickAffordanceRemoteUserSelectionManager
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
 import com.android.systemui.keyguard.data.repository.KeyguardQuickAffordanceRepository
-import com.android.systemui.keyguard.domain.quickaffordance.FakeKeyguardQuickAffordanceRegistry
 import com.android.systemui.keyguard.shared.quickaffordance.KeyguardQuickAffordancePosition
 import com.android.systemui.keyguard.shared.quickaffordance.KeyguardQuickAffordancesMetricsLogger
 import com.android.systemui.plugins.ActivityStarter
@@ -75,6 +75,10 @@ import org.mockito.Mockito.verifyZeroInteractions
 import org.mockito.MockitoAnnotations
 
 @OptIn(ExperimentalCoroutinesApi::class)
+@FlakyTest(
+    bugId = 292574995,
+    detail = "on certain architectures all permutations with startActivity=true is causing failures"
+)
 @SmallTest
 @RunWith(Parameterized::class)
 class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
@@ -300,7 +304,6 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
             )
         val featureFlags =
             FakeFeatureFlags().apply {
-                set(Flags.CUSTOMIZABLE_LOCK_SCREEN_QUICK_AFFORDANCES, false)
                 set(Flags.FACE_AUTH_REFACTOR, true)
             }
         val testDispatcher = StandardTestDispatcher()
@@ -312,20 +315,6 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
                             featureFlags = featureFlags,
                         )
                         .keyguardInteractor,
-                registry =
-                    FakeKeyguardQuickAffordanceRegistry(
-                        mapOf(
-                            KeyguardQuickAffordancePosition.BOTTOM_START to
-                                listOf(
-                                    homeControls,
-                                ),
-                            KeyguardQuickAffordancePosition.BOTTOM_END to
-                                listOf(
-                                    quickAccessWallet,
-                                    qrCodeScanner,
-                                ),
-                        ),
-                    ),
                 lockPatternUtils = lockPatternUtils,
                 keyguardStateController = keyguardStateController,
                 userTracker = userTracker,
@@ -345,6 +334,7 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
     @Test
     fun onQuickAffordanceTriggered() =
         testScope.runTest {
+            val key = BuiltInKeyguardQuickAffordanceKeys.HOME_CONTROLS
             setUpMocks(
                 needStrongAuthAfterBoot = needStrongAuthAfterBoot,
                 keyguardIsUnlocked = keyguardIsUnlocked,
@@ -367,7 +357,7 @@ class KeyguardQuickAffordanceInteractorParameterizedTest : SysuiTestCase() {
                 }
 
             underTest.onQuickAffordanceTriggered(
-                configKey = BuiltInKeyguardQuickAffordanceKeys.HOME_CONTROLS,
+                configKey = "${KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId()}::${key}",
                 expandable = expandable,
                 slotId = "",
             )

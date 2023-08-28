@@ -335,6 +335,15 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     private boolean mDelayLastActivityRemoval;
 
+    /**
+     * Whether the activity navigation should be isolated. That is, Activities cannot be launched
+     * on an isolated TaskFragment, unless the activity is launched from an Activity in the same
+     * isolated TaskFragment, or explicitly requested to be launched to.
+     * <p>
+     * Note that only an embedded TaskFragment can be isolated.
+     */
+    private boolean mIsolatedNav;
+
     final Point mLastSurfaceSize = new Point();
 
     private final Rect mTmpBounds = new Rect();
@@ -485,6 +494,19 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     @NonNull
     TaskFragmentAnimationParams getAnimationParams() {
         return mAnimationParams;
+    }
+
+    /** @see #mIsolatedNav */
+    void setIsolatedNav(boolean isolatedNav) {
+        if (!isEmbedded()) {
+            return;
+        }
+        mIsolatedNav = isolatedNav;
+    }
+
+    /** @see #mIsolatedNav */
+    boolean isIsolatedNav() {
+        return isEmbedded() && mIsolatedNav;
     }
 
     TaskFragment getAdjacentTaskFragment() {
@@ -1026,7 +1048,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         final WindowContainer<?> parent = getParent();
         final Task thisTask = asTask();
         if (thisTask != null && parent.asTask() == null
-                && mTransitionController.isTransientHide(thisTask)) {
+                && mTransitionController.isTransientVisible(thisTask)) {
             // Keep transient-hide root tasks visible. Non-root tasks still follow standard rule.
             return TASK_FRAGMENT_VISIBILITY_VISIBLE;
         }
@@ -1087,21 +1109,13 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
 
             final int otherWindowingMode = other.getWindowingMode();
-            if (otherWindowingMode == WINDOWING_MODE_FULLSCREEN) {
-                if (isTranslucent(other, starting)) {
-                    // Can be visible behind a translucent fullscreen TaskFragment.
-                    gotTranslucentFullscreen = true;
-                    continue;
-                }
-                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-            } else if (otherWindowingMode == WINDOWING_MODE_MULTI_WINDOW
-                    && other.matchParentBounds()) {
+            if (otherWindowingMode == WINDOWING_MODE_FULLSCREEN
+                    || (otherWindowingMode != WINDOWING_MODE_PINNED && other.matchParentBounds())) {
                 if (isTranslucent(other, starting)) {
                     // Can be visible behind a translucent TaskFragment.
                     gotTranslucentFullscreen = true;
                     continue;
                 }
-                // Multi-window TaskFragment that matches parent bounds would occlude other children
                 return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
             }
 
@@ -3075,7 +3089,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     @Override
     void dump(PrintWriter pw, String prefix, boolean dumpAll) {
         super.dump(pw, prefix, dumpAll);
-        pw.println(prefix + "bounds=" + getBounds().toShortString());
+        pw.println(prefix + "bounds=" + getBounds().toShortString()
+                + (mIsolatedNav ? ", isolatedNav" : ""));
         final String doublePrefix = prefix + "  ";
         for (int i = mChildren.size() - 1; i >= 0; i--) {
             final WindowContainer<?> child = mChildren.get(i);

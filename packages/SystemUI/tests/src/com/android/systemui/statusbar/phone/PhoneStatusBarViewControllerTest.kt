@@ -27,6 +27,7 @@ import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.shade.ShadeControllerImpl
 import com.android.systemui.shade.ShadeLogger
 import com.android.systemui.shade.ShadeViewController
@@ -50,6 +51,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import java.util.Optional
+import javax.inject.Provider
 
 @SmallTest
 class PhoneStatusBarViewControllerTest : SysuiTestCase() {
@@ -67,11 +69,15 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
     @Mock
     private lateinit var configurationController: ConfigurationController
     @Mock
+    private lateinit var mStatusOverlayHoverListenerFactory: StatusOverlayHoverListenerFactory
+    @Mock
     private lateinit var userChipViewModel: StatusBarUserChipViewModel
     @Mock
     private lateinit var centralSurfacesImpl: CentralSurfacesImpl
     @Mock
     private lateinit var shadeControllerImpl: ShadeControllerImpl
+    @Mock
+    private lateinit var sceneInteractor: Provider<SceneInteractor>
     @Mock
     private lateinit var shadeLogger: ShadeLogger
     @Mock
@@ -140,8 +146,6 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
     @Test
     fun handleTouchEventFromStatusBar_viewNotEnabled_returnsTrueAndNoViewEvent() {
         `when`(centralSurfacesImpl.commandQueuePanelsEnabled).thenReturn(true)
-        `when`(centralSurfacesImpl.shadeViewController)
-                .thenReturn(shadeViewController)
         `when`(shadeViewController.isViewEnabled).thenReturn(false)
         val returnVal = view.onTouchEvent(
                 MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
@@ -152,8 +156,6 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
     @Test
     fun handleTouchEventFromStatusBar_viewNotEnabledButIsMoveEvent_viewReceivesEvent() {
         `when`(centralSurfacesImpl.commandQueuePanelsEnabled).thenReturn(true)
-        `when`(centralSurfacesImpl.shadeViewController)
-                .thenReturn(shadeViewController)
         `when`(shadeViewController.isViewEnabled).thenReturn(false)
         val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_MOVE, 0f, 0f, 0)
 
@@ -165,8 +167,6 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
     @Test
     fun handleTouchEventFromStatusBar_panelAndViewEnabled_viewReceivesEvent() {
         `when`(centralSurfacesImpl.commandQueuePanelsEnabled).thenReturn(true)
-        `when`(centralSurfacesImpl.shadeViewController)
-                .thenReturn(shadeViewController)
         `when`(shadeViewController.isViewEnabled).thenReturn(true)
         val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 2f, 0)
 
@@ -178,8 +178,6 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
     @Test
     fun handleTouchEventFromStatusBar_topEdgeTouch_viewNeverReceivesEvent() {
         `when`(centralSurfacesImpl.commandQueuePanelsEnabled).thenReturn(true)
-        `when`(centralSurfacesImpl.shadeViewController)
-                .thenReturn(shadeViewController)
         `when`(shadeViewController.isFullyCollapsed).thenReturn(true)
         val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
 
@@ -204,9 +202,12 @@ class PhoneStatusBarViewControllerTest : SysuiTestCase() {
             userChipViewModel,
             centralSurfacesImpl,
             shadeControllerImpl,
+            shadeViewController,
+            sceneInteractor,
             shadeLogger,
             viewUtil,
-            configurationController
+            configurationController,
+            mStatusOverlayHoverListenerFactory
         ).create(view).also {
             it.init()
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,6 @@ class AppListSwitchItemTest {
     fun appLabel_displayed() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(null),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -57,7 +56,6 @@ class AppListSwitchItemTest {
     fun summary_displayed() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(null),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -68,27 +66,9 @@ class AppListSwitchItemTest {
     }
 
     @Test
-    fun title_onClick() {
-        var titleClicked = false
-        composeTestRule.setContent {
-            ITEM_MODEL.AppListSwitchItem(
-                onClick = { titleClicked = true },
-                checked = stateOf(false),
-                changeable = stateOf(false),
-                onCheckedChange = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText(LABEL).performClick()
-
-        assertThat(titleClicked).isTrue()
-    }
-
-    @Test
     fun switch_checkIsNull() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(null),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -102,7 +82,6 @@ class AppListSwitchItemTest {
     fun switch_checked() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(true),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -116,7 +95,6 @@ class AppListSwitchItemTest {
     fun switch_notChecked() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(false),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -130,7 +108,6 @@ class AppListSwitchItemTest {
     fun switch_changeable() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(false),
                 changeable = stateOf(true),
                 onCheckedChange = {},
@@ -144,7 +121,6 @@ class AppListSwitchItemTest {
     fun switch_notChangeable() {
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(false),
                 changeable = stateOf(false),
                 onCheckedChange = {},
@@ -159,7 +135,6 @@ class AppListSwitchItemTest {
         var switchClicked = false
         composeTestRule.setContent {
             ITEM_MODEL.AppListSwitchItem(
-                onClick = {},
                 checked = stateOf(false),
                 changeable = stateOf(true),
                 onCheckedChange = { switchClicked = true },

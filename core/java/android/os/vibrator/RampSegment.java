@@ -125,12 +125,6 @@ public final class RampSegment extends VibrationEffectSegment {
 
     /** @hide */
     @Override
-    public boolean hasNonZeroAmplitude() {
-        return mStartAmplitude > 0 || mEndAmplitude > 0;
-    }
-
-    /** @hide */
-    @Override
     public void validate() {
         VibrationEffectSegment.checkFrequencyArgument(mStartFrequencyHz, "startFrequencyHz");
         VibrationEffectSegment.checkFrequencyArgument(mEndFrequencyHz, "endFrequencyHz");
@@ -183,6 +177,17 @@ public final class RampSegment extends VibrationEffectSegment {
                 + ", endFrequencyHz=" + mEndFrequencyHz
                 + ", duration=" + mDuration
                 + "}";
+    }
+
+    /** @hide */
+    @Override
+    public String toDebugString() {
+        return String.format("Ramp=%dms(amplitude=%.2f%s to %.2f%s)",
+                mDuration,
+                mStartAmplitude,
+                Float.compare(mStartFrequencyHz, 0) == 0 ? "" : " @ " + mStartFrequencyHz + "Hz",
+                mEndAmplitude,
+                Float.compare(mEndFrequencyHz, 0) == 0 ? "" : " @ " + mEndFrequencyHz + "Hz");
     }
 
     @Override

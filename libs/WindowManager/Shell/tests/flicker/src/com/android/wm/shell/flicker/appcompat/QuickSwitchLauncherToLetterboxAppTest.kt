@@ -18,10 +18,10 @@ package com.android.wm.shell.flicker.appcompat
 
 import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.RequiresDevice
-import android.tools.common.flicker.assertions.FlickerTest
 import android.tools.common.NavBar
 import android.tools.common.Rotation
 import android.tools.common.datatypes.Rect
+import android.tools.common.flicker.assertions.FlickerTest
 import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
@@ -45,13 +45,11 @@ import org.junit.runners.Parameterized
  *     Swipe right from the bottom of the screen to quick switch back to the app
  * ```
  */
-
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-open class QuickSwitchLauncherToLetterboxAppTest(flicker: LegacyFlickerTest) :
-    BaseAppCompat(flicker) {
+class QuickSwitchLauncherToLetterboxAppTest(flicker: LegacyFlickerTest) : BaseAppCompat(flicker) {
 
     /** {@inheritDoc} */
     override val transition: FlickerBuilder.() -> Unit = {
@@ -152,9 +150,8 @@ open class QuickSwitchLauncherToLetterboxAppTest(flicker: LegacyFlickerTest) :
     @Test
     fun appWindowBecomesAndStaysVisible() {
         flicker.assertWm {
-            this.isAppWindowInvisible(letterboxApp)
-                .then()
-                .isAppWindowVisible(letterboxApp) }
+            this.isAppWindowInvisible(letterboxApp).then().isAppWindowVisible(letterboxApp)
+        }
     }
 
     /**
@@ -245,7 +242,8 @@ open class QuickSwitchLauncherToLetterboxAppTest(flicker: LegacyFlickerTest) :
                 .isVisible(ComponentNameMatcher.SNAPSHOT, isOptional = true)
                 .then()
                 .isVisible(letterboxApp)
-                .isVisible(ComponentNameMatcher.LETTERBOX) }
+                .isVisible(ComponentNameMatcher.LETTERBOX)
+        }
     }
 
     /** {@inheritDoc} */

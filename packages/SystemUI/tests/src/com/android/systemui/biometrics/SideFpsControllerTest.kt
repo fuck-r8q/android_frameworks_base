@@ -51,6 +51,7 @@ import android.view.WindowMetrics
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.airbnb.lottie.LottieAnimationView
+import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.R
 import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
@@ -62,7 +63,6 @@ import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepositor
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
-import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.util.concurrency.FakeExecutor
@@ -149,8 +149,8 @@ class SideFpsControllerTest : SysuiTestCase() {
                 mock(KeyguardStateController::class.java),
                 keyguardBouncerRepository,
                 FakeBiometricSettingsRepository(),
-                FakeDeviceEntryFingerprintAuthRepository(),
                 FakeSystemClock(),
+                mock(KeyguardUpdateMonitor::class.java),
             )
         displayStateInteractor =
             DisplayStateInteractorImpl(
@@ -840,6 +840,27 @@ class SideFpsControllerTest : SysuiTestCase() {
 
             assertThat((lpFlags and PRIVATE_FLAG_TRUSTED_OVERLAY) != 0).isTrue()
         }
+
+    @Test
+    fun primaryBouncerRequestAnimatesAlphaIn() = testWithDisplay {
+        sideFpsController.show(SideFpsUiRequestSource.PRIMARY_BOUNCER, REASON_AUTH_KEYGUARD)
+        executor.runAllReady()
+        verify(sideFpsView).animate()
+    }
+
+    @Test
+    fun alternateBouncerRequestsDoesNotAnimateAlphaIn() = testWithDisplay {
+        sideFpsController.show(SideFpsUiRequestSource.ALTERNATE_BOUNCER, REASON_AUTH_KEYGUARD)
+        executor.runAllReady()
+        verify(sideFpsView, never()).animate()
+    }
+
+    @Test
+    fun autoShowRequestsDoesNotAnimateAlphaIn() = testWithDisplay {
+        sideFpsController.show(SideFpsUiRequestSource.AUTO_SHOW, REASON_AUTH_KEYGUARD)
+        executor.runAllReady()
+        verify(sideFpsView, never()).animate()
+    }
 }
 
 private fun insetsForSmallNavbar() = insetsWithBottom(60)

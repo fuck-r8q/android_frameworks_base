@@ -30,6 +30,7 @@ import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.IApplicationThread;
 import android.app.WindowConfiguration;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.IBinder;
@@ -139,6 +140,14 @@ class TransitionController {
      * degenerate states.
      */
     final ArrayList<ActivityRecord> mValidateCommitVis = new ArrayList<>();
+
+    /**
+     * List of activity-level participants. ActivityRecord is not expected to change independently,
+     * however, recent compatibility logic can now cause this at arbitrary times determined by
+     * client code. If it happens during an animation, the surface can be left at the wrong spot.
+     * TODO(b/290237710) remove when compat logic is moved.
+     */
+    final ArrayList<ActivityRecord> mValidateActivityCompat = new ArrayList<>();
 
     /**
      * Currently playing transitions (in the order they were started). When finished, records are
@@ -468,11 +477,18 @@ class TransitionController {
         if (mCollectingTransition != null && mCollectingTransition.isInTransientHide(task)) {
             return true;
         }
-        for (int i = mWaitingTransitions.size() - 1; i >= 0; --i) {
-            if (mWaitingTransitions.get(i).isInTransientHide(task)) return true;
-        }
         for (int i = mPlayingTransitions.size() - 1; i >= 0; --i) {
             if (mPlayingTransitions.get(i).isInTransientHide(task)) return true;
+        }
+        return false;
+    }
+
+    boolean isTransientVisible(@NonNull Task task) {
+        if (mCollectingTransition != null && mCollectingTransition.isTransientVisible(task)) {
+            return true;
+        }
+        for (int i = mPlayingTransitions.size() - 1; i >= 0; --i) {
+            if (mPlayingTransitions.get(i).isTransientVisible(task)) return true;
         }
         return false;
     }
@@ -559,6 +575,17 @@ class TransitionController {
     @WindowManager.TransitionType
     int getCollectingTransitionType() {
         return mCollectingTransition != null ? mCollectingTransition.mType : TRANSIT_NONE;
+    }
+
+    /**
+     * Returns {@code true} if the window container is in the collecting transition, and its
+     * collected rotation is different from the target rotation.
+     */
+    boolean hasCollectingRotationChange(@NonNull WindowContainer<?> wc, int targetRotation) {
+        final Transition transition = mCollectingTransition;
+        if (transition == null || !transition.mParticipants.contains(wc)) return false;
+        final Transition.ChangeInfo changeInfo = transition.mChanges.get(wc);
+        return changeInfo != null && changeInfo.mRotation != targetRotation;
     }
 
     /**
@@ -896,6 +923,14 @@ class TransitionController {
             }
         }
         mValidateCommitVis.clear();
+        for (int i = 0; i < mValidateActivityCompat.size(); ++i) {
+            ActivityRecord ar = mValidateActivityCompat.get(i);
+            if (ar.getSurfaceControl() == null) continue;
+            final Point tmpPos = new Point();
+            ar.getRelativePosition(tmpPos);
+            ar.getSyncTransaction().setPosition(ar.getSurfaceControl(), tmpPos.x, tmpPos.y);
+        }
+        mValidateActivityCompat.clear();
     }
 
     /**

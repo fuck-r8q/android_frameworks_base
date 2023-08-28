@@ -198,6 +198,9 @@
          service. Off by default, since the service may not be available on some devices. -->
     <bool name="config_enableProximityService">false</bool>
 
+    <!-- Enable or disable android.companion.virtual.VirtualDeviceManager. Enabled by default. -->
+    <bool name="config_enableVirtualDeviceManager">true</bool>
+
     <!-- Whether dialogs should close automatically when the user touches outside
          of them.  This should not normally be modified. -->
     <bool name="config_closeDialogWhenTouchOutside">true</bool>
@@ -1028,7 +1031,7 @@
          requires swapping ROTATION_90 and ROTATION_270.
          TODO(b/265991392): This should eventually be configured and parsed in
           display_settings.xml -->
-    <bool name="config_matchSecondaryInternalDisplaysOrientationToReverseDefaultDisplay">true</bool>
+    <bool name="config_matchSecondaryInternalDisplaysOrientationToReverseDefaultDisplay">false</bool>
 
     <!-- Indicate available ColorDisplayManager.COLOR_MODE_xxx. -->
     <integer-array name="config_availableColorModes">
@@ -2312,6 +2315,8 @@
     <string name="config_systemFinancedDeviceController" translatable="false">com.android.devicelockcontroller</string>
     <!-- The name of the package that will hold the call streaming role. -->
     <string name="config_systemCallStreaming" translatable="false"></string>
+    <!-- The name of the package that will hold the default retail demo role. -->
+    <string name="config_defaultRetailDemo" translatable="false"></string>
 
     <!-- The component name of the wear service class that will be started by the system server. -->
     <string name="config_wearServiceComponent" translatable="false"></string>
@@ -2625,6 +2630,17 @@
          assistant activities (ACTIVITY_TYPE_ASSISTANT) -->
     <bool name="config_dismissDreamOnActivityStart">false</bool>
 
+    <!-- Whether to send a user activity event to PowerManager when a dream quits unexpectedly so
+         that the screen won't immediately shut off.
+
+         When a dream stops unexpectedly, such as due to an app update, if the device has been
+         inactive less than the user's screen timeout, the device goes to keyguard and times out
+         back to dreaming after a few seconds. If the device has been inactive longer, the screen
+         will immediately turn off. With this flag on, the device will go back to keyguard in all
+         scenarios rather than turning off, which gives the device a chance to start dreaming
+         again. -->
+    <bool name="config_resetScreenTimeoutOnUnexpectedDreamExit">false</bool>
+
     <!-- The prefixes of dream component names that are loggable.
          Matched against ComponentName#flattenToString() for dream components.
          If empty, logs "other" for all. -->
@@ -2694,6 +2710,9 @@
     <!-- True if the display hardware only has brightness buckets rather than a full range of
          backlight values -->
     <bool name="config_displayBrightnessBucketsInDoze">false</bool>
+
+    <!-- True to skip the fade animation on display off event -->
+    <bool name="config_displayColorFadeDisabled">false</bool>
 
     <!-- Power Management: Specifies whether to decouple the auto-suspend state of the
          device from the display on/off state.
@@ -2875,12 +2894,14 @@
     <bool name="config_multiuserDelayUserDataLocking">false</bool>
 
     <!-- Whether the device allows users to start in background visible on displays.
-         Should be false for most devices, except automotive vehicle with passenger displays. -->
+         Should be false for all devices in production. Can be enabled only for development use
+         in automotive vehicles with passenger displays. -->
     <bool name="config_multiuserVisibleBackgroundUsers">false</bool>
 
     <!-- Whether the device allows users to start in background visible on the default display.
-         Should be false for most devices, except passenger-only automotive build (i.e., when
-         Android runs in a separate system in the back seat to manage the passenger displays).
+         Should be false for all devices in production. Can be enabled only for development use
+         in passenger-only automotive build (i.e., when Android runs in a separate system in the
+         back seat to manage the passenger displays).
          When set to true, config_multiuserVisibleBackgroundUsers must also be true. -->
     <bool name="config_multiuserVisibleBackgroundUsersOnDefaultDisplay">false</bool>
 
@@ -3923,8 +3944,14 @@
     <!-- Flag indicating device support for EAP SIM, AKA, AKA' -->
     <bool name="config_eap_sim_based_auth_supported">true</bool>
 
+    <!-- How long history of recent vibrations should be kept for the dumpsys. -->
+    <integer name="config_recentVibrationsDumpSizeLimit">20</integer>
+
     <!-- How long history of previous vibrations should be kept for the dumpsys. -->
-    <integer name="config_previousVibrationsDumpLimit">50</integer>
+    <integer name="config_previousVibrationsDumpSizeLimit">50</integer>
+
+    <!-- How close vibration request should be when they're aggregated for dumpsys, in ms. -->
+    <integer name="config_previousVibrationsDumpAggregationTimeMillisLimit">1000</integer>
 
     <!-- The default vibration strength, must be between 1 and 255 inclusive. -->
     <integer name="config_defaultVibrationAmplitude">255</integer>
@@ -4128,6 +4155,10 @@
          handle wallpaper cropping.
     -->
     <string name="config_wallpaperCropperPackage" translatable="false">com.android.wallpapercropper</string>
+
+    <!-- Wallpaper will get top app scheduling priority if this is set to true.
+    -->
+    <bool name="config_wallpaperTopApp">false</bool>
 
     <!-- True if the device supports at least one form of multi-window.
          E.g. freeform, split-screen, picture-in-picture. -->
@@ -4388,12 +4419,12 @@
          Example: "com.android.companiondevicemanager"
          See android.companion.CompanionDeviceManager.
     -->
-    <string name="config_companionDeviceManagerPackage" translatable="false"></string>
+    <string name="config_companionDeviceManagerPackage" translatable="false">com.android.companiondevicemanager</string>
 
     <!-- A list of packages managing companion device(s) by the same manufacturers as the main
          device. It will fall back to showing a prompt if the association has been called multiple
          times in a short period.
-         Note that config_companionDeviceManagerPackage and config_companionDeviceCerts are
+         Note that config_companionDevicePackages and config_companionDeviceCerts are
          parallel arrays.
      -->
     <string-array name="config_companionDevicePackages" translatable="false"></string-array>
@@ -4401,7 +4432,7 @@
     <!-- A list of SHA256 Certificates managing companion device(s) by the same manufacturers as
          the main device. It will fall back to showing a prompt if the association has been called
          multiple times in a short period.
-         Note that config_companionDeviceCerts and config_companionDeviceManagerPackage are parallel
+         Note that config_companionDeviceCerts and config_companionDevicePackages are parallel
          arrays.
          Example: "1A:2B:3C:4D"
      -->
@@ -5147,13 +5178,18 @@
          a threshold.
          For example, no higher refresh rate if
              display brightness <= disp0 && ambient brightness <= amb0
-             || display brightness <= disp1 && ambient brightness <= amb1 -->
+             || display brightness <= disp1 && ambient brightness <= amb1
+         Brightness thresholds are paired with lux thresholds - they both have to be met.
+         A negative brightness or lux value means that only one threshold should be used - e.g. if
+         the brightness value is negative, only the lux threshold is applied. -->
+    <!-- Low zone brightness thresholds in the range [0, 255] -->
     <integer-array translatable="false" name="config_brightnessThresholdsOfPeakRefreshRate">
          <!--
            <item>disp0</item>
            <item>disp1</item>
         -->
     </integer-array>
+    <!-- Low zone lux thresholds -->
     <integer-array translatable="false" name="config_ambientThresholdsOfPeakRefreshRate">
          <!--
            <item>amb0</item>
@@ -5174,14 +5210,18 @@
          may have lower display brightness requirements for the flickering is visible.
          For example, fixed refresh rate if
              display brightness >= disp0 && ambient brightness >= amb0
-             || display brightness >= disp1 && ambient brightness >= amb1 -->
+             || display brightness >= disp1 && ambient brightness >= amb1
+         Brightness thresholds are paired with lux thresholds - they both have to be met.
+         A negative brightness or lux value means that only one threshold should be used - e.g. if
+         the brightness value is negative, only the lux threshold is applied. -->
+    <!-- High zone brightness thresholds in the range [0, 255] -->
     <integer-array translatable="false" name="config_highDisplayBrightnessThresholdsOfFixedRefreshRate">
          <!--
            <item>disp0</item>
            <item>disp1</item>
         -->
     </integer-array>
-
+    <!-- High zone lux thresholds -->
     <integer-array translatable="false" name="config_highAmbientBrightnessThresholdsOfFixedRefreshRate">
          <!--
            <item>amb0</item>
@@ -5272,7 +5312,7 @@
     </string-array>
 
     <!-- The integer index of the selected option in config_udfps_touch_detection_options -->
-    <integer name="config_selected_udfps_touch_detection">3</integer>
+    <integer name="config_selected_udfps_touch_detection">0</integer>
 
     <!-- An array of arrays of side fingerprint sensor properties relative to each display.
          Note: this value is temporary and is expected to be queried directly
@@ -5544,10 +5584,6 @@
     <!-- pdp data reject retry delay in ms -->
     <integer name="config_pdp_reject_retry_delay_ms">-1</integer>
 
-    <!-- Duration in milliseconds for device to vibrate on mash press on power
-         button. -->
-    <integer name="config_mashPressVibrateTimeOnPowerButton">0</integer>
-
     <!-- Whether or not to enable the binder heavy hitter watcher by default -->
     <bool name="config_defaultBinderHeavyHitterWatcherEnabled">false</bool>
 
@@ -5610,13 +5646,13 @@
 
     <!-- Blur radius for the Option 3 in R.integer.config_letterboxBackgroundType. Values < 0 are
         ignored and 0 is used. -->
-    <dimen name="config_letterboxBackgroundWallpaperBlurRadius">31dp</dimen>
+    <dimen name="config_letterboxBackgroundWallpaperBlurRadius">24dp</dimen>
 
     <!-- Alpha of a black translucent scrim showed over wallpaper letterbox background when
         the Option 3 is selected for R.integer.config_letterboxBackgroundType.
         Values < 0 or >= 1 are ignored and 0.0 (transparent) is used instead. -->
     <item name="config_letterboxBackgroundWallaperDarkScrimAlpha" format="float" type="dimen">
-        0.5
+        0.75
     </item>
 
     <!-- Corners appearance of the letterbox background.
@@ -5641,7 +5677,7 @@
             but isn't supported on the device or both dark scrim alpha and blur radius aren't
             provided.
      -->
-    <color name="config_letterboxBackgroundColor">@color/letterbox_background</color>
+    <color name="config_letterboxBackgroundColor">@color/system_neutral1_1000</color>
 
     <!-- Horizontal position of a center of the letterboxed app window.
         0 corresponds to the left side of the screen and 1 to the right side. If given value < 0
@@ -5742,6 +5778,9 @@
 
     <!-- Whether per-app user aspect ratio override settings is enabled -->
     <bool name="config_appCompatUserAppAspectRatioSettingsIsEnabled">false</bool>
+
+    <!-- Whether per-app fullscreen override option is allowed in user aspect ratio settings -->
+    <bool name="config_appCompatUserAppAspectRatioFullscreenIsEnabled">false</bool>
 
     <!-- Whether sending compat fake focus for split screen resumed activities is enabled.
          Needed because some game engines wait to get focus before drawing the content of
@@ -6560,4 +6599,16 @@
          serialization, a default vibration will be used.
          Note that, indefinitely repeating vibrations are not allowed as shutdown vibrations. -->
     <string name="config_defaultShutdownVibrationFile" />
+
+    <!-- Whether single finger panning is enabled when magnification is on -->
+    <bool name="config_enable_a11y_magnification_single_panning">false</bool>
+
+    <!-- The file path in which custom vibrations are provided for haptic feedbacks.
+         If the device does not specify any such file path here, if the file path specified here
+         does not exist, or if the contents of the file does not make up a valid customization
+         serialization, the system default vibrations for haptic feedback will be used.
+         If the content of the customization file is valid, the system will use the provided
+         vibrations for the customized haptic feedback IDs, and continue to use the system defaults
+         for the non-customized ones. -->
+    <string name="config_hapticFeedbackCustomizationFile" />
 </resources>

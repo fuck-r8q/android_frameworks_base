@@ -16,29 +16,42 @@
 
 package com.android.systemui.scene
 
-import com.android.keyguard.KeyguardSecurityModel.SecurityMode
+import android.content.pm.UserInfo
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.AuthenticationRepository
-import com.android.systemui.authentication.data.repository.AuthenticationRepositoryImpl
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
-import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository.Companion.toSecurityMode
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.bouncer.data.repository.BouncerRepository
+import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
+import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
+import com.android.systemui.flags.FakeFeatureFlags
+import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
+import com.android.systemui.keyguard.data.repository.KeyguardRepository
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.LockscreenSceneInteractor
+import com.android.systemui.keyguard.shared.model.WakeSleepReason
+import com.android.systemui.keyguard.shared.model.WakefulnessModel
+import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.scene.data.repository.SceneContainerRepository
 import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.shared.model.RemoteUserInput
+import com.android.systemui.scene.shared.model.RemoteUserInputAction
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.mockito.mock
+import com.android.systemui.util.mockito.whenever
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.currentTime
 
 /**
  * Utilities for creating scene container framework related repositories, interactors, and
@@ -48,34 +61,43 @@ import kotlinx.coroutines.test.TestScope
 class SceneTestUtils(
     test: SysuiTestCase,
 ) {
-    val testDispatcher: TestDispatcher by lazy { StandardTestDispatcher() }
-    val testScope: TestScope by lazy { TestScope(testDispatcher) }
-    private var securityMode: SecurityMode =
-        FakeAuthenticationRepository.DEFAULT_AUTHENTICATION_METHOD.toSecurityMode()
+    val testDispatcher = StandardTestDispatcher()
+    val testScope = TestScope(testDispatcher)
+    val featureFlags =
+        FakeFeatureFlags().apply {
+            set(Flags.SCENE_CONTAINER, true)
+            set(Flags.FACE_AUTH_REFACTOR, false)
+        }
+    private val userRepository: UserRepository by lazy {
+        FakeUserRepository().apply {
+            val users = listOf(UserInfo(/* id=  */ 0, "name", /* flags= */ 0))
+            setUserInfos(users)
+            runBlocking { setSelectedUserInfo(users.first()) }
+        }
+    }
+
     val authenticationRepository: FakeAuthenticationRepository by lazy {
         FakeAuthenticationRepository(
-            delegate =
-                AuthenticationRepositoryImpl(
-                    applicationScope = applicationScope(),
-                    getSecurityMode = { securityMode },
-                    backgroundDispatcher = testDispatcher,
-                    userRepository = FakeUserRepository(),
-                    lockPatternUtils = mock(),
-                    keyguardRepository = FakeKeyguardRepository(),
-                ),
-            onSecurityModeChanged = { securityMode = it },
+            currentTime = { testScope.currentTime },
         )
+    }
+    val keyguardRepository: FakeKeyguardRepository by lazy {
+        FakeKeyguardRepository().apply {
+            setWakefulnessModel(
+                WakefulnessModel(
+                    WakefulnessState.AWAKE,
+                    WakeSleepReason.OTHER,
+                    WakeSleepReason.OTHER,
+                )
+            )
+        }
     }
     private val context = test.context
 
     fun fakeSceneContainerRepository(
-        containerConfigurations: Set<SceneContainerConfig> =
-            setOf(
-                fakeSceneContainerConfig(CONTAINER_1),
-                fakeSceneContainerConfig(CONTAINER_2),
-            )
+        containerConfig: SceneContainerConfig = fakeSceneContainerConfig(),
     ): SceneContainerRepository {
-        return SceneContainerRepository(containerConfigurations.associateBy { it.name })
+        return SceneContainerRepository(containerConfig)
     }
 
     fun fakeSceneKeys(): List<SceneKey> {
@@ -89,23 +111,23 @@ class SceneTestUtils(
     }
 
     fun fakeSceneContainerConfig(
-        name: String,
         sceneKeys: List<SceneKey> = fakeSceneKeys(),
     ): SceneContainerConfig {
         return SceneContainerConfig(
-            name = name,
             sceneKeys = sceneKeys,
             initialSceneKey = SceneKey.Lockscreen,
         )
     }
 
-    fun sceneInteractor(): SceneInteractor {
+    fun sceneInteractor(
+        repository: SceneContainerRepository = fakeSceneContainerRepository()
+    ): SceneInteractor {
         return SceneInteractor(
-            repository = fakeSceneContainerRepository(),
+            repository = repository,
         )
     }
 
-    fun authenticationRepository(): AuthenticationRepository {
+    fun authenticationRepository(): FakeAuthenticationRepository {
         return authenticationRepository
     }
 
@@ -115,6 +137,24 @@ class SceneTestUtils(
         return AuthenticationInteractor(
             applicationScope = applicationScope(),
             repository = repository,
+            backgroundDispatcher = testDispatcher,
+            userRepository = userRepository,
+            keyguardRepository = keyguardRepository,
+            clock = mock { whenever(elapsedRealtime()).thenAnswer { testScope.currentTime } }
+        )
+    }
+
+    fun keyguardRepository(): FakeKeyguardRepository {
+        return keyguardRepository
+    }
+
+    fun keyguardInteractor(repository: KeyguardRepository): KeyguardInteractor {
+        return KeyguardInteractor(
+            repository = repository,
+            commandQueue = FakeCommandQueue(),
+            featureFlags = featureFlags,
+            bouncerRepository = FakeKeyguardBouncerRepository(),
+            configurationRepository = FakeConfigurationRepository()
         )
     }
 
@@ -128,7 +168,7 @@ class SceneTestUtils(
             repository = BouncerRepository(),
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
-            containerName = CONTAINER_1,
+            featureFlags = featureFlags,
         )
     }
 
@@ -138,32 +178,19 @@ class SceneTestUtils(
         return BouncerViewModel(
             applicationContext = context,
             applicationScope = applicationScope(),
-            interactorFactory =
-                object : BouncerInteractor.Factory {
-                    override fun create(containerName: String): BouncerInteractor {
-                        return bouncerInteractor
-                    }
-                },
-            containerName = CONTAINER_1,
+            interactor = bouncerInteractor,
+            featureFlags = featureFlags,
         )
     }
 
     fun lockScreenSceneInteractor(
         authenticationInteractor: AuthenticationInteractor,
-        sceneInteractor: SceneInteractor,
         bouncerInteractor: BouncerInteractor,
     ): LockscreenSceneInteractor {
         return LockscreenSceneInteractor(
             applicationScope = applicationScope(),
             authenticationInteractor = authenticationInteractor,
-            bouncerInteractorFactory =
-                object : BouncerInteractor.Factory {
-                    override fun create(containerName: String): BouncerInteractor {
-                        return bouncerInteractor
-                    }
-                },
-            sceneInteractor = sceneInteractor,
-            containerName = CONTAINER_1,
+            bouncerInteractor = bouncerInteractor,
         )
     }
 
@@ -172,7 +199,13 @@ class SceneTestUtils(
     }
 
     companion object {
-        const val CONTAINER_1 = "container1"
-        const val CONTAINER_2 = "container2"
+        val REMOTE_INPUT_DOWN_GESTURE =
+            listOf(
+                RemoteUserInput(10f, 10f, RemoteUserInputAction.DOWN),
+                RemoteUserInput(10f, 20f, RemoteUserInputAction.MOVE),
+                RemoteUserInput(10f, 30f, RemoteUserInputAction.MOVE),
+                RemoteUserInput(10f, 40f, RemoteUserInputAction.MOVE),
+                RemoteUserInput(10f, 40f, RemoteUserInputAction.UP),
+            )
     }
 }

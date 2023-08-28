@@ -94,6 +94,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RecentTaskInfo;
 import android.app.ActivityManagerInternal;
@@ -211,7 +212,6 @@ import com.android.internal.policy.LogDecelerateInterpolator;
 import com.android.internal.policy.PhoneWindow;
 import com.android.internal.policy.TransitionAnimation;
 import com.android.internal.statusbar.IStatusBarService;
-import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.AccessibilityManagerInternal;
@@ -224,6 +224,7 @@ import com.android.server.UiThread;
 import com.android.server.display.BrightnessUtils;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.input.KeyboardMetricsCollector;
+import com.android.server.input.KeyboardMetricsCollector.KeyboardLogEvent;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.KeyCombinationManager.TwoKeysCombinationRule;
@@ -231,6 +232,7 @@ import com.android.server.policy.keyguard.KeyguardServiceDelegate;
 import com.android.server.policy.keyguard.KeyguardServiceDelegate.DrawnListener;
 import com.android.server.policy.keyguard.KeyguardStateMonitor.StateCallback;
 import com.android.server.statusbar.StatusBarManagerInternal;
+import com.android.server.vibrator.HapticFeedbackVibrationProvider;
 import com.android.server.vr.VrManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
@@ -375,12 +377,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final String TALKBACK_LABEL = "TalkBack";
 
     private static final int POWER_BUTTON_SUPPRESSION_DELAY_DEFAULT_MILLIS = 800;
-    private static final VibrationAttributes TOUCH_VIBRATION_ATTRIBUTES =
-            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH);
-    private static final VibrationAttributes PHYSICAL_EMULATION_VIBRATION_ATTRIBUTES =
-            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_PHYSICAL_EMULATION);
-    private static final VibrationAttributes HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES =
-            VibrationAttributes.createForUsage(VibrationAttributes.USAGE_HARDWARE_FEEDBACK);
 
     /**
      * Keyguard stuff
@@ -429,6 +425,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     ActivityManagerInternal mActivityManagerInternal;
     ActivityTaskManagerInternal mActivityTaskManagerInternal;
     AutofillManagerInternal mAutofillManagerInternal;
+    InputManager mInputManager;
     InputManagerInternal mInputManagerInternal;
     DreamManagerInternal mDreamManagerInternal;
     PowerManagerInternal mPowerManagerInternal;
@@ -454,6 +451,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     PackageManager mPackageManager;
     SideFpsEventHandler mSideFpsEventHandler;
     LockPatternUtils mLockPatternUtils;
+    private HapticFeedbackVibrationProvider mHapticFeedbackVibrationProvider;
     private boolean mHasFeatureAuto;
     private boolean mHasFeatureWatch;
     private boolean mHasFeatureLeanback;
@@ -461,9 +459,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     // Assigned on main thread, accessed on UI thread
     volatile VrManagerInternal mVrManagerInternal;
-
-    // Vibrator pattern for haptic feedback during boot when safe mode is enabled.
-    long[] mSafeModeEnabledVibePattern;
 
     /** If true, hitting shift & menu will broadcast Intent.ACTION_BUG_REPORT */
     boolean mEnableShiftMenuBugReports = false;
@@ -562,7 +557,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mPowerVolUpBehavior;
     boolean mStylusButtonsEnabled = true;
     boolean mHasSoftInput = false;
-    boolean mHapticTextHandleEnabled;
     boolean mUseTvRouting;
     boolean mAllowStartActivityForLongPressOnPowerDuringSetup;
     MetricsLogger mLogger;
@@ -653,6 +647,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     SettingsObserver mSettingsObserver;
     ModifierShortcutManager mModifierShortcutManager;
+    /** Currently fully consumed key codes per device */
+    private final SparseArray<Set<Integer>> mConsumedKeysForDevice = new SparseArray<>();
     PowerManager.WakeLock mBroadcastWakeLock;
     PowerManager.WakeLock mPowerKeyWakeLock;
     boolean mHavePendingMediaKeyRepeatWithWakeLock;
@@ -780,7 +776,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     handleSwitchKeyboardLayout(msg.arg1, msg.arg2);
                     break;
                 case MSG_LOG_KEYBOARD_SYSTEM_EVENT:
-                    handleKeyboardSystemEvent(msg.arg2, (KeyEvent) msg.obj);
+                    handleKeyboardSystemEvent(KeyboardLogEvent.from(msg.arg1), (KeyEvent) msg.obj);
                     break;
             }
         }
@@ -1862,8 +1858,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void launchAllAppsViaA11y() {
-        getAccessibilityManagerInternal().performSystemAction(
-                AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
+        AccessibilityManagerInternal accessibilityManager = getAccessibilityManagerInternal();
+        if (accessibilityManager != null) {
+            accessibilityManager.performSystemAction(
+                    AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS);
+        }
     }
 
     private void toggleNotificationPanel() {
@@ -1920,7 +1919,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mDisplayId = displayId;
         }
 
-        int handleHomeButton(IBinder focusedToken, KeyEvent event) {
+        boolean handleHomeButton(IBinder focusedToken, KeyEvent event) {
             final boolean keyguardOn = keyguardOn();
             final int repeatCount = event.getRepeatCount();
             final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
@@ -1934,6 +1933,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             // If we have released the home key, and didn't do anything else
             // while it was pressed, then it is time to go home!
             if (!down) {
+                logKeyboardSystemsEvent(event, KeyboardLogEvent.HOME);
                 if (mDisplayId == DEFAULT_DISPLAY) {
                     cancelPreloadRecentApps();
                 }
@@ -1941,12 +1941,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mHomePressed = false;
                 if (mHomeConsumed) {
                     mHomeConsumed = false;
-                    return -1;
+                    return true;
                 }
 
                 if (canceled) {
                     Log.i(TAG, "Ignoring HOME; event canceled.");
-                    return -1;
+                    return true;
                 }
 
                 // Delay handling home if a double-tap is possible.
@@ -1958,13 +1958,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         mHomeDoubleTapPending = true;
                         mHandler.postDelayed(mHomeDoubleTapTimeoutRunnable,
                                 ViewConfiguration.getDoubleTapTimeout());
-                        return -1;
+                        return true;
                     }
                 }
 
                 // Post to main thread to avoid blocking input pipeline.
                 mHandler.post(() -> handleShortPressOnHome(mDisplayId));
-                return -1;
+                return true;
             }
 
             final KeyInterceptionInfo info =
@@ -1976,12 +1976,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         || (info.layoutParamsType == TYPE_NOTIFICATION_SHADE
                         && isKeyguardShowing())) {
                     // the "app" is keyguard, so give it the key
-                    return 0;
+                    return false;
                 }
                 for (int t : WINDOW_TYPES_WHERE_HOME_DOESNT_WORK) {
                     if (info.layoutParamsType == t) {
                         // don't do anything, but also don't pass it to the app
-                        return -1;
+                        return true;
                     }
                 }
             }
@@ -2006,7 +2006,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             event.getEventTime()));
                 }
             }
-            return -1;
+            return true;
         }
 
         private void handleDoubleTapOnHome() {
@@ -2135,6 +2135,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
         mActivityManagerInternal = LocalServices.getService(ActivityManagerInternal.class);
         mActivityTaskManagerInternal = LocalServices.getService(ActivityTaskManagerInternal.class);
+        mInputManager = mContext.getSystemService(InputManager.class);
         mInputManagerInternal = LocalServices.getService(InputManagerInternal.class);
         mDreamManagerInternal = LocalServices.getService(DreamManagerInternal.class);
         mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
@@ -2204,7 +2205,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mWakeGestureListener = new MyWakeGestureListener(mContext, mHandler);
         mSettingsObserver = new SettingsObserver(mHandler);
         mSettingsObserver.observe();
-        mModifierShortcutManager = new ModifierShortcutManager(mContext);
+        mModifierShortcutManager = new ModifierShortcutManager(mContext, mHandler);
         mUiMode = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_defaultUiModeType);
         mHomeIntent =  new Intent(Intent.ACTION_MAIN, null);
@@ -2284,9 +2285,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mTriplePressOnStemPrimaryBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_triplePressOnStemPrimaryBehavior);
 
-        mHapticTextHandleEnabled = mContext.getResources().getBoolean(
-                com.android.internal.R.bool.config_enableHapticTextHandle);
-
         mUseTvRouting = AudioSystem.getPlatformType(mContext) == AudioSystem.PLATFORM_TELEVISION;
 
         mHandleVolumeKeysInWM = mContext.getResources().getBoolean(
@@ -2327,8 +2325,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mContext.registerReceiver(mMultiuserReceiver, filter);
 
         mVibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
-        mSafeModeEnabledVibePattern = getLongIntArray(mContext.getResources(),
-                com.android.internal.R.array.config_safeModeEnabledVibePattern);
+        mHapticFeedbackVibrationProvider =
+                new HapticFeedbackVibrationProvider(mContext.getResources(), mVibrator);
 
         mGlobalKeyManager = new GlobalKeyManager(mContext);
 
@@ -2694,7 +2692,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    public void updateSettings() {
+    private void updateSettings() {
+        updateSettings(null);
+    }
+
+    /**
+     * Update provider Setting values on a given {@code handler}, or synchronously if {@code null}
+     * is passed for handler.
+     */
+    void updateSettings(Handler handler) {
+        if (handler != null) {
+            handler.post(() -> updateSettings(null));
+            return;
+        }
         ContentResolver resolver = mContext.getContentResolver();
         boolean updateRotation = false;
         synchronized (mLock) {
@@ -3062,20 +3072,33 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      * We won't log keyboard events when the input device is null
      * or when it is virtual.
      */
-    private void handleKeyboardSystemEvent(int keyboardSystemEvent, KeyEvent event) {
-        final InputManager inputManager = mContext.getSystemService(InputManager.class);
-        final InputDevice inputDevice = inputManager != null
-                ? inputManager.getInputDevice(event.getDeviceId()) : null;
-        if (inputDevice != null && !inputDevice.isVirtual()) {
-            KeyboardMetricsCollector.logKeyboardSystemsEventReportedAtom(
-                    inputDevice, keyboardSystemEvent,
-                    new int[]{event.getKeyCode()}, event.getMetaState());
-        }
+    private void handleKeyboardSystemEvent(KeyboardLogEvent keyboardLogEvent, KeyEvent event) {
+        final InputDevice inputDevice = mInputManager.getInputDevice(event.getDeviceId());
+        KeyboardMetricsCollector.logKeyboardSystemsEventReportedAtom(inputDevice,
+                keyboardLogEvent, event.getMetaState(), event.getKeyCode());
+        event.recycle();
     }
 
-    private void logKeyboardSystemsEvent(KeyEvent event, int keyboardSystemEvent) {
-        mHandler.obtainMessage(MSG_LOG_KEYBOARD_SYSTEM_EVENT, 0, keyboardSystemEvent, event)
-                .sendToTarget();
+    private void logKeyboardSystemsEventOnActionUp(KeyEvent event,
+            KeyboardLogEvent keyboardSystemEvent) {
+        if (event.getAction() != KeyEvent.ACTION_UP) {
+            return;
+        }
+        logKeyboardSystemsEvent(event, keyboardSystemEvent);
+    }
+
+    private void logKeyboardSystemsEventOnActionDown(KeyEvent event,
+            KeyboardLogEvent keyboardSystemEvent) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN) {
+            return;
+        }
+        logKeyboardSystemsEvent(event, keyboardSystemEvent);
+    }
+
+    private void logKeyboardSystemsEvent(KeyEvent event, KeyboardLogEvent keyboardSystemEvent) {
+        KeyEvent eventToLog = KeyEvent.obtain(event);
+        mHandler.obtainMessage(MSG_LOG_KEYBOARD_SYSTEM_EVENT, keyboardSystemEvent.getIntValue(), 0,
+                eventToLog).sendToTarget();
     }
 
     // TODO(b/117479243): handle it in InputPolicy
@@ -3084,24 +3107,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public long interceptKeyBeforeDispatching(IBinder focusedToken, KeyEvent event,
             int policyFlags) {
-        final boolean keyguardOn = keyguardOn();
         final int keyCode = event.getKeyCode();
-        final int repeatCount = event.getRepeatCount();
-        final int metaState = event.getMetaState();
         final int flags = event.getFlags();
-        final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
-        final boolean canceled = event.isCanceled();
-        final int displayId = event.getDisplayId();
-        final long key_consumed = -1;
-        final long key_not_consumed = 0;
+        final long keyConsumed = -1;
+        final long keyNotConsumed = 0;
+        final int deviceId = event.getDeviceId();
 
         if (DEBUG_INPUT) {
-            Log.d(TAG, "interceptKeyTi keyCode=" + keyCode + " down=" + down + " repeatCount="
-                    + repeatCount + " keyguardOn=" + keyguardOn + " canceled=" + canceled);
+            Log.d(TAG,
+                    "interceptKeyTi keyCode=" + keyCode + " action=" + event.getAction()
+                            + " repeatCount=" + event.getRepeatCount() + " keyguardOn="
+                            + keyguardOn() + " canceled=" + event.isCanceled());
         }
 
         if (mKeyCombinationManager.isKeyConsumed(event)) {
-            return key_consumed;
+            return keyConsumed;
         }
 
         if ((flags & KeyEvent.FLAG_FALLBACK) == 0) {
@@ -3112,8 +3132,54 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
         }
 
-        // Cancel any pending meta actions if we see any other keys being pressed between the down
-        // of the meta key and its corresponding up.
+        Set<Integer> consumedKeys = mConsumedKeysForDevice.get(deviceId);
+        if (consumedKeys == null) {
+            consumedKeys = new HashSet<>();
+            mConsumedKeysForDevice.put(deviceId, consumedKeys);
+        }
+
+        if (interceptSystemKeysAndShortcuts(focusedToken, event)
+                && event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            consumedKeys.add(keyCode);
+            return keyConsumed;
+        }
+
+        boolean needToConsumeKey = consumedKeys.contains(keyCode);
+        if (event.getAction() == KeyEvent.ACTION_UP || event.isCanceled()) {
+            consumedKeys.remove(keyCode);
+            if (consumedKeys.isEmpty()) {
+                mConsumedKeysForDevice.remove(deviceId);
+            }
+        }
+
+        return needToConsumeKey ? keyConsumed : keyNotConsumed;
+    }
+
+    // You can only start consuming the key gesture if ACTION_DOWN and repeat count
+    // is 0. If you start intercepting the key halfway, then key will not be consumed
+    // and will be sent to apps for processing too.
+    // e.g. If a certain combination is only handled on ACTION_UP (i.e.
+    // interceptShortcut() returns true only for ACTION_UP), then since we already
+    // sent the ACTION_DOWN events to the application, we MUST also send the
+    // ACTION_UP to the application.
+    // So, to ensure that your intercept logic works properly, and we don't send any
+    // conflicting events to application, make sure to consume the event on
+    // ACTION_DOWN even if you want to do something on ACTION_UP. This is essential
+    // to maintain event parity and to not have incomplete key gestures.
+    @SuppressLint("MissingPermission")
+    private boolean interceptSystemKeysAndShortcuts(IBinder focusedToken, KeyEvent event) {
+        final boolean keyguardOn = keyguardOn();
+        final int keyCode = event.getKeyCode();
+        final int repeatCount = event.getRepeatCount();
+        final int metaState = event.getMetaState();
+        final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+        final boolean canceled = event.isCanceled();
+        final int displayId = event.getDisplayId();
+        final int deviceId = event.getDeviceId();
+        final boolean firstDown = down && repeatCount == 0;
+
+        // Cancel any pending meta actions if we see any other keys being pressed between the
+        // down of the meta key and its corresponding up.
         if (mPendingMetaAction && !KeyEvent.isMetaKey(keyCode)) {
             mPendingMetaAction = false;
         }
@@ -3127,50 +3193,49 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 dismissKeyboardShortcutsMenu();
                 mPendingMetaAction = false;
                 mPendingCapsLockToggle = false;
-                return key_consumed;
+                return true;
             }
         }
 
-        switch(keyCode) {
+        switch (keyCode) {
             case KeyEvent.KEYCODE_HOME:
-                logKeyboardSystemsEvent(event, FrameworkStatsLog
-                        .KEYBOARD_SYSTEMS_EVENT_REPORTED__KEYBOARD_SYSTEM_EVENT__HOME);
                 return handleHomeShortcuts(displayId, focusedToken, event);
             case KeyEvent.KEYCODE_MENU:
                 // Hijack modified menu keys for debugging features
                 final int chordBug = KeyEvent.META_SHIFT_ON;
 
-                if (down && repeatCount == 0) {
-                    if (mEnableShiftMenuBugReports && (metaState & chordBug) == chordBug) {
-                        Intent intent = new Intent(Intent.ACTION_BUG_REPORT);
-                        mContext.sendOrderedBroadcastAsUser(intent, UserHandle.CURRENT,
-                                null, null, null, 0, null, null);
-                        return key_consumed;
-                    }
+                if (mEnableShiftMenuBugReports && firstDown
+                        && (metaState & chordBug) == chordBug) {
+                    Intent intent = new Intent(Intent.ACTION_BUG_REPORT);
+                    mContext.sendOrderedBroadcastAsUser(intent, UserHandle.CURRENT,
+                            null, null, null, 0, null, null);
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.TRIGGER_BUG_REPORT);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_RECENT_APPS:
-                if (down && repeatCount == 0) {
+                if (firstDown) {
                     showRecentApps(false /* triggeredFromAltTab */);
-                    logKeyboardSystemsEvent(event, FrameworkStatsLog
-                            .KEYBOARD_SYSTEMS_EVENT_REPORTED__KEYBOARD_SYSTEM_EVENT__RECENT_APPS);
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.RECENT_APPS);
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_APP_SWITCH:
                 if (!keyguardOn) {
-                    if (down && repeatCount == 0) {
+                    if (firstDown) {
                         preloadRecentApps();
                     } else if (!down) {
                         toggleRecentApps();
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.APP_SWITCH);
                     }
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_A:
-                if (down && event.isMetaPressed()) {
+                if (firstDown && event.isMetaPressed()) {
                     launchAssistAction(Intent.EXTRA_ASSIST_INPUT_HINT_KEYBOARD,
-                            event.getDeviceId(),
-                            event.getEventTime(), AssistUtils.INVOCATION_TYPE_UNKNOWN);
-                    return key_consumed;
+                            deviceId, event.getEventTime(),
+                            AssistUtils.INVOCATION_TYPE_UNKNOWN);
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LAUNCH_ASSISTANT);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_H:
@@ -3180,73 +3245,83 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             case KeyEvent.KEYCODE_I:
-                if (down && event.isMetaPressed()) {
+                if (firstDown && event.isMetaPressed()) {
                     showSystemSettings();
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LAUNCH_SYSTEM_SETTINGS);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_L:
-                if (down && event.isMetaPressed() && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed()) {
                     lockNow(null /* options */);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LOCK_SCREEN);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_N:
-                if (down && event.isMetaPressed()) {
+                if (firstDown && event.isMetaPressed()) {
                     if (event.isCtrlPressed()) {
                         sendSystemKeyToStatusBarAsync(event);
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.OPEN_NOTES);
                     } else {
                         toggleNotificationPanel();
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_NOTIFICATION_PANEL);
                     }
-                    return key_consumed;
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_S:
-                if (down && event.isMetaPressed() && event.isCtrlPressed() && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
                     interceptScreenshotChord(SCREENSHOT_KEY_OTHER, 0 /*pressDelay*/);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.TAKE_SCREENSHOT);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_T:
-                if (down && event.isMetaPressed()) {
+                if (firstDown && event.isMetaPressed()) {
                     toggleTaskbar();
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_TASKBAR);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_DPAD_UP:
-                if (down && event.isMetaPressed() && event.isCtrlPressed() && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
                     StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
                     if (statusbar != null) {
                         statusbar.goToFullscreenFromSplit();
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.SPLIT_SCREEN_NAVIGATION);
+                        return true;
                     }
-                    return key_consumed;
                 }
                 break;
             case KeyEvent.KEYCODE_DPAD_LEFT:
-                if (down && event.isMetaPressed() && event.isCtrlPressed() && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
                     enterStageSplitFromRunningApp(true /* leftOrTop */);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.SPLIT_SCREEN_NAVIGATION);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (down && event.isMetaPressed() && event.isCtrlPressed() && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed() && event.isCtrlPressed()) {
                     enterStageSplitFromRunningApp(false /* leftOrTop */);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.SPLIT_SCREEN_NAVIGATION);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_SLASH:
-                if (down && repeatCount == 0 && event.isMetaPressed() && !keyguardOn) {
+                if (firstDown && event.isMetaPressed() && !keyguardOn) {
                     toggleKeyboardShortcutsMenu(event.getDeviceId());
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.OPEN_SHORTCUT_HELPER);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_ASSIST:
                 Slog.wtf(TAG, "KEYCODE_ASSIST should be handled in interceptKeyBeforeQueueing");
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_VOICE_ASSIST:
                 Slog.wtf(TAG, "KEYCODE_VOICE_ASSIST should be handled in"
                         + " interceptKeyBeforeQueueing");
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_VIDEO_APP_1:
             case KeyEvent.KEYCODE_VIDEO_APP_2:
             case KeyEvent.KEYCODE_VIDEO_APP_3:
@@ -3264,7 +3339,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_DEMO_APP_3:
             case KeyEvent.KEYCODE_DEMO_APP_4:
                 Slog.wtf(TAG, "KEYCODE_APP_X should be handled in interceptKeyBeforeQueueing");
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_BRIGHTNESS_UP:
             case KeyEvent.KEYCODE_BRIGHTNESS_DOWN:
                 if (down) {
@@ -3301,23 +3376,31 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             minLinearBrightness, maxLinearBrightness);
                     mDisplayManager.setBrightness(screenDisplayId, adjustedLinearBrightness);
 
-                    startActivityAsUser(new Intent(Intent.ACTION_SHOW_BRIGHTNESS_DIALOG),
-                            UserHandle.CURRENT_OR_SELF);
+                    Intent intent = new Intent(Intent.ACTION_SHOW_BRIGHTNESS_DIALOG);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+                    intent.putExtra(EXTRA_FROM_BRIGHTNESS_KEY, true);
+                    startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.getBrightnessEvent(keyCode));
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_KEYBOARD_BACKLIGHT_DOWN:
                 if (down) {
                     mInputManagerInternal.decrementKeyboardBacklight(event.getDeviceId());
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.KEYBOARD_BACKLIGHT_DOWN);
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_KEYBOARD_BACKLIGHT_UP:
                 if (down) {
                     mInputManagerInternal.incrementKeyboardBacklight(event.getDeviceId());
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.KEYBOARD_BACKLIGHT_UP);
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_KEYBOARD_BACKLIGHT_TOGGLE:
                 // TODO: Add logic
-                return key_consumed;
+                if (!down) {
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.KEYBOARD_BACKLIGHT_TOGGLE);
+                }
+                return true;
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_MUTE:
@@ -3325,7 +3408,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     // On TVs or when the configuration is enabled, volume keys never
                     // go to the foreground app.
                     dispatchDirectAudioEvent(event);
-                    return key_consumed;
+                    return true;
                 }
 
                 // If the device is in VR mode and keys are "internal" (e.g. on the side of the
@@ -3334,26 +3417,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (mDefaultDisplayPolicy.isPersistentVrModeEnabled()) {
                     final InputDevice d = event.getDevice();
                     if (d != null && !d.isExternal()) {
-                        return key_consumed;
+                        return true;
                     }
                 }
                 break;
             case KeyEvent.KEYCODE_TAB:
-                if (down && event.isMetaPressed()) {
-                    if (!keyguardOn && isUserSetupComplete()) {
+                if (firstDown && !keyguardOn && isUserSetupComplete()) {
+                    if (event.isMetaPressed()) {
                         showRecentApps(false);
-                        return key_consumed;
-                    }
-                } else if (down && repeatCount == 0) {
-                    // Display task switcher for ALT-TAB.
-                    if (mRecentAppsHeldModifiers == 0 && !keyguardOn && isUserSetupComplete()) {
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.RECENT_APPS);
+                        return true;
+                    } else if (mRecentAppsHeldModifiers == 0) {
                         final int shiftlessModifiers =
                                 event.getModifiers() & ~KeyEvent.META_SHIFT_MASK;
                         if (KeyEvent.metaStateHasModifiers(
                                 shiftlessModifiers, KeyEvent.META_ALT_ON)) {
                             mRecentAppsHeldModifiers = shiftlessModifiers;
                             showRecentApps(true);
-                            return key_consumed;
+                            logKeyboardSystemsEvent(event, KeyboardLogEvent.RECENT_APPS);
+                            return true;
                         }
                     }
                 }
@@ -3364,19 +3446,22 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Message msg = mHandler.obtainMessage(MSG_HANDLE_ALL_APPS);
                     msg.setAsynchronous(true);
                     msg.sendToTarget();
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.ALL_APPS);
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_NOTIFICATION:
                 if (!down) {
                     toggleNotificationPanel();
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_NOTIFICATION_PANEL);
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_SEARCH:
-                if (down && repeatCount == 0 && !keyguardOn()) {
-                    switch(mSearchKeyBehavior) {
+                if (firstDown && !keyguardOn) {
+                    switch (mSearchKeyBehavior) {
                         case SEARCH_BEHAVIOR_TARGET_ACTIVITY: {
                             launchTargetSearchActivity();
-                            return key_consumed;
+                            logKeyboardSystemsEvent(event, KeyboardLogEvent.LAUNCH_SEARCH);
+                            return true;
                         }
                         case SEARCH_BEHAVIOR_DEFAULT_SEARCH:
                         default:
@@ -3385,21 +3470,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             case KeyEvent.KEYCODE_LANGUAGE_SWITCH:
-                if (down && repeatCount == 0) {
+                if (firstDown) {
                     int direction = (metaState & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
                     sendSwitchKeyboardLayout(event, direction);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LANGUAGE_SWITCH);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_SPACE:
                 // Handle keyboard layout switching. (META + SPACE)
-                if ((metaState & KeyEvent.META_META_MASK) == 0) {
-                    return key_not_consumed;
-                }
-                if (down && repeatCount == 0) {
+                if (firstDown && event.isMetaPressed()) {
                     int direction = (metaState & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
                     sendSwitchKeyboardLayout(event, direction);
-                    return key_consumed;
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LANGUAGE_SWITCH);
+                    return true;
                 }
                 break;
             case KeyEvent.KEYCODE_META_LEFT:
@@ -3417,14 +3501,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (mPendingCapsLockToggle) {
                         mInputManagerInternal.toggleCapsLock(event.getDeviceId());
                         mPendingCapsLockToggle = false;
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_CAPS_LOCK);
                     } else if (mPendingMetaAction) {
                         if (!canceled) {
                             launchAllAppsViaA11y();
+                            logKeyboardSystemsEvent(event, KeyboardLogEvent.ACCESSIBILITY_ALL_APPS);
                         }
                         mPendingMetaAction = false;
                     }
                 }
-                return key_consumed;
+                return true;
             case KeyEvent.KEYCODE_ALT_LEFT:
             case KeyEvent.KEYCODE_ALT_RIGHT:
                 if (down) {
@@ -3440,15 +3526,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             && (metaState & mRecentAppsHeldModifiers) == 0) {
                         mRecentAppsHeldModifiers = 0;
                         hideRecentApps(true, false);
-                        return key_consumed;
+                        return true;
                     }
 
                     // Toggle Caps Lock on META-ALT.
                     if (mPendingCapsLockToggle) {
                         mInputManagerInternal.toggleCapsLock(event.getDeviceId());
                         mPendingCapsLockToggle = false;
-                        return key_consumed;
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_CAPS_LOCK);
+                        return true;
                     }
+                }
+                break;
+            case KeyEvent.KEYCODE_CAPS_LOCK:
+                if (!down) {
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_CAPS_LOCK);
                 }
                 break;
             case KeyEvent.KEYCODE_STYLUS_BUTTON_PRIMARY:
@@ -3457,24 +3549,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_STYLUS_BUTTON_TAIL:
                 Slog.wtf(TAG, "KEYCODE_STYLUS_BUTTON_* should be handled in"
                         + " interceptKeyBeforeQueueing");
-                return key_consumed;
+                return true;
         }
-
         if (isValidGlobalKey(keyCode)
                 && mGlobalKeyManager.handleGlobalKey(mContext, keyCode, event)) {
-            return key_consumed;
+            return true;
         }
 
         // Reserve all the META modifier combos for system behavior
-        if ((metaState & KeyEvent.META_META_ON) != 0) {
-            return key_consumed;
-        }
-
-        // Let the application handle the key.
-        return key_not_consumed;
+        return (metaState & KeyEvent.META_META_ON) != 0;
     }
 
-    private int handleHomeShortcuts(int displayId, IBinder focusedToken, KeyEvent event) {
+    private boolean handleHomeShortcuts(int displayId, IBinder focusedToken, KeyEvent event) {
         // First we always handle the home key here, so applications
         // can never break it, although if keyguard is on, we do let
         // it handle it, because that gives us the correct 5 second
@@ -3544,16 +3630,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void requestBugreportForTv() {
-        if ("1".equals(SystemProperties.get("ro.debuggable"))
-                || Settings.Global.getInt(mContext.getContentResolver(),
-                        Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1) {
-            try {
-                if (!ActivityManager.getService().launchBugReportHandlerApp()) {
-                    ActivityManager.getService().requestInteractiveBugReport();
-                }
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Error taking bugreport", e);
+        try {
+            if (!ActivityManager.getService().launchBugReportHandlerApp()) {
+                ActivityManager.getService().requestInteractiveBugReport();
             }
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Error taking bugreport", e);
         }
     }
 
@@ -4302,6 +4384,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // Handle special keys.
         switch (keyCode) {
             case KeyEvent.KEYCODE_BACK: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.BACK);
                 if (down) {
                     mBackKeyHandled = false;
                 } else {
@@ -4319,6 +4402,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_MUTE: {
+                logKeyboardSystemsEventOnActionDown(event,
+                        KeyboardLogEvent.getVolumeEvent(keyCode));
                 if (down) {
                     sendSystemKeyToStatusBarAsync(event);
 
@@ -4419,6 +4504,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             case KeyEvent.KEYCODE_TV_POWER: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.TOGGLE_POWER);
                 result &= ~ACTION_PASS_TO_USER;
                 isWakeKey = false; // wake-up will be handled separately
                 if (down && hdmiControlManager != null) {
@@ -4428,6 +4514,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
 
             case KeyEvent.KEYCODE_POWER: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.TOGGLE_POWER);
                 EventLogTags.writeInterceptPower(
                         KeyEvent.actionToString(event.getAction()),
                         mPowerKeyHandled ? 1 : 0,
@@ -4450,12 +4537,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_SYSTEM_NAVIGATION_LEFT:
                 // fall through
             case KeyEvent.KEYCODE_SYSTEM_NAVIGATION_RIGHT: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.SYSTEM_NAVIGATION);
                 result &= ~ACTION_PASS_TO_USER;
                 interceptSystemNavigationKey(event);
                 break;
             }
 
             case KeyEvent.KEYCODE_SLEEP: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.SLEEP);
                 result &= ~ACTION_PASS_TO_USER;
                 isWakeKey = false;
                 if (!mPowerManager.isInteractive()) {
@@ -4466,19 +4555,23 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 } else {
                     sleepRelease(event.getEventTime());
                 }
+                sendSystemKeyToStatusBarAsync(event);
                 break;
             }
 
             case KeyEvent.KEYCODE_SOFT_SLEEP: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.SLEEP);
                 result &= ~ACTION_PASS_TO_USER;
                 isWakeKey = false;
                 if (!down) {
                     mPowerManagerInternal.setUserInactiveOverrideFromWindowManager();
                 }
+                sendSystemKeyToStatusBarAsync(event);
                 break;
             }
 
             case KeyEvent.KEYCODE_WAKEUP: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.WAKEUP);
                 result &= ~ACTION_PASS_TO_USER;
                 isWakeKey = true;
                 break;
@@ -4487,6 +4580,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_MUTE:
                 result &= ~ACTION_PASS_TO_USER;
                 if (down && event.getRepeatCount() == 0) {
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.SYSTEM_MUTE);
                     toggleMicrophoneMuteFromKey();
                 }
                 break;
@@ -4501,6 +4595,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_MEDIA_RECORD:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
             case KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK: {
+                logKeyboardSystemsEventOnActionUp(event, KeyboardLogEvent.MEDIA_KEY);
                 if (MediaSessionLegacyHelper.getHelper(mContext).isGlobalPriorityActive()) {
                     // If the global session is active pass all media keys to it
                     // instead of the active window.
@@ -4545,6 +4640,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                             0 /* unused */, event.getEventTime() /* eventTime */);
                     msg.setAsynchronous(true);
                     msg.sendToTarget();
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LAUNCH_ASSISTANT);
                 }
                 result &= ~ACTION_PASS_TO_USER;
                 break;
@@ -4555,6 +4651,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Message msg = mHandler.obtainMessage(MSG_LAUNCH_VOICE_ASSIST_WITH_WAKE_LOCK);
                     msg.setAsynchronous(true);
                     msg.sendToTarget();
+                    logKeyboardSystemsEvent(event, KeyboardLogEvent.LAUNCH_VOICE_ASSISTANT);
                 }
                 result &= ~ACTION_PASS_TO_USER;
                 break;
@@ -5512,10 +5609,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    static long[] getLongIntArray(Resources r, int resid) {
-        return ArrayUtils.convertToLongArray(r.getIntArray(resid));
-    }
-
     private void bindKeyguard() {
         synchronized (mLock) {
             if (mKeyguardBound) {
@@ -5548,12 +5641,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mDefaultDisplayRotation.updateOrientationListener();
         synchronized (mLock) {
             mSystemReady = true;
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    updateSettings();
-                }
-            });
+            updateSettings(mHandler);
             // If this happens, for whatever reason, systemReady came later than systemBooted.
             // And keyguard should be already bound from systemBooted
             if (mSystemBooted) {
@@ -6002,138 +6090,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (!mVibrator.hasVibrator()) {
             return false;
         }
-        VibrationEffect effect = getVibrationEffect(effectId);
+        VibrationEffect effect =
+                mHapticFeedbackVibrationProvider.getVibrationForHapticFeedback(effectId);
         if (effect == null) {
             return false;
         }
-        VibrationAttributes attrs = getVibrationAttributes(effectId);
-        if (always) {
-            attrs = new VibrationAttributes.Builder(attrs)
-                    .setFlags(VibrationAttributes.FLAG_BYPASS_USER_VIBRATION_INTENSITY_OFF)
-                    .build();
-        }
+        VibrationAttributes attrs =
+                mHapticFeedbackVibrationProvider.getVibrationAttributesForHapticFeedback(
+                        effectId, /* bypassVibrationIntensitySetting= */ always);
         mVibrator.vibrate(uid, packageName, effect, reason, attrs);
         return true;
     }
 
-    private VibrationEffect getVibrationEffect(int effectId) {
-        long[] pattern;
-        switch (effectId) {
-            case HapticFeedbackConstants.CONTEXT_CLICK:
-            case HapticFeedbackConstants.GESTURE_END:
-            case HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE:
-            case HapticFeedbackConstants.SCROLL_TICK:
-            case HapticFeedbackConstants.SEGMENT_TICK:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK);
-
-            case HapticFeedbackConstants.TEXT_HANDLE_MOVE:
-                if (!mHapticTextHandleEnabled) {
-                    return null;
-                }
-                // fallthrough
-            case HapticFeedbackConstants.CLOCK_TICK:
-            case HapticFeedbackConstants.SEGMENT_FREQUENT_TICK:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TEXTURE_TICK);
-
-            case HapticFeedbackConstants.KEYBOARD_RELEASE:
-            case HapticFeedbackConstants.VIRTUAL_KEY_RELEASE:
-            case HapticFeedbackConstants.ENTRY_BUMP:
-            case HapticFeedbackConstants.DRAG_CROSSING:
-                return VibrationEffect.get(VibrationEffect.EFFECT_TICK, false);
-
-            case HapticFeedbackConstants.KEYBOARD_TAP: // == KEYBOARD_PRESS
-            case HapticFeedbackConstants.VIRTUAL_KEY:
-            case HapticFeedbackConstants.EDGE_RELEASE:
-            case HapticFeedbackConstants.CALENDAR_DATE:
-            case HapticFeedbackConstants.CONFIRM:
-            case HapticFeedbackConstants.GESTURE_START:
-            case HapticFeedbackConstants.SCROLL_ITEM_FOCUS:
-            case HapticFeedbackConstants.SCROLL_LIMIT:
-                return VibrationEffect.get(VibrationEffect.EFFECT_CLICK);
-
-            case HapticFeedbackConstants.LONG_PRESS:
-            case HapticFeedbackConstants.LONG_PRESS_POWER_BUTTON:
-            case HapticFeedbackConstants.DRAG_START:
-            case HapticFeedbackConstants.EDGE_SQUEEZE:
-                return VibrationEffect.get(VibrationEffect.EFFECT_HEAVY_CLICK);
-
-            case HapticFeedbackConstants.REJECT:
-                return VibrationEffect.get(VibrationEffect.EFFECT_DOUBLE_CLICK);
-
-            case HapticFeedbackConstants.SAFE_MODE_ENABLED:
-                pattern = mSafeModeEnabledVibePattern;
-                break;
-
-            case HapticFeedbackConstants.ASSISTANT_BUTTON:
-                if (mVibrator.areAllPrimitivesSupported(
-                        VibrationEffect.Composition.PRIMITIVE_QUICK_RISE,
-                        VibrationEffect.Composition.PRIMITIVE_TICK)) {
-                    // quiet ramp, short pause, then sharp tick
-                    return VibrationEffect.startComposition()
-                            .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.25f)
-                            .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 1f, 50)
-                            .compose();
-                }
-                // fallback for devices without composition support
-                return VibrationEffect.get(VibrationEffect.EFFECT_HEAVY_CLICK);
-
-            case HapticFeedbackConstants.GESTURE_THRESHOLD_DEACTIVATE:
-                return getScaledPrimitiveOrElseEffect(
-                        VibrationEffect.Composition.PRIMITIVE_TICK, 0.4f,
-                        VibrationEffect.EFFECT_TEXTURE_TICK);
-
-            case HapticFeedbackConstants.TOGGLE_ON:
-                return getScaledPrimitiveOrElseEffect(
-                        VibrationEffect.Composition.PRIMITIVE_TICK, 0.5f,
-                        VibrationEffect.EFFECT_TICK);
-
-            case HapticFeedbackConstants.TOGGLE_OFF:
-                return getScaledPrimitiveOrElseEffect(
-                        VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.2f,
-                        VibrationEffect.EFFECT_TEXTURE_TICK);
-
-            case HapticFeedbackConstants.NO_HAPTICS:
-            default:
-                return null;
-        }
-        if (pattern.length == 0) {
-            // No vibration
-            return null;
-        } else if (pattern.length == 1) {
-            // One-shot vibration
-            return VibrationEffect.createOneShot(pattern[0], VibrationEffect.DEFAULT_AMPLITUDE);
-        } else {
-            // Pattern vibration
-            return VibrationEffect.createWaveform(pattern, -1);
-        }
-    }
-
-    private VibrationEffect getScaledPrimitiveOrElseEffect(int primitiveId, float scale,
-            int elseEffectId) {
-        if (mVibrator.areAllPrimitivesSupported(primitiveId)) {
-            return VibrationEffect.startComposition()
-                    .addPrimitive(primitiveId, scale)
-                    .compose();
-        } else {
-            return VibrationEffect.get(elseEffectId);
-        }
-    }
-
-    private VibrationAttributes getVibrationAttributes(int effectId) {
-        switch (effectId) {
-            case HapticFeedbackConstants.EDGE_SQUEEZE:
-            case HapticFeedbackConstants.EDGE_RELEASE:
-                return PHYSICAL_EMULATION_VIBRATION_ATTRIBUTES;
-            case HapticFeedbackConstants.ASSISTANT_BUTTON:
-            case HapticFeedbackConstants.LONG_PRESS_POWER_BUTTON:
-            case HapticFeedbackConstants.SCROLL_TICK:
-            case HapticFeedbackConstants.SCROLL_ITEM_FOCUS:
-            case HapticFeedbackConstants.SCROLL_LIMIT:
-                return HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES;
-            default:
-                return TOUCH_VIBRATION_ATTRIBUTES;
-        }
-    }
 
     @Override
     public void keepScreenOnStartedLw() {
@@ -6271,8 +6239,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.print("mAllowStartActivityForLongPressOnPowerDuringSetup=");
                 pw.println(mAllowStartActivityForLongPressOnPowerDuringSetup);
         pw.print(prefix);
-                pw.print("mHasSoftInput="); pw.print(mHasSoftInput);
-                pw.print(" mHapticTextHandleEnabled="); pw.println(mHapticTextHandleEnabled);
+                pw.print("mHasSoftInput="); pw.println(mHasSoftInput);
         pw.print(prefix);
                 pw.print("mDismissImeOnBackKeyPressed="); pw.print(mDismissImeOnBackKeyPressed);
                 pw.print(" mIncallPowerBehavior=");
@@ -6284,10 +6251,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.println(endcallBehaviorToString(mEndcallBehavior));
         pw.print(prefix);
         // TODO(b/117479243): handle it in InputPolicy
-        pw.print("mDisplayHomeButtonHandlers=");
+        pw.println("mDisplayHomeButtonHandlers=");
         for (int i = 0; i < mDisplayHomeButtonHandlers.size(); i++) {
             final int key = mDisplayHomeButtonHandlers.keyAt(i);
-            pw.println(mDisplayHomeButtonHandlers.get(key));
+            pw.print(prefix); pw.print("  "); pw.println(mDisplayHomeButtonHandlers.get(key));
         }
         pw.print(prefix); pw.print("mKeyguardOccluded="); pw.print(isKeyguardOccluded());
                 pw.print(" mKeyguardOccludedChanged="); pw.print(mKeyguardOccludedChanged);
@@ -6297,6 +6264,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.print(" mLockScreenTimeout="); pw.print(mLockScreenTimeout);
                 pw.print(" mLockScreenTimerActive="); pw.println(mLockScreenTimerActive);
 
+        mHapticFeedbackVibrationProvider.dump(prefix, pw);
         mGlobalKeyManager.dump(prefix, pw);
         mKeyCombinationManager.dump(prefix, pw);
         mSingleKeyGestureDetector.dump(prefix, pw);
@@ -6558,6 +6526,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     private class HdmiVideoExtconUEventObserver extends ExtconStateObserver<Boolean> {
         private static final String HDMI_EXIST = "HDMI=1";
+        private static final String DP_EXIST = "DP=1";
         private static final String NAME = "hdmi";
 
         private boolean init(ExtconInfo hdmi) {
@@ -6588,7 +6557,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         public Boolean parseState(ExtconInfo extconIfno, String state) {
             // extcon event state changes from kernel4.9
             // new state will be like STATE=HDMI=1
-            return state.contains(HDMI_EXIST);
+            // or like STATE=DP=1 for newer kernel
+            return state.contains(HDMI_EXIST) || state.contains(DP_EXIST);
         }
     }
 

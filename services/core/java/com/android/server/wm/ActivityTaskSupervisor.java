@@ -660,6 +660,13 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         mFinishingActivities.remove(r);
 
         stopWaitingForActivityVisible(r);
+
+        final Task task = r.getTask();
+        if (task != null && task.mKillProcessesOnDestroyed && task.getTopMostActivity() == r) {
+            // The activity is destroyed or its process is died, so cancel the pending kill.
+            task.mKillProcessesOnDestroyed = false;
+            removeTimeoutOfKillProcessesOnDestroyed(task);
+        }
     }
 
     /** There is no valid launch time, just stop waiting. */
@@ -1814,7 +1821,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 /* multi_window */
                 false,
                 /* bal_code */
-                -1
+                -1,
+                /* task_stack */
+                null
         );
 
         boolean restrictActivitySwitch = ActivitySecurityModelFeatureFlags
@@ -1963,9 +1972,13 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         killTaskProcessesIfPossible(task);
     }
 
+    private void removeTimeoutOfKillProcessesOnDestroyed(Task task) {
+        mHandler.removeMessages(KILL_TASK_PROCESSES_TIMEOUT_MSG, task);
+    }
+
     void killTaskProcessesOnDestroyedIfNeeded(Task task) {
         if (task == null || !task.mKillProcessesOnDestroyed) return;
-        mHandler.removeMessages(KILL_TASK_PROCESSES_TIMEOUT_MSG, task);
+        removeTimeoutOfKillProcessesOnDestroyed(task);
         killTaskProcessesIfPossible(task);
     }
 
@@ -2332,7 +2345,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
      * Processes the activities to be stopped or destroyed. This should be called when the resumed
      * activities are idle or drawn.
      */
-    private void processStoppingAndFinishingActivities(ActivityRecord launchedActivity,
+    void processStoppingAndFinishingActivities(ActivityRecord launchedActivity,
             boolean processPausingActivities, String reason) {
         // Stop any activities that are scheduled to do so but have been waiting for the transition
         // animation to finish.
@@ -2340,11 +2353,15 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         ArrayList<ActivityRecord> readyToStopActivities = null;
         for (int i = 0; i < mStoppingActivities.size(); i++) {
             final ActivityRecord s = mStoppingActivities.get(i);
-            final boolean animating = s.isInTransition();
+            // Activity in a force hidden task should not be counted as animating, i.e., we want to
+            // send onStop before any configuration change when removing pip transition is ongoing.
+            final boolean animating = s.isInTransition()
+                    && s.getTask() != null && !s.getTask().isForceHidden();
             displaySwapping |= s.isDisplaySleepingAndSwapping();
             ProtoLog.v(WM_DEBUG_STATES, "Stopping %s: nowVisible=%b animating=%b "
                     + "finishing=%s", s, s.nowVisible, animating, s.finishing);
-            if ((!animating && !displaySwapping) || mService.mShuttingDown) {
+            if ((!animating && !displaySwapping) || mService.mShuttingDown
+                    || s.getRootTask().isForceHiddenForPinnedTask()) {
                 if (!processPausingActivities && s.isState(PAUSING)) {
                     // Defer processing pausing activities in this iteration and reschedule
                     // a delayed idle to reprocess it again
@@ -2918,7 +2935,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 } break;
                 case KILL_TASK_PROCESSES_TIMEOUT_MSG: {
                     final Task task = (Task) msg.obj;
-                    if (task.mKillProcessesOnDestroyed) {
+                    if (task.mKillProcessesOnDestroyed && task.hasActivity()) {
                         Slog.i(TAG, "Destroy timeout of remove-task, attempt to kill " + task);
                         killTaskProcessesIfPossible(task);
                     }

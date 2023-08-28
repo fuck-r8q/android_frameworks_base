@@ -837,6 +837,11 @@ package android.appwidget {
 
 package android.companion {
 
+  public final class CompanionDeviceManager {
+    method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public void enableSecureTransport(boolean);
+    field public static final int MESSAGE_REQUEST_PING = 1669362552; // 0x63807378
+  }
+
   public abstract class CompanionDeviceService extends android.app.Service {
     method public void onBindCompanionDeviceService(@NonNull android.content.Intent);
   }
@@ -850,6 +855,7 @@ package android.content {
     ctor public AttributionSource(int, @Nullable String, @Nullable String, @NonNull android.os.IBinder);
     ctor public AttributionSource(int, @Nullable String, @Nullable String, @Nullable java.util.Set<java.lang.String>, @Nullable android.content.AttributionSource);
     ctor public AttributionSource(int, int, @Nullable String, @Nullable String, @NonNull android.os.IBinder, @Nullable String[], @Nullable android.content.AttributionSource);
+    ctor public AttributionSource(int, int, @Nullable String, @Nullable String, @NonNull android.os.IBinder, @Nullable String[], int, @Nullable android.content.AttributionSource);
     method public void enforceCallingPid();
   }
 
@@ -3525,7 +3531,10 @@ package android.view {
   public final class InputDevice implements android.os.Parcelable {
     method @RequiresPermission("android.permission.DISABLE_INPUT_DEVICE") public void disable();
     method @RequiresPermission("android.permission.DISABLE_INPUT_DEVICE") public void enable();
+    method public int getAssociatedDisplayId();
     method @NonNull public android.hardware.input.InputDeviceIdentifier getIdentifier();
+    method @Nullable public String getKeyboardLanguageTag();
+    method @Nullable public String getKeyboardLayoutType();
   }
 
   public abstract class InputEvent implements android.os.Parcelable {
@@ -3622,6 +3631,8 @@ package android.view {
     method public default void holdLock(android.os.IBinder, int);
     method public default boolean isGlobalKey(int);
     method public default boolean isTaskSnapshotSupported();
+    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithMirror(int, @NonNull android.view.Window);
+    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithSc(int, @NonNull android.view.SurfaceControl);
     method public default void setDisplayImePolicy(int, int);
     method public default void setShouldShowSystemDecors(int, boolean);
     method public default void setShouldShowWithInsecureKeyguard(int, boolean);
@@ -4233,6 +4244,7 @@ package android.window {
     field public final boolean isTrustedOverlay;
     field public final boolean isVisible;
     field @NonNull public final String name;
+    field @NonNull public final android.graphics.Matrix transform;
     field @NonNull public final android.os.IBinder windowToken;
   }
 

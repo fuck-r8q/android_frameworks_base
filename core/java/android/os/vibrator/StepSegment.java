@@ -101,13 +101,6 @@ public final class StepSegment extends VibrationEffectSegment {
 
     /** @hide */
     @Override
-    public boolean hasNonZeroAmplitude() {
-        // DEFAULT_AMPLITUDE == -1 is still a non-zero amplitude that will be resolved later.
-        return Float.compare(mAmplitude, 0) != 0;
-    }
-
-    /** @hide */
-    @Override
     public void validate() {
         VibrationEffectSegment.checkFrequencyArgument(mFrequencyHz, "frequencyHz");
         VibrationEffectSegment.checkDurationArgument(mDuration, "duration");
@@ -166,6 +159,13 @@ public final class StepSegment extends VibrationEffectSegment {
                 + ", frequencyHz=" + mFrequencyHz
                 + ", duration=" + mDuration
                 + "}";
+    }
+
+    /** @hide */
+    @Override
+    public String toDebugString() {
+        return String.format("Step=%dms(amplitude=%.2f%s)", mDuration, mAmplitude,
+                Float.compare(mFrequencyHz, 0) == 0 ? "" : " @ " + mFrequencyHz + "Hz");
     }
 
     @Override

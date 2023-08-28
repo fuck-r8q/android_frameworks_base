@@ -618,6 +618,8 @@
     <string name="biometric_or_screen_lock_app_setting_name" msgid="5348462421758257752">"Erabili sistema biometrikoak edo pantailaren blokeoa"</string>
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Egiaztatu zeu zarela"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Aurrera egiteko, erabili sistema biometrikoak"</string>
+    <string name="biometric_dialog_fingerprint_subtitle" msgid="2520227942533751342">"Aurrera egiteko, erabili hatz-marka"</string>
+    <string name="biometric_dialog_face_subtitle" msgid="5269284162191087084">"Aurrera egiteko, erabili aurpegia"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Aurrera egiteko, erabili sistema biometrikoak edo pantailaren blokeoa"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Hardware biometrikoa ez dago erabilgarri"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Utzi da autentifikazioa"</string>
@@ -673,7 +675,7 @@
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"Sakatu hau aurpegi-eredua ezabatzeko eta, gero, gehitu aurpegia berriro"</string>
     <string name="face_setup_notification_title" msgid="8843461561970741790">"Konfiguratu Aurpegi bidez desblokeatzea"</string>
     <string name="face_setup_notification_content" msgid="5463999831057751676">"Telefonoa desblokeatzeko, begira iezaiozu"</string>
-    <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"Aurpegi bidez desblokeatzeko aukera erabiltzeko, aktibatu "<b>"kamera erabiltzeko baimena"</b>" Ezarpenak &gt; Pribatutasuna atalean"</string>
+    <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"Aurpegi bidez desblokeatzeko eginbidea erabiltzeko, aktibatu "<b>"kamera erabiltzeko baimena"</b>" Ezarpenak &gt; Pribatutasuna atalean"</string>
     <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"Konfiguratu telefonoa desblokeatzeko modu gehiago"</string>
     <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"Sakatu hau hatz-marka bat gehitzeko"</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"Hatz-marka bidez desblokeatzea"</string>
@@ -1396,7 +1398,7 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"BAZTERTU"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Aukeratu idazketa-metodoa"</string>
     <string name="show_ime" msgid="6406112007347443383">"Erakutsi pantailan teklatu fisikoa aktibo dagoen bitartean"</string>
-    <string name="hardware" msgid="1800597768237606953">"Erakutsi teklatu birtuala"</string>
+    <string name="hardware" msgid="3611039921284836033">"Erabili pantailako teklatua"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Konfiguratu <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Konfiguratu teklatu fisikoak"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Hizkuntza eta diseinua hautatzeko, sakatu hau"</string>

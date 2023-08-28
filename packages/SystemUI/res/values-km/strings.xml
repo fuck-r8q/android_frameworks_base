@@ -69,7 +69,7 @@
     <string name="usb_disable_contaminant_detection" msgid="3827082183595978641">"បើក USB"</string>
     <string name="learn_more" msgid="4690632085667273811">"ស្វែងយល់​បន្ថែម"</string>
     <string name="global_action_screenshot" msgid="2760267567509131654">"រូបថតអេក្រង់"</string>
-    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"បានបិទការដោះសោបន្ថែម"</string>
+    <string name="global_action_smart_lock_disabled" msgid="6286551337177954859">"បានបិទ Extend Unlock"</string>
     <string name="remote_input_image_insertion_text" msgid="4850791636452521123">"បាន​ផ្ញើរូបភាព"</string>
     <string name="screenshot_saving_title" msgid="2298349784913287333">"កំពុង​រក្សាទុក​រូបថត​អេក្រង់..."</string>
     <string name="screenshot_saving_work_profile_title" msgid="5332829607308450880">"កំពុងរក្សាទុករូបថតអេក្រង់ទៅកម្រងព័ត៌មានការងារ…"</string>
@@ -118,6 +118,9 @@
     <string name="screenrecord_save_text" msgid="3008973099800840163">"ចុចដើម្បីមើល"</string>
     <string name="screenrecord_save_error" msgid="5862648532560118815">"មានបញ្ហាក្នុងការរក្សាទុក​ការថតវីដេអូអេក្រង់"</string>
     <string name="screenrecord_start_error" msgid="2200660692479682368">"មានបញ្ហា​ក្នុងការ​ចាប់ផ្ដើម​ថត​អេក្រង់"</string>
+    <string name="immersive_cling_title" msgid="8372056499315585941">"កំពុងមើលពេញអេក្រង់"</string>
+    <string name="immersive_cling_description" msgid="6913958856085185775">"ដើម្បីចាកចេញ សូមអូសពីលើចុះក្រោម។"</string>
+    <string name="immersive_cling_positive" msgid="3076681691468978568">"យល់ហើយ"</string>
     <string name="accessibility_back" msgid="6530104400086152611">"ថយក្រោយ"</string>
     <string name="accessibility_home" msgid="5430449841237966217">"គេហ​ទំព័រ"</string>
     <string name="accessibility_menu" msgid="2701163794470513040">"ម៉ឺនុយ"</string>
@@ -147,6 +150,8 @@
     <string name="biometric_dialog_tap_confirm_with_face_alt_2" msgid="8586608186457385108">"បានស្គាល់មុខ។ សូមចុច ដើម្បីបន្ត។"</string>
     <string name="biometric_dialog_tap_confirm_with_face_alt_3" msgid="2192670471930606539">"បានស្គាល់មុខ។ សូមចុចរូបដោះសោ ដើម្បីបន្ត។"</string>
     <string name="biometric_dialog_authenticated" msgid="7337147327545272484">"បាន​ផ្ទៀងផ្ទាត់"</string>
+    <!-- no translation found for biometric_dialog_cancel_authentication (981316588773442637) -->
+    <skip />
     <string name="biometric_dialog_use_pin" msgid="8385294115283000709">"ប្រើកូដ PIN"</string>
     <string name="biometric_dialog_use_pattern" msgid="2315593393167211194">"ប្រើ​លំនាំ"</string>
     <string name="biometric_dialog_use_password" msgid="3445033859393474779">"ប្រើពាក្យសម្ងាត់"</string>
@@ -359,6 +364,8 @@
     <string name="keyguard_face_successful_unlock" msgid="4203999851465708287">"បានដោះសោដោយប្រើមុខ"</string>
     <string name="keyguard_face_successful_unlock_alt1" msgid="5853906076353839628">"បានស្គាល់មុខ"</string>
     <string name="keyguard_retry" msgid="886802522584053523">"អូសឡើងលើ ដើម្បី​ព្យាយាម​ម្ដងទៀត"</string>
+    <!-- no translation found for accesssibility_keyguard_retry (8880238862712870676) -->
+    <skip />
     <string name="require_unlock_for_nfc" msgid="1305686454823018831">"ដោះសោ ដើម្បីប្រើ NFC"</string>
     <string name="do_disclosure_generic" msgid="4896482821974707167">"ឧបករណ៍​នេះគឺជា​កម្មសិទ្ធិរបស់​ស្ថាប័ន​អ្នក"</string>
     <string name="do_disclosure_with_name" msgid="2091641464065004091">"ឧបករណ៍នេះ​គឺជា​កម្មសិទ្ធិ​របស់ <xliff:g id="ORGANIZATION_NAME">%s</xliff:g>"</string>
@@ -412,6 +419,10 @@
     <string name="media_projection_entry_generic_permission_dialog_warning_entire_screen" msgid="5407906851409410209">"នៅពេលអ្នកកំពុងចែករំលែក ថត ឬភ្ជាប់, Android មានសិទ្ធិចូលប្រើអ្វីៗដែលអាចមើលឃើញនៅលើអេក្រង់របស់អ្នក ឬចាក់នៅលើឧបករណ៍របស់អ្នក។ ដូច្នេះ សូមប្រុងប្រយ័ត្នចំពោះអ្វីៗដូចជា ពាក្យសម្ងាត់ ព័ត៌មានលម្អិតអំពីការទូទាត់ប្រាក់ សារ រូបថត ព្រមទាំងសំឡេង និងវីដេអូ។"</string>
     <string name="media_projection_entry_generic_permission_dialog_warning_single_app" msgid="3454859977888159495">"នៅពេលអ្នកកំពុងចែករំលែក ថត ឬភ្ជាប់កម្មវិធី, Android មានសិទ្ធិចូលប្រើអ្វីៗដែលបង្ហាញ ឬចាក់នៅលើកម្មវិធីនោះ។ ដូច្នេះ សូមប្រុងប្រយ័ត្នចំពោះអ្វីៗដូចជា ពាក្យសម្ងាត់ ព័ត៌មានលម្អិតអំពីការទូទាត់ប្រាក់ សារ រូបថត ព្រមទាំងសំឡេង និងវីដេអូ។"</string>
     <string name="media_projection_entry_generic_permission_dialog_continue" msgid="8640381403048097116">"ចាប់ផ្ដើម"</string>
+    <string name="media_projection_task_switcher_text" msgid="590885489897412359">"ការចែករំលែក​ផ្អាក នៅពេលដែល​អ្នកប្ដូរ​កម្មវិធី"</string>
+    <string name="media_projection_task_switcher_action_switch" msgid="8682258717291921123">"ចែករំលែក​កម្មវិធីនេះ​ជំនួសវិញ"</string>
+    <string name="media_projection_task_switcher_action_back" msgid="5324164224147845282">"ប្ដូរទៅវិញ"</string>
+    <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"ការប្ដូរ​កម្មវិធី"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"បានទប់ស្កាត់ដោយអ្នកគ្រប់គ្រង​ផ្នែកព័ត៌មានវិទ្យា​របស់អ្នក"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"ការថតអេក្រង់ត្រូវបានបិទ​ដោយគោលការណ៍ឧបករណ៍"</string>
     <string name="clear_all_notifications_text" msgid="348312370303046130">"សម្អាត​ទាំងអស់"</string>
@@ -759,13 +770,7 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"ម៉ឺនុយ​ថាមពល"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"ទំព័រ <xliff:g id="ID_1">%1$d</xliff:g> នៃ <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"អេក្រង់​ចាក់សោ"</string>
-    <string name="thermal_shutdown_title" msgid="2702966892682930264">"ទូរសព្ទ​បាន​បិទដោយសារ​វា​ឡើងកម្តៅ"</string>
-    <string name="thermal_shutdown_message" msgid="6142269839066172984">"ឥឡូវនេះ ទូរសព្ទ​របស់អ្នក​កំពុងដំណើរការ​ជាធម្មតា។\nសូមចុច​ដើម្បីទទួលបាន​ព័ត៌មានបន្ថែម"</string>
-    <string name="thermal_shutdown_dialog_message" msgid="6745684238183492031">"ទូរសព្ទ​របស់អ្នក​ក្តៅពេក ដូច្នេះ​វាបាន​បិទ​ដើម្បី​បន្ថយ​កម្តៅ។ ឥឡូវនេះ ​ទូរសព្ទ​របស់អ្នក​កំពុង​ដំណើរការ​ធម្មតា។\n\nទូរសព្ទ​របស់អ្នក​អាចនឹង​ឡើង​កម្តៅ​ខ្លាំងជ្រុល ប្រសិន​បើអ្នក៖\n	• ប្រើប្រាស់​កម្មវិធី​ដែល​ប្រើប្រាស់ទិន្នន័យច្រើនក្នុងរយៈពេលខ្លី (ដូចជាហ្គេម វីដេអូ ឬកម្មវិធីរុករក)\n	• ទាញយក ឬ​បង្ហោះ​ឯកសារដែលមានទំហំធំ\n	• ប្រើប្រាស់​ទូរសព្ទ​របស់អ្នក​នៅកន្លែង​មានសីតុណ្ហភាព​ខ្ពស់"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"មើលជំហាន​ថែទាំ"</string>
-    <string name="high_temp_title" msgid="2218333576838496100">"ទូរសព្ទ​នេះ​កំពុង​កើន​កម្តៅ"</string>
-    <string name="high_temp_notif_message" msgid="1277346543068257549">"មុខងារ​មួយចំនួន​នឹងមិនអាច​ប្រើបានពេញលេញ​នោះទេ ខណៈពេល​ដែលទូរសព្ទ​កំពុងបញ្ចុះកម្ដៅ។\nសូមចុច​ដើម្បីទទួលបាន​ព័ត៌មានបន្ថែម"</string>
-    <string name="high_temp_dialog_message" msgid="3793606072661253968">"ទូរសព្ទ​របស់អ្នក​នឹង​ព្យាយាម​បញ្ចុះ​កម្តៅ​ដោយ​ស្វ័យប្រវត្តិ។ អ្នក​នៅតែ​អាច​ប្រើ​ទូរសព្ទ​របស់អ្នក​បាន​ដដែល​ ប៉ុន្តែ​វា​នឹង​ដំណើរ​ការ​យឺត​ជាង​មុន។\n\nបន្ទាប់​ពី​ទូរសព្ទ​របស់អ្នក​ត្រជាក់​ជាង​មុន​ហើយ វា​នឹង​ដំណើរការ​ដូច​ធម្មតា។"</string>
     <string name="high_temp_dialog_help_text" msgid="7380171287943345858">"មើលជំហាន​ថែទាំ"</string>
     <string name="high_temp_alarm_title" msgid="8654754369605452169">"ដកឧបករណ៍របស់អ្នក"</string>
     <string name="high_temp_alarm_notify_message" msgid="3917622943609118956">"ឧបករណ៍របស់អ្នកកំពុងឡើងកម្ដៅនៅជិតរន្ធសាកថ្ម។ ប្រសិនបើឧបករណ៍នេះត្រូវបានភ្ជាប់ទៅឆ្នាំង​សាក ឬគ្រឿងបរិក្ខារ USB សូមដកវា និងមានការប្រុងប្រយ័ត្ន ដោយសារខ្សែក៏អាចក្ដៅផងដែរ។"</string>
@@ -935,6 +940,8 @@
     <string name="controls_pin_instructions_retry" msgid="1566667581012131046">"សាកល្បងប្រើ​កូដ PIN ផ្សេងទៀត"</string>
     <string name="controls_confirmation_message" msgid="7744104992609594859">"បញ្ជាក់​ការផ្លាស់ប្ដូរ​សម្រាប់ <xliff:g id="DEVICE">%s</xliff:g>"</string>
     <string name="controls_structure_tooltip" msgid="4355922222944447867">"អូសដើម្បី​មើលច្រើនទៀត"</string>
+    <!-- no translation found for retry_face (416380073082560186) -->
+    <skip />
     <string name="controls_seeding_in_progress" msgid="3033855341410264148">"កំពុងផ្ទុក​ការណែនាំ"</string>
     <string name="controls_media_title" msgid="1746947284862928133">"មេឌៀ"</string>
     <string name="controls_media_close_session" msgid="4780485355795635052">"លាក់ផ្ទាំង​គ្រប់គ្រង​មេឌៀនេះសម្រាប់ <xliff:g id="APP_NAME">%1$s</xliff:g> ឬ?"</string>
@@ -1161,4 +1168,40 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"ភាពប្រុងប្រៀប​របស់ Google Assistant ត្រូវបានបើក"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"កំណត់កម្មវិធីកំណត់ចំណាំលំនាំដើមនៅក្នុងការកំណត់"</string>
     <string name="install_app" msgid="5066668100199613936">"ដំឡើង​កម្មវិធី"</string>
+    <!-- no translation found for privacy_dialog_title (7839968133469098311) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_summary (2458769652125995409) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_more_button (7610604080293562345) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_done_button (4504330708531434263) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_expand_action (9129262348628331377) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_collapse_action (277419962019466347) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_button (8006250171305878606) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_close_app_message (1316408652526310985) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_service (8320590856621823604) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_manage_permissions (2543451567190470413) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_call_usage (7858746847946397562) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_call_usage (1214810644978167344) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage (631997836335929880) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage (4883417856848222450) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_1 (9047570143069220911) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_1 (2551340497722370109) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_active_app_usage_2 (2770926061339921767) -->
+    <skip />
+    <!-- no translation found for privacy_dialog_recent_app_usage_2 (2874689735085367167) -->
+    <skip />
 </resources>

@@ -94,11 +94,16 @@ constructor(
 
     private fun listenForDreamingToGone() {
         scope.launch {
-            keyguardInteractor.biometricUnlockState.collect { biometricUnlockState ->
-                if (biometricUnlockState == BiometricUnlockModel.WAKE_AND_UNLOCK_FROM_DREAM) {
-                    startTransitionTo(KeyguardState.GONE)
+            keyguardInteractor.biometricUnlockState
+                .sample(transitionInteractor.startedKeyguardTransitionStep, ::Pair)
+                .collect { (biometricUnlockState, lastStartedTransitionStep) ->
+                    if (
+                        lastStartedTransitionStep.to == KeyguardState.DREAMING &&
+                            biometricUnlockState == BiometricUnlockModel.WAKE_AND_UNLOCK_FROM_DREAM
+                    ) {
+                        startTransitionTo(KeyguardState.GONE)
+                    }
                 }
-            }
         }
     }
 

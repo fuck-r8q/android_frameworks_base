@@ -20,10 +20,8 @@ import static android.window.ConfigurationHelper.isDifferentDisplay;
 import static android.window.ConfigurationHelper.shouldUpdateResources;
 
 import android.annotation.AnyThread;
-import android.annotation.BinderThread;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.app.ActivityThread;
 import android.app.IWindowToken;
 import android.app.ResourcesManager;
@@ -36,14 +34,9 @@ import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.util.Log;
-import android.view.IWindowManager;
-import android.view.WindowManager.LayoutParams.WindowType;
-import android.view.WindowManagerGlobal;
 
 import com.android.internal.annotations.GuardedBy;
-import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.function.pooled.PooledLambda;
 
 import java.lang.ref.WeakReference;
@@ -55,7 +48,7 @@ import java.lang.ref.WeakReference;
  * {@link Context#getWindowContextToken() the token of non-Activity UI Contexts}.
  *
  * @see WindowContext
- * @see android.view.IWindowManager#attachWindowContextToDisplayArea(IBinder, int, int, Bundle)
+ * @see android.view.IWindowManager#attachWindowContextToDisplayArea
  *
  * @hide
  */
@@ -70,14 +63,10 @@ public class WindowTokenClient extends IWindowToken.Stub {
 
     private final ResourcesManager mResourcesManager = ResourcesManager.getInstance();
 
-    private IWindowManager mWms;
-
     @GuardedBy("itself")
     private final Configuration mConfiguration = new Configuration();
 
     private boolean mShouldDumpConfigForIme;
-
-    private boolean mAttachToWindowContainer;
 
     private final Handler mHandler = ActivityThread.currentActivityThread().getHandler();
 
@@ -101,96 +90,22 @@ public class WindowTokenClient extends IWindowToken.Stub {
     }
 
     /**
-     * Attaches this {@link WindowTokenClient} to a {@link com.android.server.wm.DisplayArea}.
-     *
-     * @param type The window type of the {@link WindowContext}
-     * @param displayId The {@link Context#getDisplayId() ID of display} to associate with
-     * @param options The window context launched option
-     * @return {@code true} if attaching successfully.
-     */
-    public boolean attachToDisplayArea(@WindowType int type, int displayId,
-            @Nullable Bundle options) {
-        try {
-            final Configuration configuration = getWindowManagerService()
-                    .attachWindowContextToDisplayArea(this, type, displayId, options);
-            if (configuration == null) {
-                return false;
-            }
-            onConfigurationChanged(configuration, displayId, false /* shouldReportConfigChange */);
-            mAttachToWindowContainer = true;
-            return true;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Attaches this {@link WindowTokenClient} to a {@code DisplayContent}.
-     *
-     * @param displayId The {@link Context#getDisplayId() ID of display} to associate with
-     * @return {@code true} if attaching successfully.
-     */
-    public boolean attachToDisplayContent(int displayId) {
-        final IWindowManager wms = getWindowManagerService();
-        // #createSystemUiContext may call this method before WindowManagerService is initialized.
-        if (wms == null) {
-            return false;
-        }
-        try {
-            final Configuration configuration = wms.attachToDisplayContent(this, displayId);
-            if (configuration == null) {
-                return false;
-            }
-            onConfigurationChanged(configuration, displayId, false /* shouldReportConfigChange */);
-            mAttachToWindowContainer = true;
-            return true;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Attaches this {@link WindowTokenClient} to a {@code windowToken}.
-     *
-     * @param windowToken the window token to associated with
-     */
-    public void attachToWindowToken(IBinder windowToken) {
-        try {
-            getWindowManagerService().attachWindowContextToWindowToken(this, windowToken);
-            mAttachToWindowContainer = true;
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /** Detaches this {@link WindowTokenClient} from associated WindowContainer if there's one. */
-    public void detachFromWindowContainerIfNeeded() {
-        if (!mAttachToWindowContainer) {
-            return;
-        }
-        try {
-            getWindowManagerService().detachWindowContextFromWindowContainer(this);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    private IWindowManager getWindowManagerService() {
-        if (mWms == null) {
-            mWms = WindowManagerGlobal.getWindowManagerService();
-        }
-        return mWms;
-    }
-
-    /**
      * Called when {@link Configuration} updates from the server side receive.
      *
      * @param newConfig the updated {@link Configuration}
      * @param newDisplayId the updated {@link android.view.Display} ID
      */
-    @BinderThread
+    @AnyThread
     @Override
     public void onConfigurationChanged(Configuration newConfig, int newDisplayId) {
+        // TODO(b/290876897): No need to post on mHandler after migrating to ClientTransaction
+        postOnConfigurationChanged(newConfig, newDisplayId);
+    }
+
+    /**
+     * Posts an {@link #onConfigurationChanged} to the main thread.
+     */
+    public void postOnConfigurationChanged(@NonNull Configuration newConfig, int newDisplayId) {
         mHandler.post(PooledLambda.obtainRunnable(this::onConfigurationChanged, newConfig,
                 newDisplayId, true /* shouldReportConfigChange */).recycleOnUse());
     }
@@ -207,15 +122,14 @@ public class WindowTokenClient extends IWindowToken.Stub {
      * {@code shouldReportConfigChange} is {@code true}, which is usually from
      * {@link IWindowToken#onConfigurationChanged(Configuration, int)}
      * directly, while this method could be run on any thread if it is used to initialize
-     * Context's {@code Configuration} via {@link #attachToDisplayArea(int, int, Bundle)}
-     * or {@link #attachToDisplayContent(int)}.
+     * Context's {@code Configuration} via {@link WindowTokenClientController#attachToDisplayArea}
+     * or {@link WindowTokenClientController#attachToDisplayContent}.
      *
      * @param shouldReportConfigChange {@code true} to indicate that the {@code Configuration}
      *                                 should be dispatched to listeners.
      *
      */
     @AnyThread
-    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void onConfigurationChanged(Configuration newConfig, int newDisplayId,
             boolean shouldReportConfigChange) {
         final Context context = mContextRef.get();
@@ -255,7 +169,6 @@ public class WindowTokenClient extends IWindowToken.Stub {
                 windowContext.dispatchConfigurationChanged(newConfig);
             }
 
-
             if (shouldReportConfigChange && diff != 0
                     && context instanceof WindowProviderService) {
                 final WindowProviderService windowProviderService = (WindowProviderService) context;
@@ -280,9 +193,10 @@ public class WindowTokenClient extends IWindowToken.Stub {
         }
     }
 
-    @BinderThread
+    @AnyThread
     @Override
     public void onWindowTokenRemoved() {
+        // TODO(b/290876897): No need to post on mHandler after migrating to ClientTransaction
         mHandler.post(PooledLambda.obtainRunnable(
                 WindowTokenClient::onWindowTokenRemovedInner, this).recycleOnUse());
     }

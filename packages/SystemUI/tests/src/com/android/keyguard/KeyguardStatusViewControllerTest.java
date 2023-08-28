@@ -23,76 +23,21 @@ import static org.mockito.Mockito.when;
 
 import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
+import android.testing.TestableLooper;
 
-import com.android.internal.jank.InteractionJankMonitor;
-import com.android.keyguard.logging.KeyguardLogger;
-import com.android.systemui.SysuiTestCase;
-import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.plugins.ClockConfig;
 import com.android.systemui.plugins.ClockController;
 import com.android.systemui.statusbar.notification.AnimatableProperty;
-import com.android.systemui.statusbar.phone.DozeParameters;
-import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
-import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
-import com.android.systemui.statusbar.policy.KeyguardStateController;
 
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 @SmallTest
+@TestableLooper.RunWithLooper(setAsMainLooper = true)
 @RunWith(AndroidTestingRunner.class)
-public class KeyguardStatusViewControllerTest extends SysuiTestCase {
-
-    @Mock private KeyguardStatusView mKeyguardStatusView;
-    @Mock private KeyguardSliceViewController mKeyguardSliceViewController;
-    @Mock private KeyguardClockSwitchController mKeyguardClockSwitchController;
-    @Mock private KeyguardStateController mKeyguardStateController;
-    @Mock private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
-    @Mock private ConfigurationController mConfigurationController;
-    @Mock private DozeParameters mDozeParameters;
-    @Mock private ScreenOffAnimationController mScreenOffAnimationController;
-    @Mock private KeyguardLogger mKeyguardLogger;
-    @Mock private KeyguardStatusViewController mControllerMock;
-    @Mock private FeatureFlags mFeatureFlags;
-    @Mock private InteractionJankMonitor mInteractionJankMonitor;
-
-    @Captor
-    private ArgumentCaptor<KeyguardUpdateMonitorCallback> mKeyguardUpdateMonitorCallbackCaptor;
-
-    private KeyguardStatusViewController mController;
-
-    @Before
-    public void setup() {
-        MockitoAnnotations.initMocks(this);
-
-        mController = new KeyguardStatusViewController(
-                mKeyguardStatusView,
-                mKeyguardSliceViewController,
-                mKeyguardClockSwitchController,
-                mKeyguardStateController,
-                mKeyguardUpdateMonitor,
-                mConfigurationController,
-                mDozeParameters,
-                mScreenOffAnimationController,
-                mKeyguardLogger,
-                mFeatureFlags,
-                mInteractionJankMonitor) {
-                    @Override
-                    void setProperty(
-                            AnimatableProperty property,
-                            float value,
-                            boolean animate) {
-                        // Route into the mock version for verification
-                        mControllerMock.setProperty(property, value, animate);
-                    }
-                };
-    }
+public class KeyguardStatusViewControllerTest extends KeyguardStatusViewControllerBaseTest {
 
     @Test
     public void dozeTimeTick_updatesSlice() {
@@ -169,5 +114,13 @@ public class KeyguardStatusViewControllerTest extends SysuiTestCase {
         mController.setSplitShadeEnabled(false);
         verify(mKeyguardClockSwitchController, times(1)).setSplitShadeEnabled(false);
         verify(mKeyguardClockSwitchController, times(0)).setSplitShadeEnabled(true);
+    }
+
+    @Test
+    public void correctlyDump() {
+        mController.onInit();
+        verify(mDumpManager).registerDumpable(mController);
+        mController.onDestroy();
+        verify(mDumpManager, times(1)).unregisterDumpable(KeyguardStatusViewController.TAG);
     }
 }

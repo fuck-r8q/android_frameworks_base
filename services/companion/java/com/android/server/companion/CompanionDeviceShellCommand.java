@@ -16,6 +16,8 @@
 
 package com.android.server.companion;
 
+import static android.companion.CompanionDeviceManager.MESSAGE_REQUEST_CONTEXT_SYNC;
+
 import android.companion.AssociationInfo;
 import android.companion.ContextSyncMessage;
 import android.companion.Telecom;
@@ -30,7 +32,6 @@ import com.android.server.companion.datatransfer.contextsync.BitmapUtils;
 import com.android.server.companion.datatransfer.contextsync.CrossDeviceSyncController;
 import com.android.server.companion.presence.CompanionDevicePresenceMonitor;
 import com.android.server.companion.transport.CompanionTransportManager;
-import com.android.server.companion.transport.Transport;
 
 import java.io.PrintWriter;
 import java.util.List;
@@ -106,15 +107,10 @@ class CompanionDeviceShellCommand extends ShellCommand {
                     mService.loadAssociationsFromDisk();
                     break;
 
-                case "simulate-device-appeared":
+                case "simulate-device-event":
                     associationId = getNextIntArgRequired();
-                    mDevicePresenceMonitor.simulateDeviceAppeared(associationId);
-                    break;
-
-                case "simulate-device-disappeared":
-                    associationId = getNextIntArgRequired();
-                    mDevicePresenceMonitor.simulateDeviceDisappeared(associationId);
-                    break;
+                    int event = getNextIntArgRequired();
+                    mDevicePresenceMonitor.simulateDeviceEvent(associationId, event);
 
                 case "remove-inactive-associations": {
                     // This command should trigger the same "clean-up" job as performed by the
@@ -135,7 +131,7 @@ class CompanionDeviceShellCommand extends ShellCommand {
                 case "send-context-sync-empty-message": {
                     associationId = getNextIntArgRequired();
                     mTransportManager.createEmulatedTransport(associationId)
-                            .processMessage(Transport.MESSAGE_REQUEST_CONTEXT_SYNC,
+                            .processMessage(MESSAGE_REQUEST_CONTEXT_SYNC,
                                     /* sequence= */ 0,
                                     CrossDeviceSyncController.createEmptyMessage());
                     break;
@@ -147,7 +143,7 @@ class CompanionDeviceShellCommand extends ShellCommand {
                     String address = getNextArgRequired();
                     String facilitator = getNextArgRequired();
                     mTransportManager.createEmulatedTransport(associationId)
-                            .processMessage(Transport.MESSAGE_REQUEST_CONTEXT_SYNC,
+                            .processMessage(MESSAGE_REQUEST_CONTEXT_SYNC,
                                     /* sequence= */ 0,
                                     CrossDeviceSyncController.createCallCreateMessage(callId,
                                             address, facilitator));
@@ -159,7 +155,7 @@ class CompanionDeviceShellCommand extends ShellCommand {
                     String callId = getNextArgRequired();
                     int control = getNextIntArgRequired();
                     mTransportManager.createEmulatedTransport(associationId)
-                            .processMessage(Transport.MESSAGE_REQUEST_CONTEXT_SYNC,
+                            .processMessage(MESSAGE_REQUEST_CONTEXT_SYNC,
                                     /* sequence= */ 0,
                                     CrossDeviceSyncController.createCallControlMessage(callId,
                                             control));
@@ -184,7 +180,7 @@ class CompanionDeviceShellCommand extends ShellCommand {
                     }
                     pos.end(telecomToken);
                     mTransportManager.createEmulatedTransport(associationId)
-                            .processMessage(Transport.MESSAGE_REQUEST_CONTEXT_SYNC,
+                            .processMessage(MESSAGE_REQUEST_CONTEXT_SYNC,
                                     /* sequence= */ 0, pos.getBytes());
                     break;
                 }
@@ -246,7 +242,7 @@ class CompanionDeviceShellCommand extends ShellCommand {
                     pos.end(callsToken);
                     pos.end(telecomToken);
                     mTransportManager.createEmulatedTransport(associationId)
-                            .processMessage(Transport.MESSAGE_REQUEST_CONTEXT_SYNC,
+                            .processMessage(MESSAGE_REQUEST_CONTEXT_SYNC,
                                     /* sequence= */ 0, pos.getBytes());
                     break;
                 }
@@ -319,7 +315,9 @@ class CompanionDeviceShellCommand extends ShellCommand {
         pw.println("      information from persistent storage. USE FOR DEBUGGING PURPOSES ONLY.");
         pw.println("      USE FOR DEBUGGING AND/OR TESTING PURPOSES ONLY.");
 
-        pw.println("  simulate-device-appeared ASSOCIATION_ID");
+        pw.println("  simulate-device-event ASSOCIATION_ID EVENT");
+        pw.println("  Simulate the companion device event changes:");
+        pw.println("    Case(0): ");
         pw.println("      Make CDM act as if the given companion device has appeared.");
         pw.println("      I.e. bind the associated companion application's");
         pw.println("      CompanionDeviceService(s) and trigger onDeviceAppeared() callback.");
@@ -327,15 +325,17 @@ class CompanionDeviceShellCommand extends ShellCommand {
         pw.println("      will act as if device disappeared, unless 'simulate-device-disappeared'");
         pw.println("      or 'simulate-device-appeared' is called again before 60 seconds run out"
                 + ".");
-        pw.println("      USE FOR DEBUGGING AND/OR TESTING PURPOSES ONLY.");
-
-        pw.println("  simulate-device-disappeared ASSOCIATION_ID");
+        pw.println("    Case(1): ");
         pw.println("      Make CDM act as if the given companion device has disappeared.");
         pw.println("      I.e. unbind the associated companion application's");
         pw.println("      CompanionDeviceService(s) and trigger onDeviceDisappeared() callback.");
         pw.println("      NOTE: This will only have effect if 'simulate-device-appeared' was");
         pw.println("      invoked for the same device (same ASSOCIATION_ID) no longer than");
         pw.println("      60 seconds ago.");
+        pw.println("    Case(2): ");
+        pw.println("      Make CDM act as if the given companion device is BT connected ");
+        pw.println("    Case(3): ");
+        pw.println("      Make CDM act as if the given companion device is BT disconnected ");
         pw.println("      USE FOR DEBUGGING AND/OR TESTING PURPOSES ONLY.");
 
         pw.println("  remove-inactive-associations");

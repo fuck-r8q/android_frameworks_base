@@ -16,17 +16,13 @@
 
 package android.content.res;
 
-import static android.content.res.Element.TAG_MANIFEST;
-
 import android.annotation.NonNull;
+import android.annotation.StyleableRes;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  * Validates manifest files by ensuring that tag counts and the length of string attributes are
@@ -36,29 +32,11 @@ import java.util.Map;
  */
 public class Validator {
 
-    private static final int MAX_TAG_COUNT = 100000;
-
     private final ArrayDeque<Element> mElements = new ArrayDeque<>();
-    private final Map<String, TagCounter> mTagCounters = new HashMap<>();
 
     private void cleanUp() {
         while (!mElements.isEmpty()) {
             mElements.pop().recycle();
-        }
-        Iterator<Map.Entry<String, TagCounter>> it = mTagCounters.entrySet().iterator();
-        while (it.hasNext()) {
-            it.next().getValue().recycle();
-            it.remove();
-        }
-    }
-
-    private void seen(String tag) throws XmlPullParserException {
-        mTagCounters.putIfAbsent(tag, TagCounter.obtain(MAX_TAG_COUNT));
-        TagCounter counter = mTagCounters.get(tag);
-        counter.increment();
-        if (!counter.isValid()) {
-            throw new XmlPullParserException("The number of " + tag
-                    + " tags exceeded " + MAX_TAG_COUNT);
         }
     }
 
@@ -76,25 +54,19 @@ public class Validator {
             return;
         }
         if (eventType == XmlPullParser.START_TAG) {
-            try {
-                String tag = parser.getName();
-                // only validate manifests
-                if (depth == 0 && mElements.size() == 0 && !TAG_MANIFEST.equals(tag)) {
-                    return;
-                }
+            String tag = parser.getName();
+            if (Element.shouldValidate(tag)) {
+                Element element = Element.obtain(tag);
                 Element parent = mElements.peek();
-                if (parent == null || parent.hasChild(tag)) {
-                    seen(tag);
-                    Element element = Element.obtain(tag);
-                    element.validateStringAttrs(parser);
-                    if (parent != null) {
+                if (parent != null && parent.hasChild(tag)) {
+                    try {
                         parent.seen(element);
+                    } catch (SecurityException e) {
+                        cleanUp();
+                        throw e;
                     }
-                    mElements.push(element);
                 }
-            } catch (XmlPullParserException e) {
-                cleanUp();
-                throw e;
+                mElements.push(element);
             }
         } else if (eventType == XmlPullParser.END_TAG && depth == mElements.size()) {
             mElements.pop().recycle();
@@ -106,11 +78,21 @@ public class Validator {
     /**
      * Validates the resource string of a manifest tag attribute.
      */
-    public void validateAttr(@NonNull XmlPullParser parser, int index, CharSequence stringValue)
-            throws XmlPullParserException {
+    public void validateResStrAttr(@NonNull XmlPullParser parser, @StyleableRes int index,
+            CharSequence stringValue) throws XmlPullParserException {
         if (parser.getDepth() > mElements.size()) {
             return;
         }
-        mElements.peek().validateResStringAttr(index, stringValue);
+        mElements.peek().validateResStrAttr(index, stringValue);
+    }
+
+    /**
+     * Validates the string of a manifest tag attribute by name.
+     */
+    public void validateStrAttr(@NonNull XmlPullParser parser, String attrName, String attrValue) {
+        if (parser.getDepth() > mElements.size()) {
+            return;
+        }
+        mElements.peek().validateStrAttr(attrName, attrValue);
     }
 }

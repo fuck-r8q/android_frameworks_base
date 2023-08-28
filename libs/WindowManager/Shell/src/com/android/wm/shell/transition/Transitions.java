@@ -149,22 +149,27 @@ public class Transitions implements RemoteCallable<Transitions>,
     /** Transition type for maximize to freeform transition. */
     public static final int TRANSIT_RESTORE_FROM_MAXIMIZE = WindowManager.TRANSIT_FIRST_CUSTOM + 9;
 
-    /** Transition type to freeform in desktop mode. */
-    public static final int TRANSIT_ENTER_FREEFORM = WindowManager.TRANSIT_FIRST_CUSTOM + 10;
+    /** Transition type for starting the move to desktop mode. */
+    public static final int TRANSIT_START_DRAG_TO_DESKTOP_MODE =
+            WindowManager.TRANSIT_FIRST_CUSTOM + 10;
 
-    /** Transition type to freeform in desktop mode. */
-    public static final int TRANSIT_ENTER_DESKTOP_MODE = WindowManager.TRANSIT_FIRST_CUSTOM + 11;
+    /** Transition type for finalizing the move to desktop mode. */
+    public static final int TRANSIT_FINALIZE_DRAG_TO_DESKTOP_MODE =
+            WindowManager.TRANSIT_FIRST_CUSTOM + 11;
 
     /** Transition type to fullscreen from desktop mode. */
     public static final int TRANSIT_EXIT_DESKTOP_MODE = WindowManager.TRANSIT_FIRST_CUSTOM + 12;
 
     /** Transition type to animate back to fullscreen when drag to freeform is cancelled. */
-    public static final int TRANSIT_CANCEL_ENTERING_DESKTOP_MODE =
+    public static final int TRANSIT_CANCEL_DRAG_TO_DESKTOP_MODE =
             WindowManager.TRANSIT_FIRST_CUSTOM + 13;
 
     /** Transition type to animate the toggle resize between the max and default desktop sizes. */
     public static final int TRANSIT_DESKTOP_MODE_TOGGLE_RESIZE =
             WindowManager.TRANSIT_FIRST_CUSTOM + 14;
+
+    /** Transition to animate task to desktop. */
+    public static final int TRANSIT_MOVE_TO_DESKTOP = WindowManager.TRANSIT_FIRST_CUSTOM + 15;
 
     private final WindowOrganizer mOrganizer;
     private final Context mContext;

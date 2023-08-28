@@ -42,6 +42,7 @@ import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -141,8 +142,10 @@ public abstract class PipTransitionController implements Transitions.TransitionH
         mPipBoundsAlgorithm = pipBoundsAlgorithm;
         mPipAnimationController = pipAnimationController;
         mTransitions = transitions;
-        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            shellInit.addInitCallback(this::onInit, this);
+        if (!PipUtils.isPip2ExperimentEnabled()) {
+            if (Transitions.ENABLE_SHELL_TRANSITIONS) {
+                shellInit.addInitCallback(this::onInit, this);
+            }
         }
     }
 
@@ -283,4 +286,9 @@ public abstract class PipTransitionController implements Transitions.TransitionH
          */
         void onPipTransitionCanceled(int direction);
     }
+
+    /**
+     * Dumps internal states.
+     */
+    public void dump(PrintWriter pw, String prefix) {}
 }

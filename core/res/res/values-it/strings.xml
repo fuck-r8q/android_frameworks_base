@@ -619,6 +619,8 @@
     <string name="biometric_or_screen_lock_app_setting_name" msgid="5348462421758257752">"Usa la biometria o il blocco schermo"</string>
     <string name="biometric_dialog_default_title" msgid="55026799173208210">"Verifica la tua identità"</string>
     <string name="biometric_dialog_default_subtitle" msgid="8457232339298571992">"Usa la biometria per continuare"</string>
+    <string name="biometric_dialog_fingerprint_subtitle" msgid="2520227942533751342">"Utilizza la tua impronta per continuare"</string>
+    <string name="biometric_dialog_face_subtitle" msgid="5269284162191087084">"Usa il tuo volto per continuare"</string>
     <string name="biometric_or_screen_lock_dialog_default_subtitle" msgid="159539678371552009">"Per continuare devi usare i tuoi dati biometrici o il tuo blocco schermo"</string>
     <string name="biometric_error_hw_unavailable" msgid="2494077380540615216">"Hardware biometrico non disponibile"</string>
     <string name="biometric_error_user_canceled" msgid="6732303949695293730">"Autenticazione annullata"</string>
@@ -690,7 +692,7 @@
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Sposta lo smartphone verso sinistra"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Sposta lo smartphone verso destra"</string>
     <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Guarda più direttamente verso il dispositivo."</string>
-    <string name="face_acquired_not_detected" msgid="1057966913397548150">"Volto non visible. Tieni lo smartphone all\'altezza degli occhi."</string>
+    <string name="face_acquired_not_detected" msgid="1057966913397548150">"Volto non visibile. Tieni lo smartphone all\'altezza degli occhi."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Troppo movimento. Tieni fermo il telefono."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Ripeti l\'acquisizione del volto."</string>
     <string name="face_acquired_too_different" msgid="2520389515612972889">"Impossibile riconoscere il volto. Riprova."</string>
@@ -1397,7 +1399,7 @@
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"RIFIUTO"</string>
     <string name="select_input_method" msgid="3971267998568587025">"Scegli il metodo di immissione"</string>
     <string name="show_ime" msgid="6406112007347443383">"Tieni sullo schermo quando è attiva la tastiera fisica"</string>
-    <string name="hardware" msgid="1800597768237606953">"Mostra tastiera virtuale"</string>
+    <string name="hardware" msgid="3611039921284836033">"Usa tastiera sullo schermo"</string>
     <string name="select_keyboard_layout_notification_title" msgid="5823199895322205589">"Configura <xliff:g id="DEVICE_NAME">%s</xliff:g>"</string>
     <string name="select_multiple_keyboards_layout_notification_title" msgid="6999491025126641938">"Configura le tastiere fisiche"</string>
     <string name="select_keyboard_layout_notification_message" msgid="8835158247369158154">"Tocca per selezionare la lingua e il layout"</string>

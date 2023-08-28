@@ -88,13 +88,6 @@ public final class PrimitiveSegment extends VibrationEffectSegment {
     }
 
     /** @hide */
-    @Override
-    public boolean hasNonZeroAmplitude() {
-        // Every primitive plays a vibration with a non-zero amplitude, even at scale == 0.
-        return true;
-    }
-
-    /** @hide */
     @NonNull
     @Override
     public PrimitiveSegment resolve(int defaultAmplitude) {
@@ -145,6 +138,13 @@ public final class PrimitiveSegment extends VibrationEffectSegment {
                 + ", scale=" + mScale
                 + ", delay=" + mDelay
                 + '}';
+    }
+
+    /** @hide */
+    @Override
+    public String toDebugString() {
+        return String.format("Primitive=%s(scale=%.2f, delay=%dms)",
+                VibrationEffect.Composition.primitiveToString(mPrimitiveId), mScale, mDelay);
     }
 
     @Override
