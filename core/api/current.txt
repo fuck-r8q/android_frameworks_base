@@ -10560,6 +10560,7 @@ package android.content {
   public final class ContextParams {
     method @Nullable public String getAttributionTag();
     method @Nullable public android.content.AttributionSource getNextAttributionSource();
+    method @NonNull public boolean shouldRegisterAttributionSource();
   }
 
   public static final class ContextParams.Builder {
@@ -10568,6 +10569,7 @@ package android.content {
     method @NonNull public android.content.ContextParams build();
     method @NonNull public android.content.ContextParams.Builder setAttributionTag(@Nullable String);
     method @NonNull public android.content.ContextParams.Builder setNextAttributionSource(@Nullable android.content.AttributionSource);
+    method @NonNull public android.content.ContextParams.Builder setShouldRegisterAttributionSource(boolean);
   }
 
   public class ContextWrapper extends android.content.Context {
@@ -39349,8 +39351,10 @@ package android.security {
   }
 
   public final class FileIntegrityManager {
+    method @FlaggedApi(Flags.FLAG_FSVERITY_API) @Nullable public byte[] getFsverityDigest(@NonNull java.io.File) throws java.io.IOException;
     method public boolean isApkVeritySupported();
     method @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
+    method @FlaggedApi(Flags.FLAG_FSVERITY_API) public void setupFsverity(@NonNull java.io.File) throws java.io.IOException;
   }
 
   public final class KeyChain {
