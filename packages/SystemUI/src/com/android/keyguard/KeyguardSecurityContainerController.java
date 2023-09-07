@@ -83,6 +83,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInterac
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
+import com.android.systemui.scene.shared.flag.SceneContainerFlags;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -123,6 +124,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
     private final UserSwitcherController mUserSwitcherController;
     private final GlobalSettings mGlobalSettings;
     private final FeatureFlags mFeatureFlags;
+    private final SceneContainerFlags mSceneContainerFlags;
     private final SessionTracker mSessionTracker;
     private final Optional<SideFpsController> mSideFpsController;
     private final FalsingA11yDelegate mFalsingA11yDelegate;
@@ -369,11 +371,9 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
 
                 @Override
                 public void onOrientationChanged(int orientation) {
-                    if (mFeatureFlags.isEnabled(LOCKSCREEN_ENABLE_LANDSCAPE)) {
-                        // TODO(b/295603468)
-                        // Fix reinflation of views when flag is enabled.
-                        KeyguardSecurityContainerController.this
-                            .onDensityOrFontScaleOrOrientationChanged();
+                    if (mFeatureFlags.isEnabled(LOCKSCREEN_ENABLE_LANDSCAPE)
+                            && getResources().getBoolean(R.bool.update_bouncer_constraints)) {
+                        mSecurityViewFlipperController.updateConstraints(orientation);
                     }
                 }
             };
@@ -433,6 +433,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
             FalsingManager falsingManager,
             UserSwitcherController userSwitcherController,
             FeatureFlags featureFlags,
+            SceneContainerFlags sceneContainerFlags,
             GlobalSettings globalSettings,
             SessionTracker sessionTracker,
             Optional<SideFpsController> sideFpsController,
@@ -466,6 +467,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         mFalsingManager = falsingManager;
         mUserSwitcherController = userSwitcherController;
         mFeatureFlags = featureFlags;
+        mSceneContainerFlags = sceneContainerFlags;
         mGlobalSettings = globalSettings;
         mSessionTracker = sessionTracker;
         mSideFpsController = sideFpsController;
@@ -503,7 +505,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
 
         showPrimarySecurityScreen(false);
 
-        if (mFeatureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+        if (mSceneContainerFlags.isEnabled()) {
             // When the scene framework says that the lockscreen has been dismissed, dismiss the
             // keyguard here, revealing the underlying app or launcher:
             mSceneTransitionCollectionJob = mJavaAdapter.get().alwaysCollectFlow(

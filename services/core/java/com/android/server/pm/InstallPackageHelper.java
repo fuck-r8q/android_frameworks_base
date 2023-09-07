@@ -44,7 +44,6 @@ import static android.os.incremental.IncrementalManager.isIncrementalPath;
 import static android.os.storage.StorageManager.FLAG_STORAGE_CE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_DE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_EXTERNAL;
-
 import static com.android.server.pm.DexOptHelper.useArtService;
 import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
 import static com.android.server.pm.InstructionSets.getDexCodeInstructionSet;
@@ -1144,8 +1143,7 @@ final class InstallPackageHelper {
         Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "parsePackage");
         final ParsedPackage parsedPackage;
         try (PackageParser2 pp = mPm.mInjector.getPreparingPackageParser()) {
-            if (request.getPackageLite() == null || !PackageInstallerSession.isArchivedInstallation(
-                    request.getInstallFlags())) {
+            if (request.getPackageLite() == null || !request.isArchived()) {
                 // TODO: pass packageLite from install request instead of reparsing the package
                 parsedPackage = pp.parsePackage(tmpPackageFile, parseFlags, false);
                 AndroidPackageUtils.validatePackageDexMetadata(parsedPackage);
@@ -3556,7 +3554,7 @@ final class InstallPackageHelper {
                 logCriticalInfo(Log.WARN, "System package " + packageName
                         + " no longer exists; its data will be wiped");
                 mInjector.getHandler().post(
-                        () -> mRemovePackageHelper.removePackageData(ps, userIds, null, 0, false));
+                        () -> mRemovePackageHelper.removePackageData(ps, userIds));
                 expectingBetter.put(ps.getPackageName(), ps.getPath());
             } else {
                 // we still have a disabled system package, but, it still might have
@@ -3631,7 +3629,7 @@ final class InstallPackageHelper {
             // partition], completely remove the package data.
             final PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
             if (ps != null && mPm.mPackages.get(packageName) == null) {
-                mRemovePackageHelper.removePackageData(ps, userIds, null, 0, false);
+                mRemovePackageHelper.removePackageData(ps, userIds);
             }
             logCriticalInfo(Log.WARN, msg);
         }

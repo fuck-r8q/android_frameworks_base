@@ -115,7 +115,7 @@ object Flags {
     val BUILDER_EXTRAS_OVERRIDE =
         sysPropBooleanFlag(
             "persist.sysui.notification.builder_extras_override",
-            default = true
+            default = false
         )
 
     /** Only notify group expansion listeners when a change happens. */
@@ -215,7 +215,7 @@ object Flags {
     /** Inflate and bind views upon emitting a blueprint value . */
     // TODO(b/297365780): Tracking Bug
     @JvmField
-    val LAZY_INFLATE_KEYGUARD = unreleasedFlag("lazy_inflate_keyguard", teamfood = true)
+    val LAZY_INFLATE_KEYGUARD = releasedFlag("lazy_inflate_keyguard")
 
     /** Enables UI updates for AI wallpapers in the wallpaper picker. */
     // TODO(b/267722622): Tracking Bug
@@ -643,7 +643,22 @@ object Flags {
      */
     // TODO(b/283300105): Tracking Bug
     @JvmField val SCENE_CONTAINER_ENABLED = false
-    @JvmField val SCENE_CONTAINER = unreleasedFlag("scene_container")
+    @Deprecated(
+        message = """
+            Do not use this flag directly. Please use
+            [com.android.systemui.scene.shared.flag.SceneContainerFlags#isEnabled].
+
+            (Not really deprecated but using this as a simple way to bring attention to the above).
+        """,
+        replaceWith = ReplaceWith(
+            "com.android.systemui.scene.shared.flag.SceneContainerFlags#isEnabled",
+        ),
+        level = DeprecationLevel.WARNING,
+    )
+    @JvmField val SCENE_CONTAINER = resourceBooleanFlag(
+        R.bool.config_sceneContainerFrameworkEnabled,
+        "scene_container",
+    )
 
     // 1900
     @JvmField val NOTE_TASKS = releasedFlag("keycode_flag")
@@ -708,7 +723,7 @@ object Flags {
     @JvmField val KEYBOARD_BACKLIGHT_INDICATOR = releasedFlag("keyboard_backlight_indicator")
 
     // TODO(b/277192623): Tracking Bug
-    @JvmField val KEYBOARD_EDUCATION = unreleasedFlag("keyboard_education", teamfood = false)
+    @JvmField val KEYBOARD_EDUCATION = unreleasedFlag("keyboard_education", teamfood = true)
 
     // TODO(b/277201412): Tracking Bug
     @JvmField
@@ -774,11 +789,11 @@ object Flags {
 
     /** Enable the Compose implementation of the PeopleSpaceActivity. */
     @JvmField
-    val COMPOSE_PEOPLE_SPACE = releasedFlag("compose_people_space")
+    val COMPOSE_PEOPLE_SPACE = unreleasedFlag("compose_people_space", teamfood = true)
 
     /** Enable the Compose implementation of the Quick Settings footer actions. */
     @JvmField
-    val COMPOSE_QS_FOOTER_ACTIONS = unreleasedFlag("compose_qs_footer_actions")
+    val COMPOSE_QS_FOOTER_ACTIONS = unreleasedFlag("compose_qs_footer_actions", teamfood = true)
 
     /** Enable the share wifi button in Quick Settings internet dialog. */
     @JvmField
