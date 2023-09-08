@@ -963,6 +963,8 @@ class WindowTestsBase extends SystemServiceTestsBase {
      * @see DisplayRotation#updateRotationUnchecked
      */
     void unblockDisplayRotation(DisplayContent dc) {
+        dc.mOpeningApps.clear();
+        mWm.mAppsFreezingScreen = 0;
         mWm.stopFreezingDisplayLocked();
         // The rotation animation won't actually play, it needs to be cleared manually.
         dc.setRotationAnimation(null);
@@ -971,9 +973,17 @@ class WindowTestsBase extends SystemServiceTestsBase {
     static void resizeDisplay(DisplayContent displayContent, int width, int height) {
         displayContent.updateBaseDisplayMetrics(width, height, displayContent.mBaseDisplayDensity,
                 displayContent.mBaseDisplayPhysicalXDpi, displayContent.mBaseDisplayPhysicalYDpi);
+        displayContent.getDisplayRotation().configure(width, height);
         final Configuration c = new Configuration();
         displayContent.computeScreenConfiguration(c);
         displayContent.onRequestedOverrideConfigurationChanged(c);
+    }
+
+    /** Used for the tests that assume the display is portrait by default. */
+    static void makeDisplayPortrait(DisplayContent displayContent) {
+        if (displayContent.mBaseDisplayHeight <= displayContent.mBaseDisplayWidth) {
+            resizeDisplay(displayContent, 500, 1000);
+        }
     }
 
     // The window definition for UseTestDisplay#addWindows. The test can declare to add only

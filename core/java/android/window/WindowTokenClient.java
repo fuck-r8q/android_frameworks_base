@@ -23,12 +23,12 @@ import android.annotation.AnyThread;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
 import android.app.ActivityThread;
-import android.app.IWindowToken;
 import android.app.ResourcesManager;
 import android.content.Context;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.inputmethodservice.AbstractInputMethodService;
+import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
@@ -37,6 +37,7 @@ import android.os.IBinder;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.function.pooled.PooledLambda;
 
 import java.lang.ref.WeakReference;
@@ -52,7 +53,7 @@ import java.lang.ref.WeakReference;
  *
  * @hide
  */
-public class WindowTokenClient extends IWindowToken.Stub {
+public class WindowTokenClient extends Binder {
     private static final String TAG = WindowTokenClient.class.getSimpleName();
 
     /**
@@ -95,16 +96,16 @@ public class WindowTokenClient extends IWindowToken.Stub {
      * @param newConfig the updated {@link Configuration}
      * @param newDisplayId the updated {@link android.view.Display} ID
      */
-    @AnyThread
-    @Override
+    @VisibleForTesting
+    @MainThread
     public void onConfigurationChanged(Configuration newConfig, int newDisplayId) {
-        // TODO(b/290876897): No need to post on mHandler after migrating to ClientTransaction
-        postOnConfigurationChanged(newConfig, newDisplayId);
+        onConfigurationChanged(newConfig, newDisplayId, true /* shouldReportConfigChange */);
     }
 
     /**
      * Posts an {@link #onConfigurationChanged} to the main thread.
      */
+    @VisibleForTesting
     public void postOnConfigurationChanged(@NonNull Configuration newConfig, int newDisplayId) {
         mHandler.post(PooledLambda.obtainRunnable(this::onConfigurationChanged, newConfig,
                 newDisplayId, true /* shouldReportConfigChange */).recycleOnUse());
@@ -120,14 +121,13 @@ public class WindowTokenClient extends IWindowToken.Stub {
      * <p>
      * Note that this method must be executed on the main thread if
      * {@code shouldReportConfigChange} is {@code true}, which is usually from
-     * {@link IWindowToken#onConfigurationChanged(Configuration, int)}
+     * {@link #onConfigurationChanged(Configuration, int)}
      * directly, while this method could be run on any thread if it is used to initialize
      * Context's {@code Configuration} via {@link WindowTokenClientController#attachToDisplayArea}
      * or {@link WindowTokenClientController#attachToDisplayContent}.
      *
      * @param shouldReportConfigChange {@code true} to indicate that the {@code Configuration}
      *                                 should be dispatched to listeners.
-     *
      */
     @AnyThread
     public void onConfigurationChanged(Configuration newConfig, int newDisplayId,
@@ -193,16 +193,12 @@ public class WindowTokenClient extends IWindowToken.Stub {
         }
     }
 
-    @AnyThread
-    @Override
-    public void onWindowTokenRemoved() {
-        // TODO(b/290876897): No need to post on mHandler after migrating to ClientTransaction
-        mHandler.post(PooledLambda.obtainRunnable(
-                WindowTokenClient::onWindowTokenRemovedInner, this).recycleOnUse());
-    }
-
+    /**
+     * Called when the attached window is removed from the display.
+     */
+    @VisibleForTesting
     @MainThread
-    private void onWindowTokenRemovedInner() {
+    public void onWindowTokenRemoved() {
         final Context context = mContextRef.get();
         if (context != null) {
             context.destroy();

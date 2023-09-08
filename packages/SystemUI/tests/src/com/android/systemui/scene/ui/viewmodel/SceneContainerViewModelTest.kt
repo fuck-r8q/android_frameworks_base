@@ -52,10 +52,10 @@ class SceneContainerViewModelTest : SysuiTestCase() {
         val isVisible by collectLastValue(underTest.isVisible)
         assertThat(isVisible).isTrue()
 
-        interactor.setVisible(false)
+        interactor.setVisible(false, "reason")
         assertThat(isVisible).isFalse()
 
-        interactor.setVisible(true)
+        interactor.setVisible(true, "reason")
         assertThat(isVisible).isTrue()
     }
 
@@ -69,7 +69,8 @@ class SceneContainerViewModelTest : SysuiTestCase() {
         val currentScene by collectLastValue(underTest.currentScene)
         assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
 
-        underTest.setCurrentScene(SceneModel(SceneKey.Shade))
+        underTest.onSceneChanged(SceneModel(SceneKey.Shade))
+
         assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Shade))
     }
 

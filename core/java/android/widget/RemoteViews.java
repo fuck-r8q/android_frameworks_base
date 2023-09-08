@@ -337,7 +337,7 @@ public class RemoteViews implements Parcelable, Filter {
      *
      * @hide
      */
-    private static final int MAX_ADAPTER_CONVERSION_WAITING_TIME_MS = 2000;
+    private static final int MAX_ADAPTER_CONVERSION_WAITING_TIME_MS = 5000;
 
     /**
      * Application that hosts the remote views.
@@ -4823,7 +4823,7 @@ public class RemoteViews implements Parcelable, Filter {
     public static boolean isAdapterConversionEnabled() {
         return AppGlobals.getIntCoreSetting(
                 SystemUiDeviceConfigFlags.REMOTEVIEWS_ADAPTER_CONVERSION,
-                SystemUiDeviceConfigFlags.REMOTEVIEWS_ADAPTER_CONVERSION_DEFAULT ? 1 : 0) == 1;
+                SystemUiDeviceConfigFlags.REMOTEVIEWS_ADAPTER_CONVERSION_DEFAULT ? 1 : 0) != 0;
     }
 
     /**
@@ -6948,6 +6948,7 @@ public class RemoteViews implements Parcelable, Filter {
             // something is going to start.
             opts.setPendingIntentBackgroundActivityStartMode(
                     ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+            opts.setPendingIntentBackgroundActivityLaunchAllowedByPermission(true);
             return Pair.create(intent, opts);
         }
     }

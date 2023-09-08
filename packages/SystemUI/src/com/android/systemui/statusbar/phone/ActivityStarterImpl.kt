@@ -401,7 +401,7 @@ constructor(
         isActivityIntent: Boolean,
         showOverLockscreen: Boolean,
     ): Boolean {
-        // TODO(b/184121838): Support launch animations when occluded.
+        // TODO(b/294418322): Support launch animations when occluded.
         if (keyguardStateController.isOccluded) {
             return false
         }
@@ -914,8 +914,8 @@ constructor(
             val packages: Array<String> =
                 context.resources.getStringArray(R.array.system_ui_packages)
             for (pkg in packages) {
-                if (intent.component == null) break
-                if (pkg == intent.component.packageName) {
+                val componentName = intent.component ?: break
+                if (pkg == componentName.packageName) {
                     return UserHandle(UserHandle.myUserId())
                 }
             }

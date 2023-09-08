@@ -7745,7 +7745,7 @@ package android.app {
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekFastDrawable();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.graphics.drawable.Drawable peekFastDrawable(int);
     method public void removeOnColorsChangedListener(@NonNull android.app.WallpaperManager.OnColorsChangedListener);
-    method public void sendWallpaperCommand(android.os.IBinder, String, int, int, int, android.os.Bundle);
+    method @RequiresPermission(value="android.permission.ALWAYS_UPDATE_WALLPAPER", conditional=true) public void sendWallpaperCommand(android.os.IBinder, String, int, int, int, android.os.Bundle);
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public void setBitmap(android.graphics.Bitmap) throws java.io.IOException;
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public int setBitmap(android.graphics.Bitmap, android.graphics.Rect, boolean) throws java.io.IOException;
     method @RequiresPermission(android.Manifest.permission.SET_WALLPAPER) public int setBitmap(android.graphics.Bitmap, android.graphics.Rect, boolean, int) throws java.io.IOException;
@@ -9493,8 +9493,8 @@ package android.appwidget {
     method @NonNull public java.util.List<android.appwidget.AppWidgetProviderInfo> getInstalledProvidersForProfile(@Nullable android.os.UserHandle);
     method public static android.appwidget.AppWidgetManager getInstance(android.content.Context);
     method public boolean isRequestPinAppWidgetSupported();
-    method public void notifyAppWidgetViewDataChanged(int[], int);
-    method public void notifyAppWidgetViewDataChanged(int, int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int[], int);
+    method @Deprecated public void notifyAppWidgetViewDataChanged(int, int);
     method public void partiallyUpdateAppWidget(int[], android.widget.RemoteViews);
     method public void partiallyUpdateAppWidget(int, android.widget.RemoteViews);
     method public boolean requestPinAppWidget(@NonNull android.content.ComponentName, @Nullable android.os.Bundle, @Nullable android.app.PendingIntent);
@@ -9613,6 +9613,7 @@ package android.companion {
     method @Nullable public CharSequence getDisplayName();
     method public int getId();
     method public int getSystemDataSyncFlags();
+    method @Nullable public String getTag();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.AssociationInfo> CREATOR;
   }
@@ -9682,6 +9683,7 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void attachSystemDataTransport(int, @NonNull java.io.InputStream, @NonNull java.io.OutputStream) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public android.content.IntentSender buildAssociationCancellationIntent();
     method @Nullable public android.content.IntentSender buildPermissionTransferUserConsentIntent(int) throws android.companion.DeviceNotAssociatedException;
+    method public void clearAssociationTag(int);
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method public void disableSystemDataSyncForTypes(int, int);
     method @Deprecated public void disassociate(@NonNull String);
@@ -9691,6 +9693,7 @@ package android.companion {
     method @NonNull public java.util.List<android.companion.AssociationInfo> getMyAssociations();
     method @Deprecated public boolean hasNotificationAccess(android.content.ComponentName);
     method public void requestNotificationAccess(android.content.ComponentName);
+    method public void setAssociationTag(int, @NonNull String);
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
     method public void startSystemDataTransfer(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.companion.CompanionException>) throws android.companion.DeviceNotAssociatedException;
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void stopObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
@@ -11782,6 +11785,7 @@ package android.content.om {
     method @NonNull public void setResourceValue(@NonNull String, @IntRange(from=android.util.TypedValue.TYPE_FIRST_INT, to=android.util.TypedValue.TYPE_LAST_INT) int, int, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, int, @NonNull String, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, @NonNull android.os.ParcelFileDescriptor, @Nullable String);
+    method @NonNull public void setResourceValue(@NonNull String, @NonNull android.content.res.AssetFileDescriptor, @Nullable String);
     method public void setTargetOverlayable(@Nullable String);
   }
 
@@ -12909,7 +12913,7 @@ package android.content.pm {
     field public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
     field public static final String FEATURE_TELEPHONY_SUBSCRIPTION = "android.hardware.telephony.subscription";
     field @Deprecated public static final String FEATURE_TELEVISION = "android.hardware.type.television";
-    field public static final String FEATURE_THREADNETWORK = "android.hardware.threadnetwork";
+    field public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
     field public static final String FEATURE_TOUCHSCREEN = "android.hardware.touchscreen";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH = "android.hardware.touchscreen.multitouch";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT = "android.hardware.touchscreen.multitouch.distinct";
@@ -14430,11 +14434,13 @@ package android.database.sqlite {
     method public void execSQL(String, Object[]) throws android.database.SQLException;
     method public static String findEditTable(String);
     method public java.util.List<android.util.Pair<java.lang.String,java.lang.String>> getAttachedDbs();
+    method public long getLastChangedRowCount();
     method public long getLastInsertRowId();
     method public long getMaximumSize();
     method public long getPageSize();
     method public String getPath();
     method @Deprecated public java.util.Map<java.lang.String,java.lang.String> getSyncedTables();
+    method public long getTotalChangedRowCount();
     method public int getVersion();
     method public boolean inTransaction();
     method public long insert(String, String, android.content.ContentValues);
@@ -33746,6 +33752,7 @@ package android.os {
   public static class PerformanceHintManager.Session implements java.io.Closeable {
     method public void close();
     method public void reportActualWorkDuration(long);
+    method public void setPreferPowerEfficiency(boolean);
     method public void setThreads(@NonNull int[]);
     method public void updateTargetWorkDuration(long);
   }
@@ -33783,7 +33790,7 @@ package android.os {
     method public boolean isInteractive();
     method public boolean isLowPowerStandbyEnabled();
     method public boolean isPowerSaveMode();
-    method public boolean isRebootingUserspaceSupported();
+    method @Deprecated public boolean isRebootingUserspaceSupported();
     method @Deprecated public boolean isScreenOn();
     method public boolean isSustainedPerformanceModeSupported();
     method public boolean isWakeLockLevelSupported(int);
@@ -45083,6 +45090,7 @@ package android.telephony {
     field public static final int NR_STATE_RESTRICTED = 1; // 0x1
     field public static final int SERVICE_TYPE_DATA = 2; // 0x2
     field public static final int SERVICE_TYPE_EMERGENCY = 5; // 0x5
+    field public static final int SERVICE_TYPE_MMS = 6; // 0x6
     field public static final int SERVICE_TYPE_SMS = 3; // 0x3
     field public static final int SERVICE_TYPE_UNKNOWN = 0; // 0x0
     field public static final int SERVICE_TYPE_VIDEO = 4; // 0x4
@@ -47347,9 +47355,9 @@ package android.text {
   }
 
   public class BoringLayout extends android.text.Layout implements android.text.TextUtils.EllipsizeCallback {
-    ctor public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
-    ctor public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
-    ctor public BoringLayout(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, float, float, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
+    ctor @Deprecated public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
+    ctor @Deprecated public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
+    ctor @Deprecated public BoringLayout(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, float, float, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public void ellipsized(int, int);
     method public int getBottomPadding();
     method public int getEllipsisCount(int);
@@ -47362,12 +47370,12 @@ package android.text {
     method public int getLineTop(int);
     method public int getParagraphDirection(int);
     method public int getTopPadding();
-    method public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint);
-    method public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint, android.text.BoringLayout.Metrics);
-    method @Nullable public static android.text.BoringLayout.Metrics isBoring(@NonNull CharSequence, @NonNull android.text.TextPaint, @NonNull android.text.TextDirectionHeuristic, boolean, @Nullable android.text.BoringLayout.Metrics);
-    method public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
-    method public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
-    method @NonNull public static android.text.BoringLayout make(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
+    method @Deprecated public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint);
+    method @Deprecated public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint, android.text.BoringLayout.Metrics);
+    method @Deprecated @Nullable public static android.text.BoringLayout.Metrics isBoring(@NonNull CharSequence, @NonNull android.text.TextPaint, @NonNull android.text.TextDirectionHeuristic, boolean, @Nullable android.text.BoringLayout.Metrics);
+    method @Deprecated public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
+    method @Deprecated public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
+    method @Deprecated @NonNull public static android.text.BoringLayout make(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public android.text.BoringLayout replaceOrMake(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
     method @NonNull public android.text.BoringLayout replaceOrMake(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public android.text.BoringLayout replaceOrMake(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
@@ -47392,7 +47400,6 @@ package android.text {
     method public int getBottomPadding();
     method public int getEllipsisCount(int);
     method public int getEllipsisStart(int);
-    method @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
     method public boolean getLineContainsTab(int);
     method public int getLineCount();
     method public int getLineDescent(int);
@@ -47565,20 +47572,26 @@ package android.text {
     method public void drawBackground(@NonNull android.graphics.Canvas);
     method public void drawText(@NonNull android.graphics.Canvas);
     method public void fillCharacterBounds(@IntRange(from=0) int, @IntRange(from=0) int, @NonNull float[], @IntRange(from=0) int);
-    method public final android.text.Layout.Alignment getAlignment();
+    method @NonNull public final android.text.Layout.Alignment getAlignment();
     method public abstract int getBottomPadding();
+    method public final int getBreakStrategy();
     method public void getCursorPath(int, android.graphics.Path, CharSequence);
     method public static float getDesiredWidth(CharSequence, android.text.TextPaint);
     method public static float getDesiredWidth(CharSequence, int, int, android.text.TextPaint);
     method public abstract int getEllipsisCount(int);
     method public abstract int getEllipsisStart(int);
-    method public int getEllipsizedWidth();
+    method @Nullable public final android.text.TextUtils.TruncateAt getEllipsize();
+    method @IntRange(from=0) public int getEllipsizedWidth();
     method public int getHeight();
+    method public final int getHyphenationFrequency();
+    method public final int getJustificationMode();
+    method @Nullable public final int[] getLeftIndents();
     method public final int getLineAscent(int);
     method public final int getLineBaseline(int);
     method public final int getLineBottom(int);
     method public int getLineBottom(int, boolean);
     method public int getLineBounds(int, android.graphics.Rect);
+    method @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
     method public abstract boolean getLineContainsTab(int);
     method public abstract int getLineCount();
     method public abstract int getLineDescent(int);
@@ -47589,29 +47602,35 @@ package android.text {
     method public float getLineLeft(int);
     method public float getLineMax(int);
     method public float getLineRight(int);
+    method public final float getLineSpacingAmount();
+    method public final float getLineSpacingMultiplier();
     method public abstract int getLineStart(int);
     method public abstract int getLineTop(int);
     method public int getLineVisibleEnd(int);
     method public float getLineWidth(int);
+    method @IntRange(from=1) public final int getMaxLines();
     method public int getOffsetForHorizontal(int, float);
     method public int getOffsetToLeftOf(int);
     method public int getOffsetToRightOf(int);
-    method public final android.text.TextPaint getPaint();
+    method @NonNull public final android.text.TextPaint getPaint();
     method public final android.text.Layout.Alignment getParagraphAlignment(int);
     method public abstract int getParagraphDirection(int);
     method public final int getParagraphLeft(int);
     method public final int getParagraphRight(int);
     method public float getPrimaryHorizontal(int);
     method @Nullable public int[] getRangeForRect(@NonNull android.graphics.RectF, @NonNull android.text.SegmentFinder, @NonNull android.text.Layout.TextInclusionStrategy);
+    method @Nullable public final int[] getRightIndents();
     method public float getSecondaryHorizontal(int);
     method public void getSelectionPath(int, int, android.graphics.Path);
     method public final float getSpacingAdd();
     method public final float getSpacingMultiplier();
-    method public final CharSequence getText();
+    method @NonNull public final CharSequence getText();
+    method @NonNull public final android.text.TextDirectionHeuristic getTextDirectionHeuristic();
     method public abstract int getTopPadding();
-    method public final int getWidth();
+    method @IntRange(from=0) public final int getWidth();
     method public final void increaseWidthTo(int);
     method public boolean isFallbackLineSpacingEnabled();
+    method public final boolean isIncludeFontPadding();
     method public boolean isRtlCharAt(int);
     method protected final boolean isSpanned();
     field public static final int BREAK_STRATEGY_BALANCED = 2; // 0x2
@@ -47637,6 +47656,26 @@ package android.text {
     enum_constant public static final android.text.Layout.Alignment ALIGN_CENTER;
     enum_constant public static final android.text.Layout.Alignment ALIGN_NORMAL;
     enum_constant public static final android.text.Layout.Alignment ALIGN_OPPOSITE;
+  }
+
+  public static final class Layout.Builder {
+    ctor public Layout.Builder(@NonNull CharSequence, @IntRange(from=0) int, @IntRange(from=0) int, @NonNull android.text.TextPaint, @IntRange(from=0) int);
+    method @NonNull public android.text.Layout build();
+    method @NonNull public android.text.Layout.Builder setAlignment(@NonNull android.text.Layout.Alignment);
+    method @NonNull public android.text.Layout.Builder setBreakStrategy(int);
+    method @NonNull public android.text.Layout.Builder setEllipsize(@Nullable android.text.TextUtils.TruncateAt);
+    method @NonNull public android.text.Layout.Builder setEllipsizedWidth(@IntRange(from=0) int);
+    method @NonNull public android.text.Layout.Builder setFallbackLineSpacingEnabled(boolean);
+    method @NonNull public android.text.Layout.Builder setHyphenationFrequency(int);
+    method @NonNull public android.text.Layout.Builder setIncludeFontPadding(boolean);
+    method @NonNull public android.text.Layout.Builder setJustificationMode(int);
+    method @NonNull public android.text.Layout.Builder setLeftIndents(@Nullable int[]);
+    method @NonNull public android.text.Layout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
+    method @NonNull public android.text.Layout.Builder setLineSpacingAmount(float);
+    method @NonNull public android.text.Layout.Builder setLineSpacingMultiplier(float);
+    method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
+    method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
+    method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);
   }
 
   public static class Layout.Directions {

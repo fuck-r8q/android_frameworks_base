@@ -2612,8 +2612,6 @@
   <java-symbol type="string" name="biometric_or_screen_lock_app_setting_name" />
   <java-symbol type="string" name="biometric_dialog_default_title" />
   <java-symbol type="string" name="biometric_dialog_default_subtitle" />
-  <java-symbol type="string" name="biometric_dialog_face_subtitle" />
-  <java-symbol type="string" name="biometric_dialog_fingerprint_subtitle" />
   <java-symbol type="string" name="biometric_or_screen_lock_dialog_default_subtitle" />
   <java-symbol type="string" name="biometric_error_hw_unavailable" />
   <java-symbol type="string" name="biometric_error_user_canceled" />
@@ -2622,6 +2620,9 @@
   <java-symbol type="string" name="biometric_error_canceled" />
   <java-symbol type="string" name="biometric_error_device_not_secured" />
   <java-symbol type="string" name="biometric_error_generic" />
+
+  <!-- Biometric FRR config -->
+  <java-symbol type="fraction" name="config_biometricNotificationFrrThreshold" />
 
   <!-- Device credential strings for BiometricManager -->
   <java-symbol type="string" name="screen_lock_app_setting_name" />
@@ -2636,6 +2637,7 @@
   <java-symbol type="string" name="fingerprint_error_vendor_unknown" />
   <java-symbol type="string" name="fingerprint_error_not_match" />
   <java-symbol type="string" name="fingerprint_udfps_error_not_match" />
+  <java-symbol type="string" name="fingerprint_dialog_use_fingerprint_instead" />
   <java-symbol type="string" name="fingerprint_acquired_partial" />
   <java-symbol type="string" name="fingerprint_acquired_insufficient" />
   <java-symbol type="string" name="fingerprint_acquired_imager_dirty" />
@@ -3078,6 +3080,7 @@
   <java-symbol type="id" name="addToDictionaryButton" />
   <java-symbol type="id" name="deleteButton" />
   <!-- TextView -->
+  <java-symbol type="bool" name="config_textShareSupported" />
   <java-symbol type="string" name="failed_to_copy_to_clipboard" />
 
   <java-symbol type="id" name="notification_material_reply_container" />
@@ -3410,6 +3413,8 @@
 
   <!-- Colon separated list of package names that should be granted DND access -->
   <java-symbol type="string" name="config_defaultDndAccessPackages" />
+  <!-- Colon separated list of package names that should be removed from DND access packages -->
+  <java-symbol type="string" name="config_defaultDndDeniedPackages" />
 
   <!-- For NetworkPolicyManagerService -->
   <java-symbol type="string" name="config_networkOverLimitComponent" />
@@ -4041,6 +4046,7 @@
 
   <!-- Battery saver config -->
   <java-symbol type="integer" name="config_lowBatteryAutoTriggerDefaultLevel" />
+  <java-symbol type="bool" name="config_batterySaverSupported" />
   <java-symbol type="string" name="config_batterySaverDeviceSpecificConfig" />
   <java-symbol type="bool" name="config_batterySaverStickyBehaviourDisabled" />
   <java-symbol type="integer" name="config_dynamicPowerSavingsDefaultDisableThreshold" />
@@ -4490,6 +4496,7 @@
 
   <java-symbol type="string" name="notification_history_title_placeholder" />
 
+  <java-symbol type="dimen" name="config_wallpaperMinScale"/>
   <!-- The max scale for the wallpaper when it's zoomed in -->
   <java-symbol type="dimen" name="config_wallpaperMaxScale"/>
 
@@ -4557,7 +4564,7 @@
   <java-symbol type="integer" name="device_idle_notification_allowlist_duration_ms" />
   <java-symbol type="bool" name="device_idle_wait_for_unlock" />
   <java-symbol type="bool" name="device_idle_use_window_alarms" />
-  <java-symbol type="bool" name="device_idle_use_body_sensor" />
+  <java-symbol type="bool" name="device_idle_use_mode_manager" />
 
   <!-- Binder heavy hitter watcher configs -->
   <java-symbol type="bool" name="config_defaultBinderHeavyHitterWatcherEnabled" />
@@ -5221,4 +5228,9 @@
   <java-symbol type="bool" name="config_enable_a11y_magnification_single_panning" />
 
   <java-symbol type="string" name="config_hapticFeedbackCustomizationFile" />
+
+  <!-- For ActivityManager PSS profiling configurability -->
+  <java-symbol type="bool" name="config_am_disablePssProfiling" />
+
+  <java-symbol type="raw" name="default_ringtone_vibration_effect" />
 </resources>

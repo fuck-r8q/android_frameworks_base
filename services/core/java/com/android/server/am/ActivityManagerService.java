@@ -58,6 +58,7 @@ import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_INSTRUMENTAT
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_PERSISTENT;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_SYSTEM;
 import static android.content.pm.ApplicationInfo.HIDDEN_API_ENFORCEMENT_DEFAULT;
+import static android.content.pm.PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
 import static android.content.pm.PackageManager.GET_SHARED_LIBRARY_FILES;
 import static android.content.pm.PackageManager.MATCH_ALL;
 import static android.content.pm.PackageManager.MATCH_ANY_USER;
@@ -3115,6 +3116,22 @@ public class ActivityManagerService extends IActivityManager.Stub
                 throw new IllegalStateException("SdkSandboxManagerLocal not found when checking"
                         + " whether SDK sandbox uid may start or bind to a service.");
             }
+        }
+    }
+
+    /**
+     * Enforces that the uid of the caller matches the uid of the package.
+     *
+     * @param packageName the name of the package to match uid against.
+     * @param callingUid the uid of the caller.
+     * @throws SecurityException if the calling uid doesn't match uid of the package.
+     */
+    private void enforceCallingPackage(String packageName, int callingUid) {
+        final int userId = UserHandle.getUserId(callingUid);
+        final int packageUid = getPackageManagerInternal().getPackageUid(packageName,
+                /*flags=*/ 0, userId);
+        if (packageUid != callingUid) {
+            throw new SecurityException(packageName + " does not belong to uid " + callingUid);
         }
     }
 
@@ -7480,6 +7497,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 break;
             case BugreportParams.BUGREPORT_MODE_WIFI:
                 type = "bugreportwifi";
+                break;
+            case BugreportParams.BUGREPORT_MODE_ONBOARDING:
+                type = "bugreportonboarding";
                 break;
             default:
                 throw new IllegalArgumentException(
@@ -13814,13 +13834,16 @@ public class ActivityManagerService extends IActivityManager.Stub
     // A backup agent has just come up
     @Override
     public void backupAgentCreated(String agentPackageName, IBinder agent, int userId) {
+        final int callingUid = Binder.getCallingUid();
+        enforceCallingPackage(agentPackageName, callingUid);
+
         // Resolve the target user id and enforce permissions.
-        userId = mUserController.handleIncomingUser(Binder.getCallingPid(), Binder.getCallingUid(),
+        userId = mUserController.handleIncomingUser(Binder.getCallingPid(), callingUid,
                 userId, /* allowAll */ false, ALLOW_FULL_ONLY, "backupAgentCreated", null);
         if (DEBUG_BACKUP) {
             Slog.v(TAG_BACKUP, "backupAgentCreated: " + agentPackageName + " = " + agent
                     + " callingUserId = " + UserHandle.getCallingUserId() + " userId = " + userId
-                    + " callingUid = " + Binder.getCallingUid() + " uid = " + Process.myUid());
+                    + " callingUid = " + callingUid + " uid = " + Process.myUid());
         }
 
         synchronized(this) {
@@ -14309,7 +14332,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     private List<ResolveInfo> collectReceiverComponents(Intent intent, String resolvedType,
             int callingUid, int[] users, int[] broadcastAllowList) {
         // TODO: come back and remove this assumption to triage all broadcasts
-        int pmFlags = STOCK_PM_FLAGS | MATCH_DEBUG_TRIAGED_MISSING;
+        long pmFlags = STOCK_PM_FLAGS | MATCH_DEBUG_TRIAGED_MISSING
+                | FILTER_OUT_QUARANTINED_COMPONENTS;
 
         List<ResolveInfo> receivers = null;
         HashSet<ComponentName> singleUserReceivers = null;
@@ -14937,6 +14961,16 @@ public class ActivityManagerService extends IActivityManager.Stub
 
                             mAtmInternal.onPackagesSuspendedChanged(packageNames, suspended,
                                     userIdExtra);
+
+                            final boolean quarantined = intent.getBooleanExtra(
+                                    Intent.EXTRA_QUARANTINED, false);
+                            if (suspended && quarantined && packageNames != null) {
+                                for (int i = 0; i < packageNames.length; i++) {
+                                    forceStopPackageLocked(packageNames[i], -1, false, true, true,
+                                            false, false, userId, "suspended");
+                                }
+                            }
+
                             break;
                     }
                     break;

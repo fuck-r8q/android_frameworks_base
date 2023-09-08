@@ -974,17 +974,22 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         // Need to update layers on involved displays since they were all paused while
         // the animation played. This puts the layers back into the correct order.
-        mController.mBuildingFinishLayers = true;
-        try {
-            for (int i = displays.size() - 1; i >= 0; --i) {
-                if (displays.valueAt(i) == null) continue;
-                displays.valueAt(i).assignChildLayers(t);
-            }
-        } finally {
-            mController.mBuildingFinishLayers = false;
+        for (int i = displays.size() - 1; i >= 0; --i) {
+            if (displays.valueAt(i) == null) continue;
+            updateDisplayLayers(displays.valueAt(i), t);
         }
+
         for (int i = 0; i < info.getRootCount(); ++i) {
             t.reparent(info.getRoot(i).getLeash(), null);
+        }
+    }
+
+    private static void updateDisplayLayers(DisplayContent dc, SurfaceControl.Transaction t) {
+        dc.mTransitionController.mBuildingFinishLayers = true;
+        try {
+            dc.assignChildLayers(t);
+        } finally {
+            dc.mTransitionController.mBuildingFinishLayers = false;
         }
     }
 
@@ -1201,8 +1206,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                                         "  Skipping post-transition snapshot for task %d",
                                         task.mTaskId);
                             }
-                            snapController.mActivitySnapshotController
-                                    .notifyAppVisibilityChanged(ar, false /* visible */);
                         }
                         ar.commitVisibility(false /* visible */, false /* performLayout */,
                                 true /* fromTransition */);
@@ -1403,6 +1406,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Handle back animation if it's already started.
         mController.mAtm.mBackNavigationController.onTransitionFinish(mTargets, this);
         mController.mFinishingTransition = null;
+        mController.mSnapshotController.onTransitionFinish(mType, mTargets);
     }
 
     void abort() {
@@ -1607,16 +1611,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // transferred. If transition is transient, IME won't be moved during the transition and
         // the tasks are still live, so we take the snapshot at the end of the transition instead.
         if (mTransientLaunches == null) {
-            for (int i = mParticipants.size() - 1; i >= 0; --i) {
-                final ActivityRecord ar = mParticipants.valueAt(i).asActivityRecord();
-                if (ar == null || ar.getTask() == null
-                        || ar.getTask().isVisibleRequested()) continue;
-                final ChangeInfo change = mChanges.get(ar);
-                // Intentionally skip record snapshot for changes originated from PiP.
-                if (change != null && change.mWindowingMode == WINDOWING_MODE_PINNED) continue;
-                mController.mSnapshotController.mTaskSnapshotController.recordSnapshot(
-                        ar.getTask(), false /* allowSnapshotHome */);
-            }
+            mController.mSnapshotController.onTransactionReady(mType, mTargets);
         }
 
         // This is non-null only if display has changes. It handles the visible windows that don't
@@ -2365,8 +2360,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final WindowContainer<?> wc = sortedTargets.get(i).mContainer;
             // Don't include wallpapers since they are in a different DA.
             if (isWallpaper(wc)) continue;
-            final int endDisplayId = getDisplayId(wc);
-            if (endDisplayId < 0) continue;
+            final DisplayContent dc = wc.getDisplayContent();
+            if (dc == null) continue;
+            final int endDisplayId = dc.getDisplayId();
 
             // Check if Root was already created for this display with a higher-Z window
             if (outInfo.findRootIndex(endDisplayId) >= 0) continue;
@@ -2388,6 +2384,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final SurfaceControl rootLeash = leashReference.makeAnimationLeash().setName(
                     "Transition Root: " + leashReference.getName()).build();
             rootLeash.setUnreleasedWarningCallSite("Transition.calculateTransitionRoots");
+            // Update layers to start transaction because we prevent assignment during collect, so
+            // the layer of transition root can be correct.
+            updateDisplayLayers(dc, startT);
             startT.setLayer(rootLeash, leashReference.getLastLayer());
             outInfo.addRootLeash(endDisplayId, rootLeash,
                     ancestor.getBounds().left, ancestor.getBounds().top);

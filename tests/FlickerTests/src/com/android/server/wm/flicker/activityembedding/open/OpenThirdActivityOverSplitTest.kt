@@ -18,7 +18,6 @@ package com.android.server.wm.flicker.activityembedding.open
 
 import android.platform.test.annotations.Presubmit
 import android.tools.common.datatypes.Rect
-import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
@@ -40,7 +39,7 @@ import org.junit.runners.Parameterized
  *
  * Transitions: Let B start C, expect C to cover B and end up in split A|C.
  *
- * To run this test: `atest FlickerTests:OpenThirdActivityOverSplitTest`
+ * To run this test: `atest FlickerTestsOther:OpenThirdActivityOverSplitTest`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)

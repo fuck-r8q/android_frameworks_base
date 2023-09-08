@@ -121,10 +121,19 @@ constructor(
             } else {
                 combine(
                     airplaneModeInteractor.isAirplaneMode,
+                    iconInteractor.isAllowedDuringAirplaneMode,
                     iconInteractor.isForceHidden,
                     iconInteractor.voWifiAvailable,
-                ) { isAirplaneMode, isForceHidden, voWifiAvailable ->
-                    (!isAirplaneMode && !isForceHidden) || voWifiAvailable
+                ) { isAirplaneMode, isAllowedDuringAirplaneMode, isForceHidden, voWifiAvailable ->
+                    if (isForceHidden) {
+                        false
+                    } else if (isAirplaneMode) {
+                        isAllowedDuringAirplaneMode
+                    } else if (voWifiAvailable) {
+                        voWifiAvailable
+                    } else {
+                        true
+                    }
                 }
             }
             .distinctUntilChanged()

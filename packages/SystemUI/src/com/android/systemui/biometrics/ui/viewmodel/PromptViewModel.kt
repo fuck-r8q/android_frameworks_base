@@ -17,11 +17,15 @@ package com.android.systemui.biometrics.ui.viewmodel
 
 import android.hardware.biometrics.BiometricPrompt
 import android.util.Log
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import com.android.systemui.biometrics.AuthBiometricView
 import com.android.systemui.biometrics.domain.interactor.PromptSelectorInteractor
 import com.android.systemui.biometrics.domain.model.BiometricModalities
 import com.android.systemui.biometrics.shared.model.BiometricModality
 import com.android.systemui.biometrics.shared.model.PromptKind
+import com.android.systemui.flags.FeatureFlags
+import com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION
 import com.android.systemui.statusbar.VibratorHelper
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -43,6 +47,7 @@ class PromptViewModel
 constructor(
     private val interactor: PromptSelectorInteractor,
     private val vibrator: VibratorHelper,
+    private val featureFlags: FeatureFlags,
 ) {
     /** The set of modalities available for this prompt */
     val modalities: Flow<BiometricModalities> =
@@ -63,11 +68,18 @@ constructor(
     /** If the user has successfully authenticated and confirmed (when explicitly required). */
     val isAuthenticated: Flow<PromptAuthState> = _isAuthenticated.asStateFlow()
 
+    private val _isOverlayTouched: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
     /**
      * If the API caller or the user's personal preferences require explicit confirmation after
      * successful authentication.
      */
-    val isConfirmationRequired: Flow<Boolean> = interactor.isConfirmationRequired
+    val isConfirmationRequired: Flow<Boolean> =
+        combine(_isOverlayTouched, interactor.isConfirmationRequired) {
+            isOverlayTouched,
+            isConfirmationRequired ->
+            !isOverlayTouched && isConfirmationRequired
+        }
 
     /** The kind of credential the user has. */
     val credentialKind: Flow<PromptKind> = interactor.credentialKind
@@ -89,6 +101,11 @@ constructor(
 
     private val _forceLargeSize = MutableStateFlow(false)
     private val _forceMediumSize = MutableStateFlow(false)
+
+    private val _hapticsToPlay = MutableStateFlow(HapticFeedbackConstants.NO_HAPTICS)
+
+    /** Event fired to the view indicating a [HapticFeedbackConstants] to be played */
+    val hapticsToPlay = _hapticsToPlay.asStateFlow()
 
     /** The size of the prompt. */
     val size: Flow<PromptSize> =
@@ -140,6 +157,12 @@ constructor(
                 size.isNotSmall && authState.isAuthenticated && authState.needsUserConfirmation
             }
             .distinctUntilChanged()
+
+    /** If the icon can be used as a confirmation button. */
+    val isIconConfirmButton: Flow<Boolean> =
+        combine(size, interactor.isConfirmationRequired) { size, isConfirmationRequired ->
+            size.isNotSmall && isConfirmationRequired
+        }
 
     /** If the negative button should be shown. */
     val isNegativeButtonVisible: Flow<Boolean> =
@@ -289,8 +312,10 @@ constructor(
             if (message.isNotBlank()) PromptMessage.Help(message) else PromptMessage.Empty
         _forceMediumSize.value = true
         _legacyState.value =
-            if (alreadyAuthenticated) {
+            if (alreadyAuthenticated && isConfirmationRequired.first()) {
                 AuthBiometricView.STATE_PENDING_CONFIRMATION
+            } else if (alreadyAuthenticated && !isConfirmationRequired.first()) {
+                AuthBiometricView.STATE_AUTHENTICATED
             } else {
                 AuthBiometricView.STATE_HELP
             }
@@ -388,18 +413,10 @@ constructor(
     }
 
     private suspend fun needsExplicitConfirmation(modality: BiometricModality): Boolean {
-        val availableModalities = modalities.first()
         val confirmationRequired = isConfirmationRequired.first()
 
-        if (availableModalities.hasFaceAndFingerprint) {
-            // coex only needs confirmation when face is successful, unless it happens on the
-            // first attempt (i.e. without failure) before fingerprint scanning starts
-            val fingerprintStarted = fingerprintStartMode.first() != FingerprintStartMode.Pending
-            if (modality == BiometricModality.Face) {
-                return fingerprintStarted || confirmationRequired
-            }
-        }
-        if (availableModalities.hasFaceOnly) {
+        // Only worry about confirmationRequired if face was used to unlock
+        if (modality == BiometricModality.Face) {
             return confirmationRequired
         }
         // fingerprint only never requires confirmation
@@ -430,6 +447,26 @@ constructor(
     }
 
     /**
+     * Touch event occurred on the overlay
+     *
+     * Tracks whether a finger is currently down to set [_isOverlayTouched] to be used as user
+     * confirmation
+     */
+    fun onOverlayTouch(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            _isOverlayTouched.value = true
+
+            if (_isAuthenticated.value.needsUserConfirmation) {
+                confirmAuthenticated()
+            }
+            return true
+        } else if (event.actionMasked == MotionEvent.ACTION_UP) {
+            _isOverlayTouched.value = false
+        }
+        return false
+    }
+
+    /**
      * Switch to the credential view.
      *
      * TODO(b/251476085): this should be decoupled from the shared panel controller
@@ -438,11 +475,26 @@ constructor(
         _forceLargeSize.value = true
     }
 
-    private fun VibratorHelper.success(modality: BiometricModality) =
-        vibrateAuthSuccess("$TAG, modality = $modality BP::success")
+    private fun VibratorHelper.success(modality: BiometricModality) {
+        if (featureFlags.isEnabled(ONE_WAY_HAPTICS_API_MIGRATION)) {
+            _hapticsToPlay.value = HapticFeedbackConstants.CONFIRM
+        } else {
+            vibrateAuthSuccess("$TAG, modality = $modality BP::success")
+        }
+    }
 
-    private fun VibratorHelper.error(modality: BiometricModality = BiometricModality.None) =
-        vibrateAuthError("$TAG, modality = $modality BP::error")
+    private fun VibratorHelper.error(modality: BiometricModality = BiometricModality.None) {
+        if (featureFlags.isEnabled(ONE_WAY_HAPTICS_API_MIGRATION)) {
+            _hapticsToPlay.value = HapticFeedbackConstants.REJECT
+        } else {
+            vibrateAuthError("$TAG, modality = $modality BP::error")
+        }
+    }
+
+    /** Clears the [hapticsToPlay] variable by setting it to the NO_HAPTICS default. */
+    fun clearHaptics() {
+        _hapticsToPlay.value = HapticFeedbackConstants.NO_HAPTICS
+    }
 
     companion object {
         private const val TAG = "PromptViewModel"

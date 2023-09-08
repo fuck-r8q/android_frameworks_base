@@ -801,31 +801,31 @@ public class ScreenshotView extends FrameLayout implements
             Intent shareIntent;
             if (mFlags.isEnabled(Flags.SCREENSHOT_METADATA) && mScreenshotData != null
                     && mScreenshotData.getContextUrl() != null) {
-                shareIntent = ActionIntentCreator.INSTANCE.createShareIntentWithExtraText(
+                shareIntent = ActionIntentCreator.INSTANCE.createShareWithText(
                         imageData.uri, mScreenshotData.getContextUrl().toString());
             } else {
-                shareIntent = ActionIntentCreator.INSTANCE.createShareIntentWithSubject(
+                shareIntent = ActionIntentCreator.INSTANCE.createShareWithSubject(
                         imageData.uri, imageData.subject);
             }
             mActionExecutor.launchIntentAsync(shareIntent,
                     imageData.shareTransition.get().bundle,
-                    imageData.owner.getIdentifier(), false);
+                    imageData.owner, false);
         });
         mEditChip.setOnClickListener(v -> {
             mUiEventLogger.log(ScreenshotEvent.SCREENSHOT_EDIT_TAPPED, 0, mPackageName);
             prepareSharedTransition();
             mActionExecutor.launchIntentAsync(
-                    ActionIntentCreator.INSTANCE.createEditIntent(imageData.uri, mContext),
+                    ActionIntentCreator.INSTANCE.createEdit(imageData.uri, mContext),
                     imageData.editTransition.get().bundle,
-                    imageData.owner.getIdentifier(), true);
+                    imageData.owner, true);
         });
         mScreenshotPreview.setOnClickListener(v -> {
             mUiEventLogger.log(ScreenshotEvent.SCREENSHOT_PREVIEW_TAPPED, 0, mPackageName);
             prepareSharedTransition();
             mActionExecutor.launchIntentAsync(
-                    ActionIntentCreator.INSTANCE.createEditIntent(imageData.uri, mContext),
+                    ActionIntentCreator.INSTANCE.createEdit(imageData.uri, mContext),
                     imageData.editTransition.get().bundle,
-                    imageData.owner.getIdentifier(), true);
+                    imageData.owner, true);
         });
         if (mQuickShareChip != null) {
             if (imageData.quickShareAction != null) {

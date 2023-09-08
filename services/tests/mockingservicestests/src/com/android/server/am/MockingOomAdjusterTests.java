@@ -253,6 +253,7 @@ public class MockingOomAdjusterTests {
      * Replace the process LRU with the given processes.
      * @param apps
      */
+    @SuppressWarnings("GuardedBy")
     private void setProcessesToLru(ProcessRecord... apps) {
         ArrayList<ProcessRecord> lru = sService.mProcessList.getLruProcessesLOSP();
         lru.clear();

@@ -114,7 +114,9 @@
                     "exclude-annotation":"org.junit.Ignore"
                 }
             ]
-        },
+        }
+    ],
+    "presubmit-large":[
         {
             "name":"CtsPackageManagerTestCases",
             "options":[
@@ -123,11 +125,12 @@
                 },
                 {
                     "exclude-annotation":"org.junit.Ignore"
+                },
+                {
+                    "exclude-filter": "android.content.pm.cts.PackageManagerShellCommandMultiUserTest"
                 }
             ]
-        }
-    ],
-    "presubmit-large":[
+        },
         {
             "name":"CtsUsesNativeLibraryTest",
             "options":[
@@ -162,6 +165,14 @@
         },
         {
             "name":"CtsInstallHostTestCases"
+        },
+        {
+            "name": "CtsPackageManagerTestCases",
+            "options": [
+                {
+                    "include-filter": "android.content.pm.cts.PackageManagerShellCommandMultiUserTest"
+                }
+            ]
         }
     ]
 }

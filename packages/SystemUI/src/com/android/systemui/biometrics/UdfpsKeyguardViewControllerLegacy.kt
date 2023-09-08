@@ -83,6 +83,7 @@ constructor(
         dumpManager,
     ),
     UdfpsKeyguardViewControllerAdapter {
+    private val uniqueIdentifier = this.toString()
     private val useExpandedOverlay: Boolean =
         featureFlags.isEnabled(Flags.UDFPS_NEW_TOUCH_DETECTION)
     private var showingUdfpsBouncer = false
@@ -282,7 +283,7 @@ constructor(
 
     public override fun onViewAttached() {
         super.onViewAttached()
-        alternateBouncerInteractor.setAlternateBouncerUIAvailable(true)
+        alternateBouncerInteractor.setAlternateBouncerUIAvailable(true, uniqueIdentifier)
         val dozeAmount = statusBarStateController.dozeAmount
         lastDozeAmount = dozeAmount
         stateListener.onDozeAmountChanged(dozeAmount, dozeAmount)
@@ -305,14 +306,15 @@ constructor(
         activityLaunchAnimator.addListener(activityLaunchAnimatorListener)
         view.mUseExpandedOverlay = useExpandedOverlay
         view.startIconAsyncInflate {
-            (view.findViewById(R.id.udfps_animation_view_internal) as View).accessibilityDelegate =
-                udfpsKeyguardAccessibilityDelegate
+            val animationViewInternal: View =
+                view.requireViewById(R.id.udfps_animation_view_internal)
+            animationViewInternal.accessibilityDelegate = udfpsKeyguardAccessibilityDelegate
         }
     }
 
     override fun onViewDetached() {
         super.onViewDetached()
-        alternateBouncerInteractor.setAlternateBouncerUIAvailable(false)
+        alternateBouncerInteractor.setAlternateBouncerUIAvailable(false, uniqueIdentifier)
         faceDetectRunning = false
         keyguardStateController.removeCallback(keyguardStateControllerCallback)
         statusBarStateController.removeCallback(stateListener)

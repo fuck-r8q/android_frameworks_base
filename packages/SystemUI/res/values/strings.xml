@@ -752,6 +752,9 @@
     off. This means a separate profile on a user's phone that's specifically for their
     work apps and managed by their company. "Work" is used as an adjective. [CHAR LIMIT=NONE] -->
     <string name="quick_settings_work_mode_label">Work apps</string>
+    <!-- QuickSettings: Subtitle for the Work profile Quick Settings tile when it's in the off
+    state. This corresponds to the work profile not being currently accessible. [CHAR LIMIT=20] -->
+    <string name="quick_settings_work_mode_paused_state">Paused</string>
     <!-- QuickSettings: Label for the toggle to activate Night display (renamed "Night Light" with title caps). [CHAR LIMIT=20] -->
     <string name="quick_settings_night_display_label">Night Light</string>
     <!-- QuickSettings: Secondary text for when the Night Light will be enabled at sunset. [CHAR LIMIT=20] -->
@@ -2419,6 +2422,8 @@
     <string name="magnification_open_settings_click_label">Open magnification settings</string>
     <!-- Click action label for magnification settings panel. [CHAR LIMIT=NONE] -->
     <string name="magnification_close_settings_click_label">Close magnification settings</string>
+    <!-- Click action label for exiting magnifier edit mode. [CHAR LIMIT=NONE] -->
+    <string name="magnification_exit_edit_mode_click_label">Exit edit mode</string>
     <!-- Label of the corner of a rectangle that you can tap and drag to resize the magnification area. [CHAR LIMIT=NONE] -->
     <string name="magnification_drag_corner_to_resize">Drag corner to resize</string>
 
@@ -3067,13 +3072,6 @@
     [CHAR LIMIT=NONE].
     -->
     <string name="wallet_quick_affordance_unavailable_configure_the_app">To add the Wallet app as a shortcut, make sure at least one card has been added</string>
-
-    <!--
-    Requirement for the QR code scanner functionality to be available for the user to use. This is
-    shown as part of a bulleted list of requirements. When all requirements are met, the piece of
-    functionality can be accessed through a shortcut button on the lock screen. [CHAR LIMIT=NONE].
-    -->
-    <string name="qr_scanner_quick_affordance_unavailable_explanation">To add the QR code scanner as a shortcut, make sure a camera app is installed</string>
 
     <!--
     Explains that the lock screen shortcut for the "home" app is not available because the app isn't

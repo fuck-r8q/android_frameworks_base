@@ -42,6 +42,8 @@ public class Element {
     public static final int MAX_ATTR_LEN_PATH = 4000;
     public static final int MAX_ATTR_LEN_DATA_VALUE = 4000;
 
+    private static final String BAD_COMPONENT_NAME_CHARS = ";,[](){}:?-%^*|/\\";
+
     private static final String TAG = "PackageParsing";
     protected static final String TAG_ACTION = "action";
     protected static final String TAG_ACTIVITY = "activity";
@@ -128,6 +130,7 @@ public class Element {
     protected static final String TAG_ATTR_VALUE = "value";
     protected static final String TAG_ATTR_VERSION_NAME = "versionName";
     protected static final String TAG_ATTR_WRITE_PERMISSION = "writePermission";
+    protected static final String TAG_ATTR_ZYGOTE_PRELOAD_NAME = "zygotePreloadName";
 
     // The length of mTagCounters corresponds to the number of tags defined in getCounterIdx. If new
     // tags are added then the size here should be increased to match.
@@ -374,6 +377,7 @@ public class Element {
             case TAG_ATTR_TASK_AFFINITY:
             case TAG_ATTR_WRITE_PERMISSION:
             case TAG_ATTR_VERSION_NAME:
+            case TAG_ATTR_ZYGOTE_PRELOAD_NAME:
                 return MAX_ATTR_LEN_NAME;
             case TAG_ATTR_PATH:
             case TAG_ATTR_PATH_ADVANCED_PATTERN:
@@ -488,6 +492,7 @@ public class Element {
             case R.styleable.AndroidManifestApplication_requiredAccountType:
             case R.styleable.AndroidManifestApplication_restrictedAccountType:
             case R.styleable.AndroidManifestApplication_taskAffinity:
+            case R.styleable.AndroidManifestApplication_zygotePreloadName:
                 return MAX_ATTR_LEN_NAME;
             default:
                 return DEFAULT_MAX_STRING_ATTR_LENGTH;
@@ -738,6 +743,7 @@ public class Element {
                 switch (name) {
                     case TAG_ATTR_BACKUP_AGENT:
                     case TAG_ATTR_NAME:
+                    case TAG_ATTR_ZYGOTE_PRELOAD_NAME:
                         return true;
                     default:
                         return false;
@@ -766,7 +772,8 @@ public class Element {
                 return index == R.styleable.AndroidManifestActivityAlias_targetActivity;
             case TAG_APPLICATION:
                 return index == R.styleable.AndroidManifestApplication_backupAgent
-                        || index == R.styleable.AndroidManifestApplication_name;
+                        || index == R.styleable.AndroidManifestApplication_name
+                        || index == R.styleable.AndroidManifestApplication_zygotePreloadName;
             case TAG_INSTRUMENTATION:
                 return index ==  R.styleable.AndroidManifestInstrumentation_name;
             case TAG_PROVIDER:
@@ -785,32 +792,12 @@ public class Element {
     }
 
     void validateComponentName(CharSequence name) {
-        int i = 0;
-        if (name.charAt(0) == '.') {
-            i = 1;
-        }
         boolean isStart = true;
-        for (; i < name.length(); i++) {
-            if (name.charAt(i) == '.') {
-                if (isStart) {
-                    break;
-                }
-                isStart = true;
-            } else {
-                if (isStart) {
-                    if (Character.isJavaIdentifierStart(name.charAt(i))) {
-                        isStart = false;
-                    } else {
-                        break;
-                    }
-                } else if (!Character.isJavaIdentifierPart(name.charAt(i))) {
-                    break;
-                }
+        for (int i = 0; i < name.length(); i++) {
+            if (BAD_COMPONENT_NAME_CHARS.indexOf(name.charAt(i)) >= 0) {
+                Slog.e(TAG, name + " is not a valid Java class name");
+                throw new SecurityException(name + " is not a valid Java class name");
             }
-        }
-        if ((i < name.length()) || (name.charAt(name.length() - 1) == '.')) {
-            Slog.e(TAG, name + " is not a valid Java class name");
-            throw new SecurityException(name + " is not a valid Java class name");
         }
     }
 

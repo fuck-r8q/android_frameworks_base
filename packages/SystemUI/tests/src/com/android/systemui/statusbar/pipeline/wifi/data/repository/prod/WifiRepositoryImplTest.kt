@@ -489,6 +489,26 @@ class WifiRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
+    fun wifiNetwork_neverHasHotspot() =
+        testScope.runTest {
+            val latest by collectLastValue(underTest.wifiNetwork)
+
+            val wifiInfo =
+                mock<WifiInfo>().apply {
+                    whenever(this.ssid).thenReturn(SSID)
+                    whenever(this.isPrimary).thenReturn(true)
+                }
+            val network = mock<Network>().apply { whenever(this.getNetId()).thenReturn(NETWORK_ID) }
+
+            getNetworkCallback()
+                .onCapabilitiesChanged(network, createWifiNetworkCapabilities(wifiInfo))
+
+            assertThat(latest is WifiNetworkModel.Active).isTrue()
+            assertThat((latest as WifiNetworkModel.Active).hotspotDeviceType)
+                .isEqualTo(WifiNetworkModel.HotspotDeviceType.NONE)
+        }
+
+    @Test
     fun wifiNetwork_isCarrierMerged_flowHasCarrierMerged() =
         testScope.runTest {
             val latest by collectLastValue(underTest.wifiNetwork)
@@ -981,6 +1001,27 @@ class WifiRepositoryImplTest : SysuiTestCase() {
             val latest2Active = latest2 as WifiNetworkModel.Active
             assertThat(latest2Active.networkId).isEqualTo(NETWORK_ID)
             assertThat(latest2Active.ssid).isEqualTo(SSID)
+        }
+
+    @Test
+    fun secondaryNetworks_alwaysEmpty() =
+        testScope.runTest {
+            val latest by collectLastValue(underTest.secondaryNetworks)
+            collectLastValue(underTest.wifiNetwork)
+
+            // Even WHEN we do have non-primary wifi info
+            val wifiInfo =
+                mock<WifiInfo>().apply {
+                    whenever(this.ssid).thenReturn(SSID)
+                    whenever(this.isPrimary).thenReturn(false)
+                }
+            val network = mock<Network>().apply { whenever(this.getNetId()).thenReturn(NETWORK_ID) }
+
+            getNetworkCallback()
+                .onCapabilitiesChanged(network, createWifiNetworkCapabilities(wifiInfo))
+
+            // THEN the secondary networks list is empty because this repo doesn't support it
+            assertThat(latest).isEmpty()
         }
 
     @Test

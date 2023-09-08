@@ -65,6 +65,7 @@ class SystemEventCoordinatorTest : SysuiTestCase() {
                     fakeSystemClock,
                     batteryController,
                     privacyController,
+                    context,
                     featureFlags,
                     TestScope(UnconfinedTestDispatcher()),
                     connectedDisplayInteractor

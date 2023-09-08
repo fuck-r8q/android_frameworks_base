@@ -2719,6 +2719,9 @@ public class ActivityRecordTests extends WindowTestsBase {
         assertEquals(Configuration.ORIENTATION_PORTRAIT, displayConfig.orientation);
         assertEquals(Configuration.ORIENTATION_PORTRAIT, activityConfig.orientation);
 
+        // Unblock the rotation animation, so the further orientation updates won't be ignored.
+        unblockDisplayRotation(activity.mDisplayContent);
+
         final ActivityRecord topActivity = createActivityRecord(activity.getTask());
         topActivity.setOrientation(SCREEN_ORIENTATION_LANDSCAPE);
 
@@ -2939,6 +2942,9 @@ public class ActivityRecordTests extends WindowTestsBase {
         // transform to activity1.
         int rotation = (mDisplayContent.getRotation() + 1) % 4;
         mDisplayContent.setFixedRotationLaunchingApp(activity, rotation);
+        // The configuration with rotation change should not trigger task-association.
+        assertNotNull(activity.mStartingData);
+        assertNull(activity.mStartingData.mAssociatedTask);
         doReturn(rotation).when(mDisplayContent)
                 .rotationForActivityInDifferentOrientation(topActivity);
 

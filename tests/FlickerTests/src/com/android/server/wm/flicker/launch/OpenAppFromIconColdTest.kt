@@ -16,13 +16,13 @@
 
 package com.android.server.wm.flicker.launch
 
-import android.platform.test.annotations.FlakyTest
 import android.tools.common.Rotation
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
 import android.tools.device.flicker.rules.RemoveAllTasksButHomeRule
+import androidx.test.filters.FlakyTest
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,7 +53,8 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class OpenAppFromIconColdTest(flicker: LegacyFlickerTest) : OpenAppFromLauncherTransition(flicker) {
+open class OpenAppFromIconColdTest(flicker: LegacyFlickerTest) :
+    OpenAppFromLauncherTransition(flicker) {
     /** {@inheritDoc} */
     override val transition: FlickerBuilder.() -> Unit
         get() = {
@@ -70,8 +71,8 @@ class OpenAppFromIconColdTest(flicker: LegacyFlickerTest) : OpenAppFromLauncherT
                 tapl
                     .goHome()
                     .switchToAllApps()
-                    .getAppIcon(testApp.launcherName)
-                    .launch(testApp.`package`)
+                    .getAppIcon(testApp.appName)
+                    .launch(testApp.packageName)
             }
             teardown { testApp.exit(wmHelper) }
         }
@@ -87,6 +88,7 @@ class OpenAppFromIconColdTest(flicker: LegacyFlickerTest) : OpenAppFromLauncherT
     override fun appWindowReplacesLauncherAsTopWindow() {
         super.appWindowReplacesLauncherAsTopWindow()
     }
+
     @FlakyTest(bugId = 240916028)
     @Test
     override fun appWindowAsTopWindowAtEnd() {

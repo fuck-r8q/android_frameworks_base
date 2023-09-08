@@ -179,8 +179,16 @@ class TaskContainer {
 
     @Nullable
     TaskFragmentContainer getTopNonFinishingTaskFragmentContainer() {
+        return getTopNonFinishingTaskFragmentContainer(true /* includePin */);
+    }
+
+    @Nullable
+    TaskFragmentContainer getTopNonFinishingTaskFragmentContainer(boolean includePin) {
         for (int i = mContainers.size() - 1; i >= 0; i--) {
             final TaskFragmentContainer container = mContainers.get(i);
+            if (!includePin && isTaskFragmentContainerPinned(container)) {
+                continue;
+            }
             if (!container.isFinished()) {
                 return container;
             }
@@ -257,13 +265,35 @@ class TaskContainer {
     }
 
     void removeSplitPinContainer() {
+        if (mSplitPinContainer == null) {
+            return;
+        }
+
+        final TaskFragmentContainer primaryContainer = mSplitPinContainer.getPrimaryContainer();
+        final TaskFragmentContainer secondaryContainer = mSplitPinContainer.getSecondaryContainer();
         mSplitContainers.remove(mSplitPinContainer);
         mSplitPinContainer = null;
+
+        // Remove the other SplitContainers that contains the unpinned container (unless it
+        // is the current top-most split-pair), since the state are no longer valid.
+        final List<SplitContainer> splitsToRemove = new ArrayList<>();
+        for (SplitContainer splitContainer : mSplitContainers) {
+            if (splitContainer.getSecondaryContainer().equals(secondaryContainer)
+                    && !splitContainer.getPrimaryContainer().equals(primaryContainer)) {
+                splitsToRemove.add(splitContainer);
+            }
+        }
+        removeSplitContainers(splitsToRemove);
     }
 
     @Nullable
     SplitPinContainer getSplitPinContainer() {
         return mSplitPinContainer;
+    }
+
+    boolean isTaskFragmentContainerPinned(@NonNull TaskFragmentContainer taskFragmentContainer) {
+        return mSplitPinContainer != null
+                && mSplitPinContainer.getSecondaryContainer() == taskFragmentContainer;
     }
 
     void addTaskFragmentContainer(@NonNull TaskFragmentContainer taskFragmentContainer) {
@@ -329,11 +359,23 @@ class TaskContainer {
         }
     }
 
-    /** Adds the descriptors of split states in this Task to {@code outSplitStates}. */
-    void getSplitStates(@NonNull List<SplitInfo> outSplitStates) {
+    /**
+     * Gets the descriptors of split states in this Task.
+     *
+     * @return a list of {@code SplitInfo} if all the SplitContainers are stable, or {@code null} if
+     * any SplitContainer is in an intermediate state.
+     */
+    @Nullable
+    List<SplitInfo> getSplitStatesIfStable() {
+        final List<SplitInfo> splitStates = new ArrayList<>();
         for (SplitContainer container : mSplitContainers) {
-            outSplitStates.add(container.toSplitInfo());
+            final SplitInfo splitInfo = container.toSplitInfoIfStable();
+            if (splitInfo == null) {
+                return null;
+            }
+            splitStates.add(splitInfo);
         }
+        return splitStates;
     }
 
     /** A wrapper class which contains the information of {@link TaskContainer} */

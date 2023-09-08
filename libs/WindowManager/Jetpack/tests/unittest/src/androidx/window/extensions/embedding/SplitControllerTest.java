@@ -595,6 +595,18 @@ public class SplitControllerTest {
     }
 
     @Test
+    public void testResolveStartActivityIntent_skipIfPinned() {
+        final TaskFragmentContainer container = createMockTaskFragmentContainer(mActivity);
+        final TaskContainer taskContainer = container.getTaskContainer();
+        spyOn(taskContainer);
+        final Intent intent = new Intent();
+        setupSplitRule(mActivity, intent);
+        doReturn(true).when(taskContainer).isTaskFragmentContainerPinned(container);
+        assertNull(mSplitController.resolveStartActivityIntent(mTransaction, TASK_ID, intent,
+                mActivity));
+    }
+
+    @Test
     public void testPlaceActivityInTopContainer() {
         mSplitController.placeActivityInTopContainer(mTransaction, mActivity);
 
@@ -1044,6 +1056,29 @@ public class SplitControllerTest {
     }
 
     @Test
+    public void testResolveActivityToContainer_skipIfNonTopOrPinned() {
+        final TaskFragmentContainer container = createMockTaskFragmentContainer(mActivity);
+        final Activity pinnedActivity = createMockActivity();
+        final TaskFragmentContainer topContainer = mSplitController.newContainer(pinnedActivity,
+                TASK_ID);
+        final TaskContainer taskContainer = container.getTaskContainer();
+        spyOn(taskContainer);
+        doReturn(container).when(taskContainer).getTopNonFinishingTaskFragmentContainer(false);
+        doReturn(true).when(taskContainer).isTaskFragmentContainerPinned(topContainer);
+
+        // No need to handle when the new launched activity is in a pinned TaskFragment.
+        assertTrue(mSplitController.resolveActivityToContainer(mTransaction, pinnedActivity,
+                false /* isOnReparent */));
+        verify(mSplitController, never()).shouldExpand(any(), any());
+
+        // Should proceed to resolve if the new launched activity is in the next top TaskFragment
+        // (e.g. the top-most TaskFragment is pinned)
+        mSplitController.resolveActivityToContainer(mTransaction, mActivity,
+                false /* isOnReparent */);
+        verify(mSplitController).shouldExpand(any(), any());
+    }
+
+    @Test
     public void testGetPlaceholderOptions() {
         // Setup to make sure a transaction record is started.
         mTransactionManager.startNewTransaction();
@@ -1248,6 +1283,34 @@ public class SplitControllerTest {
         assertEquals(1, splitInfo.getSecondaryActivityStack().getActivities().size());
         assertEquals(r0, splitInfo.getPrimaryActivityStack().getActivities().get(0));
         assertEquals(r1, splitInfo.getSecondaryActivityStack().getActivities().get(0));
+    }
+
+    @Test
+    public void testSplitInfoCallback_NotReportSplitIfUnstable() {
+        final Activity r0 = createMockActivity();
+        final Activity r1 = createMockActivity();
+        addSplitTaskFragments(r0, r1);
+
+        // Should report new SplitInfo list if stable.
+        mSplitController.updateCallbackIfNecessary();
+        assertEquals(1, mSplitInfos.size());
+
+        // Should not report new SplitInfo list if unstable, e.g. any Activity is finishing.
+        mSplitInfos.clear();
+        final Activity r2 = createMockActivity();
+        final Activity r3 = createMockActivity();
+        doReturn(true).when(r2).isFinishing();
+        addSplitTaskFragments(r2, r3);
+
+        mSplitController.updateCallbackIfNecessary();
+        assertTrue(mSplitInfos.isEmpty());
+
+        // Should report SplitInfo list if it becomes stable again.
+        mSplitInfos.clear();
+        doReturn(false).when(r2).isFinishing();
+
+        mSplitController.updateCallbackIfNecessary();
+        assertEquals(2, mSplitInfos.size());
     }
 
     @Test

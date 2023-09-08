@@ -1375,8 +1375,6 @@ struct ResTable_config
     // match the requested configuration at all.
     bool isLocaleBetterThan(const ResTable_config& o, const ResTable_config* requested) const;
 
-    bool isBetterThanBeforeLocale(const ResTable_config& o, const ResTable_config* requested) const;
-
     String8 toString() const;
 };
 
@@ -1872,6 +1870,8 @@ struct FabricatedOverlayEntryParameters {
   DataValue data_value;
   std::string data_string_value;
   std::optional<android::base::borrowed_fd> data_binary_value;
+  off64_t binary_data_offset;
+  size_t binary_data_size;
   std::string configuration;
 };
 

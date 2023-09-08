@@ -2341,6 +2341,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mDisplayContent.updateImeControlTarget(isImeLayeringTarget() /* updateImeParent */);
             // Fix the starting window to task when Activity has changed.
             if (mStartingData != null && mStartingData.mAssociatedTask == null
+                    && mTempConfiguration.windowConfiguration.getRotation()
+                            == selfConfiguration.windowConfiguration.getRotation()
                     && !mTempConfiguration.windowConfiguration.getBounds().equals(getBounds())) {
                 mStartingData.mResizedFromTransfer = true;
                 // Lock the starting window to task, so it won't resize from transfer anymore.
@@ -2417,7 +2419,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         ProtoLog.v(WM_DEBUG_ADD_REMOVE,
                 "removeIfPossible: %s callers=%s", this, Debug.getCallers(5));
 
-        final boolean startingWindow = mAttrs.type == TYPE_APPLICATION_STARTING;
+        final boolean startingWindow = mStartingData != null;
         if (startingWindow) {
             ProtoLog.d(WM_DEBUG_STARTING_WINDOW, "Starting window removed %s", this);
             // Cancel the remove starting window animation on shell. The main window might changed
@@ -2431,6 +2433,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     return false;
                 }, true);
             }
+            mTransitionController.mTransitionTracer.logRemovingStartingWindow(mStartingData);
         } else if (mAttrs.type == TYPE_BASE_APPLICATION
                 && isSelfAnimating(0, ANIMATION_TYPE_STARTING_REVEAL)) {
             // Cancel the remove starting window animation in case the binder dead before remove

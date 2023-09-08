@@ -85,11 +85,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -1170,6 +1170,16 @@ public class SubscriptionManager {
      */
     public static final String SATELLITE_ENABLED = SimInfo.COLUMN_SATELLITE_ENABLED;
 
+    /**
+     * TelephonyProvider column name for satellite attach enabled for carrier. The value of this
+     * column is set based on user settings.
+     * By default, it's disabled.
+     * <P>Type: INTEGER (int)</P>
+     * @hide
+     */
+    public static final String SATELLITE_ATTACH_ENABLED_FOR_CARRIER =
+            SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"USAGE_SETTING_"},
@@ -1381,13 +1391,24 @@ public class SubscriptionManager {
 
     private final Context mContext;
 
-    // Cache of Resource that has been created in getResourcesForSubId. Key is a Pair containing
-    // the Package Name and subId. Applications can create new contexts from
-    // {@link android.content.Context#createPackageContext} with the same resources for different
-    // purposes. Therefore, Cache can be wasted for resources from different contexts in the same
-    // package. Use the package name rather than the context itself as a key value of cache.
-    private static final Map<Pair<String, Integer>, Resources> sResourcesCache =
-            new ConcurrentHashMap<>();
+    /**
+     * In order to prevent the overflow of the heap size due to an indiscriminate increase in the
+     * cache, the heap size of the resource cache is set sufficiently large.
+     */
+    private static final int MAX_RESOURCE_CACHE_ENTRY_COUNT = 10_000;
+
+    /**
+     * Cache of Resources that has been created in getResourcesForSubId. Key contains package name,
+     * and Configuration of Resources. If more than the maximum number of resources are stored in
+     * this cache, the least recently used Resources will be removed to maintain the maximum size.
+     */
+    private static final Map<Pair<String, Configuration>, Resources> sResourcesCache =
+            Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Entry eldest) {
+                    return size() > MAX_RESOURCE_CACHE_ENTRY_COUNT;
+                }
+            });
 
     /**
      * A listener class for monitoring changes to {@link SubscriptionInfo} records.
@@ -2890,11 +2911,16 @@ public class SubscriptionManager {
     @NonNull
     public static Resources getResourcesForSubId(Context context, int subId,
             boolean useRootLocale) {
-        // Check if resources for this context and subId already exist in the resource cache.
-        // Resources that use the root locale are not cached.
-        Pair<String, Integer> cacheKey = null;
-        if (isValidSubscriptionId(subId) && !useRootLocale) {
-            cacheKey = Pair.create(context.getPackageName(), subId);
+        // Check if the Resources already exists in the cache based on the given context. Find a
+        // Resource that match Configuration.
+        Pair<String, Configuration> cacheKey = null;
+        if (isValidSubscriptionId(subId)) {
+            Configuration configurationKey =
+                    new Configuration(context.getResources().getConfiguration());
+            if (useRootLocale) {
+                configurationKey.setLocale(Locale.ROOT);
+            }
+            cacheKey = Pair.create(context.getPackageName(), configurationKey);
             Resources cached = sResourcesCache.get(cacheKey);
             if (cached != null) {
                 // Cache hit. Use cached Resources.

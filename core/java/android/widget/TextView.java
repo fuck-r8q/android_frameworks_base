@@ -13202,9 +13202,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (mTextOperationUser == null) {
             return super.isStylusHandwritingAvailable();
         }
-        final int userId = mTextOperationUser.getIdentifier();
         final InputMethodManager imm = getInputMethodManager();
-        return imm.isStylusHandwritingAvailableAsUser(userId);
+        return imm.isStylusHandwritingAvailableAsUser(mTextOperationUser);
     }
 
     @Nullable
@@ -14987,7 +14986,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     boolean canShare() {
-        if (!getContext().canStartActivityForResult() || !isDeviceProvisioned()) {
+        if (!getContext().canStartActivityForResult() || !isDeviceProvisioned()
+                || !getContext().getResources().getBoolean(
+                com.android.internal.R.bool.config_textShareSupported)) {
             return false;
         }
         return canCopy();

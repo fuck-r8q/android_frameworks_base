@@ -51,9 +51,11 @@ import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.wm.shell.common.annotations.ShellMainThread;
 
+import javax.inject.Inject;
+
 /** Class that defines cross-activity animation. */
 @ShellMainThread
-class CrossActivityAnimation {
+public class CrossActivityAnimation extends ShellBackAnimation {
     /**
      * Minimum scale of the entering/closing window.
      */
@@ -106,6 +108,7 @@ class CrossActivityAnimation {
     private final SpringAnimation mLeavingProgressSpring;
     // Max window x-shift in pixels.
     private final float mWindowXShift;
+    private final BackAnimationRunner mBackAnimationRunner;
 
     private float mEnteringProgress = 0f;
     private float mLeavingProgress = 0f;
@@ -126,11 +129,11 @@ class CrossActivityAnimation {
     private IRemoteAnimationFinishedCallback mFinishCallback;
 
     private final BackProgressAnimator mProgressAnimator = new BackProgressAnimator();
-    final BackAnimationRunner mBackAnimationRunner;
 
     private final BackAnimationBackground mBackground;
 
-    CrossActivityAnimation(Context context, BackAnimationBackground background) {
+    @Inject
+    public CrossActivityAnimation(Context context, BackAnimationBackground background) {
         mCornerRadius = ScreenDecorationsUtils.getWindowCornerRadius(context);
         mBackAnimationRunner = new BackAnimationRunner(new Callback(), new Runner());
         mBackground = background;
@@ -357,6 +360,11 @@ class CrossActivityAnimation {
         mTransaction.apply();
     }
 
+    @Override
+    public BackAnimationRunner getRunner() {
+        return mBackAnimationRunner;
+    }
+
     private final class Callback extends IOnBackInvokedCallback.Default {
         @Override
         public void onBackStarted(BackMotionEvent backEvent) {
@@ -371,7 +379,15 @@ class CrossActivityAnimation {
 
         @Override
         public void onBackCancelled() {
-            mProgressAnimator.onBackCancelled(CrossActivityAnimation.this::finishAnimation);
+            mProgressAnimator.onBackCancelled(() -> {
+                // mProgressAnimator can reach finish stage earlier than mLeavingProgressSpring,
+                // and if we release all animation leash first, the leavingProgressSpring won't
+                // able to update the animation anymore, which cause flicker.
+                // Here should force update the closing animation target to the final stage before
+                // release it.
+                setLeavingProgress(0);
+                finishAnimation();
+            });
         }
 
         @Override

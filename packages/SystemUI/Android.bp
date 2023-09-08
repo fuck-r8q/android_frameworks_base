@@ -198,7 +198,6 @@ android_library {
         "lottie",
         "LowLightDreamLib",
         "motion_tool_lib",
-        "IntentResolver-core",
     ],
     manifest: "AndroidManifest.xml",
     defaults: [
@@ -394,7 +393,6 @@ android_library {
         "motion_tool_lib",
         "androidx.core_core-animation-testing-nodeps",
         "androidx.compose.ui_ui",
-        "IntentResolver-core",
     ],
 }
 
@@ -417,9 +415,11 @@ android_library {
     static_libs: [
         "SystemUI-tests-base",
         "androidx.test.uiautomator_uiautomator",
+        "androidx.core_core-animation-testing",
         "mockito-target-extended-minus-junit4",
         "androidx.test.ext.junit",
         "androidx.test.ext.truth",
+        "kotlin-test",
     ],
     libs: [
         "android.test.runner",
@@ -488,6 +488,7 @@ android_robolectric_test {
     ],
     static_libs: [
         "androidx.test.uiautomator_uiautomator",
+        "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
         "inline-mockito-robolectric-prebuilt",
     ],

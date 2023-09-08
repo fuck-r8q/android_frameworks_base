@@ -787,6 +787,12 @@ public class QuickSettingsController implements Dumpable {
 
     /** update Qs height state */
     public void setExpansionHeight(float height) {
+        // TODO(b/277909752): remove below log when bug is fixed
+        if (mSplitShadeEnabled && mShadeExpandedFraction == 1.0f && height == 0) {
+            Log.wtf(TAG,
+                    "setting QS height to 0 in split shade while shade is open(ing). "
+                            + "Value of mExpandImmediate = " + mExpandImmediate);
+        }
         int maxHeight = getMaxExpansionHeight();
         height = Math.min(Math.max(
                 height, getMinExpansionHeight()), maxHeight);
@@ -933,7 +939,6 @@ public class QuickSettingsController implements Dumpable {
         return mShadeExpandedHeight;
     }
 
-    @VisibleForTesting
     void setExpandImmediate(boolean expandImmediate) {
         if (expandImmediate != mExpandImmediate) {
             mShadeLog.logQsExpandImmediateChanged(expandImmediate);
@@ -1011,6 +1016,7 @@ public class QuickSettingsController implements Dumpable {
                 && mPanelViewControllerLazy.get().mAnimateBack) {
             mPanelViewControllerLazy.get().adjustBackAnimationScale(adjustedExpansionFraction);
         }
+        mShadeExpansionStateManager.onQsExpansionFractionChanged(qsExpansionFraction);
         mMediaHierarchyManager.setQsExpansion(qsExpansionFraction);
         int qsPanelBottomY = calculateBottomPosition(qsExpansionFraction);
         mScrimController.setQsPosition(qsExpansionFraction, qsPanelBottomY);

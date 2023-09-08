@@ -379,7 +379,10 @@ public class PackageInfoUtils {
                 | flag(state.isVirtualPreload(), ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD)
                 | flag(state.isHidden(), ApplicationInfo.PRIVATE_FLAG_HIDDEN);
 
-        if (state.getEnabledState() == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+        if ((flags & PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS) != 0
+                && state.isQuarantined()) {
+            ai.enabled = false;
+        } else  if (state.getEnabledState() == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
             ai.enabled = true;
         } else if (state.getEnabledState()
                 == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED) {
@@ -1082,18 +1085,18 @@ public class PackageInfoUtils {
     }
 
     @NonNull
-    public static File getDataDir(AndroidPackage pkg, int userId) {
-        if ("android".equals(pkg.getPackageName())) {
+    public static File getDataDir(PackageStateInternal ps, int userId) {
+        if ("android".equals(ps.getPackageName())) {
             return Environment.getDataSystemDirectory();
         }
 
-        if (pkg.isDefaultToDeviceProtectedStorage()
+        if (ps.isDefaultToDeviceProtectedStorage()
                 && PackageManager.APPLY_DEFAULT_TO_DEVICE_PROTECTED_STORAGE) {
-            return Environment.getDataUserDePackageDirectory(pkg.getVolumeUuid(), userId,
-                    pkg.getPackageName());
+            return Environment.getDataUserDePackageDirectory(ps.getVolumeUuid(), userId,
+                    ps.getPackageName());
         } else {
-            return Environment.getDataUserCePackageDirectory(pkg.getVolumeUuid(), userId,
-                    pkg.getPackageName());
+            return Environment.getDataUserCePackageDirectory(ps.getVolumeUuid(), userId,
+                    ps.getPackageName());
         }
     }
 

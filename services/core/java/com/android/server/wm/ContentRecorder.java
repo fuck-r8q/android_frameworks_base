@@ -93,7 +93,7 @@ final class ContentRecorder implements WindowContainerListener {
     @Nullable private Point mLastSurfaceSize = null;
 
     ContentRecorder(@NonNull DisplayContent displayContent) {
-        this(displayContent, new RemoteMediaProjectionManagerWrapper());
+        this(displayContent, new RemoteMediaProjectionManagerWrapper(displayContent.mDisplayId));
     }
 
     @VisibleForTesting
@@ -565,7 +565,13 @@ final class ContentRecorder implements WindowContainerListener {
 
     private static final class RemoteMediaProjectionManagerWrapper implements
             MediaProjectionManagerWrapper {
+
+        private final int mDisplayId;
         @Nullable private IMediaProjectionManager mIMediaProjectionManager = null;
+
+        RemoteMediaProjectionManagerWrapper(int displayId) {
+            mDisplayId = displayId;
+        }
 
         @Override
         public void stopActiveProjection() {
@@ -574,12 +580,15 @@ final class ContentRecorder implements WindowContainerListener {
                 return;
             }
             try {
+                ProtoLog.e(WM_DEBUG_CONTENT_RECORDING,
+                        "Content Recording: stopping active projection for display %d",
+                        mDisplayId);
                 mIMediaProjectionManager.stopActiveProjection();
             } catch (RemoteException e) {
                 ProtoLog.e(WM_DEBUG_CONTENT_RECORDING,
                         "Content Recording: Unable to tell MediaProjectionManagerService to stop "
-                                + "the active projection: %s",
-                        e);
+                                + "the active projection for display %d: %s",
+                        mDisplayId, e);
             }
         }
 

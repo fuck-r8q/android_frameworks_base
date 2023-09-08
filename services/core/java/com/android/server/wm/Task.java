@@ -2917,8 +2917,8 @@ class Task extends TaskFragment {
             // No need to check if allowed if it's leaving dragResize
             if (dragResizing
                     && !(getRootTask().getWindowingMode() == WINDOWING_MODE_FREEFORM)) {
-                throw new IllegalArgumentException("Drag resize not allow for root task id="
-                        + getRootTaskId());
+                Slog.e(TAG, "Drag resize isn't allowed for root task id=" + getRootTaskId());
+                return;
             }
             mDragResizing = dragResizing;
             resetDragResizingChangeReported();
@@ -5778,7 +5778,7 @@ class Task extends TaskFragment {
             }
         }
         ActivityRecord topActivity = getDisplayArea().topRunningActivity();
-        Task topRootTask = topActivity.getRootTask();
+        Task topRootTask = topActivity == null ? null : topActivity.getRootTask();
         if (topRootTask != null && topRootTask != this && topActivity.isState(RESUMED)) {
             // Usually resuming a top activity triggers the next app transition, but nothing's got
             // resumed in this case, so we need to execute it explicitly.

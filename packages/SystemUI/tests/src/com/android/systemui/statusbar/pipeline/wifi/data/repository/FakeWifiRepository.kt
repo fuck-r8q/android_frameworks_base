@@ -17,7 +17,7 @@
 package com.android.systemui.statusbar.pipeline.wifi.data.repository
 
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
-import com.android.systemui.statusbar.pipeline.wifi.data.repository.prod.WifiRepositoryImpl.Companion.ACTIVITY_DEFAULT
+import com.android.systemui.statusbar.pipeline.wifi.data.repository.prod.WifiRepositoryHelper.ACTIVITY_DEFAULT
 import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiNetworkModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +33,8 @@ class FakeWifiRepository : WifiRepository {
     private val _wifiNetwork: MutableStateFlow<WifiNetworkModel> =
         MutableStateFlow(WifiNetworkModel.Inactive)
     override val wifiNetwork: StateFlow<WifiNetworkModel> = _wifiNetwork
+
+    override val secondaryNetworks = MutableStateFlow<List<WifiNetworkModel>>(emptyList())
 
     private val _wifiActivity = MutableStateFlow(ACTIVITY_DEFAULT)
     override val wifiActivity: StateFlow<DataActivityModel> = _wifiActivity

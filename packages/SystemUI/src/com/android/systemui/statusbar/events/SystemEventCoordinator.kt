@@ -17,8 +17,10 @@
 package com.android.systemui.statusbar.events
 
 import android.annotation.IntRange
+import android.content.Context
 import android.provider.DeviceConfig
 import android.provider.DeviceConfig.NAMESPACE_PRIVACY
+import com.android.systemui.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.display.domain.interactor.ConnectedDisplayInteractor
@@ -48,6 +50,7 @@ constructor(
     private val systemClock: SystemClock,
     private val batteryController: BatteryController,
     private val privacyController: PrivacyItemController,
+    private val context: Context,
     private val featureFlags: FeatureFlags,
     @Application private val appScope: CoroutineScope,
     connectedDisplayInteractor: ConnectedDisplayInteractor
@@ -88,6 +91,11 @@ constructor(
     fun notifyPrivacyItemsChanged(showAnimation: Boolean = true) {
         val event = PrivacyEvent(showAnimation)
         event.privacyItems = privacyStateListener.currentPrivacyItems
+        event.contentDescription = run {
+            val items = PrivacyChipBuilder(context, event.privacyItems).joinTypes()
+            context.getString(
+                    R.string.ongoing_privacy_chip_content_multiple_apps, items)
+        }
         scheduler.onStatusEvent(event)
     }
 
@@ -156,11 +164,12 @@ constructor(
         }
 
         private fun isChipAnimationEnabled(): Boolean {
-            return DeviceConfig.getBoolean(NAMESPACE_PRIVACY, CHIP_ANIMATION_ENABLED, true)
+            val defaultValue =
+                context.resources.getBoolean(R.bool.config_enablePrivacyChipAnimation)
+            return DeviceConfig.getBoolean(NAMESPACE_PRIVACY, CHIP_ANIMATION_ENABLED, defaultValue)
         }
     }
 }
 
 private const val DEBOUNCE_TIME = 3000L
 private const val CHIP_ANIMATION_ENABLED = "privacy_chip_animation_enabled"
-private const val TAG = "SystemEventCoordinator"

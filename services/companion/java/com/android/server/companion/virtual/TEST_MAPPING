@@ -33,16 +33,27 @@
       ]
     },
     {
-      "name": "CtsVirtualDevicesTestCases",
+      "name": "CtsHardwareTestCases",
       "options": [
         {
           "include-filter": "android.hardware.input.cts.tests"
         },
         {
-          "exclude-annotation": "androidx.test.filters.FlakyTest"
+          "exclude-annotation": "android.platform.test.annotations.FlakyTest"
         }
       ],
       "file_patterns": ["Virtual[^/]*\\.java"]
+    },
+    {
+      "name": "CtsAccessibilityServiceTestCases",
+      "options": [
+        {
+          "include-filter": "android.accessibilityservice.cts.AccessibilityDisplayProxyTest"
+        },
+        {
+          "exclude-annotation": "android.support.test.filters.FlakyTest"
+        }
+      ]
     }
   ]
 }

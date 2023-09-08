@@ -3039,14 +3039,15 @@
          on the headphone/microphone jack. When false use the older uevent framework. -->
     <bool name="config_useDevInputEventForAudioJack">false</bool>
 
-    <!-- Whether safe headphone volume is enabled or not (country specific). -->
+    <!-- Whether safe headphone hearing is enforced by any regulation (e.g.
+         EN50332-3, EN50332-2) or not (country specific). -->
     <bool name="config_safe_media_volume_enabled">true</bool>
 
-    <!-- Whether safe headphone sound dosage warning is enabled or not
-         (country specific). This value should only be overlaid to true
-         when a vendor supports offload and has the HAL sound dose
-         interfaces implemented. Otherwise, this can lead to a compliance
-         issue with the safe hearing standards EN50332-3 and IEC62368-1.
+    <!-- Whether safe headphone sound dosage warning is enabled or not.
+         This value should only be overlaid to true when a vendor supports
+         offload and has the HAL sound dose interfaces implemented.
+         Otherwise, this can lead to a compliance issue with the safe
+         hearing standards EN50332-3 and IEC62368-1.
     -->
     <bool name="config_safe_sound_dosage_enabled">false</bool>
 
@@ -3215,8 +3216,9 @@
 
     <!-- Component name of the activity used to ask a user to confirm system language change after
          receiving <Set Menu Language> CEC message. -->
-    <string name="config_hdmiCecSetMenuLanguageActivity"
-            >com.android.systemui/com.android.systemui.hdmi.HdmiCecSetMenuLanguageActivity</string>
+    <string name="config_hdmiCecSetMenuLanguageActivity">
+        com.android.systemui/com.android.systemui.tv.hdmi.HdmiCecSetMenuLanguageActivity
+    </string>
 
     <!-- Name of the dialog that is used to request the user's consent for a Platform VPN -->
     <string name="config_platformVpnConfirmDialogComponent" translatable="false"
@@ -4292,6 +4294,9 @@
 
     <!-- Colon separated list of package names that should be granted DND access -->
     <string name="config_defaultDndAccessPackages" translatable="false">com.android.camera2</string>
+
+    <!-- Colon separated list of package names that should be removed from DND access packages -->
+    <string name="config_defaultDndDeniedPackages" translatable="false"></string>
 
     <!-- User restrictions set on the SYSTEM user when it is first created.
          Note: Also update appropriate overlay files. -->
@@ -5386,6 +5391,12 @@
 
     <!-- Default value for performant auth feature. -->
     <bool name="config_performantAuthDefault">false</bool>
+
+    <!-- Threshold for false rejection rate (FRR) of biometric authentication. Applies for both
+         fingerprint and face. If a dual-modality device only enrolled a single biometric and
+         experiences high FRR (above threshold), system notification will be sent to encourage user
+         to enroll the other eligible biometric. -->
+    <fraction name="config_biometricNotificationFrrThreshold">30%</fraction>
 
     <!-- The component name for the default profile supervisor, which can be set as a profile owner
     even after user setup is complete. The defined component should be used for supervision purposes
@@ -6611,4 +6622,11 @@
          vibrations for the customized haptic feedback IDs, and continue to use the system defaults
          for the non-customized ones. -->
     <string name="config_hapticFeedbackCustomizationFile" />
+
+    <!-- Enables or disables the "Share" action item shown in the context menu that appears upon
+        long-pressing on selected text. Enabled by default. -->
+    <bool name="config_textShareSupported">true</bool>
+
+    <!-- Whether or not ActivityManager PSS profiling is disabled. -->
+    <bool name="config_am_disablePssProfiling">false</bool>
 </resources>

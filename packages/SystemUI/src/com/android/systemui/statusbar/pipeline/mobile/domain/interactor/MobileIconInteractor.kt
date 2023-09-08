@@ -132,6 +132,9 @@ interface MobileIconInteractor {
     /** True if the rsrp level should be preferred over the primary level for LTE. */
     val alwaysUseRsrpLevelForLte: StateFlow<Boolean>
 
+    /** See [MobileConnectionRepository.isAllowedDuringAirplaneMode]. */
+    val isAllowedDuringAirplaneMode: StateFlow<Boolean>
+
     /** True when in carrier network change mode */
     val carrierNetworkChangeActive: StateFlow<Boolean>
 
@@ -460,4 +463,6 @@ class MobileIconInteractorImpl(
         return networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE
                 || networkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA
     }
+
+    override val isAllowedDuringAirplaneMode = connectionRepository.isAllowedDuringAirplaneMode
 }

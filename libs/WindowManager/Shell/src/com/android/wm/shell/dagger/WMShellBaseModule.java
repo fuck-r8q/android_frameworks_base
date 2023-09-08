@@ -36,6 +36,7 @@ import com.android.wm.shell.activityembedding.ActivityEmbeddingController;
 import com.android.wm.shell.back.BackAnimation;
 import com.android.wm.shell.back.BackAnimationBackground;
 import com.android.wm.shell.back.BackAnimationController;
+import com.android.wm.shell.back.ShellBackAnimationRegistry;
 import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.common.DevicePostureController;
@@ -44,6 +45,7 @@ import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.DockStateReader;
+import com.android.wm.shell.common.FloatingContentCoordinator;
 import com.android.wm.shell.common.LaunchAdjacentController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
@@ -73,7 +75,6 @@ import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 import com.android.wm.shell.onehanded.OneHanded;
 import com.android.wm.shell.onehanded.OneHandedController;
-import com.android.wm.shell.pip.Pip;
 import com.android.wm.shell.recents.RecentTasks;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
@@ -107,9 +108,9 @@ import java.util.Optional;
 /**
  * Provides basic dependencies from {@link com.android.wm.shell}, these dependencies are only
  * accessible from components within the WM subcomponent (can be explicitly exposed to the
- * SysUIComponent, see {@link WMComponent}).
+ * SysUIComponent, see {@link com.android.systemui.dagger.WMComponent}).
  *
- * This module only defines *common* dependencies across various SystemUI implementations,
+ * <p>This module only defines *common* dependencies across various SystemUI implementations,
  * dependencies that are device/form factor SystemUI implementation specific should go into their
  * respective modules (ie. {@link WMShellModule} for handheld, {@link TvWMShellModule} for tv, etc.)
  */
@@ -119,6 +120,12 @@ public abstract class WMShellBaseModule {
     //
     // Internal common - Components used internally by multiple shell features
     //
+
+    @WMSingleton
+    @Provides
+    static FloatingContentCoordinator provideFloatingContentCoordinator() {
+        return new FloatingContentCoordinator();
+    }
 
     @WMSingleton
     @Provides
@@ -303,16 +310,25 @@ public abstract class WMShellBaseModule {
             ShellController shellController,
             @ShellMainThread ShellExecutor shellExecutor,
             @ShellBackgroundThread Handler backgroundHandler,
-            BackAnimationBackground backAnimationBackground
-    ) {
+            BackAnimationBackground backAnimationBackground,
+            Optional<ShellBackAnimationRegistry> shellBackAnimationRegistry) {
         if (BackAnimationController.IS_ENABLED) {
-            return Optional.of(
-                    new BackAnimationController(shellInit, shellController, shellExecutor,
-                            backgroundHandler, context, backAnimationBackground));
+            return shellBackAnimationRegistry.map(
+                    (animations) ->
+                            new BackAnimationController(
+                                    shellInit,
+                                    shellController,
+                                    shellExecutor,
+                                    backgroundHandler,
+                                    context,
+                                    backAnimationBackground,
+                                    animations));
         }
         return Optional.empty();
     }
 
+    @BindsOptionalOf
+    abstract ShellBackAnimationRegistry optionalBackAnimationRegistry();
 
     //
     // Bubbles (optional feature)
@@ -797,7 +813,6 @@ public abstract class WMShellBaseModule {
             ShellTaskOrganizer shellTaskOrganizer,
             Optional<BubbleController> bubblesOptional,
             Optional<SplitScreenController> splitScreenOptional,
-            Optional<Pip> pipOptional,
             FullscreenTaskListener fullscreenTaskListener,
             Optional<UnfoldAnimationController> unfoldAnimationController,
             Optional<UnfoldTransitionHandler> unfoldTransitionHandler,

@@ -3454,6 +3454,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 if (mFixedRotationLaunchingApp != null) {
                     setSeamlessTransitionForFixedRotation(controller.getCollectingTransition());
                 }
+            } else if (mAsyncRotationController != null && !isRotationChanging()) {
+                Slog.i(TAG, "Finish AsyncRotation for previous intermediate change");
+                finishAsyncRotationIfPossible();
             }
             return;
         }
@@ -3626,6 +3629,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         pw.print("  mFocusedApp="); pw.println(mFocusedApp);
         if (mFixedRotationLaunchingApp != null) {
             pw.println("  mFixedRotationLaunchingApp=" + mFixedRotationLaunchingApp);
+        }
+        if (mAsyncRotationController != null) {
+            mAsyncRotationController.dump(pw, prefix);
         }
 
         pw.println();
@@ -6489,6 +6495,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     boolean isKeyguardAlwaysUnlocked() {
         return (mDisplayInfo.flags & Display.FLAG_ALWAYS_UNLOCKED) != 0;
+    }
+
+    /**
+     * @return whether the physical display has a fixed orientation and cannot be rotated.
+     */
+    boolean isDisplayOrientationFixed() {
+        return (mDisplayInfo.flags & Display.FLAG_ROTATES_WITH_CONTENT) == 0;
     }
 
     /**

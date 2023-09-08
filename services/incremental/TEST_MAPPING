@@ -9,7 +9,12 @@
       ]
     },
     {
-      "name": "CtsPackageManagerIncrementalStatsHostTestCases"
+      "name": "CtsPackageManagerIncrementalStatsHostTestCases",
+      "options": [
+        {
+          "exclude-annotation": "android.platform.test.annotations.LargeTest"
+        }
+      ]
     },
     {
       "name": "CtsIncrementalInstallHostTestCases"
@@ -22,7 +27,9 @@
     },
     {
       "name": "CtsInstalledLoadingProgressHostTests"
-    },
+    }
+   ],
+  "presubmit-large": [
     {
       "name": "CtsPackageManagerTestCases",
       "options": [
@@ -41,6 +48,16 @@
   "kernel-presubmit": [
     {
       "name": "CtsIncrementalInstallHostTestCases"
+    }
+  ],
+  "postsubmit": [
+    {
+      "name": "CtsPackageManagerIncrementalStatsHostTestCases",
+      "options": [
+        {
+          "include-annotation": "android.platform.test.annotations.LargeTest"
+        }
+      ]
     }
   ]
 }

@@ -45,15 +45,18 @@ constructor(
      */
     val allSceneKeys: List<SceneKey> = interactor.allSceneKeys()
 
-    /** The current scene. */
-    val currentScene: StateFlow<SceneModel> = interactor.currentScene
+    /** The scene that should be rendered. */
+    val currentScene: StateFlow<SceneModel> = interactor.desiredScene
 
     /** Whether the container is visible. */
     val isVisible: StateFlow<Boolean> = interactor.isVisible
 
-    /** Requests a transition to the scene with the given key. */
-    fun setCurrentScene(scene: SceneModel) {
-        interactor.setCurrentScene(scene)
+    /** Notifies that the UI has transitioned sufficiently to the given scene. */
+    fun onSceneChanged(scene: SceneModel) {
+        interactor.onSceneChanged(
+            scene = scene,
+            loggingReason = SCENE_TRANSITION_LOGGING_REASON,
+        )
     }
 
     /**
@@ -68,5 +71,9 @@ constructor(
     /** Handles a [MotionEvent] representing remote user input. */
     fun onRemoteUserInput(event: MotionEvent) {
         interactor.onRemoteUserInput(RemoteUserInput.translateMotionEvent(event))
+    }
+
+    companion object {
+        private const val SCENE_TRANSITION_LOGGING_REASON = "user input"
     }
 }

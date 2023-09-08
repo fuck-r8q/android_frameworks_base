@@ -2120,6 +2120,21 @@ public final class Settings {
             "android.settings.MANAGE_MORE_DEFAULT_APPS_SETTINGS";
 
     /**
+     * Activity Action: Show app screen size list settings for user to override app aspect
+     * ratio.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Can include the following extra {@link android.content.Intent#EXTRA_PACKAGE_NAME} specifying
+     * the name of the package to scroll to in the page.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_MANAGE_USER_ASPECT_RATIO_SETTINGS =
+            "android.settings.MANAGE_USER_ASPECT_RATIO_SETTINGS";
+
+    /**
      * Activity Action: Show notification settings.
      *
      * @hide
@@ -10122,6 +10137,13 @@ public final class Settings {
         public static final String AUDIO_DEVICE_INVENTORY = "audio_device_inventory";
 
         /**
+         * Stores a boolean that defines whether the CSD as a feature is enabled or not.
+         * @hide
+         */
+        public static final String AUDIO_SAFE_CSD_AS_A_FEATURE_ENABLED =
+                "audio_safe_csd_as_a_feature_enabled";
+
+        /**
          * Indicates whether notification display on the lock screen is enabled.
          * <p>
          * Type: int (0 for false, 1 for true)
@@ -11261,6 +11283,19 @@ public final class Settings {
                 "navigation_mode";
 
         /**
+         * The value is from another(source) device's {@link #NAVIGATION_MODE} during restore.
+         * It's supposed to be written only by
+         * {@link com.android.providers.settings.SettingsHelper}.
+         * This setting should not be added into backup array.
+         * <p>Value: -1 = Can't get value from restore(default),
+         *  0 = 3 button,
+         *  1 = 2 button,
+         *  2 = fully gestural.
+         * @hide
+         */
+        public static final String NAVIGATION_MODE_RESTORE = "navigation_mode_restore";
+
+        /**
          * Scale factor for the back gesture inset size on the left side of the screen.
          * @hide
          */
@@ -11830,6 +11865,13 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_DISPLAY_MAGNIFICATION_EDGE_HAPTIC_ENABLED =
                 "accessibility_display_magnification_edge_haptic_enabled";
+
+        /**
+         * If 1, DND default allowed packages have been updated
+         *
+         *  @hide
+         */
+        public static final String DND_CONFIGS_MIGRATED = "dnd_settings_migrated";
 
         /**
          * These entries are considered common between the personal and the managed profile,
@@ -17104,6 +17146,12 @@ public final class Settings {
                 ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
             getPublicSettingsForClass(Global.class, allKeys, readableKeys,
                     readableKeysWithMaxTargetSdk);
+            // Add Global.Wearable keys on watches.
+            if (ActivityThread.currentApplication().getApplicationContext().getPackageManager()
+                    .hasSystemFeature(PackageManager.FEATURE_WATCH)) {
+                getPublicSettingsForClass(Global.Wearable.class, allKeys, readableKeys,
+                        readableKeysWithMaxTargetSdk);
+            }
         }
 
         /**
@@ -18296,7 +18344,7 @@ public final class Settings {
          * Settings migrated from Wear OS settings provider.
          * @hide
          */
-        public static class Wearable {
+        public static final class Wearable extends NameValueTable {
             /**
              * Whether the user has any pay tokens on their watch.
              * @hide
@@ -18619,6 +18667,7 @@ public final class Settings {
              * What OS does paired device has.
              * @hide
              */
+            @Readable
             public static final String PAIRED_DEVICE_OS_TYPE = "paired_device_os_type";
 
             // Possible values of PAIRED_DEVICE_OS_TYPE
@@ -19191,6 +19240,14 @@ public final class Settings {
              * @hide
              */
             public static final String WEAR_LAUNCHER_UI_MODE = "wear_launcher_ui_mode";
+
+            /** Whether Wear Power Anomaly Service is enabled.
+             *
+             * (0 = false, 1 = true)
+             * @hide
+             */
+            public static final String WEAR_POWER_ANOMALY_SERVICE_ENABLED =
+                    "wear_power_anomaly_service_enabled";
         }
     }
 

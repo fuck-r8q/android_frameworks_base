@@ -40,7 +40,6 @@ import android.view.WindowManager;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
 import android.window.WindowContainerTransaction;
-import android.window.WindowContainerTransactionCallback;
 
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.wm.shell.desktopmode.DesktopModeController;
@@ -127,14 +126,7 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             mTransition = transition;
         }
 
-        void joinFinishArgs(WindowContainerTransaction wct,
-                WindowContainerTransactionCallback wctCB) {
-            if (wctCB != null) {
-                // Technically can probably support 1, but don't want to encourage CB usage since
-                // it creates instabliity, so just throw.
-                throw new IllegalArgumentException("Can't mix transitions that require finish"
-                        + " sync callback");
-            }
+        void joinFinishArgs(WindowContainerTransaction wct) {
             if (wct != null) {
                 if (mFinishWCT == null) {
                     mFinishWCT = wct;
@@ -392,12 +384,12 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                 info.getChanges().remove(i);
             }
         }
-        Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        Transitions.TransitionFinishCallback finishCB = (wct) -> {
             --mixed.mInFlightSubAnimations;
-            mixed.joinFinishArgs(wct, wctCB);
+            mixed.joinFinishArgs(wct);
             if (mixed.mInFlightSubAnimations > 0) return;
             mActiveTransitions.remove(mixed);
-            finishCallback.onTransitionFinished(mixed.mFinishWCT, wctCB);
+            finishCallback.onTransitionFinished(mixed.mFinishWCT);
         };
         if (pipChange == null) {
             if (mixed.mLeftoversHandler != null) {
@@ -464,15 +456,15 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             return false;
         }
         final boolean isGoingHome = homeIsOpening;
-        Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        Transitions.TransitionFinishCallback finishCB = (wct) -> {
             --mixed.mInFlightSubAnimations;
-            mixed.joinFinishArgs(wct, wctCB);
+            mixed.joinFinishArgs(wct);
             if (mixed.mInFlightSubAnimations > 0) return;
             mActiveTransitions.remove(mixed);
             if (isGoingHome) {
                 mSplitHandler.onTransitionAnimationComplete();
             }
-            finishCallback.onTransitionFinished(mixed.mFinishWCT, wctCB);
+            finishCallback.onTransitionFinished(mixed.mFinishWCT);
         };
         if (isGoingHome || mSplitHandler.getSplitItemPosition(pipChange.getLastParent())
                 != SPLIT_POSITION_UNDEFINED) {
@@ -589,12 +581,12 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
         // We need to split the transition into 2 parts: the split part and the display part.
         mixed.mInFlightSubAnimations = 2;
 
-        Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        Transitions.TransitionFinishCallback finishCB = (wct) -> {
             --mixed.mInFlightSubAnimations;
-            mixed.joinFinishArgs(wct, wctCB);
+            mixed.joinFinishArgs(wct);
             if (mixed.mInFlightSubAnimations > 0) return;
             mActiveTransitions.remove(mixed);
-            finishCallback.onTransitionFinished(mixed.mFinishWCT, null /* wctCB */);
+            finishCallback.onTransitionFinished(mixed.mFinishWCT);
         };
 
         // Dispatch the display change. This will most-likely be taken by the default handler.
@@ -617,7 +609,7 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
         // Split-screen is only interested in the recents transition finishing (and merging), so
         // just wrap finish and start recents animation directly.
-        Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        Transitions.TransitionFinishCallback finishCB = (wct) -> {
             mixed.mInFlightSubAnimations = 0;
             mActiveTransitions.remove(mixed);
             // If pair-to-pair switching, the post-recents clean-up isn't needed.
@@ -629,7 +621,7 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
                 mSplitHandler.onRecentsPairToPairAnimationFinish(wct);
             }
             mSplitHandler.onTransitionAnimationComplete();
-            finishCallback.onTransitionFinished(wct, wctCB);
+            finishCallback.onTransitionFinished(wct);
         };
         mixed.mInFlightSubAnimations = 1;
         mSplitHandler.onRecentsInSplitAnimationStart(info);
@@ -647,11 +639,11 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
-        final Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        final Transitions.TransitionFinishCallback finishCB = (wct) -> {
             mixed.mInFlightSubAnimations--;
             if (mixed.mInFlightSubAnimations == 0) {
                 mActiveTransitions.remove(mixed);
-                finishCallback.onTransitionFinished(wct, wctCB);
+                finishCallback.onTransitionFinished(wct);
             }
         };
         mixed.mInFlightSubAnimations++;
@@ -696,11 +688,11 @@ public class DefaultMixedHandler implements Transitions.TransitionHandler,
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
-        final Transitions.TransitionFinishCallback finishCB = (wct, wctCB) -> {
+        final Transitions.TransitionFinishCallback finishCB = (wct) -> {
             mixed.mInFlightSubAnimations--;
             if (mixed.mInFlightSubAnimations > 0) return;
             mActiveTransitions.remove(mixed);
-            finishCallback.onTransitionFinished(wct, wctCB);
+            finishCallback.onTransitionFinished(wct);
         };
         mixed.mInFlightSubAnimations = 1;
         // Sync pip state.

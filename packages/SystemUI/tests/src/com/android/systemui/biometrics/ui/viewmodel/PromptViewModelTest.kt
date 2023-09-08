@@ -19,6 +19,7 @@ package com.android.systemui.biometrics.ui.viewmodel
 import android.hardware.biometrics.PromptInfo
 import android.hardware.face.FaceSensorPropertiesInternal
 import android.hardware.fingerprint.FingerprintSensorPropertiesInternal
+import android.view.HapticFeedbackConstants
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
 import com.android.systemui.SysuiTestCase
@@ -33,6 +34,8 @@ import com.android.systemui.biometrics.fingerprintSensorPropertiesInternal
 import com.android.systemui.biometrics.shared.model.BiometricModality
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
+import com.android.systemui.flags.FakeFeatureFlags
+import com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION
 import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.util.mockito.any
 import com.google.common.truth.Truth.assertThat
@@ -71,13 +74,15 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
 
     private lateinit var selector: PromptSelectorInteractor
     private lateinit var viewModel: PromptViewModel
+    private val featureFlags = FakeFeatureFlags()
 
     @Before
     fun setup() {
         selector = PromptSelectorInteractorImpl(promptRepository, lockPatternUtils)
         selector.resetPrompt()
 
-        viewModel = PromptViewModel(selector, vibrator)
+        viewModel = PromptViewModel(selector, vibrator, featureFlags)
+        featureFlags.set(ONE_WAY_HAPTICS_API_MIGRATION, false)
     }
 
     @Test
@@ -148,6 +153,29 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
             verify(vibrator).vibrateAuthSuccess(any())
             verify(vibrator, never()).vibrateAuthError(any())
         }
+
+    @Test
+    fun playSuccessHaptic_onwayHapticsEnabled_SetsConfirmConstant() = runGenericTest {
+        featureFlags.set(ONE_WAY_HAPTICS_API_MIGRATION, true)
+        val expectConfirmation = testCase.expectConfirmation(atLeastOneFailure = false)
+        viewModel.showAuthenticated(testCase.authenticatedModality, 1_000L)
+
+        if (expectConfirmation) {
+            viewModel.confirmAuthenticated()
+        }
+
+        val currentConstant by collectLastValue(viewModel.hapticsToPlay)
+        assertThat(currentConstant).isEqualTo(HapticFeedbackConstants.CONFIRM)
+    }
+
+    @Test
+    fun playErrorHaptic_onwayHapticsEnabled_SetsRejectConstant() = runGenericTest {
+        featureFlags.set(ONE_WAY_HAPTICS_API_MIGRATION, true)
+        viewModel.showTemporaryError("test", "messageAfterError", false)
+
+        val currentConstant by collectLastValue(viewModel.hapticsToPlay)
+        assertThat(currentConstant).isEqualTo(HapticFeedbackConstants.REJECT)
+    }
 
     private suspend fun TestScope.showAuthenticated(
         authenticatedModality: BiometricModality,
@@ -499,6 +527,7 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         val messageVisible by collectLastValue(viewModel.isIndicatorMessageVisible)
         val size by collectLastValue(viewModel.size)
         val legacyState by collectLastValue(viewModel.legacyState)
+        val confirmationRequired by collectLastValue(viewModel.isConfirmationRequired)
 
         if (testCase.isCoex && testCase.authenticatedByFingerprint) {
             viewModel.ensureFingerprintHasStarted(isDelayed = true)
@@ -507,7 +536,11 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         viewModel.showHelp(helpMessage)
 
         assertThat(size).isEqualTo(PromptSize.MEDIUM)
-        assertThat(legacyState).isEqualTo(AuthBiometricView.STATE_PENDING_CONFIRMATION)
+        if (confirmationRequired == true) {
+            assertThat(legacyState).isEqualTo(AuthBiometricView.STATE_PENDING_CONFIRMATION)
+        } else {
+            assertThat(legacyState).isEqualTo(AuthBiometricView.STATE_AUTHENTICATED)
+        }
         assertThat(message).isEqualTo(PromptMessage.Help(helpMessage))
         assertThat(messageVisible).isTrue()
         assertThat(authenticating).isFalse()

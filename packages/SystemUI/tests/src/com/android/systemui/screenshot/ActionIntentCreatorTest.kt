@@ -20,12 +20,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.test.ext.truth.content.IntentSubject.assertThat
 import androidx.test.filters.SmallTest
 import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.util.mockito.eq
 import com.android.systemui.util.mockito.mock
-import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 import org.mockito.Mockito.`when` as whenever
 
@@ -33,113 +34,132 @@ import org.mockito.Mockito.`when` as whenever
 class ActionIntentCreatorTest : SysuiTestCase() {
 
     @Test
-    fun testCreateShareIntent() {
+    fun testCreateShare() {
         val uri = Uri.parse("content://fake")
 
-        val output = ActionIntentCreator.createShareIntent(uri)
+        val output = ActionIntentCreator.createShare(uri)
 
-        assertThat(output.action).isEqualTo(Intent.ACTION_CHOOSER)
-        assertFlagsSet(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            output.flags
-        )
+        assertThat(output).hasAction(Intent.ACTION_CHOOSER)
+        assertThat(output)
+            .hasFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
 
+        assertThat(output).extras().parcelable<Intent>(Intent.EXTRA_INTENT).isNotNull()
         val wrappedIntent = output.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-        assertThat(wrappedIntent?.action).isEqualTo(Intent.ACTION_SEND)
-        assertThat(wrappedIntent?.data).isEqualTo(uri)
-        assertThat(wrappedIntent?.type).isEqualTo("image/png")
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_SUBJECT)).isNull()
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_TEXT)).isNull()
-        assertThat(wrappedIntent?.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
-            .isEqualTo(uri)
+
+        assertThat(wrappedIntent).hasAction(Intent.ACTION_SEND)
+        assertThat(wrappedIntent).hasData(uri)
+        assertThat(wrappedIntent).hasType("image/png")
+        assertThat(wrappedIntent).extras().doesNotContainKey(Intent.EXTRA_SUBJECT)
+        assertThat(wrappedIntent).extras().doesNotContainKey(Intent.EXTRA_TEXT)
+        assertThat(wrappedIntent).extras().parcelable<Uri>(Intent.EXTRA_STREAM).isEqualTo(uri)
     }
 
     @Test
-    fun testCreateShareIntentWithSubject() {
+    fun testCreateShare_embeddedUserIdRemoved() {
+        val uri = Uri.parse("content://555@fake")
+
+        val output = ActionIntentCreator.createShare(uri)
+
+        assertThat(output.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java))
+            .hasData(Uri.parse("content://fake"))
+    }
+
+    @Test
+    fun testCreateShareWithSubject() {
         val uri = Uri.parse("content://fake")
         val subject = "Example subject"
 
-        val output = ActionIntentCreator.createShareIntentWithSubject(uri, subject)
+        val output = ActionIntentCreator.createShareWithSubject(uri, subject)
 
-        assertThat(output.action).isEqualTo(Intent.ACTION_CHOOSER)
-        assertFlagsSet(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            output.flags
-        )
+        assertThat(output).hasAction(Intent.ACTION_CHOOSER)
+        assertThat(output)
+            .hasFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
 
         val wrappedIntent = output.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-        assertThat(wrappedIntent?.action).isEqualTo(Intent.ACTION_SEND)
-        assertThat(wrappedIntent?.data).isEqualTo(uri)
-        assertThat(wrappedIntent?.type).isEqualTo("image/png")
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_SUBJECT)).isEqualTo(subject)
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_TEXT)).isNull()
-        assertThat(wrappedIntent?.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
-            .isEqualTo(uri)
+        assertThat(wrappedIntent).hasAction(Intent.ACTION_SEND)
+        assertThat(wrappedIntent).hasData(uri)
+        assertThat(wrappedIntent).hasType("image/png")
+        assertThat(wrappedIntent).extras().string(Intent.EXTRA_SUBJECT).isEqualTo(subject)
+        assertThat(wrappedIntent).extras().doesNotContainKey(Intent.EXTRA_TEXT)
+        assertThat(wrappedIntent).extras().parcelable<Uri>(Intent.EXTRA_STREAM).isEqualTo(uri)
     }
 
     @Test
-    fun testCreateShareIntentWithExtraText() {
+    fun testCreateShareWithText() {
         val uri = Uri.parse("content://fake")
         val extraText = "Extra text"
 
-        val output = ActionIntentCreator.createShareIntentWithExtraText(uri, extraText)
+        val output = ActionIntentCreator.createShareWithText(uri, extraText)
 
-        assertThat(output.action).isEqualTo(Intent.ACTION_CHOOSER)
-        assertFlagsSet(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            output.flags
-        )
+        assertThat(output).hasAction(Intent.ACTION_CHOOSER)
+        assertThat(output)
+            .hasFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
 
         val wrappedIntent = output.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
-        assertThat(wrappedIntent?.action).isEqualTo(Intent.ACTION_SEND)
-        assertThat(wrappedIntent?.data).isEqualTo(uri)
-        assertThat(wrappedIntent?.type).isEqualTo("image/png")
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_SUBJECT)).isNull()
-        assertThat(wrappedIntent?.getStringExtra(Intent.EXTRA_TEXT)).isEqualTo(extraText)
-        assertThat(wrappedIntent?.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
-            .isEqualTo(uri)
+        assertThat(wrappedIntent).hasAction(Intent.ACTION_SEND)
+        assertThat(wrappedIntent).hasData(uri)
+        assertThat(wrappedIntent).hasType("image/png")
+        assertThat(wrappedIntent).extras().doesNotContainKey(Intent.EXTRA_SUBJECT)
+        assertThat(wrappedIntent).extras().string(Intent.EXTRA_TEXT).isEqualTo(extraText)
+        assertThat(wrappedIntent).extras().parcelable<Uri>(Intent.EXTRA_STREAM).isEqualTo(uri)
     }
 
     @Test
-    fun testCreateEditIntent() {
+    fun testCreateEdit() {
         val uri = Uri.parse("content://fake")
         val context = mock<Context>()
 
-        val output = ActionIntentCreator.createEditIntent(uri, context)
+        whenever(context.getString(eq(R.string.config_screenshotEditor))).thenReturn("")
 
-        assertThat(output.action).isEqualTo(Intent.ACTION_EDIT)
-        assertThat(output.data).isEqualTo(uri)
-        assertThat(output.type).isEqualTo("image/png")
-        assertThat(output.component).isNull()
-        val expectedFlags =
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TASK
-        assertFlagsSet(expectedFlags, output.flags)
+        val output = ActionIntentCreator.createEdit(uri, context)
+
+        assertThat(output).hasAction(Intent.ACTION_EDIT)
+        assertThat(output).hasData(uri)
+        assertThat(output).hasType("image/png")
+        assertWithMessage("getComponent()").that(output.component).isNull()
+        assertThat(output)
+            .hasFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK
+            )
     }
 
     @Test
-    fun testCreateEditIntent_withEditor() {
+    fun testCreateEdit_embeddedUserIdRemoved() {
+        val uri = Uri.parse("content://555@fake")
+        val context = mock<Context>()
+        whenever(context.getString(eq(R.string.config_screenshotEditor))).thenReturn("")
+
+        val output = ActionIntentCreator.createEdit(uri, context)
+
+        assertThat(output).hasData(Uri.parse("content://fake"))
+    }
+
+    @Test
+    fun testCreateEdit_withEditor() {
         val uri = Uri.parse("content://fake")
         val context = mock<Context>()
-        var component = ComponentName("com.android.foo", "com.android.foo.Something")
+        val component = ComponentName("com.android.foo", "com.android.foo.Something")
 
         whenever(context.getString(eq(R.string.config_screenshotEditor)))
             .thenReturn(component.flattenToString())
 
-        val output = ActionIntentCreator.createEditIntent(uri, context)
+        val output = ActionIntentCreator.createEdit(uri, context)
 
-        assertThat(output.component).isEqualTo(component)
-    }
-
-    private fun assertFlagsSet(expected: Int, observed: Int) {
-        assertThat(observed and expected).isEqualTo(expected)
+        assertThat(output).hasComponent(component)
     }
 }

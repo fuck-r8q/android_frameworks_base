@@ -16,7 +16,6 @@
 
 package com.android.server.wm.flicker.activityembedding.open
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Presubmit
 import android.tools.common.datatypes.Rect
 import android.tools.common.flicker.subject.region.RegionSubject
@@ -24,6 +23,7 @@ import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.RequiresDevice
 import com.android.server.wm.flicker.activityembedding.ActivityEmbeddingTestBase
 import com.android.server.wm.flicker.helpers.ActivityEmbeddingAppHelper
@@ -41,7 +41,7 @@ import org.junit.runners.Parameterized
  * Transitions: From A launch a trampoline Activity T, T launches secondary Activity B and finishes
  * itself, end up in split A|B.
  *
- * To run this test: `atest FlickerTests:OpenTrampolineActivityTest`
+ * To run this test: `atest FlickerTestsOther:OpenTrampolineActivityTest`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
@@ -104,8 +104,10 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
         flicker.assertWm {
             notContains(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
                 .then()
-                .isAppWindowInvisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
-                    isOptional = true)
+                .isAppWindowInvisible(
+                    ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
+                    isOptional = true
+                )
                 .then()
                 .isAppWindowVisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
         }
@@ -133,8 +135,10 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
                 }
                 // Begin of transition.
                 .then()
-                .isAppWindowInvisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
-                    isOptional = true)
+                .isAppWindowInvisible(
+                    ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
+                    isOptional = true
+                )
                 .then()
                 .invoke("mainAndSecondaryInSplit") {
                     val mainActivityRegion =
@@ -174,8 +178,10 @@ class OpenTrampolineActivityTest(flicker: LegacyFlickerTest) : ActivityEmbedding
                         .coversExactly(startDisplayBounds)
                 }
                 .then()
-                .isInvisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
-                    isOptional = true)
+                .isInvisible(
+                    ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT,
+                    isOptional = true
+                )
                 .then()
                 .isVisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
         }

@@ -29,8 +29,17 @@ interface WifiRepository {
     /** Observable for the current wifi default status. */
     val isWifiDefault: StateFlow<Boolean>
 
-    /** Observable for the current wifi network. */
+    /** Observable for the current primary wifi network. */
     val wifiNetwork: StateFlow<WifiNetworkModel>
+
+    /**
+     * Observable for secondary wifi networks (if any). Should specifically exclude the primary
+     * network emitted by [wifiNetwork].
+     *
+     * This isn't used by phones/tablets, which only display the primary network, but may be used by
+     * other variants like Car.
+     */
+    val secondaryNetworks: StateFlow<List<WifiNetworkModel>>
 
     /** Observable for the current wifi network activity. */
     val wifiActivity: StateFlow<DataActivityModel>
@@ -49,6 +58,9 @@ interface WifiRepository {
         const val COL_NAME_IS_ENABLED = "isEnabled"
         /** Column name to use for [isWifiDefault] for table logging. */
         const val COL_NAME_IS_DEFAULT = "isDefault"
+
+        const val CARRIER_MERGED_INVALID_SUB_ID_REASON =
+            "Wifi network was carrier merged but had invalid sub ID"
     }
 }
 

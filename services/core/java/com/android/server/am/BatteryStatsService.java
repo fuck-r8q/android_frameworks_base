@@ -84,6 +84,7 @@ import android.power.PowerStatsInternal;
 import android.provider.Settings;
 import android.telephony.DataConnectionRealTimeInfo;
 import android.telephony.ModemActivityInfo;
+import android.telephony.NetworkRegistrationInfo;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
 import android.util.IndentingPrintWriter;
@@ -109,6 +110,7 @@ import com.android.server.LocalServices;
 import com.android.server.Watchdog;
 import com.android.server.net.BaseNetworkObserver;
 import com.android.server.pm.UserManagerInternal;
+import com.android.server.power.optimization.Flags;
 import com.android.server.power.stats.BatteryExternalStatsWorker;
 import com.android.server.power.stats.BatteryStatsImpl;
 import com.android.server.power.stats.BatteryUsageStatsProvider;
@@ -1586,7 +1588,8 @@ public final class BatteryStatsService extends IBatteryStats.Stub
     @Override
     @EnforcePermission(UPDATE_DEVICE_STATS)
     public void notePhoneDataConnectionState(final int dataType, final boolean hasData,
-            final int serviceType, final int nrFrequency) {
+            final int serviceType, @NetworkRegistrationInfo.NRState final int nrState,
+            final int nrFrequency) {
         super.notePhoneDataConnectionState_enforcePermission();
 
         synchronized (mLock) {
@@ -1595,7 +1598,7 @@ public final class BatteryStatsService extends IBatteryStats.Stub
             mHandler.post(() -> {
                 synchronized (mStats) {
                     mStats.notePhoneDataConnectionStateLocked(dataType, hasData, serviceType,
-                            nrFrequency, elapsedRealtime, uptime);
+                            nrState, nrFrequency, elapsedRealtime, uptime);
                 }
             });
         }
@@ -2605,6 +2608,10 @@ public final class BatteryStatsService extends IBatteryStats.Stub
         awaitCompletion();
         synchronized (mStats) {
             mStats.dumpConstantsLocked(pw);
+
+            pw.println("Flags:");
+            pw.println("    " + Flags.FLAG_STREAMLINED_BATTERY_STATS
+                    + ": " + Flags.streamlinedBatteryStats());
         }
     }
 

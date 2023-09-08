@@ -2567,12 +2567,12 @@ public final class ActiveServices {
                         FGS_STOP_REASON_STOP_FOREGROUND,
                         FGS_TYPE_POLICY_CHECK_UNKNOWN);
 
-                // foregroundServiceType is used in logFGSStateChangeLocked(), so we can't clear it
-                // earlier.
-                r.foregroundServiceType = 0;
                 synchronized (mFGSLogger) {
                     mFGSLogger.logForegroundServiceStop(r.appInfo.uid, r);
                 }
+                // foregroundServiceType is used in logFGSStateChangeLocked(), so we can't clear it
+                // earlier.
+                r.foregroundServiceType = 0;
                 r.mFgsNotificationWasDeferred = false;
                 signalForegroundServiceObserversLocked(r);
                 resetFgsRestrictionLocked(r);
@@ -3741,6 +3741,8 @@ public final class ActiveServices {
                 || (flags & Context.BIND_EXTERNAL_SERVICE_LONG) != 0;
         final boolean allowInstant = (flags & Context.BIND_ALLOW_INSTANT) != 0;
         final boolean inSharedIsolatedProcess = (flags & Context.BIND_SHARED_ISOLATED_PROCESS) != 0;
+        final boolean filterOutQuarantined =
+                (flags & Context.BIND_FILTER_OUT_QUARANTINED_COMPONENTS) != 0;
 
         ProcessRecord attributedApp = null;
         if (sdkSandboxClientAppUid > 0) {
@@ -3750,7 +3752,7 @@ public final class ActiveServices {
                 isSdkSandboxService, sdkSandboxClientAppUid, sdkSandboxClientAppPackage,
                 resolvedType, callingPackage, callingPid, callingUid, userId, true, callerFg,
                 isBindExternal, allowInstant, null /* fgsDelegateOptions */,
-                inSharedIsolatedProcess);
+                inSharedIsolatedProcess, filterOutQuarantined);
         if (res == null) {
             return 0;
         }
@@ -4306,6 +4308,20 @@ public final class ActiveServices {
             boolean createIfNeeded, boolean callingFromFg, boolean isBindExternal,
             boolean allowInstant, ForegroundServiceDelegationOptions fgsDelegateOptions,
             boolean inSharedIsolatedProcess) {
+        return retrieveServiceLocked(service, instanceName, isSdkSandboxService,
+                sdkSandboxClientAppUid, sdkSandboxClientAppPackage, resolvedType, callingPackage,
+                callingPid, callingUid, userId, createIfNeeded, callingFromFg, isBindExternal,
+                allowInstant, fgsDelegateOptions, inSharedIsolatedProcess,
+                false /* filterOutQuarantined */);
+    }
+
+    private ServiceLookupResult retrieveServiceLocked(Intent service,
+            String instanceName, boolean isSdkSandboxService, int sdkSandboxClientAppUid,
+            String sdkSandboxClientAppPackage, String resolvedType,
+            String callingPackage, int callingPid, int callingUid, int userId,
+            boolean createIfNeeded, boolean callingFromFg, boolean isBindExternal,
+            boolean allowInstant, ForegroundServiceDelegationOptions fgsDelegateOptions,
+            boolean inSharedIsolatedProcess, boolean filterOutQuarantined) {
         if (isSdkSandboxService && instanceName == null) {
             throw new IllegalArgumentException("No instanceName provided for sdk sandbox process");
         }
@@ -4422,10 +4438,13 @@ public final class ActiveServices {
 
         if (r == null) {
             try {
-                int flags = ActivityManagerService.STOCK_PM_FLAGS
+                long flags = ActivityManagerService.STOCK_PM_FLAGS
                         | PackageManager.MATCH_DEBUG_TRIAGED_MISSING;
                 if (allowInstant) {
                     flags |= PackageManager.MATCH_INSTANT;
+                }
+                if (filterOutQuarantined) {
+                    flags |= PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
                 }
                 // TODO: come back and remove this assumption to triage all services
                 ResolveInfo rInfo = mAm.getPackageManagerInternal().resolveService(service,
@@ -5315,7 +5334,7 @@ public final class ActiveServices {
             boolean whileRestarting, boolean permissionsReviewRequired, boolean packageFrozen,
             boolean enqueueOomAdj)
             throws TransactionTooLargeException {
-        if (r.app != null && r.app.getThread() != null) {
+        if (r.app != null && r.app.isThreadReady()) {
             sendServiceArgsLocked(r, execInFg, false);
             return null;
         }
@@ -5362,10 +5381,9 @@ public final class ActiveServices {
                     r.packageName, r.userId, UsageEvents.Event.APP_COMPONENT_USED);
         }
 
-        // Service is now being launched, its package can't be stopped.
         try {
-            mAm.mPackageManagerInt.setPackageStoppedState(
-                    r.packageName, false, r.userId);
+            mAm.mPackageManagerInt.notifyComponentUsed(
+                    r.packageName, r.userId, r.mRecentCallingPackage, r.toString());
         } catch (IllegalArgumentException e) {
             Slog.w(TAG, "Failed trying to unstop package "
                     + r.packageName + ": " + e);
@@ -5387,7 +5405,7 @@ public final class ActiveServices {
                 final IApplicationThread thread = app.getThread();
                 final int pid = app.getPid();
                 final UidRecord uidRecord = app.getUidRecord();
-                if (thread != null) {
+                if (app.isThreadReady()) {
                     try {
                         if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                             Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
@@ -5419,7 +5437,7 @@ public final class ActiveServices {
                     final int pid = app.getPid();
                     final UidRecord uidRecord = app.getUidRecord();
                     r.isolationHostProc = app;
-                    if (thread != null) {
+                    if (app.isThreadReady()) {
                         try {
                             if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                                 Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
@@ -5862,7 +5880,7 @@ public final class ActiveServices {
 
         boolean oomAdjusted = false;
         // Tell the service that it has been unbound.
-        if (r.app != null && r.app.getThread() != null) {
+        if (r.app != null && r.app.isThreadReady()) {
             for (int i = r.bindings.size() - 1; i >= 0; i--) {
                 IntentBindRecord ibr = r.bindings.valueAt(i);
                 if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Bringing down binding " + ibr
@@ -6004,7 +6022,7 @@ public final class ActiveServices {
             mAm.mBatteryStatsService.noteServiceStopLaunch(r.appInfo.uid, r.name.getPackageName(),
                     r.name.getClassName());
             stopServiceAndUpdateAllowlistManagerLocked(r);
-            if (r.app.getThread() != null) {
+            if (r.app.isThreadReady()) {
                 // Bump the process to the top of LRU list
                 mAm.updateLruProcessLocked(r.app, false, null);
                 updateServiceForegroundLocked(r.app.mServices, false);
@@ -6168,7 +6186,7 @@ public final class ActiveServices {
         if (!c.serviceDead) {
             if (DEBUG_SERVICE) Slog.v(TAG_SERVICE, "Disconnecting binding " + b.intent
                     + ": shouldUnbind=" + b.intent.hasBound);
-            if (s.app != null && s.app.getThread() != null && b.intent.apps.size() == 0
+            if (s.app != null && s.app.isThreadReady() && b.intent.apps.size() == 0
                     && b.intent.hasBound) {
                 try {
                     bumpServiceExecutingLocked(s, false, "unbind", OOM_ADJ_REASON_UNBIND_SERVICE);
@@ -6670,7 +6688,7 @@ public final class ActiveServices {
                     sr.pendingStarts.add(new ServiceRecord.StartItem(sr, true,
                             sr.getLastStartId(), baseIntent, null, 0, null, null,
                             ActivityManager.PROCESS_STATE_UNKNOWN));
-                    if (sr.app != null && sr.app.getThread() != null) {
+                    if (sr.app != null && sr.app.isThreadReady()) {
                         // We always run in the foreground, since this is called as
                         // part of the "remove task" UI operation.
                         try {

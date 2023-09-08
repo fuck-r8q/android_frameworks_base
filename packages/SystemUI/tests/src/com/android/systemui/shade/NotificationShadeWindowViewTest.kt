@@ -50,6 +50,7 @@ import com.android.systemui.statusbar.NotificationInsetsController
 import com.android.systemui.statusbar.NotificationShadeDepthController
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.SysuiStatusBarStateController
+import com.android.systemui.statusbar.notification.data.repository.NotificationExpansionRepository
 import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
@@ -104,6 +105,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock private lateinit var lockIconViewController: LockIconViewController
     @Mock private lateinit var keyguardUnlockAnimationController: KeyguardUnlockAnimationController
     @Mock private lateinit var ambientState: AmbientState
+    @Mock private lateinit var shadeLogger: ShadeLogger
     @Mock private lateinit var pulsingGestureListener: PulsingGestureListener
     @Mock
     private lateinit var mLockscreenHostedDreamGestureListener: LockscreenHostedDreamGestureListener
@@ -178,6 +180,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 keyguardUnlockAnimationController,
                 notificationInsetsController,
                 ambientState,
+                shadeLogger,
                 pulsingGestureListener,
                 mLockscreenHostedDreamGestureListener,
                 keyguardBouncerViewModel,
@@ -185,6 +188,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 Mockito.mock(KeyguardMessageAreaController.Factory::class.java),
                 keyguardTransitionInteractor,
                 primaryBouncerToGoneTransitionViewModel,
+                NotificationExpansionRepository(),
                 featureFlags,
                 FakeSystemClock(),
                 BouncerMessageInteractor(

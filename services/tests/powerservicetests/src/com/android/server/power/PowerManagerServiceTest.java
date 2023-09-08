@@ -108,8 +108,10 @@ import com.android.server.power.PowerManagerService.WakeLock;
 import com.android.server.power.batterysaver.BatterySaverController;
 import com.android.server.power.batterysaver.BatterySaverPolicy;
 import com.android.server.power.batterysaver.BatterySaverStateMachine;
-import com.android.server.power.batterysaver.BatterySavingStats;
 import com.android.server.testutils.OffsettableClock;
+
+import com.google.testing.junit.testparameterinjector.TestParameter;
+import com.google.testing.junit.testparameterinjector.TestParameterInjector;
 
 import libcore.junit.util.compat.CoreCompatChangeRule.DisableCompatChanges;
 import libcore.junit.util.compat.CoreCompatChangeRule.EnableCompatChanges;
@@ -119,6 +121,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
+import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
@@ -137,9 +140,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * Tests for {@link com.android.server.power.PowerManagerService}.
  *
  * Build/Install/Run:
- *  atest FrameworksServicesTests:PowerManagerServiceTest
+ *  atest PowerServiceTests:PowerManagerServiceTest
  */
 @SuppressWarnings("GuardedBy")
+@RunWith(TestParameterInjector.class)
 public class PowerManagerServiceTest {
     private static final String SYSTEM_PROPERTY_QUIESCENT = "ro.boot.quiescent";
     private static final String SYSTEM_PROPERTY_REBOOT_REASON = "sys.boot.reason";
@@ -179,6 +183,7 @@ public class PowerManagerServiceTest {
     private OffsettableClock mClock;
     private long mLastElapsedRealtime;
     private TestLooper mTestLooper;
+    private boolean mIsBatterySaverSupported = true;
 
     private static class IntentFilterMatcher implements ArgumentMatcher<IntentFilter> {
         private final IntentFilter mFilter;
@@ -210,6 +215,10 @@ public class PowerManagerServiceTest {
                 .setBatterySaverEnabled(BATTERY_SAVER_ENABLED)
                 .setBrightnessFactor(BRIGHTNESS_FACTOR)
                 .build();
+        when(mBatterySaverStateMachineMock.getBatterySaverController()).thenReturn(
+                mBatterySaverControllerMock);
+        when(mBatterySaverStateMachineMock.getBatterySaverPolicy()).thenReturn(
+                mBatterySaverPolicyMock);
         when(mBatterySaverPolicyMock.getBatterySaverPolicy(
                 eq(PowerManager.ServiceType.SCREEN_BRIGHTNESS)))
                 .thenReturn(powerSaveState);
@@ -230,11 +239,16 @@ public class PowerManagerServiceTest {
         mContextSpy = spy(new ContextWrapper(ApplicationProvider.getApplicationContext()));
         mResourcesSpy = spy(mContextSpy.getResources());
         when(mContextSpy.getResources()).thenReturn(mResourcesSpy);
+        setBatterySaverSupported();
 
         MockContentResolver cr = new MockContentResolver(mContextSpy);
         cr.addProvider(Settings.AUTHORITY, new FakeSettingsProvider());
         when(mContextSpy.getContentResolver()).thenReturn(cr);
 
+        when(mResourcesSpy.getBoolean(com.android.internal.R.bool.config_dreamsSupported))
+                .thenReturn(true);
+        when(mResourcesSpy.getBoolean(com.android.internal.R.bool.config_dreamsEnabledByDefault))
+                .thenReturn(true);
         Settings.Global.putInt(mContextSpy.getContentResolver(),
                 Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0);
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
@@ -260,21 +274,7 @@ public class PowerManagerServiceTest {
             }
 
             @Override
-            BatterySaverPolicy createBatterySaverPolicy(
-                    Object lock, Context context, BatterySavingStats batterySavingStats) {
-                return mBatterySaverPolicyMock;
-            }
-
-            @Override
-            BatterySaverController createBatterySaverController(
-                    Object lock, Context context, BatterySaverPolicy batterySaverPolicy,
-                    BatterySavingStats batterySavingStats) {
-                return mBatterySaverControllerMock;
-            }
-
-            @Override
-            BatterySaverStateMachine createBatterySaverStateMachine(Object lock, Context context,
-                    BatterySaverController batterySaverController) {
+            BatterySaverStateMachine createBatterySaverStateMachine(Object lock, Context context) {
                 return mBatterySaverStateMachineMock;
             }
 
@@ -469,6 +469,12 @@ public class PowerManagerServiceTest {
     private void advanceTime(long timeMs) {
         mClock.fastForward(timeMs);
         mTestLooper.dispatchAll();
+    }
+
+    private void setBatterySaverSupported() {
+        when(mResourcesSpy.getBoolean(
+                com.android.internal.R.bool.config_batterySaverSupported)).thenReturn(
+                mIsBatterySaverSupported);
     }
 
     @Test
@@ -1079,13 +1085,9 @@ public class PowerManagerServiceTest {
     @SuppressWarnings("GuardedBy")
     @Test
     public void testScreensaverActivateOnSleepEnabled_powered_afterTimeout_goesToDreaming() {
-        when(mResourcesSpy.getBoolean(com.android.internal.R.bool.config_dreamsSupported))
-                .thenReturn(true);
         when(mBatteryManagerInternalMock.isPowered(anyInt())).thenReturn(true);
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP, 1);
-        Settings.Secure.putInt(mContextSpy.getContentResolver(),
-                Settings.Secure.SCREENSAVER_ENABLED, 1);
 
         doAnswer(inv -> {
             when(mDreamManagerInternalMock.isDreaming()).thenReturn(true);
@@ -1107,8 +1109,6 @@ public class PowerManagerServiceTest {
     public void testAmbientSuppression_disablesDreamingAndWakesDevice() {
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP, 1);
-        Settings.Secure.putInt(mContextSpy.getContentResolver(),
-                Settings.Secure.SCREENSAVER_ENABLED, 1);
 
         setDreamsDisabledByAmbientModeSuppressionConfig(true);
         setMinimumScreenOffTimeoutConfig(10000);
@@ -1136,8 +1136,6 @@ public class PowerManagerServiceTest {
     public void testAmbientSuppressionDisabled_shouldNotWakeDevice() {
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP, 1);
-        Settings.Secure.putInt(mContextSpy.getContentResolver(),
-                Settings.Secure.SCREENSAVER_ENABLED, 1);
 
         setDreamsDisabledByAmbientModeSuppressionConfig(false);
         setMinimumScreenOffTimeoutConfig(10000);
@@ -1164,8 +1162,6 @@ public class PowerManagerServiceTest {
     public void testAmbientSuppression_doesNotAffectDreamForcing() {
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP, 1);
-        Settings.Secure.putInt(mContextSpy.getContentResolver(),
-                Settings.Secure.SCREENSAVER_ENABLED, 1);
 
         setDreamsDisabledByAmbientModeSuppressionConfig(true);
         setMinimumScreenOffTimeoutConfig(10000);
@@ -1191,8 +1187,6 @@ public class PowerManagerServiceTest {
     public void testBatteryDrainDuringDream() {
         Settings.Secure.putInt(mContextSpy.getContentResolver(),
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_SLEEP, 1);
-        Settings.Secure.putInt(mContextSpy.getContentResolver(),
-                Settings.Secure.SCREENSAVER_ENABLED, 1);
 
         setMinimumScreenOffTimeoutConfig(100);
         setDreamsBatteryLevelDrainConfig(5);
@@ -2546,6 +2540,19 @@ public class PowerManagerServiceTest {
     }
 
     @Test
+    public void testGetFullPowerSavePolicy_whenNoBatterySaverSupported() {
+        mIsBatterySaverSupported = false;
+        setBatterySaverSupported();
+        createService();
+        BatterySaverPolicyConfig mockReturnConfig = new BatterySaverPolicyConfig.Builder().build();
+        assertFalse(mService.getBinderServiceInstance().setPowerSaveModeEnabled(true));
+        BatterySaverPolicyConfig policyConfig =
+                mService.getBinderServiceInstance().getFullPowerSavePolicy();
+        assertThat(mockReturnConfig.toString()).isEqualTo(policyConfig.toString());
+        verify(mBatterySaverStateMachineMock, never()).getFullBatterySaverPolicy();
+    }
+
+    @Test
     public void testSetFullPowerSavePolicy_callsStateMachine() {
         createService();
         startSystem();
@@ -2768,12 +2775,13 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    public void testFeatureEnabledProcStateUncachedToCached_fullWakeLockDisabled() {
+    public void testFeatureEnabledProcStateUncachedToCached_screenWakeLockDisabled(
+            @TestParameter PowerManagerServiceTest.ScreenWakeLockTestParameter param) {
         doReturn(true).when(mDeviceParameterProvider)
                 .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
         createService();
         startSystem();
-        WakeLock wakeLock = acquireWakeLock("fullWakeLock", PowerManager.FULL_WAKE_LOCK);
+        WakeLock wakeLock = acquireWakeLock(param.mDescr, param.mFlags);
         setUncachedUidProcState(wakeLock.mOwnerUid);
 
         setCachedUidProcState(wakeLock.mOwnerUid);
@@ -2781,12 +2789,13 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    public void testFeatureDisabledProcStateUncachedToCached_fullWakeLockEnabled() {
+    public void testFeatureDisabledProcStateUncachedToCached_screenWakeLockEnabled(
+            @TestParameter PowerManagerServiceTest.ScreenWakeLockTestParameter param) {
         doReturn(false).when(mDeviceParameterProvider)
                 .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
         createService();
         startSystem();
-        WakeLock wakeLock = acquireWakeLock("fullWakeLock", PowerManager.FULL_WAKE_LOCK);
+        WakeLock wakeLock = acquireWakeLock(param.mDescr, param.mFlags);
         setUncachedUidProcState(wakeLock.mOwnerUid);
 
         setCachedUidProcState(wakeLock.mOwnerUid);
@@ -2794,68 +2803,27 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    public void testFeatureEnabledProcStateUncachedToCached_screenBrightWakeLockDisabled() {
+    public void testFeatureEnabledProcStateCachedToUncached_screenWakeLockEnabled(
+            @TestParameter PowerManagerServiceTest.ScreenWakeLockTestParameter param) {
         doReturn(true).when(mDeviceParameterProvider)
                 .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
         createService();
         startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenBrightWakeLock",
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK);
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-
+        WakeLock wakeLock = acquireWakeLock(param.mDescr, param.mFlags);
         setCachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isTrue();
+
+        setUncachedUidProcState(wakeLock.mOwnerUid);
+        assertThat(wakeLock.mDisabled).isFalse();
     }
 
     @Test
-    public void testFeatureDisabledProcStateUncachedToCached_screenBrightWakeLockEnabled() {
+    public void testFeatureDisabledProcStateCachedToUncached_screenWakeLockEnabled(
+            @TestParameter PowerManagerServiceTest.ScreenWakeLockTestParameter param) {
         doReturn(false).when(mDeviceParameterProvider)
                 .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
         createService();
         startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenBrightWakeLock",
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK);
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-
-        setCachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureEnabledProcStateUncachedToCached_screenDimWakeLockDisabled() {
-        doReturn(true).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenDimWakeLock",
-                PowerManager.SCREEN_DIM_WAKE_LOCK);
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-
-        setCachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isTrue();
-    }
-
-    @Test
-    public void testFeatureDisabledProcStateUncachedToCached_screenDimWakeLockEnabled() {
-        doReturn(false).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenDimWakeLock",
-                PowerManager.SCREEN_DIM_WAKE_LOCK);
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-
-        setCachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureEnabledProcStateCachedToUncached_fullWakeLockEnabled() {
-        doReturn(true).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("fullWakeLock", PowerManager.FULL_WAKE_LOCK);
+        WakeLock wakeLock = acquireWakeLock(param.mDescr, param.mFlags);
         setCachedUidProcState(wakeLock.mOwnerUid);
 
         setUncachedUidProcState(wakeLock.mOwnerUid);
@@ -2863,76 +2831,7 @@ public class PowerManagerServiceTest {
     }
 
     @Test
-    public void testFeatureDisabledProcStateCachedToUncached_fullWakeLockEnabled() {
-        doReturn(false).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("fullWakeLock", PowerManager.FULL_WAKE_LOCK);
-        setCachedUidProcState(wakeLock.mOwnerUid);
-
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureEnabledProcStateCachedToUncached_screenBrightWakeLockEnabled() {
-        doReturn(true).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenBrightWakeLock",
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK);
-        setCachedUidProcState(wakeLock.mOwnerUid);
-
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureDisabledProcStateCachedToUncached_screenBrightWakeLockEnabled() {
-        doReturn(false).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenBrightWakeLock",
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK);
-        setCachedUidProcState(wakeLock.mOwnerUid);
-
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureEnabledProcStateCachedToUncached_screenDimWakeLockEnabled() {
-        doReturn(true).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenDimWakeLock",
-                PowerManager.SCREEN_DIM_WAKE_LOCK);
-        setCachedUidProcState(wakeLock.mOwnerUid);
-
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureDisabledProcStateCachedToUncached_screenDimWakeLockEnabled() {
-        doReturn(false).when(mDeviceParameterProvider)
-                .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
-        createService();
-        startSystem();
-        WakeLock wakeLock = acquireWakeLock("screenDimWakeLock",
-                PowerManager.SCREEN_DIM_WAKE_LOCK);
-        setCachedUidProcState(wakeLock.mOwnerUid);
-
-        setUncachedUidProcState(wakeLock.mOwnerUid);
-        assertThat(wakeLock.mDisabled).isFalse();
-    }
-
-    @Test
-    public void testFeatureDynamicallyDisabledProcStateUncachedToCached_fullWakeLockEnabled() {
+    public void testFeatureDynamicallyDisabledProcStateUncachedToCached_screenWakeLockEnabled() {
         doReturn(true).when(mDeviceParameterProvider)
                 .isDisableScreenWakeLocksWhileCachedFeatureEnabled();
         ArgumentCaptor<DeviceConfig.OnPropertiesChangedListener> listenerCaptor =
@@ -2959,5 +2858,19 @@ public class PowerManagerServiceTest {
 
     private void setUncachedUidProcState(int uid) {
         mService.updateUidProcStateInternal(uid, PROCESS_STATE_RECEIVER);
+    }
+
+    private enum ScreenWakeLockTestParameter {
+        FULL_WAKE_LOCK("fullWakeLock", PowerManager.FULL_WAKE_LOCK),
+        SCREEN_BRIGHT_WAKE_LOCK("screenBrightWakeLock", PowerManager.SCREEN_BRIGHT_WAKE_LOCK),
+        SCREEN_DIM_WAKE_LOCK("screenDimWakeLock", PowerManager.SCREEN_DIM_WAKE_LOCK);
+
+        final String mDescr;
+        final int mFlags;
+
+        ScreenWakeLockTestParameter(String descr, int flags) {
+            this.mDescr = descr;
+            this.mFlags = flags;
+        }
     }
 }

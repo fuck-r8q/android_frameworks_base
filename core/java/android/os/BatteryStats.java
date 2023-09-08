@@ -1656,6 +1656,8 @@ public abstract class BatteryStats {
     public abstract CpuScalingPolicies getCpuScalingPolicies();
 
     public final static class HistoryTag {
+        public static final int HISTORY_TAG_POOL_OVERFLOW = -1;
+
         public String string;
         public int uid;
 
@@ -1968,6 +1970,9 @@ public abstract class BatteryStats {
         public static final int STATE2_GPS_SIGNAL_QUALITY_SHIFT = 7;
         public static final int STATE2_GPS_SIGNAL_QUALITY_MASK =
                 0x3 << STATE2_GPS_SIGNAL_QUALITY_SHIFT;
+        // Values for NR_STATE_*
+        public static final int STATE2_NR_STATE_SHIFT = 9;
+        public static final int STATE2_NR_STATE_MASK = 0x3 << STATE2_NR_STATE_SHIFT;
 
         public static final int STATE2_POWER_SAVE_FLAG = 1<<31;
         public static final int STATE2_VIDEO_ON_FLAG = 1<<30;
@@ -2763,6 +2768,14 @@ public abstract class BatteryStats {
      */
     public abstract Timer getPhoneDataConnectionTimer(int dataType);
 
+    /**
+     * Returns the time in microseconds that the phone's data connection was in NR NSA mode while
+     * on battery.
+     *
+     * {@hide}
+     */
+    public abstract long getNrNsaTime(long elapsedRealtimeUs);
+
     /** @hide */
     public static final int RADIO_ACCESS_TECHNOLOGY_OTHER = 0;
     /** @hide */
@@ -3029,7 +3042,11 @@ public abstract class BatteryStats {
                 "cellular_high_tx_power", "Chtp"),
         new BitDescription(HistoryItem.STATE2_GPS_SIGNAL_QUALITY_MASK,
             HistoryItem.STATE2_GPS_SIGNAL_QUALITY_SHIFT, "gps_signal_quality", "Gss",
-            new String[] { "poor", "good", "none"}, new String[] { "poor", "good", "none"})
+            new String[] { "poor", "good", "none"}, new String[] { "poor", "good", "none"}),
+        new BitDescription(HistoryItem.STATE2_NR_STATE_MASK,
+            HistoryItem.STATE2_NR_STATE_SHIFT, "nr_state", "nrs",
+            new String[]{"none", "restricted", "not_restricted", "connected"},
+            new String[]{"0", "1", "2", "3"}),
     };
 
     public static final String[] HISTORY_EVENT_NAMES = new String[] {
@@ -5612,20 +5629,36 @@ public abstract class BatteryStats {
         sb.append(prefix);
         sb.append("     Cellular Radio Access Technology:");
         didOne = false;
-        for (int i=0; i<NUM_DATA_CONNECTION_TYPES; i++) {
-            final long time = getPhoneDataConnectionTime(i, rawRealtime, which);
+        for (int connType = 0; connType < NUM_DATA_CONNECTION_TYPES; connType++) {
+            final long time = getPhoneDataConnectionTime(connType, rawRealtime, which);
             if (time == 0) {
                 continue;
             }
             sb.append("\n       ");
             sb.append(prefix);
             didOne = true;
-            sb.append(i < DATA_CONNECTION_NAMES.length ? DATA_CONNECTION_NAMES[i] : "ERROR");
+            sb.append(connType < DATA_CONNECTION_NAMES.length ?
+                DATA_CONNECTION_NAMES[connType] : "ERROR");
             sb.append(" ");
             formatTimeMs(sb, time/1000);
             sb.append("(");
             sb.append(formatRatioLocked(time, whichBatteryRealtime));
             sb.append(") ");
+
+            if (connType == TelephonyManager.NETWORK_TYPE_LTE) {
+                // Report any of the LTE time was spent in NR NSA mode.
+                final long nrNsaTime = getNrNsaTime(rawRealtime);
+                if (nrNsaTime != 0) {
+                    sb.append("\n         ");
+                    sb.append(prefix);
+                    sb.append("nr_nsa");
+                    sb.append(" ");
+                    formatTimeMs(sb, nrNsaTime / 1000);
+                    sb.append("(");
+                    sb.append(formatRatioLocked(nrNsaTime, whichBatteryRealtime));
+                    sb.append(") ");
+                }
+            }
         }
         if (!didOne) sb.append(" (no activity)");
         pw.println(sb.toString());
@@ -6795,10 +6828,11 @@ public abstract class BatteryStats {
                     if (bd.mask == HistoryItem.STATE_WAKE_LOCK_FLAG && wakelockTag != null) {
                         didWake = true;
                         sb.append("=");
-                        if (longNames) {
+                        if (longNames
+                                || wakelockTag.poolIdx == HistoryTag.HISTORY_TAG_POOL_OVERFLOW) {
                             UserHandle.formatUid(sb, wakelockTag.uid);
                             sb.append(":\"");
-                            sb.append(wakelockTag.string);
+                            sb.append(wakelockTag.string.replace("\"", "\"\""));
                             sb.append("\"");
                         } else {
                             sb.append(wakelockTag.poolIdx);
@@ -6818,7 +6852,7 @@ public abstract class BatteryStats {
         }
         if (!didWake && wakelockTag != null) {
             sb.append(longNames ? " wake_lock=" : ",w=");
-            if (longNames) {
+            if (longNames || wakelockTag.poolIdx == HistoryTag.HISTORY_TAG_POOL_OVERFLOW) {
                 UserHandle.formatUid(sb, wakelockTag.uid);
                 sb.append(":\"");
                 sb.append(wakelockTag.string);
@@ -7079,7 +7113,14 @@ public abstract class BatteryStats {
                 if (rec.wakeReasonTag != null) {
                     if (checkin) {
                         item.append(",wr=");
-                        item.append(rec.wakeReasonTag.poolIdx);
+                        if (rec.wakeReasonTag.poolIdx == HistoryTag.HISTORY_TAG_POOL_OVERFLOW) {
+                            item.append(sUidToString.applyAsString(rec.wakeReasonTag.uid));
+                            item.append(":\"");
+                            item.append(rec.wakeReasonTag.string.replace("\"", "\"\""));
+                            item.append("\"");
+                        } else {
+                            item.append(rec.wakeReasonTag.poolIdx);
+                        }
                     } else {
                         item.append(" wake_reason=");
                         item.append(rec.wakeReasonTag.uid);
@@ -7107,7 +7148,15 @@ public abstract class BatteryStats {
                     }
                     item.append("=");
                     if (checkin) {
-                        item.append(rec.eventTag.poolIdx);
+                        if (rec.eventTag.poolIdx == HistoryTag.HISTORY_TAG_POOL_OVERFLOW) {
+                            item.append(HISTORY_EVENT_INT_FORMATTERS[idx]
+                                    .applyAsString(rec.eventTag.uid));
+                            item.append(":\"");
+                            item.append(rec.eventTag.string.replace("\"", "\"\""));
+                            item.append("\"");
+                        } else {
+                            item.append(rec.eventTag.poolIdx);
+                        }
                     } else {
                         item.append(HISTORY_EVENT_INT_FORMATTERS[idx]
                                 .applyAsString(rec.eventTag.uid));

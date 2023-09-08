@@ -40,6 +40,7 @@ import static android.hardware.display.DisplayViewport.VIEWPORT_INTERNAL;
 import static android.hardware.display.DisplayViewport.VIEWPORT_VIRTUAL;
 import static android.Manifest.permission.MANAGE_CROSS_DEVICE;
 import static android.hardware.display.HdrConversionMode.HDR_CONVERSION_UNSUPPORTED;
+import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
 import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.os.Process.ROOT_UID;
 
@@ -605,7 +606,7 @@ public final class DisplayManagerService extends SystemService {
         DisplayManagerGlobal.invalidateLocalDisplayInfoCaches();
 
         publishBinderService(Context.DISPLAY_SERVICE, new BinderService(),
-                true /*allowIsolated*/);
+                true /*allowIsolated*/, DUMP_FLAG_PRIORITY_CRITICAL);
         publishLocalService(DisplayManagerInternal.class, new LocalService());
     }
 
@@ -1563,6 +1564,7 @@ public final class DisplayManagerService extends SystemService {
                 if (displayId != Display.INVALID_DISPLAY && virtualDevice != null && dwpc != null) {
                     mDisplayWindowPolicyControllers.put(
                             displayId, Pair.create(virtualDevice, dwpc));
+                    Slog.d(TAG, "Virtual Display: successfully created virtual display");
                 }
             }
 
@@ -1609,19 +1611,25 @@ public final class DisplayManagerService extends SystemService {
                     if (!getProjectionService().setContentRecordingSession(session, projection)) {
                         // Unable to start mirroring, so release VirtualDisplay. Projection service
                         // handles stopping the projection.
+                        Slog.w(TAG, "Content Recording: failed to start mirroring - "
+                                + "releasing virtual display " + displayId);
                         releaseVirtualDisplayInternal(callback.asBinder());
                         return Display.INVALID_DISPLAY;
                     } else if (projection != null) {
                         // Indicate that this projection has been used to record, and can't be used
                         // again.
+                        Slog.d(TAG, "Content Recording: notifying MediaProjection of successful"
+                                + " VirtualDisplay creation.");
                         projection.notifyVirtualDisplayCreated(displayId);
                     }
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Unable to tell MediaProjectionManagerService to set the "
                             + "content recording session", e);
+                    return displayId;
                 }
+                Slog.d(TAG, "Virtual Display: successfully set up virtual display "
+                        + displayId);
             }
-
             return displayId;
         } finally {
             Binder.restoreCallingIdentity(secondToken);
@@ -1645,10 +1653,13 @@ public final class DisplayManagerService extends SystemService {
             return -1;
         }
 
+
+        Slog.d(TAG, "Virtual Display: creating DisplayDevice with VirtualDisplayAdapter");
         DisplayDevice device = mVirtualDisplayAdapter.createVirtualDisplayLocked(
                 callback, projection, callingUid, packageName, surface, flags,
                 virtualDisplayConfig);
         if (device == null) {
+            Slog.w(TAG, "Virtual Display: VirtualDisplayAdapter failed to create DisplayDevice");
             return -1;
         }
 
@@ -1726,6 +1737,7 @@ public final class DisplayManagerService extends SystemService {
 
             DisplayDevice device =
                     mVirtualDisplayAdapter.releaseVirtualDisplayLocked(appToken);
+            Slog.d(TAG, "Virtual Display: Display Device released");
             if (device != null) {
                 // TODO: multi-display - handle virtual displays the same as other display adapters.
                 mDisplayDeviceRepo.onDisplayDeviceEvent(device,

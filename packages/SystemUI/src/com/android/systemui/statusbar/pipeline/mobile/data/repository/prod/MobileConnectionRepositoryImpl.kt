@@ -97,15 +97,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -602,6 +603,9 @@ class MobileConnectionRepositoryImpl(
         Log.d(tag, "getSlotIndex subId: $subId slotIndex: $slotIndex list.size: ${list.size}")
         return slotIndex
     }
+
+    /** Typical mobile connections aren't available during airplane mode. */
+    override val isAllowedDuringAirplaneMode = MutableStateFlow(false).asStateFlow()
 
     class Factory
     @Inject

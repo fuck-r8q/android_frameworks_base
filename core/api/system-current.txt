@@ -36,6 +36,7 @@ package android {
     field public static final String ALLOW_ANY_CODEC_FOR_PLAYBACK = "android.permission.ALLOW_ANY_CODEC_FOR_PLAYBACK";
     field public static final String ALLOW_PLACE_IN_MULTI_PANE_SETTINGS = "android.permission.ALLOW_PLACE_IN_MULTI_PANE_SETTINGS";
     field public static final String ALLOW_SLIPPERY_TOUCHES = "android.permission.ALLOW_SLIPPERY_TOUCHES";
+    field public static final String ALWAYS_UPDATE_WALLPAPER = "android.permission.ALWAYS_UPDATE_WALLPAPER";
     field public static final String AMBIENT_WALLPAPER = "android.permission.AMBIENT_WALLPAPER";
     field public static final String APPROVE_INCIDENT_REPORTS = "android.permission.APPROVE_INCIDENT_REPORTS";
     field public static final String ASSOCIATE_COMPANION_DEVICES = "android.permission.ASSOCIATE_COMPANION_DEVICES";
@@ -6275,11 +6276,13 @@ package android.location {
   }
 
   public final class GnssMeasurementRequest implements android.os.Parcelable {
+    method @NonNull public android.os.WorkSource getWorkSource();
     method public boolean isCorrelationVectorOutputsEnabled();
   }
 
   public static final class GnssMeasurementRequest.Builder {
     method @NonNull public android.location.GnssMeasurementRequest.Builder setCorrelationVectorOutputsEnabled(boolean);
+    method @NonNull @RequiresPermission(android.Manifest.permission.UPDATE_DEVICE_STATS) public android.location.GnssMeasurementRequest.Builder setWorkSource(@Nullable android.os.WorkSource);
   }
 
   public final class GnssReflectingPlane implements android.os.Parcelable {
@@ -10386,6 +10389,7 @@ package android.os {
     field public static final int BUGREPORT_FLAG_USE_PREDUMPED_UI_DATA = 1; // 0x1
     field public static final int BUGREPORT_MODE_FULL = 0; // 0x0
     field public static final int BUGREPORT_MODE_INTERACTIVE = 1; // 0x1
+    field public static final int BUGREPORT_MODE_ONBOARDING = 7; // 0x7
     field public static final int BUGREPORT_MODE_REMOTE = 2; // 0x2
     field public static final int BUGREPORT_MODE_TELEPHONY = 4; // 0x4
     field public static final int BUGREPORT_MODE_WEAR = 3; // 0x3
@@ -10747,7 +10751,7 @@ package android.os {
     field @RequiresPermission(android.Manifest.permission.MANAGE_LOW_POWER_STANDBY) public static final String ACTION_LOW_POWER_STANDBY_PORTS_CHANGED = "android.os.action.LOW_POWER_STANDBY_PORTS_CHANGED";
     field public static final int POWER_SAVE_MODE_TRIGGER_DYNAMIC = 1; // 0x1
     field public static final int POWER_SAVE_MODE_TRIGGER_PERCENTAGE = 0; // 0x0
-    field public static final String REBOOT_USERSPACE = "userspace";
+    field @Deprecated public static final String REBOOT_USERSPACE = "userspace";
     field public static final int SOUND_TRIGGER_MODE_ALL_DISABLED = 2; // 0x2
     field public static final int SOUND_TRIGGER_MODE_ALL_ENABLED = 0; // 0x0
     field public static final int SOUND_TRIGGER_MODE_CRITICAL_ONLY = 1; // 0x1

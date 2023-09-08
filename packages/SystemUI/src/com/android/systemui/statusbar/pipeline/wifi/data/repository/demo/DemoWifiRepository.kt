@@ -48,6 +48,9 @@ constructor(
     private val _wifiNetwork = MutableStateFlow<WifiNetworkModel>(WifiNetworkModel.Inactive)
     override val wifiNetwork: StateFlow<WifiNetworkModel> = _wifiNetwork
 
+    private val _secondaryNetworks = MutableStateFlow<List<WifiNetworkModel>>(emptyList())
+    override val secondaryNetworks: StateFlow<List<WifiNetworkModel>> = _secondaryNetworks
+
     private val _wifiActivity =
         MutableStateFlow(DataActivityModel(hasActivityIn = false, hasActivityOut = false))
     override val wifiActivity: StateFlow<DataActivityModel> = _wifiActivity
@@ -97,6 +100,7 @@ constructor(
             isValidated = validated ?: true,
             level = level ?: 0,
             ssid = ssid ?: DEMO_NET_SSID,
+            hotspotDeviceType = hotspotDeviceType,
 
             // These fields below aren't supported in demo mode, since they aren't needed to satisfy
             // the interface.

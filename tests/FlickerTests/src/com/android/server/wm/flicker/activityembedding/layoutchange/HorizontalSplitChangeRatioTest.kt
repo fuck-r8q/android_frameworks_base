@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package com.android.server.wm.flicker.activityembedding
+package com.android.server.wm.flicker.activityembedding.layoutchange
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Presubmit
 import android.tools.common.datatypes.Rect
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import androidx.test.filters.FlakyTest
+import com.android.server.wm.flicker.activityembedding.ActivityEmbeddingTestBase
 import com.android.server.wm.flicker.helpers.ActivityEmbeddingAppHelper
 import androidx.test.filters.RequiresDevice
 import org.junit.FixMethodOrder
@@ -35,18 +36,17 @@ import org.junit.runners.Parameterized
  * Test changing split ratio at runtime on a horizona split.
  *
  * Setup: Launch A|B in horizontal split with B being the secondary activity, by default A and B
- * windows are equal in size. B is on the top and A is on the bottom.
- * Transitions:
- * Change the split ratio to A:B=0.7:0.3, expect bounds change for both A and B.
+ * windows are equal in size. B is on the top and A is on the bottom. Transitions: Change the split
+ * ratio to A:B=0.7:0.3, expect bounds change for both A and B.
  *
- * To run this test: `atest FlickerTests:HorizontalSplitChangeRatioTest`
+ * To run this test: `atest FlickerTestsOther:HorizontalSplitChangeRatioTest`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
-        ActivityEmbeddingTestBase(flicker) {
+    ActivityEmbeddingTestBase(flicker) {
     /** {@inheritDoc} */
     override val transition: FlickerBuilder.() -> Unit = {
         setup {
@@ -54,12 +54,9 @@ class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
             testApp.launchViaIntent(wmHelper)
             testApp.launchSecondaryActivityHorizontally(wmHelper)
             startDisplayBounds =
-                    wmHelper.currentState.layerState.physicalDisplayBounds
-                            ?: error("Display not found")
+                wmHelper.currentState.layerState.physicalDisplayBounds ?: error("Display not found")
         }
-        transitions {
-            testApp.changeSecondaryActivityRatio(wmHelper)
-        }
+        transitions { testApp.changeSecondaryActivityRatio(wmHelper) }
         teardown {
             tapl.goHome()
             testApp.exit(wmHelper)
@@ -94,7 +91,8 @@ class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
     @Test
     fun secondaryActivityWindowIsAlwaysVisible() {
         flicker.assertWm {
-            isAppWindowVisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT) }
+            isAppWindowVisible(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
+        }
     }
 
     /** Assert the Secondary activity window is always visible. */
@@ -110,15 +108,17 @@ class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
     fun secondaryActivityAdjustsHeightRuntime() {
         flicker.assertLayersStart {
             val topLayerRegion =
-                    this.visibleRegion(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
+                this.visibleRegion(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
             val bottomLayerRegion =
-                    this.visibleRegion(ActivityEmbeddingAppHelper.MAIN_ACTIVITY_COMPONENT)
+                this.visibleRegion(ActivityEmbeddingAppHelper.MAIN_ACTIVITY_COMPONENT)
             // Compare dimensions of two splits, given we're using default split attributes,
             // both activities take up the same visible size on the display.
             check { "height" }
-                    .that(topLayerRegion.region.height).isEqual(bottomLayerRegion.region.height)
+                .that(topLayerRegion.region.height)
+                .isEqual(bottomLayerRegion.region.height)
             check { "width" }
-                    .that(topLayerRegion.region.width).isEqual(bottomLayerRegion.region.width)
+                .that(topLayerRegion.region.width)
+                .isEqual(bottomLayerRegion.region.width)
             topLayerRegion.notOverlaps(bottomLayerRegion.region)
             // Layers of two activities sum to be fullscreen size on display.
             topLayerRegion.plus(bottomLayerRegion.region).coversExactly(startDisplayBounds)
@@ -126,20 +126,20 @@ class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
 
         flicker.assertLayersEnd {
             val topLayerRegion =
-                    this.visibleRegion(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
+                this.visibleRegion(ActivityEmbeddingAppHelper.SECONDARY_ACTIVITY_COMPONENT)
             val bottomLayerRegion =
-                    this.visibleRegion(ActivityEmbeddingAppHelper.MAIN_ACTIVITY_COMPONENT)
+                this.visibleRegion(ActivityEmbeddingAppHelper.MAIN_ACTIVITY_COMPONENT)
             // Compare dimensions of two splits, given we're using default split attributes,
             // both activities take up the same visible size on the display.
             check { "height" }
-                    .that(topLayerRegion.region.height).isLower(bottomLayerRegion.region.height)
+                .that(topLayerRegion.region.height)
+                .isLower(bottomLayerRegion.region.height)
             check { "height" }
-                    .that(
-                            topLayerRegion.region.height / 0.3f -
-                                    bottomLayerRegion.region.height / 0.7f)
-                    .isLower(0.1f)
+                .that(topLayerRegion.region.height / 0.3f - bottomLayerRegion.region.height / 0.7f)
+                .isLower(0.1f)
             check { "width" }
-                    .that(topLayerRegion.region.width).isEqual(bottomLayerRegion.region.width)
+                .that(topLayerRegion.region.width)
+                .isEqual(bottomLayerRegion.region.width)
             topLayerRegion.notOverlaps(bottomLayerRegion.region)
             // Layers of two activities sum to be fullscreen size on display.
             topLayerRegion.plus(bottomLayerRegion.region).coversExactly(startDisplayBounds)
@@ -149,6 +149,7 @@ class HorizontalSplitChangeRatioTest(flicker: LegacyFlickerTest) :
     companion object {
         /** {@inheritDoc} */
         private var startDisplayBounds = Rect.EMPTY
+
         /**
          * Creates the test configurations.
          *

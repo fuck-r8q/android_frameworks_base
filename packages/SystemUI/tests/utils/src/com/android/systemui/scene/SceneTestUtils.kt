@@ -18,9 +18,11 @@ package com.android.systemui.scene
 
 import android.content.pm.UserInfo
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.authentication.data.model.AuthenticationMethodModel as DataLayerAuthenticationMethodModel
 import com.android.systemui.authentication.data.repository.AuthenticationRepository
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
+import com.android.systemui.authentication.domain.model.AuthenticationMethodModel as DomainLayerAuthenticationMethodModel
 import com.android.systemui.bouncer.data.repository.BouncerRepository
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
@@ -32,7 +34,6 @@ import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
-import com.android.systemui.keyguard.domain.interactor.LockscreenSceneInteractor
 import com.android.systemui.keyguard.shared.model.WakeSleepReason
 import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.keyguard.shared.model.WakefulnessState
@@ -92,12 +93,13 @@ class SceneTestUtils(
             )
         }
     }
+
     private val context = test.context
 
     fun fakeSceneContainerRepository(
         containerConfig: SceneContainerConfig = fakeSceneContainerConfig(),
     ): SceneContainerRepository {
-        return SceneContainerRepository(containerConfig)
+        return SceneContainerRepository(applicationScope(), containerConfig)
     }
 
     fun fakeSceneKeys(): List<SceneKey> {
@@ -123,7 +125,9 @@ class SceneTestUtils(
         repository: SceneContainerRepository = fakeSceneContainerRepository()
     ): SceneInteractor {
         return SceneInteractor(
+            applicationScope = applicationScope(),
             repository = repository,
+            logger = mock(),
         )
     }
 
@@ -133,6 +137,7 @@ class SceneTestUtils(
 
     fun authenticationInteractor(
         repository: AuthenticationRepository,
+        sceneInteractor: SceneInteractor = sceneInteractor(),
     ): AuthenticationInteractor {
         return AuthenticationInteractor(
             applicationScope = applicationScope(),
@@ -140,6 +145,7 @@ class SceneTestUtils(
             backgroundDispatcher = testDispatcher,
             userRepository = userRepository,
             keyguardRepository = keyguardRepository,
+            sceneInteractor = sceneInteractor,
             clock = mock { whenever(elapsedRealtime()).thenAnswer { testScope.currentTime } }
         )
     }
@@ -174,23 +180,14 @@ class SceneTestUtils(
 
     fun bouncerViewModel(
         bouncerInteractor: BouncerInteractor,
+        authenticationInteractor: AuthenticationInteractor,
     ): BouncerViewModel {
         return BouncerViewModel(
             applicationContext = context,
             applicationScope = applicationScope(),
-            interactor = bouncerInteractor,
-            featureFlags = featureFlags,
-        )
-    }
-
-    fun lockScreenSceneInteractor(
-        authenticationInteractor: AuthenticationInteractor,
-        bouncerInteractor: BouncerInteractor,
-    ): LockscreenSceneInteractor {
-        return LockscreenSceneInteractor(
-            applicationScope = applicationScope(),
-            authenticationInteractor = authenticationInteractor,
             bouncerInteractor = bouncerInteractor,
+            authenticationInteractor = authenticationInteractor,
+            featureFlags = featureFlags,
         )
     }
 
@@ -207,5 +204,18 @@ class SceneTestUtils(
                 RemoteUserInput(10f, 40f, RemoteUserInputAction.MOVE),
                 RemoteUserInput(10f, 40f, RemoteUserInputAction.UP),
             )
+
+        fun DomainLayerAuthenticationMethodModel.toDataLayer(): DataLayerAuthenticationMethodModel {
+            return when (this) {
+                DomainLayerAuthenticationMethodModel.None -> DataLayerAuthenticationMethodModel.None
+                DomainLayerAuthenticationMethodModel.Swipe ->
+                    DataLayerAuthenticationMethodModel.None
+                DomainLayerAuthenticationMethodModel.Pin -> DataLayerAuthenticationMethodModel.Pin
+                DomainLayerAuthenticationMethodModel.Password ->
+                    DataLayerAuthenticationMethodModel.Password
+                DomainLayerAuthenticationMethodModel.Pattern ->
+                    DataLayerAuthenticationMethodModel.Pattern
+            }
+        }
     }
 }

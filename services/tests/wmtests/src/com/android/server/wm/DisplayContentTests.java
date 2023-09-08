@@ -1819,7 +1819,7 @@ public class DisplayContentTests extends WindowTestsBase {
 
         final ActivityRecord activity = createActivityRecord(mDisplayContent);
         final ActivityRecord recentsActivity = createActivityRecord(mDisplayContent);
-        recentsActivity.setRequestedOrientation(SCREEN_ORIENTATION_PORTRAIT);
+        recentsActivity.setRequestedOrientation(SCREEN_ORIENTATION_NOSENSOR);
         doReturn(mock(RecentsAnimationController.class)).when(mWm).getRecentsAnimationController();
 
         // Do not rotate if the recents animation is animating on top.
@@ -2049,6 +2049,17 @@ public class DisplayContentTests extends WindowTestsBase {
         assertNotEquals(testPlayer.mLastReady.getChange(dcToken).getEndRotation(),
                 testPlayer.mLastReady.getChange(dcToken).getStartRotation());
         testPlayer.finish();
+
+        // The AsyncRotationController should only exist if there is an ongoing rotation change.
+        dc.finishAsyncRotationIfPossible();
+        dc.setLastHasContent();
+        doReturn(dr.getRotation() + 1).when(dr).rotationForOrientation(anyInt(), anyInt());
+        dr.updateRotationUnchecked(true /* forceUpdate */);
+        assertNotNull(dc.getAsyncRotationController());
+        doReturn(dr.getRotation() - 1).when(dr).rotationForOrientation(anyInt(), anyInt());
+        dr.updateRotationUnchecked(true /* forceUpdate */);
+        assertNull("Cancel AsyncRotationController for the intermediate rotation changes 0->1->0",
+                dc.getAsyncRotationController());
     }
 
     @Test

@@ -120,6 +120,14 @@ public class LogModule {
         return factory.create("ShadeLog", 500, false);
     }
 
+    /** Provides a logging buffer for Shade messages. */
+    @Provides
+    @SysUISingleton
+    @ShadeTouchLog
+    public static LogBuffer provideShadeTouchLogBuffer(LogBufferFactory factory) {
+        return factory.create("ShadeTouchLog", 500, false);
+    }
+
     /** Provides a logging buffer for all logs related to managing notification sections. */
     @Provides
     @SysUISingleton
@@ -489,11 +497,29 @@ public class LogModule {
         return factory.create("DreamLog", 250);
     }
 
+    /**
+     * Provides a {@link LogBuffer} for communal-related logs.
+     */
+    @Provides
+    @SysUISingleton
+    @CommunalLog
+    public static LogBuffer provideCommunalLogBuffer(LogBufferFactory factory) {
+        return factory.create("CommunalLog", 250);
+    }
+
     /** Provides a {@link LogBuffer} for display metrics related logs. */
     @Provides
     @SysUISingleton
     @DisplayMetricsRepoLog
     public static LogBuffer provideDisplayMetricsRepoLogBuffer(LogBufferFactory factory) {
         return factory.create("DisplayMetricsRepo", 50);
+    }
+
+    /** Provides a {@link LogBuffer} for the scene framework. */
+    @Provides
+    @SysUISingleton
+    @SceneFrameworkLog
+    public static LogBuffer provideSceneFrameworkLogBuffer(LogBufferFactory factory) {
+        return factory.create("SceneFramework", 50);
     }
 }

@@ -254,13 +254,6 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
     // The doze screen brightness.
     private final float mScreenBrightnessDozeConfig;
 
-    // The dim screen brightness.
-    private final float mScreenBrightnessDimConfig;
-
-    // The minimum dim amount to use if the screen brightness is already below
-    // mScreenBrightnessDimConfig.
-    private final float mScreenBrightnessMinimumDimAmount;
-
     // True if auto-brightness should be used.
     private boolean mUseSoftwareAutoBrightnessConfig;
 
@@ -349,7 +342,7 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
     private boolean mDozing;
 
     private boolean mAppliedDimming;
-    private boolean mAppliedLowPower;
+
     private boolean mAppliedThrottling;
 
     // Reason for which the brightness was last changed. See {@link BrightnessReason} for more
@@ -529,11 +522,6 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
         // DOZE AND DIM SETTINGS
         mScreenBrightnessDozeConfig = BrightnessUtils.clampAbsoluteBrightness(
                 pm.getBrightnessConstraint(PowerManager.BRIGHTNESS_CONSTRAINT_TYPE_DOZE));
-        mScreenBrightnessDimConfig = BrightnessUtils.clampAbsoluteBrightness(
-                pm.getBrightnessConstraint(PowerManager.BRIGHTNESS_CONSTRAINT_TYPE_DIM));
-        mScreenBrightnessMinimumDimAmount = resources.getFloat(
-                R.dimen.config_screenBrightnessMinimumDimAmountFloat);
-
         loadBrightnessRampRates();
         mSkipScreenOnBrightnessRamp = resources.getBoolean(
                 R.bool.config_skipScreenOnBrightnessRamp);
@@ -565,7 +553,7 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
                 mUniqueDisplayId,
                 mThermalBrightnessThrottlingDataId,
                 mDisplayDeviceConfig
-        ));
+        ), mContext);
         // Seed the cached brightness
         saveBrightnessInfo(getScreenBrightnessSetting());
         mAutomaticBrightnessStrategy =
@@ -613,7 +601,9 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
 
         setUpAutoBrightness(resources, handler);
 
-        mColorFadeEnabled = mInjector.isColorFadeEnabled(resources);
+        mColorFadeEnabled = mInjector.isColorFadeEnabled()
+                && !resources.getBoolean(
+                  com.android.internal.R.bool.config_displayColorFadeDisabled);
         mColorFadeFadesConfig = resources.getBoolean(
                 R.bool.config_animateScreenLights);
 
@@ -1424,6 +1414,7 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
         // Note throttling effectively changes the allowed brightness range, so, similarly to HBM,
         // we broadcast this change through setting.
         final float unthrottledBrightnessState = brightnessState;
+
         if (mBrightnessThrottler.isThrottled()) {
             mTempBrightnessEvent.setThermalMax(mBrightnessThrottler.getBrightnessCap());
             brightnessState = Math.min(brightnessState, mBrightnessThrottler.getBrightnessCap());
@@ -1447,42 +1438,12 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
             mDisplayBrightnessController.updateScreenBrightnessSetting(brightnessState);
         }
 
-        // Apply dimming by at least some minimum amount when user activity
-        // timeout is about to expire.
-        if (mPowerRequest.policy == DisplayPowerRequest.POLICY_DIM) {
-            if (brightnessState > PowerManager.BRIGHTNESS_MIN) {
-                brightnessState = Math.max(
-                        Math.min(brightnessState - mScreenBrightnessMinimumDimAmount,
-                                mScreenBrightnessDimConfig),
-                        PowerManager.BRIGHTNESS_MIN);
-                mBrightnessReasonTemp.addModifier(BrightnessReason.MODIFIER_DIMMED);
-            }
-            if (!mAppliedDimming) {
-                slowChange = false;
-            }
-            mAppliedDimming = true;
-        } else if (mAppliedDimming) {
-            slowChange = false;
-            mAppliedDimming = false;
-        }
-        // If low power mode is enabled, scale brightness by screenLowPowerBrightnessFactor
-        // as long as it is above the minimum threshold.
-        if (mPowerRequest.lowPowerMode) {
-            if (brightnessState > PowerManager.BRIGHTNESS_MIN) {
-                final float brightnessFactor =
-                        Math.min(mPowerRequest.screenLowPowerBrightnessFactor, 1);
-                final float lowPowerBrightnessFloat = (brightnessState * brightnessFactor);
-                brightnessState = Math.max(lowPowerBrightnessFloat, PowerManager.BRIGHTNESS_MIN);
-                mBrightnessReasonTemp.addModifier(BrightnessReason.MODIFIER_LOW_POWER);
-            }
-            if (!mAppliedLowPower) {
-                slowChange = false;
-            }
-            mAppliedLowPower = true;
-        } else if (mAppliedLowPower) {
-            slowChange = false;
-            mAppliedLowPower = false;
-        }
+        DisplayBrightnessState clampedState = mBrightnessClamperController.clamp(mPowerRequest,
+                brightnessState, slowChange);
+
+        brightnessState = clampedState.getBrightness();
+        slowChange = clampedState.isSlowChange();
+        mBrightnessReasonTemp.addModifier(clampedState.getBrightnessReason().getModifier());
 
         // The current brightness to use has been calculated at this point, and HbmController should
         // be notified so that it can accurately calculate HDR or HBM levels. We specifically do it
@@ -1539,8 +1500,6 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
             // transformations to the brightness have pushed it outside of the currently
             // allowed range.
             float animateValue = clampScreenBrightness(brightnessState);
-
-            animateValue = mBrightnessClamperController.clamp(animateValue);
 
             // If there are any HDR layers on the screen, we have a special brightness value that we
             // use instead. We still preserve the calculated brightness for Standard Dynamic Range
@@ -2377,7 +2336,6 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
         pw.println();
         pw.println("Display Power Controller Configuration:");
         pw.println("  mScreenBrightnessDozeConfig=" + mScreenBrightnessDozeConfig);
-        pw.println("  mScreenBrightnessDimConfig=" + mScreenBrightnessDimConfig);
         pw.println("  mUseSoftwareAutoBrightnessConfig=" + mUseSoftwareAutoBrightnessConfig);
         pw.println("  mSkipScreenOnBrightnessRamp=" + mSkipScreenOnBrightnessRamp);
         pw.println("  mColorFadeFadesConfig=" + mColorFadeFadesConfig);
@@ -2409,7 +2367,6 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
         pw.println("  mPowerRequest=" + mPowerRequest);
         pw.println("  mBrightnessReason=" + mBrightnessReason);
         pw.println("  mAppliedDimming=" + mAppliedDimming);
-        pw.println("  mAppliedLowPower=" + mAppliedLowPower);
         pw.println("  mAppliedThrottling=" + mAppliedThrottling);
         pw.println("  mDozing=" + mDozing);
         pw.println("  mSkipRampState=" + skipRampStateToString(mSkipRampState));
@@ -2448,6 +2405,10 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
         }
 
         dumpRbcEvents(pw);
+
+        if (mScreenOffBrightnessSensorController != null) {
+            mScreenOffBrightnessSensorController.dump(pw);
+        }
 
         if (mBrightnessRangeController != null) {
             mBrightnessRangeController.dump(pw);
@@ -3005,10 +2966,8 @@ final class DisplayPowerController2 implements AutomaticBrightnessController.Cal
                     sensorManager, resources);
         }
 
-        boolean isColorFadeEnabled(Resources resources) {
-            return !ActivityManager.isLowRamDeviceStatic()
-                && !resources.getBoolean(
-                  com.android.internal.R.bool.config_displayColorFadeDisabled);
+        boolean isColorFadeEnabled() {
+            return !ActivityManager.isLowRamDeviceStatic();
         }
     }
 

@@ -24,6 +24,7 @@ import static android.content.ContentProvider.isAuthorityRedirectedForCloneProfi
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_DEFAULT;
 import static android.content.Intent.CATEGORY_HOME;
+import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE;
 import static android.content.pm.PackageManager.CERT_INPUT_RAW_X509;
 import static android.content.pm.PackageManager.CERT_INPUT_SHA256;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
@@ -521,6 +522,7 @@ public class ComputerEngine implements Computer {
                 comp != null || pkgName != null /*onlyExposedExplicitly*/,
                 isImplicitImageCaptureIntentAndNotSetByDpc(intent, userId, resolvedType,
                         flags));
+
         List<ResolveInfo> list = Collections.emptyList();
         boolean skipPostResolution = false;
         if (comp != null) {
@@ -642,6 +644,12 @@ public class ComputerEngine implements Computer {
         final String instantAppPkgName = getInstantAppPackageName(callingUid);
         flags = updateFlagsForResolve(flags, userId, callingUid, includeInstantApps,
                 false /* isImplicitImageCaptureIntentAndNotSetByDpc */);
+
+        // Only if the query is coming from the system process,
+        // it should be allowed to match quarantined components
+        if (callingUid != Process.SYSTEM_UID) {
+            flags |= PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
+        }
         Intent originalIntent = null;
         ComponentName comp = intent.getComponent();
         if (comp == null) {
@@ -1514,11 +1522,17 @@ public class ComputerEngine implements Computer {
             ai.uid = UserHandle.getUid(userId, ps.getAppId());
             ai.primaryCpuAbi = ps.getPrimaryCpuAbiLegacy();
             ai.secondaryCpuAbi = ps.getSecondaryCpuAbiLegacy();
+            ai.volumeUuid = ps.getVolumeUuid();
+            ai.storageUuid = StorageManager.convert(ai.volumeUuid);
+            if (ps.isDefaultToDeviceProtectedStorage()) {
+                ai.privateFlags |= PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE;
+            }
             ai.setVersionCode(ps.getVersionCode());
             ai.flags = ps.getFlags();
             ai.privateFlags = ps.getPrivateFlags();
             pi.applicationInfo = PackageInfoUtils.generateDelegateApplicationInfo(
                     ai, flags, state, userId);
+            pi.signingInfo = ps.getSigningInfo();
 
             if (DEBUG_PACKAGE_INFO) {
                 Log.v(TAG, "ps.pkg is n/a for ["
@@ -4024,6 +4038,9 @@ public class ComputerEngine implements Computer {
         flags = updateFlagsForComponent(flags, userId);
         enforceCrossUserPermission(callingUid, userId, false /* requireFullPermission */,
                 false /* checkShell */, "get provider info");
+        if (callingUid != Process.SYSTEM_UID) {
+            flags |= PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
+        }
         ParsedProvider p = mComponentResolver.getProvider(component);
         if (DEBUG_PACKAGE_INFO) Log.v(
                 TAG, "getProviderInfo " + component + ": " + p);
@@ -4653,6 +4670,9 @@ public class ComputerEngine implements Computer {
             int callingUid) {
         if (!mUserManager.exists(userId)) return null;
         flags = updateFlagsForComponent(flags, userId);
+        if (callingUid != Process.SYSTEM_UID) {
+            flags |= PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
+        }
         final ProviderInfo providerInfo = mComponentResolver.queryProvider(this, name, flags,
                 userId);
         boolean checkedGrants = false;
@@ -4765,6 +4785,13 @@ public class ComputerEngine implements Computer {
                 false /* checkShell */, "queryContentProviders");
         if (!mUserManager.exists(userId)) return ParceledListSlice.emptyList();
         flags = updateFlagsForComponent(flags, userId);
+
+        // Only if the service query is coming from the system process,
+        // it should be allowed to match quarantined components
+        if (callingUid != Process.SYSTEM_UID) {
+            flags |= PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS;
+        }
+
         ArrayList<ProviderInfo> finalList = null;
         final List<ProviderInfo> matchList = mComponentResolver.queryProviders(this, processName,
                 metaDataKey, uid, flags, userId);

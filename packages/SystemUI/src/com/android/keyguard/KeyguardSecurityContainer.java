@@ -100,6 +100,7 @@ import com.android.systemui.Gefingerpoken;
 import com.android.systemui.R;
 import com.android.systemui.classifier.FalsingA11yDelegate;
 import com.android.systemui.plugins.FalsingManager;
+import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.statusbar.policy.BaseUserSwitcherAdapter;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
@@ -666,6 +667,11 @@ public class KeyguardSecurityContainer extends ConstraintLayout {
     }
 
     @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        return TouchLogger.logDispatchTouch(TAG, ev, super.dispatchTouchEvent(ev));
+    }
+
+    @Override
     protected void dispatchDraw(Canvas canvas) {
         super.dispatchDraw(canvas);
         if (mViewMediatorCallback != null) {
@@ -1198,8 +1204,6 @@ public class KeyguardSecurityContainer extends ConstraintLayout {
                 });
                 mPopup.show();
             });
-
-            mUserSwitcherViewGroup.setAlpha(0f);
         }
 
         @Override

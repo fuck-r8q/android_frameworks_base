@@ -16,13 +16,13 @@
 
 package com.android.server.wm.flicker.activityembedding.open
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Presubmit
 import android.tools.common.datatypes.Rect
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
 import android.tools.device.flicker.legacy.LegacyFlickerTestFactory
+import androidx.test.filters.FlakyTest
 import androidx.test.filters.RequiresDevice
 import com.android.server.wm.flicker.activityembedding.ActivityEmbeddingTestBase
 import com.android.server.wm.flicker.helpers.ActivityEmbeddingAppHelper
@@ -39,7 +39,7 @@ import org.junit.runners.Parameterized
  * Setup: Launch A|B in split with B being the secondary activity. Transitions: A start C with
  * alwaysExpand=true, expect C to launch in fullscreen and cover split A|B.
  *
- * To run this test: `atest FlickerTests:MainActivityStartsSecondaryWithAlwaysExpandTest`
+ * To run this test: `atest FlickerTestsOther:MainActivityStartsSecondaryWithAlwaysExpandTest`
  */
 @RequiresDevice
 @RunWith(Parameterized::class)
@@ -70,8 +70,7 @@ class MainActivityStartsSecondaryWithAlwaysExpandTest(flicker: LegacyFlickerTest
 
     @Ignore("Not applicable to this CUJ.") override fun navBarWindowIsVisibleAtStartAndEnd() {}
 
-    @FlakyTest(bugId = 291575593)
-    override fun entireScreenCovered() {}
+    @FlakyTest(bugId = 291575593) override fun entireScreenCovered() {}
 
     @Ignore("Not applicable to this CUJ.") override fun statusBarWindowIsAlwaysVisible() {}
 
@@ -134,6 +133,7 @@ class MainActivityStartsSecondaryWithAlwaysExpandTest(flicker: LegacyFlickerTest
     companion object {
         /** {@inheritDoc} */
         private var startDisplayBounds = Rect.EMPTY
+
         /**
          * Creates the test configurations.
          *

@@ -25,7 +25,6 @@ import com.android.systemui.scene.SceneTestUtils
 import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
-import com.android.systemui.scene.shared.model.SceneTransitionModel
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +38,7 @@ import org.junit.runners.JUnit4
 class SceneInteractorTest : SysuiTestCase() {
 
     private val utils = SceneTestUtils(this)
+    private val testScope = utils.testScope
     private val repository = utils.fakeSceneContainerRepository()
     private val underTest = utils.sceneInteractor(repository = repository)
 
@@ -48,77 +48,115 @@ class SceneInteractorTest : SysuiTestCase() {
     }
 
     @Test
-    fun currentScene() = runTest {
-        val currentScene by collectLastValue(underTest.currentScene)
-        assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
+    fun changeScene() =
+        testScope.runTest {
+            val desiredScene by collectLastValue(underTest.desiredScene)
+            assertThat(desiredScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
 
-        underTest.setCurrentScene(SceneModel(SceneKey.Shade))
-        assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Shade))
-    }
+            underTest.changeScene(SceneModel(SceneKey.Shade), "reason")
+            assertThat(desiredScene).isEqualTo(SceneModel(SceneKey.Shade))
+        }
 
     @Test
-    fun sceneTransitionProgress() = runTest {
-        val transitionProgress by collectLastValue(underTest.transitionProgress)
-        assertThat(transitionProgress).isEqualTo(1f)
+    fun onSceneChanged() =
+        testScope.runTest {
+            val desiredScene by collectLastValue(underTest.desiredScene)
+            assertThat(desiredScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
 
-        val progress = MutableStateFlow(0.55f)
-        repository.setTransitionState(
-            MutableStateFlow(
+            underTest.onSceneChanged(SceneModel(SceneKey.Shade), "reason")
+            assertThat(desiredScene).isEqualTo(SceneModel(SceneKey.Shade))
+        }
+
+    @Test
+    fun transitionState() =
+        testScope.runTest {
+            val underTest = utils.fakeSceneContainerRepository()
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Idle(SceneKey.Lockscreen)
+                )
+            underTest.setTransitionState(transitionState)
+            val reflectedTransitionState by collectLastValue(underTest.transitionState)
+            assertThat(reflectedTransitionState).isEqualTo(transitionState.value)
+
+            val progress = MutableStateFlow(1f)
+            transitionState.value =
                 ObservableTransitionState.Transition(
                     fromScene = SceneKey.Lockscreen,
                     toScene = SceneKey.Shade,
                     progress = progress,
-                ),
-            )
-        )
-        assertThat(transitionProgress).isEqualTo(0.55f)
-    }
-
-    @Test
-    fun isVisible() = runTest {
-        val isVisible by collectLastValue(underTest.isVisible)
-        assertThat(isVisible).isTrue()
-
-        underTest.setVisible(false)
-        assertThat(isVisible).isFalse()
-
-        underTest.setVisible(true)
-        assertThat(isVisible).isTrue()
-    }
-
-    @Test
-    fun sceneTransitions() = runTest {
-        val transitions by collectLastValue(underTest.transitions)
-        assertThat(transitions).isNull()
-
-        val initialSceneKey = underTest.currentScene.value.key
-        underTest.setCurrentScene(SceneModel(SceneKey.Shade))
-        assertThat(transitions)
-            .isEqualTo(
-                SceneTransitionModel(
-                    from = initialSceneKey,
-                    to = SceneKey.Shade,
                 )
-            )
+            assertThat(reflectedTransitionState).isEqualTo(transitionState.value)
 
-        underTest.setCurrentScene(SceneModel(SceneKey.QuickSettings))
-        assertThat(transitions)
-            .isEqualTo(
-                SceneTransitionModel(
-                    from = SceneKey.Shade,
-                    to = SceneKey.QuickSettings,
+            progress.value = 0.1f
+            assertThat(reflectedTransitionState).isEqualTo(transitionState.value)
+
+            progress.value = 0.9f
+            assertThat(reflectedTransitionState).isEqualTo(transitionState.value)
+
+            underTest.setTransitionState(null)
+            assertThat(reflectedTransitionState)
+                .isEqualTo(
+                    ObservableTransitionState.Idle(utils.fakeSceneContainerConfig().initialSceneKey)
                 )
-            )
-    }
-
-    @Test
-    fun remoteUserInput() = runTest {
-        val remoteUserInput by collectLastValue(underTest.remoteUserInput)
-        assertThat(remoteUserInput).isNull()
-
-        for (input in SceneTestUtils.REMOTE_INPUT_DOWN_GESTURE) {
-            underTest.onRemoteUserInput(input)
-            assertThat(remoteUserInput).isEqualTo(input)
         }
-    }
+
+    @Test
+    fun transitioningTo() =
+        testScope.runTest {
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Idle(underTest.desiredScene.value.key)
+                )
+            underTest.setTransitionState(transitionState)
+
+            val transitionTo by collectLastValue(underTest.transitioningTo)
+            assertThat(transitionTo).isNull()
+
+            underTest.changeScene(SceneModel(SceneKey.Shade), "reason")
+            assertThat(transitionTo).isNull()
+
+            val progress = MutableStateFlow(0f)
+            transitionState.value =
+                ObservableTransitionState.Transition(
+                    fromScene = underTest.desiredScene.value.key,
+                    toScene = SceneKey.Shade,
+                    progress = progress,
+                )
+            assertThat(transitionTo).isEqualTo(SceneKey.Shade)
+
+            progress.value = 0.5f
+            assertThat(transitionTo).isEqualTo(SceneKey.Shade)
+
+            progress.value = 1f
+            assertThat(transitionTo).isEqualTo(SceneKey.Shade)
+
+            transitionState.value = ObservableTransitionState.Idle(SceneKey.Shade)
+            assertThat(transitionTo).isNull()
+        }
+
+    @Test
+    fun isVisible() =
+        testScope.runTest {
+            val isVisible by collectLastValue(underTest.isVisible)
+            assertThat(isVisible).isTrue()
+
+            underTest.setVisible(false, "reason")
+            assertThat(isVisible).isFalse()
+
+            underTest.setVisible(true, "reason")
+            assertThat(isVisible).isTrue()
+        }
+
+    @Test
+    fun remoteUserInput() =
+        testScope.runTest {
+            val remoteUserInput by collectLastValue(underTest.remoteUserInput)
+            assertThat(remoteUserInput).isNull()
+
+            for (input in SceneTestUtils.REMOTE_INPUT_DOWN_GESTURE) {
+                underTest.onRemoteUserInput(input)
+                assertThat(remoteUserInput).isEqualTo(input)
+            }
+        }
 }

@@ -22,6 +22,7 @@ import android.app.WindowConfiguration.ACTIVITY_TYPE_HOME
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
+import android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
 import android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED
 import android.app.WindowConfiguration.WindowingMode
 import android.content.Context
@@ -33,7 +34,6 @@ import android.os.IBinder
 import android.os.SystemProperties
 import android.util.DisplayMetrics.DENSITY_DEFAULT
 import android.view.SurfaceControl
-import android.view.SurfaceControl.Transaction
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.view.WindowManager.TRANSIT_NONE
 import android.view.WindowManager.TRANSIT_OPEN
@@ -56,6 +56,7 @@ import com.android.wm.shell.common.annotations.ExternalThread
 import com.android.wm.shell.common.annotations.ShellMainThread
 import com.android.wm.shell.desktopmode.DesktopModeTaskRepository.VisibleTasksListener
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
+import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.sysui.ShellCommandHandler
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
@@ -104,6 +105,9 @@ class DesktopTasksController(
     private val transitionAreaHeight
         get() = context.resources.getDimensionPixelSize(
                 com.android.wm.shell.R.dimen.desktop_mode_transition_area_height)
+
+    // This is public to avoid cyclic dependency; it is set by SplitScreenController
+    lateinit var splitScreenController: SplitScreenController
 
     init {
         desktopMode = DesktopModeImpl()
@@ -262,6 +266,19 @@ class DesktopTasksController(
         }
     }
 
+    /**
+     * Perform needed cleanup transaction once animation is complete. Bounds need to be set
+     * here instead of initial wct to both avoid flicker and to have task bounds to use for
+     * the staging animation.
+     *
+     * @param taskInfo task entering split that requires a bounds update
+     */
+    fun onDesktopSplitSelectAnimComplete(taskInfo: RunningTaskInfo) {
+        val wct = WindowContainerTransaction()
+        wct.setBounds(taskInfo.token, Rect())
+        shellTaskOrganizer.applyTransaction(wct)
+    }
+
     /** Move a task with given `taskId` to fullscreen */
     fun moveToFullscreen(taskId: Int) {
         shellTaskOrganizer.getRunningTaskInfo(taskId)?.let { task -> moveToFullscreen(task) }
@@ -296,7 +313,7 @@ class DesktopTasksController(
             task.taskId
         )
         val wct = WindowContainerTransaction()
-        wct.setBounds(task.token, null)
+        wct.setBounds(task.token, Rect())
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
             enterDesktopTaskTransitionHandler.startCancelMoveToDesktopMode(wct,
@@ -533,6 +550,7 @@ class DesktopTasksController(
         )
         // Check if we should skip handling this transition
         var reason = ""
+        val triggerTask = request.triggerTask
         val shouldHandleRequest =
             when {
                 // Only handle open or to front transitions
@@ -541,19 +559,19 @@ class DesktopTasksController(
                     false
                 }
                 // Only handle when it is a task transition
-                request.triggerTask == null -> {
+                triggerTask == null -> {
                     reason = "triggerTask is null"
                     false
                 }
                 // Only handle standard type tasks
-                request.triggerTask.activityType != ACTIVITY_TYPE_STANDARD -> {
-                    reason = "activityType not handled (${request.triggerTask.activityType})"
+                triggerTask.activityType != ACTIVITY_TYPE_STANDARD -> {
+                    reason = "activityType not handled (${triggerTask.activityType})"
                     false
                 }
                 // Only handle fullscreen or freeform tasks
-                request.triggerTask.windowingMode != WINDOWING_MODE_FULLSCREEN &&
-                        request.triggerTask.windowingMode != WINDOWING_MODE_FREEFORM -> {
-                    reason = "windowingMode not handled (${request.triggerTask.windowingMode})"
+                triggerTask.windowingMode != WINDOWING_MODE_FULLSCREEN &&
+                        triggerTask.windowingMode != WINDOWING_MODE_FREEFORM -> {
+                    reason = "windowingMode not handled (${triggerTask.windowingMode})"
                     false
                 }
                 // Otherwise process it
@@ -569,17 +587,17 @@ class DesktopTasksController(
             return null
         }
 
-        val task: RunningTaskInfo = request.triggerTask
-
-        val result = when {
-            // If display has tasks stashed, handle as stashed launch
-            desktopModeTaskRepository.isStashed(task.displayId) -> handleStashedTaskLaunch(task)
-            // Check if fullscreen task should be updated
-            task.windowingMode == WINDOWING_MODE_FULLSCREEN -> handleFullscreenTaskLaunch(task)
-            // Check if freeform task should be updated
-            task.windowingMode == WINDOWING_MODE_FREEFORM -> handleFreeformTaskLaunch(task)
-            else -> {
-                null
+        val result = triggerTask?.let { task ->
+            when {
+                // If display has tasks stashed, handle as stashed launch
+                desktopModeTaskRepository.isStashed(task.displayId) -> handleStashedTaskLaunch(task)
+                // Check if fullscreen task should be updated
+                task.windowingMode == WINDOWING_MODE_FULLSCREEN -> handleFullscreenTaskLaunch(task)
+                // Check if freeform task should be updated
+                task.windowingMode == WINDOWING_MODE_FREEFORM -> handleFreeformTaskLaunch(task)
+                else -> {
+                    null
+                }
             }
         }
         KtProtoLog.v(
@@ -686,13 +704,43 @@ class DesktopTasksController(
             WINDOWING_MODE_FULLSCREEN
         }
         wct.setWindowingMode(taskInfo.token, targetWindowingMode)
-        wct.setBounds(taskInfo.token, null)
+        wct.setBounds(taskInfo.token, Rect())
         if (isDesktopDensityOverrideSet()) {
-            wct.setDensityDpi(taskInfo.token, getFullscreenDensityDpi())
+            wct.setDensityDpi(taskInfo.token, getDefaultDensityDpi())
         }
     }
 
-    private fun getFullscreenDensityDpi(): Int {
+    /**
+     * Adds split screen changes to a transaction. Note that bounds are not reset here due to
+     * animation; see {@link onDesktopSplitSelectAnimComplete}
+     */
+    private fun addMoveToSplitChanges(
+        wct: WindowContainerTransaction,
+        taskInfo: RunningTaskInfo
+    ) {
+        wct.setWindowingMode(taskInfo.token, WINDOWING_MODE_MULTI_WINDOW)
+        // The task's density may have been overridden in freeform; revert it here as we don't
+        // want it overridden in multi-window.
+        wct.setDensityDpi(taskInfo.token, getDefaultDensityDpi())
+    }
+
+    /**
+     * Requests a task be transitioned from desktop to split select. Applies needed windowing
+     * changes if this transition is enabled.
+     */
+    fun requestSplit(
+        taskInfo: RunningTaskInfo
+    ) {
+        val windowingMode = taskInfo.windowingMode
+        if (windowingMode == WINDOWING_MODE_FULLSCREEN || windowingMode == WINDOWING_MODE_FREEFORM
+        ) {
+            val wct = WindowContainerTransaction()
+            addMoveToSplitChanges(wct, taskInfo)
+            splitScreenController.requestEnterSplitSelect(taskInfo, wct)
+        }
+    }
+
+    private fun getDefaultDensityDpi(): Int {
         return context.resources.displayMetrics.densityDpi
     }
 
@@ -967,6 +1015,13 @@ class DesktopTasksController(
                 true /* blocking */
             )
             return result[0]
+        }
+
+        override fun onDesktopSplitSelectAnimComplete(taskInfo: RunningTaskInfo) {
+            ExecutorUtils.executeRemoteCallWithTaskPermission(
+                controller,
+                "onDesktopSplitSelectAnimComplete"
+            ) { c -> c.onDesktopSplitSelectAnimComplete(taskInfo) }
         }
 
         override fun setTaskListener(listener: IDesktopTaskListener?) {

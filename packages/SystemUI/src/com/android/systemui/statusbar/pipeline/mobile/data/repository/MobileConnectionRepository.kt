@@ -136,6 +136,11 @@ interface MobileConnectionRepository {
     val imsRegistrationTech: StateFlow<Int>
     val isConnectionFailed: StateFlow<Boolean>
 
+    /**
+     * True if this type of connection is allowed while airplane mode is on, and false otherwise.
+     */
+    val isAllowedDuringAirplaneMode: StateFlow<Boolean>
+
     companion object {
         /** The default number of levels to use for [numberOfLevels]. */
         const val DEFAULT_NUM_LEVELS = 4

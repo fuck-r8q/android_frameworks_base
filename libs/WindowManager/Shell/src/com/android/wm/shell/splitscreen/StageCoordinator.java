@@ -83,7 +83,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.LauncherApps;
 import android.content.pm.ShortcutInfo;
-import android.content.res.Configuration;
 import android.graphics.Rect;
 import android.hardware.devicestate.DeviceStateManager;
 import android.os.Bundle;
@@ -146,8 +145,10 @@ import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Coordinates the staging (visibility, sizing, ...) of the split-screen {@link MainStage} and
@@ -187,6 +188,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private final ShellTaskOrganizer mTaskOrganizer;
     private final Context mContext;
     private final List<SplitScreen.SplitScreenListener> mListeners = new ArrayList<>();
+    private final Set<SplitScreen.SplitSelectListener> mSelectListeners = new HashSet<>();
     private final DisplayController mDisplayController;
     private final DisplayImeController mDisplayImeController;
     private final DisplayInsetsController mDisplayInsetsController;
@@ -462,6 +464,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
     SplitscreenEventLogger getLogger() {
         return mLogger;
+    }
+
+    void requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
+            WindowContainerTransaction wct) {
+        boolean enteredSplitSelect = false;
+        for (SplitScreen.SplitSelectListener listener : mSelectListeners) {
+            enteredSplitSelect |= listener.onRequestEnterSplitSelect(taskInfo);
+        }
+        if (enteredSplitSelect) mTaskOrganizer.applyTransaction(wct);
     }
 
     void startShortcut(String packageName, String shortcutId, @SplitPosition int position,
@@ -1495,7 +1506,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
     }
 
-    private void clearSplitPairedInRecents(@ExitReason int exitReason) {
+    void clearSplitPairedInRecents(@ExitReason int exitReason) {
         if (!shouldBreakPairedTaskInRecents(exitReason) || !mShouldUpdateRecents) return;
 
         mRecentTasks.ifPresent(recentTasks -> {
@@ -1659,6 +1670,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mListeners.remove(listener);
     }
 
+    void registerSplitSelectListener(SplitScreen.SplitSelectListener listener) {
+        mSelectListeners.add(listener);
+    }
+
+    void unregisterSplitSelectListener(SplitScreen.SplitSelectListener listener) {
+        mSelectListeners.remove(listener);
+    }
+
     void sendStatusToListener(SplitScreen.SplitScreenListener listener) {
         listener.onStagePositionChanged(STAGE_TYPE_MAIN, getMainStagePosition());
         listener.onStagePositionChanged(STAGE_TYPE_SIDE, getSideStagePosition());
@@ -1780,8 +1799,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         mRootTaskInfo = taskInfo;
         if (mSplitLayout != null
                 && mSplitLayout.updateConfiguration(mRootTaskInfo.configuration)
-                && mMainStage.isActive()
-                && !ENABLE_SHELL_TRANSITIONS) {
+                && mMainStage.isActive()) {
             // Clear the divider remote animating flag as the divider will be re-rendered to apply
             // the new rotation config.
             mIsDividerRemoteAnimating = false;
@@ -2217,20 +2235,6 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             return;
         }
         mDisplayController.addDisplayChangingController(this::onDisplayChange);
-    }
-
-    @Override
-    public void onDisplayConfigurationChanged(int displayId, Configuration newConfig) {
-        if (displayId != DEFAULT_DISPLAY) {
-            return;
-        }
-        if (mSplitLayout != null && mSplitLayout.isDensityChanged(newConfig.densityDpi)
-                && mMainStage.isActive()
-                && mSplitLayout.updateConfiguration(newConfig)
-                && ENABLE_SHELL_TRANSITIONS) {
-            mSplitLayout.update(null /* t */);
-            onLayoutSizeChanged(mSplitLayout);
-        }
     }
 
     /**
@@ -2737,7 +2741,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 == TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE) {
             // Open to side should only be used when split already active and foregorund.
             if (mainChild == null && sideChild == null) {
-                Log.w(TAG, "Launched a task in split, but didn't receive any task in transition.");
+                Log.w(TAG, splitFailureMessage("startPendingEnterAnimation",
+                        "Launched a task in split, but didn't receive any task in transition."));
                 // This should happen when the target app is already on front, so just cancel.
                 mSplitTransitions.mPendingEnter.cancel(null);
                 return true;

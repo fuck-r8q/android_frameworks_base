@@ -2571,8 +2571,6 @@ public class OomAdjuster {
             capability &= ~PROCESS_CAPABILITY_BFSL;
         }
 
-        state.setHasForegroundActivities(foregroundActivities);
-
         if (app.isPendingFinishAttach()) {
             // If the app is still starting up. We reset the computations to the
             // hardcoded values in setAttachingProcessStatesLSP. This ensures that the app keeps
@@ -2591,6 +2589,7 @@ public class OomAdjuster {
         // keep it out of the cached vaues.
         state.setCurCapability(capability);
         state.updateLastInvisibleTime(hasVisibleActivities);
+        state.setHasForegroundActivities(foregroundActivities);
         state.setCompletedAdjSeq(mAdjSeq);
 
         schedGroup = setIntermediateAdjLSP(app, adj, prevAppAdj, schedGroup);

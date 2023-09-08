@@ -16,11 +16,11 @@
 
 package com.android.server.wm.flicker.launch
 
-import android.platform.test.annotations.FlakyTest
 import android.platform.test.annotations.Presubmit
 import android.tools.common.traces.component.ComponentNameMatcher
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
+import androidx.test.filters.FlakyTest
 import com.android.server.wm.flicker.navBarLayerPositionAtEnd
 import com.android.server.wm.flicker.statusBarLayerPositionAtEnd
 import org.junit.Assume
@@ -46,7 +46,7 @@ abstract class OpenAppFromLockscreenTransition(flicker: LegacyFlickerTest) :
     @Presubmit
     @Test
     open fun focusChanges() {
-        flicker.assertEventLog { this.focusChanges("", testApp.`package`) }
+        flicker.assertEventLog { this.focusChanges("", testApp.packageName) }
     }
 
     /**

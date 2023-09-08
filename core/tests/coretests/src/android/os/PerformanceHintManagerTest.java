@@ -69,6 +69,24 @@ public class PerformanceHintManagerTest {
     }
 
     @Test
+    public void testCreateHintSession_noTids() {
+        assertThrows(NullPointerException.class, () -> {
+            mPerformanceHintManager.createHintSession(
+                    null, DEFAULT_TARGET_NS);
+        });
+        assertThrows(IllegalArgumentException.class, () -> {
+            mPerformanceHintManager.createHintSession(
+                    new int[]{}, DEFAULT_TARGET_NS);
+        });
+    }
+
+    @Test
+    public void testCreateHintSession_invalidTids() {
+        assertNull(mPerformanceHintManager.createHintSession(
+                new int[]{-1}, DEFAULT_TARGET_NS));
+    }
+
+    @Test
     public void testGetPreferredUpdateRateNanos() {
         if (createSession() != null) {
             assertTrue(mPerformanceHintManager.getPreferredUpdateRateNanos() > 0);
@@ -154,5 +172,14 @@ public class PerformanceHintManagerTest {
         assertThrows(SecurityException.class, () -> {
             session.setThreads(new int[]{-1});
         });
+    }
+
+    @Test
+    public void testSetPreferPowerEfficiency() {
+        Session s = createSession();
+        assumeNotNull(s);
+        s.setPreferPowerEfficiency(false);
+        s.setPreferPowerEfficiency(true);
+        s.setPreferPowerEfficiency(true);
     }
 }
