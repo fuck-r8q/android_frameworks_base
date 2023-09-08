@@ -11094,6 +11094,7 @@ package android.content {
     field public static final String EXTRA_ALLOW_MULTIPLE = "android.intent.extra.ALLOW_MULTIPLE";
     field @Deprecated public static final String EXTRA_ALLOW_REPLACE = "android.intent.extra.ALLOW_REPLACE";
     field public static final String EXTRA_ALTERNATE_INTENTS = "android.intent.extra.ALTERNATE_INTENTS";
+    field public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
     field public static final String EXTRA_ASSIST_CONTEXT = "android.intent.extra.ASSIST_CONTEXT";
     field public static final String EXTRA_ASSIST_INPUT_DEVICE_ID = "android.intent.extra.ASSIST_INPUT_DEVICE_ID";
     field public static final String EXTRA_ASSIST_INPUT_HINT_KEYBOARD = "android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD";
@@ -16298,7 +16299,8 @@ package android.graphics {
     method public void arcTo(@NonNull android.graphics.RectF, float, float);
     method public void arcTo(float, float, float, float, float, float, boolean);
     method public void close();
-    method public void computeBounds(@NonNull android.graphics.RectF, boolean);
+    method @Deprecated public void computeBounds(@NonNull android.graphics.RectF, boolean);
+    method public void computeBounds(@NonNull android.graphics.RectF);
     method public void conicTo(float, float, float, float, float);
     method public void cubicTo(float, float, float, float, float, float);
     method @NonNull public android.graphics.Path.FillType getFillType();
@@ -38643,7 +38645,7 @@ package android.security {
   public final class FileIntegrityManager {
     method @FlaggedApi(Flags.FLAG_FSVERITY_API) @Nullable public byte[] getFsVerityDigest(@NonNull java.io.File) throws java.io.IOException;
     method public boolean isApkVeritySupported();
-    method @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
     method @FlaggedApi(Flags.FLAG_FSVERITY_API) public void setupFsVerity(@NonNull java.io.File) throws java.io.IOException;
   }
 
