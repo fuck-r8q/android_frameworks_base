@@ -18,6 +18,7 @@ package com.android.systemui.biometrics;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,14 +27,15 @@ import android.content.Context;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.ActivityLaunchAnimator;
-import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
-import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.KeyguardViewMediator;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.shade.ShadeExpansionChangeEvent;
+import com.android.systemui.shade.ShadeExpansionListener;
 import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
@@ -48,6 +50,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.util.List;
 
 public class UdfpsKeyguardViewLegacyControllerBaseTest extends SysuiTestCase {
     // Dependencies
@@ -79,6 +83,9 @@ public class UdfpsKeyguardViewLegacyControllerBaseTest extends SysuiTestCase {
     private @Captor ArgumentCaptor<StatusBarStateController.StateListener> mStateListenerCaptor;
     protected StatusBarStateController.StateListener mStatusBarStateListener;
 
+    private @Captor ArgumentCaptor<ShadeExpansionListener> mExpansionListenerCaptor;
+    protected List<ShadeExpansionListener> mExpansionListeners;
+
     private @Captor ArgumentCaptor<KeyguardStateController.Callback>
             mKeyguardStateControllerCallbackCaptor;
     protected KeyguardStateController.Callback mKeyguardStateControllerCallback;
@@ -109,6 +116,23 @@ public class UdfpsKeyguardViewLegacyControllerBaseTest extends SysuiTestCase {
         mStatusBarStateListener = mStateListenerCaptor.getValue();
     }
 
+    protected void captureStatusBarExpansionListeners() {
+        verify(mShadeExpansionStateManager, times(2))
+                .addExpansionListener(mExpansionListenerCaptor.capture());
+        // first (index=0) is from super class, UdfpsAnimationViewController.
+        // second (index=1) is from UdfpsKeyguardViewController
+        mExpansionListeners = mExpansionListenerCaptor.getAllValues();
+    }
+
+    protected void updateStatusBarExpansion(float fraction, boolean expanded) {
+        ShadeExpansionChangeEvent event =
+                new ShadeExpansionChangeEvent(
+                        fraction, expanded, /* tracking= */ false, /* dragDownPxAmount= */ 0f);
+        for (ShadeExpansionListener listener : mExpansionListeners) {
+            listener.onPanelExpansionChanged(event);
+        }
+    }
+
     protected void captureKeyguardStateControllerCallback() {
         verify(mKeyguardStateController).addCallback(
                 mKeyguardStateControllerCallbackCaptor.capture());
@@ -131,6 +155,7 @@ public class UdfpsKeyguardViewLegacyControllerBaseTest extends SysuiTestCase {
         UdfpsKeyguardViewControllerLegacy controller = new UdfpsKeyguardViewControllerLegacy(
                 mView,
                 mStatusBarStateController,
+                mShadeExpansionStateManager,
                 mStatusBarKeyguardViewManager,
                 mKeyguardUpdateMonitor,
                 mDumpManager,
