@@ -23,7 +23,6 @@ import static android.hardware.biometrics.BiometricOverlayConstants.REASON_AUTH_
 import static android.hardware.biometrics.BiometricOverlayConstants.REASON_AUTH_KEYGUARD;
 import static android.hardware.biometrics.BiometricOverlayConstants.REASON_ENROLL_ENROLLING;
 import static android.hardware.biometrics.BiometricOverlayConstants.REASON_ENROLL_FIND_SENSOR;
-
 import static com.android.internal.util.Preconditions.checkNotNull;
 import static com.android.systemui.classifier.Classifier.UDFPS_AUTHENTICATION;
 import static com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION;
@@ -60,6 +59,7 @@ import android.view.accessibility.AccessibilityManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -67,11 +67,10 @@ import com.android.internal.logging.InstanceId;
 import com.android.internal.util.LatencyTracker;
 import com.android.keyguard.FaceAuthApiRequestReason;
 import com.android.keyguard.KeyguardUpdateMonitor;
-import com.android.settingslib.udfps.UdfpsOverlayParams;
-import com.android.settingslib.udfps.UdfpsUtils;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.biometrics.dagger.BiometricsBackground;
+import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
 import com.android.systemui.biometrics.udfps.InteractionEvent;
 import com.android.systemui.biometrics.udfps.NormalizedTouchData;
 import com.android.systemui.biometrics.udfps.SinglePointerTouchProcessor;
@@ -92,7 +91,6 @@ import com.android.systemui.keyguard.ui.viewmodel.UdfpsKeyguardViewModels;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
 import com.android.systemui.statusbar.VibratorHelper;
@@ -106,8 +104,6 @@ import com.android.systemui.util.concurrency.Execution;
 import com.android.systemui.util.settings.SecureSettings;
 import com.android.systemui.util.time.SystemClock;
 
-import kotlin.Unit;
-
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -117,6 +113,10 @@ import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
 import javax.inject.Provider;
+
+import kotlin.Unit;
+
+import kotlinx.coroutines.ExperimentalCoroutinesApi;
 
 /**
  * Shows and hides the under-display fingerprint sensor (UDFPS) overlay, handles UDFPS touch events,
@@ -149,7 +149,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     private final WindowManager mWindowManager;
     private final DelayableExecutor mFgExecutor;
     @NonNull private final Executor mBiometricExecutor;
-    @NonNull private final ShadeExpansionStateManager mShadeExpansionStateManager;
     @NonNull private final StatusBarStateController mStatusBarStateController;
     @NonNull private final KeyguardStateController mKeyguardStateController;
     @NonNull private final StatusBarKeyguardViewManager mKeyguardViewManager;
@@ -264,23 +263,44 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     }
 
     public class UdfpsOverlayController extends IUdfpsOverlayController.Stub {
+        @OptIn(markerClass = ExperimentalCoroutinesApi.class)
         @Override
         public void showUdfpsOverlay(long requestId, int sensorId, int reason,
                 @NonNull IUdfpsOverlayControllerCallback callback) {
             mFgExecutor.execute(() -> UdfpsController.this.showUdfpsOverlay(
-                    new UdfpsControllerOverlay(mContext, mFingerprintManager, mInflater,
-                            mWindowManager, mAccessibilityManager, mStatusBarStateController,
-                            mShadeExpansionStateManager, mKeyguardViewManager,
-                            mKeyguardUpdateMonitor, mDialogManager, mDumpManager,
-                            mLockscreenShadeTransitionController, mConfigurationController,
-                            mKeyguardStateController,
-                            mUnlockedScreenOffAnimationController,
-                            mUdfpsDisplayMode, mSecureSettings, requestId, reason, callback,
-                            (view, event, fromUdfpsView) -> onTouch(requestId, event,
-                                    fromUdfpsView), mActivityLaunchAnimator, mFeatureFlags,
-                            mPrimaryBouncerInteractor, mAlternateBouncerInteractor, mUdfpsUtils,
-                            mUdfpsKeyguardAccessibilityDelegate,
-                            mUdfpsKeyguardViewModels)));
+                    new UdfpsControllerOverlay(
+                        mContext,
+                        mFingerprintManager,
+                        mInflater,
+                        mWindowManager,
+                        mAccessibilityManager,
+                        mStatusBarStateController,
+                        mKeyguardViewManager,
+                        mKeyguardUpdateMonitor,
+                        mDialogManager,
+                        mDumpManager,
+                        mLockscreenShadeTransitionController,
+                        mConfigurationController,
+                        mKeyguardStateController,
+                        mUnlockedScreenOffAnimationController,
+                        mUdfpsDisplayMode,
+                        mSecureSettings,
+                        requestId,
+                        reason,
+                        callback,
+                        (view, event, fromUdfpsView) -> onTouch(
+                            requestId,
+                            event,
+                            fromUdfpsView
+                        ),
+                        mActivityLaunchAnimator,
+                        mFeatureFlags,
+                        mPrimaryBouncerInteractor,
+                        mAlternateBouncerInteractor,
+                        mUdfpsUtils,
+                        mUdfpsKeyguardAccessibilityDelegate,
+                        mUdfpsKeyguardViewModels
+                    )));
         }
 
         @Override
@@ -814,7 +834,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             @NonNull WindowManager windowManager,
             @NonNull StatusBarStateController statusBarStateController,
             @Main DelayableExecutor fgExecutor,
-            @NonNull ShadeExpansionStateManager shadeExpansionStateManager,
             @NonNull StatusBarKeyguardViewManager statusBarKeyguardViewManager,
             @NonNull DumpManager dumpManager,
             @NonNull KeyguardUpdateMonitor keyguardUpdateMonitor,
@@ -859,7 +878,6 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mFingerprintManager = checkNotNull(fingerprintManager);
         mWindowManager = windowManager;
         mFgExecutor = fgExecutor;
-        mShadeExpansionStateManager = shadeExpansionStateManager;
         mStatusBarStateController = statusBarStateController;
         mKeyguardStateController = keyguardStateController;
         mKeyguardViewManager = statusBarKeyguardViewManager;
