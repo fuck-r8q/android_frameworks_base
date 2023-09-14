@@ -20,12 +20,10 @@ import static com.android.systemui.statusbar.phone.dagger.StatusBarViewModule.ST
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import com.android.systemui.scene.ui.view.WindowRootView;
 import com.android.systemui.shade.ShadeHeaderController;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.phone.CentralSurfacesCommandQueueCallbacks;
 import com.android.systemui.statusbar.phone.CentralSurfacesImpl;
-import com.android.systemui.statusbar.phone.StatusBarHeadsUpChangeListener;
 import com.android.systemui.statusbar.phone.StatusBarNotificationActivityStarterModule;
 import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment;
 
@@ -67,14 +65,6 @@ public interface CentralSurfacesComponent {
     @Retention(RUNTIME)
     @Scope
     @interface CentralSurfacesScope {}
-
-    /** Creates the root view of the main SysUI window}. */
-    WindowRootView getWindowRootView();
-
-    /**
-     * Creates a StatusBarHeadsUpChangeListener.
-     */
-    StatusBarHeadsUpChangeListener getStatusBarHeadsUpChangeListener();
 
     /**
      * Creates a CentralSurfacesCommandQueueCallbacks.

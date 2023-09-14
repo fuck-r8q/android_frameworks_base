@@ -325,7 +325,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
      * Id of the View currently being displayed.
      */
     @GuardedBy("mLock")
-    @Nullable private AutofillId mCurrentViewId;
+    private @Nullable AutofillId mCurrentViewId;
 
     @GuardedBy("mLock")
     private IAutoFillManagerClient mClient;
@@ -373,7 +373,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     private Bundle mClientState;
 
     @GuardedBy("mLock")
-    private boolean mDestroyed;
+    boolean mDestroyed;
 
     /**
      * Helper used to handle state of Save UI when it must be hiding to show a custom description
@@ -452,7 +452,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     private ArrayList<AutofillId> mAugmentedAutofillableIds;
 
     @NonNull
-    private final AutofillInlineSessionController mInlineSessionController;
+    final AutofillInlineSessionController mInlineSessionController;
 
     /**
      * Receiver of assist data from the app's {@link Activity}.
@@ -619,7 +619,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
      * TODO(b/151867668): improve how asynchronous data dependencies are handled, without using
      * CountDownLatch.
      */
-    private final class AssistDataReceiverImpl extends IAssistDataReceiver.Stub {
+    final class AssistDataReceiverImpl extends IAssistDataReceiver.Stub {
         @GuardedBy("mLock")
         private boolean mWaitForInlineRequest;
         @GuardedBy("mLock")
@@ -634,18 +634,28 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             mPendingFillRequest = null;
             mWaitForInlineRequest = isInlineRequest;
             mPendingInlineSuggestionsRequest = null;
-            return isInlineRequest ? (inlineSuggestionsRequest) -> {
-                synchronized (mLock) {
-                    if (!mWaitForInlineRequest || mPendingInlineSuggestionsRequest != null) {
-                        return;
-                    }
-                    mWaitForInlineRequest = inlineSuggestionsRequest != null;
-                    mPendingInlineSuggestionsRequest = inlineSuggestionsRequest;
-                    mWaitForInlineRequest = inlineSuggestionsRequest != null;
-                    maybeRequestFillFromServiceLocked();
-                    viewState.resetState(ViewState.STATE_PENDING_CREATE_INLINE_REQUEST);
+            if (isInlineRequest) {
+                WeakReference<AssistDataReceiverImpl> assistDataReceiverWeakReference =
+                    new WeakReference<AssistDataReceiverImpl>(this);
+                WeakReference<ViewState> viewStateWeakReference =
+                    new WeakReference<ViewState>(viewState);
+                return new InlineSuggestionRequestConsumer(assistDataReceiverWeakReference,
+                    viewStateWeakReference);
+            }
+            return null;
+        }
+
+        void handleInlineSuggestionRequest(InlineSuggestionsRequest inlineSuggestionsRequest,
+                ViewState viewState) {
+            synchronized (mLock) {
+                if (!mWaitForInlineRequest || mPendingInlineSuggestionsRequest != null) {
+                    return;
                 }
-            } : null;
+                mWaitForInlineRequest = inlineSuggestionsRequest != null;
+                mPendingInlineSuggestionsRequest = inlineSuggestionsRequest;
+                maybeRequestFillFromServiceLocked();
+                viewState.resetState(ViewState.STATE_PENDING_CREATE_INLINE_REQUEST);
+            }
         }
 
         void newAutofillRequestLocked(@Nullable InlineSuggestionsRequest inlineRequest) {
@@ -1272,18 +1282,22 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                         viewState, /* isInlineRequest= */ true);
             }
             if (inlineSuggestionsRequestConsumer != null) {
-                final AutofillId focusedId = mCurrentViewId;
                 final int requestIdCopy = requestId;
+                final AutofillId focusedId = mCurrentViewId;
+
+                WeakReference sessionWeakReference = new WeakReference<Session>(this);
+                InlineSuggestionRendorInfoCallbackOnResultListener
+                        inlineSuggestionRendorInfoCallbackOnResultListener =
+                                new InlineSuggestionRendorInfoCallbackOnResultListener(
+                                        sessionWeakReference,
+                                        requestIdCopy,
+                                        inlineSuggestionsRequestConsumer,
+                                        focusedId);
+                RemoteCallback inlineSuggestionRendorInfoCallback = new RemoteCallback(
+                        inlineSuggestionRendorInfoCallbackOnResultListener, mHandler);
+
                 remoteRenderService.getInlineSuggestionsRendererInfo(
-                        new RemoteCallback((extras) -> {
-                            synchronized (mLock) {
-                                mInlineSessionController.onCreateInlineSuggestionsRequestLocked(
-                                        focusedId, inlineSuggestionsRequestCacheDecorator(
-                                                inlineSuggestionsRequestConsumer, requestIdCopy),
-                                        extras);
-                            }
-                        }, mHandler)
-                );
+                        inlineSuggestionRendorInfoCallback);
                 viewState.setState(ViewState.STATE_PENDING_CREATE_INLINE_REQUEST);
             }
         } else if (mSessionFlags.mClientSuggestionsEnabled) {
@@ -5534,7 +5548,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     }
 
     @NonNull
-    private Consumer<InlineSuggestionsRequest> inlineSuggestionsRequestCacheDecorator(
+    Consumer<InlineSuggestionsRequest> inlineSuggestionsRequestCacheDecorator(
             @NonNull Consumer<InlineSuggestionsRequest> consumer, int requestId) {
         return inlineSuggestionsRequest -> {
             consumer.accept(inlineSuggestionsRequest);

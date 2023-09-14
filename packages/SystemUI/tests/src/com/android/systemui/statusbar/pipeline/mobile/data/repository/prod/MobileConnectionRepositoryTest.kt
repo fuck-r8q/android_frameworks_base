@@ -63,6 +63,7 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetwork
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.DefaultNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.OverrideNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.UnknownNetworkType
+import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SystemUiCarrierConfig
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SystemUiCarrierConfigTest.Companion.configWithOverride
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SystemUiCarrierConfigTest.Companion.createTestConfig
@@ -83,6 +84,7 @@ import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import com.qti.extphone.NrIconType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.TestScope
@@ -117,6 +119,14 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
+    private val subscriptionModel: MutableStateFlow<SubscriptionModel?> =
+        MutableStateFlow(
+            SubscriptionModel(
+                subscriptionId = SUB_1_ID,
+                carrierName = DEFAULT_NAME,
+            )
+        )
+
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
@@ -128,7 +138,8 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
             MobileConnectionRepositoryImpl(
                 mContext,
                 SUB_1_ID,
-                DEFAULT_NAME,
+                subscriptionModel,
+                DEFAULT_NAME_MODEL,
                 SEP,
                 telephonyManager,
                 systemUiCarrierConfig,
@@ -190,6 +201,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
 
             // gsmLevel updates, no change to cdmaLevel
             strength = signalStrength(gsmLevel = 3, cdmaLevel = 2, isGsm = true)
+            callback.onSignalStrengthsChanged(strength)
 
             assertThat(latest).isEqualTo(2)
 
@@ -649,12 +661,51 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
         }
 
     @Test
+    fun networkNameForSubId_updates() =
+        testScope.runTest {
+            var latest: NetworkNameModel? = null
+            val job = underTest.carrierName.onEach { latest = it }.launchIn(this)
+
+            subscriptionModel.value =
+                SubscriptionModel(
+                    subscriptionId = SUB_1_ID,
+                    carrierName = DEFAULT_NAME,
+                )
+
+            assertThat(latest?.name).isEqualTo(DEFAULT_NAME)
+
+            val updatedName = "Derived Carrier"
+            subscriptionModel.value =
+                SubscriptionModel(
+                    subscriptionId = SUB_1_ID,
+                    carrierName = updatedName,
+                )
+
+            assertThat(latest?.name).isEqualTo(updatedName)
+
+            job.cancel()
+        }
+
+    @Test
+    fun networkNameForSubId_defaultWhenSubscriptionModelNull() =
+        testScope.runTest {
+            var latest: NetworkNameModel? = null
+            val job = underTest.carrierName.onEach { latest = it }.launchIn(this)
+
+            subscriptionModel.value = null
+
+            assertThat(latest?.name).isEqualTo(DEFAULT_NAME)
+
+            job.cancel()
+        }
+
+    @Test
     fun networkName_default() =
         testScope.runTest {
             var latest: NetworkNameModel? = null
             val job = underTest.networkName.onEach { latest = it }.launchIn(this)
 
-            assertThat(latest).isEqualTo(DEFAULT_NAME)
+            assertThat(latest).isEqualTo(DEFAULT_NAME_MODEL)
 
             job.cancel()
         }
@@ -712,7 +763,7 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
 
             fakeBroadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intentWithoutInfo)
 
-            assertThat(latest).isEqualTo(DEFAULT_NAME)
+            assertThat(latest).isEqualTo(DEFAULT_NAME_MODEL)
 
             job.cancel()
         }
@@ -870,8 +921,9 @@ class MobileConnectionRepositoryTest : SysuiTestCase() {
     companion object {
         private const val SUB_1_ID = 1
 
-        private val DEFAULT_NAME = NetworkNameModel.Default("default name")
-        private const val SEP = "-"
+        private val DEFAULT_NAME = "Fake Mobile Network"
+        private val DEFAULT_NAME_MODEL = NetworkNameModel.Default(DEFAULT_NAME)
+        private val SEP = "-"
 
         private const val SPN = "testSpn"
         private const val PLMN = "testPlmn"

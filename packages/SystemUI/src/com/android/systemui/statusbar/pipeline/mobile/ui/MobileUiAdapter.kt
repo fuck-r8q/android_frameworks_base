@@ -26,6 +26,7 @@ import android.telephony.TelephonyManager
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.shade.carrier.ShadeCarrierGroupController
 import com.android.systemui.statusbar.phone.StatusBarIconController
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
@@ -58,6 +59,8 @@ constructor(
     private var lastValue: List<Int>? = null
     private var isMultiSimEnabled: Boolean = telephonyManager.isMultiSimEnabled()
 
+    private var shadeCarrierGroupController: ShadeCarrierGroupController? = null
+
     override fun start() {
         // Start notifying the icon controller of subscriptions
         scope.launch {
@@ -66,8 +69,14 @@ constructor(
                 logger.logUiAdapterSubIdsSentToIconController(it)
                 lastValue = it
                 iconController.setNewMobileIconSubIds(it)
+                shadeCarrierGroupController?.updateModernMobileIcons(it)
             }
         }
+    }
+
+    /** Set the [ShadeCarrierGroupController] to notify of subscription updates */
+    fun setShadeCarrierGroupController(controller: ShadeCarrierGroupController) {
+        shadeCarrierGroupController = controller
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {

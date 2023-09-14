@@ -49,10 +49,12 @@ import com.android.systemui.recents.Recents
 import com.android.systemui.settings.dagger.MultiUserUtilsModule
 import com.android.systemui.shortcut.ShortcutKeyDispatcher
 import com.android.systemui.statusbar.ImmersiveModeConfirmation
+import com.android.systemui.statusbar.gesture.GesturePointerEventListener
 import com.android.systemui.statusbar.notification.InstantAppNotifier
 import com.android.systemui.statusbar.phone.KeyguardLiftController
 import com.android.systemui.statusbar.phone.LockscreenWallpaper
 import com.android.systemui.statusbar.phone.ScrimController
+import com.android.systemui.statusbar.phone.StatusBarHeadsUpChangeListener
 import com.android.systemui.stylus.StylusUsiPowerStartable
 import com.android.systemui.temporarydisplay.chipbar.ChipbarCoordinator
 import com.android.systemui.theme.ThemeOverlayController
@@ -180,6 +182,12 @@ abstract class SystemUICoreStartableModule {
     @IntoMap
     @ClassKey(ScreenDecorations::class)
     abstract fun bindScreenDecorations(sysui: ScreenDecorations): CoreStartable
+
+    /** Inject into GesturePointerEventHandler. */
+    @Binds
+    @IntoMap
+    @ClassKey(GesturePointerEventListener::class)
+    abstract fun bindGesturePointerEventListener(sysui: GesturePointerEventListener): CoreStartable
 
     /** Inject into SessionTracker.  */
     @Binds
@@ -331,4 +339,11 @@ abstract class SystemUICoreStartableModule {
     @IntoMap
     @ClassKey(ScrimController::class)
     abstract fun bindScrimController(impl: ScrimController): CoreStartable
+
+    @Binds
+    @IntoMap
+    @ClassKey(StatusBarHeadsUpChangeListener::class)
+    abstract fun bindStatusBarHeadsUpChangeListener(
+        impl: StatusBarHeadsUpChangeListener
+    ): CoreStartable
 }

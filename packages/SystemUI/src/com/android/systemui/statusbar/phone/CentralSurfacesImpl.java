@@ -89,11 +89,9 @@ import android.util.MathUtils;
 import android.view.Display;
 import android.view.IRemoteAnimationRunner;
 import android.view.IWindowManager;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ThreadedRenderer;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewRootImpl;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController.Appearance;
@@ -1602,17 +1600,15 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 CollapsedStatusBarFragment.class,
                 mCentralSurfacesComponent::createCollapsedStatusBarFragment);
 
-        ViewGroup windowRootView = mCentralSurfacesComponent.getWindowRootView();
-        // TODO(b/277762009): Inject [NotificationShadeWindowView] directly into the controller.
-        //  (Right now, there's a circular dependency.)
-        mNotificationShadeWindowController.setWindowRootView(windowRootView);
+        // Ideally, NotificationShadeWindowController could automatically fetch the window root view
+        // in #attach or a CoreStartable.start method or something similar. But for now, to avoid
+        // regressions, we'll continue standing up the root view in CentralSurfaces.
+        mNotificationShadeWindowController.fetchWindowRootView();
         getNotificationShadeWindowViewController().setupExpandedStatusBar();
         mShadeController.setNotificationShadeWindowViewController(
                 getNotificationShadeWindowViewController());
         mBackActionInteractor.setup(mQsController, mShadeSurface);
         mNotificationActivityStarter = mCentralSurfacesComponent.getNotificationActivityStarter();
-
-        mHeadsUpManager.addListener(mCentralSurfacesComponent.getStatusBarHeadsUpChangeListener());
 
         // Listen for demo mode changes
         mDemoModeController.addCallback(mDemoModeCallback);
@@ -1689,11 +1685,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public AuthKeyguardMessageArea getKeyguardMessageArea() {
         return getNotificationShadeWindowViewController().getKeyguardMessageArea();
-    }
-
-    @Override
-    public int getStatusBarHeight() {
-        return mStatusBarWindowController.getStatusBarHeight();
     }
 
     private void updateReportRejectedTouchVisibility() {
@@ -1818,11 +1809,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public boolean getCommandQueuePanelsEnabled() {
         return mCommandQueue.panelsEnabled();
-    }
-
-    @Override
-    public int getStatusBarWindowState() {
-        return mStatusBarWindowState;
     }
 
     @Override
@@ -2638,44 +2624,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     }
 
     @Override
-    public boolean interceptMediaKey(KeyEvent event) {
-        return mState == StatusBarState.KEYGUARD
-                && mStatusBarKeyguardViewManager.interceptMediaKey(event);
-    }
-
-    /**
-     * While IME is active and a BACK event is detected, check with
-     * {@link StatusBarKeyguardViewManager#dispatchBackKeyEventPreIme()} to see if the event
-     * should be handled before routing to IME, in order to prevent the user having to hit back
-     * twice to exit bouncer.
-     */
-    @Override
-    public boolean dispatchKeyEventPreIme(KeyEvent event) {
-        switch (event.getKeyCode()) {
-            case KeyEvent.KEYCODE_BACK:
-                if (mState == StatusBarState.KEYGUARD
-                        && mStatusBarKeyguardViewManager.dispatchBackKeyEventPreIme()) {
-                    return mBackActionInteractor.onBackRequested();
-                }
-        }
-        return false;
-    }
-
-    protected boolean shouldUnlockOnMenuPressed() {
-        return mDeviceInteractive && mState != StatusBarState.SHADE
-            && mStatusBarKeyguardViewManager.shouldDismissOnMenuPressed();
-    }
-
-    @Override
-    public boolean onMenuPressed() {
-        if (shouldUnlockOnMenuPressed()) {
-            mShadeController.animateCollapseShadeForced();
-            return true;
-        }
-        return false;
-    }
-
-    @Override
     public void endAffordanceLaunch() {
         releaseGestureWakeLock();
         mCameraLauncherLazy.get().setLaunchingAffordance(false);
@@ -2692,15 +2640,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mScrimController.getState() == ScrimState.BOUNCER_SCRIMMED;
         final boolean isBouncerOverDream = isBouncerShowingOverDream();
         return (isScrimmedBouncer || isBouncerOverDream);
-    }
-
-    @Override
-    public boolean onSpacePressed() {
-        if (mDeviceInteractive && mState != StatusBarState.SHADE) {
-            mShadeController.animateCollapseShadeForced();
-            return true;
-        }
-        return false;
     }
 
     private void showBouncerOrLockScreenIfKeyguard() {

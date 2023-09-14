@@ -33,7 +33,7 @@ import com.android.systemui.flags.FlagsFactory.unreleasedFlag
  * On public release builds, flags will always return their default value. There is no way to change
  * their value on release builds.
  *
- * See [FeatureFlagsDebug] for instructions on flipping the flags via adb.
+ * See [FeatureFlagsClassicDebug] for instructions on flipping the flags via adb.
  */
 object Flags {
     @JvmField val TEAMFOOD = unreleasedFlag("teamfood")
@@ -70,8 +70,7 @@ object Flags {
 
     // TODO(b/260335638): Tracking Bug
     @JvmField
-    val NOTIFICATION_INLINE_REPLY_ANIMATION =
-        unreleasedFlag("notification_inline_reply_animation")
+    val NOTIFICATION_INLINE_REPLY_ANIMATION = releasedFlag("notification_inline_reply_animation")
 
     /** Makes sure notification panel is updated before the user switch is complete. */
     // TODO(b/278873737): Tracking Bug
@@ -115,7 +114,7 @@ object Flags {
     // TODO(b/292213543): Tracking Bug
     @JvmField
     val NOTIFICATION_GROUP_EXPANSION_CHANGE =
-            unreleasedFlag("notification_group_expansion_change", teamfood = false)
+            unreleasedFlag("notification_group_expansion_change", teamfood = true)
 
     // 200 - keyguard/lockscreen
     // ** Flag retired **
@@ -195,7 +194,7 @@ object Flags {
     // TODO(b/294110497): Tracking Bug
     @JvmField
     val ENABLE_WALLET_CONTEXTUAL_LOYALTY_CARDS =
-        unreleasedFlag("enable_wallet_contextual_loyalty_cards", teamfood = true)
+        releasedFlag("enable_wallet_contextual_loyalty_cards")
 
     // TODO(b/242908637): Tracking Bug
     @JvmField val WALLPAPER_FULLSCREEN_PREVIEW = releasedFlag("wallpaper_fullscreen_preview")
@@ -254,7 +253,7 @@ object Flags {
     // TODO(b/290652751): Tracking bug.
     @JvmField
     val MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA =
-        unreleasedFlag("migrate_split_keyguard_bottom_area")
+        unreleasedFlag("migrate_split_keyguard_bottom_area", teamfood = true)
 
     /** Whether to listen for fingerprint authentication over keyguard occluding activities. */
     // TODO(b/283260512): Tracking bug.
@@ -269,7 +268,7 @@ object Flags {
 
     /** Migrate the lock icon view to the new keyguard root view. */
     // TODO(b/286552209): Tracking bug.
-    @JvmField val MIGRATE_LOCK_ICON = unreleasedFlag("migrate_lock_icon")
+    @JvmField val MIGRATE_LOCK_ICON = unreleasedFlag("migrate_lock_icon", teamfood = true)
 
     // TODO(b/288276738): Tracking bug.
     @JvmField val WIDGET_ON_KEYGUARD = unreleasedFlag("widget_on_keyguard")
@@ -285,11 +284,7 @@ object Flags {
     /** Enables preview loading animation in the wallpaper picker. */
     // TODO(b/274443705): Tracking Bug
     @JvmField
-    val WALLPAPER_PICKER_PREVIEW_ANIMATION =
-            unreleasedFlag(
-                    "wallpaper_picker_preview_animation",
-                teamfood = true
-            )
+    val WALLPAPER_PICKER_PREVIEW_ANIMATION = releasedFlag("wallpaper_picker_preview_animation")
 
     /**
      * TODO(b/278086361): Tracking bug
@@ -355,7 +350,7 @@ object Flags {
 
     // TODO(b/278068252): Tracking Bug
     @JvmField
-    val QS_PIPELINE_AUTO_ADD = unreleasedFlag("qs_pipeline_auto_add", teamfood = false)
+    val QS_PIPELINE_AUTO_ADD = unreleasedFlag("qs_pipeline_auto_add", teamfood = true)
 
     // TODO(b/254512383): Tracking Bug
     @JvmField
@@ -367,10 +362,6 @@ object Flags {
 
     // TODO(b/244064524): Tracking Bug
     @JvmField val QS_SECONDARY_DATA_SUB_INFO = releasedFlag("qs_secondary_data_sub_info")
-
-    /** Enables Font Scaling Quick Settings tile */
-    // TODO(b/269341316): Tracking Bug
-    @JvmField val ENABLE_FONT_SCALING_TILE = releasedFlag("enable_font_scaling_tile")
 
     /** Enables new QS Edit Mode visual refresh */
     // TODO(b/269787742): Tracking Bug
@@ -386,8 +377,7 @@ object Flags {
     @JvmField val NEW_BLUETOOTH_REPOSITORY = releasedFlag("new_bluetooth_repository")
 
     // TODO(b/292533677): Tracking Bug
-    val WIFI_TRACKER_LIB_FOR_WIFI_ICON =
-        unreleasedFlag("wifi_tracker_lib_for_wifi_icon", teamfood = true)
+    val WIFI_TRACKER_LIB_FOR_WIFI_ICON = releasedFlag("wifi_tracker_lib_for_wifi_icon")
 
     // TODO(b/293863612): Tracking Bug
     @JvmField val INCOMPATIBLE_CHARGING_BATTERY_ICON =
@@ -398,6 +388,10 @@ object Flags {
 
     // TODO(b/294588085): Tracking Bug
     val WIFI_SECONDARY_NETWORKS = releasedFlag("wifi_secondary_networks")
+
+    // TODO(b/290676905): Tracking Bug
+    val NEW_SHADE_CARRIER_GROUP_MOBILE_ICONS =
+        unreleasedFlag("new_shade_carrier_group_mobile_icons")
 
     // 700 - dialer/calls
     // TODO(b/254512734): Tracking Bug
@@ -503,21 +497,6 @@ object Flags {
     val WM_CAPTION_ON_SHELL =
         sysPropBooleanFlag("persist.wm.debug.caption_on_shell", default = true)
 
-    @Keep
-    @JvmField
-    val ENABLE_FLING_TO_DISMISS_BUBBLE =
-        sysPropBooleanFlag("persist.wm.debug.fling_to_dismiss_bubble", default = true)
-
-    @Keep
-    @JvmField
-    val ENABLE_FLING_TO_DISMISS_PIP =
-        sysPropBooleanFlag("persist.wm.debug.fling_to_dismiss_pip", default = true)
-
-    @Keep
-    @JvmField
-    val ENABLE_PIP_KEEP_CLEAR_ALGORITHM =
-        sysPropBooleanFlag("persist.wm.debug.enable_pip_keep_clear_algorithm", default = true)
-
     // TODO(b/256873975): Tracking Bug
     @JvmField
     @Keep
@@ -538,19 +517,6 @@ object Flags {
             namespace = DeviceConfig.NAMESPACE_WINDOW_MANAGER,
             teamfood = false
         )
-
-    // TODO(b/198643358): Tracking bug
-    @Keep
-    @JvmField
-    val ENABLE_PIP_SIZE_LARGE_SCREEN =
-        sysPropBooleanFlag("persist.wm.debug.enable_pip_size_large_screen", default = true)
-
-    // TODO(b/265998256): Tracking bug
-    @Keep
-    @JvmField
-    val ENABLE_PIP_APP_ICON_OVERLAY =
-        sysPropBooleanFlag("persist.wm.debug.enable_pip_app_icon_overlay", default = true)
-
 
     // TODO(b/293252410) : Tracking Bug
     @JvmField
@@ -634,6 +600,10 @@ object Flags {
 
     // TODO(b/251205791): Tracking Bug
     @JvmField val SCREENSHOT_APP_CLIPS = releasedFlag("screenshot_app_clips")
+
+    /** TODO(b/295143676): Tracking bug. When enable, captures a screenshot for each display. */
+    @JvmField
+    val MULTI_DISPLAY_SCREENSHOT = unreleasedFlag("multi_display_screenshot")
 
     // 1400 - columbus
     // TODO(b/254512756): Tracking Bug
@@ -776,6 +746,10 @@ object Flags {
     @JvmField
     val ONE_WAY_HAPTICS_API_MIGRATION = unreleasedFlag("oneway_haptics_api_migration")
 
+    /** TODO(b/296223317): Enables the new keyguard presentation containing a clock. */
+    @JvmField
+    val ENABLE_CLOCK_KEYGUARD_PRESENTATION = unreleasedFlag("enable_clock_keyguard_presentation")
+
     /** Enable the Compose implementation of the PeopleSpaceActivity. */
     @JvmField
     val COMPOSE_PEOPLE_SPACE = unreleasedFlag("compose_people_space")
@@ -787,4 +761,8 @@ object Flags {
     /** Enable the share wifi button in Quick Settings internet dialog. */
     @JvmField
     val SHARE_WIFI_QS_BUTTON = unreleasedFlag("share_wifi_qs_button")
+
+    /** Enable haptic slider component in the brightness slider */
+    @JvmField
+    val HAPTIC_BRIGHTNESS_SLIDER = unreleasedFlag("haptic_brightness_slider")
 }

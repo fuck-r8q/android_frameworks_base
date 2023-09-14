@@ -79,6 +79,7 @@ public class SettingsBackupTest {
                     Settings.System.SHOW_GTALK_SERVICE_STATUS, // candidate for backup?
                     Settings.System.SHOW_TOUCHES,
                     Settings.System.SHOW_KEY_PRESSES,
+                    Settings.System.SHOW_ROTARY_INPUT,
                     Settings.System.SIP_ADDRESS_ONLY, // value, not a setting
                     Settings.System.SIP_ALWAYS, // value, not a setting
                     Settings.System.SYSTEM_LOCALES, // bug?
@@ -102,6 +103,7 @@ public class SettingsBackupTest {
                     Settings.System.PEAK_REFRESH_RATE, // depends on hardware capabilities
                     Settings.System.SCREEN_BRIGHTNESS_FLOAT,
                     Settings.System.WEAR_ACCESSIBILITY_GESTURE_ENABLED_DURING_OOBE,
+                    Settings.System.WEAR_TTS_PREWARM_ENABLED,
                     Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ,
                     Settings.System.MULTI_AUDIO_FOCUS_ENABLED // form-factor/OEM specific
                     );

@@ -104,6 +104,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
 
     private final KeyguardUnlockAnimationController mKeyguardUnlockAnimationController;
 
+    private boolean mShownOnSecondaryDisplay = false;
     private boolean mOnlyClock = false;
     private boolean mIsActiveDreamLockscreenHosted = false;
     private FeatureFlags mFeatureFlags;
@@ -185,8 +186,18 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
     }
 
     /**
-     * Mostly used for alternate displays, limit the information shown
+     * When set, limits the information shown in an external display.
      */
+    public void setShownOnSecondaryDisplay(boolean shownOnSecondaryDisplay) {
+        mShownOnSecondaryDisplay = shownOnSecondaryDisplay;
+    }
+
+    /**
+     * Mostly used for alternate displays, limit the information shown
+     *
+     * @deprecated use {@link KeyguardClockSwitchController#setShownOnSecondaryDisplay}
+     */
+    @Deprecated
     public void setOnlyClock(boolean onlyClock) {
         mOnlyClock = onlyClock;
     }
@@ -211,14 +222,25 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mSmallClockFrame = mView.findViewById(R.id.lockscreen_clock_view);
         mLargeClockFrame = mView.findViewById(R.id.lockscreen_clock_view_large);
 
-        mDumpManager.unregisterDumpable(getClass().getSimpleName()); // unregister previous clocks
-        mDumpManager.registerDumpable(getClass().getSimpleName(), this);
+        if (!mOnlyClock) {
+            mDumpManager.unregisterDumpable(getClass().getSimpleName()); // unregister previous
+            mDumpManager.registerDumpable(getClass().getSimpleName(), this);
+        }
 
         if (mFeatureFlags.isEnabled(LOCKSCREEN_WALLPAPER_DREAM_ENABLED)) {
             mStatusArea = mView.findViewById(R.id.keyguard_status_area);
             collectFlow(mStatusArea, mKeyguardInteractor.isActiveDreamLockscreenHosted(),
                     mIsActiveDreamLockscreenHostedCallback);
         }
+    }
+
+    private void hideSliceViewAndNotificationIconContainer() {
+        View ksv = mView.findViewById(R.id.keyguard_slice_view);
+        ksv.setVisibility(View.GONE);
+
+        View nic = mView.findViewById(
+                R.id.left_aligned_notification_icon_container);
+        nic.setVisibility(View.GONE);
     }
 
     @Override
@@ -234,13 +256,15 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mKeyguardDateWeatherViewInvisibility =
                 mView.getResources().getInteger(R.integer.keyguard_date_weather_view_invisibility);
 
-        if (mOnlyClock) {
-            View ksv = mView.findViewById(R.id.keyguard_slice_view);
-            ksv.setVisibility(View.GONE);
+        if (mShownOnSecondaryDisplay) {
+            mView.setLargeClockOnSecondaryDisplay(true);
+            displayClock(LARGE, /* animate= */ false);
+            hideSliceViewAndNotificationIconContainer();
+            return;
+        }
 
-            View nic = mView.findViewById(
-                    R.id.left_aligned_notification_icon_container);
-            nic.setVisibility(View.GONE);
+        if (mOnlyClock) {
+            hideSliceViewAndNotificationIconContainer();
             return;
         }
         updateAodIcons();
@@ -269,7 +293,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
             int viewIndex = mStatusArea.indexOfChild(ksv);
             ksv.setVisibility(View.GONE);
 
-            mSmartspaceController.removeViewsFromParent(mStatusArea);
+            removeViewsFromStatusArea();
             addSmartspaceView();
             // TODO(b/261757708): add content observer for the Settings toggle and add/remove
             //  weather according to the Settings.
@@ -293,6 +317,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         setClock(null);
 
         mSecureSettings.unregisterContentObserver(mDoubleLineClockObserver);
+        mSecureSettings.unregisterContentObserver(mShowWeatherObserver);
 
         mKeyguardUnlockAnimationController.removeKeyguardUnlockAnimationListener(
                 mKeyguardUnlockAnimationListener);
@@ -300,7 +325,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
 
     void onLocaleListChanged() {
         if (mSmartspaceController.isEnabled()) {
-            mSmartspaceController.removeViewsFromParent(mStatusArea);
+            removeViewsFromStatusArea();
             addSmartspaceView();
             if (mSmartspaceController.isDateWeatherDecoupled()) {
                 mDateWeatherView.removeView(mWeatherView);
@@ -594,5 +619,14 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
 
         return ((mCurrentClockSize == LARGE) ? clock.getLargeClock() : clock.getSmallClock())
                 .getConfig().getHasCustomWeatherDataDisplay();
+    }
+
+    private void removeViewsFromStatusArea() {
+        for  (int i = mStatusArea.getChildCount() - 1; i >= 0; i--) {
+            final View childView = mStatusArea.getChildAt(i);
+            if (childView.getTag(R.id.tag_smartspace_view) != null) {
+                mStatusArea.removeViewAt(i);
+            }
+        }
     }
 }

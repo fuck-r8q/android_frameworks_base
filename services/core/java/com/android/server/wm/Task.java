@@ -745,7 +745,7 @@ class Task extends TaskFragment {
             } catch (RemoteException e) {
             }
         }
-        if (autoRemoveFromRecents(oldParent.asTaskFragment()) || isVoiceSession) {
+        if (shouldAutoRemoveFromRecents(oldParent.asTaskFragment()) || isVoiceSession) {
             // Task creator asked to remove this when done, or this task was a voice
             // interaction, so it should not remain on the recent tasks list.
             mTaskSupervisor.mRecentTasks.remove(this);
@@ -1581,12 +1581,14 @@ class Task extends TaskFragment {
         return count > 0;
     }
 
-    private boolean autoRemoveFromRecents(TaskFragment oldParentFragment) {
+    private boolean shouldAutoRemoveFromRecents(TaskFragment oldParentFragment) {
         // We will automatically remove the task either if it has explicitly asked for
         // this, or it is empty and has never contained an activity that got shown to
-        // the user, or it was being embedded in another Task.
-        return autoRemoveRecents || (!hasChild() && !getHasBeenVisible()
-                || (oldParentFragment != null && oldParentFragment.isEmbedded()));
+        // the user, or it was being embedded in another Task, or the display policy
+        // doesn't allow recents,
+        return autoRemoveRecents || (!hasChild() && !getHasBeenVisible())
+                || (oldParentFragment != null && oldParentFragment.isEmbedded())
+                || (mDisplayContent != null && !mDisplayContent.canShowTasksInHostDeviceRecents());
     }
 
     private void clearPinnedTaskIfNeed() {
@@ -3498,6 +3500,8 @@ class Task extends TaskFragment {
         info.topActivityLetterboxHorizontalPosition = TaskInfo.PROPERTY_VALUE_UNSET;
         info.topActivityLetterboxWidth = TaskInfo.PROPERTY_VALUE_UNSET;
         info.topActivityLetterboxHeight = TaskInfo.PROPERTY_VALUE_UNSET;
+        info.isUserFullscreenOverrideEnabled = top != null
+                && top.mLetterboxUiController.shouldApplyUserFullscreenOverride();
         info.isFromLetterboxDoubleTap = top != null && top.mLetterboxUiController.isFromDoubleTap();
         if (info.isLetterboxDoubleTapEnabled) {
             info.topActivityLetterboxWidth = top.getBounds().width();

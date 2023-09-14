@@ -128,6 +128,7 @@ import android.graphics.PointF;
 import android.graphics.PorterDuff;
 import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.RenderNode;
 import android.graphics.drawable.Drawable;
@@ -321,13 +322,6 @@ public final class ViewRootImpl implements ViewParent,
      */
     public static final boolean CLIENT_IMMERSIVE_CONFIRMATION =
             SystemProperties.getBoolean("persist.wm.debug.client_immersive_confirmation", false);
-
-    /**
-     * Whether the client should compute the window frame on its own.
-     * @hide
-     */
-    public static final boolean LOCAL_LAYOUT =
-            SystemProperties.getBoolean("persist.debug.local_layout", true);
 
     /**
      * Set this system property to true to force the view hierarchy to render
@@ -1923,8 +1917,8 @@ public final class ViewRootImpl implements ViewParent,
         final float compatScale = frames.compatScale;
         final boolean frameChanged = !mWinFrame.equals(frame);
         final boolean configChanged = !mLastReportedMergedConfiguration.equals(mergedConfiguration);
-        final boolean attachedFrameChanged = LOCAL_LAYOUT
-                && !Objects.equals(mTmpFrames.attachedFrame, attachedFrame);
+        final boolean attachedFrameChanged =
+                !Objects.equals(mTmpFrames.attachedFrame, attachedFrame);
         final boolean displayChanged = mDisplay.getDisplayId() != displayId;
         final boolean compatScaleChanged = mTmpFrames.compatScale != compatScale;
         final boolean dragResizingChanged = mPendingDragResizing != dragResizing;
@@ -2412,6 +2406,22 @@ public final class ViewRootImpl implements ViewParent,
         // Note: don't apply scroll offset, because we want to know its
         // visibility in the virtual canvas being given to the view hierarchy.
         return r.intersect(0, 0, mWidth, mHeight);
+    }
+
+    @Override
+    public boolean getChildLocalHitRegion(@NonNull View child, @NonNull Region region,
+            @NonNull Matrix matrix, boolean isHover) {
+        if (child != mView) {
+            throw new IllegalArgumentException("child " + child + " is not the root view "
+                    + mView + " managed by this ViewRootImpl");
+        }
+
+        RectF rectF = new RectF(0, 0, mWidth, mHeight);
+        matrix.mapRect(rectF);
+        // Note: don't apply scroll offset, because we want to know its
+        // visibility in the virtual canvas being given to the view hierarchy.
+        return region.op(Math.round(rectF.left), Math.round(rectF.top),
+                Math.round(rectF.right), Math.round(rectF.bottom), Region.Op.INTERSECT);
     }
 
     @Override
@@ -4135,7 +4145,7 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void fireAccessibilityFocusEventIfHasFocusedNode() {
-        if (!AccessibilityManager.getInstance(mContext).isEnabled()) {
+        if (!mAccessibilityManager.isEnabled()) {
             return;
         }
         final View focusedView = mView.findFocus();
@@ -5187,8 +5197,12 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private boolean getAccessibilityFocusedRect(Rect bounds) {
-        final AccessibilityManager manager = AccessibilityManager.getInstance(mView.mContext);
-        if (!manager.isEnabled() || !manager.isTouchExplorationEnabled()) {
+        if (mView == null) {
+            Slog.w(TAG, "calling getAccessibilityFocusedRect() while the mView is null");
+            return false;
+        }
+        if (!mAccessibilityManager.isEnabled()
+                || !mAccessibilityManager.isTouchExplorationEnabled()) {
             return false;
         }
 
@@ -7260,8 +7274,8 @@ public final class ViewRootImpl implements ViewParent,
                 && action != MotionEvent.ACTION_HOVER_EXIT) {
             return;
         }
-        AccessibilityManager manager = AccessibilityManager.getInstance(mContext);
-        if (manager.isEnabled() && manager.isTouchExplorationEnabled()) {
+        if (mAccessibilityManager.isEnabled()
+                && mAccessibilityManager.isTouchExplorationEnabled()) {
             return;
         }
         if (mView == null) {
@@ -8314,8 +8328,7 @@ public final class ViewRootImpl implements ViewParent,
         final int measuredWidth = mMeasuredWidth;
         final int measuredHeight = mMeasuredHeight;
         final boolean relayoutAsync;
-        if (LOCAL_LAYOUT
-                && (mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) == 0
+        if ((mViewFrameInfo.flags & FrameInfo.FLAG_WINDOW_VISIBILITY_CHANGED) == 0
                 && mWindowAttributes.type != TYPE_APPLICATION_STARTING
                 && mSyncSeqId <= mLastSyncSeqId
                 && winConfigFromAm.diff(winConfigFromWm, false /* compareUndefined */) == 0) {
@@ -11078,7 +11091,7 @@ public final class ViewRootImpl implements ViewParent,
                 return;
             }
             // The accessibility may be turned off while we were waiting so check again.
-            if (AccessibilityManager.getInstance(mContext).isEnabled()) {
+            if (mAccessibilityManager.isEnabled()) {
                 mLastEventTimeMillis = SystemClock.uptimeMillis();
                 AccessibilityEvent event = AccessibilityEvent.obtain();
                 event.setEventType(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);

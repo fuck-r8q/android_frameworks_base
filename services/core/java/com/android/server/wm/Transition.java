@@ -1949,11 +1949,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             break;
         }
 
-        final AsyncRotationController asyncRotationController = dc.getAsyncRotationController();
-        if (asyncRotationController != null) {
-            asyncRotationController.accept(navWindow);
-        }
-
         if (animate) {
             final NavBarFadeAnimationController controller =
                     new NavBarFadeAnimationController(dc);
