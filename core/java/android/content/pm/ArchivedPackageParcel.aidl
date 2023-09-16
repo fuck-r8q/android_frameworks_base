@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import android.content.pm.ArchivedActivityParcel;
 import android.content.pm.SigningDetails;
 
 /**
@@ -29,9 +30,8 @@ parcelable ArchivedPackageParcel {
     int versionCode;
     int versionCodeMajor;
     int targetSdkVersion;
-    String backupAllowed;
     String defaultToDeviceProtectedStorage;
     String requestLegacyExternalStorage;
     String userDataFragile;
-    String clearUserDataOnFailedRestoreAllowed;
+    ArchivedActivityParcel[] archivedActivities;
 }
