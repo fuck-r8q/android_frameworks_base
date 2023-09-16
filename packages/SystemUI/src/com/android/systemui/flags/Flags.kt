@@ -115,7 +115,7 @@ object Flags {
     val BUILDER_EXTRAS_OVERRIDE =
         sysPropBooleanFlag(
             "persist.sysui.notification.builder_extras_override",
-            default = false
+            default = true
         )
 
     /** Only notify group expansion listeners when a change happens. */
@@ -662,7 +662,6 @@ object Flags {
     // 2200 - biometrics (udfps, sfps, BiometricPrompt, etc.)
     // TODO(b/259264861): Tracking Bug
     @JvmField val UDFPS_NEW_TOUCH_DETECTION = releasedFlag("udfps_new_touch_detection")
-    @JvmField val UDFPS_ELLIPSE_DETECTION = releasedFlag("udfps_ellipse_detection")
 
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag("track_stylus_ever_used")
@@ -774,7 +773,8 @@ object Flags {
 
     // TODO(b/290213663): Tracking Bug
     @JvmField
-    val ONE_WAY_HAPTICS_API_MIGRATION = unreleasedFlag("oneway_haptics_api_migration")
+    val ONE_WAY_HAPTICS_API_MIGRATION =
+            unreleasedFlag("oneway_haptics_api_migration", teamfood = true)
 
     /** TODO(b/296223317): Enables the new keyguard presentation containing a clock. */
     @JvmField

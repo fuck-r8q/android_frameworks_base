@@ -2115,6 +2115,7 @@ package android.net.wifi.sharedconnectivity.app {
 
   public class SharedConnectivityManager {
     method @Nullable public static android.net.wifi.sharedconnectivity.app.SharedConnectivityManager create(@NonNull android.content.Context, @NonNull String, @NonNull String);
+    method @NonNull public android.content.BroadcastReceiver getBroadcastReceiver();
     method @Nullable public android.content.ServiceConnection getServiceConnection();
     method public void setService(@Nullable android.os.IInterface);
   }
@@ -3502,6 +3503,10 @@ package android.view {
     method public void setButtonState(int);
     method public void setDisplayId(int);
     field public static final int FLAG_IS_ACCESSIBILITY_EVENT = 2048; // 0x800
+  }
+
+  public static final class MotionEvent.PointerCoords {
+    method public boolean isResampled();
   }
 
   @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME) @java.lang.annotation.Target({java.lang.annotation.ElementType.METHOD}) public @interface RemotableViewMethod {
