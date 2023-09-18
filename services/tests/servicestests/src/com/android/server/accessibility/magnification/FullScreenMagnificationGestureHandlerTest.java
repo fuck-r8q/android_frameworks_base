@@ -30,6 +30,8 @@ import static com.android.server.testutils.TestUtils.strictMock;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
@@ -37,12 +39,14 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.animation.ValueAnimator;
 import android.annotation.NonNull;
+import android.content.pm.PackageManager;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.Region;
@@ -168,6 +172,8 @@ public class FullScreenMagnificationGestureHandlerTest {
     AccessibilityTraceManager mMockTraceManager;
     @Mock
     FullScreenMagnificationVibrationHelper mMockFullScreenMagnificationVibrationHelper;
+    @Mock
+    FullScreenMagnificationGestureHandler.MagnificationLogger mMockMagnificationLogger;
 
     @Rule
     public final TestableContext mContext = new TestableContext(getInstrumentation().getContext());
@@ -251,8 +257,12 @@ public class FullScreenMagnificationGestureHandlerTest {
                 mContext, mFullScreenMagnificationController, mMockTraceManager, mMockCallback,
                 detectTripleTap, detectShortcutTrigger,
                 mWindowMagnificationPromptController, DISPLAY_0,
-                mMockFullScreenMagnificationVibrationHelper);
-        h.setSinglePanningEnabled(true);
+                mMockFullScreenMagnificationVibrationHelper, mMockMagnificationLogger);
+        if (isWatch()) {
+            h.setSinglePanningEnabled(true);
+        } else {
+            h.setSinglePanningEnabled(false);
+        }
         mHandler = new TestHandler(h.mDetectingState, mClock) {
             @Override
             protected String messageToString(Message m) {
@@ -422,6 +432,70 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
+    public void testLongTapAfterShortcutTriggered_neverLogMagnificationTripleTap() {
+        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
+
+        longTap();
+
+        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
+    }
+
+    @Test
+    public void testSwipeAndHoldAfterShortcutTriggered_neverLogMagnificationTripleTap() {
+        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
+
+        swipeAndHold();
+
+        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
+    }
+
+    @Test
+    public void testTripleTap_isNotActivated_logMagnificationTripleTapIsEnabled() {
+        goFromStateIdleTo(STATE_IDLE);
+
+        tap();
+        tap();
+        longTap();
+
+        verify(mMockMagnificationLogger).logMagnificationTripleTap(true);
+    }
+
+    @Test
+    public void testTripleTap_isActivated_logMagnificationTripleTapIsNotEnabled() {
+        goFromStateIdleTo(STATE_ACTIVATED);
+        reset(mMockMagnificationLogger);
+
+        tap();
+        tap();
+        longTap();
+
+        verify(mMockMagnificationLogger).logMagnificationTripleTap(false);
+    }
+
+    @Test
+    public void testTripleTapAndHold_isNotActivated_logMagnificationTripleTapIsEnabled() {
+        goFromStateIdleTo(STATE_IDLE);
+
+        tap();
+        tap();
+        swipeAndHold();
+
+        verify(mMockMagnificationLogger).logMagnificationTripleTap(true);
+    }
+
+    @Test
+    public void testTripleTapAndHold_isActivated_logMagnificationTripleTapIsNotEnabled() {
+        goFromStateIdleTo(STATE_ACTIVATED);
+        reset(mMockMagnificationLogger);
+
+        tap();
+        tap();
+        swipeAndHold();
+
+        verify(mMockMagnificationLogger).logMagnificationTripleTap(false);
+    }
+
+    @Test
     public void testTripleTapAndHold_zoomsImmediately() {
         assertZoomsImmediatelyOnSwipeFrom(STATE_2TAPS, STATE_NON_ACTIVATED_ZOOMED_TMP);
         assertZoomsImmediatelyOnSwipeFrom(STATE_ACTIVATED_2TAPS, STATE_ZOOMED_FURTHER_TMP);
@@ -569,6 +643,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     public void testActionUpNotAtEdge_singlePanningState_detectingState() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
 
         send(upEvent());
@@ -579,6 +654,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     public void testScroll_SinglePanningDisabled_delegatingState() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         mMgh.setSinglePanningEnabled(false);
 
         goFromStateIdleTo(STATE_ACTIVATED);
@@ -591,6 +667,7 @@ public class FullScreenMagnificationGestureHandlerTest {
     @Test
     @FlakyTest
     public void testScroll_singleHorizontalPanningAndAtEdge_leftEdgeOverscroll() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         float centerY =
                 (INITIAL_MAGNIFICATION_BOUNDS.top + INITIAL_MAGNIFICATION_BOUNDS.bottom) / 2.0f;
@@ -614,6 +691,7 @@ public class FullScreenMagnificationGestureHandlerTest {
     @Test
     @FlakyTest
     public void testScroll_singleHorizontalPanningAndAtEdge_rightEdgeOverscroll() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         float centerY =
                 (INITIAL_MAGNIFICATION_BOUNDS.top + INITIAL_MAGNIFICATION_BOUNDS.bottom) / 2.0f;
@@ -637,6 +715,7 @@ public class FullScreenMagnificationGestureHandlerTest {
     @Test
     @FlakyTest
     public void testScroll_singleVerticalPanningAndAtEdge_verticalOverscroll() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         float centerX =
                 (INITIAL_MAGNIFICATION_BOUNDS.right + INITIAL_MAGNIFICATION_BOUNDS.left) / 2.0f;
@@ -658,6 +737,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     public void testScroll_singlePanningAndAtEdge_noOverscroll() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         float centerY =
                 (INITIAL_MAGNIFICATION_BOUNDS.top + INITIAL_MAGNIFICATION_BOUNDS.bottom) / 2.0f;
@@ -679,6 +759,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     public void testScroll_singleHorizontalPanningAndAtEdge_vibrate() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         mFullScreenMagnificationController.setCenter(
                 DISPLAY_0,
@@ -702,6 +783,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     public void testScroll_singleVerticalPanningAndAtEdge_doNotVibrate() {
+        assumeTrue(mMgh.mIsSinglePanningEnabled);
         goFromStateIdleTo(STATE_SINGLE_PANNING);
         mFullScreenMagnificationController.setCenter(
                 DISPLAY_0,
@@ -866,6 +948,10 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     private void triggerContextChanged() {
         mFullScreenMagnificationController.onUserContextChanged(DISPLAY_0);
+    }
+
+    private boolean isWatch() {
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WATCH);
     }
 
     /**

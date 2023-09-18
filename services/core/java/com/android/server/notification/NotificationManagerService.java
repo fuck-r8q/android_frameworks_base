@@ -1239,7 +1239,9 @@ public class NotificationManagerService extends SystemService {
                 mNotificationRecordLogger.log(
                         NotificationRecordLogger.NotificationEvent.fromAction(actionIndex,
                                 generatedByAssistant, action.isContextual()), r);
-                EventLogTags.writeNotificationActionClicked(key, actionIndex,
+                EventLogTags.writeNotificationActionClicked(key,
+                        action.actionIntent.getTarget().toString(),
+                        action.actionIntent.getIntent().toString(), actionIndex,
                         r.getLifespanMs(now), r.getFreshnessMs(now), r.getExposureMs(now),
                         nv.rank, nv.count);
                 nv.recycle();
@@ -1926,6 +1928,7 @@ public class NotificationManagerService extends SystemService {
                 mConditionProviders.onUserRemoved(userId);
                 mAssistants.onUserRemoved(userId);
                 mHistoryManager.onUserRemoved(userId);
+                mPreferencesHelper.syncChannelsBypassingDnd();
                 handleSavePolicyFile();
             } else if (action.equals(Intent.ACTION_USER_UNLOCKED)) {
                 final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, USER_NULL);
@@ -2377,6 +2380,7 @@ public class NotificationManagerService extends SystemService {
         });
         mPermissionHelper = permissionHelper;
         mNotificationChannelLogger = channelLogger;
+        mUserProfiles.updateCache(getContext());
         mPreferencesHelper = new PreferencesHelper(getContext(),
                 mPackageManagerClient,
                 mRankingHandler,
@@ -2385,6 +2389,7 @@ public class NotificationManagerService extends SystemService {
                 mPermissionManager,
                 mNotificationChannelLogger,
                 mAppOps,
+                mUserProfiles,
                 new SysUiStatsEvent.BuilderFactory(),
                 mShowReviewPermissionsNotification);
         mRankingHelper = new RankingHelper(getContext(),
@@ -2439,8 +2444,6 @@ public class NotificationManagerService extends SystemService {
         }
         mZenModeHelper.initZenMode();
         mInterruptionFilter = mZenModeHelper.getZenModeListenerInterruptionFilter();
-
-        mUserProfiles.updateCache(getContext());
 
         if (mPackageManagerClient.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)) {
             telephonyManager.listen(new PhoneStateListener() {

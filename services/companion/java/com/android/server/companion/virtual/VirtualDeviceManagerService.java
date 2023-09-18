@@ -35,6 +35,7 @@ import android.companion.virtual.VirtualDevice;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.sensor.VirtualSensor;
+import android.content.AttributionSource;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.IVirtualDisplayCallback;
@@ -84,6 +85,7 @@ public class VirtualDeviceManagerService extends SystemService {
     private final Object mVirtualDeviceManagerLock = new Object();
     private final VirtualDeviceManagerImpl mImpl;
     private final VirtualDeviceManagerInternal mLocalService;
+    private VirtualDeviceLog mVirtualDeviceLog = new VirtualDeviceLog(getContext());
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private final PendingTrampolineMap mPendingTrampolines = new PendingTrampolineMap(mHandler);
 
@@ -314,13 +316,15 @@ public class VirtualDeviceManagerService extends SystemService {
         @Override // Binder call
         public IVirtualDevice createVirtualDevice(
                 IBinder token,
-                String packageName,
+                AttributionSource attributionSource,
                 int associationId,
                 @NonNull VirtualDeviceParams params,
                 @NonNull IVirtualDeviceActivityListener activityListener,
                 @NonNull IVirtualDeviceSoundEffectListener soundEffectListener) {
             createVirtualDevice_enforcePermission();
+            attributionSource.enforceCallingUid();
             final int callingUid = getCallingUid();
+            final String packageName = attributionSource.getPackageName();
             if (!PermissionUtils.validateCallingPackageName(getContext(), packageName)) {
                 throw new SecurityException(
                         "Package name " + packageName + " does not belong to calling uid "
@@ -340,11 +344,12 @@ public class VirtualDeviceManagerService extends SystemService {
             final int deviceId = sNextUniqueIndex.getAndIncrement();
             final Consumer<ArraySet<Integer>> runningAppsChangedCallback =
                     runningUids -> notifyRunningAppsChanged(deviceId, runningUids);
-            VirtualDeviceImpl virtualDevice = new VirtualDeviceImpl(getContext(),
-                    associationInfo, VirtualDeviceManagerService.this, token, callingUid,
-                    deviceId, cameraAccessController,
-                    mPendingTrampolineCallback, activityListener,
+            VirtualDeviceImpl virtualDevice = new VirtualDeviceImpl(getContext(), associationInfo,
+                    VirtualDeviceManagerService.this, mVirtualDeviceLog, token, attributionSource,
+                    deviceId,
+                    cameraAccessController, mPendingTrampolineCallback, activityListener,
                     soundEffectListener, runningAppsChangedCallback, params);
+
             synchronized (mVirtualDeviceManagerLock) {
                 if (mVirtualDevices.size() == 0) {
                     final long callindId = Binder.clearCallingIdentity();
@@ -519,6 +524,8 @@ public class VirtualDeviceManagerService extends SystemService {
             for (int i = 0; i < virtualDevicesSnapshot.size(); i++) {
                 virtualDevicesSnapshot.get(i).dump(fd, fout, args);
             }
+
+            mVirtualDeviceLog.dump(fout);
         }
     }
 

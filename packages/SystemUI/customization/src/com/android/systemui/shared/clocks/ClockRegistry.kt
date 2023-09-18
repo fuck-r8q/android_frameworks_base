@@ -51,15 +51,18 @@ import kotlinx.coroutines.withContext
 private val KEY_TIMESTAMP = "appliedTimestamp"
 private val KNOWN_PLUGINS =
     mapOf<String, List<ClockMetadata>>(
-        "com.android.systemui.falcon.one" to listOf(ClockMetadata("ANALOG_CLOCK_BIGNUM")),
-        "com.android.systemui.falcon.two" to listOf(ClockMetadata("DIGITAL_CLOCK_CALLIGRAPHY")),
-        "com.android.systemui.falcon.three" to listOf(ClockMetadata("DIGITAL_CLOCK_FLEX")),
-        "com.android.systemui.falcon.four" to listOf(ClockMetadata("DIGITAL_CLOCK_GROWTH")),
-        "com.android.systemui.falcon.five" to listOf(ClockMetadata("DIGITAL_CLOCK_HANDWRITTEN")),
-        "com.android.systemui.falcon.six" to listOf(ClockMetadata("DIGITAL_CLOCK_INFLATE")),
-        "com.android.systemui.falcon.seven" to listOf(ClockMetadata("DIGITAL_CLOCK_METRO")),
-        "com.android.systemui.falcon.eight" to listOf(ClockMetadata("DIGITAL_CLOCK_NUMBEROVERLAP")),
-        "com.android.systemui.falcon.nine" to listOf(ClockMetadata("DIGITAL_CLOCK_WEATHER")),
+        "com.android.systemui.clocks.bignum" to listOf(ClockMetadata("ANALOG_CLOCK_BIGNUM")),
+        "com.android.systemui.clocks.calligraphy" to
+            listOf(ClockMetadata("DIGITAL_CLOCK_CALLIGRAPHY")),
+        "com.android.systemui.clocks.flex" to listOf(ClockMetadata("DIGITAL_CLOCK_FLEX")),
+        "com.android.systemui.clocks.growth" to listOf(ClockMetadata("DIGITAL_CLOCK_GROWTH")),
+        "com.android.systemui.clocks.handwritten" to
+            listOf(ClockMetadata("DIGITAL_CLOCK_HANDWRITTEN")),
+        "com.android.systemui.clocks.inflate" to listOf(ClockMetadata("DIGITAL_CLOCK_INFLATE")),
+        "com.android.systemui.clocks.metro" to listOf(ClockMetadata("DIGITAL_CLOCK_METRO")),
+        "com.android.systemui.clocks.numoverlap" to
+            listOf(ClockMetadata("DIGITAL_CLOCK_NUMBEROVERLAP")),
+        "com.android.systemui.clocks.weather" to listOf(ClockMetadata("DIGITAL_CLOCK_WEATHER")),
     )
 
 private fun <TKey : Any, TVal : Any> ConcurrentHashMap<TKey, TVal>.concurrentGetOrPut(
@@ -407,6 +410,18 @@ open class ClockRegistry(
         get() = settings?.seedColor
         set(value) {
             scope.launch(bgDispatcher) { mutateSetting { it.copy(seedColor = value) } }
+        }
+
+    // Returns currentClockId if clock is connected, otherwise DEFAULT_CLOCK_ID. Since this
+    // is dependent on which clocks are connected, it may change when a clock is installed or
+    // removed from the device (unlike currentClockId).
+    // TODO: Merge w/ CurrentClockId when we convert to a flow. We shouldn't need both behaviors.
+    val activeClockId: String
+        get() {
+            if (!availableClocks.containsKey(currentClockId)) {
+                return DEFAULT_CLOCK_ID
+            }
+            return currentClockId
         }
 
     init {

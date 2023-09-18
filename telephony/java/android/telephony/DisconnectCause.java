@@ -360,8 +360,11 @@ public final class DisconnectCause {
      */
     public static final int INCOMING_AUTO_REJECTED = 81;
 
-    /** @hide */
-    public static final int INCOMING_CALLS_BARRED_WITHIN_CUG = 82;
+    /**
+     * Indicates that the call was unable to be made because the satellite modem is enabled.
+     */
+    public static final int SATELLITE_ENABLED = 82;
+
     /** @hide */
     public static final int BEARER_CAPABILITY_UNAVAILABLE = 83;
     /** @hide */
@@ -463,11 +466,8 @@ public final class DisconnectCause {
     /** @hide */
     public static final int SECURE_MODE = 128;
 
-    /**
-     * Indicates that the call was unable to be made because the satellite modem is enabled.
-     * @hide
-     */
-    public static final int SATELLITE_ENABLED = 129;
+    /** @hide */
+    public static final int INCOMING_CALLS_BARRED_WITHIN_CUG = 129;
 
     //*********************************************************************************************
     // When adding a disconnect type:
@@ -490,7 +490,7 @@ public final class DisconnectCause {
      * Largest valid value for call disconnect codes.
      * @hide
      */
-    public static final int MAXIMUM_VALID_VALUE = SATELLITE_ENABLED;
+    public static final int MAXIMUM_VALID_VALUE = INCOMING_CALLS_BARRED_WITHIN_CUG;
 
     /** Private constructor to avoid class instantiation. */
     private DisconnectCause() {

@@ -17,15 +17,9 @@
 package com.android.wm.shell.dagger.pip;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
-import android.os.Handler;
 
-import com.android.internal.logging.UiEventLogger;
-import com.android.wm.shell.common.annotations.ShellMainThread;
 import com.android.wm.shell.dagger.WMSingleton;
-import com.android.wm.shell.pip.PipMediaController;
 import com.android.wm.shell.pip.PipSurfaceTransactionHelper;
-import com.android.wm.shell.pip.PipUiEventLogger;
 
 import dagger.Module;
 import dagger.Provides;
@@ -36,24 +30,9 @@ import dagger.Provides;
  */
 @Module
 public abstract class Pip1SharedModule {
-    // Needs handler for registering broadcast receivers
-    @WMSingleton
-    @Provides
-    static PipMediaController providePipMediaController(Context context,
-            @ShellMainThread Handler mainHandler) {
-        return new PipMediaController(context, mainHandler);
-    }
-
     @WMSingleton
     @Provides
     static PipSurfaceTransactionHelper providePipSurfaceTransactionHelper(Context context) {
         return new PipSurfaceTransactionHelper(context);
-    }
-
-    @WMSingleton
-    @Provides
-    static PipUiEventLogger providePipUiEventLogger(UiEventLogger uiEventLogger,
-            PackageManager packageManager) {
-        return new PipUiEventLogger(uiEventLogger, packageManager);
     }
 }

@@ -61,6 +61,7 @@ import android.companion.virtual.sensor.IVirtualSensorCallback;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtual.sensor.VirtualSensorCallback;
 import android.companion.virtual.sensor.VirtualSensorConfig;
+import android.content.AttributionSource;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
@@ -225,6 +226,7 @@ public class VirtualDeviceManagerServiceTest {
     private VirtualDeviceManagerService mVdms;
     private VirtualDeviceManagerInternal mLocalService;
     private VirtualDeviceManagerService.VirtualDeviceManagerImpl mVdm;
+    private VirtualDeviceLog mVirtualDeviceLog;
     @Mock
     private InputController.NativeWrapper mNativeWrapperMock;
     @Mock
@@ -369,6 +371,7 @@ public class VirtualDeviceManagerServiceTest {
         mVdms = new VirtualDeviceManagerService(mContext);
         mLocalService = mVdms.getLocalServiceInstance();
         mVdm = mVdms.new VirtualDeviceManagerImpl();
+        mVirtualDeviceLog = new VirtualDeviceLog(mContext);
         mDeviceImpl = createVirtualDevice(VIRTUAL_DEVICE_ID_1, DEVICE_OWNER_UID_1);
         mSensorController = mDeviceImpl.getSensorControllerForTest();
     }
@@ -1729,7 +1732,9 @@ public class VirtualDeviceManagerServiceTest {
     private VirtualDeviceImpl createVirtualDevice(int virtualDeviceId, int ownerUid,
             VirtualDeviceParams params) {
         VirtualDeviceImpl virtualDeviceImpl = new VirtualDeviceImpl(mContext,
-                mAssociationInfo, mVdms, new Binder(), ownerUid, virtualDeviceId,
+                mAssociationInfo, mVdms, mVirtualDeviceLog, new Binder(),
+                new AttributionSource(ownerUid, "com.android.virtualdevice.test", "virtualdevice"),
+                virtualDeviceId,
                 mInputController, mCameraAccessController,
                 mPendingTrampolineCallback, mActivityListener, mSoundEffectListener,
                 mRunningAppsChangedCallback, params, new DisplayManagerGlobal(mIDisplayManager));

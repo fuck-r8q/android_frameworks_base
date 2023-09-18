@@ -225,6 +225,9 @@ import static com.android.server.wm.IdentifierProto.TITLE;
 import static com.android.server.wm.IdentifierProto.USER_ID;
 import static com.android.server.wm.LetterboxConfiguration.DEFAULT_LETTERBOX_ASPECT_RATIO_FOR_MULTI_WINDOW;
 import static com.android.server.wm.LetterboxConfiguration.MIN_FIXED_ORIENTATION_LETTERBOX_ASPECT_RATIO;
+import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIENT;
+import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
+import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_RECENTS;
@@ -2714,6 +2717,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (isTransferringSplashScreen()) {
             return true;
         }
+        // Only do transfer after transaction has done when starting window exist.
+        if (mStartingData != null && mStartingData.mWaitForSyncTransactionCommit) {
+            mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_COPY_TO_CLIENT;
+            return true;
+        }
         requestCopySplashScreen();
         return isTransferringSplashScreen();
     }
@@ -2874,11 +2882,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mStartingData == null) {
             return;
         }
-        mStartingData.mWaitForSyncTransactionCommit = false;
-        if (mStartingData.mRemoveAfterTransaction) {
-            mStartingData.mRemoveAfterTransaction = false;
-            removeStartingWindowAnimation(mStartingData.mPrepareRemoveAnimation);
+        final StartingData lastData = mStartingData;
+        lastData.mWaitForSyncTransactionCommit = false;
+        if (lastData.mRemoveAfterTransaction == AFTER_TRANSACTION_REMOVE_DIRECTLY) {
+            removeStartingWindowAnimation(lastData.mPrepareRemoveAnimation);
+        } else if (lastData.mRemoveAfterTransaction == AFTER_TRANSACTION_COPY_TO_CLIENT) {
+            removeStartingWindow();
         }
+        lastData.mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
     }
 
     void removeStartingWindowAnimation(boolean prepareAnimation) {
@@ -2905,7 +2916,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mStartingData != null) {
             if (mStartingData.mWaitForSyncTransactionCommit
                     || mTransitionController.inCollectingTransition(startingWindow)) {
-                mStartingData.mRemoveAfterTransaction = true;
+                mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
                 mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                 return;
             }
@@ -4258,6 +4269,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 Slog.v(TAG_APP, "Keeping entry during removeHistory for activity " + this);
             }
         }
+        if (task != null && task.mKillProcessesOnDestroyed) {
+            mTaskSupervisor.removeTimeoutOfKillProcessesOnProcessDied(this, task);
+        }
         // upgrade transition trigger to task if this is the last activity since it means we are
         // closing the task.
         final WindowContainer trigger = remove && task != null && task.getChildCount() == 1
@@ -4403,7 +4417,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // Reset the last saved PiP snap fraction on removal.
         mDisplayContent.mPinnedTaskController.onActivityHidden(mActivityComponent);
         mDisplayContent.onRunningActivityChanged();
-        mWmService.mEmbeddedWindowController.onActivityRemoved(this);
         mRemovingFromDisplay = false;
     }
 
@@ -5686,9 +5699,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // to be some edge cases where we change our visibility but client visibility never gets
         // updated.
         // If we're becoming invisible, update the client visibility if we are not running an
-        // animation. Otherwise, we'll update client visibility in onAnimationFinished.
-        if (visible || usingShellTransitions
-                || !isAnimating(PARENTS, ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_RECENTS)) {
+        // animation and aren't in RESUMED state. Otherwise, we'll update client visibility in
+        // onAnimationFinished or activityStopped.
+        if (visible || (mState != RESUMED && (usingShellTransitions || !isAnimating(
+                PARENTS, ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_RECENTS)))) {
             setClientVisible(visible);
         }
 
@@ -7381,8 +7395,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     void showStartingWindow(boolean taskSwitch) {
-        showStartingWindow(null /* prev */, false /* newTask */, taskSwitch,
-                false /* startActivity */, null);
+        // Pass the activity which contains starting window already.
+        final ActivityRecord prev = task.getActivity(
+                a -> a != this && a.mStartingData != null && a.showToCurrentUser());
+        showStartingWindow(prev, false /* newTask */, taskSwitch, false /* startActivity */, null);
     }
 
     /**

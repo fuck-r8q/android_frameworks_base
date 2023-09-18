@@ -69,6 +69,7 @@ android_test {
         "ActivityContext",
         "coretests-aidl",
         "securebox",
+        "flag-junit",
     ],
 
     libs: [

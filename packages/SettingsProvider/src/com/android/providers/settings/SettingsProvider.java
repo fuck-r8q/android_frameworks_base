@@ -251,7 +251,7 @@ public class SettingsProvider extends ContentProvider {
     public static final int WRITE_FALLBACK_SETTINGS_FILES_JOB_ID = 1;
     public static final long ONE_DAY_INTERVAL_MILLIS = 24 * 60 * 60 * 1000L;
 
-    // Overlay specified settings whitelisted for Instant Apps
+    // Overlay specified settings allowlisted for Instant Apps
     private static final Set<String> OVERLAY_ALLOWED_GLOBAL_INSTANT_APP_SETTINGS = new ArraySet<>();
     private static final Set<String> OVERLAY_ALLOWED_SYSTEM_INSTANT_APP_SETTINGS = new ArraySet<>();
     private static final Set<String> OVERLAY_ALLOWED_SECURE_INSTANT_APP_SETTINGS = new ArraySet<>();
@@ -1157,8 +1157,6 @@ public class SettingsProvider extends ContentProvider {
             Slog.v(LOG_TAG, "getConfigSetting(" + name + ")");
         }
 
-        Settings.Config.enforceReadPermission(/*namespace=*/name.split("/")[0]);
-
         // Get the value.
         synchronized (mLock) {
             return mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_CONFIG,
@@ -1337,9 +1335,6 @@ public class SettingsProvider extends ContentProvider {
         if (DEBUG) {
             Slog.v(LOG_TAG, "getAllConfigFlags() for " + prefix);
         }
-
-        Settings.Config.enforceReadPermission(
-                prefix != null ? prefix.split("/")[0] : null);
 
         synchronized (mLock) {
             // Get the settings.
@@ -2155,7 +2150,7 @@ public class SettingsProvider extends ContentProvider {
 
     @GuardedBy("mLock")
     private List<String> getSettingsNamesLocked(int settingsType, int userId) {
-        // Don't enforce the instant app whitelist for now -- its too prone to unintended breakage
+        // Don't enforce the instant app allowlist for now -- its too prone to unintended breakage
         // in the current form.
         return mSettingsRegistry.getSettingsNamesLocked(settingsType, userId);
     }
@@ -2196,7 +2191,7 @@ public class SettingsProvider extends ContentProvider {
         }
         if (!getInstantAppAccessibleSettings(settingsType).contains(settingName)
                 && !getOverlayInstantAppAccessibleSettings(settingsType).contains(settingName)) {
-            // Don't enforce the instant app whitelist for now -- its too prone to unintended
+            // Don't enforce the instant app allowlist for now -- its too prone to unintended
             // breakage in the current form.
             Slog.w(LOG_TAG, "Instant App " + ai.packageName
                     + " trying to access unexposed setting, this will be an error in the future.");

@@ -77,6 +77,7 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameMode
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.DefaultNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.OverrideNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType.UnknownNetworkType
+import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SystemUiCarrierConfig
 import com.android.systemui.statusbar.pipeline.mobile.data.model.toDataConnectionType
 import com.android.systemui.statusbar.pipeline.mobile.data.model.toNetworkNameModel
@@ -120,6 +121,7 @@ import kotlinx.coroutines.flow.stateIn
 class MobileConnectionRepositoryImpl(
     private val context: Context,
     override val subId: Int,
+    subscriptionModel: StateFlow<SubscriptionModel?>,
     defaultNetworkName: NetworkNameModel,
     networkNameSeparator: String,
     private val telephonyManager: TelephonyManager,
@@ -365,6 +367,14 @@ class MobileConnectionRepositoryImpl(
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), DEFAULT_NUM_LEVELS)
+
+    override val carrierName =
+        subscriptionModel
+            .map {
+                it?.let { model -> NetworkNameModel.SubscriptionDerived(model.carrierName) }
+                    ?: defaultNetworkName
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), defaultNetworkName)
 
     /**
      * There are a few cases where we will need to poll [TelephonyManager] so we can update some
@@ -624,12 +634,14 @@ class MobileConnectionRepositoryImpl(
         fun build(
             subId: Int,
             mobileLogger: TableLogBuffer,
+            subscriptionModel: StateFlow<SubscriptionModel?>,
             defaultNetworkName: NetworkNameModel,
             networkNameSeparator: String,
         ): MobileConnectionRepository {
             return MobileConnectionRepositoryImpl(
                 context,
                 subId,
+                subscriptionModel,
                 defaultNetworkName,
                 networkNameSeparator,
                 telephonyManager.createForSubscriptionId(subId),

@@ -25,7 +25,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.UserHandle;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationAdapter;
 import android.view.View;
@@ -197,8 +196,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
     /** Get the Keyguard Message Area that displays auth messages. */
     AuthKeyguardMessageArea getKeyguardMessageArea();
 
-    int getStatusBarHeight();
-
     boolean isLaunchingActivityOverLockscreen();
 
     void onKeyguardViewManagerStatesUpdated();
@@ -228,9 +225,6 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     /** */
     boolean getCommandQueuePanelsEnabled();
-
-    /** */
-    int getStatusBarWindowState();
 
     BiometricUnlockController getBiometricUnlockController();
 
@@ -276,18 +270,10 @@ public interface CentralSurfaces extends Dumpable, LifecycleOwner {
 
     void userActivity();
 
-    boolean interceptMediaKey(KeyEvent event);
-
-    boolean dispatchKeyEventPreIme(KeyEvent event);
-
-    boolean onMenuPressed();
-
     void endAffordanceLaunch();
 
     /** Should the keyguard be hidden immediately in response to a back press/gesture. */
     boolean shouldKeyguardHideImmediately();
-
-    boolean onSpacePressed();
 
     void showBouncerWithDimissAndCancelIfKeyguard(OnDismissAction performAction,
             Runnable cancelAction);

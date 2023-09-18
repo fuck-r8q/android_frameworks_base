@@ -43,6 +43,7 @@ import android.companion.virtual.audio.IAudioConfigChangedCallback;
 import android.companion.virtual.audio.IAudioRoutingCallback;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtual.sensor.VirtualSensorEvent;
+import android.content.AttributionSource;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -125,6 +126,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     private final VirtualDeviceManagerService mService;
     private final PendingTrampolineCallback mPendingTrampolineCallback;
     private final int mOwnerUid;
+    private final VirtualDeviceLog mVirtualDeviceLog;
+    private final String mOwnerPackageName;
     private int mDeviceId;
     private @Nullable String mPersistentDeviceId;
     // Thou shall not hold the mVirtualDeviceLock over the mInputController calls.
@@ -195,8 +198,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             Context context,
             AssociationInfo associationInfo,
             VirtualDeviceManagerService service,
+            VirtualDeviceLog virtualDeviceLog,
             IBinder token,
-            int ownerUid,
+            AttributionSource attributionSource,
             int deviceId,
             CameraAccessController cameraAccessController,
             PendingTrampolineCallback pendingTrampolineCallback,
@@ -208,8 +212,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 context,
                 associationInfo,
                 service,
+                virtualDeviceLog,
                 token,
-                ownerUid,
+                attributionSource,
                 deviceId,
                 /* inputController= */ null,
                 cameraAccessController,
@@ -226,8 +231,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             Context context,
             AssociationInfo associationInfo,
             VirtualDeviceManagerService service,
+            VirtualDeviceLog virtualDeviceLog,
             IBinder token,
-            int ownerUid,
+            AttributionSource attributionSource,
             int deviceId,
             InputController inputController,
             CameraAccessController cameraAccessController,
@@ -238,7 +244,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             VirtualDeviceParams params,
             DisplayManagerGlobal displayManager) {
         super(PermissionEnforcer.fromContext(context));
-        UserHandle ownerUserHandle = UserHandle.getUserHandleForUid(ownerUid);
+        mVirtualDeviceLog = virtualDeviceLog;
+        mOwnerPackageName = attributionSource.getPackageName();
+        UserHandle ownerUserHandle = UserHandle.getUserHandleForUid(attributionSource.getUid());
         mContext = context.createContextAsUser(ownerUserHandle, 0);
         mAssociationInfo = associationInfo;
         mPersistentDeviceId = PERSISTENT_ID_PREFIX_CDM_ASSOCIATION + associationInfo.getId();
@@ -247,7 +255,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         mActivityListener = activityListener;
         mSoundEffectListener = soundEffectListener;
         mRunningAppsChangedCallback = runningAppsChangedCallback;
-        mOwnerUid = ownerUid;
+        mOwnerUid = attributionSource.getUid();
         mDeviceId = deviceId;
         mAppToken = token;
         mParams = params;
@@ -268,6 +276,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+        mVirtualDeviceLog.logCreated(deviceId, mOwnerUid);
     }
 
     @VisibleForTesting
@@ -402,6 +411,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         super.close_enforcePermission();
         // Remove about-to-be-closed virtual device from the service before butchering it.
         boolean removed = mService.removeVirtualDevice(mDeviceId);
+        mVirtualDeviceLog.logClosed(mDeviceId, mOwnerUid);
         mDeviceId = Context.DEVICE_ID_INVALID;
 
         // Device is already closed.
@@ -771,7 +781,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         fout.println("  VirtualDevice: ");
         fout.println("    mDeviceId: " + mDeviceId);
         fout.println("    mAssociationId: " + mAssociationInfo.getId());
-        fout.println("    mParams: " + mParams);
+        fout.println("    mOwnerPackageName: " + mOwnerPackageName);
+        fout.println("    mParams: ");
+        mParams.dump(fout, "        ");
         fout.println("    mVirtualDisplayIds: ");
         synchronized (mVirtualDeviceLock) {
             for (int i = 0; i < mVirtualDisplays.size(); i++) {

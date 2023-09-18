@@ -60,8 +60,11 @@ class FakeMobileConnectionRepository(
 
     override val cdmaRoaming = MutableStateFlow(false)
 
-    override val networkName =
-        MutableStateFlow<NetworkNameModel>(NetworkNameModel.Default("default"))
+    override val networkName: MutableStateFlow<NetworkNameModel> =
+        MutableStateFlow(NetworkNameModel.Default(DEFAULT_NETWORK_NAME))
+
+    override val carrierName: MutableStateFlow<NetworkNameModel> =
+        MutableStateFlow(NetworkNameModel.Default(DEFAULT_NETWORK_NAME))
 
     override val lteRsrpLevel = MutableStateFlow(0)
     override val voiceNetworkType = MutableStateFlow(0)
@@ -78,5 +81,9 @@ class FakeMobileConnectionRepository(
 
     fun setDataEnabled(enabled: Boolean) {
         _dataEnabled.value = enabled
+    }
+
+    companion object {
+        const val DEFAULT_NETWORK_NAME = "default name"
     }
 }

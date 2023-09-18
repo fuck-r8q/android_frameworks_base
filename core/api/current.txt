@@ -14424,14 +14424,14 @@ package android.database.sqlite {
     method @NonNull public static android.database.sqlite.SQLiteDatabase create(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method @NonNull public static android.database.sqlite.SQLiteDatabase createInMemory(@NonNull android.database.sqlite.SQLiteDatabase.OpenParams);
     method @NonNull public android.database.sqlite.SQLiteRawStatement createRawStatement(@NonNull String);
-    method public int delete(String, String, String[]);
+    method public int delete(@NonNull String, @Nullable String, @Nullable String[]);
     method public static boolean deleteDatabase(@NonNull java.io.File);
     method public void disableWriteAheadLogging();
     method public boolean enableWriteAheadLogging();
     method public void endTransaction();
     method public void execPerConnectionSQL(@NonNull String, @Nullable Object[]) throws android.database.SQLException;
     method public void execSQL(String) throws android.database.SQLException;
-    method public void execSQL(String, Object[]) throws android.database.SQLException;
+    method public void execSQL(@NonNull String, @NonNull Object[]) throws android.database.SQLException;
     method public static String findEditTable(String);
     method public java.util.List<android.util.Pair<java.lang.String,java.lang.String>> getAttachedDbs();
     method public long getLastChangedRowCount();
@@ -14443,9 +14443,9 @@ package android.database.sqlite {
     method public long getTotalChangedRowCount();
     method public int getVersion();
     method public boolean inTransaction();
-    method public long insert(String, String, android.content.ContentValues);
-    method public long insertOrThrow(String, String, android.content.ContentValues) throws android.database.SQLException;
-    method public long insertWithOnConflict(String, String, android.content.ContentValues, int);
+    method public long insert(@NonNull String, @Nullable String, @Nullable android.content.ContentValues);
+    method public long insertOrThrow(@NonNull String, @Nullable String, @Nullable android.content.ContentValues) throws android.database.SQLException;
+    method public long insertWithOnConflict(@NonNull String, @Nullable String, @Nullable android.content.ContentValues, int);
     method public boolean isDatabaseIntegrityOk();
     method public boolean isDbLockedByCurrentThread();
     method @Deprecated public boolean isDbLockedByOtherThreads();
@@ -14462,19 +14462,19 @@ package android.database.sqlite {
     method public static android.database.sqlite.SQLiteDatabase openOrCreateDatabase(@NonNull java.io.File, @Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method public static android.database.sqlite.SQLiteDatabase openOrCreateDatabase(@NonNull String, @Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method public static android.database.sqlite.SQLiteDatabase openOrCreateDatabase(@NonNull String, @Nullable android.database.sqlite.SQLiteDatabase.CursorFactory, @Nullable android.database.DatabaseErrorHandler);
-    method public android.database.Cursor query(boolean, String, String[], String, String[], String, String, String, String);
-    method public android.database.Cursor query(boolean, String, String[], String, String[], String, String, String, String, android.os.CancellationSignal);
-    method public android.database.Cursor query(String, String[], String, String[], String, String, String);
-    method public android.database.Cursor query(String, String[], String, String[], String, String, String, String);
-    method public android.database.Cursor queryWithFactory(android.database.sqlite.SQLiteDatabase.CursorFactory, boolean, String, String[], String, String[], String, String, String, String);
-    method public android.database.Cursor queryWithFactory(android.database.sqlite.SQLiteDatabase.CursorFactory, boolean, String, String[], String, String[], String, String, String, String, android.os.CancellationSignal);
-    method public android.database.Cursor rawQuery(String, String[]);
-    method public android.database.Cursor rawQuery(String, String[], android.os.CancellationSignal);
-    method public android.database.Cursor rawQueryWithFactory(android.database.sqlite.SQLiteDatabase.CursorFactory, String, String[], String);
-    method public android.database.Cursor rawQueryWithFactory(android.database.sqlite.SQLiteDatabase.CursorFactory, String, String[], String, android.os.CancellationSignal);
+    method @NonNull public android.database.Cursor query(boolean, @NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String, @Nullable String);
+    method @NonNull public android.database.Cursor query(boolean, @NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String, @Nullable String, @Nullable android.os.CancellationSignal);
+    method @NonNull public android.database.Cursor query(@NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String);
+    method @NonNull public android.database.Cursor query(@NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String, @Nullable String);
+    method @NonNull public android.database.Cursor queryWithFactory(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory, boolean, @NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String, @Nullable String);
+    method @NonNull public android.database.Cursor queryWithFactory(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory, boolean, @NonNull String, @Nullable String[], @Nullable String, @Nullable String[], @Nullable String, @Nullable String, @Nullable String, @Nullable String, @Nullable android.os.CancellationSignal);
+    method @NonNull public android.database.Cursor rawQuery(@NonNull String, @Nullable String[]);
+    method @NonNull public android.database.Cursor rawQuery(@NonNull String, @Nullable String[], @Nullable android.os.CancellationSignal);
+    method @NonNull public android.database.Cursor rawQueryWithFactory(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory, @NonNull String, @Nullable String[], @NonNull String);
+    method @NonNull public android.database.Cursor rawQueryWithFactory(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory, @NonNull String, @Nullable String[], @NonNull String, @Nullable android.os.CancellationSignal);
     method public static int releaseMemory();
-    method public long replace(String, String, android.content.ContentValues);
-    method public long replaceOrThrow(String, String, android.content.ContentValues) throws android.database.SQLException;
+    method public long replace(@NonNull String, @Nullable String, @Nullable android.content.ContentValues);
+    method public long replaceOrThrow(@NonNull String, @Nullable String, @Nullable android.content.ContentValues) throws android.database.SQLException;
     method public void setCustomAggregateFunction(@NonNull String, @NonNull java.util.function.BinaryOperator<java.lang.String>) throws android.database.sqlite.SQLiteException;
     method public void setCustomScalarFunction(@NonNull String, @NonNull java.util.function.UnaryOperator<java.lang.String>) throws android.database.sqlite.SQLiteException;
     method public void setForeignKeyConstraintsEnabled(boolean);
@@ -14485,8 +14485,8 @@ package android.database.sqlite {
     method public void setPageSize(long);
     method public void setTransactionSuccessful();
     method public void setVersion(int);
-    method public int update(String, android.content.ContentValues, String, String[]);
-    method public int updateWithOnConflict(String, android.content.ContentValues, String, String[], int);
+    method public int update(@NonNull String, @Nullable android.content.ContentValues, @Nullable String, @Nullable String[]);
+    method public int updateWithOnConflict(@NonNull String, @Nullable android.content.ContentValues, @Nullable String, @Nullable String[], int);
     method public void validateSql(@NonNull String, @Nullable android.os.CancellationSignal);
     method @Deprecated public boolean yieldIfContended();
     method public boolean yieldIfContendedSafely();
@@ -15734,6 +15734,7 @@ package android.graphics {
 
   public final class Gainmap implements android.os.Parcelable {
     ctor public Gainmap(@NonNull android.graphics.Bitmap);
+    ctor public Gainmap(@NonNull android.graphics.Gainmap, @NonNull android.graphics.Bitmap);
     method public int describeContents();
     method @NonNull public float getDisplayRatioForFullHdr();
     method @NonNull public float[] getEpsilonHdr();
@@ -42350,6 +42351,7 @@ package android.telecom {
     field public static final int PROPERTY_HIGH_DEF_AUDIO = 16; // 0x10
     field public static final int PROPERTY_IS_ADHOC_CONFERENCE = 8192; // 0x2000
     field public static final int PROPERTY_IS_EXTERNAL_CALL = 64; // 0x40
+    field public static final int PROPERTY_IS_TRANSACTIONAL = 32768; // 0x8000
     field public static final int PROPERTY_NETWORK_IDENTIFIED_EMERGENCY_CALL = 2048; // 0x800
     field public static final int PROPERTY_RTT = 1024; // 0x400
     field public static final int PROPERTY_SELF_MANAGED = 256; // 0x100
@@ -44966,6 +44968,7 @@ package android.telephony {
     field public static final int OUT_OF_NETWORK = 11; // 0xb
     field public static final int OUT_OF_SERVICE = 18; // 0x12
     field public static final int POWER_OFF = 17; // 0x11
+    field public static final int SATELLITE_ENABLED = 82; // 0x52
     field public static final int SERVER_ERROR = 12; // 0xc
     field public static final int SERVER_UNREACHABLE = 9; // 0x9
     field public static final int TIMED_OUT = 13; // 0xd
@@ -46090,6 +46093,7 @@ package android.telephony {
     field public static final int ERI_FLASH = 2; // 0x2
     field public static final int ERI_OFF = 1; // 0x1
     field public static final int ERI_ON = 0; // 0x0
+    field public static final String EVENT_DISPLAY_SOS_MESSAGE = "android.telephony.event.DISPLAY_SOS_MESSAGE";
     field public static final String EXTRA_ACTIVE_SIM_SUPPORTED_COUNT = "android.telephony.extra.ACTIVE_SIM_SUPPORTED_COUNT";
     field public static final String EXTRA_APN_PROTOCOL = "android.telephony.extra.APN_PROTOCOL";
     field public static final String EXTRA_APN_TYPE = "android.telephony.extra.APN_TYPE";
@@ -47630,7 +47634,7 @@ package android.text {
     method @IntRange(from=0) public final int getWidth();
     method public final void increaseWidthTo(int);
     method public boolean isFallbackLineSpacingEnabled();
-    method public final boolean isIncludeFontPadding();
+    method public final boolean isFontPaddingIncluded();
     method public boolean isRtlCharAt(int);
     method protected final boolean isSpanned();
     field public static final int BREAK_STRATEGY_BALANCED = 2; // 0x2
@@ -47666,13 +47670,13 @@ package android.text {
     method @NonNull public android.text.Layout.Builder setEllipsize(@Nullable android.text.TextUtils.TruncateAt);
     method @NonNull public android.text.Layout.Builder setEllipsizedWidth(@IntRange(from=0) int);
     method @NonNull public android.text.Layout.Builder setFallbackLineSpacingEnabled(boolean);
+    method @NonNull public android.text.Layout.Builder setFontPaddingIncluded(boolean);
     method @NonNull public android.text.Layout.Builder setHyphenationFrequency(int);
-    method @NonNull public android.text.Layout.Builder setIncludeFontPadding(boolean);
     method @NonNull public android.text.Layout.Builder setJustificationMode(int);
     method @NonNull public android.text.Layout.Builder setLeftIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.Layout.Builder setLineSpacingAmount(float);
-    method @NonNull public android.text.Layout.Builder setLineSpacingMultiplier(float);
+    method @NonNull public android.text.Layout.Builder setLineSpacingMultiplier(@FloatRange(from=0) float);
     method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
     method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);

@@ -26,8 +26,6 @@ import com.android.internal.logging.UiEventLogger
 import com.android.keyguard.FaceAuthUiEvent
 import com.android.systemui.Dumpable
 import com.android.systemui.R
-import com.android.systemui.biometrics.data.repository.FacePropertyRepository
-import com.android.systemui.biometrics.shared.model.SensorStrength
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
@@ -54,6 +52,7 @@ import com.android.systemui.log.SessionTracker
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.phone.KeyguardBypassController
+import com.android.systemui.user.data.model.SelectionStatus
 import com.android.systemui.user.data.repository.UserRepository
 import java.io.PrintWriter
 import java.util.Arrays
@@ -72,8 +71,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -162,7 +161,6 @@ constructor(
     @FaceAuthTableLog private val faceAuthLog: TableLogBuffer,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val featureFlags: FeatureFlags,
-    facePropertyRepository: FacePropertyRepository,
     dumpManager: DumpManager,
 ) : DeviceEntryFaceAuthRepository, Dumpable {
     private var authCancellationSignal: CancellationSignal? = null
@@ -181,13 +179,6 @@ constructor(
     private val _detectionStatus = MutableStateFlow<FaceDetectionStatus?>(null)
     override val detectionStatus: Flow<FaceDetectionStatus>
         get() = _detectionStatus.filterNotNull()
-
-    private val isFaceBiometricsAllowed: Flow<Boolean> =
-        facePropertyRepository.sensorInfo.flatMapLatest {
-            if (it?.strength == SensorStrength.STRONG)
-                biometricSettingsRepository.isStrongBiometricAllowed
-            else biometricSettingsRepository.isNonStrongBiometricAllowed
-        }
 
     private val _isLockedOut = MutableStateFlow(false)
     override val isLockedOut: StateFlow<Boolean> = _isLockedOut
@@ -211,7 +202,7 @@ constructor(
     private val keyguardSessionId: InstanceId?
         get() = sessionTracker.getSessionId(StatusBarManager.SESSION_KEYGUARD)
 
-    private val _canRunFaceAuth = MutableStateFlow(true)
+    private val _canRunFaceAuth = MutableStateFlow(false)
     override val canRunFaceAuth: StateFlow<Boolean>
         get() = _canRunFaceAuth
 
@@ -292,7 +283,9 @@ constructor(
                 } else {
                     keyguardRepository.isKeyguardGoingAway
                 },
-                userRepository.userSwitchingInProgress,
+                userRepository.selectedUser.map {
+                    it.selectionStatus == SelectionStatus.SELECTION_IN_PROGRESS
+                },
             )
             .onEach { anyOfThemIsTrue ->
                 if (anyOfThemIsTrue) {
@@ -313,8 +306,10 @@ constructor(
                 canFaceAuthOrDetectRun(faceDetectLog),
                 logAndObserve(isBypassEnabled, "isBypassEnabled", faceDetectLog),
                 logAndObserve(
-                    isFaceBiometricsAllowed.isFalse().or(trustRepository.isCurrentUserTrusted),
-                    "biometricIsNotAllowedOrCurrentUserIsTrusted",
+                    biometricSettingsRepository.isFaceAuthCurrentlyAllowed
+                        .isFalse()
+                        .or(trustRepository.isCurrentUserTrusted),
+                    "faceAuthIsNotCurrentlyAllowedOrCurrentUserIsTrusted",
                     faceDetectLog
                 ),
                 // We don't want to run face detect if fingerprint can be used to unlock the device
@@ -334,6 +329,7 @@ constructor(
                     cancelDetection()
                 }
             }
+            .flowOn(mainDispatcher)
             .logDiffsForTable(faceDetectLog, "", "canFaceDetectRun", false)
             .launchIn(applicationScope)
     }
@@ -346,13 +342,8 @@ constructor(
     private fun canFaceAuthOrDetectRun(tableLogBuffer: TableLogBuffer): Flow<Boolean> {
         return listOf(
                 logAndObserve(
-                    biometricSettingsRepository.isFaceEnrolled,
-                    "isFaceEnrolled",
-                    tableLogBuffer
-                ),
-                logAndObserve(
-                    biometricSettingsRepository.isFaceAuthenticationEnabled,
-                    "isFaceAuthenticationEnabled",
+                    biometricSettingsRepository.isFaceAuthEnrolledAndEnabled,
+                    "isFaceAuthEnrolledAndEnabled",
                     tableLogBuffer
                 ),
                 logAndObserve(faceAuthPaused.isFalse(), "faceAuthIsNotPaused", tableLogBuffer),
@@ -406,7 +397,11 @@ constructor(
                     "currentUserIsNotTrusted",
                     faceAuthLog
                 ),
-                logAndObserve(isFaceBiometricsAllowed, "isFaceBiometricsAllowed", faceAuthLog),
+                logAndObserve(
+                    biometricSettingsRepository.isFaceAuthCurrentlyAllowed,
+                    "isFaceAuthCurrentlyAllowed",
+                    faceAuthLog
+                ),
                 logAndObserve(isAuthenticated.isFalse(), "faceNotAuthenticated", faceAuthLog),
             )
             .reduce(::and)
@@ -420,6 +415,7 @@ constructor(
                     cancel()
                 }
             }
+            .flowOn(mainDispatcher)
             .logDiffsForTable(faceAuthLog, "", "canFaceAuthRun", false)
             .launchIn(applicationScope)
     }
