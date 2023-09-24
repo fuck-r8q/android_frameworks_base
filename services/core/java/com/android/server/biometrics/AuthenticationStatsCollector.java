@@ -45,12 +45,12 @@ public class AuthenticationStatsCollector {
     private static final String TAG = "AuthenticationStatsCollector";
 
     // The minimum number of attempts that will calculate the FRR and trigger the notification.
-    private static final int MINIMUM_ATTEMPTS = 500;
+    private static final int MINIMUM_ATTEMPTS = 150;
     // Upload the data every 50 attempts (average number of daily authentications).
     private static final int AUTHENTICATION_UPLOAD_INTERVAL = 50;
     // The maximum number of eligible biometric enrollment notification can be sent.
     @VisibleForTesting
-    static final int MAXIMUM_ENROLLMENT_NOTIFICATIONS = 2;
+    static final int MAXIMUM_ENROLLMENT_NOTIFICATIONS = 1;
 
     @NonNull private final Context mContext;
 
@@ -68,8 +68,10 @@ public class AuthenticationStatsCollector {
         @Override
         public void onReceive(@NonNull Context context, @NonNull Intent intent) {
             final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+
             if (userId != UserHandle.USER_NULL
                     && intent.getAction().equals(Intent.ACTION_USER_REMOVED)) {
+                Slog.d(TAG, "Removing data for user: " + userId);
                 onUserRemoved(userId);
             }
         }
@@ -84,7 +86,9 @@ public class AuthenticationStatsCollector {
         mModality = modality;
         mBiometricNotification = biometricNotification;
 
-        context.registerReceiver(mBroadcastReceiver, new IntentFilter(Intent.ACTION_USER_REMOVED));
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_USER_REMOVED);
+        context.registerReceiver(mBroadcastReceiver, intentFilter);
     }
 
     private void initializeUserAuthenticationStatsMap() {
@@ -94,6 +98,8 @@ public class AuthenticationStatsCollector {
                     mAuthenticationStatsPersister.getAllFrrStats(mModality)) {
                 mUserAuthenticationStatsMap.put(stats.getUserId(), stats);
             }
+            mAuthenticationStatsPersister.persistFrrThreshold(mThreshold);
+
             mPersisterInitialized = true;
         } catch (IllegalStateException e) {
             Slog.w(TAG, "Failed to initialize AuthenticationStatsPersister.", e);
@@ -121,10 +127,11 @@ public class AuthenticationStatsCollector {
 
         authenticationStats.authenticate(authenticated);
 
+        sendNotificationIfNeeded(userId);
+
         if (mPersisterInitialized) {
             persistDataIfNeeded(userId);
         }
-        sendNotificationIfNeeded(userId);
     }
 
     /** Check if a notification should be sent after a calculation cycle. */
@@ -164,8 +171,10 @@ public class AuthenticationStatsCollector {
         }
         if (hasEnrolledFace && !hasEnrolledFingerprint) {
             mBiometricNotification.sendFpEnrollNotification(mContext);
+            authenticationStats.updateNotificationCounter();
         } else if (!hasEnrolledFace && hasEnrolledFingerprint) {
             mBiometricNotification.sendFaceEnrollNotification(mContext);
+            authenticationStats.updateNotificationCounter();
         }
     }
 

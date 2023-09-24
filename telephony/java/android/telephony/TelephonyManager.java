@@ -2744,10 +2744,6 @@ public class TelephonyManager {
         return getCurrentPhoneType();
     }
 
-    private int getPhoneTypeFromProperty() {
-        return getPhoneTypeFromProperty(getPhoneId());
-    }
-
     /** {@hide} */
     @UnsupportedAppUsage
     private int getPhoneTypeFromProperty(int phoneId) {
@@ -2755,10 +2751,6 @@ public class TelephonyManager {
                 phoneId, TelephonyProperties.current_active_phone(), null);
         if (type != null) return type;
         return getPhoneTypeFromNetworkType(phoneId);
-    }
-
-    private int getPhoneTypeFromNetworkType() {
-        return getPhoneTypeFromNetworkType(getPhoneId());
     }
 
     /** {@hide} */
@@ -11662,16 +11654,6 @@ public class TelephonyManager {
     }
 
    /**
-    * Set TelephonyProperties.icc_operator_numeric for the default phone.
-    *
-    * @hide
-    */
-    public void setSimOperatorNumeric(String numeric) {
-        int phoneId = getPhoneId();
-        setSimOperatorNumericForPhone(phoneId, numeric);
-    }
-
-   /**
     * Set TelephonyProperties.icc_operator_numeric for the given phone.
     *
     * @hide
@@ -11683,16 +11665,6 @@ public class TelephonyManager {
                     TelephonyProperties.icc_operator_numeric(), phoneId, numeric);
             TelephonyProperties.icc_operator_numeric(newList);
         }
-    }
-
-    /**
-     * Set TelephonyProperties.icc_operator_alpha for the default phone.
-     *
-     * @hide
-     */
-    public void setSimOperatorName(String name) {
-        int phoneId = getPhoneId();
-        setSimOperatorNameForPhone(phoneId, name);
     }
 
     /**
@@ -11948,17 +11920,6 @@ public class TelephonyManager {
     }
 
     /**
-     * Set baseband version for the default phone.
-     *
-     * @param version baseband version
-     * @hide
-     */
-    public void setBasebandVersion(String version) {
-        int phoneId = getPhoneId();
-        setBasebandVersionForPhone(phoneId, version);
-    }
-
-    /**
      * Set baseband version by phone id.
      *
      * @param phoneId for which baseband version is set
@@ -11996,18 +11957,6 @@ public class TelephonyManager {
     }
 
     /**
-     * Set phone type for the default phone.
-     *
-     * @param type phone type
-     *
-     * @hide
-     */
-    public void setPhoneType(int type) {
-        int phoneId = getPhoneId();
-        setPhoneType(phoneId, type);
-    }
-
-    /**
      * Set phone type by phone id.
      *
      * @param phoneId for which phone type is set
@@ -12022,19 +11971,6 @@ public class TelephonyManager {
                     TelephonyProperties.current_active_phone(), phoneId, type);
             TelephonyProperties.current_active_phone(newList);
         }
-    }
-
-    /**
-     * Get OTASP number schema for the default phone.
-     *
-     * @param defaultValue default value
-     * @return OTA SP number schema
-     *
-     * @hide
-     */
-    public String getOtaSpNumberSchema(String defaultValue) {
-        int phoneId = getPhoneId();
-        return getOtaSpNumberSchemaForPhone(phoneId, defaultValue);
     }
 
     /**
@@ -12057,19 +11993,6 @@ public class TelephonyManager {
     }
 
     /**
-     * Get SMS receive capable from system property for the default phone.
-     *
-     * @param defaultValue default value
-     * @return SMS receive capable
-     *
-     * @hide
-     */
-    public boolean getSmsReceiveCapable(boolean defaultValue) {
-        int phoneId = getPhoneId();
-        return getSmsReceiveCapableForPhone(phoneId, defaultValue);
-    }
-
-    /**
      * Get SMS receive capable from system property by phone id.
      *
      * @param phoneId for which SMS receive capable is get
@@ -12084,19 +12007,6 @@ public class TelephonyManager {
         }
 
         return defaultValue;
-    }
-
-    /**
-     * Get SMS send capable from system property for the default phone.
-     *
-     * @param defaultValue default value
-     * @return SMS send capable
-     *
-     * @hide
-     */
-    public boolean getSmsSendCapable(boolean defaultValue) {
-        int phoneId = getPhoneId();
-        return getSmsSendCapableForPhone(phoneId, defaultValue);
     }
 
     /**
@@ -12163,16 +12073,6 @@ public class TelephonyManager {
 
     /**
      * Set the alphabetic name of current registered operator.
-     * @param name the alphabetic name of current registered operator.
-     * @hide
-     */
-    public void setNetworkOperatorName(String name) {
-        int phoneId = getPhoneId();
-        setNetworkOperatorNameForPhone(phoneId, name);
-    }
-
-    /**
-     * Set the alphabetic name of current registered operator.
      * @param phoneId which phone you want to set
      * @param name the alphabetic name of current registered operator.
      * @hide
@@ -12206,16 +12106,6 @@ public class TelephonyManager {
 
     /**
      * Set the numeric name (MCC+MNC) of current registered operator.
-     * @param operator the numeric name (MCC+MNC) of current registered operator
-     * @hide
-     */
-    public void setNetworkOperatorNumeric(String numeric) {
-        int phoneId = getPhoneId();
-        setNetworkOperatorNumericForPhone(phoneId, numeric);
-    }
-
-    /**
-     * Set the numeric name (MCC+MNC) of current registered operator.
      * @param phoneId for which phone type is set
      * @param operator the numeric name (MCC+MNC) of current registered operator
      * @hide
@@ -12227,16 +12117,6 @@ public class TelephonyManager {
                     TelephonyProperties.operator_numeric(), phoneId, numeric);
             TelephonyProperties.operator_numeric(newList);
         }
-    }
-
-    /**
-     * Set roaming state of the current network, for GSM purposes.
-     * @param isRoaming is network in romaing state or not
-     * @hide
-     */
-    public void setNetworkRoaming(boolean isRoaming) {
-        int phoneId = getPhoneId();
-        setNetworkRoamingForPhone(phoneId, isRoaming);
     }
 
     /**
@@ -12412,21 +12292,6 @@ public class TelephonyManager {
                 if (!TextUtils.isEmpty(languageTag)) {
                     return Locale.forLanguageTag(languageTag);
                 }
-            }
-        } catch (RemoteException ex) {
-        }
-        return null;
-    }
-
-    /**
-     * TODO delete after SuW migrates to new API.
-     * @hide
-     */
-    public String getLocaleFromDefaultSim() {
-        try {
-            final ITelephony telephony = getITelephony();
-            if (telephony != null) {
-                return telephony.getSimLocaleForSubscriber(getSubId());
             }
         } catch (RemoteException ex) {
         }

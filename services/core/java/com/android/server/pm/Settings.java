@@ -27,7 +27,6 @@ import static android.content.pm.PackageManager.UNINSTALL_REASON_USER_TYPE;
 import static android.os.Process.INVALID_UID;
 import static android.os.Process.PACKAGE_INFO_GID;
 import static android.os.Process.SYSTEM_UID;
-
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 import static com.android.server.pm.PackageManagerService.WRITE_USER_PACKAGE_RESTRICTIONS;
 import static com.android.server.pm.SharedUidMigration.BEST_EFFORT;
@@ -2065,8 +2064,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         ATTR_ARCHIVE_ACTIVITY_TITLE);
                 Path iconPath = Path.of(parser.getAttributeValue(null,
                         ATTR_ARCHIVE_ICON_PATH));
-                Path monochromeIconPath = Path.of(parser.getAttributeValue(null,
-                        ATTR_ARCHIVE_MONOCHROME_ICON_PATH));
+                String monochromeAttribute = parser.getAttributeValue(null,
+                        ATTR_ARCHIVE_MONOCHROME_ICON_PATH);
+                Path monochromeIconPath = monochromeAttribute == null ? null : Path.of(
+                        monochromeAttribute);
 
                 if (title == null || iconPath == null) {
                     Slog.wtf(TAG,
@@ -2916,11 +2917,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
 
             StringBuilder sb = new StringBuilder();
             for (final PackageSetting ps : mPackages.values()) {
-                // TODO(b/135203078): This doesn't handle multiple users
-                final String dataPath = PackageInfoUtils.getDataDir(ps, UserHandle.USER_SYSTEM)
-                        .getAbsolutePath();
-
-                if (ps.getPkg() == null || dataPath == null) {
+                if (ps.getPkg() == null) {
                     if (!"android".equals(ps.getPackageName())) {
                         Slog.w(TAG, "Skipping " + ps + " due to missing metadata");
                     }
@@ -2931,6 +2928,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                     // error in libpackagelistparser
                     continue;
                 }
+
+                // TODO(b/135203078): This doesn't handle multiple users
+                final File dataDir = PackageInfoUtils.getDataDir(ps, UserHandle.USER_SYSTEM);
+                final String dataPath = dataDir == null ? "null" : dataDir.getAbsolutePath();
 
                 final boolean isDebug = ps.getPkg().isDebuggable();
                 final IntArray gids = new IntArray();
@@ -2973,7 +2974,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 sb.append(ps.getSeInfo());
                 sb.append(" ");
                 final int gidsSize = gids.size();
-                if (gids != null && gids.size() > 0) {
+                if (gids.size() > 0) {
                     sb.append(gids.get(0));
                     for (int i = 1; i < gidsSize; i++) {
                         sb.append(",");
@@ -4746,6 +4747,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD, "VIRTUAL_PRELOAD",
             ApplicationInfo.PRIVATE_FLAG_ODM, "ODM",
             ApplicationInfo.PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING, "PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING",
+            ApplicationInfo.PRIVATE_FLAG_HAS_FRAGILE_USER_DATA, "PRIVATE_FLAG_HAS_FRAGILE_USER_DATA",
     };
 
     void dumpVersionLPr(IndentingPrintWriter pw) {
@@ -4893,8 +4895,6 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             pw.print("]");
         }
         pw.println();
-        File dataDir = PackageInfoUtils.getDataDir(ps, UserHandle.myUserId());
-        pw.print(prefix); pw.print("  dataDir="); pw.println(dataDir.getAbsolutePath());
         if (pkg != null) {
             pw.print(prefix); pw.print("  versionName="); pw.println(pkg.getVersionName());
             pw.print(prefix); pw.print("  usesNonSdkApi="); pw.println(pkg.isNonSdkApiRequested());
@@ -5194,6 +5194,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             pw.println();
             pw.print("      installReason=");
             pw.println(userState.getInstallReason());
+
+            File dataDir = PackageInfoUtils.getDataDir(ps, user.id);
+            pw.print("      dataDir=");
+            pw.println(dataDir.getAbsolutePath());
 
             final PackageUserStateInternal pus = ps.readUserState(user.id);
             pw.print("      firstInstallTime=");

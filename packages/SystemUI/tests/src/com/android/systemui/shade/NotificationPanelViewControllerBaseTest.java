@@ -146,6 +146,7 @@ import com.android.systemui.statusbar.notification.stack.NotificationRoundnessMa
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator;
+import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.ConfigurationControllerImpl;
 import com.android.systemui.statusbar.phone.DozeParameters;
@@ -324,6 +325,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock private JavaAdapter mJavaAdapter;
     @Mock private CastController mCastController;
     @Mock private KeyguardRootView mKeyguardRootView;
+    @Mock private SharedNotificationContainerInteractor mSharedNotificationContainerInteractor;
 
     protected final int mMaxUdfpsBurnInOffsetY = 5;
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
@@ -626,6 +628,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mScreenOffAnimationController,
                 mLockscreenGestureLogger,
                 mShadeExpansionStateManager,
+                mShadeRepository,
                 mSysUIUnfoldComponent,
                 mSysUiState,
                 () -> mKeyguardBottomAreaViewController,
@@ -652,6 +655,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyuardLongPressViewModel,
                 mKeyguardInteractor,
                 mActivityStarter,
+                mSharedNotificationContainerInteractor,
                 mEmergencyButtonControllerFactory,
                 mKeyguardViewConfigurator,
                 mKeyguardFaceAuthInteractor,
@@ -716,7 +720,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mAmbientState,
                 mRecordingController,
                 mFalsingManager,
-                new FalsingCollectorFake(),
                 mAccessibilityManager,
                 mLockscreenGestureLogger,
                 mMetricsLogger,

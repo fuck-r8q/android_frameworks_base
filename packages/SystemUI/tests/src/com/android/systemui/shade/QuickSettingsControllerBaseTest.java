@@ -37,7 +37,7 @@ import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.TestScopeProvider;
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.classifier.FalsingCollector;
+import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.fragments.FragmentHostManager;
@@ -49,7 +49,7 @@ import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.qs.QSFragment;
 import com.android.systemui.screenrecord.RecordingController;
-import com.android.systemui.shade.data.repository.ShadeRepository;
+import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.shade.transition.ShadeTransitionController;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -62,6 +62,7 @@ import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
+import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor;
 import com.android.systemui.statusbar.phone.KeyguardBottomAreaView;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.KeyguardStatusBarView;
@@ -132,7 +133,6 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
     @Mock protected AmbientState mAmbientState;
     @Mock protected RecordingController mRecordingController;
     @Mock protected FalsingManager mFalsingManager;
-    @Mock protected FalsingCollector mFalsingCollector;
     @Mock protected AccessibilityManager mAccessibilityManager;
     @Mock protected LockscreenGestureLogger mLockscreenGestureLogger;
     @Mock protected MetricsLogger mMetricsLogger;
@@ -147,6 +147,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
     protected FakeDisableFlagsRepository mDisableFlagsRepository =
             new FakeDisableFlagsRepository();
     protected FakeKeyguardRepository mKeyguardRepository = new FakeKeyguardRepository();
+    protected FakeShadeRepository mShadeRepository = new FakeShadeRepository();
 
     protected SysuiStatusBarStateController mStatusBarStateController;
     protected ShadeInteractor mShadeInteractor;
@@ -174,7 +175,11 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                         mKeyguardRepository,
                         new FakeUserSetupRepository(),
                         mDeviceProvisionedController,
-                        mUserInteractor
+                        mUserInteractor,
+                        new SharedNotificationContainerInteractor(
+                                new FakeConfigurationRepository(),
+                                mContext),
+                        mShadeRepository
                 );
 
         KeyguardStatusView keyguardStatusView = new KeyguardStatusView(mContext);
@@ -240,7 +245,6 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 mAmbientState,
                 mRecordingController,
                 mFalsingManager,
-                mFalsingCollector,
                 mAccessibilityManager,
                 mLockscreenGestureLogger,
                 mMetricsLogger,
@@ -249,7 +253,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 mShadeLogger,
                 mDumpManager,
                 mock(KeyguardFaceAuthInteractor.class),
-                mock(ShadeRepository.class),
+                mShadeRepository,
                 mShadeInteractor,
                 new JavaAdapter(mTestScope.getBackgroundScope()),
                 mCastController

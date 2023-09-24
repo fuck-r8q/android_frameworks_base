@@ -2137,6 +2137,34 @@ public class ActivityManagerService extends IActivityManager.Stub
         mVoiceInteractionManagerProvider = provider;
     }
 
+    /**
+     * Represents volatile states associated with a Dropbox entry.
+     * <p>
+     * These states, such as the process frozen state, can change quickly over time and thus
+     * should be captured as soon as possible to ensure accurate state. If a state is undefined,
+     * it means that the state was not read early and a fallback value can be used.
+     * </p>
+     */
+    static class VolatileDropboxEntryStates {
+        private final Boolean mIsProcessFrozen;
+
+        private VolatileDropboxEntryStates(Boolean frozenState) {
+            this.mIsProcessFrozen = frozenState;
+        }
+
+        public static VolatileDropboxEntryStates withProcessFrozenState(boolean frozenState) {
+            return new VolatileDropboxEntryStates(frozenState);
+        }
+
+        public static VolatileDropboxEntryStates emptyVolatileDropboxEnytyStates() {
+            return new VolatileDropboxEntryStates(null);
+        }
+
+        public Boolean isProcessFrozen() {
+            return mIsProcessFrozen;
+        }
+    }
+
     static class MemBinder extends Binder {
         ActivityManagerService mActivityManagerService;
         private final PriorityDump.PriorityDumper mPriorityDumper =
@@ -3575,6 +3603,12 @@ public class ActivityManagerService extends IActivityManager.Stub
     @Override
     public boolean clearApplicationUserData(final String packageName, boolean keepState,
             final IPackageDataObserver observer, int userId) {
+        return clearApplicationUserData(packageName, keepState, /*isRestore=*/ false, observer,
+                userId);
+    }
+
+    private boolean clearApplicationUserData(final String packageName, boolean keepState,
+            boolean isRestore, final IPackageDataObserver observer, int userId) {
         enforceNotIsolatedCaller("clearApplicationUserData");
         int uid = Binder.getCallingUid();
         int pid = Binder.getCallingPid();
@@ -3669,6 +3703,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                         intent.putExtra(Intent.EXTRA_UID,
                                 (appInfo != null) ? appInfo.uid : INVALID_UID);
                         intent.putExtra(Intent.EXTRA_USER_HANDLE, resolvedUserId);
+                        if (isRestore) {
+                            intent.putExtra(Intent.EXTRA_IS_RESTORE, true);
+                        }
                         if (isInstantApp) {
                             intent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName);
                         }
@@ -3887,15 +3924,16 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @Override
     public void forceStopPackage(final String packageName, int userId) {
-        forceStopPackage(packageName, userId, /*flags=*/ 0);
+        forceStopPackage(packageName, userId, /*flags=*/ 0, null);
     }
 
     @Override
     public void forceStopPackageEvenWhenStopping(final String packageName, int userId) {
-        forceStopPackage(packageName, userId, ActivityManager.FLAG_OR_STOPPED);
+        forceStopPackage(packageName, userId, ActivityManager.FLAG_OR_STOPPED, null);
     }
 
-    private void forceStopPackage(final String packageName, int userId, int userRunningFlags) {
+    private void forceStopPackage(final String packageName, int userId, int userRunningFlags,
+            String reason) {
         if (checkCallingPermission(android.Manifest.permission.FORCE_STOP_PACKAGES)
                 != PackageManager.PERMISSION_GRANTED) {
             String msg = "Permission Denial: forceStopPackage() from pid="
@@ -3940,7 +3978,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 + packageName + ": " + e);
                     }
                     if (mUserController.isUserRunning(user, userRunningFlags)) {
-                        forceStopPackageLocked(packageName, pkgUid, "from pid " + callingPid);
+                        forceStopPackageLocked(packageName, pkgUid,
+                                reason == null ? ("from pid " + callingPid) : reason);
                         finishForceStopPackageLocked(packageName, pkgUid);
                     }
                 }
@@ -5495,6 +5534,19 @@ public class ActivityManagerService extends IActivityManager.Stub
                 intent = new Intent(Intent.ACTION_MAIN);
             }
             try {
+                if (allowlistToken != null) {
+                    final int callingUid = Binder.getCallingUid();
+                    final String packageName;
+                    final long token = Binder.clearCallingIdentity();
+                    try {
+                        packageName = AppGlobals.getPackageManager().getNameForUid(callingUid);
+                    } finally {
+                        Binder.restoreCallingIdentity(token);
+                    }
+                    Slog.wtf(TAG, "Send a non-null allowlistToken to a non-PI target."
+                            + " Calling package: " + packageName + "; intent: " + intent
+                            + "; options: " + options);
+                }
                 target.send(code, intent, resolvedType, allowlistToken, null,
                         requiredPermission, options);
             } catch (RemoteException e) {
@@ -9029,7 +9081,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         addErrorToDropBox(
                 eventType, r, processName, null, null, null, null, null, null, crashInfo,
-                new Float(loadingProgress), incrementalMetrics, null);
+                new Float(loadingProgress), incrementalMetrics, null, null);
 
         // For GWP-ASan recoverable crashes, don't make the app crash (the whole point of
         // 'recoverable' is that the app doesn't crash). Normally, for nonrecoreable native crashes,
@@ -9140,7 +9192,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         final StringBuilder sb = new StringBuilder(1024);
         synchronized (sb) {
-            appendDropBoxProcessHeaders(process, processName, sb);
+            appendDropBoxProcessHeaders(process, processName, null, sb);
             sb.append("Build: ").append(Build.FINGERPRINT).append("\n");
             sb.append("System-App: ").append(isSystemApp).append("\n");
             sb.append("Uptime-Millis: ").append(info.violationUptimeMillis).append("\n");
@@ -9243,7 +9295,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 callingPid, (r != null) ? r.getProcessClassEnum() : 0);
 
         addErrorToDropBox("wtf", r, processName, null, null, null, tag, null, null, crashInfo,
-                null, null, null);
+                null, null, null, null);
 
         return r;
     }
@@ -9268,7 +9320,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         for (Pair<String, ApplicationErrorReport.CrashInfo> p = list.poll();
                 p != null; p = list.poll()) {
             addErrorToDropBox("wtf", proc, "system_server", null, null, null, p.first, null, null,
-                    p.second, null, null, null);
+                    p.second, null, null, null, null);
         }
     }
 
@@ -9291,7 +9343,7 @@ public class ActivityManagerService extends IActivityManager.Stub
      * to append various headers to the dropbox log text.
      */
     void appendDropBoxProcessHeaders(ProcessRecord process, String processName,
-            final StringBuilder sb) {
+            final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9310,7 +9362,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             sb.append("PID: ").append(process.getPid()).append("\n");
             sb.append("UID: ").append(process.uid).append("\n");
             if (process.mOptRecord != null) {
-                sb.append("Frozen: ").append(process.mOptRecord.isFrozen()).append("\n");
+                // Use 'isProcessFrozen' from 'volatileStates' if it'snon-null (present),
+                // otherwise use 'isFrozen' from 'mOptRecord'.
+                sb.append("Frozen: ").append(
+                    (volatileStates != null && volatileStates.isProcessFrozen() != null)
+                    ? volatileStates.isProcessFrozen() : process.mOptRecord.isFrozen()
+                ).append("\n");
             }
             int flags = process.info.flags;
             final IPackageManager pm = AppGlobals.getPackageManager();
@@ -9423,7 +9480,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             String subject, final String report, final File dataFile,
             final ApplicationErrorReport.CrashInfo crashInfo,
             @Nullable Float loadingProgress, @Nullable IncrementalMetrics incrementalMetrics,
-            @Nullable UUID errorId) {
+            @Nullable UUID errorId, @Nullable VolatileDropboxEntryStates volatileStates) {
         // NOTE -- this must never acquire the ActivityManagerService lock,
         // otherwise the watchdog may be prevented from resetting the system.
 
@@ -9445,7 +9502,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (rateLimitResult.shouldRateLimit()) return;
 
         final StringBuilder sb = new StringBuilder(1024);
-        appendDropBoxProcessHeaders(process, processName, sb);
+        appendDropBoxProcessHeaders(process, processName, volatileStates, sb);
         if (process != null) {
             sb.append("Foreground: ")
                     .append(process.isInterestingToUserLocked() ? "Yes" : "No")
@@ -14966,8 +15023,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                                     Intent.EXTRA_QUARANTINED, false);
                             if (suspended && quarantined && packageNames != null) {
                                 for (int i = 0; i < packageNames.length; i++) {
-                                    forceStopPackageLocked(packageNames[i], -1, false, true, true,
-                                            false, false, userId, "suspended");
+                                    forceStopPackage(packageNames[i], userId,
+                                            ActivityManager.FLAG_OR_STOPPED, "quarantined");
                                 }
                             }
 
@@ -19095,6 +19152,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         public StatsEvent getCachedAppsHighWatermarkStats(int atomTag, boolean resetAfterPull) {
             return mAppProfiler.mCachedAppsWatermarkData.getCachedAppsHighWatermarkStats(
                     atomTag, resetAfterPull);
+        }
+
+        @Override
+        public boolean clearApplicationUserData(final String packageName, boolean keepState,
+                boolean isRestore, final IPackageDataObserver observer, int userId) {
+            return ActivityManagerService.this.clearApplicationUserData(packageName, keepState,
+                    isRestore, observer, userId);
         }
     }
 

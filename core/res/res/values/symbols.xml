@@ -468,6 +468,7 @@
   <java-symbol type="integer" name="config_toastDefaultGravity" />
   <java-symbol type="integer" name="config_triplePressOnPowerBehavior" />
   <java-symbol type="integer" name="config_shortPressOnSleepBehavior" />
+  <java-symbol type="bool" name="config_silenceRingerOnSleepKey" />
   <java-symbol type="integer" name="config_longPressOnStemPrimaryBehavior" />
   <java-symbol type="integer" name="config_shortPressOnStemPrimaryBehavior" />
   <java-symbol type="string" name="config_primaryShortPressTargetActivity" />
@@ -1085,6 +1086,7 @@
   <java-symbol type="string" name="managed_profile_label_badge_2" />
   <java-symbol type="string" name="managed_profile_label_badge_3" />
   <java-symbol type="string" name="clone_profile_label_badge" />
+  <java-symbol type="string" name="private_profile_label_badge" />
   <java-symbol type="string" name="mediasize_unknown_portrait" />
   <java-symbol type="string" name="mediasize_unknown_landscape" />
   <java-symbol type="string" name="mediasize_iso_a0" />
@@ -1436,6 +1438,9 @@
   <java-symbol type="drawable" name="ic_qs_one_handed_mode" />
   <java-symbol type="drawable" name="ic_clone_icon_badge" />
   <java-symbol type="drawable" name="ic_clone_badge" />
+  <java-symbol type="drawable" name="ic_private_profile_icon_badge" />
+  <java-symbol type="drawable" name="ic_private_profile_badge" />
+  <java-symbol type="drawable" name="stat_sys_private_profile_status" />
 
   <java-symbol type="drawable" name="sim_light_blue" />
   <java-symbol type="drawable" name="sim_light_green" />
@@ -4319,6 +4324,8 @@
   <java-symbol type="array" name="config_highRefreshRateBlacklist" />
   <java-symbol type="array" name="config_forceSlowJpegModeList" />
 
+  <java-symbol type="array" name="config_smallAreaDetectionAllowlist" />
+
   <java-symbol type="layout" name="chooser_dialog" />
   <java-symbol type="layout" name="chooser_dialog_item" />
   <java-symbol type="drawable" name="chooser_dialog_background" />
@@ -4946,6 +4953,7 @@
   <java-symbol type="bool" name="config_assistTouchGestureEnabledDefault" />
 
   <java-symbol type="bool" name="config_searchPressHoldNavHandleEnabledDefault" />
+  <java-symbol type="bool" name="config_searchLongPressHomeEnabledDefault" />
 
   <java-symbol type="integer" name="config_hotwordDetectedResultMaxBundleSize" />
 
@@ -5041,10 +5049,9 @@
   <java-symbol type="string" name="vdm_camera_access_denied" />
   <java-symbol type="string" name="vdm_secure_window" />
 
-  <java-symbol type="color" name="camera_privacy_light_day"/>
-  <java-symbol type="color" name="camera_privacy_light_night"/>
   <java-symbol type="integer" name="config_cameraPrivacyLightAlsAveragingIntervalMillis"/>
-  <java-symbol type="integer" name="config_cameraPrivacyLightAlsNightThreshold"/>
+  <java-symbol type="array" name="config_cameraPrivacyLightAlsLuxThresholds"/>
+  <java-symbol type="array" name="config_cameraPrivacyLightColors"/>
 
   <java-symbol type="bool" name="config_bg_current_drain_monitor_enabled" />
   <java-symbol type="array" name="config_bg_current_drain_threshold_to_restricted_bucket" />
@@ -5251,4 +5258,12 @@
   <java-symbol type="bool" name="config_am_disablePssProfiling" />
 
   <java-symbol type="raw" name="default_ringtone_vibration_effect" />
+
+  <!-- Whether we order unlocking and waking -->
+  <java-symbol type="bool" name="config_orderUnlockAndWake" />
+
+  <!-- External TV Input Logging Configs -->
+  <java-symbol type="bool" name="config_tvExternalInputLoggingDisplayNameFilterEnabled" />
+  <java-symbol type="array" name="config_tvExternalInputLoggingDeviceOnScreenDisplayNames" />
+  <java-symbol type="array" name="config_tvExternalInputLoggingDeviceBrandNames" />
 </resources>

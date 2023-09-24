@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Prenos datoteke"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Ulazni uređaj"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Pristup Internetu"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Dozvoli kontakte i istoriju poziva"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Informacije će se koristiti za obaveštenja o pozivima i drugo"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"Deljenje internet veze"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"SMS-ovi"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"Pristup SIM kartici"</string>
@@ -405,7 +403,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"Omogućava promenu veličine svih aktivnosti za režim sa više prozora, bez obzira na vrednosti manifesta."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"Omogući prozore proizvoljnog formata"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Omogućava podršku za eksperimentalne prozore proizvoljnog formata."</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"Režim za računare"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"Lozinka rezervne kopije za računar"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Rezervne kopije čitavog sistema trenutno nisu zaštićene"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Dodirnite da biste promenili ili uklonili lozinku za pravljenje rezervnih kopija čitavog sistema na računaru"</string>

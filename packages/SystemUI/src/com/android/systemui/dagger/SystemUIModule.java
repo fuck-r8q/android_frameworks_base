@@ -76,7 +76,6 @@ import com.android.systemui.qs.QSFragmentStartableModule;
 import com.android.systemui.qs.footer.dagger.FooterActionsModule;
 import com.android.systemui.recents.Recents;
 import com.android.systemui.retail.dagger.RetailModeModule;
-import com.android.systemui.scene.SceneContainerFrameworkModule;
 import com.android.systemui.scene.ui.view.WindowRootViewComponent;
 import com.android.systemui.screenrecord.ScreenRecordModule;
 import com.android.systemui.screenshot.dagger.ScreenshotModule;
@@ -109,7 +108,6 @@ import com.android.systemui.statusbar.notification.row.dagger.NotificationShelfC
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.LetterboxModule;
 import com.android.systemui.statusbar.phone.NotificationIconAreaControllerModule;
-import com.android.systemui.statusbar.phone.dagger.CentralSurfacesComponent;
 import com.android.systemui.statusbar.pipeline.dagger.StatusBarPipelineModule;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -196,7 +194,6 @@ import javax.inject.Named;
             QRCodeScannerModule.class,
             QSFragmentStartableModule.class,
             RetailModeModule.class,
-            SceneContainerFrameworkModule.class,
             ScreenshotModule.class,
             SensorModule.class,
             SecurityRepositoryModule.class,
@@ -219,7 +216,6 @@ import javax.inject.Named;
             WalletModule.class
         },
         subcomponents = {
-            CentralSurfacesComponent.class,
             ComplicationComponent.class,
             NavigationBarComponent.class,
             NotificationRowComponent.class,

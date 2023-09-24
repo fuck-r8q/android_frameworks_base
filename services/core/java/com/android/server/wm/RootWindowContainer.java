@@ -1617,6 +1617,19 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     /**
+     * Check if the display is valid for primary home activity.
+     *
+     * @param displayId The target display ID
+     * @return {@code true} if allowed to launch, {@code false} otherwise.
+     */
+    boolean shouldPlacePrimaryHomeOnDisplay(int displayId) {
+        // No restrictions to default display, vr 2d display or main display for visible users.
+        return displayId == DEFAULT_DISPLAY || (displayId != INVALID_DISPLAY
+                && (displayId == mService.mVr2dDisplayId
+                || mWmService.shouldPlacePrimaryHomeOnDisplay(displayId)));
+    }
+
+    /**
      * Check if the display area is valid for secondary home activity.
      *
      * @param taskDisplayArea The target display area.
@@ -1689,10 +1702,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         final int displayId = taskDisplayArea != null ? taskDisplayArea.getDisplayId()
                 : INVALID_DISPLAY;
-        if (displayId == DEFAULT_DISPLAY || (displayId != INVALID_DISPLAY
-                && (displayId == mService.mVr2dDisplayId
-                || mWmService.shouldPlacePrimaryHomeOnDisplay(displayId)))) {
-            // No restrictions to default display, vr 2d display or main display for visible users.
+        if (shouldPlacePrimaryHomeOnDisplay(displayId)) {
             return true;
         }
 
@@ -2529,6 +2539,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Prepare transition before resume top activity, so it can be collected.
             if (!displayShouldSleep && display.mTransitionController.isShellTransitionsEnabled()
                     && !display.mTransitionController.isCollecting()) {
+                // Use NONE if keyguard is not showing.
                 int transit = TRANSIT_NONE;
                 Task startTask = null;
                 if (!display.getDisplayPolicy().isAwake()) {
@@ -2540,11 +2551,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     transit = WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
                     startTask = display.getTaskOccludingKeyguard();
                 }
-                if (transit != TRANSIT_NONE) {
-                    display.mTransitionController.requestStartTransition(
-                            display.mTransitionController.createTransition(transit),
-                            startTask, null /* remoteTransition */, null /* displayChange */);
-                }
+                display.mTransitionController.requestStartTransition(
+                        display.mTransitionController.createTransition(transit),
+                        startTask, null /* remoteTransition */, null /* displayChange */);
             }
             // Set the sleeping state of the root tasks on the display.
             display.forAllRootTasks(rootTask -> {
@@ -2824,7 +2833,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // transition exists, so this affects only when no lock screen is set. Otherwise
             // keyguard going away animation will be played.
             // See also AppTransitionController#getTransitCompatType for more details.
-            if ((!mTaskSupervisor.getKeyguardController().isDisplayOccluded(display.mDisplayId)
+            if ((!mTaskSupervisor.getKeyguardController().isKeyguardOccluded(display.mDisplayId)
                     && token.mTag.equals(KEYGUARD_SLEEP_TOKEN_TAG))
                     || token.mTag.equals(DISPLAY_OFF_SLEEP_TOKEN_TAG)) {
                 display.mSkipAppTransitionAnimation = true;
@@ -3292,6 +3301,20 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final int userId = UserHandle.getUserId(aInfo.uid);
         forAllActivities(r -> {
             if (r.mUserId == userId && packageName.equals(r.packageName)) {
+                r.updateApplicationInfo(aInfo);
+            }
+        });
+    }
+
+    void updateActivityApplicationInfo(int userId,
+            ArrayMap<String, ApplicationInfo> applicationInfoByPackage) {
+        forAllActivities(r -> {
+            if (r.mUserId != userId) {
+                return;
+            }
+
+            final ApplicationInfo aInfo = applicationInfoByPackage.get(r.packageName);
+            if (aInfo != null) {
                 r.updateApplicationInfo(aInfo);
             }
         });

@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Dosya aktarımı"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Giriş cihazı"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"İnternet erişimi"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Kişilere ve çağrı geçmişine erişime izin ver"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Bilgi, arama bildirimleri ve daha fazlası için kullanılır"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"İnternet bağlantısı paylaşımı"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"Kısa Mesajlar"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"SIM Erişimi"</string>
@@ -405,7 +403,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"Manifest değerlerinden bağımsız olarak, tüm etkinlikleri birden fazla pencerede yeniden boyutlandırılabilir yap."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"Serbest biçimli pencereleri etkinleştir"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Deneysel serbest biçimli pencere desteğini etkinleştir."</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"Masaüstü modu"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"Masaüstü yedekleme şifresi"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Masaüstü tam yedeklemeleri şu an korunmuyor"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Masaüstü tam yedeklemelerinin şifresini değiştirmek veya kaldırmak için dokunun"</string>

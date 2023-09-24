@@ -19,6 +19,7 @@ package android.companion.virtual;
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -32,6 +33,7 @@ import android.app.PendingIntent;
 import android.companion.AssociationInfo;
 import android.companion.virtual.audio.VirtualAudioDevice;
 import android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChangeCallback;
+import android.companion.virtual.flags.Flags;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.content.ComponentName;
 import android.content.Context;
@@ -57,6 +59,8 @@ import android.os.Looper;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.Surface;
+
+import com.android.internal.util.AnnotationValidations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -173,6 +177,9 @@ public final class VirtualDeviceManager {
             int associationId,
             @NonNull VirtualDeviceParams params) {
         Objects.requireNonNull(params, "params must not be null");
+        if (Flags.moreLogs()) {
+            Log.i(TAG, "Creating VirtualDevice");
+        }
         try {
             return new VirtualDevice(mService, mContext, associationId, params);
         } catch (RemoteException e) {
@@ -506,6 +513,28 @@ public final class VirtualDeviceManager {
         @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
         public void close() {
             mVirtualDeviceInternal.close();
+        }
+
+        /**
+         * Specifies a policy for this virtual device.
+         *
+         * <p>Policies define the system behavior that may be specific for this virtual device. The
+         * given policy must be able to be changed dynamically during the lifetime of the device.
+         *
+         * @param policyType the type of policy, i.e. which behavior to specify a policy for.
+         * @param devicePolicy the value of the policy, i.e. how to interpret the device behavior.
+         *
+         * @see VirtualDeviceParams#POLICY_TYPE_RECENTS
+         */
+        @FlaggedApi(Flags.FLAG_DYNAMIC_POLICY)
+        @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+        public void setDevicePolicy(@VirtualDeviceParams.DynamicPolicyType int policyType,
+                @VirtualDeviceParams.DevicePolicy int devicePolicy) {
+            AnnotationValidations.validate(
+                    VirtualDeviceParams.DynamicPolicyType.class, null, policyType);
+            AnnotationValidations.validate(
+                    VirtualDeviceParams.DevicePolicy.class, null, devicePolicy);
+            mVirtualDeviceInternal.setDevicePolicy(policyType, devicePolicy);
         }
 
         /**

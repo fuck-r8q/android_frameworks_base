@@ -40,6 +40,7 @@ import android.util.Pair;
 import android.util.Slog;
 
 import com.android.internal.util.ArrayUtils;
+import com.android.internal.util.XmlUtils;
 
 import libcore.io.IoUtils;
 
@@ -73,7 +74,7 @@ public class ApkLiteParseUtils {
     // Constants copied from services.jar side since they're not accessible
     private static final String ANDROID_RES_NAMESPACE =
             "http://schemas.android.com/apk/res/android";
-    private static final int DEFAULT_MIN_SDK_VERSION = 1;
+    public static final int DEFAULT_MIN_SDK_VERSION = 1;
     private static final int DEFAULT_TARGET_SDK_VERSION = 0;
     public static final String ANDROID_MANIFEST_FILENAME = "AndroidManifest.xml";
     private static final int PARSE_IS_SYSTEM_DIR = 1 << 4;
@@ -446,6 +447,13 @@ public class ApkLiteParseUtils {
         int overlayPriority = 0;
         int rollbackDataPolicy = 0;
 
+        boolean clearUserDataAllowed = true;
+        boolean backupAllowed = true;
+        boolean defaultToDeviceProtectedStorage = false;
+        String requestLegacyExternalStorage = null;
+        boolean userDataFragile = false;
+        boolean clearUserDataOnFailedRestoreAllowed = true;
+
         String requiredSystemPropertyName = null;
         String requiredSystemPropertyValue = null;
 
@@ -484,6 +492,23 @@ public class ApkLiteParseUtils {
                         "extractNativeLibs", true);
                 useEmbeddedDex = parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE,
                         "useEmbeddedDex", false);
+
+                clearUserDataAllowed = parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE,
+                        "allowClearUserDataOnFailedRestore", true);
+                backupAllowed = parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE,
+                        "allowBackup", true);
+                defaultToDeviceProtectedStorage = parser.getAttributeBooleanValue(
+                        ANDROID_RES_NAMESPACE,
+                        "defaultToDeviceProtectedStorage", false);
+                userDataFragile = parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE,
+                        "hasFragileUserData", false);
+                clearUserDataOnFailedRestoreAllowed = parser.getAttributeBooleanValue(
+                        ANDROID_RES_NAMESPACE,
+                        "allowClearUserDataOnFailedRestore", true);
+
+                requestLegacyExternalStorage = parser.getAttributeValue(ANDROID_RES_NAMESPACE,
+                        "requestLegacyExternalStorage");
+
                 rollbackDataPolicy = parser.getAttributeIntValue(ANDROID_RES_NAMESPACE,
                         "rollbackDataPolicy", 0);
                 String permission = parser.getAttributeValue(ANDROID_RES_NAMESPACE,
@@ -604,6 +629,9 @@ public class ApkLiteParseUtils {
             return input.skip(message);
         }
 
+        boolean isRequestLegacyExternalStorage = XmlUtils.convertValueToBoolean(
+                requestLegacyExternalStorage, targetSdkVersion < Build.VERSION_CODES.Q);
+
         return input.success(
                 new ApkLite(codePath, packageSplit.first, packageSplit.second, isFeatureSplit,
                         configForSplit, usesSplitName, isSplitRequired, versionCode,
@@ -613,7 +641,9 @@ public class ApkLiteParseUtils {
                         overlayIsStatic, overlayPriority, requiredSystemPropertyName,
                         requiredSystemPropertyValue, minSdkVersion, targetSdkVersion,
                         rollbackDataPolicy, requiredSplitTypes.first, requiredSplitTypes.second,
-                        hasDeviceAdminReceiver, isSdkLibrary));
+                        hasDeviceAdminReceiver, isSdkLibrary, clearUserDataAllowed, backupAllowed,
+                        defaultToDeviceProtectedStorage, isRequestLegacyExternalStorage,
+                        userDataFragile, clearUserDataOnFailedRestoreAllowed));
     }
 
     private static boolean isDeviceAdminReceiver(

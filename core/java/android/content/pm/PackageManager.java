@@ -787,6 +787,7 @@ public abstract class PackageManager {
             MATCH_DEBUG_TRIAGED_MISSING,
             MATCH_INSTANT,
             MATCH_APEX,
+            MATCH_ARCHIVED_PACKAGES,
             GET_DISABLED_COMPONENTS,
             GET_DISABLED_UNTIL_USED_COMPONENTS,
             GET_UNINSTALLED_PACKAGES,
@@ -811,6 +812,7 @@ public abstract class PackageManager {
             GET_UNINSTALLED_PACKAGES,
             MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
             MATCH_APEX,
+            MATCH_ARCHIVED_PACKAGES,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ApplicationInfoFlagsBits {}
@@ -1233,6 +1235,21 @@ public abstract class PackageManager {
      * {@link PackageInfo} flag: return all attributions declared in the package manifest
      */
     public static final long GET_ATTRIBUTIONS_LONG = 0x80000000L;
+
+    /**
+     * Flag parameter to also retrieve some information about archived packages.
+     * Packages can be archived through {@link PackageArchiver} and do not have any APKs stored on
+     * the device, but do keep the data directory.
+     * <p> Note: Archived apps are a subset of apps returned by {@link #MATCH_UNINSTALLED_PACKAGES}.
+     * <p> Note: this flag may cause less information about currently installed
+     * applications to be returned.
+     * <p> Note: use of this flag requires the android.permission.QUERY_ALL_PACKAGES
+     * permission to see uninstalled packages.
+     * @hide
+     */
+    // TODO(b/278553670) Unhide and update @links before launch.
+    @SystemApi
+    public static final long MATCH_ARCHIVED_PACKAGES = 1L << 32;
 
     /**
      * @hide
@@ -1680,6 +1697,13 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_FROM_MANAGED_USER_OR_PROFILE = 1 << 26;
+
+    /**
+     * Flag parameter for {@link PackageInstaller.SessionParams} to indicate that this
+     * session is for archived package installation.
+     * @hide
+     */
+    public static final int INSTALL_ARCHIVED = 1 << 27;
 
     /**
      * Flag parameter for {@link #installPackage} to force a non-staged update of an APEX. This is
@@ -9933,6 +9957,16 @@ public abstract class PackageManager {
      */
     public abstract @NonNull PackageInstaller getPackageInstaller();
 
+    /**
+     * {@link PackageArchiver} can be used to archive and restore archived packages.
+     *
+     * @hide
+     */
+    @SystemApi
+    public @NonNull PackageArchiver getPackageArchiver() {
+        throw new UnsupportedOperationException(
+                "getPackageArchiver not implemented in subclass");
+    }
     /**
      * Adds a {@code CrossProfileIntentFilter}. After calling this method all
      * intents sent from the user with id sourceUserId can also be be resolved

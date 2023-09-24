@@ -2668,9 +2668,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mAmInternal.enforceCallingPermission(Manifest.permission.UPDATE_LOCK_TASK_PACKAGES,
                     "updateLockTaskPackages()");
         }
-        synchronized (mGlobalLock) {
-            ProtoLog.w(WM_DEBUG_LOCKTASK, "Allowlisting %d:%s", userId, Arrays.toString(packages));
-            getLockTaskController().updateLockTaskPackages(userId, packages);
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                ProtoLog.w(WM_DEBUG_LOCKTASK, "Allowlisting %d:%s", userId,
+                        Arrays.toString(packages));
+                getLockTaskController().updateLockTaskPackages(userId, packages);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(origId);
         }
     }
 
@@ -4077,10 +4083,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mRecentTasks.notifyTaskPersisterLocked(task, flush);
     }
 
-    boolean isKeyguardLocked(int displayId) {
-        return mKeyguardController.isKeyguardLocked(displayId);
-    }
-
     /**
      * Clears launch params for the given package.
      *
@@ -4614,6 +4616,20 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private int increaseAssetConfigurationSeq() {
         mGlobalAssetsSeq = Math.max(++mGlobalAssetsSeq, 1);
         return mGlobalAssetsSeq;
+    }
+
+    /**
+     * Updates the {@link ApplicationInfo}s of the package activities th that are attached in the
+     * WM hierarchy.
+     */
+    public void updateActivityApplicationInfo(int userId,
+            ArrayMap<String, ApplicationInfo> applicationInfoByPackage) {
+        synchronized (mGlobalLock) {
+            if (mRootWindowContainer != null) {
+                mRootWindowContainer.updateActivityApplicationInfo(userId,
+                        applicationInfoByPackage);
+            }
+        }
     }
 
     /**
@@ -6208,6 +6224,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public void onPackageReplaced(ApplicationInfo aInfo) {
             synchronized (mGlobalLock) {
+                // In case if setWindowManager hasn't been called yet when booting.
+                if (mRootWindowContainer == null) return;
                 mRootWindowContainer.updateActivityApplicationInfo(aInfo);
             }
         }

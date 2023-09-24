@@ -77,6 +77,7 @@ import android.content.IntentSender;
 import android.content.IntentSender.SendIntentException;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.ArchivedPackageParcel;
 import android.content.pm.AuxiliaryResolveInfo;
 import android.content.pm.ChangedPackages;
 import android.content.pm.Checksum;
@@ -115,7 +116,11 @@ import android.content.pm.UserPackage;
 import android.content.pm.VerifierDeviceIdentity;
 import android.content.pm.VersionedPackage;
 import android.content.pm.overlay.OverlayPaths;
+import android.content.pm.parsing.ApkLite;
+import android.content.pm.parsing.ApkLiteParseUtils;
 import android.content.pm.parsing.PackageLite;
+import android.content.pm.parsing.result.ParseResult;
+import android.content.pm.parsing.result.ParseTypeImpl;
 import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.graphics.Bitmap;
@@ -796,6 +801,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     final SparseArray<VerifyingSession> mPendingEnableRollback = new SparseArray<>();
 
     final PackageInstallerService mInstallerService;
+
+    final PackageArchiverService mArchiverService;
 
     final ArtManagerService mArtManagerService;
 
@@ -1626,7 +1633,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 (i, pm) -> new CrossProfileIntentFilterHelper(i.getSettings(),
                         i.getUserManagerService(), i.getLock(), i.getUserManagerInternal(),
                         context),
-                (i, pm) -> new UpdateOwnershipHelper());
+                (i, pm) -> new UpdateOwnershipHelper(),
+                (i, pm) -> new PackageArchiverService(i.getContext(), pm));
 
         if (Build.VERSION.SDK_INT <= 0) {
             Slog.w(TAG, "**** ro.build.version.sdk not set!");
@@ -1771,6 +1779,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mFactoryTest = testParams.factoryTest;
         mIncrementalManager = testParams.incrementalManager;
         mInstallerService = testParams.installerService;
+        mArchiverService = testParams.archiverService;
         mInstantAppRegistry = testParams.instantAppRegistry;
         mChangedPackagesTracker = testParams.changedPackagesTracker;
         mInstantAppResolverConnection = testParams.instantAppResolverConnection;
@@ -1970,9 +1979,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mApexManager = injector.getApexManager();
         mAppsFilter = mInjector.getAppsFilter();
 
-        mInstantAppRegistry = new InstantAppRegistry(mContext, mPermissionManager,
-                mInjector.getUserManagerInternal(), new DeletePackageHelper(this));
-
         mChangedPackagesTracker = new ChangedPackagesTracker();
 
         mAppInstallDir = new File(Environment.getDataDirectory(), "app");
@@ -1986,8 +1992,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mAppDataHelper = new AppDataHelper(this);
         mInstallPackageHelper = new InstallPackageHelper(this, mAppDataHelper);
         mRemovePackageHelper = new RemovePackageHelper(this, mAppDataHelper);
-        mDeletePackageHelper = new DeletePackageHelper(this, mRemovePackageHelper,
-                mAppDataHelper);
+        mDeletePackageHelper = new DeletePackageHelper(this, mRemovePackageHelper);
+
+        mInstantAppRegistry = new InstantAppRegistry(mContext, mPermissionManager,
+                mInjector.getUserManagerInternal(), mDeletePackageHelper);
+
         mSharedLibraries.setDeletePackageHelper(mDeletePackageHelper);
         mPreferredActivityHelper = new PreferredActivityHelper(this);
         mResolveIntentHelper = new ResolveIntentHelper(mContext, mPreferredActivityHelper,
@@ -2352,6 +2361,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             });
 
             mInstallerService = mInjector.getPackageInstallerService();
+            mArchiverService = mInjector.getPackageArchiverService();
             final ComponentName instantAppResolverComponent = getInstantAppResolver(computer);
             if (instantAppResolverComponent != null) {
                 if (DEBUG_INSTANT) {
@@ -2916,10 +2926,13 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     private void notifyPackageUseInternal(String packageName, int reason) {
         long time = System.currentTimeMillis();
-        this.commitPackageStateMutation(null, mutator -> {
-            final PackageStateWrite state = mutator.forPackage(packageName);
-            state.setLastPackageUsageTime(reason, time);
-        });
+        synchronized (mLock) {
+            final PackageSetting pkgSetting = mSettings.getPackageLPr(packageName);
+            if (pkgSetting == null) {
+                return;
+            }
+            pkgSetting.getPkgState().setLastPackageUsageTimeInMills(reason, time);
+        }
     }
 
     /*package*/ DexManager getDexManager() {
@@ -4311,16 +4324,17 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     public PackageFreezer freezePackage(String packageName, int userId, String killReason,
-            int exitInfoReason) {
-        return new PackageFreezer(packageName, userId, killReason, this, exitInfoReason);
+            int exitInfoReason, InstallRequest request) {
+        return new PackageFreezer(packageName, userId, killReason, this, exitInfoReason, request);
     }
 
     public PackageFreezer freezePackageForDelete(String packageName, int userId, int deleteFlags,
             String killReason, int exitInfoReason) {
         if ((deleteFlags & PackageManager.DELETE_DONT_KILL_APP) != 0) {
-            return new PackageFreezer(this);
+            return new PackageFreezer(this, null /* request */);
         } else {
-            return freezePackage(packageName, userId, killReason, exitInfoReason);
+            return freezePackage(packageName, userId, killReason, exitInfoReason,
+                    null /* request */);
         }
     }
 
@@ -4630,7 +4644,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     mDomainVerificationConnection, mInstallerService, mPackageProperty,
                     mResolveComponentName, mInstantAppResolverSettingsComponent,
                     mRequiredSdkSandboxPackage, mServicesExtensionPackageName,
-                    mSharedSystemSharedLibraryPackageName);
+                    mSharedSystemSharedLibraryPackageName, mArchiverService);
         }
 
         @Override
@@ -4649,7 +4663,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             try (PackageFreezer ignored =
                             freezePackage(packageName, UserHandle.USER_ALL,
                                     "clearApplicationProfileData",
-                                    ApplicationExitInfo.REASON_OTHER)) {
+                                    ApplicationExitInfo.REASON_OTHER, null /* request */)) {
                 synchronized (mInstallLock) {
                     mAppDataHelper.clearAppProfilesLIF(pkg);
                 }
@@ -4692,7 +4706,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     final boolean succeeded;
                     try (PackageFreezer freezer = freezePackage(packageName, UserHandle.USER_ALL,
                             "clearApplicationUserData",
-                            ApplicationExitInfo.REASON_USER_REQUESTED)) {
+                            ApplicationExitInfo.REASON_USER_REQUESTED, null /* request */)) {
                         synchronized (mInstallLock) {
                             succeeded = clearApplicationUserDataLIF(snapshotComputer(), packageName,
                                     userId);
@@ -6314,6 +6328,38 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
         }
 
+        @Override
+        public ArchivedPackageParcel getArchivedPackage(String apkPath) {
+            ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
+            ParseResult<ApkLite> result = ApkLiteParseUtils.parseApkLite(input.reset(),
+                    new File(apkPath), ParsingPackageUtils.PARSE_COLLECT_CERTIFICATES);
+            if (result.isError()) {
+                throw new IllegalArgumentException(result.getErrorMessage(), result.getException());
+            }
+            final ApkLite apk = result.getResult();
+
+            ArchivedPackageParcel archPkg = new ArchivedPackageParcel();
+            archPkg.packageName = apk.getPackageName();
+            archPkg.signingDetails = apk.getSigningDetails();
+
+            archPkg.versionCodeMajor = apk.getVersionCodeMajor();
+            archPkg.versionCode = apk.getVersionCode();
+
+            archPkg.targetSdkVersion = apk.getTargetSdkVersion();
+
+            // These get translated in flags important for user data management.
+            archPkg.clearUserDataAllowed = apk.isClearUserDataAllowed();
+            archPkg.backupAllowed = apk.isBackupAllowed();
+            archPkg.defaultToDeviceProtectedStorage =
+                    apk.isDefaultToDeviceProtectedStorage();
+            archPkg.requestLegacyExternalStorage = apk.isRequestLegacyExternalStorage();
+            archPkg.userDataFragile = apk.isUserDataFragile();
+            archPkg.clearUserDataOnFailedRestoreAllowed =
+                    apk.isClearUserDataOnFailedRestoreAllowed();
+
+            return archPkg;
+        }
+
         /**
          * Wait for the handler to finish handling all pending messages.
          * @param timeoutMillis Maximum time in milliseconds to wait.
@@ -6954,6 +7000,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             Objects.requireNonNull(packageNames, "packageNames cannot be null");
             return mDistractingPackageHelper.getDistractingPackageRestrictionsAsUser(snapshot,
                     packageNames, userId, callingUid);
+        }
+
+        @Override
+        public ParceledListSlice<PackageInstaller.SessionInfo> getHistoricalSessions(int userId) {
+            return mInstallerService.getHistoricalSessions(userId);
         }
     }
 
@@ -7770,7 +7821,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
             consumer.accept(mPackageStateMutator);
             mPackageStateMutator.onFinished();
-            onChanged();
         }
 
         return PackageStateMutator.Result.SUCCESS;

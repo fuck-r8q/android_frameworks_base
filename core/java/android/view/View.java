@@ -106,6 +106,8 @@ import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.os.Vibrator;
+import android.os.vibrator.Flags;
 import android.sysprop.DisplayProperties;
 import android.text.InputType;
 import android.text.TextUtils;
@@ -5319,11 +5321,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @Retention(RetentionPolicy.SOURCE)
     public @interface LayerType {}
 
-    @ViewDebug.ExportedProperty(category = "drawing", mapping = {
-            @ViewDebug.IntToString(from = LAYER_TYPE_NONE, to = "NONE"),
-            @ViewDebug.IntToString(from = LAYER_TYPE_SOFTWARE, to = "SOFTWARE"),
-            @ViewDebug.IntToString(from = LAYER_TYPE_HARDWARE, to = "HARDWARE")
-    })
     int mLayerType = LAYER_TYPE_NONE;
     Paint mLayerPaint;
 
@@ -5416,6 +5413,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * The pointer icon when the mouse hovers on this view. The default is null.
      */
     private PointerIcon mMousePointerIcon;
+
+    /** Vibrator for haptic feedback. */
+    private Vibrator mVibrator;
 
     /**
      * @hide
@@ -22639,6 +22639,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             @EnumEntry(value = LAYER_TYPE_SOFTWARE, name = "software"),
             @EnumEntry(value = LAYER_TYPE_HARDWARE, name = "hardware")
     })
+    @ViewDebug.ExportedProperty(category = "drawing", mapping = {
+            @ViewDebug.IntToString(from = LAYER_TYPE_NONE, to = "NONE"),
+            @ViewDebug.IntToString(from = LAYER_TYPE_SOFTWARE, to = "SOFTWARE"),
+            @ViewDebug.IntToString(from = LAYER_TYPE_HARDWARE, to = "HARDWARE")
+    })
     @LayerType
     public int getLayerType() {
         return mLayerType;
@@ -27772,8 +27777,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 && !isHapticFeedbackEnabled()) {
             return false;
         }
-        return mAttachInfo.mRootCallbacks.performHapticFeedback(feedbackConstant,
-                (flags & HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING) != 0);
+
+        final boolean always = (flags & HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING) != 0;
+        if (Flags.useVibratorHapticFeedback()) {
+            if (!mAttachInfo.canPerformHapticFeedback()) {
+                return false;
+            }
+            getSystemVibrator().performHapticFeedback(
+                    feedbackConstant, always, "View#performHapticFeedback");
+            return true;
+        }
+        return mAttachInfo.mRootCallbacks.performHapticFeedback(feedbackConstant, always);
+    }
+
+    private Vibrator getSystemVibrator() {
+        if (mVibrator != null) {
+            return mVibrator;
+        }
+        return mVibrator = mContext.getSystemService(Vibrator.class);
     }
 
     /**
@@ -31251,6 +31272,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             }
 
             return events;
+        }
+
+        private boolean canPerformHapticFeedback() {
+            return mSession != null
+                    && (mDisplay.getFlags() & Display.FLAG_TOUCH_FEEDBACK_DISABLED) == 0;
         }
 
         @Nullable

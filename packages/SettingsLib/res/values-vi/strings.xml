@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Chuyển tệp"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Thiết bị đầu vào"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Truy cập Internet"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Cho truy cập danh bạ và nhật ký cuộc gọi"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Thông tin được dùng cho tính năng thông báo cuộc gọi, v.v."</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"Chia sẻ kết nối internet"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"Tin nhắn văn bản"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"Truy cập SIM"</string>
@@ -405,7 +403,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"Cho phép thay đổi kích thước của tất cả các hoạt động cho nhiều cửa sổ, bất kể giá trị tệp kê khai là gì."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"Bật cửa sổ dạng tự do"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Bật tính năng hỗ trợ cửa sổ dạng tự do thử nghiệm."</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"Chế độ máy tính"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"Mật khẩu cho bản sao lưu qua máy tính"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Các bản sao lưu đầy đủ qua máy tính hiện không được bảo vệ"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Nhấn để thay đổi hoặc xóa mật khẩu dành cho các bản sao lưu đầy đủ vào máy tính"</string>

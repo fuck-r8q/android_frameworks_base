@@ -178,8 +178,8 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
 
         connectionFactory =
             MobileConnectionRepositoryImpl.Factory(
-                fakeBroadcastDispatcher,
                 context,
+                fakeBroadcastDispatcher,
                 telephonyManager = telephonyManager,
                 bgDispatcher = dispatcher,
                 logger = logger,
