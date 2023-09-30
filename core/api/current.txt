@@ -54456,8 +54456,8 @@ package android.view.animation {
   public class AnimationUtils {
     ctor public AnimationUtils();
     method public static long currentAnimationTimeMillis();
-    method public static long getExpectedPresentationTimeMillis();
-    method public static long getExpectedPresentationTimeNanos();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeMillis();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeNanos();
     method public static android.view.animation.Animation loadAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.Interpolator loadInterpolator(android.content.Context, @AnimRes @InterpolatorRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.LayoutAnimationController loadLayoutAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
@@ -55029,10 +55029,12 @@ package android.view.inputmethod {
     method public int getInitialToolType();
     method @NonNull public java.util.Set<java.lang.Class<? extends android.view.inputmethod.PreviewableHandwritingGesture>> getSupportedHandwritingGesturePreviews();
     method @NonNull public java.util.List<java.lang.Class<? extends android.view.inputmethod.HandwritingGesture>> getSupportedHandwritingGestures();
+    method @FlaggedApi("android.view.inputmethod.editorinfo_handwriting_enabled") public boolean isStylusHandwritingEnabled();
     method public final void makeCompatible(int);
     method public void setInitialSurroundingSubText(@NonNull CharSequence, int);
     method public void setInitialSurroundingText(@NonNull CharSequence);
     method public void setInitialToolType(int);
+    method @FlaggedApi("android.view.inputmethod.editorinfo_handwriting_enabled") public void setStylusHandwritingEnabled(boolean);
     method public void setSupportedHandwritingGesturePreviews(@NonNull java.util.Set<java.lang.Class<? extends android.view.inputmethod.PreviewableHandwritingGesture>>);
     method public void setSupportedHandwritingGestures(@NonNull java.util.List<java.lang.Class<? extends android.view.inputmethod.HandwritingGesture>>);
     method public void writeToParcel(android.os.Parcel, int);
