@@ -10643,6 +10643,7 @@ package android.content {
   public final class ContextParams {
     method @Nullable public String getAttributionTag();
     method @Nullable public android.content.AttributionSource getNextAttributionSource();
+    method @NonNull public boolean shouldRegisterAttributionSource();
   }
 
   public static final class ContextParams.Builder {
@@ -10651,6 +10652,7 @@ package android.content {
     method @NonNull public android.content.ContextParams build();
     method @NonNull public android.content.ContextParams.Builder setAttributionTag(@Nullable String);
     method @NonNull public android.content.ContextParams.Builder setNextAttributionSource(@Nullable android.content.AttributionSource);
+    method @NonNull public android.content.ContextParams.Builder setShouldRegisterAttributionSource(boolean);
   }
 
   public class ContextWrapper extends android.content.Context {
@@ -17762,6 +17764,7 @@ package android.graphics.text {
     method @NonNull public android.graphics.text.LineBreaker.Builder setHyphenationFrequency(int);
     method @NonNull public android.graphics.text.LineBreaker.Builder setIndents(@Nullable int[]);
     method @NonNull public android.graphics.text.LineBreaker.Builder setJustificationMode(int);
+    method @NonNull public android.graphics.text.LineBreaker.Builder setUseBoundsForWidth(boolean);
   }
 
   public static class LineBreaker.ParagraphConstraints {
@@ -34201,6 +34204,7 @@ package android.os {
     field public static final String DISALLOW_MICROPHONE_TOGGLE = "disallow_microphone_toggle";
     field public static final String DISALLOW_MODIFY_ACCOUNTS = "no_modify_accounts";
     field public static final String DISALLOW_MOUNT_PHYSICAL_MEDIA = "no_physical_media";
+    field public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
     field public static final String DISALLOW_NETWORK_RESET = "no_network_reset";
     field public static final String DISALLOW_OUTGOING_BEAM = "no_outgoing_beam";
     field public static final String DISALLOW_OUTGOING_CALLS = "no_outgoing_calls";
@@ -39431,8 +39435,10 @@ package android.security {
   }
 
   public final class FileIntegrityManager {
+    method @FlaggedApi(Flags.FLAG_FSVERITY_API) @Nullable public byte[] getFsVerityDigest(@NonNull java.io.File) throws java.io.IOException;
     method public boolean isApkVeritySupported();
     method @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
+    method @FlaggedApi(Flags.FLAG_FSVERITY_API) public void setupFsVerity(@NonNull java.io.File) throws java.io.IOException;
   }
 
   public final class KeyChain {
@@ -42351,7 +42357,7 @@ package android.telecom {
     field public static final int PROPERTY_HIGH_DEF_AUDIO = 16; // 0x10
     field public static final int PROPERTY_IS_ADHOC_CONFERENCE = 8192; // 0x2000
     field public static final int PROPERTY_IS_EXTERNAL_CALL = 64; // 0x40
-    field public static final int PROPERTY_IS_TRANSACTIONAL = 32768; // 0x8000
+    field @FlaggedApi(Flags.FLAG_VOIP_APP_ACTIONS_SUPPORT) public static final int PROPERTY_IS_TRANSACTIONAL = 32768; // 0x8000
     field public static final int PROPERTY_NETWORK_IDENTIFIED_EMERGENCY_CALL = 2048; // 0x800
     field public static final int PROPERTY_RTT = 1024; // 0x400
     field public static final int PROPERTY_SELF_MANAGED = 256; // 0x100
@@ -47387,6 +47393,7 @@ package android.text {
 
   public static class BoringLayout.Metrics extends android.graphics.Paint.FontMetricsInt {
     ctor public BoringLayout.Metrics();
+    method @NonNull public android.graphics.RectF getDrawingBoundingBox();
     field public int width;
   }
 
@@ -47428,6 +47435,7 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
+    method @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -47570,6 +47578,7 @@ package android.text {
 
   public abstract class Layout {
     ctor protected Layout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float);
+    method @NonNull public android.graphics.RectF computeDrawingBoundingBox();
     method public void draw(android.graphics.Canvas);
     method public void draw(android.graphics.Canvas, android.graphics.Path, android.graphics.Paint, int);
     method public void draw(@NonNull android.graphics.Canvas, @Nullable java.util.List<android.graphics.Path>, @Nullable java.util.List<android.graphics.Paint>, @Nullable android.graphics.Path, @Nullable android.graphics.Paint, int);
@@ -47631,6 +47640,7 @@ package android.text {
     method @NonNull public final CharSequence getText();
     method @NonNull public final android.text.TextDirectionHeuristic getTextDirectionHeuristic();
     method public abstract int getTopPadding();
+    method public boolean getUseBoundsForWidth();
     method @IntRange(from=0) public final int getWidth();
     method public final void increaseWidthTo(int);
     method public boolean isFallbackLineSpacingEnabled();
@@ -47680,6 +47690,7 @@ package android.text {
     method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
     method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);
+    method @NonNull public android.text.Layout.Builder setUseBoundsForWidth(boolean);
   }
 
   public static class Layout.Directions {
@@ -47948,6 +47959,7 @@ package android.text {
     method @NonNull public android.text.StaticLayout.Builder setMaxLines(@IntRange(from=0) int);
     method public android.text.StaticLayout.Builder setText(CharSequence);
     method @NonNull public android.text.StaticLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
+    method @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.StaticLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -60633,6 +60645,7 @@ package android.widget {
     method public final android.text.method.TransformationMethod getTransformationMethod();
     method public android.graphics.Typeface getTypeface();
     method public android.text.style.URLSpan[] getUrls();
+    method public boolean getUseBoundsForWidth();
     method public boolean hasSelection();
     method public boolean isAllCaps();
     method public boolean isCursorVisible();
@@ -60775,6 +60788,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(@Nullable android.graphics.Typeface, int);
     method public void setTypeface(@Nullable android.graphics.Typeface);
+    method public void setUseBoundsForWidth(boolean);
     method public void setWidth(int);
     field public static final int AUTO_SIZE_TEXT_TYPE_NONE = 0; // 0x0
     field public static final int AUTO_SIZE_TEXT_TYPE_UNIFORM = 1; // 0x1

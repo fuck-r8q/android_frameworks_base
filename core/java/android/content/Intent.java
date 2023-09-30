@@ -5282,6 +5282,16 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_SHOW_FOREGROUND_SERVICE_MANAGER =
             "android.intent.action.SHOW_FOREGROUND_SERVICE_MANAGER";
 
+    /**
+     * Broadcast Action: Sent to the responsible installer of an archived package when unarchival
+     * is requested.
+     *
+     * @see android.content.pm.PackageArchiver
+     * @hide
+     */
+    @SystemApi
+    public static final String ACTION_UNARCHIVE_PACKAGE = "android.intent.action.UNARCHIVE_PACKAGE";
+
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
     // Standard intent categories (see addCategory()).
@@ -6716,6 +6726,15 @@ public class Intent implements Parcelable, Cloneable {
      */
     public static final String EXTRA_VISIBILITY_ALLOW_LIST =
             "android.intent.extra.VISIBILITY_ALLOW_LIST";
+
+    /**
+     * A boolean extra used with {@link #ACTION_PACKAGE_DATA_CLEARED} which indicates if the intent
+     * is broadcast as part of a restore operation.
+     *
+     * @hide
+     */
+    public static final String EXTRA_IS_RESTORE =
+            "android.intent.extra.IS_RESTORE";
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------

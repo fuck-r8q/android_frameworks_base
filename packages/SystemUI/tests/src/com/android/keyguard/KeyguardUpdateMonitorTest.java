@@ -2938,7 +2938,6 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
                 TelephonyManager.SIM_STATE_NOT_READY);
     }
 
-
     @Test
     public void onAuthEnrollmentChangesCallbacksAreNotified() {
         KeyguardUpdateMonitorCallback callback = mock(KeyguardUpdateMonitorCallback.class);

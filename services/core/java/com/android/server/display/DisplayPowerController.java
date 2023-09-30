@@ -430,6 +430,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     private float mBrightnessRampRateFastIncrease;
     private float mBrightnessRampRateSlowDecrease;
     private float mBrightnessRampRateSlowIncrease;
+    private float mBrightnessRampRateSlowDecreaseIdle;
+    private float mBrightnessRampRateSlowIncreaseIdle;
 
     // Report HBM brightness change to StatsD
     private int mDisplayStatsId;
@@ -1312,6 +1314,10 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         mBrightnessRampRateFastIncrease = mDisplayDeviceConfig.getBrightnessRampFastIncrease();
         mBrightnessRampRateSlowDecrease = mDisplayDeviceConfig.getBrightnessRampSlowDecrease();
         mBrightnessRampRateSlowIncrease = mDisplayDeviceConfig.getBrightnessRampSlowIncrease();
+        mBrightnessRampRateSlowDecreaseIdle =
+                mDisplayDeviceConfig.getBrightnessRampSlowDecreaseIdle();
+        mBrightnessRampRateSlowIncreaseIdle =
+                mDisplayDeviceConfig.getBrightnessRampSlowIncreaseIdle();
         mBrightnessRampDecreaseMaxTimeMillis =
                 mDisplayDeviceConfig.getBrightnessRampDecreaseMaxMillis();
         mBrightnessRampIncreaseMaxTimeMillis =
@@ -1922,12 +1928,16 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 } else {
                     boolean isIncreasing = animateValue > currentBrightness;
                     final float rampSpeed;
+                    final boolean idle = mAutomaticBrightnessController != null
+                            && mAutomaticBrightnessController.isInIdleMode();
                     if (isIncreasing && slowChange) {
-                        rampSpeed = mBrightnessRampRateSlowIncrease;
+                        rampSpeed = idle ? mBrightnessRampRateSlowIncreaseIdle
+                                : mBrightnessRampRateSlowIncrease;
                     } else if (isIncreasing && !slowChange) {
                         rampSpeed = mBrightnessRampRateFastIncrease;
                     } else if (!isIncreasing && slowChange) {
-                        rampSpeed = mBrightnessRampRateSlowDecrease;
+                        rampSpeed = idle ? mBrightnessRampRateSlowDecreaseIdle
+                                : mBrightnessRampRateSlowDecrease;
                     } else {
                         rampSpeed = mBrightnessRampRateFastDecrease;
                     }
@@ -3527,7 +3537,8 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
 
         DisplayPowerState getDisplayPowerState(DisplayBlanker blanker, ColorFade colorFade,
                 int displayId, int displayState) {
-            return new DisplayPowerState(blanker, colorFade, displayId, displayState);
+            return new DisplayPowerState(blanker, colorFade, displayId, displayState,
+                    new Handler(/*async=*/ true));
         }
 
         DualRampAnimator<DisplayPowerState> getDualRampAnimator(DisplayPowerState dps,

@@ -33,6 +33,13 @@ class FakeShadeRepository : ShadeRepository {
     private val _udfpsTransitionToFullShadeProgress = MutableStateFlow(0f)
     override val udfpsTransitionToFullShadeProgress = _udfpsTransitionToFullShadeProgress
 
+    private val _lockscreenShadeExpansion = MutableStateFlow(0f)
+    override val lockscreenShadeExpansion = _lockscreenShadeExpansion
+
+    private val _legacyShadeExpansion = MutableStateFlow(0f)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyShadeExpansion = _legacyShadeExpansion
+
     fun setShadeModel(model: ShadeModel) {
         _shadeModel.value = model
     }
@@ -43,5 +50,14 @@ class FakeShadeRepository : ShadeRepository {
 
     override fun setUdfpsTransitionToFullShadeProgress(progress: Float) {
         _udfpsTransitionToFullShadeProgress.value = progress
+    }
+
+    override fun setLockscreenShadeExpansion(lockscreenShadeExpansion: Float) {
+        _lockscreenShadeExpansion.value = lockscreenShadeExpansion
+    }
+
+    @Deprecated("Should only be called by NPVC and tests")
+    override fun setLegacyShadeExpansion(expandedFraction: Float) {
+        _legacyShadeExpansion.value = expandedFraction
     }
 }

@@ -62,7 +62,7 @@ public class SystemVibrator extends Vibrator {
     }
 
     @Override
-    protected VibratorInfo getInfo() {
+    public VibratorInfo getInfo() {
         synchronized (mLock) {
             if (mVibratorInfo != null) {
                 return mVibratorInfo;
@@ -203,6 +203,15 @@ public class SystemVibrator extends Vibrator {
         }
         CombinedVibration combinedEffect = CombinedVibration.createParallel(effect);
         mVibratorManager.vibrate(uid, opPkg, combinedEffect, reason, attributes);
+    }
+
+    @Override
+    public void performHapticFeedback(int constant, boolean always, String reason) {
+        if (mVibratorManager == null) {
+            Log.w(TAG, "Failed to perform haptic feedback; no vibrator manager.");
+            return;
+        }
+        mVibratorManager.performHapticFeedback(constant, always, reason);
     }
 
     @Override

@@ -1185,6 +1185,9 @@
     -->
     <integer name="config_shortPressOnSleepBehavior">0</integer>
 
+    <!-- Whether to silence telephony ringer on sleep key event -->
+    <bool name="config_silenceRingerOnSleepKey">false</bool>
+
     <!-- Control the behavior when the user long presses the stem primary button.
          Stem primary button is only used on watch form factor. If a device is not
          a watch, setting this config is no-op.
@@ -3490,7 +3493,8 @@
     <!-- Whether this device prefers to show snapshot or splash screen on back predict target.
          When set true, there will create windowless starting surface for the preview target, so it
          won't affect activity's lifecycle. This should only be disabled on low-ram device. -->
-    <bool name="config_predictShowStartingSurface">true</bool>
+    <!-- TODO(b/268563842) enable once activity snapshot is ready -->
+    <bool name="config_predictShowStartingSurface">false</bool>
 
     <!-- default window ShowCircularMask property -->
     <bool name="config_windowShowCircularMask">false</bool>
@@ -5461,7 +5465,7 @@
          fingerprint and face. If a dual-modality device only enrolled a single biometric and
          experiences high FRR (above threshold), system notification will be sent to encourage user
          to enroll the other eligible biometric. -->
-    <fraction name="config_biometricNotificationFrrThreshold">30%</fraction>
+    <fraction name="config_biometricNotificationFrrThreshold">25%</fraction>
 
     <!-- The component name for the default profile supervisor, which can be set as a profile owner
     even after user setup is complete. The defined component should be used for supervision purposes
@@ -5494,6 +5498,13 @@
     <!-- The list of packages to automatically opt out of refresh rates higher than 60hz because
          of known compatibility issues. -->
     <string-array name="config_highRefreshRateBlacklist"></string-array>
+
+    <!-- The list of packages to automatically opt in to refresh rate suppressing by small area
+    detection. Format of this array should be packageName:threshold and threshold value should
+     be between 0 to 1-->
+    <string-array name="config_smallAreaDetectionAllowlist" translatable="false">
+        <!-- Add packages:threshold here -->
+    </string-array>
 
     <!-- The list of packages to force slowJpegMode for Apps using Camera API1 -->
     <string-array name="config_forceSlowJpegModeList" translatable="false">
@@ -5961,9 +5972,9 @@
     <bool name="config_cecPowerControlModeTv_allowed">true</bool>
     <bool name="config_cecPowerControlModeTv_default">false</bool>
     <bool name="config_cecPowerControlModeTvAndAudioSystem_allowed">true</bool>
-    <bool name="config_cecPowerControlModeTvAndAudioSystem_default">true</bool>
+    <bool name="config_cecPowerControlModeTvAndAudioSystem_default">false</bool>
     <bool name="config_cecPowerControlModeBroadcast_allowed">true</bool>
-    <bool name="config_cecPowerControlModeBroadcast_default">false</bool>
+    <bool name="config_cecPowerControlModeBroadcast_default">true</bool>
     <bool name="config_cecPowerControlModeNone_allowed">true</bool>
     <bool name="config_cecPowerControlModeNone_default">false</bool>
 
@@ -6200,6 +6211,8 @@
 
     <!-- Default value for Settings.SEARCH_PRESS_HOLD_NAV_HANDLE_ENABLED -->
     <bool name="config_searchPressHoldNavHandleEnabledDefault">true</bool>
+    <!-- Default value for Settings.ASSIST_LONG_PRESS_HOME_ENABLED for search overlay -->
+    <bool name="config_searchLongPressHomeEnabledDefault">true</bool>
 
     <!-- The maximum byte size of the information contained in the bundle of
     HotwordDetectedResult. -->
@@ -6553,8 +6566,19 @@
 
     <!-- Interval in milliseconds to average light sensor values for camera light brightness -->
     <integer name="config_cameraPrivacyLightAlsAveragingIntervalMillis">3000</integer>
-    <!-- Light sensor's lux value to use as the threshold between using day or night brightness -->
-    <integer name="config_cameraPrivacyLightAlsNightThreshold">4</integer>
+    <!-- Ambient Light sensor's lux values to use as the threshold between brightness colors defined
+         by config_cameraPrivacyLightColors. If the ambient brightness less than the first element
+         in this array then lights of type "camera" will be set to the color in position 0 of
+         config_cameraPrivacyLightColors. This array must be strictly increasing and have a length
+         of zero means there is only one brightness -->
+    <integer-array name="config_cameraPrivacyLightAlsLuxThresholds">
+    </integer-array>
+    <!-- Colors to configure the camera privacy light at different brightnesses. This array must
+         have exactly one more entry than config_cameraPrivacyLightAlsLuxThresholds,
+         or a length of zero if the feature isn't supported. If nonempty and the device doesn't have
+         an ambient light sensor the last element in this array will be the only one used -->
+    <array name="config_cameraPrivacyLightColors">
+    </array>
 
     <!-- List of system components which are allowed to receive ServiceState entries in an
          un-sanitized form, even if the location toggle is off. This is intended ONLY for system
@@ -6692,4 +6716,7 @@
 
     <!-- Whether or not ActivityManager PSS profiling is disabled. -->
     <bool name="config_am_disablePssProfiling">false</bool>
+
+    <!-- Whether unlocking and waking a device are sequenced -->
+    <bool name="config_orderUnlockAndWake">false</bool>
 </resources>

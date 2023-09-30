@@ -36,16 +36,22 @@ class KeyguardBlueprintViewBinder {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
                     launch {
                         viewModel.blueprint.collect { blueprint ->
-                            Trace.beginSection("KeyguardBlueprintController#applyBlueprint")
+                            val prevBluePrint = viewModel.currentBluePrint
+                            Trace.beginSection("KeyguardBlueprint#applyBlueprint")
                             Log.d(TAG, "applying blueprint: $blueprint")
+                            // Add and remove views of sections that are not contained by the other.
+                            prevBluePrint?.removeViews(blueprint, constraintLayout)
+                            blueprint.addViews(prevBluePrint, constraintLayout)
+
                             ConstraintSet().apply {
                                 clone(constraintLayout)
                                 val emptyLayout = ConstraintSet.Layout()
                                 knownIds.forEach { getConstraint(it).layout.copyFrom(emptyLayout) }
-                                blueprint?.apply(this)
-                                blueprint?.removeUnConstrainedViews(constraintLayout, this)
+                                blueprint.applyConstraints(this)
                                 applyTo(constraintLayout)
                             }
+
+                            viewModel.currentBluePrint = blueprint
                             Trace.endSection()
                         }
                     }

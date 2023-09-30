@@ -29,6 +29,8 @@ import static android.app.servertransaction.ActivityLifecycleItem.ON_STOP;
 import static android.app.servertransaction.ActivityLifecycleItem.PRE_ON_CREATE;
 import static android.content.ContentResolver.DEPRECATE_DATA_COLUMNS;
 import static android.content.ContentResolver.DEPRECATE_DATA_PREFIX;
+import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
+import static android.content.res.Configuration.UI_MODE_TYPE_MASK;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.window.ConfigurationHelper.freeTextLayoutCachesIfNeeded;
@@ -207,6 +209,7 @@ import android.window.WindowContextInfo;
 import android.window.WindowProviderService;
 import android.window.WindowTokenClientController;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.app.IVoiceInteractor;
@@ -224,6 +227,7 @@ import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.org.conscrypt.TrustedCertificateStore;
 import com.android.server.am.MemInfoDumpProto;
 
+import dalvik.annotation.optimization.NeverCompile;
 import dalvik.system.AppSpecializationHooks;
 import dalvik.system.CloseGuard;
 import dalvik.system.VMDebug;
@@ -1497,6 +1501,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @NeverCompile
         @Override
         public void dumpMemInfo(ParcelFileDescriptor pfd, Debug.MemoryInfo mem, boolean checkin,
                 boolean dumpFullInfo, boolean dumpDalvik, boolean dumpSummaryOnly,
@@ -1511,6 +1516,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @NeverCompile
         private void dumpMemInfo(PrintWriter pw, Debug.MemoryInfo memInfo, boolean checkin,
                 boolean dumpFullInfo, boolean dumpDalvik, boolean dumpSummaryOnly, boolean dumpUnreachable) {
             long nativeMax = Debug.getNativeHeapSize() / 1024;
@@ -1667,6 +1673,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @NeverCompile
         @Override
         public void dumpMemInfoProto(ParcelFileDescriptor pfd, Debug.MemoryInfo mem,
                 boolean dumpFullInfo, boolean dumpDalvik, boolean dumpSummaryOnly,
@@ -1680,6 +1687,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
+        @NeverCompile
         private void dumpMemInfo(ProtoOutputStream proto, Debug.MemoryInfo memInfo,
                 boolean dumpFullInfo, boolean dumpDalvik,
                 boolean dumpSummaryOnly, boolean dumpUnreachable) {
@@ -3021,6 +3029,7 @@ public final class ActivityThread extends ClientTransactionHandler
         pw.println(String.format(format, objs));
     }
 
+    @NeverCompile
     public static void dumpMemInfoTable(PrintWriter pw, Debug.MemoryInfo memInfo, boolean checkin,
             boolean dumpFullInfo, boolean dumpDalvik, boolean dumpSummaryOnly,
             int pid, String processName,
@@ -3350,6 +3359,7 @@ public final class ActivityThread extends ClientTransactionHandler
     /**
      * Dump mem info data to proto.
      */
+    @NeverCompile
     public static void dumpMemInfoTable(ProtoOutputStream proto, Debug.MemoryInfo memInfo,
             boolean dumpDalvik, boolean dumpSummaryOnly,
             long nativeMax, long nativeAllocated, long nativeFree,
@@ -3579,6 +3589,12 @@ public final class ActivityThread extends ClientTransactionHandler
     @Override
     public ActivityClientRecord getActivityClient(IBinder token) {
         return mActivities.get(token);
+    }
+
+    @Nullable
+    @Override
+    public Context getWindowContext(@NonNull IBinder clientToken) {
+        return WindowTokenClientController.getInstance().getWindowContext(clientToken);
     }
 
     @VisibleForTesting(visibility = PACKAGE)
@@ -6100,9 +6116,21 @@ public final class ActivityThread extends ClientTransactionHandler
         final boolean shouldUpdateResources = hasPublicResConfigChange
                 || shouldUpdateResources(activityToken, currentResConfig, newConfig,
                 amOverrideConfig, movedToDifferentDisplay, hasPublicResConfigChange);
-        final boolean shouldReportChange = shouldReportChange(
-                activity.mCurrentConfig, newConfig, r.mSizeConfigurations,
-                activity.mActivityInfo.getRealConfigChanged(), alwaysReportChange);
+
+        // TODO(b/274944389): remove once a longer-term solution is implemented.
+        boolean skipActivityRelaunchWhenDocking = activity.getResources().getBoolean(
+                R.bool.config_skipActivityRelaunchWhenDocking);
+        int handledConfigChanges = activity.mActivityInfo.getRealConfigChanged();
+        if (skipActivityRelaunchWhenDocking && onlyDeskInUiModeChanged(activity.mCurrentConfig,
+                newConfig)) {
+            // If we're not relaunching this activity when docking, we should send the configuration
+            // changed event. Pretend as if the activity is handling uiMode config changes in its
+            // manifest so that we'll report any dock changes.
+            handledConfigChanges |= ActivityInfo.CONFIG_UI_MODE;
+        }
+
+        final boolean shouldReportChange = shouldReportChange(activity.mCurrentConfig, newConfig,
+                r.mSizeConfigurations, handledConfigChanges, alwaysReportChange);
         // Nothing significant, don't proceed with updating and reporting.
         if (!shouldUpdateResources && !shouldReportChange) {
             return null;
@@ -6146,6 +6174,25 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         return configToReport;
+    }
+
+    /**
+     * Returns true if the uiMode configuration changed, and desk mode
+     * ({@link android.content.res.Configuration#UI_MODE_TYPE_DESK}) was the only change to uiMode.
+     */
+    private boolean onlyDeskInUiModeChanged(Configuration oldConfig, Configuration newConfig) {
+        boolean deskModeChanged = isInDeskUiMode(oldConfig) != isInDeskUiMode(newConfig);
+
+        // UI mode contains fields other than the UI mode type, so determine if any other fields
+        // changed.
+        boolean uiModeOtherFieldsChanged =
+                (oldConfig.uiMode & ~UI_MODE_TYPE_MASK) != (newConfig.uiMode & ~UI_MODE_TYPE_MASK);
+
+        return deskModeChanged && !uiModeOtherFieldsChanged;
+    }
+
+    private static boolean isInDeskUiMode(Configuration config) {
+        return (config.uiMode & UI_MODE_TYPE_MASK) == UI_MODE_TYPE_DESK;
     }
 
     /**

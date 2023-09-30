@@ -226,7 +226,6 @@ import static com.android.server.wm.IdentifierProto.USER_ID;
 import static com.android.server.wm.LetterboxConfiguration.DEFAULT_LETTERBOX_ASPECT_RATIO_FOR_MULTI_WINDOW;
 import static com.android.server.wm.LetterboxConfiguration.MIN_FIXED_ORIENTATION_LETTERBOX_ASPECT_RATIO;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIENT;
-import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_PREDICT_BACK;
@@ -595,19 +594,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     // Tracking splash screen status from previous activity
     boolean mSplashScreenStyleSolidColor = false;
 
-    Drawable mEnterpriseThumbnailDrawable;
-
     boolean mPauseSchedulePendingForPip = false;
 
     // Gets set to indicate that the activity is currently being auto-pipped.
     boolean mAutoEnteringPip = false;
-
-    private void updateEnterpriseThumbnailDrawable(Context context) {
-        DevicePolicyManager dpm = context.getSystemService(DevicePolicyManager.class);
-        mEnterpriseThumbnailDrawable = dpm.getResources().getDrawable(
-                WORK_PROFILE_ICON, OUTLINE, PROFILE_SWITCH_ANIMATION,
-                () -> context.getDrawable(R.drawable.ic_corp_badge));
-    }
 
     static final int LAUNCH_SOURCE_TYPE_SYSTEM = 1;
     static final int LAUNCH_SOURCE_TYPE_HOME = 2;
@@ -2232,8 +2222,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         mActivityRecordInputSink = new ActivityRecordInputSink(this, sourceRecord);
 
-        updateEnterpriseThumbnailDrawable(mAtmService.getUiContext());
-
         boolean appActivityEmbeddingEnabled = false;
         try {
             appActivityEmbeddingEnabled = WindowManager.hasWindowExtensionsEnabled()
@@ -2733,7 +2721,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     private void requestCopySplashScreen() {
         mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_COPYING;
-        if (!mAtmService.mTaskOrganizerController.copySplashScreenView(getTask())) {
+        if (mStartingSurface == null || !mAtmService.mTaskOrganizerController.copySplashScreenView(
+                getTask(), mStartingSurface.mTaskOrganizer)) {
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_FINISH;
             removeStartingWindow();
         }
@@ -2746,12 +2735,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      */
     void onCopySplashScreenFinish(SplashScreenViewParcelable parcelable) {
         removeTransferSplashScreenTimeout();
-        // unable to copy from shell, maybe it's not a splash screen. or something went wrong.
-        // either way, abort and reset the sequence.
-        if (parcelable == null
+        final SurfaceControl windowAnimationLeash = (parcelable == null
                 || mTransferringSplashScreenState != TRANSFER_SPLASH_SCREEN_COPYING
                 || mStartingWindow == null || mStartingWindow.mRemoved
-                || finishing) {
+                || finishing) ? null
+                : TaskOrganizerController.applyStartingWindowAnimation(mStartingWindow);
+        if (windowAnimationLeash == null) {
+            // Unable to copy from shell, maybe it's not a splash screen, or something went wrong.
+            // Either way, abort and reset the sequence.
             if (parcelable != null) {
                 parcelable.clearIfNeeded();
             }
@@ -2759,9 +2750,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             removeStartingWindow();
             return;
         }
-        // schedule attach splashScreen to client
-        final SurfaceControl windowAnimationLeash = TaskOrganizerController
-                .applyStartingWindowAnimation(mStartingWindow);
         try {
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_ATTACH_TO_CLIENT;
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
@@ -2801,7 +2789,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 && (mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_FINISH
                 || mTransferringSplashScreenState == TRANSFER_SPLASH_SCREEN_IDLE)) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Cleaning splash screen token=%s", this);
-            mAtmService.mTaskOrganizerController.onAppSplashScreenViewRemoved(getTask());
+            mAtmService.mTaskOrganizerController.onAppSplashScreenViewRemoved(getTask(),
+                    mStartingSurface != null ? mStartingSurface.mTaskOrganizer : null);
         }
     }
 
@@ -2889,7 +2878,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         } else if (lastData.mRemoveAfterTransaction == AFTER_TRANSACTION_COPY_TO_CLIENT) {
             removeStartingWindow();
         }
-        lastData.mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
     }
 
     void removeStartingWindowAnimation(boolean prepareAnimation) {
@@ -2965,7 +2953,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         reparent(newTaskFrag, position);
     }
 
-    private boolean isHomeIntent(Intent intent) {
+    static boolean isHomeIntent(Intent intent) {
         return ACTION_MAIN.equals(intent.getAction())
                 && (intent.hasCategory(CATEGORY_HOME)
                 || intent.hasCategory(CATEGORY_SECONDARY_HOME))
@@ -3399,7 +3387,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // current focused activity could be another activity in the same Task if activities are
         // displayed on adjacent TaskFragments.
         final ActivityRecord currentFocusedApp = mDisplayContent.mFocusedApp;
-        if (currentFocusedApp != null && currentFocusedApp.task == task) {
+        final int topFocusedDisplayId = mRootWindowContainer.getTopFocusedDisplayContent() != null
+                ? mRootWindowContainer.getTopFocusedDisplayContent().getDisplayId()
+                : INVALID_DISPLAY;
+        if (currentFocusedApp != null && currentFocusedApp.task == task
+                && topFocusedDisplayId == mDisplayContent.getDisplayId()) {
             final Task topFocusableTask = mDisplayContent.getTask(
                     (t) -> t.isLeafTask() && t.isFocusable(), true /*  traverseTopToBottom */);
             if (task == topFocusableTask) {
@@ -3421,7 +3413,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         rootTask.moveToFront(reason, task);
         // Report top activity change to tracking services and WM
-        if (mRootWindowContainer.getTopResumedActivity() == this) {
+        if (mState == RESUMED && mRootWindowContainer.getTopResumedActivity() == this) {
             mAtmService.setLastResumedActivityUncheckLocked(this, reason);
         }
         return true;
@@ -7290,15 +7282,18 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         return mVisibleRequested || nowVisible || mState == PAUSING || mState == RESUMED;
     }
 
+    /**
+     * Returns the task id of the activity token. If onlyRoot=true is specified, it will
+     * return a valid id only if the activity is root or the activity is immediately above
+     * the first non-relinquish-identity activity.
+     * TODO(b/297476786): Clarify the use cases about when should get the bottom activity
+     *                    or the first non-relinquish-identity activity from bottom.
+     */
     static int getTaskForActivityLocked(IBinder token, boolean onlyRoot) {
         final ActivityRecord r = ActivityRecord.forTokenLocked(token);
         if (r == null || r.getParent() == null) {
             return INVALID_TASK_ID;
         }
-        return getTaskForActivityLocked(r, onlyRoot);
-    }
-
-    static int getTaskForActivityLocked(ActivityRecord r, boolean onlyRoot) {
         final Task task = r.task;
         if (onlyRoot && r.compareTo(task.getRootActivity(
                 false /*ignoreRelinquishIdentity*/, true /*setToBottomIfNone*/)) > 0) {
@@ -7888,9 +7883,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return;
         }
         final Rect frame = win.getRelativeFrame();
-        final Drawable thumbnailDrawable = task.mUserId == mWmService.mCurrentUserId
-                ? mAtmService.getUiContext().getDrawable(R.drawable.ic_account_circle)
-                : mEnterpriseThumbnailDrawable;
+        final Context context = mAtmService.getUiContext();
+        final Drawable thumbnailDrawable;
+        if (task.mUserId == mWmService.mCurrentUserId) {
+            thumbnailDrawable = context.getDrawable(R.drawable.ic_account_circle);
+        } else {
+            final DevicePolicyManager dpm = context.getSystemService(DevicePolicyManager.class);
+            thumbnailDrawable = dpm.getResources().getDrawable(
+                    WORK_PROFILE_ICON, OUTLINE, PROFILE_SWITCH_ANIMATION,
+                    () -> context.getDrawable(R.drawable.ic_corp_badge));
+        }
         final HardwareBuffer thumbnail = getDisplayContent().mAppTransition
                 .createCrossProfileAppsThumbnail(thumbnailDrawable, frame);
         if (thumbnail == null) {

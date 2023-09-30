@@ -58,9 +58,8 @@ class ShadeRepositoryImplTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
 
         underTest = ShadeRepositoryImpl(shadeExpansionStateManager)
-        `when`(shadeExpansionStateManager.addExpansionListener(any())).thenReturn(
-            ShadeExpansionChangeEvent(0f, false, false, 0f)
-        )
+        `when`(shadeExpansionStateManager.addExpansionListener(any()))
+            .thenReturn(ShadeExpansionChangeEvent(0f, false, false, 0f))
     }
 
     @Test
@@ -119,6 +118,36 @@ class ShadeRepositoryImplTest : SysuiTestCase() {
 
             underTest.setQsExpansion(1f)
             assertThat(underTest.qsExpansion.value).isEqualTo(1f)
+        }
+
+    @Test
+    fun updateDragDownAmount() =
+        testScope.runTest {
+            assertThat(underTest.lockscreenShadeExpansion.value).isEqualTo(0f)
+
+            underTest.setLockscreenShadeExpansion(.5f)
+            assertThat(underTest.lockscreenShadeExpansion.value).isEqualTo(.5f)
+
+            underTest.setLockscreenShadeExpansion(.82f)
+            assertThat(underTest.lockscreenShadeExpansion.value).isEqualTo(.82f)
+
+            underTest.setLockscreenShadeExpansion(1f)
+            assertThat(underTest.lockscreenShadeExpansion.value).isEqualTo(1f)
+        }
+
+    @Test
+    fun updateLegacyShadeExpansion() =
+        testScope.runTest {
+            assertThat(underTest.legacyShadeExpansion.value).isEqualTo(0f)
+
+            underTest.setLegacyShadeExpansion(.5f)
+            assertThat(underTest.legacyShadeExpansion.value).isEqualTo(.5f)
+
+            underTest.setLegacyShadeExpansion(.82f)
+            assertThat(underTest.legacyShadeExpansion.value).isEqualTo(.82f)
+
+            underTest.setLegacyShadeExpansion(1f)
+            assertThat(underTest.legacyShadeExpansion.value).isEqualTo(1f)
         }
 
     @Test

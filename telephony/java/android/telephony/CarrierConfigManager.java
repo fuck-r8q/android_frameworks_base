@@ -2057,7 +2057,7 @@ public class CarrierConfigManager {
             "lte_plus_threshold_bandwidth_khz_int";
 
     /**
-     * The combined channel bandwidth threshold (non-inclusive) in KHz required to display the
+     * The combined channel bandwidth threshold (inclusive) in KHz required to display the
      * NR advanced (i.e. 5G+) data icon. It is 0 by default, meaning minimum bandwidth check is
      * not enabled. Other factors like bands or frequency can also determine whether the NR
      * advanced data icon is shown or not.
@@ -9528,6 +9528,19 @@ public class CarrierConfigManager {
             "carrier_supported_satellite_services_per_provider_bundle";
 
     /**
+     * This config enables modem to scan satellite PLMNs specified as per
+     * {@link #KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE} and attach to same
+     * in case cellular networks are not enabled. This will need specific agreement between
+     * satellite provider and the carrier before enabling this flag.
+     *
+     * The default value is false.
+     *
+     * @hide
+     */
+    public static final String KEY_SATELLITE_ATTACH_SUPPORTED_BOOL =
+            "satellite_attach_supported_bool";
+
+    /**
      * Indicating whether DUN APN should be disabled when the device is roaming. In that case,
      * the default APN (i.e. internet) will be used for tethering.
      *
@@ -10077,9 +10090,15 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_USE_ONLY_DIALED_SIM_ECC_LIST_BOOL, false);
         sDefaults.putString(KEY_CARRIER_NETWORK_SERVICE_WWAN_PACKAGE_OVERRIDE_STRING, "");
         sDefaults.putString(KEY_CARRIER_NETWORK_SERVICE_WLAN_PACKAGE_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CARRIER_NETWORK_SERVICE_WLAN_CLASS_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CARRIER_NETWORK_SERVICE_WWAN_CLASS_OVERRIDE_STRING, "");
         sDefaults.putString(KEY_CARRIER_QUALIFIED_NETWORKS_SERVICE_PACKAGE_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CARRIER_QUALIFIED_NETWORKS_SERVICE_CLASS_OVERRIDE_STRING, "");
         sDefaults.putString(KEY_CARRIER_DATA_SERVICE_WWAN_PACKAGE_OVERRIDE_STRING, "");
         sDefaults.putString(KEY_CARRIER_DATA_SERVICE_WLAN_PACKAGE_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CARRIER_DATA_SERVICE_WWAN_CLASS_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CARRIER_DATA_SERVICE_WLAN_CLASS_OVERRIDE_STRING, "");
+        sDefaults.putString(KEY_CONFIG_PLANS_PACKAGE_OVERRIDE_STRING, "");
         sDefaults.putString(KEY_CARRIER_INSTANT_LETTERING_INVALID_CHARS_STRING, "");
         sDefaults.putString(KEY_CARRIER_INSTANT_LETTERING_ESCAPED_CHARS_STRING, "");
         sDefaults.putString(KEY_CARRIER_INSTANT_LETTERING_ENCODING_STRING, "");
@@ -10675,6 +10694,7 @@ public class CarrierConfigManager {
         sDefaults.putPersistableBundle(
                 KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE,
                 PersistableBundle.EMPTY);
+        sDefaults.putBoolean(KEY_SATELLITE_ATTACH_SUPPORTED_BOOL, false);
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);
         sDefaults.putString(KEY_DEFAULT_PREFERRED_APN_NAME_STRING, "");
         sDefaults.putBoolean(KEY_SUPPORTS_CALL_COMPOSER_BOOL, false);

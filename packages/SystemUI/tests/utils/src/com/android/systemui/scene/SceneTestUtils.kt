@@ -27,6 +27,9 @@ import com.android.systemui.bouncer.data.repository.BouncerRepository
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
+import com.android.systemui.classifier.FalsingCollector
+import com.android.systemui.classifier.FalsingCollectorFake
+import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
@@ -37,10 +40,12 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.shared.model.WakeSleepReason
 import com.android.systemui.keyguard.shared.model.WakefulnessModel
 import com.android.systemui.keyguard.shared.model.WakefulnessState
+import com.android.systemui.power.data.repository.FakePowerRepository
 import com.android.systemui.scene.data.repository.SceneContainerRepository
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.shade.data.repository.FakeShadeRepository
 import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.mockito.mock
@@ -92,7 +97,12 @@ class SceneTestUtils(
         }
     }
 
+    val powerRepository: FakePowerRepository by lazy { FakePowerRepository() }
+
     private val context = test.context
+
+    private val falsingCollectorFake: FalsingCollector by lazy { FalsingCollectorFake() }
+    private var falsingInteractor: FalsingInteractor? = null
 
     fun fakeSceneContainerRepository(
         containerConfig: SceneContainerConfig = fakeSceneContainerConfig(),
@@ -125,6 +135,7 @@ class SceneTestUtils(
         return SceneInteractor(
             applicationScope = applicationScope(),
             repository = repository,
+            powerRepository = powerRepository,
             logger = mock(),
         )
     }
@@ -148,17 +159,15 @@ class SceneTestUtils(
         )
     }
 
-    fun keyguardRepository(): FakeKeyguardRepository {
-        return keyguardRepository
-    }
-
     fun keyguardInteractor(repository: KeyguardRepository): KeyguardInteractor {
         return KeyguardInteractor(
             repository = repository,
             commandQueue = FakeCommandQueue(),
             featureFlags = featureFlags,
             bouncerRepository = FakeKeyguardBouncerRepository(),
-            configurationRepository = FakeConfigurationRepository()
+            configurationRepository = FakeConfigurationRepository(),
+            shadeRepository = FakeShadeRepository(),
+            sceneInteractorProvider = { sceneInteractor() },
         )
     }
 
@@ -173,6 +182,7 @@ class SceneTestUtils(
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
             featureFlags = featureFlags,
+            falsingInteractor = falsingInteractor(),
         )
     }
 
@@ -187,6 +197,14 @@ class SceneTestUtils(
             authenticationInteractor = authenticationInteractor,
             featureFlags = featureFlags,
         )
+    }
+
+    fun falsingInteractor(collector: FalsingCollector = falsingCollector()): FalsingInteractor {
+        return falsingInteractor ?: FalsingInteractor(collector).also { falsingInteractor = it }
+    }
+
+    fun falsingCollector(): FalsingCollector {
+        return falsingCollectorFake
     }
 
     private fun applicationScope(): CoroutineScope {

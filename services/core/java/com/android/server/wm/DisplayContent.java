@@ -6517,10 +6517,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
-     * @return whether the physical display has a fixed orientation and cannot be rotated.
+     * @return whether the physical display orientation should change when its content rotates to
+     *   match the orientation of the content.
      */
-    boolean isDisplayOrientationFixed() {
-        return (mDisplayInfo.flags & Display.FLAG_ROTATES_WITH_CONTENT) == 0;
+    boolean shouldRotateWithContent() {
+        return (mDisplayInfo.flags & Display.FLAG_ROTATES_WITH_CONTENT) != 0;
     }
 
     /**
@@ -6544,7 +6545,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     boolean isKeyguardOccluded() {
         return mRootWindowContainer.mTaskSupervisor
-                .getKeyguardController().isDisplayOccluded(mDisplayId);
+                .getKeyguardController().isKeyguardOccluded(mDisplayId);
     }
 
     /**

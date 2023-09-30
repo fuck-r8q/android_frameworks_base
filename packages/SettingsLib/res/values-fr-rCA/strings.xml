@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"Transfert de fichier"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"Périphérique d\'entrée"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"Accès Internet"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"Autoriser accès : contacts et hist. d\'app."</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"Ces infos seront utilisées pour les annonces d\'appels et plus"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"Partage de connexion Internet"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"Messages texte"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"Accès à la carte SIM"</string>
@@ -405,7 +403,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"Permet de redimensionner toutes les activités pour le mode multi-fenêtre, indépendamment des valeurs du fichier manifeste."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"Activer les fenêtres de forme libre"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"Activer la compatibilité avec les fenêtres de forme libre expérimentales."</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"Mode Bureau"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"Mot de passe sauvegarde PC"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"Les sauvegardes complètes sur PC ne sont pas protégées actuellement"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"Touchez pour modifier ou supprimer le mot de passe utilisé pour les sauvegardes complètes sur ordinateur."</string>

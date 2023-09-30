@@ -25,16 +25,20 @@ import android.os.UserManager
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.UiEventLogger
 import com.android.keyguard.KeyguardUpdateMonitor
+import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory
+import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.disableflags.data.model.DisableFlagsModel
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository
+import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeUserSetupRepository
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
 import com.android.systemui.telephony.data.repository.FakeTelephonyRepository
@@ -51,6 +55,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -69,6 +74,13 @@ class ShadeInteractorTest : SysuiTestCase() {
     private val userRepository = FakeUserRepository()
     private val disableFlagsRepository = FakeDisableFlagsRepository()
     private val keyguardRepository = FakeKeyguardRepository()
+    private val shadeRepository = FakeShadeRepository()
+    private val configurationRepository = FakeConfigurationRepository()
+    private val sharedNotificationContainerInteractor =
+        SharedNotificationContainerInteractor(
+            configurationRepository,
+            mContext,
+        )
 
     @Mock private lateinit var manager: UserManager
     @Mock private lateinit var headlessSystemUserMode: HeadlessSystemUserMode
@@ -143,6 +155,8 @@ class ShadeInteractorTest : SysuiTestCase() {
                 userSetupRepository,
                 deviceProvisionedController,
                 userInteractor,
+                sharedNotificationContainerInteractor,
+                shadeRepository,
             )
     }
 
@@ -352,5 +366,72 @@ class ShadeInteractorTest : SysuiTestCase() {
 
             // THEN expand is enabled
             assertThat(actual).isTrue()
+        }
+
+    @Test
+    fun fullShadeExpansionWhenShadeLocked() =
+        testScope.runTest {
+            val actual by collectLastValue(underTest.shadeExpansion)
+
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE_LOCKED)
+            shadeRepository.setLockscreenShadeExpansion(0.5f)
+
+            assertThat(actual).isEqualTo(1f)
+        }
+
+    @Test
+    fun fullShadeExpansionWhenStatusBarStateIsNotShadeLocked() =
+        testScope.runTest {
+            val actual by collectLastValue(underTest.shadeExpansion)
+
+            keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
+
+            shadeRepository.setLockscreenShadeExpansion(0.5f)
+            assertThat(actual).isEqualTo(0.5f)
+
+            shadeRepository.setLockscreenShadeExpansion(0.8f)
+            assertThat(actual).isEqualTo(0.8f)
+        }
+
+    fun shadeExpansionWhenInSplitShadeAndQsExpanded() =
+        testScope.runTest {
+            val actual by collectLastValue(underTest.shadeExpansion)
+
+            // WHEN split shade is enabled and QS is expanded
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            overrideResource(R.bool.config_use_split_notification_shade, true)
+            configurationRepository.onAnyConfigurationChange()
+            runCurrent()
+            shadeRepository.setQsExpansion(.5f)
+            shadeRepository.setLegacyShadeExpansion(.7f)
+
+            // THEN legacy shade expansion is passed through
+            assertThat(actual).isEqualTo(.7f)
+        }
+
+    fun shadeExpansionWhenNotInSplitShadeAndQsExpanded() =
+        testScope.runTest {
+            val actual by collectLastValue(underTest.shadeExpansion)
+
+            // WHEN split shade is not enabled and QS is expanded
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            shadeRepository.setQsExpansion(.5f)
+            shadeRepository.setLegacyShadeExpansion(1f)
+
+            // THEN shade expansion is zero
+            assertThat(actual).isEqualTo(0f)
+        }
+
+    fun shadeExpansionWhenNotInSplitShadeAndQsCollapsed() =
+        testScope.runTest {
+            val actual by collectLastValue(underTest.shadeExpansion)
+
+            // WHEN split shade is not enabled and QS is expanded
+            keyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            shadeRepository.setQsExpansion(0f)
+            shadeRepository.setLegacyShadeExpansion(.6f)
+
+            // THEN shade expansion is zero
+            assertThat(actual).isEqualTo(.6f)
         }
 }

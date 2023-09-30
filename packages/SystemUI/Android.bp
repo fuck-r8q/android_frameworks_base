@@ -132,17 +132,6 @@ android_library {
     manifest: "AndroidManifest-res.xml",
 }
 
-aconfig_declarations {
-    name: "systemui_aconfig_flags",
-    package: "com.android.systemui.aconfig",
-    srcs: ["src/com/android/systemui/aconfig/systemui.aconfig"],
-}
-
-java_aconfig_library {
-    name: "systemui_aconfig_flags_lib",
-    aconfig_declarations: "systemui_aconfig_flags",
-}
-
 android_library {
     name: "SystemUI-core",
     srcs: [
@@ -174,7 +163,7 @@ android_library {
         "SystemUISharedLib",
         "SystemUI-statsd",
         "SettingsLib",
-        "systemui_aconfig_flags_lib",
+        "com_android_systemui_flags_lib",
         "androidx.core_core-ktx",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
@@ -254,6 +243,9 @@ filegroup {
         "tests/src/com/android/systemui/statusbar/pipeline/airplane/data/repository/FakeAirplaneModeRepository.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/shared/data/repository/FakeConnectivityRepository.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/FakeWifiRepository.kt",
+
+        /* Log fakes */
+        "tests/src/com/android/systemui/log/core/FakeLogBuffer.kt",
     ],
     path: "tests/src",
 }
@@ -329,6 +321,39 @@ filegroup {
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/prod/WifiRepositoryImplTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/domain/interactor/WifiInteractorImplTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/ui/viewmodel/WifiViewModelTest.kt",
+
+        /* Bouncer UI tests */
+        "tests/src/com/android/keyguard/KeyguardPasswordViewControllerTest.kt",
+        "tests/src/com/android/keyguard/KeyguardPatternViewControllerTest.kt",
+        "tests/src/com/android/keyguard/KeyguardPinBasedInputViewControllerTest.java",
+        "tests/src/com/android/keyguard/KeyguardPinViewControllerTest.kt",
+        "tests/src/com/android/keyguard/KeyguardSecurityContainerTest.java",
+        "tests/src/com/android/keyguard/KeyguardSecurityContainerControllerTest.kt",
+        "tests/src/com/android/keyguard/KeyguardSecurityViewFlipperControllerTest.java",
+        "tests/src/com/android/keyguard/KeyguardSimPinViewControllerTest.kt",
+        "tests/src/com/android/keyguard/KeyguardSimPukViewControllerTest.kt",
+
+        /* Communal tests */
+        "tests/src/com/android/systemui/communal/data/repository/CommunalWidgetRepositoryImplTest.kt",
+        "tests/src/com/android/systemui/communal/domain/interactor/CommunalInteractorTest.kt",
+        "tests/src/com/android/systemui/communal/ui/view/layout/blueprints/DefaultCommunalBlueprintTest.kt",
+
+        /* Dream tests */
+        "tests/src/com/android/systemui/dreams/complication/HideComplicationTouchHandlerTest.java",
+        "tests/src/com/android/systemui/dreams/conditions/AssistantAttentionConditionTest.java",
+        "tests/src/com/android/systemui/dreams/conditions/DreamConditionTest.java",
+        "tests/src/com/android/systemui/dreams/touch/scrim/BouncerlessScrimControllerTest.java",
+        "tests/src/com/android/systemui/dreams/touch/scrim/ScrimManagerTest.java",
+        "tests/src/com/android/systemui/dreams/touch/BouncerSwipeTouchHandlerTest.java",
+        "tests/src/com/android/systemui/dreams/touch/ShadeTouchHandlerTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayAnimationsControllerTest.kt",
+        "tests/src/com/android/systemui/dreams/DreamOverlayCallbackControllerTest.kt",
+        "tests/src/com/android/systemui/dreams/DreamOverlayContainerViewControllerTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayNotificationCountProviderTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayServiceTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayStateControllerTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayStatusBarItemsProviderTest.java",
+        "tests/src/com/android/systemui/dreams/DreamOverlayStatusBarViewControllerTest.java",
     ],
     path: "tests/src",
 }
@@ -364,7 +389,7 @@ android_library {
         "SystemUICustomizationLib",
         "SystemUI-statsd",
         "SettingsLib",
-        "systemui_aconfig_flags_lib",
+        "com_android_systemui_flags_lib",
         "androidx.viewpager2_viewpager2",
         "androidx.legacy_legacy-support-v4",
         "androidx.recyclerview_recyclerview",

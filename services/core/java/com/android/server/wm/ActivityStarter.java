@@ -1162,10 +1162,12 @@ class ActivityStarter {
             }
         }
 
+        final TaskDisplayArea suggestedLaunchDisplayArea =
+                computeSuggestedLaunchDisplayArea(inTask, sourceRecord, checkedOptions);
         mInterceptor.setStates(userId, realCallingPid, realCallingUid, startFlags, callingPackage,
                 callingFeatureId);
         if (mInterceptor.intercept(intent, rInfo, aInfo, resolvedType, inTask, inTaskFragment,
-                callingPid, callingUid, checkedOptions)) {
+                callingPid, callingUid, checkedOptions, suggestedLaunchDisplayArea)) {
             // activity start was intercepted, e.g. because the target user is currently in quiet
             // mode (turn off work) or the target application is suspended
             intent = mInterceptor.mIntent;
@@ -1921,6 +1923,15 @@ class ActivityStarter {
                 ? mLaunchParams.mPreferredTaskDisplayArea
                 : mRootWindowContainer.getDefaultTaskDisplayArea();
         mPreferredWindowingMode = mLaunchParams.mWindowingMode;
+    }
+
+    private TaskDisplayArea computeSuggestedLaunchDisplayArea(
+            Task task, ActivityRecord source, ActivityOptions options) {
+        mSupervisor.getLaunchParamsController().calculate(task, /*layout=*/null,
+                /*activity=*/ null, source, options, mRequest, PHASE_DISPLAY, mLaunchParams);
+        return mLaunchParams.hasPreferredTaskDisplayArea()
+                ? mLaunchParams.mPreferredTaskDisplayArea
+                : mRootWindowContainer.getDefaultTaskDisplayArea();
     }
 
     @VisibleForTesting
@@ -2753,8 +2764,7 @@ class ActivityStarter {
             mTransientLaunch = mOptions.getTransientLaunch();
             final KeyguardController kc = mSupervisor.getKeyguardController();
             final int displayId = mPreferredTaskDisplayArea.getDisplayId();
-            mDisplayLockAndOccluded = kc.isKeyguardLocked(displayId)
-                    && kc.isDisplayOccluded(displayId);
+            mDisplayLockAndOccluded = kc.isKeyguardOccluded(displayId);
             // Recents animation on lock screen, do not resume & move launcher to top.
             if (mTransientLaunch && mDisplayLockAndOccluded
                     && mService.getTransitionController().isShellTransitionsEnabled()) {

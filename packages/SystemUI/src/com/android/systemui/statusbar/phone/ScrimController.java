@@ -763,7 +763,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
      * Sets the amount of vertical over scroll that should be performed on the notifications scrim.
      */
     public void setNotificationsOverScrollAmount(int overScrollAmount) {
-        mNotificationsScrim.setTranslationY(overScrollAmount);
+        if (mNotificationsScrim != null) mNotificationsScrim.setTranslationY(overScrollAmount);
     }
 
     /**
@@ -1480,7 +1480,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
 
     public void setScrimBehindChangeRunnable(Runnable changeRunnable) {
         // TODO: remove this. This is necessary because of an order-of-operations limitation.
-        // The fix is to move more of these class into @CentralSurfacesScope
+        // The fix is to move more of these class into @SysUISingleton.
         if (mScrimBehind == null) {
             mScrimBehindChangeRunnable = changeRunnable;
         } else {

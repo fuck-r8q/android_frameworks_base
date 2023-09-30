@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"העברת קבצים"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"מכשיר קלט"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"גישה לאינטרנט"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"אישור גישה אל אנשי קשר והיסטוריית שיחות"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"המידע ישמש להודעות על שיחות ועוד"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"שיתוף חיבור לאינטרנט"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"הודעות טקסט"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"‏גישה ל-SIM"</string>
@@ -405,7 +403,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"מאפשר יכולת קביעת גודל של כל הפעילויות לריבוי חלונות, ללא התחשבות בערכי המניפסט."</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"הפעלת האפשרות לשנות את הגודל והמיקום של החלונות"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"הפעלת תמיכה בתכונה הניסיונית של שינוי הגודל והמיקום של החלונות."</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"ממשק המחשב"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"סיסמת גיבוי שולחן העבודה"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"גיבויים מלאים בשולחן העבודה אינם מוגנים כעת"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"יש להקיש כדי לשנות או להסיר את הסיסמה לגיבויים מלאים בשולחן העבודה"</string>
