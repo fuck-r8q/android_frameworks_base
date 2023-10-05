@@ -4463,7 +4463,7 @@ package android.app {
     method public void onProvideAssistData(android.os.Bundle);
     method public android.net.Uri onProvideReferrer();
     method public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[]);
-    method public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[], int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[], int);
     method @CallSuper protected void onRestart();
     method protected void onRestoreInstanceState(@NonNull android.os.Bundle);
     method public void onRestoreInstanceState(@Nullable android.os.Bundle, @Nullable android.os.PersistableBundle);
@@ -4505,7 +4505,7 @@ package android.app {
     method public android.view.DragAndDropPermissions requestDragAndDropPermissions(android.view.DragEvent);
     method public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<java.lang.Void,java.lang.Throwable>);
     method public final void requestPermissions(@NonNull String[], int);
-    method public final void requestPermissions(@NonNull String[], int, int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public final void requestPermissions(@NonNull String[], int, int);
     method public final void requestShowKeyboardShortcuts();
     method @Deprecated public boolean requestVisibleBehind(boolean);
     method public final boolean requestWindowFeature(int);
@@ -4553,7 +4553,7 @@ package android.app {
     method public void setVrModeEnabled(boolean, @NonNull android.content.ComponentName) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean shouldDockBigOverlays();
     method public boolean shouldShowRequestPermissionRationale(@NonNull String);
-    method public boolean shouldShowRequestPermissionRationale(@NonNull String, int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public boolean shouldShowRequestPermissionRationale(@NonNull String, int);
     method public boolean shouldUpRecreateTask(android.content.Intent);
     method public boolean showAssist(android.os.Bundle);
     method @Deprecated public final void showDialog(int);
@@ -9769,7 +9769,7 @@ package android.content {
     method public int describeContents();
     method public void enforceCallingUid();
     method @Nullable public String getAttributionTag();
-    method public int getDeviceId();
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public int getDeviceId();
     method @Nullable public android.content.AttributionSource getNext();
     method @Nullable public String getPackageName();
     method public int getPid();
@@ -9785,7 +9785,7 @@ package android.content {
     ctor public AttributionSource.Builder(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource build();
     method @NonNull public android.content.AttributionSource.Builder setAttributionTag(@Nullable String);
-    method @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
     method @Deprecated @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setPackageName(@Nullable String);
@@ -15224,6 +15224,7 @@ package android.graphics {
     method public int getMaxAnisotropy();
     method public void setFilterMode(int);
     method public void setMaxAnisotropy(@IntRange(from=1) int);
+    method @FlaggedApi("com.android.graphics.hwui.flags.gainmap_animations") public void setOverrideGainmap(@Nullable android.graphics.Gainmap);
     field public static final int FILTER_MODE_DEFAULT = 0; // 0x0
     field public static final int FILTER_MODE_LINEAR = 2; // 0x2
     field public static final int FILTER_MODE_NEAREST = 1; // 0x1
@@ -42981,7 +42982,6 @@ package android.telephony {
     field public static final String KEY_GSM_ROAMING_NETWORKS_STRING_ARRAY = "gsm_roaming_networks_string_array";
     field public static final String KEY_HAS_IN_CALL_NOISE_SUPPRESSION_BOOL = "has_in_call_noise_suppression_bool";
     field public static final String KEY_HIDE_CARRIER_NETWORK_SETTINGS_BOOL = "hide_carrier_network_settings_bool";
-    field @Deprecated public static final String KEY_HIDE_ENABLE_2G = "hide_enable_2g_bool";
     field public static final String KEY_HIDE_ENHANCED_4G_LTE_BOOL = "hide_enhanced_4g_lte_bool";
     field public static final String KEY_HIDE_IMS_APN_BOOL = "hide_ims_apn_bool";
     field public static final String KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL = "hide_lte_plus_data_icon_bool";
@@ -44903,7 +44903,7 @@ package android.telephony {
     method public int getSubscriptionType();
     method public int getUsageSetting();
     method public boolean isEmbedded();
-    method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public boolean isNtn();
+    method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public boolean isOnlyNonTerrestrialNetwork();
     method public boolean isOpportunistic();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.SubscriptionInfo> CREATOR;
