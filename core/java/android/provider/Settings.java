@@ -4880,13 +4880,13 @@ public final class Settings {
         public static final String PEAK_REFRESH_RATE = "peak_refresh_rate";
 
         /**
-         * Control whether to stay awake on fold
+         * Control lock behavior on fold
          *
          * If this isn't set, the system falls back to a device specific default.
          * @hide
          */
         @Readable
-        public static final String STAY_AWAKE_ON_FOLD = "stay_awake_on_fold";
+        public static final String FOLD_LOCK_BEHAVIOR = "fold_lock_behavior_setting";
 
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
@@ -10673,6 +10673,14 @@ public final class Settings {
          */
         public static final String SEARCH_PRESS_HOLD_NAV_HANDLE_ENABLED =
                 "search_press_hold_nav_handle_enabled";
+
+        /**
+         * Whether long-pressing on the home button can trigger search.
+         *
+         * @hide
+         */
+        public static final String SEARCH_LONG_PRESS_HOME_ENABLED =
+                "search_long_press_home_enabled";
 
         /**
          * Control whether Night display is currently activated.
@@ -19286,6 +19294,10 @@ public final class Settings {
              */
             public static final int TETHERED_CONFIG_TETHERED = 2;
 
+            /**
+             * Device is set in restricted mode.
+             */
+            public static final int TETHERED_CONFIG_RESTRICTED = 3;
 
             /**
              * Whether phone switching is supported.

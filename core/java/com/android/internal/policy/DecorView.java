@@ -1160,7 +1160,9 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
                     mForceWindowDrawsBarBackgrounds, requestedVisibleTypes);
             boolean oldDrawLegacy = mDrawLegacyNavigationBarBackground;
             mDrawLegacyNavigationBarBackground =
-                    (mWindow.getAttributes().flags & FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS) == 0;
+                    ((requestedVisibleTypes | mLastForceConsumingTypes)
+                            & WindowInsets.Type.navigationBars()) != 0
+                    && (mWindow.getAttributes().flags & FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS) == 0;
             if (oldDrawLegacy != mDrawLegacyNavigationBarBackground) {
                 mDrawLegacyNavigationBarBackgroundHandled =
                         mWindow.onDrawLegacyNavigationBarBackgroundChanged(
@@ -2624,8 +2626,7 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
 
     @Override
     public String toString() {
-        return "DecorView@" + Integer.toHexString(this.hashCode()) + "["
-                + getTitleSuffix(mWindow.getAttributes()) + "]";
+        return super.toString() + "[" + getTitleSuffix(mWindow.getAttributes()) + "]";
     }
 
     private static class ColorViewState {

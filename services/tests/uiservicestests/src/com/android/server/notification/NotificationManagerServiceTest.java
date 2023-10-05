@@ -22,12 +22,15 @@ import static android.app.ActivityManagerInternal.ServiceNotificationPolicy.NOT_
 import static android.app.ActivityManagerInternal.ServiceNotificationPolicy.SHOW_IMMEDIATELY;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.Notification.EXTRA_ALLOW_DURING_SETUP;
+import static android.app.Notification.EXTRA_PICTURE;
+import static android.app.Notification.EXTRA_PICTURE_ICON;
 import static android.app.Notification.FLAG_AUTO_CANCEL;
 import static android.app.Notification.FLAG_BUBBLE;
 import static android.app.Notification.FLAG_CAN_COLORIZE;
 import static android.app.Notification.FLAG_FOREGROUND_SERVICE;
 import static android.app.Notification.FLAG_NO_CLEAR;
 import static android.app.Notification.FLAG_ONGOING_EVENT;
+import static android.app.Notification.FLAG_ONLY_ALERT_ONCE;
 import static android.app.Notification.FLAG_USER_INITIATED_JOB;
 import static android.app.NotificationChannel.USER_LOCKED_ALLOW_BUBBLE;
 import static android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED;
@@ -87,6 +90,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.server.am.PendingIntentRecord.FLAG_ACTIVITY_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_BROADCAST_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_SERVICE_SENDER;
+import static com.android.server.notification.NotificationManagerService.BITMAP_EXPIRATION_TIME_MS;
 import static com.android.server.notification.NotificationManagerService.DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_ADJUSTED;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_POSTED;
@@ -178,6 +182,7 @@ import android.content.pm.ShortcutServiceInternal;
 import android.content.pm.UserInfo;
 import android.content.pm.VersionedPackage;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.media.AudioManager;
@@ -230,6 +235,7 @@ import android.widget.RemoteViews;
 
 import androidx.test.InstrumentationRegistry;
 
+import com.android.internal.R;
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
 import com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.Flag;
 import com.android.internal.config.sysui.TestableFlagResolver;
@@ -11279,6 +11285,144 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         assertThat(mService.checkDisqualifyingFeatures(r.getUserId(), r.getUid(),
                 r.getSbn().getId(), r.getSbn().getTag(), r, false, false)).isTrue();
+    }
+
+    private NotificationRecord createBigPictureRecord(boolean isBigPictureStyle, boolean hasImage,
+                                                      boolean isImageBitmap, boolean isExpired) {
+        Notification.Builder builder = new Notification.Builder(mContext);
+        Notification.BigPictureStyle style = new Notification.BigPictureStyle();
+
+        if (isBigPictureStyle && hasImage) {
+            if (isImageBitmap) {
+                style = style.bigPicture(Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888));
+            } else {
+                style = style.bigPicture(Icon.createWithResource(mContext, R.drawable.btn_plus));
+            }
+        }
+        if (isBigPictureStyle) {
+            builder.setStyle(style);
+        }
+
+        Notification notification = builder.setChannelId(TEST_CHANNEL_ID).build();
+
+        long timePostedMs = System.currentTimeMillis();
+        if (isExpired) {
+            timePostedMs -= BITMAP_EXPIRATION_TIME_MS;
+        }
+        StatusBarNotification sbn = new StatusBarNotification(PKG, PKG, 8, "tag", mUid, 0,
+                notification, UserHandle.getUserHandleForUid(mUid), null, timePostedMs);
+
+        return new NotificationRecord(mContext, sbn, mTestNotificationChannel);
+    }
+
+    private void addRecordAndRemoveBitmaps(NotificationRecord record) {
+        mService.addNotification(record);
+        mInternalService.removeBitmaps();
+        waitForIdle();
+    }
+
+    @Test
+    public void testRemoveBitmaps_notBigPicture_noRepost() {
+        addRecordAndRemoveBitmaps(
+                createBigPictureRecord(
+                        /* isBigPictureStyle= */ false,
+                        /* hasImage= */ false,
+                        /* isImageBitmap= */ false,
+                        /* isExpired= */ false));
+        verify(mWorkerHandler, never())
+                .post(any(NotificationManagerService.EnqueueNotificationRunnable.class));
+    }
+
+    @Test
+    public void testRemoveBitmaps_bigPictureNoImage_noRepost() {
+        addRecordAndRemoveBitmaps(
+                createBigPictureRecord(
+                        /* isBigPictureStyle= */ true,
+                        /* hasImage= */ false,
+                        /* isImageBitmap= */ false,
+                        /* isExpired= */ false));
+        verify(mWorkerHandler, never())
+                .post(any(NotificationManagerService.EnqueueNotificationRunnable.class));
+    }
+
+    @Test
+    public void testRemoveBitmaps_notExpired_noRepost() {
+        addRecordAndRemoveBitmaps(
+                createBigPictureRecord(
+                        /* isBigPictureStyle= */ true,
+                        /* hasImage= */ true,
+                        /* isImageBitmap= */ true,
+                        /* isExpired= */ false));
+        verify(mWorkerHandler, never())
+                .post(any(NotificationManagerService.EnqueueNotificationRunnable.class));
+    }
+
+    @Test
+    public void testRemoveBitmaps_bitmapExpired_repost() {
+        addRecordAndRemoveBitmaps(
+                createBigPictureRecord(
+                        /* isBigPictureStyle= */ true,
+                        /* hasImage= */ true,
+                        /* isImageBitmap= */ true,
+                        /* isExpired= */ true));
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.EnqueueNotificationRunnable.class));
+    }
+
+    @Test
+    public void testRemoveBitmaps_bitmapExpired_bitmapGone() {
+        NotificationRecord record = createBigPictureRecord(
+                /* isBigPictureStyle= */ true,
+                /* hasImage= */ true,
+                /* isImageBitmap= */ true,
+                /* isExpired= */ true);
+        addRecordAndRemoveBitmaps(record);
+        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE)).isFalse();
+    }
+
+    @Test
+    public void testRemoveBitmaps_bitmapExpired_silent() {
+        NotificationRecord record = createBigPictureRecord(
+                /* isBigPictureStyle= */ true,
+                /* hasImage= */ true,
+                /* isImageBitmap= */ true,
+                /* isExpired= */ true);
+        addRecordAndRemoveBitmaps(record);
+        assertThat(record.getNotification().flags & FLAG_ONLY_ALERT_ONCE).isNotEqualTo(0);
+    }
+
+    @Test
+    public void testRemoveBitmaps_iconExpired_repost() {
+        addRecordAndRemoveBitmaps(
+                createBigPictureRecord(
+                        /* isBigPictureStyle= */ true,
+                        /* hasImage= */ true,
+                        /* isImageBitmap= */ false,
+                        /* isExpired= */ true));
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.EnqueueNotificationRunnable.class));
+    }
+
+    @Test
+    public void testRemoveBitmaps_iconExpired_iconGone() {
+        NotificationRecord record = createBigPictureRecord(
+                /* isBigPictureStyle= */ true,
+                /* hasImage= */ true,
+                /* isImageBitmap= */ false,
+                /* isExpired= */ true);
+        addRecordAndRemoveBitmaps(record);
+        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE_ICON)).isFalse();
+    }
+
+    @Test
+    public void testRemoveBitmaps_iconExpired_silent() {
+        NotificationRecord record = createBigPictureRecord(
+                /* isBigPictureStyle= */ true,
+                /* hasImage= */ true,
+                /* isImageBitmap= */ false,
+                /* isExpired= */ true);
+        addRecordAndRemoveBitmaps(record);
+        assertThat(record.getNotification().flags & FLAG_ONLY_ALERT_ONCE).isNotEqualTo(0);
     }
 
     @Test

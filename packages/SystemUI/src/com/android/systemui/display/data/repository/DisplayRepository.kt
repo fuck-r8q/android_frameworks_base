@@ -29,6 +29,7 @@ import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCall
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.display.data.DisplayEvent
 import com.android.systemui.util.Compile
 import com.android.systemui.util.traceSection
 import javax.inject.Inject
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -48,7 +50,13 @@ import kotlinx.coroutines.flow.stateIn
 
 /** Provides a [Flow] of [Display] as returned by [DisplayManager]. */
 interface DisplayRepository {
-    /** Provides a nullable set of displays. */
+    /** Display change event indicating a change to the given displayId has occurred. */
+    val displayChangeEvent: Flow<Int>
+
+    /**
+     * Provides a nullable set of displays. Updates when new displays have been added or removed but
+     * not when a display's info has changed.
+     */
     val displays: Flow<Set<Display>>
 
     /**
@@ -86,33 +94,36 @@ constructor(
     @Application applicationScope: CoroutineScope,
     @Background backgroundCoroutineDispatcher: CoroutineDispatcher
 ) : DisplayRepository {
-
     // Displays are enabled only after receiving them in [onDisplayAdded]
-    private val enabledDisplays: StateFlow<Set<Display>> =
-        conflatedCallbackFlow {
-                val callback =
-                    object : DisplayListener {
-                        override fun onDisplayAdded(displayId: Int) {
-                            trySend(getDisplays())
-                        }
+    private val allDisplayEvents: Flow<DisplayEvent> = conflatedCallbackFlow {
+        val callback =
+            object : DisplayListener {
+                override fun onDisplayAdded(displayId: Int) {
+                    trySend(DisplayEvent.Added(displayId))
+                }
 
-                        override fun onDisplayRemoved(displayId: Int) {
-                            trySend(getDisplays())
-                        }
+                override fun onDisplayRemoved(displayId: Int) {
+                    trySend(DisplayEvent.Removed(displayId))
+                }
 
-                        override fun onDisplayChanged(displayId: Int) {
-                            trySend(getDisplays())
-                        }
-                    }
-                displayManager.registerDisplayListener(
-                    callback,
-                    backgroundHandler,
-                    EVENT_FLAG_DISPLAY_ADDED or
-                        EVENT_FLAG_DISPLAY_CHANGED or
-                        EVENT_FLAG_DISPLAY_REMOVED,
-                )
-                awaitClose { displayManager.unregisterDisplayListener(callback) }
+                override fun onDisplayChanged(displayId: Int) {
+                    trySend(DisplayEvent.Changed(displayId))
+                }
             }
+        displayManager.registerDisplayListener(
+            callback,
+            backgroundHandler,
+            EVENT_FLAG_DISPLAY_ADDED or EVENT_FLAG_DISPLAY_CHANGED or EVENT_FLAG_DISPLAY_REMOVED,
+        )
+        awaitClose { displayManager.unregisterDisplayListener(callback) }
+    }
+
+    override val displayChangeEvent: Flow<Int> =
+        allDisplayEvents.filter { it is DisplayEvent.Changed }.map { it.displayId }
+
+    private val enabledDisplays =
+        allDisplayEvents
+            .map { getDisplays() }
             .flowOn(backgroundCoroutineDispatcher)
             .stateIn(
                 applicationScope,
@@ -143,7 +154,7 @@ constructor(
                         private val connectedIds = mutableSetOf<Int>()
                         override fun onDisplayConnected(id: Int) {
                             if (DEBUG) {
-                                Log.d(TAG, "$id connected")
+                                Log.d(TAG, "display with id=$id connected.")
                             }
                             connectedIds += id
                             ignoredDisplayIds.value -= id
@@ -153,7 +164,7 @@ constructor(
                         override fun onDisplayDisconnected(id: Int) {
                             connectedIds -= id
                             if (DEBUG) {
-                                Log.d(TAG, "$id disconnected. Connected ids: $connectedIds")
+                                Log.d(TAG, "display with id=$id disconnected.")
                             }
                             ignoredDisplayIds.value -= id
                             trySend(connectedIds.toSet())
@@ -175,24 +186,35 @@ constructor(
                 initialValue = emptySet()
             )
 
+    private val connectedExternalDisplayIds: Flow<Set<Int>> =
+        connectedDisplayIds
+            .map { connectedDisplayIds ->
+                connectedDisplayIds
+                    .filter { id -> displayManager.getDisplay(id)?.type == Display.TYPE_EXTERNAL }
+                    .toSet()
+            }
+            .flowOn(backgroundCoroutineDispatcher)
+            .debugLog("connectedExternalDisplayIds")
+
     /**
      * Pending displays are the ones connected, but not enabled and not ignored. A connected display
      * is ignored after the user makes the decision to use it or not. For now, the initial decision
      * from the user is final and not reversible.
      */
     private val pendingDisplayIds: Flow<Set<Int>> =
-        combine(enabledDisplayIds, connectedDisplayIds, ignoredDisplayIds) {
+        combine(enabledDisplayIds, connectedExternalDisplayIds, ignoredDisplayIds) {
                 enabledDisplaysIds,
-                connectedDisplayIds,
+                connectedExternalDisplayIds,
                 ignoredDisplayIds ->
                 if (DEBUG) {
                     Log.d(
                         TAG,
-                        "combining enabled: $enabledDisplaysIds, " +
-                            "connected: $connectedDisplayIds, ignored: $ignoredDisplayIds"
+                        "combining enabled=$enabledDisplaysIds, " +
+                            "connectedExternalDisplayIds=$connectedExternalDisplayIds, " +
+                            "ignored=$ignoredDisplayIds"
                     )
                 }
-                connectedDisplayIds - enabledDisplaysIds - ignoredDisplayIds
+                connectedExternalDisplayIds - enabledDisplaysIds - ignoredDisplayIds
             }
             .debugLog("pendingDisplayIds")
 
@@ -204,6 +226,9 @@ constructor(
                     override val id = id
                     override suspend fun enable() {
                         traceSection("DisplayRepository#enable($id)") {
+                            if (DEBUG) {
+                                Log.d(TAG, "Enabling display with id=$id")
+                            }
                             displayManager.enableConnectedDisplay(id)
                         }
                         // After the display has been enabled, it is automatically ignored.
@@ -219,6 +244,9 @@ constructor(
                     override suspend fun disable() {
                         ignore()
                         traceSection("DisplayRepository#disable($id)") {
+                            if (DEBUG) {
+                                Log.d(TAG, "Disabling display with id=$id")
+                            }
                             displayManager.disableConnectedDisplay(id)
                         }
                     }

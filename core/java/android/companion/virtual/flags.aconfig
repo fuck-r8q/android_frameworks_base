@@ -13,3 +13,17 @@ flag {
   description: "Enable dynamic policy API"
   bug: "298401780"
 }
+
+flag {
+  name: "vdm_public_apis"
+  namespace: "virtual_devices"
+  description: "Enable public VDM API for device capabilities"
+  bug: "297253526"
+}
+
+flag {
+    name: "virtual_camera"
+    namespace: "virtual_devices"
+    description: "Enable Virtual Camera"
+    bug: "270352264"
+}

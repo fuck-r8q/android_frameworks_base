@@ -26,9 +26,8 @@ import com.android.systemui.classifier.FalsingClassifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.util.kotlin.pairwise
@@ -51,7 +50,7 @@ constructor(
     private val repository: BouncerRepository,
     private val authenticationInteractor: AuthenticationInteractor,
     private val sceneInteractor: SceneInteractor,
-    featureFlags: FeatureFlags,
+    flags: SceneContainerFlags,
     private val falsingInteractor: FalsingInteractor,
 ) {
 
@@ -93,8 +92,11 @@ constructor(
     /** Whether the pattern should be visible for the currently-selected user. */
     val isPatternVisible: StateFlow<Boolean> = authenticationInteractor.isPatternVisible
 
+    /** The minimal length of a pattern. */
+    val minPatternLength = authenticationInteractor.minPatternLength
+
     init {
-        if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+        if (flags.isEnabled()) {
             // Clear the message if moved from throttling to no-longer throttling.
             applicationScope.launch {
                 isThrottled.pairwise().collect { (wasThrottled, currentlyThrottled) ->
@@ -205,10 +207,22 @@ constructor(
                 loggingReason = "successful authentication",
             )
         } else {
-            repository.setMessage(errorMessage(authenticationInteractor.getAuthenticationMethod()))
+            showErrorMessage()
         }
 
         return isAuthenticated
+    }
+
+    /**
+     * Shows the error message.
+     *
+     * Callers should use this instead of [authenticate] when they know ahead of time that an auth
+     * attempt will fail but aren't interested in the other side effects like triggering throttling.
+     * For example, if the user entered a pattern that's too short, the system can show the error
+     * message without having the attempt trigger throttling.
+     */
+    suspend fun showErrorMessage() {
+        repository.setMessage(errorMessage(authenticationInteractor.getAuthenticationMethod()))
     }
 
     private fun promptMessage(authMethod: AuthenticationMethodModel): String {

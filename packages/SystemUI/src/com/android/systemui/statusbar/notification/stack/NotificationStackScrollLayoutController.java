@@ -128,6 +128,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController.Configurati
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.OnHeadsUpChangedListener;
+import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.Compile;
@@ -672,7 +673,8 @@ public class NotificationStackScrollLayoutController {
             NotificationTargetsHelper notificationTargetsHelper,
             SecureSettings secureSettings,
             NotificationDismissibilityProvider dismissibilityProvider,
-            ActivityStarter activityStarter) {
+            ActivityStarter activityStarter,
+            SplitShadeStateController splitShadeStateController) {
         mView = view;
         mKeyguardTransitionRepo = keyguardTransitionRepo;
         mStackStateLogger = stackLogger;
@@ -722,6 +724,7 @@ public class NotificationStackScrollLayoutController {
         mSecureSettings = secureSettings;
         mDismissibilityProvider = dismissibilityProvider;
         mActivityStarter = activityStarter;
+        mView.passSplitShadeStateController(splitShadeStateController);
         updateResources();
         setUpView();
     }
@@ -1200,10 +1203,6 @@ public class NotificationStackScrollLayoutController {
         mView.setHeadsUpBoundaries(height, bottomBarHeight);
     }
 
-    public void setUnlockHintRunning(boolean running) {
-        mView.setUnlockHintRunning(running);
-    }
-
     public void setPanelFlinging(boolean flinging) {
         mView.setPanelFlinging(flinging);
     }
@@ -1659,8 +1658,9 @@ public class NotificationStackScrollLayoutController {
 
     @VisibleForTesting
     void onKeyguardTransitionChanged(TransitionStep transitionStep) {
-        boolean isTransitionToAod = transitionStep.getFrom().equals(KeyguardState.GONE)
-                && transitionStep.getTo().equals(KeyguardState.AOD);
+        boolean isTransitionToAod = transitionStep.getTo().equals(KeyguardState.AOD)
+                && (transitionStep.getFrom().equals(KeyguardState.GONE)
+                || transitionStep.getFrom().equals(KeyguardState.OCCLUDED));
         if (mIsInTransitionToAod != isTransitionToAod) {
             mIsInTransitionToAod = isTransitionToAod;
             updateShowEmptyShadeView();

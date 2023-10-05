@@ -36,7 +36,6 @@ import static android.os.storage.StorageManager.FLAG_STORAGE_CE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_DE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_EXTERNAL;
 import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
-
 import static com.android.internal.annotations.VisibleForTesting.Visibility;
 import static com.android.internal.util.FrameworkStatsLog.BOOT_TIME_EVENT_DURATION__EVENT__OTA_PACKAGE_MANAGER_INIT_TIME;
 import static com.android.server.pm.DexOptHelper.useArtService;
@@ -85,6 +84,7 @@ import android.content.pm.ComponentInfo;
 import android.content.pm.DataLoaderType;
 import android.content.pm.FallbackCategoryProvider;
 import android.content.pm.FeatureInfo;
+import android.content.pm.Flags;
 import android.content.pm.IDexModuleRegisterCallback;
 import android.content.pm.IOnChecksumsReadyListener;
 import android.content.pm.IPackageDataObserver;
@@ -801,9 +801,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     final SparseArray<VerifyingSession> mPendingEnableRollback = new SparseArray<>();
 
     final PackageInstallerService mInstallerService;
-
-    final PackageArchiverService mArchiverService;
-
     final ArtManagerService mArtManagerService;
 
     // TODO(b/260124949): Remove these.
@@ -1633,8 +1630,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 (i, pm) -> new CrossProfileIntentFilterHelper(i.getSettings(),
                         i.getUserManagerService(), i.getLock(), i.getUserManagerInternal(),
                         context),
-                (i, pm) -> new UpdateOwnershipHelper(),
-                (i, pm) -> new PackageArchiverService(i.getContext(), pm));
+                (i, pm) -> new UpdateOwnershipHelper());
 
         if (Build.VERSION.SDK_INT <= 0) {
             Slog.w(TAG, "**** ro.build.version.sdk not set!");
@@ -1779,7 +1775,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mFactoryTest = testParams.factoryTest;
         mIncrementalManager = testParams.incrementalManager;
         mInstallerService = testParams.installerService;
-        mArchiverService = testParams.archiverService;
         mInstantAppRegistry = testParams.instantAppRegistry;
         mChangedPackagesTracker = testParams.changedPackagesTracker;
         mInstantAppResolverConnection = testParams.instantAppResolverConnection;
@@ -2361,7 +2356,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             });
 
             mInstallerService = mInjector.getPackageInstallerService();
-            mArchiverService = mInjector.getPackageArchiverService();
             final ComponentName instantAppResolverComponent = getInstantAppResolver(computer);
             if (instantAppResolverComponent != null) {
                 if (DEBUG_INSTANT) {
@@ -3069,7 +3063,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void sendPackageAddedForUser(@NonNull Computer snapshot, String packageName,
-            @NonNull PackageStateInternal packageState, int userId, int dataLoaderType) {
+            @NonNull PackageStateInternal packageState, int userId, boolean isArchived,
+            int dataLoaderType) {
         final PackageUserStateInternal userState = packageState.getUserStateOrDefault(userId);
         final boolean isSystem = packageState.isSystem();
         final boolean isInstantApp = userState.isInstantApp();
@@ -3077,7 +3072,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         final int[] instantUserIds = isInstantApp ? new int[] { userId } : EMPTY_INT_ARRAY;
         sendPackageAddedForNewUsers(snapshot, packageName, isSystem /*sendBootCompleted*/,
                 false /*startReceiver*/, packageState.getAppId(), userIds, instantUserIds,
-                dataLoaderType);
+                isArchived, dataLoaderType);
 
         // Send a session commit broadcast
         final PackageInstaller.SessionInfo info = new PackageInstaller.SessionInfo();
@@ -3089,17 +3084,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     @Override
     public void sendPackageAddedForNewUsers(@NonNull Computer snapshot, String packageName,
             boolean sendBootCompleted, boolean includeStopped, @AppIdInt int appId, int[] userIds,
-            int[] instantUserIds, int dataLoaderType) {
+            int[] instantUserIds, boolean isArchived, int dataLoaderType) {
         if (ArrayUtils.isEmpty(userIds) && ArrayUtils.isEmpty(instantUserIds)) {
             return;
         }
         SparseArray<int[]> broadcastAllowList = mAppsFilter.getVisibilityAllowList(snapshot,
                 snapshot.getPackageStateInternal(packageName, Process.SYSTEM_UID),
                 userIds, snapshot.getPackageStates());
-        mHandler.post(() -> mBroadcastHelper.sendPackageAddedForNewUsers(
-                packageName, appId, userIds, instantUserIds, dataLoaderType, broadcastAllowList));
+        mHandler.post(
+                () -> mBroadcastHelper.sendPackageAddedForNewUsers(packageName, appId, userIds,
+                        instantUserIds, isArchived, dataLoaderType, broadcastAllowList));
         mPackageMonitorCallbackHelper.notifyPackageAddedForNewUsers(packageName, appId, userIds,
-                instantUserIds, dataLoaderType, broadcastAllowList);
+                instantUserIds, isArchived, dataLoaderType, broadcastAllowList);
         if (sendBootCompleted && !ArrayUtils.isEmpty(userIds)) {
             mHandler.post(() -> {
                         for (int userId : userIds) {
@@ -3120,7 +3116,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         info.mBroadcastUsers = new int[] {userId};
         info.mUid = UserHandle.getUid(userId, packageState.getAppId());
         info.mRemovedPackageVersionCode = packageState.getVersionCode();
-        info.sendPackageRemovedBroadcasts(true /*killApp*/, false /*removedBySystem*/);
+        info.sendPackageRemovedBroadcasts(true /*killApp*/, false /*removedBySystem*/,
+                false /*isArchived*/);
     }
 
     boolean isUserRestricted(int userId, String restrictionKey) {
@@ -4644,7 +4641,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     mDomainVerificationConnection, mInstallerService, mPackageProperty,
                     mResolveComponentName, mInstantAppResolverSettingsComponent,
                     mRequiredSdkSandboxPackage, mServicesExtensionPackageName,
-                    mSharedSystemSharedLibraryPackageName, mArchiverService);
+                    mSharedSystemSharedLibraryPackageName);
         }
 
         @Override
@@ -5798,7 +5795,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     sendApplicationHiddenForUser(packageName, newPackageState, userId);
                 } else {
                     sendPackageAddedForUser(newSnapshot, packageName, newPackageState, userId,
-                            DataLoaderType.NONE);
+                            false /* isArchived */, DataLoaderType.NONE);
                 }
 
                 scheduleWritePackageRestrictions(userId);
@@ -5949,15 +5946,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     }
                 }
 
-                Signature[] callerSignature;
+                SigningDetails callerSigningDetails;
                 final int appId = UserHandle.getAppId(callingUid);
                 Pair<PackageStateInternal, SharedUserApi> either =
                         snapshot.getPackageOrSharedUser(appId);
                 if (either != null) {
                     if (either.first != null) {
-                        callerSignature = either.first.getSigningDetails().getSignatures();
+                        callerSigningDetails = either.first.getSigningDetails();
                     } else {
-                        callerSignature = either.second.getSigningDetails().getSignatures();
+                        callerSigningDetails = either.second.getSigningDetails();
                     }
                 } else {
                     throw new SecurityException("Unknown calling UID: " + callingUid);
@@ -5966,8 +5963,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 // Verify: can't set installerPackageName to a package that is
                 // not signed with the same cert as the caller.
                 if (installerPackageState != null) {
-                    if (compareSignatures(callerSignature,
-                            installerPackageState.getSigningDetails().getSignatures())
+                    if (compareSignatures(callerSigningDetails,
+                            installerPackageState.getSigningDetails())
                             != PackageManager.SIGNATURE_MATCH) {
                         throw new SecurityException(
                                 "Caller does not have same cert as new installer package "
@@ -5983,8 +5980,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         ? null : snapshot.getPackageStateInternal(targetInstallerPackageName);
 
                 if (targetInstallerPkgSetting != null) {
-                    if (compareSignatures(callerSignature,
-                            targetInstallerPkgSetting.getSigningDetails().getSignatures())
+                    if (compareSignatures(callerSigningDetails,
+                            targetInstallerPkgSetting.getSigningDetails())
                             != PackageManager.SIGNATURE_MATCH) {
                         throw new SecurityException(
                                 "Caller does not have same cert as old installer package "
@@ -6348,14 +6345,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             archPkg.targetSdkVersion = apk.getTargetSdkVersion();
 
             // These get translated in flags important for user data management.
-            archPkg.clearUserDataAllowed = apk.isClearUserDataAllowed();
-            archPkg.backupAllowed = apk.isBackupAllowed();
-            archPkg.defaultToDeviceProtectedStorage =
-                    apk.isDefaultToDeviceProtectedStorage();
-            archPkg.requestLegacyExternalStorage = apk.isRequestLegacyExternalStorage();
-            archPkg.userDataFragile = apk.isUserDataFragile();
-            archPkg.clearUserDataOnFailedRestoreAllowed =
-                    apk.isClearUserDataOnFailedRestoreAllowed();
+            archPkg.backupAllowed = String.valueOf(apk.isBackupAllowed());
+            archPkg.defaultToDeviceProtectedStorage = String.valueOf(
+                    apk.isDefaultToDeviceProtectedStorage());
+            archPkg.requestLegacyExternalStorage = String.valueOf(
+                    apk.isRequestLegacyExternalStorage());
+            archPkg.userDataFragile = String.valueOf(apk.isUserDataFragile());
+            archPkg.clearUserDataOnFailedRestoreAllowed = String.valueOf(
+                    apk.isClearUserDataOnFailedRestoreAllowed());
 
             return archPkg;
         }

@@ -19,7 +19,10 @@ package com.android.server.companion.virtual;
 import static android.app.admin.DevicePolicyManager.NEARBY_STREAMING_ENABLED;
 import static android.app.admin.DevicePolicyManager.NEARBY_STREAMING_NOT_CONTROLLED_BY_POLICY;
 import static android.app.admin.DevicePolicyManager.NEARBY_STREAMING_SAME_MANAGED_ACCOUNT_ONLY;
+import static android.companion.virtual.VirtualDeviceParams.ACTIVITY_POLICY_DEFAULT_ALLOWED;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
+import static android.companion.virtual.VirtualDeviceParams.NAVIGATION_POLICY_DEFAULT_ALLOWED;
+import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
 import static android.view.WindowManager.LayoutParams.FLAG_SECURE;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
@@ -39,6 +42,7 @@ import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.IVirtualDeviceActivityListener;
 import android.companion.virtual.IVirtualDeviceIntentInterceptor;
 import android.companion.virtual.IVirtualDeviceSoundEffectListener;
+import android.companion.virtual.VirtualDevice;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.ActivityListener;
 import android.companion.virtual.VirtualDeviceParams;
@@ -89,7 +93,6 @@ import android.util.SparseIntArray;
 import android.view.Display;
 import android.view.WindowManager;
 import android.widget.Toast;
-
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -168,11 +171,18 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     @Nullable
     private LocaleList mLocaleList = null;
 
+    @NonNull
+    private final VirtualDevice mPublicVirtualDeviceObject;
+
+    @GuardedBy("mVirtualDeviceLock")
+    @NonNull
+    private final Set<ComponentName> mActivityPolicyExemptions;
+
     private ActivityListener createListenerAdapter() {
         return new ActivityListener() {
 
             @Override
-            public void onTopActivityChanged(int displayId, ComponentName topActivity) {
+            public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity) {
                 try {
                     mActivityListener.onTopActivityChanged(displayId, topActivity,
                             UserHandle.USER_NULL);
@@ -182,7 +192,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             }
 
             @Override
-            public void onTopActivityChanged(int displayId, ComponentName topActivity,
+            public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity,
                     @UserIdInt int userId) {
                 try {
                     mActivityListener.onTopActivityChanged(displayId, topActivity, userId);
@@ -286,6 +296,21 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             throw e.rethrowFromSystemServer();
         }
         mVirtualDeviceLog.logCreated(deviceId, mOwnerUid);
+
+        mPublicVirtualDeviceObject = new VirtualDevice(
+                this, getDeviceId(), getPersistentDeviceId(), mParams.getName());
+
+        if (Flags.dynamicPolicy()) {
+            mActivityPolicyExemptions = new ArraySet<>(
+                    mParams.getDevicePolicy(POLICY_TYPE_ACTIVITY) == DEVICE_POLICY_DEFAULT
+                            ? mParams.getBlockedActivities()
+                            : mParams.getAllowedActivities());
+        } else {
+            mActivityPolicyExemptions =
+                    mParams.getDefaultActivityPolicy() == ACTIVITY_POLICY_DEFAULT_ALLOWED
+                            ? mParams.getBlockedActivities()
+                            : mParams.getAllowedActivities();
+        }
     }
 
     @VisibleForTesting
@@ -315,9 +340,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         return mAssociationInfo.getDisplayName();
     }
 
-    /** Returns the optional name of the device. */
-    String getDeviceName() {
-        return mParams.getName();
+    /** Returns the public representation of the device. */
+    VirtualDevice getPublicVirtualDeviceObject() {
+        return mPublicVirtualDeviceObject;
     }
 
     /** Returns the locale of the device. */
@@ -327,7 +352,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         }
     }
 
-    /** Returns the policy specified for this policy type */
+    @Override  // Binder call
     public @VirtualDeviceParams.DevicePolicy int getDevicePolicy(
             @VirtualDeviceParams.PolicyType int policyType) {
         if (Flags.dynamicPolicy()) {
@@ -401,6 +426,34 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 resultReceiver.send(
                         VirtualDeviceManager.LAUNCH_FAILURE_PENDING_INTENT_CANCELED, null);
                 mPendingTrampolineCallback.stopWaitingForPendingTrampoline(pendingTrampoline);
+            }
+        }
+    }
+
+    @Override // Binder call
+    @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+    public void addActivityPolicyExemption(@NonNull ComponentName componentName) {
+        super.addActivityPolicyExemption_enforcePermission();
+        synchronized (mVirtualDeviceLock) {
+            if (mActivityPolicyExemptions.add(componentName)) {
+                for (int i = 0; i < mVirtualDisplays.size(); i++) {
+                    mVirtualDisplays.valueAt(i).getWindowPolicyController()
+                            .addActivityPolicyExemption(componentName);
+                }
+            }
+        }
+    }
+
+    @Override // Binder call
+    @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+    public void removeActivityPolicyExemption(@NonNull ComponentName componentName) {
+        super.removeActivityPolicyExemption_enforcePermission();
+        synchronized (mVirtualDeviceLock) {
+            if (mActivityPolicyExemptions.remove(componentName)) {
+                for (int i = 0; i < mVirtualDisplays.size(); i++) {
+                    mVirtualDisplays.valueAt(i).getWindowPolicyController()
+                            .removeActivityPolicyExemption(componentName);
+                }
             }
         }
     }
@@ -531,6 +584,16 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                     for (int i = 0; i < mVirtualDisplays.size(); i++) {
                         mVirtualDisplays.valueAt(i).getWindowPolicyController()
                                 .setShowInHostDeviceRecents(devicePolicy == DEVICE_POLICY_DEFAULT);
+                    }
+                }
+                break;
+            case POLICY_TYPE_ACTIVITY:
+                synchronized (mVirtualDeviceLock) {
+                    mDevicePolicies.put(policyType, devicePolicy);
+                    for (int i = 0; i < mVirtualDisplays.size(); i++) {
+                        mVirtualDisplays.valueAt(i).getWindowPolicyController()
+                                .setActivityLaunchDefaultAllowed(
+                                        devicePolicy == DEVICE_POLICY_DEFAULT);
                     }
                 }
                 break;
@@ -754,8 +817,10 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             synchronized (mVirtualDeviceLock) {
                 mDefaultShowPointerIcon = showPointerIcon;
             }
-            getDisplayIds().forEach(
-                    displayId -> mInputController.setShowPointerIcon(showPointerIcon, displayId));
+            final int[] displayIds = getDisplayIds();
+            for (int i = 0; i < displayIds.length; ++i) {
+                mInputController.setShowPointerIcon(showPointerIcon, displayIds[i]);
+            }
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -829,32 +894,45 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         mSensorController.dump(fout);
     }
 
-    private GenericWindowPolicyController createWindowPolicyController(
+    @GuardedBy("mVirtualDeviceLock")
+    private GenericWindowPolicyController createWindowPolicyControllerLocked(
             @NonNull Set<String> displayCategories) {
-        final GenericWindowPolicyController gwpc =
-                new GenericWindowPolicyController(FLAG_SECURE,
-                        SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
-                        getAllowedUserHandles(),
-                        mParams.getAllowedCrossTaskNavigations(),
-                        mParams.getBlockedCrossTaskNavigations(),
-                        mParams.getAllowedActivities(),
-                        mParams.getBlockedActivities(),
-                        mParams.getDefaultActivityPolicy(),
-                        createListenerAdapter(),
-                        this::onEnteringPipBlocked,
-                        this::onActivityBlocked,
-                        this::onSecureWindowShown,
-                        this::shouldInterceptIntent,
-                        displayCategories,
-                        mParams.getDevicePolicy(POLICY_TYPE_RECENTS) == DEVICE_POLICY_DEFAULT);
+        final boolean activityLaunchAllowedByDefault =
+                Flags.dynamicPolicy()
+                        ? getDevicePolicy(POLICY_TYPE_ACTIVITY) == DEVICE_POLICY_DEFAULT
+                        : mParams.getDefaultActivityPolicy() == ACTIVITY_POLICY_DEFAULT_ALLOWED;
+        final boolean crossTaskNavigationAllowedByDefault =
+                mParams.getDefaultNavigationPolicy() == NAVIGATION_POLICY_DEFAULT_ALLOWED;
+        final boolean showTasksInHostDeviceRecents =
+                getDevicePolicy(POLICY_TYPE_RECENTS) == DEVICE_POLICY_DEFAULT;
+
+        final GenericWindowPolicyController gwpc = new GenericWindowPolicyController(
+                FLAG_SECURE,
+                SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS,
+                getAllowedUserHandles(),
+                activityLaunchAllowedByDefault,
+                mActivityPolicyExemptions,
+                crossTaskNavigationAllowedByDefault,
+                /*crossTaskNavigationExemptions=*/crossTaskNavigationAllowedByDefault
+                        ? mParams.getBlockedCrossTaskNavigations()
+                        : mParams.getAllowedCrossTaskNavigations(),
+                createListenerAdapter(),
+                this::onEnteringPipBlocked,
+                this::onActivityBlocked,
+                this::onSecureWindowShown,
+                this::shouldInterceptIntent,
+                displayCategories,
+                showTasksInHostDeviceRecents);
         gwpc.registerRunningAppsChangedListener(/* listener= */ this);
         return gwpc;
     }
 
     int createVirtualDisplay(@NonNull VirtualDisplayConfig virtualDisplayConfig,
             @NonNull IVirtualDisplayCallback callback, String packageName) {
-        GenericWindowPolicyController gwpc = createWindowPolicyController(
-                virtualDisplayConfig.getDisplayCategories());
+        GenericWindowPolicyController gwpc;
+        synchronized (mVirtualDeviceLock) {
+            gwpc = createWindowPolicyControllerLocked(virtualDisplayConfig.getDisplayCategories());
+        }
         DisplayManagerInternal displayManager = LocalServices.getService(
                 DisplayManagerInternal.class);
         int displayId;
@@ -1018,14 +1096,15 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         return mOwnerUid;
     }
 
-    ArraySet<Integer> getDisplayIds() {
+    @Override  // Binder call
+    public int[] getDisplayIds() {
         synchronized (mVirtualDeviceLock) {
             final int size = mVirtualDisplays.size();
-            ArraySet<Integer> arraySet = new ArraySet<>(size);
+            int[] displayIds = new int[size];
             for (int i = 0; i < size; i++) {
-                arraySet.append(mVirtualDisplays.keyAt(i));
+                displayIds[i] = mVirtualDisplays.keyAt(i);
             }
-            return arraySet;
+            return displayIds;
         }
     }
 

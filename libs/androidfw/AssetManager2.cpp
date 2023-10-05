@@ -91,6 +91,12 @@ struct FindEntryResult {
   StringPoolRef entry_string_ref;
 };
 
+struct Theme::Entry {
+  ApkAssetsCookie cookie;
+  uint32_t type_spec_flags;
+  Res_value value;
+};
+
 AssetManager2::AssetManager2(ApkAssetsList apk_assets, const ResTable_config& configuration) {
   configurations_.push_back(configuration);
 
@@ -1020,7 +1026,7 @@ std::string AssetManager2::GetLastResourceResolution() const {
 
   log_stream << "\nBest matching is from "
              << (last_resolution_.best_config_name.empty() ? "default"
-                                                   : last_resolution_.best_config_name)
+                    : last_resolution_.best_config_name.c_str())
              << " configuration of " << last_resolution_.best_package_name;
   return log_stream.str();
 }
@@ -1600,12 +1606,6 @@ Theme::Theme(AssetManager2* asset_manager) : asset_manager_(asset_manager) {
 }
 
 Theme::~Theme() = default;
-
-struct Theme::Entry {
-  ApkAssetsCookie cookie;
-  uint32_t type_spec_flags;
-  Res_value value;
-};
 
 base::expected<std::monostate, NullOrIOError> Theme::ApplyStyle(uint32_t resid, bool force) {
   ATRACE_NAME("Theme::ApplyStyle");

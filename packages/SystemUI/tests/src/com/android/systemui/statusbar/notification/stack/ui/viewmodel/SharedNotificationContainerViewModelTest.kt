@@ -33,6 +33,8 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.shared.model.TransitionStep
+import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.shared.flag.FakeSceneContainerFlags
 import com.android.systemui.shade.data.repository.FakeShadeRepository
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository
@@ -41,13 +43,12 @@ import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCa
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeUserSetupRepository
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
 import com.android.systemui.user.domain.interactor.UserInteractor
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -59,12 +60,16 @@ import org.mockito.MockitoAnnotations
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class SharedNotificationContainerViewModelTest : SysuiTestCase() {
-    private val testScope = TestScope(StandardTestDispatcher())
+    private val utils = SceneTestUtils(this)
+
+    private val testScope = utils.testScope
 
     private val disableFlagsRepository = FakeDisableFlagsRepository()
     private val userSetupRepository = FakeUserSetupRepository()
     private val shadeRepository = FakeShadeRepository()
     private val keyguardRepository = FakeKeyguardRepository()
+    private val sceneContainerFlags = FakeSceneContainerFlags()
+    private val sceneInteractor = utils.sceneInteractor()
 
     private lateinit var configurationRepository: FakeConfigurationRepository
     private lateinit var sharedNotificationContainerInteractor:
@@ -102,11 +107,14 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             SharedNotificationContainerInteractor(
                 configurationRepository,
                 mContext,
+                ResourcesSplitShadeStateController()
             )
         shadeInteractor =
             ShadeInteractor(
                 testScope.backgroundScope,
                 disableFlagsRepository,
+                sceneContainerFlags,
+                { sceneInteractor },
                 keyguardRepository,
                 userSetupRepository,
                 deviceProvisionedController,
@@ -216,6 +224,14 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             keyguardTransitionRepository.sendTransitionStep(
                 TransitionStep(
                     to = KeyguardState.LOCKSCREEN,
+                    transitionState = TransitionState.FINISHED
+                )
+            )
+            assertThat(isOnLockscreen).isTrue()
+
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    to = KeyguardState.PRIMARY_BOUNCER,
                     transitionState = TransitionState.FINISHED
                 )
             )

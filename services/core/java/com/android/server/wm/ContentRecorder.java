@@ -36,6 +36,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.provider.DeviceConfig;
 import android.view.ContentRecordingSession;
+import android.view.ContentRecordingSession.RecordContent;
 import android.view.Display;
 import android.view.SurfaceControl;
 
@@ -85,6 +86,7 @@ final class ContentRecorder implements WindowContainerListener {
     /**
      * The last configuration orientation.
      */
+    @Configuration.Orientation
     private int mLastOrientation = ORIENTATION_UNDEFINED;
 
     /**
@@ -155,6 +157,20 @@ final class ContentRecorder implements WindowContainerListener {
                 return;
             }
 
+            // TODO(b/297514518) Do not start capture if the app is in PIP, the bounds are
+            //  inaccurate.
+            if (mContentRecordingSession.getContentToRecord() == RECORD_CONTENT_TASK) {
+                final Task capturedTask = mRecordedWindowContainer.asTask();
+                if (capturedTask.inPinnedWindowingMode()) {
+                    ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
+                            "Content Recording: Display %d was already recording, but "
+                                    + "pause capture since the task is in PIP",
+                            mDisplayContent.getDisplayId());
+                    pauseRecording();
+                    return;
+                }
+            }
+
             ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
                     "Content Recording: Display %d was already recording, so apply "
                             + "transformations if necessary",
@@ -162,7 +178,8 @@ final class ContentRecorder implements WindowContainerListener {
             // Retrieve the size of the region to record, and continue with the update
             // if the bounds or orientation has changed.
             final Rect recordedContentBounds = mRecordedWindowContainer.getBounds();
-            int recordedContentOrientation = mRecordedWindowContainer.getOrientation();
+            @Configuration.Orientation int recordedContentOrientation =
+                    mRecordedWindowContainer.getConfiguration().orientation;
             if (!mLastRecordedBounds.equals(recordedContentBounds)
                     || lastOrientation != recordedContentOrientation) {
                 Point surfaceSize = fetchSurfaceSizeIfPresent();
@@ -295,6 +312,17 @@ final class ContentRecorder implements WindowContainerListener {
             return;
         }
 
+        // TODO(b/297514518) Do not start capture if the app is in PIP, the bounds are inaccurate.
+        if (mContentRecordingSession.getContentToRecord() == RECORD_CONTENT_TASK) {
+            if (mRecordedWindowContainer.asTask().inPinnedWindowingMode()) {
+                ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
+                        "Content Recording: Display %d should start recording, but "
+                                + "don't yet since the task is in PIP",
+                        mDisplayContent.getDisplayId());
+                return;
+            }
+        }
+
         final Point surfaceSize = fetchSurfaceSizeIfPresent();
         if (surfaceSize == null) {
             ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
@@ -307,9 +335,6 @@ final class ContentRecorder implements WindowContainerListener {
                 "Content Recording: Display %d has no content and is on, so start recording for "
                         + "state %d",
                 mDisplayContent.getDisplayId(), mDisplayContent.getDisplayInfo().state);
-
-        // TODO(b/274790702): Do not start recording if waiting for consent - for now,
-        //  go ahead.
 
         // Create a mirrored hierarchy for the SurfaceControl of the DisplayArea to capture.
         mRecordedSurface = SurfaceControl.mirrorSurface(
@@ -362,7 +387,7 @@ final class ContentRecorder implements WindowContainerListener {
      */
     @Nullable
     private WindowContainer retrieveRecordedWindowContainer() {
-        final int contentToRecord = mContentRecordingSession.getContentToRecord();
+        @RecordContent final int contentToRecord = mContentRecordingSession.getContentToRecord();
         final IBinder tokenToRecord = mContentRecordingSession.getTokenToRecord();
         switch (contentToRecord) {
             case RECORD_CONTENT_DISPLAY:
@@ -477,6 +502,12 @@ final class ContentRecorder implements WindowContainerListener {
         if (scaledHeight != surfaceSize.y) {
             shiftedY = (surfaceSize.y - scaledHeight) / 2;
         }
+
+        ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
+                "Content Recording: Apply transformations of shift %d x %d, scale %f, crop %d x "
+                        + "%d for display %d",
+                shiftedX, shiftedY, scale, recordedContentBounds.width(),
+                recordedContentBounds.height(), mDisplayContent.getDisplayId());
 
         transaction
                 // Crop the area to capture to exclude the 'extra' wallpaper that is used

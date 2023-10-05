@@ -334,9 +334,9 @@ moveon:
             String16 spanTag;
             ssize_t semi = span.name.findFirst(';');
             if (semi >= 0) {
-                spanTag.setTo(span.name.c_str(), semi);
+                spanTag = String16(span.name.c_str(), semi);
             } else {
-                spanTag.setTo(span.name);
+                spanTag = span.name;
             }
             if (strcmp16(inXml->getElementName(&len), spanTag.c_str()) != 0) {
                 SourcePos(String8(fileName), inXml->getLineNumber()).error(
@@ -393,7 +393,7 @@ moveon:
         // later as part of the overall type conversion.  Return to the
         // client the raw unprocessed text.
         rawString.append(curString);
-        outString->setTo(rawString);
+        *outString = rawString;
     }
 
     return NO_ERROR;
@@ -559,7 +559,7 @@ status_t parseXMLResource(const sp<AaptFile>& file, ResXMLTree* outTree,
     root->removeWhitespace(stripAll, cDataTags);
 
     if (kIsDebug) {
-        printf("Input XML from %s:\n", (const char*)file->getPrintableSource());
+        printf("Input XML from %s:\n", file->getPrintableSource().c_str());
         root->print();
     }
     sp<AaptFile> rsc = new AaptFile(String8(), AaptGroupEntry(), String8());

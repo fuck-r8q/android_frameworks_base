@@ -17,7 +17,6 @@
 package androidx.window.extensions.layout;
 
 import static android.view.Display.DEFAULT_DISPLAY;
-
 import static androidx.window.common.CommonFoldingFeature.COMMON_STATE_FLAT;
 import static androidx.window.common.CommonFoldingFeature.COMMON_STATE_HALF_OPENED;
 import static androidx.window.util.ExtensionHelper.isZero;

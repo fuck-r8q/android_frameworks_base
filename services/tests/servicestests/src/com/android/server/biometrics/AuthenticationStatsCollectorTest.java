@@ -104,6 +104,7 @@ public class AuthenticationStatsCollectorTest {
         when(mSharedPreferences.getStringSet(anyString(), anySet())).thenReturn(emptySet());
         when(mSharedPreferences.edit()).thenReturn(mEditor);
         when(mEditor.putFloat(anyString(), anyFloat())).thenReturn(mEditor);
+        when(mEditor.putStringSet(anyString(), anySet())).thenReturn(mEditor);
 
         mAuthenticationStatsCollector = new AuthenticationStatsCollector(mContext,
                 0 /* modality */, mBiometricNotification);
@@ -114,6 +115,11 @@ public class AuthenticationStatsCollectorTest {
     public void authenticate_authenticationSucceeded_mapShouldBeUpdated() {
         // Assert that the user doesn't exist in the map initially.
         assertThat(mAuthenticationStatsCollector.getAuthenticationStatsForUser(USER_ID_1)).isNull();
+
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFaceManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
 
         mAuthenticationStatsCollector.authenticate(USER_ID_1, true /* authenticated */);
 
@@ -129,6 +135,11 @@ public class AuthenticationStatsCollectorTest {
     public void authenticate_authenticationFailed_mapShouldBeUpdated() {
         // Assert that the user doesn't exist in the map initially.
         assertThat(mAuthenticationStatsCollector.getAuthenticationStatsForUser(USER_ID_1)).isNull();
+
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFingerprintManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
 
         mAuthenticationStatsCollector.authenticate(USER_ID_1, false /* authenticated */);
 
@@ -175,6 +186,11 @@ public class AuthenticationStatsCollectorTest {
                 new AuthenticationStats(USER_ID_1, 500 /* totalAttempts */,
                         40 /* rejectedAttempts */, 0 /* enrollmentNotifications */,
                         0 /* modality */));
+
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFingerprintManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
 
         mAuthenticationStatsCollector.authenticate(USER_ID_1, false /* authenticated */);
 
@@ -233,13 +249,13 @@ public class AuthenticationStatsCollectorTest {
         // Assert that no notification should be sent.
         verify(mBiometricNotification, never()).sendFaceEnrollNotification(any());
         verify(mBiometricNotification, never()).sendFpEnrollNotification(any());
-        // Assert that data has been reset.
+        // Assert that data hasn't been reset.
         AuthenticationStats authenticationStats = mAuthenticationStatsCollector
                 .getAuthenticationStatsForUser(USER_ID_1);
-        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
+        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
+        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
         assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
-        assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 
     @Test
@@ -260,13 +276,13 @@ public class AuthenticationStatsCollectorTest {
         // Assert that no notification should be sent.
         verify(mBiometricNotification, never()).sendFaceEnrollNotification(any());
         verify(mBiometricNotification, never()).sendFpEnrollNotification(any());
-        // Assert that data has been reset.
+        // Assert that data hasn't been reset.
         AuthenticationStats authenticationStats = mAuthenticationStatsCollector
                 .getAuthenticationStatsForUser(USER_ID_1);
-        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
+        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
+        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
         assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
-        assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 
     @Test

@@ -28,7 +28,6 @@ import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_UNEXPECTED_
 import static android.os.Build.VERSION_CODES.DONUT;
 import static android.os.Build.VERSION_CODES.O;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
-
 import static com.android.server.pm.pkg.parsing.ParsingUtils.parseKnownActivityEmbeddingCerts;
 
 import android.annotation.AnyRes;
@@ -514,7 +513,7 @@ public class ParsingPackageUtils {
         pkg
                 // Default true
                 .setBackupAllowed(lite.isBackupAllowed())
-                .setClearUserDataAllowed(lite.isClearUserDataAllowed())
+                .setClearUserDataAllowed(true)
                 .setClearUserDataOnFailedRestoreAllowed(
                         lite.isClearUserDataOnFailedRestoreAllowed())
                 .setAllowNativeHeapPointerTagging(true)
@@ -3268,8 +3267,7 @@ public class ParsingPackageUtils {
         if (existingSigningDetails == SigningDetails.UNKNOWN) {
             return verified;
         } else {
-            if (!Signature.areExactMatch(existingSigningDetails.getSignatures(),
-                    verified.getResult().getSignatures())) {
+            if (!Signature.areExactMatch(existingSigningDetails, verified.getResult())) {
                 return input.error(INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES,
                         baseCodePath + " has mismatched certificates");
             }

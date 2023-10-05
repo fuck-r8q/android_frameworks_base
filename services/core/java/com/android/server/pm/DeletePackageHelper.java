@@ -24,7 +24,6 @@ import static android.content.pm.PackageManager.DELETE_KEEP_DATA;
 import static android.content.pm.PackageManager.DELETE_SUCCEEDED;
 import static android.content.pm.PackageManager.MATCH_KNOWN_PACKAGES;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
-
 import static com.android.server.pm.InstructionSets.getAppDexInstructionSets;
 import static com.android.server.pm.PackageManagerService.DEBUG_COMPRESSION;
 import static com.android.server.pm.PackageManagerService.DEBUG_REMOVE;
@@ -121,12 +120,13 @@ final class DeletePackageHelper {
      */
     public int deletePackageX(String packageName, long versionCode, int userId, int deleteFlags,
             boolean removedBySystem) {
+        final boolean isArchived = false; // TODO(b/278553670) Pass true during archival.
+
         final PackageRemovedInfo info = new PackageRemovedInfo(mPm);
         final boolean res;
 
         final int removeUser = (deleteFlags & PackageManager.DELETE_ALL_USERS) != 0
                 ? UserHandle.USER_ALL : userId;
-
 
         final PackageSetting uninstalledPs;
         final PackageSetting disabledSystemPs;
@@ -251,7 +251,7 @@ final class DeletePackageHelper {
 
         if (res) {
             final boolean killApp = (deleteFlags & PackageManager.DELETE_DONT_KILL_APP) == 0;
-            info.sendPackageRemovedBroadcasts(killApp, removedBySystem);
+            info.sendPackageRemovedBroadcasts(killApp, removedBySystem, isArchived);
             info.sendSystemPackageUpdatedBroadcasts();
             PackageMetrics.onUninstallSucceeded(info, deleteFlags, removeUser);
         }
@@ -447,6 +447,12 @@ final class DeletePackageHelper {
         }
 
         final int userId = user == null ? UserHandle.USER_ALL : user.getIdentifier();
+        if (outInfo != null) {
+            // Remember which users are affected, before the installed states are modified
+            outInfo.mRemovedUsers = (systemApp || userId == UserHandle.USER_ALL)
+                    ? ps.queryInstalledUsers(allUserHandles, /* installed= */true)
+                    : new int[]{userId};
+        }
 
         if ((!systemApp || (flags & PackageManager.DELETE_SYSTEM_APP) != 0)
                 && userId != UserHandle.USER_ALL) {
@@ -470,10 +476,7 @@ final class DeletePackageHelper {
                         if (DEBUG_REMOVE) Slog.d(TAG, "Still installed by other users");
                         clearPackageStateAndReturn = true;
                     } else {
-                        // We need to set it back to 'installed' so the uninstall
-                        // broadcasts will be sent correctly.
                         if (DEBUG_REMOVE) Slog.d(TAG, "Not installed by other users, full delete");
-                        ps.setInstalled(true, userId);
                         mPm.mSettings.writeKernelMappingLPr(ps);
                         clearPackageStateAndReturn = false;
                     }
@@ -578,6 +581,7 @@ final class DeletePackageHelper {
 
             ps.setUserState(nextUserId,
                     ps.getCeDataInode(nextUserId),
+                    ps.getDeDataInode(nextUserId),
                     COMPONENT_ENABLED_STATE_DEFAULT,
                     false /*installed*/,
                     true /*stopped*/,
@@ -642,7 +646,6 @@ final class DeletePackageHelper {
             // Preserve data by setting flag
             flags |= PackageManager.DELETE_KEEP_DATA;
         }
-
         synchronized (mPm.mInstallLock) {
             deleteInstalledPackageLIF(deletedPs, true, flags, allUserHandles, outInfo,
                     writeSettings);

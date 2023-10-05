@@ -37,7 +37,6 @@ import com.android.systemui.biometrics.AlternateUdfpsTouchProvider;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
 import com.android.systemui.biometrics.UdfpsDisplayModeProvider;
 import com.android.systemui.biometrics.dagger.BiometricsModule;
-import com.android.systemui.biometrics.dagger.UdfpsModule;
 import com.android.systemui.bouncer.ui.BouncerViewModule;
 import com.android.systemui.classifier.FalsingModule;
 import com.android.systemui.clipboardoverlay.dagger.ClipboardOverlayModule;
@@ -124,7 +123,6 @@ import com.android.systemui.user.UserModule;
 import com.android.systemui.util.concurrency.SysUIConcurrencyModule;
 import com.android.systemui.util.dagger.UtilModule;
 import com.android.systemui.util.kotlin.CoroutinesModule;
-import com.android.systemui.util.leak.GarbageMonitorModule;
 import com.android.systemui.util.sensors.SensorModule;
 import com.android.systemui.util.settings.SettingsUtilModule;
 import com.android.systemui.util.time.SystemClock;
@@ -177,7 +175,6 @@ import javax.inject.Named;
             FlagsModule.class,
             SystemPropertiesFlagsModule.class,
             FooterActionsModule.class,
-            GarbageMonitorModule.class,
             KeyboardModule.class,
             LetterboxModule.class,
             KeyguardBlueprintModule.class,
@@ -209,7 +206,6 @@ import javax.inject.Named;
             TelephonyRepositoryModule.class,
             TemporaryDisplayModule.class,
             TunerModule.class,
-            UdfpsModule.class,
             UserModule.class,
             UtilModule.class,
             NoteTaskModule.class,

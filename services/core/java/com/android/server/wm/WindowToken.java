@@ -17,7 +17,6 @@
 package com.android.server.wm;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_BLACKSCREEN_OVERLAY;
 
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ADD_REMOVE;
@@ -749,17 +748,6 @@ class WindowToken extends WindowContainer<WindowState> {
     @Override
     WindowToken asWindowToken() {
         return this;
-    }
-
-    /**
-     * Return whether windows from this token can layer above the
-     * system bars, or in other words extend outside of the "Decor Frame"
-     */
-    boolean canLayerAboveSystemBars() {
-        int layer = getWindowLayerFromType();
-        int navLayer = mWmService.mPolicy.getWindowLayerFromTypeLw(TYPE_NAVIGATION_BAR,
-                mOwnerCanManageAppTokens);
-        return mOwnerCanManageAppTokens && (layer > navLayer);
     }
 
     int getWindowLayerFromType() {

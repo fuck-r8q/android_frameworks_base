@@ -136,6 +136,7 @@ import com.android.systemui.statusbar.LockscreenShadeTransitionController;
 import com.android.systemui.statusbar.NotificationListener;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationMediaManager;
+import com.android.systemui.statusbar.NotificationPresenter;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
@@ -398,7 +399,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
 
         when(mGradientColors.supportsDarkText()).thenReturn(true);
         when(mColorExtractor.getNeutralColors()).thenReturn(mGradientColors);
-        ConfigurationController configurationController = new ConfigurationControllerImpl(mContext);
 
         when(mLockscreenWallpaperLazy.get()).thenReturn(mLockscreenWallpaper);
         when(mBiometricUnlockControllerLazy.get()).thenReturn(mBiometricUnlockController);
@@ -437,6 +437,11 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         when(mUserTracker.getUserHandle()).thenReturn(
                 UserHandle.of(ActivityManager.getCurrentUser()));
 
+        createCentralSurfaces();
+    }
+
+    private void createCentralSurfaces() {
+        ConfigurationController configurationController = new ConfigurationControllerImpl(mContext);
         mCentralSurfaces = new CentralSurfacesImpl(
                 mContext,
                 mNotificationsController,
@@ -491,8 +496,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mNotificationShadeWindowViewControllerLazy,
                 mNotificationShelfController,
                 mStackScrollerController,
-                mNotificationPresenter,
-                mNotificationActivityStarter,
+                (Lazy<NotificationPresenter>) () -> mNotificationPresenter,
+                (Lazy<NotificationActivityStarter>) () -> mNotificationActivityStarter,
                 mNotifLaunchAnimControllerProvider,
                 new NotificationExpansionRepository(),
                 mDozeParameters,
@@ -1080,6 +1085,27 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         mCentralSurfaces.updateNotificationPanelTouchState();
 
         verify(mNotificationPanelViewController).setTouchAndAnimationDisabled(true);
+    }
+
+    /** Regression test for b/298355063 */
+    @Test
+    public void fingerprintManagerNull_noNPE() {
+        // GIVEN null fingerprint manager
+        mFingerprintManager = null;
+        createCentralSurfaces();
+
+        // GIVEN should animate doze wakeup
+        when(mDozeServiceHost.shouldAnimateWakeup()).thenReturn(true);
+        when(mBiometricUnlockController.getMode()).thenReturn(
+                BiometricUnlockController.MODE_ONLY_WAKE);
+        when(mDozeServiceHost.isPulsing()).thenReturn(false);
+        when(mStatusBarStateController.getDozeAmount()).thenReturn(1f);
+
+        // WHEN waking up from the power button
+        mWakefulnessLifecycle.dispatchStartedWakingUp(PowerManager.WAKE_REASON_POWER_BUTTON);
+        mCentralSurfaces.mWakefulnessObserver.onStartedWakingUp();
+
+        // THEN no NPE when fingerprintManager is null
     }
 
     /**

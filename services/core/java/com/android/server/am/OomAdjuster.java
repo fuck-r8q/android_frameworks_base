@@ -162,7 +162,6 @@ import android.util.proto.ProtoOutputStream;
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
 import com.android.server.am.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
@@ -320,11 +319,6 @@ public class OomAdjuster {
     static final long USE_SHORT_FGS_USAGE_INTERACTION_TIME = 183972877L;
 
     /**
-     * For some direct access we need to power manager.
-     */
-    PowerManagerInternal mLocalPowerManager;
-
-    /**
      * Service for optimizing resource usage from background apps.
      */
     CachedAppOptimizer mCachedAppOptimizer;
@@ -454,7 +448,6 @@ public class OomAdjuster {
         mProcLock = service.mProcLock;
         mActiveUids = activeUids;
 
-        mLocalPowerManager = LocalServices.getService(PowerManagerInternal.class);
         mConstants = mService.mConstants;
         mCachedAppOptimizer = new CachedAppOptimizer(mService);
         mCacheOomRanker = new CacheOomRanker(service);
@@ -1558,8 +1551,8 @@ public class OomAdjuster {
         becameIdle.clear();
 
         // Update from any uid changes.
-        if (mLocalPowerManager != null) {
-            mLocalPowerManager.startUidChanges();
+        if (mService.mLocalPowerManager != null) {
+            mService.mLocalPowerManager.startUidChanges();
         }
         for (int i = activeUids.size() - 1; i >= 0; i--) {
             final UidRecord uidRec = activeUids.valueAt(i);
@@ -1653,8 +1646,8 @@ public class OomAdjuster {
             }
             mService.mInternal.deletePendingTopUid(uidRec.getUid(), nowElapsed);
         }
-        if (mLocalPowerManager != null) {
-            mLocalPowerManager.finishUidChanges();
+        if (mService.mLocalPowerManager != null) {
+            mService.mLocalPowerManager.finishUidChanges();
         }
 
         int size = becameIdle.size();
@@ -2920,9 +2913,7 @@ public class OomAdjuster {
                 }
             }
 
-            if (schedGroup < SCHED_GROUP_TOP_APP
-                    && cr.hasFlag(Context.BIND_SCHEDULE_LIKE_TOP_APP)
-                    && clientIsSystem) {
+            if (cr.hasFlag(Context.BIND_SCHEDULE_LIKE_TOP_APP) && clientIsSystem) {
                 schedGroup = SCHED_GROUP_TOP_APP;
                 state.setScheduleLikeTopApp(true);
             }
@@ -3737,8 +3728,8 @@ public class OomAdjuster {
         final long nowElapsed = SystemClock.elapsedRealtime();
         final long maxBgTime = nowElapsed - mConstants.BACKGROUND_SETTLE_TIME;
         long nextTime = 0;
-        if (mLocalPowerManager != null) {
-            mLocalPowerManager.startUidChanges();
+        if (mService.mLocalPowerManager != null) {
+            mService.mLocalPowerManager.startUidChanges();
         }
         for (int i = N - 1; i >= 0; i--) {
             final UidRecord uidRec = mActiveUids.valueAt(i);
@@ -3758,8 +3749,8 @@ public class OomAdjuster {
                 }
             }
         }
-        if (mLocalPowerManager != null) {
-            mLocalPowerManager.finishUidChanges();
+        if (mService.mLocalPowerManager != null) {
+            mService.mLocalPowerManager.finishUidChanges();
         }
         // Also check if there are any apps in cached and background restricted mode,
         // if so, kill it if it's been there long enough, or kick off a msg to check

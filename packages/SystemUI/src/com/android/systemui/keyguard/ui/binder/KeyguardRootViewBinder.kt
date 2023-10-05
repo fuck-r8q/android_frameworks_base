@@ -59,20 +59,18 @@ object KeyguardRootViewBinder {
         val disposableHandle =
             view.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
-                    if (featureFlags.isEnabled(Flags.FP_LISTEN_OCCLUDING_APPS)) {
-                        launch {
-                            occludingAppDeviceEntryMessageViewModel.message.collect {
-                                biometricMessage ->
-                                if (biometricMessage?.message != null) {
-                                    chipbarCoordinator.displayView(
-                                        createChipbarInfo(
-                                            biometricMessage.message,
-                                            R.drawable.ic_lock,
-                                        )
+                    launch {
+                        occludingAppDeviceEntryMessageViewModel.message.collect { biometricMessage
+                            ->
+                            if (biometricMessage?.message != null) {
+                                chipbarCoordinator.displayView(
+                                    createChipbarInfo(
+                                        biometricMessage.message,
+                                        R.drawable.ic_lock,
                                     )
-                                } else {
-                                    chipbarCoordinator.removeView(ID, "occludingAppMsgNull")
-                                }
+                                )
+                            } else {
+                                chipbarCoordinator.removeView(ID, "occludingAppMsgNull")
                             }
                         }
                     }
@@ -177,14 +175,13 @@ object KeyguardRootViewBinder {
             oldRight: Int,
             oldBottom: Int
         ) {
-            val ksv = v.findViewById(R.id.keyguard_status_view) as View?
-            val lockIcon = v.findViewById(R.id.lock_icon_view) as View?
+            val nsslPlaceholder = v.findViewById(R.id.nssl_placeholder) as View?
 
-            if (ksv != null && lockIcon != null) {
+            if (nsslPlaceholder != null) {
                 // After layout, ensure the notifications are positioned correctly
                 viewModel.onSharedNotificationContainerPositionChanged(
-                    ksv!!.top.toFloat() + ksv!!.height,
-                    lockIcon!!.y
+                    nsslPlaceholder.top.toFloat(),
+                    nsslPlaceholder.bottom.toFloat(),
                 )
             }
         }

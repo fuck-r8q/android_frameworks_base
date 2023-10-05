@@ -20,6 +20,8 @@ import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.plugins.qs.QS
 import com.android.systemui.power.data.repository.FakePowerRepository
 import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.shared.flag.FakeSceneContainerFlags
 import com.android.systemui.shade.ShadeViewController
 import com.android.systemui.shade.data.repository.FakeShadeRepository
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
@@ -37,10 +39,9 @@ import com.android.systemui.statusbar.phone.LSShadeTransitionLogger
 import com.android.systemui.statusbar.phone.ScrimController
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeUserSetupRepository
 import com.android.systemui.statusbar.policy.FakeConfigurationController
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
 import com.android.systemui.util.mockito.mock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -74,8 +75,8 @@ private fun <T> anyObject(): T {
 @RunWith(AndroidTestingRunner::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class LockscreenShadeTransitionControllerTest : SysuiTestCase() {
-
-    private val testScope = TestScope(StandardTestDispatcher())
+    private val utils = SceneTestUtils(this)
+    private val testScope = utils.testScope
 
     lateinit var transitionController: LockscreenShadeTransitionController
     lateinit var row: ExpandableNotificationRow
@@ -102,17 +103,22 @@ class LockscreenShadeTransitionControllerTest : SysuiTestCase() {
     @Mock lateinit var qsTransitionController: LockscreenShadeQsTransitionController
     @Mock lateinit var activityStarter: ActivityStarter
     @Mock lateinit var transitionControllerCallback: LockscreenShadeTransitionController.Callback
+    private val sceneContainerFlags = FakeSceneContainerFlags()
+    private val sceneInteractor = utils.sceneInteractor()
     private val disableFlagsRepository = FakeDisableFlagsRepository()
     private val keyguardRepository = FakeKeyguardRepository()
     private val configurationRepository = FakeConfigurationRepository()
     private val sharedNotificationContainerInteractor = SharedNotificationContainerInteractor(
         configurationRepository,
         mContext,
+            ResourcesSplitShadeStateController()
     )
     private val shadeInteractor =
         ShadeInteractor(
             testScope.backgroundScope,
             disableFlagsRepository,
+            sceneContainerFlags,
+            { sceneInteractor },
             keyguardRepository,
             userSetupRepository = FakeUserSetupRepository(),
             deviceProvisionedController = mock(),
@@ -168,7 +174,8 @@ class LockscreenShadeTransitionControllerTest : SysuiTestCase() {
                         scrimController,
                         context,
                         configurationController,
-                        dumpManager
+                        dumpManager,
+                            ResourcesSplitShadeStateController()
                     ),
                 keyguardTransitionControllerFactory = { notificationPanelController ->
                     LockscreenShadeKeyguardTransitionController(
@@ -176,7 +183,8 @@ class LockscreenShadeTransitionControllerTest : SysuiTestCase() {
                         notificationPanelController,
                         context,
                         configurationController,
-                        dumpManager
+                        dumpManager,
+                            ResourcesSplitShadeStateController()
                     )
                 },
                 qsTransitionControllerFactory = { qsTransitionController },
@@ -184,6 +192,7 @@ class LockscreenShadeTransitionControllerTest : SysuiTestCase() {
                 shadeRepository = FakeShadeRepository(),
                 shadeInteractor = shadeInteractor,
                 powerInteractor = powerInteractor,
+                splitShadeStateController = ResourcesSplitShadeStateController()
             )
         transitionController.addCallback(transitionControllerCallback)
         whenever(nsslController.view).thenReturn(stackscroller)

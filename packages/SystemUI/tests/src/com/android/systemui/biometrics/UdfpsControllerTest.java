@@ -20,15 +20,12 @@ import static android.hardware.biometrics.BiometricFingerprintConstants.FINGERPR
 import static android.view.MotionEvent.ACTION_DOWN;
 import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_UP;
-
 import static com.android.internal.util.FunctionalUtils.ThrowingConsumer;
 import static com.android.systemui.classifier.Classifier.UDFPS_AUTHENTICATION;
 import static com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION;
-
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -77,12 +74,11 @@ import androidx.test.filters.SmallTest;
 import com.android.internal.logging.InstanceIdSequence;
 import com.android.internal.util.LatencyTracker;
 import com.android.keyguard.KeyguardUpdateMonitor;
-import com.android.settingslib.udfps.UdfpsOverlayParams;
-import com.android.settingslib.udfps.UdfpsUtils;
 import com.android.systemui.R;
 import com.android.systemui.RoboPilotTest;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.ActivityLaunchAnimator;
+import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
 import com.android.systemui.biometrics.udfps.InteractionEvent;
 import com.android.systemui.biometrics.udfps.NormalizedTouchData;
 import com.android.systemui.biometrics.udfps.SinglePointerTouchProcessor;
@@ -98,7 +94,6 @@ import com.android.systemui.keyguard.ui.viewmodel.UdfpsKeyguardViewModels;
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
 import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
@@ -314,19 +309,48 @@ public class UdfpsControllerTest extends SysuiTestCase {
                         (Provider<AlternateUdfpsTouchProvider>) () -> mAlternateTouchProvider)
                         : Optional.empty();
 
-        mUdfpsController = new UdfpsController(mContext, new FakeExecution(), mLayoutInflater,
-                mFingerprintManager, mWindowManager, mStatusBarStateController, mFgExecutor,
-                new ShadeExpansionStateManager(), mStatusBarKeyguardViewManager, mDumpManager,
-                mKeyguardUpdateMonitor, mFeatureFlags, mFalsingManager, mPowerManager,
-                mAccessibilityManager, mLockscreenShadeTransitionController, mScreenLifecycle,
-                mVibrator, mUdfpsHapticsSimulator, mUdfpsShell, mKeyguardStateController,
-                mDisplayManager, mHandler, mConfigurationController, mSystemClock,
-                mUnlockedScreenOffAnimationController, mSystemUIDialogManager, mLatencyTracker,
-                mActivityLaunchAnimator, alternateTouchProvider, mBiometricExecutor,
-                mPrimaryBouncerInteractor, mSinglePointerTouchProcessor, mSessionTracker,
-                mAlternateBouncerInteractor, mSecureSettings, mInputManager, mUdfpsUtils,
+        mUdfpsController = new UdfpsController(
+                mContext,
+                new FakeExecution(),
+                mLayoutInflater,
+                mFingerprintManager,
+                mWindowManager,
+                mStatusBarStateController,
+                mFgExecutor,
+                mStatusBarKeyguardViewManager,
+                mDumpManager,
+                mKeyguardUpdateMonitor,
+                mFeatureFlags,
+                mFalsingManager,
+                mPowerManager,
+                mAccessibilityManager,
+                mLockscreenShadeTransitionController,
+                mScreenLifecycle,
+                mVibrator,
+                mUdfpsHapticsSimulator,
+                mUdfpsShell,
+                mKeyguardStateController,
+                mDisplayManager,
+                mHandler,
+                mConfigurationController,
+                mSystemClock,
+                mUnlockedScreenOffAnimationController,
+                mSystemUIDialogManager,
+                mLatencyTracker,
+                mActivityLaunchAnimator,
+                alternateTouchProvider,
+                mBiometricExecutor,
+                mPrimaryBouncerInteractor,
+                mSinglePointerTouchProcessor,
+                mSessionTracker,
+                mAlternateBouncerInteractor,
+                mSecureSettings,
+                mInputManager,
+                mUdfpsUtils,
                 mock(KeyguardFaceAuthInteractor.class),
-                mUdfpsKeyguardAccessibilityDelegate, mUdfpsKeyguardViewModels);
+                mUdfpsKeyguardAccessibilityDelegate,
+                mUdfpsKeyguardViewModels
+        );
         verify(mFingerprintManager).setUdfpsOverlayController(mOverlayCaptor.capture());
         mOverlayController = mOverlayCaptor.getValue();
         verify(mScreenLifecycle).addObserver(mScreenObserverCaptor.capture());
