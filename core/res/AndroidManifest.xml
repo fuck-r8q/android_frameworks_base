@@ -1517,10 +1517,9 @@
 
     <!-- Allows an application to initiate a phone call without going through
         the Dialer user interface for the user to confirm the call.
-        <p>
-        <em>Note: An app holding this permission can also call carrier MMI codes to change settings
-        such as call forwarding or call waiting preferences.
-        <p>Protection level: dangerous
+        <p class="note"><b>Note:</b> An app holding this permission can also call carrier MMI
+        codes to change settings such as call forwarding or call waiting preferences.</p>
+        <p>Protection level: dangerous</p>
     -->
     <permission android:name="android.permission.CALL_PHONE"
         android:permissionGroup="android.permission-group.UNDEFINED"
@@ -1749,6 +1748,15 @@
         android:permissionGroup="android.permission-group.UNDEFINED"
         android:label="@string/permlab_cameraOpenCloseListener"
         android:description="@string/permdesc_cameraOpenCloseListener"
+        android:protectionLevel="signature" />
+
+    <!-- @SystemApi Allows camera access by Headless System User 0 when device is running in
+            HSUM Mode.
+    @hide -->
+    <permission android:name="android.permission.CAMERA_HEADLESS_SYSTEM_USER"
+        android:permissionGroup="android.permission-group.UNDEFINED"
+        android:label="@string/permlab_cameraHeadlessSystemUser"
+        android:description="@string/permdesc_cameraHeadlessSystemUser"
         android:protectionLevel="signature" />
 
     <!-- ====================================================================== -->
@@ -8296,6 +8304,10 @@
 
         <service android:name="com.android.server.notification.NotificationHistoryJobService"
                  android:permission="android.permission.BIND_JOB_SERVICE" >
+        </service>
+
+        <service android:name="com.android.server.notification.NotificationBitmapJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE" >
         </service>
 
         <service android:name="com.android.server.healthconnect.HealthConnectDailyService"

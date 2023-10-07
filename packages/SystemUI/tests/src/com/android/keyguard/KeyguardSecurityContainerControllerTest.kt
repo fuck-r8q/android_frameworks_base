@@ -43,6 +43,7 @@ import com.android.systemui.authentication.domain.interactor.AuthenticationInter
 import com.android.systemui.biometrics.FaceAuthAccessibilityDelegate
 import com.android.systemui.biometrics.SideFpsController
 import com.android.systemui.biometrics.SideFpsUiRequestSource
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants
 import com.android.systemui.classifier.FalsingA11yDelegate
 import com.android.systemui.classifier.FalsingCollector
@@ -72,6 +73,7 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.settings.GlobalSettings
 import com.google.common.truth.Truth
+import dagger.Lazy
 import java.util.Optional
 import junit.framework.Assert
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -154,6 +156,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     private lateinit var sceneInteractor: SceneInteractor
     private lateinit var keyguardTransitionInteractor: KeyguardTransitionInteractor
     private lateinit var authenticationInteractor: AuthenticationInteractor
+    @Mock private lateinit var primaryBouncerInteractor: Lazy<PrimaryBouncerInteractor>
     private lateinit var sceneTransitionStateFlow: MutableStateFlow<ObservableTransitionState>
 
     private lateinit var underTest: KeyguardSecurityContainerController
@@ -191,9 +194,9 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
 
         featureFlags = FakeFeatureFlags()
         featureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
-        featureFlags.set(Flags.SCENE_CONTAINER, false)
         featureFlags.set(Flags.BOUNCER_USER_SWITCHER, false)
         featureFlags.set(Flags.KEYGUARD_WM_STATE_REFACTOR, false)
+        featureFlags.set(Flags.REFACTOR_KEYGUARD_DISMISS_INTENT, false)
 
         keyguardPasswordViewController =
             KeyguardPasswordViewController(
@@ -244,6 +247,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 falsingManager,
                 userSwitcherController,
                 featureFlags,
+                sceneTestUtils.sceneContainerFlags,
                 globalSettings,
                 sessionTracker,
                 Optional.of(sideFpsController),
@@ -257,7 +261,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 userInteractor,
                 deviceProvisionedController,
                 faceAuthAccessibilityDelegate,
-                keyguardTransitionInteractor
+                keyguardTransitionInteractor,
+                primaryBouncerInteractor,
             ) {
                 authenticationInteractor
             }
@@ -369,6 +374,36 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     fun showSecurityScreen_oneHandedMode_flagEnabled_oneHandedMode() {
         testableResources.addOverride(R.bool.can_use_one_handed_bouncer, true)
         setupGetSecurityView(SecurityMode.Pattern)
+        verify(view)
+            .initMode(
+                eq(KeyguardSecurityContainer.MODE_ONE_HANDED),
+                eq(globalSettings),
+                eq(falsingManager),
+                eq(userSwitcherController),
+                any(),
+                eq(falsingA11yDelegate)
+            )
+    }
+
+    @Test
+    fun showSecurityScreen_oneHandedMode_flagEnabled_oneHandedMode_simpin() {
+        testableResources.addOverride(R.bool.can_use_one_handed_bouncer, true)
+        setupGetSecurityView(SecurityMode.SimPin)
+        verify(view)
+            .initMode(
+                eq(KeyguardSecurityContainer.MODE_ONE_HANDED),
+                eq(globalSettings),
+                eq(falsingManager),
+                eq(userSwitcherController),
+                any(),
+                eq(falsingA11yDelegate)
+            )
+    }
+
+    @Test
+    fun showSecurityScreen_oneHandedMode_flagEnabled_oneHandedMode_simpuk() {
+        testableResources.addOverride(R.bool.can_use_one_handed_bouncer, true)
+        setupGetSecurityView(SecurityMode.SimPuk)
         verify(view)
             .initMode(
                 eq(KeyguardSecurityContainer.MODE_ONE_HANDED),
@@ -622,51 +657,6 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
         configurationListenerArgumentCaptor.value.onUiModeChanged()
         verify(view).reloadColors()
     }
-    @Test
-    fun onOrientationChanged_landscapeKeyguardFlagDisabled_blockReinflate() {
-        featureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
-
-        // Run onOrientationChanged
-        val configurationListenerArgumentCaptor =
-            ArgumentCaptor.forClass(ConfigurationController.ConfigurationListener::class.java)
-        underTest.onViewAttached()
-        verify(configurationController).addCallback(configurationListenerArgumentCaptor.capture())
-        clearInvocations(viewFlipperController)
-        configurationListenerArgumentCaptor.value.onOrientationChanged(
-            Configuration.ORIENTATION_LANDSCAPE
-        )
-        // Verify view is reinflated when flag is on
-        verify(viewFlipperController, never()).clearViews()
-        verify(viewFlipperController, never())
-            .asynchronouslyInflateView(
-                eq(SecurityMode.PIN),
-                any(),
-                onViewInflatedCallbackArgumentCaptor.capture()
-            )
-    }
-
-    @Test
-    fun onOrientationChanged_landscapeKeyguardFlagEnabled_doesReinflate() {
-        featureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, true)
-
-        // Run onOrientationChanged
-        val configurationListenerArgumentCaptor =
-            ArgumentCaptor.forClass(ConfigurationController.ConfigurationListener::class.java)
-        underTest.onViewAttached()
-        verify(configurationController).addCallback(configurationListenerArgumentCaptor.capture())
-        clearInvocations(viewFlipperController)
-        configurationListenerArgumentCaptor.value.onOrientationChanged(
-            Configuration.ORIENTATION_LANDSCAPE
-        )
-        // Verify view is reinflated when flag is on
-        verify(viewFlipperController).clearViews()
-        verify(viewFlipperController)
-            .asynchronouslyInflateView(
-                eq(SecurityMode.PIN),
-                any(),
-                onViewInflatedCallbackArgumentCaptor.capture()
-            )
-    }
 
     @Test
     fun hasDismissActions() {
@@ -802,8 +792,6 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     @Test
     fun dismissesKeyguard_whenSceneChangesToGone() =
         sceneTestUtils.testScope.runTest {
-            featureFlags.set(Flags.SCENE_CONTAINER, true)
-
             // Upon init, we have never dismisses the keyguard.
             underTest.onInit()
             runCurrent()

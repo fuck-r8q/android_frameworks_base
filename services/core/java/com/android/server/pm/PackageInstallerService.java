@@ -18,9 +18,7 @@ package com.android.server.pm;
 
 import static android.app.admin.DevicePolicyResources.Strings.Core.PACKAGE_DELETED_BY_DO;
 import static android.os.Process.INVALID_UID;
-
 import static com.android.server.pm.PackageManagerService.SHELL_PACKAGE_NAME;
-
 import static org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
 import static org.xmlpull.v1.XmlPullParser.START_TAG;
 
@@ -182,6 +180,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             Manifest.permission.USE_FULL_SCREEN_INTENT
     );
 
+    final PackageArchiver mPackageArchiver;
+
     private final Context mContext;
     private final PackageManagerService mPm;
     private final ApexManager mApexManager;
@@ -301,6 +301,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 apexParserSupplier, mInstallThread.getLooper());
         mGentleUpdateHelper = new GentleUpdateHelper(
                 context, mInstallThread.getLooper(), new AppStateHelper(context));
+        mPackageArchiver = new PackageArchiver(mContext, mPm);
 
         LocalServices.getService(SystemServiceManager.class).startService(
                 new Lifecycle(context, this));
@@ -1241,8 +1242,18 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     @Override
     public void uninstall(VersionedPackage versionedPackage, String callerPackageName, int flags,
                 IntentSender statusReceiver, int userId) {
+        uninstall(
+                versionedPackage,
+                callerPackageName,
+                flags,
+                statusReceiver,
+                userId,
+                Binder.getCallingUid());
+    }
+
+    void uninstall(VersionedPackage versionedPackage, String callerPackageName, int flags,
+            IntentSender statusReceiver, int userId, int callingUid) {
         final Computer snapshot = mPm.snapshotComputer();
-        final int callingUid = Binder.getCallingUid();
         snapshot.enforceCrossUserPermission(callingUid, userId, true, true, "uninstall");
         if (!PackageManagerServiceUtils.isRootOrShell(callingUid)) {
             mAppOps.checkPackage(callingUid, callerPackageName);
@@ -1258,7 +1269,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         final PackageDeleteObserverAdapter adapter = new PackageDeleteObserverAdapter(mContext,
                 statusReceiver, versionedPackage.getPackageName(),
                 canSilentlyInstallPackage, userId);
-        if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DELETE_PACKAGES)
+        if (mContext.checkCallingOrSelfPermission(Manifest.permission.DELETE_PACKAGES)
                     == PackageManager.PERMISSION_GRANTED) {
             // Sweet, call straight through!
             mPm.deletePackageVersioned(versionedPackage, adapter.getBinder(), userId, flags);
@@ -1493,6 +1504,24 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             throw new SecurityException("Caller not allowed to set silent updates throttle time");
         }
         mSilentUpdatePolicy.setSilentUpdatesThrottleTime(throttleTimeInSeconds);
+    }
+
+    @Override
+    public void requestArchive(
+            @NonNull String packageName,
+            @NonNull String callerPackageName,
+            @NonNull IntentSender intentSender,
+            @NonNull UserHandle userHandle) {
+        mPackageArchiver.requestArchive(packageName, callerPackageName, intentSender,
+                userHandle);
+    }
+
+    @Override
+    public void requestUnarchive(
+            @NonNull String packageName,
+            @NonNull String callerPackageName,
+            @NonNull UserHandle userHandle) {
+        mPackageArchiver.requestUnarchive(packageName, callerPackageName, userHandle);
     }
 
     private static int getSessionCount(SparseArray<PackageInstallerSession> sessions,

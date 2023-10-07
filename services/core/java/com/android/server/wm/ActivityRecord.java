@@ -328,7 +328,6 @@ import android.util.ArraySet;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.MergedConfiguration;
-import android.util.Pair;
 import android.util.Slog;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
@@ -742,9 +741,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     private final boolean mIsUserAlwaysVisible;
 
     /** Allow activity launches which would otherwise be blocked by
-     * {@link ActivityTransitionSecurityController#checkActivityAllowedToStart}
+     * {@link BackgroundActivityStartController#checkActivityAllowedToStart}
      */
-    private boolean mAllowCrossUidActivitySwitchFromBelow;
+    boolean mAllowCrossUidActivitySwitchFromBelow;
 
     /** Have we been asked to have this token keep the screen frozen? */
     private boolean mFreezingScreen;
@@ -1461,7 +1460,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     config);
 
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    MoveToDisplayItem.obtain(displayId, config));
+                    MoveToDisplayItem.obtain(token, displayId, config));
         } catch (RemoteException e) {
             // If process died, whatever.
         }
@@ -1478,7 +1477,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     + "config: %s", this, config);
 
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    ActivityConfigurationChangeItem.obtain(config));
+                    ActivityConfigurationChangeItem.obtain(token, config));
         } catch (RemoteException e) {
             // If process died, whatever.
         }
@@ -1499,7 +1498,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     this, onTop);
 
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    TopResumedActivityChangeItem.obtain(onTop));
+                    TopResumedActivityChangeItem.obtain(token, onTop));
         } catch (RemoteException e) {
             // If process died, whatever.
             Slog.w(TAG, "Failed to send top-resumed=" + onTop + " to " + this, e);
@@ -2753,7 +2752,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         try {
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_ATTACH_TO_CLIENT;
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    TransferSplashScreenViewStateItem.obtain(parcelable,
+                    TransferSplashScreenViewStateItem.obtain(token, parcelable,
                             windowAnimationLeash));
             scheduleTransferSplashScreenTimeout();
         } catch (Exception e) {
@@ -3924,7 +3923,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             try {
                 if (DEBUG_SWITCH) Slog.i(TAG_SWITCH, "Destroying: " + this);
                 mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                        DestroyActivityItem.obtain(finishing, configChangeFlags));
+                        DestroyActivityItem.obtain(token, finishing, configChangeFlags));
             } catch (Exception e) {
                 // We can just ignore exceptions here...  if the process has crashed, our death
                 // notification will clean things up.
@@ -4837,7 +4836,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 final ArrayList<ResultInfo> list = new ArrayList<ResultInfo>();
                 list.add(new ResultInfo(resultWho, requestCode, resultCode, data));
                 mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                        ActivityResultItem.obtain(list));
+                        ActivityResultItem.obtain(token, list));
                 return;
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending result to " + this, e);
@@ -4850,7 +4849,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             final ClientTransaction transaction = ClientTransaction.obtain(app.getThread(), token);
             // Build result to be returned immediately.
             transaction.addCallback(ActivityResultItem.obtain(
-                    List.of(new ResultInfo(resultWho, requestCode, resultCode, data))));
+                    token, List.of(new ResultInfo(resultWho, requestCode, resultCode, data))));
             // When the activity result is delivered, the activity will transition to RESUMED.
             // Since the activity is only resumed so the result can be immediately delivered,
             // return it to its original lifecycle state.
@@ -4891,13 +4890,13 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     private ActivityLifecycleItem getLifecycleItemForCurrentStateForResult() {
         switch (mState) {
             case STARTED:
-                return StartActivityItem.obtain(null);
+                return StartActivityItem.obtain(token, null);
             case PAUSING:
             case PAUSED:
-                return PauseActivityItem.obtain();
+                return PauseActivityItem.obtain(token);
             case STOPPING:
             case STOPPED:
-                return StopActivityItem.obtain(configChangeFlags);
+                return StopActivityItem.obtain(token, configChangeFlags);
             default:
                 // Do not send a result immediately if the activity is in state INITIALIZING,
                 // RESTARTING_PROCESS, FINISHING, DESTROYING, or DESTROYED.
@@ -4943,7 +4942,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // so only if activity is currently RESUMED. Otherwise, client may have extra
                 // life-cycle calls to RESUMED (and PAUSED later).
                 mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                        NewIntentItem.obtain(ar, mState == RESUMED));
+                        NewIntentItem.obtain(token, ar, mState == RESUMED));
                 unsent = false;
             } catch (RemoteException e) {
                 Slog.w(TAG, "Exception thrown sending new intent to " + this, e);
@@ -6254,7 +6253,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     shortComponentName, "userLeaving=false", "make-active");
             try {
                 mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                        PauseActivityItem.obtain(finishing, false /* userLeaving */,
+                        PauseActivityItem.obtain(token, finishing, false /* userLeaving */,
                                 configChangeFlags, false /* dontReport */, mAutoEnteringPip));
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending pause: " + intent.getComponent(), e);
@@ -6268,7 +6267,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             acquireActivityBoost();
             try {
                 mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                        StartActivityItem.obtain(takeOptions()));
+                        StartActivityItem.obtain(token, takeOptions()));
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending start: " + intent.getComponent(), e);
                 releaseActivityBoost();
@@ -6576,7 +6575,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             EventLogTags.writeWmStopActivity(
                     mUserId, System.identityHashCode(this), shortComponentName);
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    StopActivityItem.obtain(configChangeFlags));
+                    StopActivityItem.obtain(token, configChangeFlags));
 
             mAtmService.mH.postDelayed(mStopTimeoutRunnable, STOP_TIMEOUT);
         } catch (Exception e) {
@@ -10054,17 +10053,17 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     (andResume ? "RESUMED" : "PAUSED"), this, Debug.getCallers(6));
             forceNewConfig = false;
             startRelaunching();
-            final ClientTransactionItem callbackItem = ActivityRelaunchItem.obtain(pendingResults,
-                    pendingNewIntents, configChangeFlags,
+            final ClientTransactionItem callbackItem = ActivityRelaunchItem.obtain(token,
+                    pendingResults, pendingNewIntents, configChangeFlags,
                     new MergedConfiguration(getProcessGlobalConfiguration(),
                             getMergedOverrideConfiguration()),
                     preserveWindow);
             final ActivityLifecycleItem lifecycleItem;
             if (andResume) {
-                lifecycleItem = ResumeActivityItem.obtain(isTransitionForward(),
+                lifecycleItem = ResumeActivityItem.obtain(token, isTransitionForward(),
                         shouldSendCompatFakeFocus());
             } else {
-                lifecycleItem = PauseActivityItem.obtain();
+                lifecycleItem = PauseActivityItem.obtain(token);
             }
             final ClientTransaction transaction = ClientTransaction.obtain(app.getThread(), token);
             transaction.addCallback(callbackItem);
@@ -10163,7 +10162,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // {@link ActivityTaskManagerService.activityStopped}).
         try {
             mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
-                    StopActivityItem.obtain(0 /* configChanges */));
+                    StopActivityItem.obtain(token, 0 /* configChanges */));
         } catch (RemoteException e) {
             Slog.w(TAG, "Exception thrown during restart " + this, e);
         }
@@ -10374,50 +10373,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     void setAllowCrossUidActivitySwitchFromBelow(boolean allowed) {
         mAllowCrossUidActivitySwitchFromBelow = allowed;
-    }
-
-    /**
-     * Determines if a source is allowed to add or remove activities from the task,
-     * if the current ActivityRecord is above it in the stack
-     *
-     * A transition is blocked ({@code false} returned) if all of the following are met:
-     * <pre>
-     * 1. The source activity and the current activity record belong to different apps
-     * (i.e, have different UIDs).
-     * 2. Both the source activity and the current activity target U+
-     * 3. The current activity has not set
-     * {@link ActivityRecord#setAllowCrossUidActivitySwitchFromBelow(boolean)} to {@code true}
-     * </pre>
-     *
-     * Returns a pair where the elements mean:
-     * <pre>
-     * First: {@code false} if we should actually block the transition (takes into consideration
-     * feature flag and targetSdk).
-     * Second: {@code false} if we should warn about the transition via toasts. This happens if
-     * the transition would be blocked in case both the app was targeting U+ and the feature was
-     * enabled.
-     * </pre>
-     *
-     * @param sourceUid The source (s) activity performing the state change
-     */
-    Pair<Boolean, Boolean> allowCrossUidActivitySwitchFromBelow(int sourceUid) {
-        int myUid = info.applicationInfo.uid;
-        if (sourceUid == myUid) {
-            return new Pair<>(true, true);
-        }
-
-        // If mAllowCrossUidActivitySwitchFromBelow is set, honor it.
-        if (mAllowCrossUidActivitySwitchFromBelow) {
-            return new Pair<>(true, true);
-        }
-
-        // If it is not set, default to true if both records target ≥ U, false otherwise
-        // TODO(b/258792202) Replace with CompatChanges and replace Pair with boolean once feature
-        // flag is removed
-        boolean restrictActivitySwitch =
-                ActivitySecurityModelFeatureFlags.shouldRestrictActivitySwitch(myUid)
-                    && ActivitySecurityModelFeatureFlags.shouldRestrictActivitySwitch(sourceUid);
-        return new Pair<>(!restrictActivitySwitch, false);
     }
 
     boolean getTurnScreenOnFlag() {

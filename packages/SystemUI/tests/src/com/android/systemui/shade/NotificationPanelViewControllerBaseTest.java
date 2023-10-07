@@ -65,6 +65,7 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.logging.testing.UiEventLoggerFake;
+import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.util.LatencyTracker;
 import com.android.keyguard.EmergencyButtonController;
 import com.android.keyguard.KeyguardClockSwitch;
@@ -120,6 +121,7 @@ import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.qs.QSFragment;
 import com.android.systemui.screenrecord.RecordingController;
+import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.data.repository.ShadeRepository;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.shade.transition.ShadeTransitionController;
@@ -172,6 +174,7 @@ import com.android.systemui.statusbar.policy.KeyguardQsUserSwitchController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.KeyguardUserSwitcherController;
 import com.android.systemui.statusbar.policy.KeyguardUserSwitcherView;
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.unfold.SysUIUnfoldComponent;
 import com.android.systemui.util.kotlin.JavaAdapter;
@@ -272,6 +275,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected KeyguardIndicationController mKeyguardIndicationController;
     @Mock protected FragmentService mFragmentService;
     @Mock protected FragmentHostManager mFragmentHostManager;
+    @Mock protected IStatusBarService mStatusBarService;
     @Mock protected EmergencyButtonController.Factory mEmergencyButtonControllerFactory;
     @Mock protected NotificationRemoteInputManager mNotificationRemoteInputManager;
     @Mock protected RecordingController mRecordingController;
@@ -320,7 +324,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
             mEmptySpaceClickListenerCaptor;
     @Mock protected ActivityStarter mActivityStarter;
     @Mock protected KeyguardFaceAuthInteractor mKeyguardFaceAuthInteractor;
-    @Mock protected ShadeRepository mShadeRepository;
     @Mock private ShadeInteractor mShadeInteractor;
     @Mock private JavaAdapter mJavaAdapter;
     @Mock private CastController mCastController;
@@ -341,6 +344,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected Handler mMainHandler;
     protected View.OnLayoutChangeListener mLayoutChangeListener;
     protected KeyguardStatusViewController mKeyguardStatusViewController;
+    protected ShadeRepository mShadeRepository;
 
     protected final FalsingManagerFake mFalsingManager = new FalsingManagerFake();
     protected final Optional<SysUIUnfoldComponent> mSysUIUnfoldComponent = Optional.empty();
@@ -362,6 +366,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mFakeKeyguardRepository = keyguardInteractorDeps.getRepository();
         mKeyguardBottomAreaInteractor = new KeyguardBottomAreaInteractor(mFakeKeyguardRepository);
         mKeyguardInteractor = keyguardInteractorDeps.getKeyguardInteractor();
+        mShadeRepository = new FakeShadeRepository();
 
         SystemClock systemClock = new FakeSystemClock();
         mStatusBarStateController = new StatusBarStateControllerImpl(mUiEventLogger, mDumpManager,
@@ -623,6 +628,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mNavigationBarController,
                 mQsController,
                 mFragmentService,
+                mStatusBarService,
                 mContentResolver,
                 mShadeHeaderController,
                 mScreenOffAnimationController,
@@ -659,7 +665,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mEmergencyButtonControllerFactory,
                 mKeyguardViewConfigurator,
                 mKeyguardFaceAuthInteractor,
-                mKeyguardRootView);
+                new ResourcesSplitShadeStateController());
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,
@@ -731,7 +737,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mShadeRepository,
                 mShadeInteractor,
                 mJavaAdapter,
-                mCastController
+                mCastController,
+                new ResourcesSplitShadeStateController()
         );
     }
 

@@ -17,7 +17,6 @@
 package androidx.window.sidecar;
 
 import static android.view.Display.DEFAULT_DISPLAY;
-
 import static androidx.window.util.ExtensionHelper.rotateRectToDisplayRotation;
 import static androidx.window.util.ExtensionHelper.transformToWindowSpaceRect;
 

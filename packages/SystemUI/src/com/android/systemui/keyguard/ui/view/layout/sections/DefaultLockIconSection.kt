@@ -54,15 +54,15 @@ constructor(
         if (!featureFlags.isEnabled(Flags.MIGRATE_LOCK_ICON)) {
             return
         }
-        notificationPanelView.findViewById<View>(R.id.lock_icon_view).let {
+        notificationPanelView.findViewById<View>(lockIconViewId).let {
             notificationPanelView.removeView(it)
         }
-        val view = LockIconView(context, null).apply { id = R.id.lock_icon_view }
+        val view = LockIconView(context, null).apply { id = lockIconViewId }
         constraintLayout.addView(view)
     }
 
     override fun bindData(constraintLayout: ConstraintLayout) {
-        constraintLayout.findViewById<LockIconView?>(R.id.lock_icon_view)?.let {
+        constraintLayout.findViewById<LockIconView?>(lockIconViewId)?.let {
             lockIconViewController.setLockIconView(it)
         }
     }
@@ -73,7 +73,13 @@ constructor(
         val mBottomPaddingPx =
             context.resources.getDimensionPixelSize(R.dimen.lock_icon_margin_bottom)
         val bounds = windowManager.currentWindowMetrics.bounds
-        val widthPixels = bounds.right.toFloat()
+        val insets = windowManager.currentWindowMetrics.windowInsets
+        var widthPixels = bounds.right.toFloat()
+        if (featureFlags.isEnabled(Flags.LOCKSCREEN_ENABLE_LANDSCAPE)) {
+            // Assumed to be initially neglected as there are no left or right insets in portrait.
+            // However, on landscape, these insets need to included when calculating the midpoint.
+            widthPixels -= (insets.systemWindowInsetLeft + insets.systemWindowInsetRight).toFloat()
+        }
         val heightPixels = bounds.bottom.toFloat()
         val defaultDensity =
             DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() /
@@ -97,7 +103,7 @@ constructor(
     }
 
     override fun removeViews(constraintLayout: ConstraintLayout) {
-        constraintLayout.removeView(R.id.lock_icon_view)
+        constraintLayout.removeView(lockIconViewId)
     }
 
     @VisibleForTesting

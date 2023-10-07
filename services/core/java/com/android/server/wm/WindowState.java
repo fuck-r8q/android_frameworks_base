@@ -28,6 +28,7 @@ import static android.graphics.GraphicsProtos.dumpPointProto;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.PowerManager.DRAW_WAKE_LOCK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
+import static android.view.InputWindowHandle.USE_SURFACE_TRUSTED_OVERLAY;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.SurfaceControl.getGlobalTransaction;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_CONTENT;
@@ -99,7 +100,6 @@ import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
-
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_APP_TRANSITIONS;
@@ -1119,7 +1119,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mInputWindowHandle.setName(getName());
         mInputWindowHandle.setPackageName(mAttrs.packageName);
         mInputWindowHandle.setLayoutParamsType(mAttrs.type);
-        mInputWindowHandle.setTrustedOverlay(shouldWindowHandleBeTrusted(s));
+        if (!USE_SURFACE_TRUSTED_OVERLAY) {
+            mInputWindowHandle.setTrustedOverlay(isWindowTrustedOverlay());
+        }
         if (DEBUG) {
             Slog.v(TAG, "Window " + this + " client=" + c.asBinder()
                             + " token=" + token + " (" + mAttrs.token + ")" + " params=" + a);
@@ -1200,12 +1202,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 : service.mAtmService.getProcessController(s.mPid, s.mUid);
     }
 
-    boolean shouldWindowHandleBeTrusted(Session s) {
+    private boolean isWindowTrustedOverlay() {
         return InputMonitor.isTrustedOverlay(mAttrs.type)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
-                        && s.mCanAddInternalSystemWindow)
+                        && mSession.mCanAddInternalSystemWindow)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                        && s.mCanCreateSystemApplicationOverlay);
+                        && mSession.mCanCreateSystemApplicationOverlay);
     }
 
     int getTouchOcclusionMode() {
@@ -1721,29 +1723,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         final DisplayContent dc = getDisplayContent();
         return mAttrs.type >= FIRST_SYSTEM_WINDOW
                 && dc != null ? dc.getDefaultTaskDisplayArea().getRootHomeTask() : null;
-    }
-
-    /**
-     * This is a form of rectangle "difference". It cut off each dimension of rect by the amount
-     * that toRemove is "pushing into" it from the outside. Any dimension that fully contains
-     * toRemove won't change.
-     */
-    private void cutRect(Rect rect, Rect toRemove) {
-        if (toRemove.isEmpty()) return;
-        if (toRemove.top < rect.bottom && toRemove.bottom > rect.top) {
-            if (toRemove.right >= rect.right && toRemove.left >= rect.left) {
-                rect.right = toRemove.left;
-            } else if (toRemove.left <= rect.left && toRemove.right <= rect.right) {
-                rect.left = toRemove.right;
-            }
-        }
-        if (toRemove.left < rect.right && toRemove.right > rect.left) {
-            if (toRemove.bottom >= rect.bottom && toRemove.top >= rect.top) {
-                rect.bottom = toRemove.top;
-            } else if (toRemove.top <= rect.top && toRemove.bottom <= rect.bottom) {
-                rect.top = toRemove.bottom;
-            }
-        }
     }
 
     /**
@@ -3972,14 +3951,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return mDragResizing != computeDragResizing();
     }
 
-    @Override
-    void setWaitingForDrawnIfResizingChanged() {
-        if (isDragResizeChanged()) {
-            mWmService.mRoot.mWaitingForDrawn.add(this);
-        }
-        super.setWaitingForDrawnIfResizingChanged();
-    }
-
     /**
      * Resets the state whether we reported a drag resize change to the app.
      */
@@ -5230,6 +5201,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             updateFrameRateSelectionPriorityIfNeeded();
             updateScaleIfNeeded();
             mWinAnimator.prepareSurfaceLocked(getSyncTransaction());
+            if (USE_SURFACE_TRUSTED_OVERLAY) {
+                getSyncTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
+            }
         }
         super.prepareSurfaces();
     }
@@ -5529,10 +5503,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // The region is on the window coordinates, so it needs to  be translated into screen
         // coordinates. There's no need to scale since that will be done by native code.
         outRegion.translate(mWindowFrames.mFrame.left, mWindowFrames.mFrame.top);
-    }
-
-    boolean hasTapExcludeRegion() {
-        return !mTapExcludeRegion.isEmpty();
     }
 
     boolean isImeLayeringTarget() {
@@ -5986,7 +5956,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean isTrustedOverlay() {
-        return mInputWindowHandle.isTrustedOverlay();
+        if (USE_SURFACE_TRUSTED_OVERLAY) {
+            WindowState parentWindow = getParentWindow();
+            return isWindowTrustedOverlay() || (parentWindow != null
+                    && parentWindow.isWindowTrustedOverlay());
+        } else {
+            return mInputWindowHandle.isTrustedOverlay();
+        }
     }
 
     public boolean receiveFocusFromTapOutside() {

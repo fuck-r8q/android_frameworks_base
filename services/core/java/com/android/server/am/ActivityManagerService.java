@@ -9631,6 +9631,14 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         } else {
             worker.start();
+            if (process != null && process.mPid == MY_PID && "crash".equals(eventType)) {
+                // We're actually crashing, let's wait for up to 2 seconds before killing ourselves,
+                // so the data could be persisted into the dropbox.
+                try {
+                    worker.join(2000);
+                } catch (InterruptedException ignored) {
+                }
+            }
         }
     }
 
@@ -9931,6 +9939,10 @@ public class ActivityManagerService extends IActivityManager.Stub
         PriorityDump.dump(mPriorityDumper, fd, pw, args);
     }
 
+    private static final String TICK =
+            "---------------------------------------"
+            + "----------------------------------------";
+
     private void dumpEverything(FileDescriptor fd, PrintWriter pw, String[] args, int opti,
             boolean dumpAll, String dumpPackage, int displayIdFilter, boolean dumpClient,
             boolean dumpNormalPriority, int dumpAppId, boolean dumpProxies) {
@@ -9986,6 +9998,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 sdumper.dumpLocked();
             }
         }
+
+        // No need to hold the lock.
+        pw.println(TICK);
+        AnrTimer.dump(pw, false);
+
         // We drop the lock here because we can't call dumpWithClient() with the lock held;
         // if the caller wants a consistent state for the !dumpClient case, it can call this
         // method with the lock held.
@@ -10431,6 +10448,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     mOomAdjuster.dumpCachedAppOptimizerSettings(pw);
                     mOomAdjuster.dumpCacheOomRankerSettings(pw);
                 }
+            } else if ("timers".equals(cmd)) {
+                AnrTimer.dump(pw, true);
             } else if ("services".equals(cmd) || "s".equals(cmd)) {
                 if (dumpClient) {
                     ActiveServices.ServiceDumper dumper;

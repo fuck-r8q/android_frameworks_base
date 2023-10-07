@@ -25,8 +25,6 @@ import com.android.systemui.authentication.domain.model.AuthenticationMethodMode
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.flags.FakeFeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardLongPressViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenSceneViewModel
@@ -38,7 +36,14 @@ import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.settings.FakeDisplayTracker
+import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
+import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
+import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
+import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
+import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -125,12 +130,24 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 ),
         )
 
-    private val shadeSceneViewModel =
-        ShadeSceneViewModel(
-            applicationScope = testScope.backgroundScope,
-            authenticationInteractor = authenticationInteractor,
-            bouncerInteractor = bouncerInteractor,
+    private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
+
+    private var mobileIconsViewModel: MobileIconsViewModel =
+        MobileIconsViewModel(
+            logger = mock(),
+            verboseLogger = mock(),
+            interactor = mobileIconsInteractor,
+            airplaneModeInteractor =
+                AirplaneModeInteractor(
+                    FakeAirplaneModeRepository(),
+                    FakeConnectivityRepository(),
+                ),
+            constants = mock(),
+            scope = testScope.backgroundScope,
         )
+
+    private lateinit var shadeHeaderViewModel: ShadeHeaderViewModel
+    private lateinit var shadeSceneViewModel: ShadeSceneViewModel
 
     private val keyguardRepository = utils.keyguardRepository
     private val keyguardInteractor =
@@ -140,7 +157,23 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
-        val featureFlags = FakeFeatureFlags().apply { set(Flags.SCENE_CONTAINER, true) }
+        shadeHeaderViewModel =
+            ShadeHeaderViewModel(
+                applicationScope = testScope.backgroundScope,
+                context = context,
+                sceneInteractor = sceneInteractor,
+                mobileIconsInteractor = mobileIconsInteractor,
+                mobileIconsViewModel = mobileIconsViewModel,
+                broadcastDispatcher = fakeBroadcastDispatcher,
+            )
+
+        shadeSceneViewModel =
+            ShadeSceneViewModel(
+                applicationScope = testScope.backgroundScope,
+                authenticationInteractor = authenticationInteractor,
+                bouncerInteractor = bouncerInteractor,
+                shadeHeaderViewModel = shadeHeaderViewModel,
+            )
 
         authenticationRepository.setUnlocked(false)
 
@@ -152,7 +185,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 sceneInteractor = sceneInteractor,
                 authenticationInteractor = authenticationInteractor,
                 keyguardInteractor = keyguardInteractor,
-                featureFlags = featureFlags,
+                flags = utils.sceneContainerFlags,
                 sysUiState = sysUiState,
                 displayId = displayTracker.defaultDisplayId,
                 sceneLogger = mock(),

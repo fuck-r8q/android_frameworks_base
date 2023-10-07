@@ -5286,7 +5286,7 @@ public class Intent implements Parcelable, Cloneable {
      * Broadcast Action: Sent to the responsible installer of an archived package when unarchival
      * is requested.
      *
-     * @see android.content.pm.PackageArchiver
+     * @see android.content.pm.PackageInstaller#requestUnarchive(String)
      * @hide
      */
     @SystemApi
@@ -6280,6 +6280,14 @@ public class Intent implements Parcelable, Cloneable {
      * different version of the same package.
      */
     public static final String EXTRA_REPLACING = "android.intent.extra.REPLACING";
+
+    /**
+     * Used as a boolean extra field in {@link android.content.Intent#ACTION_PACKAGE_ADDED} and
+     * {@link android.content.Intent#ACTION_PACKAGE_REMOVED} intents to indicate that
+     * the package is being archived. Either by removing the existing APK, or by installing
+     * a package without an APK.
+     */
+    public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
 
     /**
      * Used as a boolean extra field in {@link android.content.Intent#ACTION_PACKAGE_REMOVED}

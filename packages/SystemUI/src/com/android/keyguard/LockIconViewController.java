@@ -45,6 +45,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -54,12 +55,12 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
-import com.android.settingslib.udfps.UdfpsOverlayParams;
 import com.android.systemui.Dumpable;
 import com.android.systemui.R;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.AuthRippleController;
 import com.android.systemui.biometrics.UdfpsController;
+import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -423,7 +424,13 @@ public class LockIconViewController implements Dumpable {
     private void updateConfiguration() {
         WindowManager windowManager = mContext.getSystemService(WindowManager.class);
         Rect bounds = windowManager.getCurrentWindowMetrics().getBounds();
+        WindowInsets insets = windowManager.getCurrentWindowMetrics().getWindowInsets();
         mWidthPixels = bounds.right;
+        if (mFeatureFlags.isEnabled(Flags.LOCKSCREEN_ENABLE_LANDSCAPE)) {
+            // Assumed to be initially neglected as there are no left or right insets in portrait
+            // However, on landscape, these insets need to included when calculating the midpoint
+            mWidthPixels -= insets.getSystemWindowInsetLeft() + insets.getSystemWindowInsetRight();
+        }
         mHeightPixels = bounds.bottom;
         mBottomPaddingPx = mResources.getDimensionPixelSize(R.dimen.lock_icon_margin_bottom);
         mDefaultPaddingPx = mResources.getDimensionPixelSize(R.dimen.lock_icon_padding);

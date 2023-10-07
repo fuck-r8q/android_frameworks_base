@@ -42,6 +42,7 @@
 #include <android_view_VerifiedMotionEvent.h>
 #include <batteryservice/include/batteryservice/BatteryServiceConstants.h>
 #include <binder/IServiceManager.h>
+#include <com_android_input_flags.h>
 #include <input/Input.h>
 #include <input/PointerController.h>
 #include <input/SpriteController.h>
@@ -80,6 +81,8 @@ using android::os::InputEventInjectionSync;
 static constexpr std::chrono::duration MAX_VIBRATE_PATTERN_DELAY = 100s;
 static constexpr std::chrono::milliseconds MAX_VIBRATE_PATTERN_DELAY_MILLIS =
         std::chrono::duration_cast<std::chrono::milliseconds>(MAX_VIBRATE_PATTERN_DELAY);
+
+namespace input_flags = com::android::input::flags;
 
 namespace android {
 
@@ -372,7 +375,7 @@ public:
     virtual void onPointerDisplayIdChanged(int32_t displayId, const FloatPoint& position);
 
     /* --- PointerControllerPolicyInterface implementation --- */
-    virtual std::shared_ptr<PointerControllerInterface> createPointerController() override;
+    std::shared_ptr<PointerControllerInterface> createPointerController() override;
 
 private:
     sp<InputManagerInterface> mInputManager;
@@ -489,7 +492,7 @@ void NativeInputManager::dump(std::string& dump) {
         dump += StringPrintf(INDENT "Pointer Capture: %s, seq=%" PRIu32 "\n",
                              mLocked.pointerCaptureRequest.enable ? "Enabled" : "Disabled",
                              mLocked.pointerCaptureRequest.seq);
-        forEachPointerControllerLocked([&dump](PointerController& pc) { pc.dump(dump); });
+        forEachPointerControllerLocked([&dump](PointerController& pc) { dump += pc.dump(); });
     } // release lock
     dump += "\n";
 
@@ -530,9 +533,8 @@ void NativeInputManager::setDisplayViewports(JNIEnv* env, jobjectArray viewportO
     { // acquire lock
         std::scoped_lock _l(mLock);
         mLocked.viewports = viewports;
-        forEachPointerControllerLocked([viewports = std::move(viewports)](PointerController& pc) {
-            pc.onDisplayViewportsUpdated(viewports);
-        });
+        forEachPointerControllerLocked(
+                [&viewports](PointerController& pc) { pc.onDisplayViewportsUpdated(viewports); });
     } // release lock
 
     mInputManager->getReader().requestRefreshConfiguration(
@@ -734,7 +736,7 @@ std::shared_ptr<PointerControllerInterface> NativeInputManager::obtainPointerCon
         ensureSpriteControllerLocked();
 
         static const bool ENABLE_POINTER_CHOREOGRAPHER =
-                sysprop::InputProperties::enable_pointer_choreographer().value_or(false);
+                input_flags::enable_pointer_choreographer();
 
         // Disable the functionality of the legacy PointerController if PointerChoreographer is
         // enabled.

@@ -80,12 +80,6 @@ object KeyguardBottomAreaViewBinder {
     //If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
     @Deprecated("Deprecated as part of b/278057014")
     interface Binding {
-        /**
-         * Returns a collection of [ViewPropertyAnimator] instances that can be used to animate the
-         * indication areas.
-         */
-        fun getIndicationAreaAnimators(): List<ViewPropertyAnimator>
-
         /** Notifies that device configuration has changed. */
         fun onConfigurationChanged()
 
@@ -295,10 +289,6 @@ object KeyguardBottomAreaViewBinder {
             }
 
         return object : Binding {
-            override fun getIndicationAreaAnimators(): List<ViewPropertyAnimator> {
-                return listOf(ambientIndicationArea).mapNotNull { it?.animate() }
-            }
-
             override fun onConfigurationChanged() {
                 configurationBasedDimensions.value = loadFromResources(view)
             }

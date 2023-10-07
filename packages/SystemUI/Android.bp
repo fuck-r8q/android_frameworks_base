@@ -246,6 +246,9 @@ filegroup {
 
         /* Log fakes */
         "tests/src/com/android/systemui/log/core/FakeLogBuffer.kt",
+
+        /* QS fakes */
+        "tests/src/com/android/systemui/qs/pipeline/domain/interactor/FakeQSTile.kt",
     ],
     path: "tests/src",
 }
@@ -299,8 +302,6 @@ filegroup {
 
         /* Biometric converted tests */
         "tests/src/com/android/systemui/biometrics/BiometricTestExtensions.kt",
-        "tests/src/com/android/systemui/biometrics/AuthBiometricFingerprintAndFaceViewTest.kt",
-        "tests/src/com/android/systemui/biometrics/AuthBiometricFingerprintViewTest.kt",
         "tests/src/com/android/systemui/biometrics/AuthControllerTest.java",
         "tests/src/com/android/systemui/biometrics/BiometricDisplayListenerTest.java",
         "tests/src/com/android/systemui/biometrics/FaceHelpMessageDeferralTest.kt",
@@ -354,6 +355,17 @@ filegroup {
         "tests/src/com/android/systemui/dreams/DreamOverlayStateControllerTest.java",
         "tests/src/com/android/systemui/dreams/DreamOverlayStatusBarItemsProviderTest.java",
         "tests/src/com/android/systemui/dreams/DreamOverlayStatusBarViewControllerTest.java",
+
+        /* Smartspace tests */
+        "tests/src/com/android/systemui/smartspace/BcSmartspaceConfigProviderTest.kt",
+        "tests/src/com/android/systemui/smartspace/DreamSmartspaceControllerTest.kt",
+        "tests/src/com/android/systemui/smartspace/LockscreenAndDreamTargetFilterTest.kt",
+        "tests/src/com/android/systemui/smartspace/LockscreenPreconditionTest.kt",
+
+        /* Quick Settings new pipeline converted tests */
+        "tests/src/com/android/systemui/qs/pipeline/data/**/*Test.kt",
+        "tests/src/com/android/systemui/qs/pipeline/domain/**/*Test.kt",
+        "tests/src/com/android/systemui/qs/pipeline/shared/TileSpecTest.kt",
     ],
     path: "tests/src",
 }
@@ -563,10 +575,12 @@ systemui_optimized_java_defaults {
                 optimize: true,
                 shrink: true,
                 shrink_resources: true,
+                ignore_warnings: false,
                 proguard_compatibility: false,
             },
             conditions_default: {
                 optimize: {
+                    ignore_warnings: false,
                     proguard_compatibility: false,
                 },
             },

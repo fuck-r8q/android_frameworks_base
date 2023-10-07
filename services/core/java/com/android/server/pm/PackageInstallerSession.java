@@ -40,7 +40,6 @@ import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
 import static android.system.OsConstants.O_CREAT;
 import static android.system.OsConstants.O_RDONLY;
 import static android.system.OsConstants.O_WRONLY;
-
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.internal.util.XmlUtils.readBitmapAttribute;
 import static com.android.internal.util.XmlUtils.readByteArrayAttribute;
@@ -1174,6 +1173,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 throw new IllegalArgumentException(
                         "Archived installation can only use Streaming System DataLoader.");
             }
+            if (!TextUtils.isEmpty(params.appPackageName) && !isArchivedInstallationAllowed(
+                    params.appPackageName)) {
+                throw new IllegalArgumentException(
+                        "Archived installation of this package is not allowed.");
+            }
         }
     }
 
@@ -2237,6 +2241,19 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // require caller to hold the INSTALL_PACKAGES permission
         return context.checkCallingOrSelfPermission(Manifest.permission.INSTALL_PACKAGES)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Check if this package can be installed archived.
+     */
+    private static boolean isArchivedInstallationAllowed(String packageName) {
+        final PackageManagerInternal pmi = LocalServices.getService(PackageManagerInternal.class);
+        final PackageStateInternal existingPkgSetting = pmi.getPackageStateInternal(packageName);
+        if (existingPkgSetting == null) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -3391,6 +3408,23 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         }
 
+        if (isArchivedInstallation()) {
+            if (!isArchivedInstallationAllowed(mPackageName)) {
+                throw new PackageManagerException(
+                        PackageManager.INSTALL_FAILED_SESSION_INVALID,
+                        "Archived installation of this package is not allowed.");
+            }
+
+            if (!isInstalledByAdb(getInstallSource().mInitiatingPackageName)
+                    && !mPm.mInstallerService.mPackageArchiver.verifySupportsUnarchival(
+                    getInstallSource().mInstallerPackageName)) {
+                throw new PackageManagerException(
+                        PackageManager.INSTALL_FAILED_SESSION_INVALID,
+                        "Installer has to support unarchival in order to install archived "
+                                + "packages.");
+            }
+        }
+
         if (isIncrementalInstallation()) {
             if (!isIncrementalInstallationAllowed(mPackageName)) {
                 throw new PackageManagerException(
@@ -3627,6 +3661,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private void maybeStageFsveritySignatureLocked(File origFile, File targetFile,
             boolean fsVerityRequired) throws PackageManagerException {
+        if (android.security.Flags.deprecateFsvSig()) {
+            return;
+        }
         final File originalSignature = new File(
                 VerityUtils.getFsveritySignatureFilePath(origFile.getPath()));
         if (originalSignature.exists()) {
