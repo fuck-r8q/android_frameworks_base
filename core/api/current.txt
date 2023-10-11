@@ -10992,6 +10992,7 @@ package android.content {
     field public static final String ACTION_PACKAGE_REMOVED = "android.intent.action.PACKAGE_REMOVED";
     field public static final String ACTION_PACKAGE_REPLACED = "android.intent.action.PACKAGE_REPLACED";
     field public static final String ACTION_PACKAGE_RESTARTED = "android.intent.action.PACKAGE_RESTARTED";
+    field @FlaggedApi("android.content.pm.stay_stopped") public static final String ACTION_PACKAGE_UNSTOPPED = "android.intent.action.PACKAGE_UNSTOPPED";
     field public static final String ACTION_PACKAGE_VERIFIED = "android.intent.action.PACKAGE_VERIFIED";
     field public static final String ACTION_PASTE = "android.intent.action.PASTE";
     field public static final String ACTION_PICK = "android.intent.action.PICK";
@@ -12673,6 +12674,7 @@ package android.content.pm {
     method public boolean isDeviceUpgrading();
     method public abstract boolean isInstantApp();
     method public abstract boolean isInstantApp(@NonNull String);
+    method @FlaggedApi("android.content.pm.stay_stopped") public boolean isPackageStopped(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPackageSuspended(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPackageSuspended();
     method @CheckResult public abstract boolean isPermissionRevokedByPolicy(@NonNull String, @NonNull String);
@@ -17666,6 +17668,7 @@ package android.graphics.text {
     field public static final int LINE_BREAK_STYLE_LOOSE = 1; // 0x1
     field public static final int LINE_BREAK_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_STYLE_NORMAL = 2; // 0x2
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_NO_BREAK = 4; // 0x4
     field public static final int LINE_BREAK_STYLE_STRICT = 3; // 0x3
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_UNSPECIFIED = -1; // 0xffffffff
     field public static final int LINE_BREAK_WORD_STYLE_NONE = 0; // 0x0
@@ -46672,10 +46675,10 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setHyphenationFrequency(int);
     method @NonNull public android.text.DynamicLayout.Builder setIncludePad(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setJustificationMode(int);
-    method @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
-    method @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -47199,7 +47202,7 @@ package android.text {
     method @NonNull public android.text.StaticLayout.Builder setMaxLines(@IntRange(from=0) int);
     method public android.text.StaticLayout.Builder setText(CharSequence);
     method @NonNull public android.text.StaticLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
-    method @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.StaticLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -47910,6 +47913,10 @@ package android.text.style {
   @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public class LineBreakConfigSpan {
     ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan(@NonNull android.graphics.text.LineBreakConfig);
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
+  }
+
+  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final class LineBreakConfigSpan.NoBreakSpan extends android.text.style.LineBreakConfigSpan {
+    ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan.NoBreakSpan();
   }
 
   @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final class LineBreakConfigSpan.NoHyphenationSpan extends android.text.style.LineBreakConfigSpan {
