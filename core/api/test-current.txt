@@ -1,4 +1,6 @@
 // Signature format: 2.0
+// - add-additional-overrides=no
+// - migrating=Migration in progress see b/299366704
 package android {
 
   public static final class Manifest.permission {
@@ -2957,10 +2959,6 @@ package android.service.notification {
     method @Deprecated public boolean isBound();
   }
 
-  public class NotificationRankingUpdate implements android.os.Parcelable {
-    method public final boolean isFdNotNullAndClosed();
-  }
-
 }
 
 package android.service.quickaccesswallet {
@@ -3190,7 +3188,7 @@ package android.telephony {
     field public static final int HAL_SERVICE_MESSAGING = 2; // 0x2
     field public static final int HAL_SERVICE_MODEM = 3; // 0x3
     field public static final int HAL_SERVICE_NETWORK = 4; // 0x4
-    field public static final int HAL_SERVICE_SATELLITE = 8; // 0x8
+    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int HAL_SERVICE_SATELLITE = 8; // 0x8
     field public static final int HAL_SERVICE_SIM = 5; // 0x5
     field public static final int HAL_SERVICE_VOICE = 6; // 0x6
     field public static final android.util.Pair HAL_VERSION_UNKNOWN;
@@ -3410,7 +3408,7 @@ package android.view {
 
   public final class Choreographer {
     method public static long getFrameDelay();
-    method public long getFrameTimeNanos();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public long getFrameTimeNanos();
     method public void postCallback(int, Runnable, Object);
     method public void postCallbackDelayed(int, Runnable, Object, long);
     method public void removeCallbacks(int, Runnable, Object);
@@ -3571,8 +3569,8 @@ package android.view {
     method public default void holdLock(android.os.IBinder, int);
     method public default boolean isGlobalKey(int);
     method public default boolean isTaskSnapshotSupported();
-    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithMirror(int, @NonNull android.view.Window);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithSc(int, @NonNull android.view.SurfaceControl);
+    method @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR") @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithMirror(int, @NonNull android.view.Window);
+    method @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR") @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithSc(int, @NonNull android.view.SurfaceControl);
     method public default void setDisplayImePolicy(int, int);
     method public default void setShouldShowSystemDecors(int, boolean);
     method public default void setShouldShowWithInsecureKeyguard(int, boolean);
@@ -3629,7 +3627,7 @@ package android.view.accessibility {
 package android.view.animation {
 
   public class AnimationUtils {
-    method public static void lockAnimationClock(long, long);
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static void lockAnimationClock(long, long);
     method public static void unlockAnimationClock();
   }
 
