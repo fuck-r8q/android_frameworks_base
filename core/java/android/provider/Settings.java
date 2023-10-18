@@ -687,7 +687,8 @@ public final class Settings {
             "com.android.settings.MONITORING_CERT_INFO";
 
     /**
-     * Activity Action: Show settings to allow configuration of privacy options.
+     * Activity Action: Show settings to allow configuration of privacy options, i.e. permission
+     * manager, privacy dashboard, privacy controls and more.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
      * safeguard against this.
@@ -699,6 +700,21 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_PRIVACY_SETTINGS =
             "android.settings.PRIVACY_SETTINGS";
+
+    /**
+     * Activity Action: Show privacy controls sub-page, i.e. privacy (camera/mic) toggles and more.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_PRIVACY_CONTROLS =
+            "android.settings.PRIVACY_CONTROLS";
 
     /**
      * Activity Action: Show settings to allow configuration of VPN.
@@ -3596,12 +3612,9 @@ public final class Settings {
                 }
 
                 Bundle b;
-                // b/252663068: if we're in system server and the caller did not call
+                // If we're in system server and the caller did not call
                 // clearCallingIdentity, the read would fail due to mismatched AttributionSources.
-                // TODO(b/256013480): remove this bypass after fixing the callers in system server.
-                if (namespace.equals(DeviceConfig.NAMESPACE_DEVICE_POLICY_MANAGER)
-                        && Settings.isInSystemServer()
-                        && Binder.getCallingUid() != Process.myUid()) {
+                if (Settings.isInSystemServer() && Binder.getCallingUid() != Process.myUid()) {
                     final long token = Binder.clearCallingIdentity();
                     try {
                         // Fetch all flags for the namespace at once for caching purposes

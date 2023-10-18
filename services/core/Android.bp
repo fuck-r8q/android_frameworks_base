@@ -211,9 +211,11 @@ java_library_static {
     visibility: [
       "//frameworks/base/services",
       "//frameworks/base/tests/Input",
-      "//packages/modules/AdServices/adservices/tests/unittest/system-service",
-      "//packages/modules/AdServices/adservices/tests/unittest/service-core",
+      "//frameworks/base/tests/InputScreenshotTest",
       "//packages/modules/AdServices/adservices/tests/unittest/adservices-test-utility",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core",
+      "//packages/modules/AdServices/adservices/tests/unittest/system-service",
+      "//packages/modules/AdServices/adservices/tests/unittest/ui",
     ],
 }
 

@@ -32,6 +32,7 @@ import com.android.settingslib.spa.gallery.itemList.ItemListPageProvider
 import com.android.settingslib.spa.gallery.itemList.ItemOperatePageProvider
 import com.android.settingslib.spa.gallery.itemList.OperateListPageProvider
 import com.android.settingslib.spa.gallery.editor.SettingsOutlinedTextFieldPageProvider
+import com.android.settingslib.spa.gallery.editor.SettingsTextFieldPasswordPageProvider
 import com.android.settingslib.spa.gallery.page.ArgumentPageProvider
 import com.android.settingslib.spa.gallery.page.FooterPageProvider
 import com.android.settingslib.spa.gallery.page.IllustrationPageProvider
@@ -44,6 +45,7 @@ import com.android.settingslib.spa.gallery.preference.PreferenceMainPageProvider
 import com.android.settingslib.spa.gallery.preference.PreferencePageProvider
 import com.android.settingslib.spa.gallery.preference.SwitchPreferencePageProvider
 import com.android.settingslib.spa.gallery.preference.TwoTargetSwitchPreferencePageProvider
+import com.android.settingslib.spa.gallery.scaffold.SearchScaffoldPageProvider
 import com.android.settingslib.spa.gallery.ui.CategoryPageProvider
 import com.android.settingslib.spa.gallery.ui.SpinnerPageProvider
 import com.android.settingslib.spa.slice.SpaSliceBroadcastReceiver
@@ -92,6 +94,8 @@ class GallerySpaEnvironment(context: Context) : SpaEnvironment(context) {
                 SettingsOutlinedTextFieldPageProvider,
                 SettingsExposedDropdownMenuBoxPageProvider,
                 SettingsExposedDropdownMenuCheckBoxProvider,
+                SettingsTextFieldPasswordPageProvider,
+                SearchScaffoldPageProvider,
             ),
             rootPages = listOf(
                 HomePageProvider.createSettingsPage(),

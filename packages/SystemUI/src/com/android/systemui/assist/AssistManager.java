@@ -29,7 +29,7 @@ import com.android.internal.app.IVoiceInteractionSessionListener;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.keyguard.KeyguardUpdateMonitor;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.assist.ui.DefaultUiController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -309,8 +309,14 @@ public class AssistManager {
         }
 
         int invocationType = args.getInt(INVOCATION_TYPE_KEY);
-        return mAssistOverrideInvocationTypes != null && Arrays.stream(
-                mAssistOverrideInvocationTypes).anyMatch(override -> override == invocationType);
+        return shouldOverrideAssist(invocationType);
+    }
+
+    /** @return true if the invocation type should be handled by OverviewProxy instead of SysUI. */
+    public boolean shouldOverrideAssist(int invocationType) {
+        return mAssistOverrideInvocationTypes != null
+                && Arrays.stream(mAssistOverrideInvocationTypes).anyMatch(
+                        override -> override == invocationType);
     }
 
     /**

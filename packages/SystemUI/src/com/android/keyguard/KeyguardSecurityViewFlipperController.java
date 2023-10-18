@@ -17,6 +17,7 @@
 package com.android.keyguard;
 
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+
 import static com.android.systemui.flags.Flags.LOCKSCREEN_ENABLE_LANDSCAPE;
 
 import android.util.Log;
@@ -29,7 +30,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.keyguard.KeyguardInputViewController.Factory;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
 import com.android.keyguard.dagger.KeyguardBouncerScope;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.util.ViewController;
 
@@ -138,12 +139,12 @@ public class KeyguardSecurityViewFlipperController
                             onViewInflatedListener.onViewInflated(childController);
 
                             // Single bouncer constrains are default
-                            if (mFeatureFlags.isEnabled(LOCKSCREEN_ENABLE_LANDSCAPE)
-                                    &&
-                                    getResources().getBoolean(R.bool.update_bouncer_constraints)) {
+                            if (mFeatureFlags.isEnabled(LOCKSCREEN_ENABLE_LANDSCAPE)) {
                                 boolean useSplitBouncer =
-                                        getResources().getConfiguration().orientation
+                                        getResources().getBoolean(R.bool.update_bouncer_constraints)
+                                        && getResources().getConfiguration().orientation
                                                 == ORIENTATION_LANDSCAPE;
+
                                 updateConstraints(useSplitBouncer);
                             }
                         }
@@ -154,9 +155,9 @@ public class KeyguardSecurityViewFlipperController
     private int getLayoutIdFor(SecurityMode securityMode) {
         // TODO (b/297863911, b/297864907) - implement motion layout for other bouncers
         switch (securityMode) {
-            case Pattern: return R.layout.keyguard_pattern_view;
+            case Pattern: return R.layout.keyguard_pattern_motion_layout;
             case PIN: return R.layout.keyguard_pin_motion_layout;
-            case Password: return R.layout.keyguard_password_view;
+            case Password: return R.layout.keyguard_password_motion_layout;
             case SimPin: return R.layout.keyguard_sim_pin_view;
             case SimPuk: return R.layout.keyguard_sim_puk_view;
             default:

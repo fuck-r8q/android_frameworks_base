@@ -175,6 +175,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private final Token mToken;
     private IApplicationThread mRemoteAnimApp;
 
+    private @Nullable ActivityRecord mPipActivity;
+
     /** Only use for clean-up after binder death! */
     private SurfaceControl.Transaction mStartTransaction = null;
     private SurfaceControl.Transaction mFinishTransaction = null;
@@ -516,6 +518,21 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS, "Override sync-method for %s "
                     + "because seamless rotating", top.getName());
         }
+    }
+
+    /**
+     * Set the pip-able activity participating in this transition.
+     * @param pipActivity activity about to enter pip
+     */
+    void setPipActivity(@Nullable ActivityRecord pipActivity) {
+        mPipActivity = pipActivity;
+    }
+
+    /**
+     * @return pip-able activity participating in this transition.
+     */
+    @Nullable ActivityRecord getPipActivity() {
+        return mPipActivity;
     }
 
     /**
@@ -1616,13 +1633,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
         }
 
-        // Take task snapshots before the animation so that we can capture IME before it gets
-        // transferred. If transition is transient, IME won't be moved during the transition and
-        // the tasks are still live, so we take the snapshot at the end of the transition instead.
-        if (mTransientLaunches == null) {
-            mController.mSnapshotController.onTransactionReady(mType, mTargets);
-        }
-
         // This is non-null only if display has changes. It handles the visible windows that don't
         // need to be participated in the transition.
         for (int i = 0; i < mTargetDisplays.size(); ++i) {
@@ -1672,6 +1682,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mOverrideOptions = null;
 
         reportStartReasonsToLogger();
+
+        // Take snapshots for closing tasks/activities before the animation finished but after
+        // dispatching onTransitionReady, so IME (if there is) can be captured together and the
+        // time spent on snapshot won't delay the start of animation. Note that if this transition
+        // is transient (mTransientLaunches != null), the snapshot will be captured at the end of
+        // the transition, because IME won't move be moved during the transition and the tasks are
+        // still live.
+        if (mTransientLaunches == null) {
+            mController.mSnapshotController.onTransactionReady(mType, mTargets);
+        }
 
         // Since we created root-leash but no longer reference it from core, release it now
         info.releaseAnimSurfaces();

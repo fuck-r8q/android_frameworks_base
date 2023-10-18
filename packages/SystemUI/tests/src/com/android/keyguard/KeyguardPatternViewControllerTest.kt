@@ -24,7 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.util.LatencyTracker
 import com.android.internal.widget.LockPatternUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.classifier.FalsingCollector
@@ -94,9 +94,10 @@ class KeyguardPatternViewControllerTest : SysuiTestCase() {
             .thenReturn(mKeyguardMessageAreaController)
         fakeFeatureFlags = FakeFeatureFlags()
         fakeFeatureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, false)
+        fakeFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
         mKeyguardPatternView =
             View.inflate(mContext, R.layout.keyguard_pattern_view, null) as KeyguardPatternView
-
+        mKeyguardPatternView.setIsLockScreenLandscapeEnabled(false)
         mKeyguardPatternViewController =
             KeyguardPatternViewController(
                 mKeyguardPatternView,

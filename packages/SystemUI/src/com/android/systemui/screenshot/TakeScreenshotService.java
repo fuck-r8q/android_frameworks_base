@@ -53,7 +53,7 @@ import android.widget.Toast;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.util.ScreenshotRequest;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.flags.FeatureFlags;
 
@@ -99,7 +99,11 @@ public class TakeScreenshotService extends Service {
 
     /** Informs about coarse grained state of the Controller. */
     public interface RequestCallback {
-        /** Respond to the current request indicating the screenshot request failed. */
+        /**
+         * Respond to the current request indicating the screenshot request failed.
+         * <p>
+         * After this, the service will be disconnected and all visible UI is removed.
+         */
         void reportError();
 
         /** The controller has completed handling this request UI has been removed */

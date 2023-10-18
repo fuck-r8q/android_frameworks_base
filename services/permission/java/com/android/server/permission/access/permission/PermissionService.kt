@@ -985,7 +985,7 @@ class PermissionService(
     ) {
         val appOpPolicy = service.getSchemePolicy(UidUri.SCHEME, AppOpUri.SCHEME) as
             AppIdAppOpPolicy
-        val appOpName = checkNotNull(AppOpsManager.permissionToOp(permissionName))
+        val appOpName = AppOpsManager.permissionToOp(permissionName)!!
         val mode = if (isGranted) AppOpsManager.MODE_ALLOWED else AppOpsManager.MODE_ERRORED
         with(appOpPolicy) { setAppOpMode(packageState.appId, userId, appOpName, mode) }
     }
@@ -1753,10 +1753,19 @@ class PermissionService(
     }
 
     override fun addOnPermissionsChangeListener(listener: IOnPermissionsChangeListener) {
+        context.enforceCallingOrSelfPermission(
+            Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS, "addOnPermissionsChangeListener"
+        )
+
         onPermissionsChangeListeners.addListener(listener)
     }
 
     override fun removeOnPermissionsChangeListener(listener: IOnPermissionsChangeListener) {
+        context.enforceCallingOrSelfPermission(
+            Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS,
+            "removeOnPermissionsChangeListener"
+        )
+
         onPermissionsChangeListeners.removeListener(listener)
     }
 

@@ -206,6 +206,7 @@
     <uses-permission android:name="android.permission.ACCESS_CONTENT_PROVIDERS_EXTERNALLY" />
     <uses-permission android:name="android.permission.GRANT_RUNTIME_PERMISSIONS" />
     <uses-permission android:name="android.permission.REVOKE_RUNTIME_PERMISSIONS" />
+    <uses-permission android:name="android.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS" />
     <uses-permission android:name="android.permission.INSTALL_GRANT_RUNTIME_PERMISSIONS" />
     <uses-permission android:name="android.permission.WHITELIST_RESTRICTED_PERMISSIONS" />
     <!-- Permission required for processes that don't own the focused window to switch
@@ -852,6 +853,9 @@
     <uses-permission android:name="android.permission.MANAGE_DISPLAYS" />
     <!-- Permission required for accessing all content provider mime types -->
     <uses-permission android:name="android.permission.GET_ANY_PROVIDER_TYPE" />
+
+    <!-- Permission required for CTS-in-sandbox tests -->
+    <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_SDK_SANDBOX" />
 
     <!-- Permission required for CTS test - CtsWallpaperTestCases -->
     <uses-permission android:name="android.permission.ALWAYS_UPDATE_WALLPAPER" />

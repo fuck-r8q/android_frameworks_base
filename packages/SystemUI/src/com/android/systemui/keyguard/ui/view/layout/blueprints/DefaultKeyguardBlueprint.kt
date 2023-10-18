@@ -17,10 +17,7 @@
 
 package com.android.systemui.keyguard.ui.view.layout.blueprints
 
-import androidx.constraintlayout.widget.ConstraintLayout
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.shared.model.KeyguardBlueprint
 import com.android.systemui.keyguard.ui.view.layout.sections.AodNotificationIconsSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultAmbientIndicationAreaSection
@@ -29,6 +26,7 @@ import com.android.systemui.keyguard.ui.view.layout.sections.DefaultLockIconSect
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultNotificationStackScrollLayoutSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultSettingsPopupMenuSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultShortcutsSection
+import com.android.systemui.keyguard.ui.view.layout.sections.DefaultStatusBarSection
 import com.android.systemui.keyguard.ui.view.layout.sections.DefaultStatusViewSection
 import com.android.systemui.keyguard.ui.view.layout.sections.SplitShadeGuidelines
 import javax.inject.Inject
@@ -49,10 +47,10 @@ constructor(
     defaultAmbientIndicationAreaSection: DefaultAmbientIndicationAreaSection,
     defaultSettingsPopupMenuSection: DefaultSettingsPopupMenuSection,
     defaultStatusViewSection: DefaultStatusViewSection,
+    defaultStatusBarSection: DefaultStatusBarSection,
     defaultNotificationStackScrollLayoutSection: DefaultNotificationStackScrollLayoutSection,
     splitShadeGuidelines: SplitShadeGuidelines,
     aodNotificationIconsSection: AodNotificationIconsSection,
-    private val featureFlags: FeatureFlags,
 ) : KeyguardBlueprint {
     override val id: String = DEFAULT
 
@@ -64,20 +62,11 @@ constructor(
             defaultAmbientIndicationAreaSection,
             defaultSettingsPopupMenuSection,
             defaultStatusViewSection,
+            defaultStatusBarSection,
             defaultNotificationStackScrollLayoutSection,
             splitShadeGuidelines,
             aodNotificationIconsSection,
         )
-
-    override fun replaceViews(
-        previousBlueprint: KeyguardBlueprint?,
-        constraintLayout: ConstraintLayout,
-        bindData: Boolean
-    ) {
-        if (featureFlags.isEnabled(Flags.LAZY_INFLATE_KEYGUARD)) {
-            super.replaceViews(previousBlueprint, constraintLayout, bindData)
-        }
-    }
 
     companion object {
         const val DEFAULT = "default"

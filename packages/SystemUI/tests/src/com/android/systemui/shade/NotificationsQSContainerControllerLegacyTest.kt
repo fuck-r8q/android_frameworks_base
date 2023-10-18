@@ -27,7 +27,7 @@ import androidx.annotation.IdRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
@@ -101,7 +101,11 @@ class NotificationsQSContainerControllerLegacyTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
         fakeSystemClock = FakeSystemClock()
         delayableExecutor = FakeExecutor(fakeSystemClock)
-        featureFlags = FakeFeatureFlags().apply { set(Flags.MIGRATE_NSSL, false) }
+        featureFlags =
+            FakeFeatureFlags().apply {
+                set(Flags.MIGRATE_NSSL, false)
+                set(Flags.QS_CONTAINER_GRAPH_OPTIMIZER, false)
+            }
         mContext.ensureTestableResources()
         whenever(view.context).thenReturn(mContext)
         whenever(view.resources).thenReturn(mContext.resources)

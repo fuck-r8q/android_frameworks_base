@@ -116,7 +116,7 @@ import com.android.keyguard.dagger.KeyguardUserSwitcherComponent;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.Dumpable;
 import com.android.systemui.Gefingerpoken;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.LaunchAnimator;
 import com.android.systemui.biometrics.AuthController;
@@ -207,7 +207,6 @@ import com.android.systemui.statusbar.phone.KeyguardBottomAreaView;
 import com.android.systemui.statusbar.phone.KeyguardBottomAreaViewController;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.KeyguardClockPositionAlgorithm;
-import com.android.systemui.statusbar.phone.KeyguardStatusBarView;
 import com.android.systemui.statusbar.phone.KeyguardStatusBarViewController;
 import com.android.systemui.statusbar.phone.LockscreenGestureLogger;
 import com.android.systemui.statusbar.phone.LockscreenGestureLogger.LockscreenUiEvent;
@@ -383,7 +382,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private int mMaxAllowedKeyguardNotifications;
     private KeyguardQsUserSwitchController mKeyguardQsUserSwitchController;
     private KeyguardUserSwitcherController mKeyguardUserSwitcherController;
-    private KeyguardStatusBarView mKeyguardStatusBar;
     private KeyguardStatusBarViewController mKeyguardStatusBarViewController;
     private KeyguardStatusViewController mKeyguardStatusViewController;
     private final LockIconViewController mLockIconViewController;
@@ -594,6 +592,8 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private boolean mGestureWaitForTouchSlop;
     private boolean mIgnoreXTouchSlop;
     private boolean mExpandLatencyTracking;
+    private boolean mUseExternalTouch = false;
+
     /**
      * Whether we're waking up and will play the delayed doze animation in
      * {@link NotificationWakeUpCoordinator}. If so, we'll want to keep the clock centered until the
@@ -1043,7 +1043,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     @VisibleForTesting
     void onFinishInflate() {
         loadDimens();
-        mKeyguardStatusBar = mView.findViewById(R.id.keyguard_header);
 
         FrameLayout userAvatarContainer = null;
         KeyguardUserSwitcherView keyguardUserSwitcherView = null;
@@ -1061,7 +1060,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
         mKeyguardStatusBarViewController =
                 mKeyguardStatusBarViewComponentFactory.build(
-                                mKeyguardStatusBar,
+                                mView.findViewById(R.id.keyguard_header),
                                 mShadeViewStateProvider)
                         .getKeyguardStatusBarViewController();
         mKeyguardStatusBarViewController.init();
@@ -1234,7 +1233,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private void updateViewControllers(
             FrameLayout userAvatarView,
             KeyguardUserSwitcherView keyguardUserSwitcherView) {
-        updateStatusBarViewController();
+        updateStatusViewController();
         if (mKeyguardUserSwitcherController != null) {
             // Try to close the switcher so that callbacks are triggered if necessary.
             // Otherwise, NPV can get into a state where some of the views are still hidden
@@ -1265,7 +1264,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     /** Updates the StatusBarViewController and updates any that depend on it. */
-    public void updateStatusBarViewController() {
+    public void updateStatusViewController() {
         // Re-associate the KeyguardStatusViewController
         if (mKeyguardStatusViewController != null) {
             mKeyguardStatusViewController.onDestroy();
@@ -1414,13 +1413,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                         showKeyguardUserSwitcher /* enabled */);
 
         updateViewControllers(userAvatarView, keyguardUserSwitcherView);
-
-        if (mFeatureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW) && !mFeatureFlags.isEnabled(
-                Flags.LAZY_INFLATE_KEYGUARD)) {
-            attachSplitShadeMediaPlayerContainer(
-                    mKeyguardViewConfigurator.getKeyguardRootView()
-                        .findViewById(R.id.status_view_media_container));
-        }
 
         if (!mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
             // Update keyguard bottom area
@@ -1695,6 +1687,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     @ClockSize
     private int computeDesiredClockSize() {
+        if (shouldForceSmallClock()) {
+            return SMALL;
+        }
+
         if (mSplitShadeEnabled) {
             return computeDesiredClockSizeForSplitShade();
         }
@@ -1725,6 +1721,13 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             return SMALL;
         }
         return LARGE;
+    }
+
+    private boolean shouldForceSmallClock() {
+        return mFeatureFlags.isEnabled(Flags.LOCKSCREEN_ENABLE_LANDSCAPE)
+                && !isOnAod()
+                // True on small landscape screens
+                && mResources.getBoolean(R.bool.force_small_clock_on_lockscreen);
     }
 
     private void updateKeyguardStatusViewAlignment(boolean animate) {
@@ -1854,6 +1857,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     /** Returns extra space available to show the shelf on lockscreen */
     @VisibleForTesting
     float getVerticalSpaceForLockscreenShelf() {
+        if (mSplitShadeEnabled) {
+            return 0f;
+        }
         final float lockIconPadding = getLockIconPadding();
 
         final float noShelfOverlapBottomPadding =
@@ -2258,7 +2264,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     @Override
-    public void startWaitingForExpandGesture() {
+    public void startInputFocusTransfer() {
+        if (!mCommandQueue.panelsEnabled()) {
+            return;
+        }
         if (!isFullyCollapsed()) {
             return;
         }
@@ -2268,16 +2277,36 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     @Override
-    public void stopWaitingForExpandGesture(boolean cancel, final float velocity) {
+    public void cancelInputFocusTransfer() {
+        if (!mCommandQueue.panelsEnabled()) {
+            return;
+        }
         if (mExpectingSynthesizedDown) {
             mExpectingSynthesizedDown = false;
-            if (cancel) {
-                collapse(false /* delayed */, 1.0f /* speedUpFactor */);
-            } else {
-                // Window never will receive touch events that typically trigger haptic on open.
-                maybeVibrateOnOpening(false /* openingWithTouch */);
-                fling(velocity > 1f ? 1000f * velocity : 0  /* expand */);
-            }
+            collapse(false /* delayed */, 1.0f /* speedUpFactor */);
+            onTrackingStopped(false);
+        }
+    }
+
+    /**
+     * There are two scenarios behind this function call. First, input focus transfer has
+     * successfully happened and this view already received synthetic DOWN event.
+     * (mExpectingSynthesizedDown == false). Do nothing.
+     *
+     * Second, before input focus transfer finished, user may have lifted finger in previous window
+     * and this window never received synthetic DOWN event. (mExpectingSynthesizedDown == true). In
+     * this case, we use the velocity to trigger fling event.
+     */
+    @Override
+    public void finishInputFocusTransfer(final float velocity) {
+        if (!mCommandQueue.panelsEnabled()) {
+            return;
+        }
+        if (mExpectingSynthesizedDown) {
+            mExpectingSynthesizedDown = false;
+            // Window never will receive touch events that typically trigger haptic on open.
+            maybeVibrateOnOpening(false /* openingWithTouch */);
+            fling(velocity > 1f ? 1000f * velocity : 0  /* expand */);
             onTrackingStopped(false);
         }
     }
@@ -2616,6 +2645,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         if (mPanelExpanded != isExpanded) {
             mPanelExpanded = isExpanded;
             updateSystemUiStateFlags();
+            mShadeRepository.setLegacyExpandedOrAwaitingInputTransfer(mPanelExpanded);
             mShadeExpansionStateManager.onShadeExpansionFullyChanged(isExpanded);
             if (!isExpanded) {
                 mQsController.closeQsCustomizer();
@@ -3742,8 +3772,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                     expand = true;
                     mShadeLog.logEndMotionEvent("endMotionEvent: cancel while on keyguard",
                             forceCancel, expand);
-                } else if (mCentralSurfaces.isBouncerShowingOverDream()) {
-                    expand = false;
                 } else {
                     // If we get a cancel, put the shade back to the state it was in when the
                     // gesture started
@@ -4135,12 +4163,22 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
 
     /** Sends an external (e.g. Status Bar) intercept touch event to the Shade touch handler. */
     boolean handleExternalInterceptTouch(MotionEvent event) {
-        return mTouchHandler.onInterceptTouchEvent(event);
+        try {
+            mUseExternalTouch = true;
+            return mTouchHandler.onInterceptTouchEvent(event);
+        } finally {
+            mUseExternalTouch = false;
+        }
     }
 
     @Override
     public boolean handleExternalTouch(MotionEvent event) {
-        return mTouchHandler.onTouchEvent(event);
+        try {
+            mUseExternalTouch = true;
+            return mTouchHandler.onTouchEvent(event);
+        } finally {
+            mUseExternalTouch = false;
+        }
     }
 
     @Override
@@ -4727,9 +4765,20 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     public final class TouchHandler implements View.OnTouchListener, Gefingerpoken {
         private long mLastTouchDownTime = -1L;
 
-        /** @see ViewGroup#onInterceptTouchEvent(MotionEvent) */
+        /**
+         * With the shade and lockscreen being separated in the view hierarchy, touch handling now
+         * originates with the parent window through {@link #handleExternalTouch}. This allows for
+         * parity with the legacy hierarchy while not undertaking a massive refactoring of touch
+         * handling.
+         *
+         * @see NotificationShadeWindowViewController#didNotificationPanelInterceptEvent
+         */
         @Override
         public boolean onInterceptTouchEvent(MotionEvent event) {
+            if (mFeatureFlags.isEnabled(Flags.MIGRATE_NSSL) && !mUseExternalTouch) {
+                return false;
+            }
+
             mShadeLog.logMotionEvent(event, "NPVC onInterceptTouchEvent");
             if (mQsController.disallowTouches()) {
                 mShadeLog.logMotionEvent(event,
@@ -4882,8 +4931,20 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
             return onTouchEvent(event);
         }
 
+        /**
+         * With the shade and lockscreen being separated in the view hierarchy, touch handling now
+         * originates with the parent window through {@link #handleExternalTouch}. This allows for
+         * parity with the legacy hierarchy while not undertaking a massive refactoring of touch
+         * handling.
+         *
+         * @see NotificationShadeWindowViewController#didNotificationPanelInterceptEvent
+         */
         @Override
         public boolean onTouchEvent(MotionEvent event) {
+            if (mFeatureFlags.isEnabled(Flags.MIGRATE_NSSL) && !mUseExternalTouch) {
+                return false;
+            }
+
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 if (event.getDownTime() == mLastTouchDownTime) {
                     // An issue can occur when swiping down after unlock, where multiple down
@@ -4903,10 +4964,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 return false;
             }
 
-            // Do not allow panel expansion if bouncer is scrimmed or showing over a dream,
+            // Do not allow panel expansion if bouncer is scrimmed,
             // otherwise user would be able to pull down QS or expand the shade.
-            if (mCentralSurfaces.isBouncerShowingScrimmed()
-                    || mCentralSurfaces.isBouncerShowingOverDream()) {
+            if (mCentralSurfaces.isBouncerShowingScrimmed()) {
                 mShadeLog.logMotionEvent(event,
                         "onTouch: ignore touch, bouncer scrimmed or showing over dream");
                 return false;

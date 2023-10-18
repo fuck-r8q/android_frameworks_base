@@ -22,7 +22,6 @@ import static com.android.systemui.plugins.ActivityStarter.OnDismissAction;
 import static com.android.systemui.statusbar.phone.BiometricUnlockController.MODE_WAKE_AND_UNLOCK;
 import static com.android.systemui.statusbar.phone.BiometricUnlockController.MODE_WAKE_AND_UNLOCK_PULSING;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
-import static com.android.systemui.util.kotlin.JavaAdapterKt.combineFlows;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -472,17 +471,11 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         }
 
         if (mFlags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR)) {
+            // Show the keyguard views whenever we've told WM that the lockscreen is visible.
             mShadeViewController.postToView(() ->
                     collectFlow(
                         getViewRootImpl().getView(),
-                        combineFlows(
-                                mKeyguardTransitionInteractor.getFinishedKeyguardState(),
-                                mWmLockscreenVisibilityInteractor.get()
-                                        .getUsingKeyguardGoingAwayAnimation(),
-                                (finishedState, animating) ->
-                                        KeyguardInteractor.Companion.isKeyguardVisibleInState(
-                                                finishedState)
-                                                || animating),
+                        mWmLockscreenVisibilityInteractor.get().getLockscreenVisibility(),
                         this::consumeShowStatusBarKeyguardView));
         }
     }
@@ -635,8 +628,12 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     protected void showBouncerOrKeyguard(boolean hideBouncerWhenShowing) {
         if (needsFullscreenBouncer() && !mDozing) {
             // The keyguard might be showing (already). So we need to hide it.
-            mCentralSurfaces.hideKeyguard();
-            mPrimaryBouncerInteractor.show(true);
+            if (!primaryBouncerIsShowing()) {
+                mCentralSurfaces.hideKeyguard();
+                mPrimaryBouncerInteractor.show(true);
+            } else {
+                Log.e(TAG, "Attempted to show the sim bouncer when it is already showing.");
+            }
         } else {
             mCentralSurfaces.showKeyguard();
             if (hideBouncerWhenShowing) {

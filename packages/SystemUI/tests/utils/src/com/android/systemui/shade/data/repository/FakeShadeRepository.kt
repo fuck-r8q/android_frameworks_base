@@ -17,12 +17,17 @@
 
 package com.android.systemui.shade.data.repository
 
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.shade.domain.model.ShadeModel
+import dagger.Binds
+import dagger.Module
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Fake implementation of [ShadeRepository] */
-class FakeShadeRepository : ShadeRepository {
+@SysUISingleton
+class FakeShadeRepository @Inject constructor() : ShadeRepository {
 
     private val _shadeModel = MutableStateFlow(ShadeModel())
     override val shadeModel: Flow<ShadeModel> = _shadeModel
@@ -46,6 +51,17 @@ class FakeShadeRepository : ShadeRepository {
 
     private val _legacyQsTracking = MutableStateFlow(false)
     @Deprecated("Use ShadeInteractor instead") override val legacyQsTracking = _legacyQsTracking
+
+    private val _legacyExpandedOrAwaitingInputTransfer = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyExpandedOrAwaitingInputTransfer = _legacyExpandedOrAwaitingInputTransfer
+
+    @Deprecated("Use ShadeInteractor instead")
+    override fun setLegacyExpandedOrAwaitingInputTransfer(
+        legacyExpandedOrAwaitingInputTransfer: Boolean
+    ) {
+        _legacyExpandedOrAwaitingInputTransfer.value = legacyExpandedOrAwaitingInputTransfer
+    }
 
     @Deprecated("Should only be called by NPVC and tests")
     override fun setLegacyQsTracking(legacyQsTracking: Boolean) {
@@ -77,4 +93,9 @@ class FakeShadeRepository : ShadeRepository {
     override fun setLegacyShadeExpansion(expandedFraction: Float) {
         _legacyShadeExpansion.value = expandedFraction
     }
+}
+
+@Module
+interface FakeShadeRepositoryModule {
+    @Binds fun bindFake(fake: FakeShadeRepository): ShadeRepository
 }

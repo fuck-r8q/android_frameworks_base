@@ -25,7 +25,7 @@ import android.os.UserManager
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.UiEventLogger
 import com.android.keyguard.KeyguardUpdateMonitor
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
@@ -402,6 +402,7 @@ class ShadeInteractorTest : SysuiTestCase() {
             assertThat(actual).isEqualTo(0.8f)
         }
 
+    @Test
     fun shadeExpansionWhenInSplitShadeAndQsExpanded() =
         testScope.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
@@ -410,27 +411,31 @@ class ShadeInteractorTest : SysuiTestCase() {
             keyguardRepository.setStatusBarState(StatusBarState.SHADE)
             overrideResource(R.bool.config_use_split_notification_shade, true)
             configurationRepository.onAnyConfigurationChange()
-            runCurrent()
             shadeRepository.setQsExpansion(.5f)
             shadeRepository.setLegacyShadeExpansion(.7f)
+            runCurrent()
 
             // THEN legacy shade expansion is passed through
             assertThat(actual).isEqualTo(.7f)
         }
 
+    @Test
     fun shadeExpansionWhenNotInSplitShadeAndQsExpanded() =
         testScope.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
 
             // WHEN split shade is not enabled and QS is expanded
             keyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            overrideResource(R.bool.config_use_split_notification_shade, false)
             shadeRepository.setQsExpansion(.5f)
             shadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
 
             // THEN shade expansion is zero
             assertThat(actual).isEqualTo(0f)
         }
 
+    @Test
     fun shadeExpansionWhenNotInSplitShadeAndQsCollapsed() =
         testScope.runTest {
             val actual by collectLastValue(underTest.shadeExpansion)
@@ -471,7 +476,7 @@ class ShadeInteractorTest : SysuiTestCase() {
     @Test
     fun expanding_shadeDraggedDown_expandingTrue() =
         testScope.runTest() {
-            val actual by collectLastValue(underTest.anyExpanding)
+            val actual by collectLastValue(underTest.isAnyExpanding)
 
             // GIVEN shade and QS collapsed
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -489,7 +494,7 @@ class ShadeInteractorTest : SysuiTestCase() {
     @Test
     fun expanding_qsDraggedDown_expandingTrue() =
         testScope.runTest() {
-            val actual by collectLastValue(underTest.anyExpanding)
+            val actual by collectLastValue(underTest.isAnyExpanding)
 
             // GIVEN shade and QS collapsed
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -507,7 +512,7 @@ class ShadeInteractorTest : SysuiTestCase() {
     @Test
     fun expanding_shadeDraggedUpAndDown() =
         testScope.runTest() {
-            val actual by collectLastValue(underTest.anyExpanding)
+            val actual by collectLastValue(underTest.isAnyExpanding)
 
             // WHEN shade starts collapsed then partially expanded
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -532,7 +537,7 @@ class ShadeInteractorTest : SysuiTestCase() {
             // THEN anyExpanding is still true
             assertThat(actual).isTrue()
 
-            // WHEN shade fully shadeExpanded
+            // WHEN shade fully expanded
             shadeRepository.setLegacyShadeExpansion(1f)
             runCurrent()
 
@@ -550,7 +555,7 @@ class ShadeInteractorTest : SysuiTestCase() {
     @Test
     fun expanding_shadeDraggedDownThenUp_expandingFalse() =
         testScope.runTest() {
-            val actual by collectLastValue(underTest.anyExpanding)
+            val actual by collectLastValue(underTest.isAnyExpanding)
 
             // GIVEN shade starts collapsed
             shadeRepository.setLegacyShadeExpansion(0f)
@@ -618,6 +623,7 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = key,
                         progress = progress,
+                        isUserInputDriven = false,
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -654,6 +660,7 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = key,
                         toScene = SceneKey.Lockscreen,
                         progress = progress,
+                        isUserInputDriven = false,
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -689,6 +696,7 @@ class ShadeInteractorTest : SysuiTestCase() {
                         fromScene = SceneKey.Lockscreen,
                         toScene = SceneKey.Shade,
                         progress = progress,
+                        isUserInputDriven = false,
                     )
                 )
             sceneInteractor.setTransitionState(transitionState)
@@ -707,5 +715,416 @@ class ShadeInteractorTest : SysuiTestCase() {
 
             // THEN expansion is still 0
             assertThat(expansionAmount).isEqualTo(0f)
+        }
+
+    @Test
+    fun userInteractingWithShade_shadeDraggedUpAndDown() =
+        testScope.runTest() {
+            val actual by collectLastValue(underTest.isUserInteractingWithShade)
+            // GIVEN shade collapsed and not tracking input
+            shadeRepository.setLegacyShadeExpansion(0f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+
+            // WHEN shade tracking starts
+            shadeRepository.setLegacyShadeTracking(true)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade dragged down halfway
+            shadeRepository.setLegacyShadeExpansion(.5f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade fully expanded but tracking is not stopped
+            shadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade fully collapsed but tracking is not stopped
+            shadeRepository.setLegacyShadeExpansion(0f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade dragged halfway and tracking is stopped
+            shadeRepository.setLegacyShadeExpansion(.6f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade completes expansion stopped
+            shadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+        }
+
+    @Test
+    fun userInteractingWithShade_shadeExpanded() =
+        testScope.runTest() {
+            val actual by collectLastValue(underTest.isUserInteractingWithShade)
+            // GIVEN shade collapsed and not tracking input
+            shadeRepository.setLegacyShadeExpansion(0f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+
+            // WHEN shade tracking starts
+            shadeRepository.setLegacyShadeTracking(true)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade dragged down halfway
+            shadeRepository.setLegacyShadeExpansion(.5f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade fully expanded and tracking is stopped
+            shadeRepository.setLegacyShadeExpansion(1f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+        }
+
+    @Test
+    fun userInteractingWithShade_shadePartiallyExpanded() =
+        testScope.runTest() {
+            val actual by collectLastValue(underTest.isUserInteractingWithShade)
+            // GIVEN shade collapsed and not tracking input
+            shadeRepository.setLegacyShadeExpansion(0f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+
+            // WHEN shade tracking starts
+            shadeRepository.setLegacyShadeTracking(true)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade partially expanded
+            shadeRepository.setLegacyShadeExpansion(.4f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN tracking is stopped
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade goes back to collapsed
+            shadeRepository.setLegacyShadeExpansion(0f)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+        }
+
+    @Test
+    fun userInteractingWithShade_shadeCollapsed() =
+        testScope.runTest() {
+            val actual by collectLastValue(underTest.isUserInteractingWithShade)
+            // GIVEN shade expanded and not tracking input
+            shadeRepository.setLegacyShadeExpansion(1f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+
+            // WHEN shade tracking starts
+            shadeRepository.setLegacyShadeTracking(true)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade dragged up halfway
+            shadeRepository.setLegacyShadeExpansion(.5f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN shade fully collapsed and tracking is stopped
+            shadeRepository.setLegacyShadeExpansion(0f)
+            shadeRepository.setLegacyShadeTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+        }
+
+    @Test
+    fun userInteractingWithQs_qsDraggedUpAndDown() =
+        testScope.runTest() {
+            val actual by collectLastValue(underTest.isUserInteractingWithQs)
+            // GIVEN qs collapsed and not tracking input
+            shadeRepository.setQsExpansion(0f)
+            shadeRepository.setLegacyQsTracking(false)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+
+            // WHEN qs tracking starts
+            shadeRepository.setLegacyQsTracking(true)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN qs dragged down halfway
+            shadeRepository.setQsExpansion(.5f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN qs fully expanded but tracking is not stopped
+            shadeRepository.setQsExpansion(1f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN qs fully collapsed but tracking is not stopped
+            shadeRepository.setQsExpansion(0f)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN qs dragged halfway and tracking is stopped
+            shadeRepository.setQsExpansion(.6f)
+            shadeRepository.setLegacyQsTracking(false)
+            runCurrent()
+
+            // THEN user is interacting
+            assertThat(actual).isTrue()
+
+            // WHEN qs completes expansion stopped
+            shadeRepository.setQsExpansion(1f)
+            runCurrent()
+
+            // THEN user is not interacting
+            assertThat(actual).isFalse()
+        }
+    @Test
+    fun userInteracting_idle() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val key = SceneKey.Shade
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is idle
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(ObservableTransitionState.Idle(key))
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+        }
+
+    @Test
+    fun userInteracting_transitioning_toScene_programmatic() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val key = SceneKey.QuickSettings
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is starting to move to the scene
+            val progress = MutableStateFlow(0f)
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Transition(
+                        fromScene = SceneKey.Lockscreen,
+                        toScene = key,
+                        progress = progress,
+                        isUserInputDriven = false,
+                    )
+                )
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+
+            // WHEN transition state is partially to the scene
+            progress.value = .4f
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+
+            // WHEN transition completes
+            progress.value = 1f
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+        }
+
+    @Test
+    fun userInteracting_transitioning_toScene_userInputDriven() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val key = SceneKey.QuickSettings
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is starting to move to the scene
+            val progress = MutableStateFlow(0f)
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Transition(
+                        fromScene = SceneKey.Lockscreen,
+                        toScene = key,
+                        progress = progress,
+                        isUserInputDriven = true,
+                    )
+                )
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+
+            // WHEN transition state is partially to the scene
+            progress.value = .4f
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+
+            // WHEN transition completes
+            progress.value = 1f
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+        }
+
+    @Test
+    fun userInteracting_transitioning_fromScene_programmatic() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val key = SceneKey.QuickSettings
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is starting to move to the scene
+            val progress = MutableStateFlow(0f)
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Transition(
+                        fromScene = key,
+                        toScene = SceneKey.Lockscreen,
+                        progress = progress,
+                        isUserInputDriven = false,
+                    )
+                )
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+
+            // WHEN transition state is partially to the scene
+            progress.value = .4f
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+
+            // WHEN transition completes
+            progress.value = 1f
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
+        }
+
+    @Test
+    fun userInteracting_transitioning_fromScene_userInputDriven() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val key = SceneKey.QuickSettings
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, key)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is starting to move to the scene
+            val progress = MutableStateFlow(0f)
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Transition(
+                        fromScene = key,
+                        toScene = SceneKey.Lockscreen,
+                        progress = progress,
+                        isUserInputDriven = true,
+                    )
+                )
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+
+            // WHEN transition state is partially to the scene
+            progress.value = .4f
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+
+            // WHEN transition completes
+            progress.value = 1f
+
+            // THEN interacting is true
+            assertThat(interacting).isTrue()
+        }
+
+    @Test
+    fun userInteracting_transitioning_toAndFromDifferentScenes() =
+        testScope.runTest() {
+            // GIVEN an interacting flow based on transitions to and from a scene
+            val interactingFlow = underTest.sceneBasedInteracting(sceneInteractor, SceneKey.Shade)
+            val interacting by collectLastValue(interactingFlow)
+
+            // WHEN transition state is starting to between different scenes
+            val progress = MutableStateFlow(0f)
+            val transitionState =
+                MutableStateFlow<ObservableTransitionState>(
+                    ObservableTransitionState.Transition(
+                        fromScene = SceneKey.Lockscreen,
+                        toScene = SceneKey.QuickSettings,
+                        progress = progress,
+                        isUserInputDriven = true,
+                    )
+                )
+            sceneInteractor.setTransitionState(transitionState)
+
+            // THEN interacting is false
+            assertThat(interacting).isFalse()
         }
 }

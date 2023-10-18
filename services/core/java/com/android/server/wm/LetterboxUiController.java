@@ -33,6 +33,7 @@ import static android.content.pm.ActivityInfo.OVERRIDE_RESPECT_REQUESTED_ORIENTA
 import static android.content.pm.ActivityInfo.OVERRIDE_UNDEFINED_ORIENTATION_TO_NOSENSOR;
 import static android.content.pm.ActivityInfo.OVERRIDE_UNDEFINED_ORIENTATION_TO_PORTRAIT;
 import static android.content.pm.ActivityInfo.OVERRIDE_USE_DISPLAY_LANDSCAPE_NATURAL_ORIENTATION;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
@@ -661,12 +662,25 @@ final class LetterboxUiController {
     @ScreenOrientation
     int overrideOrientationIfNeeded(@ScreenOrientation int candidate) {
         if (shouldApplyUserFullscreenOverride()) {
+            Slog.v(TAG, "Requested orientation " + screenOrientationToString(candidate) + " for "
+                    + mActivityRecord + " is overridden to "
+                    + screenOrientationToString(SCREEN_ORIENTATION_USER)
+                    + " by user aspect ratio settings.");
             return SCREEN_ORIENTATION_USER;
         }
 
         // In some cases (e.g. Kids app) we need to map the candidate orientation to some other
         // orientation.
         candidate = mActivityRecord.mWmService.mapOrientationRequest(candidate);
+
+        if (shouldApplyUserMinAspectRatioOverride() && (!isFixedOrientation(candidate)
+                || candidate == SCREEN_ORIENTATION_LOCKED)) {
+            Slog.v(TAG, "Requested orientation " + screenOrientationToString(candidate) + " for "
+                    + mActivityRecord + " is overridden to "
+                    + screenOrientationToString(SCREEN_ORIENTATION_PORTRAIT)
+                    + " by user aspect ratio settings.");
+            return SCREEN_ORIENTATION_PORTRAIT;
+        }
 
         if (FALSE.equals(mBooleanPropertyAllowOrientationOverride)) {
             return candidate;
@@ -1126,11 +1140,25 @@ final class LetterboxUiController {
         return computeAspectRatio(bounds);
     }
 
+    /**
+     * Whether we should enable users to resize the current app.
+     */
+    boolean shouldEnableUserAspectRatioSettings() {
+        // We use mBooleanPropertyAllowUserAspectRatioOverride to allow apps to opt-out which has
+        // effect only if explicitly false. If mBooleanPropertyAllowUserAspectRatioOverride is null,
+        // the current app doesn't opt-out so the first part of the predicate is true.
+        return !FALSE.equals(mBooleanPropertyAllowUserAspectRatioOverride)
+                && mLetterboxConfiguration.isUserAppAspectRatioSettingsEnabled()
+                && mActivityRecord.mDisplayContent != null
+                && mActivityRecord.mDisplayContent.getIgnoreOrientationRequest();
+    }
+
+    /**
+     * Whether we should apply the user aspect ratio override to the min aspect ratio for the
+     * current app.
+     */
     boolean shouldApplyUserMinAspectRatioOverride() {
-        if (FALSE.equals(mBooleanPropertyAllowUserAspectRatioOverride)
-                || !mLetterboxConfiguration.isUserAppAspectRatioSettingsEnabled()
-                || mActivityRecord.mDisplayContent == null
-                || !mActivityRecord.mDisplayContent.getIgnoreOrientationRequest()) {
+        if (!shouldEnableUserAspectRatioSettings()) {
             return false;
         }
 

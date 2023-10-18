@@ -30,7 +30,7 @@ import android.testing.TestableLooper
 import android.view.SurfaceControlViewHost
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SystemUIAppComponentFactoryBase
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.DialogLaunchAnimator
@@ -172,7 +172,6 @@ class CustomizationProviderTest : SysuiTestCase() {
         val featureFlags =
             FakeFeatureFlags().apply {
                 set(Flags.LOCKSCREEN_CUSTOM_CLOCKS, true)
-                set(Flags.REVAMPED_WALLPAPER_UI, true)
                 set(Flags.WALLPAPER_FULLSCREEN_PREVIEW, true)
                 set(Flags.FACE_AUTH_REFACTOR, true)
             }

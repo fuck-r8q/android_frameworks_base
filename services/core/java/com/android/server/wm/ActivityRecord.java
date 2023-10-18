@@ -576,8 +576,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     boolean forceNewConfig; // force re-create with new config next time
     boolean supportsEnterPipOnTaskSwitch;  // This flag is set by the system to indicate that the
         // activity can enter picture in picture while pausing (only when switching to another task)
+    // The PiP params used when deferring the entering of picture-in-picture.
     PictureInPictureParams pictureInPictureArgs = new PictureInPictureParams.Builder().build();
-        // The PiP params used when deferring the entering of picture-in-picture.
     boolean shouldDockBigOverlays;
     int launchCount;        // count of launches since last state
     long lastLaunchTime;    // time of last launch of this activity
@@ -591,7 +591,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     IBinder mRequestedLaunchingTaskFragmentToken;
 
     // Tracking splash screen status from previous activity
-    boolean mSplashScreenStyleSolidColor = false;
+    boolean mAllowIconSplashScreen = true;
 
     boolean mPauseSchedulePendingForPip = false;
 
@@ -1459,7 +1459,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     + "display, activityRecord=%s, displayId=%d, config=%s", this, displayId,
                     config);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     MoveToDisplayItem.obtain(token, displayId, config));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1476,7 +1476,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Sending new config to %s, "
                     + "config: %s", this, config);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     ActivityConfigurationChangeItem.obtain(token, config));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1497,7 +1497,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             ProtoLog.v(WM_DEBUG_STATES, "Sending position change to %s, onTop: %b",
                     this, onTop);
 
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     TopResumedActivityChangeItem.obtain(token, onTop));
         } catch (RemoteException e) {
             // If process died, whatever.
@@ -1747,6 +1747,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
 
         mAnimatingActivityRegistry = registry;
+    }
+
+    boolean canAutoEnterPip() {
+        // beforeStopping=false since the actual pip-ing will take place after startPausing()
+        final boolean activityCanPip = checkEnterPictureInPictureState(
+                "startActivityUnchecked", false /* beforeStopping */);
+
+        // check if this activity is about to auto-enter pip
+        return activityCanPip && pictureInPictureArgs != null
+                && pictureInPictureArgs.isAutoEnterEnabled();
     }
 
     /**
@@ -2422,8 +2432,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     @VisibleForTesting
     boolean addStartingWindow(String pkg, int resolvedTheme, ActivityRecord from, boolean newTask,
             boolean taskSwitch, boolean processRunning, boolean allowTaskSnapshot,
-            boolean activityCreated, boolean isSimple,
-            boolean activityAllDrawn) {
+            boolean activityCreated, boolean allowIcon, boolean activityAllDrawn) {
         // If the display is frozen, we won't do anything until the actual window is
         // displayed so there is no reason to put in the starting window.
         if (!okToDisplay()) {
@@ -2458,8 +2467,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         final int typeParameter = StartingSurfaceController
                 .makeStartingWindowTypeParameter(newTask, taskSwitch, processRunning,
-                        allowTaskSnapshot, activityCreated, isSimple, useLegacy, activityAllDrawn,
-                        type, packageName, mUserId);
+                        allowTaskSnapshot, activityCreated, allowIcon, useLegacy,
+                        activityAllDrawn, type, packageName, mUserId);
 
         if (type == STARTING_WINDOW_TYPE_SNAPSHOT) {
             if (isActivityTypeHome()) {
@@ -2751,7 +2760,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         try {
             mTransferringSplashScreenState = TRANSFER_SPLASH_SCREEN_ATTACH_TO_CLIENT;
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     TransferSplashScreenViewStateItem.obtain(token, parcelable,
                             windowAnimationLeash));
             scheduleTransferSplashScreenTimeout();
@@ -2902,7 +2911,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final boolean animate;
         if (mStartingData != null) {
             if (mStartingData.mWaitForSyncTransactionCommit
-                    || mTransitionController.inCollectingTransition(startingWindow)) {
+                    || mTransitionController.isCollecting(this)) {
                 mStartingData.mRemoveAfterTransaction = AFTER_TRANSACTION_REMOVE_DIRECTLY;
                 mStartingData.mPrepareRemoveAnimation = prepareAnimation;
                 return;
@@ -3922,7 +3931,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
             try {
                 if (DEBUG_SWITCH) Slog.i(TAG_SWITCH, "Destroying: " + this);
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                         DestroyActivityItem.obtain(token, finishing, configChangeFlags));
             } catch (Exception e) {
                 // We can just ignore exceptions here...  if the process has crashed, our death
@@ -4833,9 +4842,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         if (isState(RESUMED) && attachedToProcess()) {
             try {
-                final ArrayList<ResultInfo> list = new ArrayList<ResultInfo>();
+                final ArrayList<ResultInfo> list = new ArrayList<>();
                 list.add(new ResultInfo(resultWho, requestCode, resultCode, data));
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                         ActivityResultItem.obtain(token, list));
                 return;
             } catch (Exception e) {
@@ -4846,7 +4855,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // Schedule sending results now for Media Projection setup.
         if (forceSendForMediaProjection && attachedToProcess() && isState(STARTED, PAUSING, PAUSED,
                 STOPPING, STOPPED)) {
-            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread(), token);
+            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread());
             // Build result to be returned immediately.
             transaction.addCallback(ActivityResultItem.obtain(
                     token, List.of(new ResultInfo(resultWho, requestCode, resultCode, data))));
@@ -4941,7 +4950,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // Making sure the client state is RESUMED after transaction completed and doing
                 // so only if activity is currently RESUMED. Otherwise, client may have extra
                 // life-cycle calls to RESUMED (and PAUSED later).
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                         NewIntentItem.obtain(token, ar, mState == RESUMED));
                 unsent = false;
             } catch (RemoteException e) {
@@ -6252,7 +6261,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             EventLogTags.writeWmPauseActivity(mUserId, System.identityHashCode(this),
                     shortComponentName, "userLeaving=false", "make-active");
             try {
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                         PauseActivityItem.obtain(token, finishing, false /* userLeaving */,
                                 configChangeFlags, false /* dontReport */, mAutoEnteringPip));
             } catch (Exception e) {
@@ -6266,7 +6275,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             setState(STARTED, "makeActiveIfNeeded");
             acquireActivityBoost();
             try {
-                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+                mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                         StartActivityItem.obtain(token, takeOptions()));
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending start: " + intent.getComponent(), e);
@@ -6574,7 +6583,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             }
             EventLogTags.writeWmStopActivity(
                     mUserId, System.identityHashCode(this), shortComponentName);
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     StopActivityItem.obtain(token, configChangeFlags));
 
             mAtmService.mH.postDelayed(mStopTimeoutRunnable, STOP_TIMEOUT);
@@ -6859,7 +6868,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     void onFirstWindowDrawn(WindowState win) {
         firstWindowDrawn = true;
         // stop tracking
-        mSplashScreenStyleSolidColor = true;
+        mAllowIconSplashScreen = false;
 
         if (mStartingWindow != null) {
             ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Finish starting %s"
@@ -6908,7 +6917,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     void onStartingWindowDrawn() {
         boolean wasTaskVisible = false;
         if (task != null) {
-            mSplashScreenStyleSolidColor = true;
+            mAllowIconSplashScreen = false;
             wasTaskVisible = !setTaskHasBeenVisible();
         }
 
@@ -7477,52 +7486,69 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         return false;
     }
-    private boolean shouldUseSolidColorSplashScreen(ActivityRecord sourceRecord,
+
+    /**
+     * Checks whether an icon splash screen can be used in the starting window based on the
+     * preference in the {@code options} and this activity's theme, giving higher priority to the
+     * {@code options}'s preference.
+     *
+     * When no preference is specified, a default behaviour is defined:
+     *  - if the activity is started from the home or shell app, an icon can be used
+     *  - if the activity is started from SystemUI, an icon should not be used
+     *  - if there is a launching activity, use its preference
+     *  - if none of the above is met, only use an icon when the activity is started for the first
+     *    time from a System app
+     *
+     * The returned value is sent to WmShell, which will make the final decision on what splash
+     * screen type will be used.
+     *
+     * @return true if an icon can be used in the splash screen
+     *         false when an icon should not be used in the splash screen
+     */
+    private boolean canUseIconSplashScreen(ActivityRecord sourceRecord,
             boolean startActivity, ActivityOptions options, int resolvedTheme) {
         if (sourceRecord == null && !startActivity) {
-            // Use simple style if this activity is not top activity. This could happen when adding
-            // a splash screen window to the warm start activity which is re-create because top is
-            // finishing.
+            // Shouldn't use an icon if this activity is not top activity. This could happen when
+            // adding a splash screen window to the warm start activity which is re-create because
+            // top is finishing.
             final ActivityRecord above = task.getActivityAbove(this);
             if (above != null) {
-                return true;
+                return false;
             }
         }
 
         // setSplashScreenStyle decide in priority of windowSplashScreenBehavior.
-        if (options != null) {
-            final int optionsStyle = options.getSplashScreenStyle();
-            if (optionsStyle == SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR) {
-                return true;
-            } else if (optionsStyle == SplashScreen.SPLASH_SCREEN_STYLE_ICON
-                    || isIconStylePreferred(resolvedTheme)) {
-                return false;
-            }
-            // Choose the default behavior for Launcher and SystemUI when the SplashScreen style is
-            // not specified in the ActivityOptions.
-            if (mLaunchSourceType == LAUNCH_SOURCE_TYPE_HOME
-                    || launchedFromUid == Process.SHELL_UID) {
-                return false;
-            } else if (mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEMUI) {
-                return true;
-            }
-        } else if (isIconStylePreferred(resolvedTheme)) {
+        final int optionsStyle = options != null ? options.getSplashScreenStyle() :
+                SplashScreen.SPLASH_SCREEN_STYLE_UNDEFINED;
+        if (optionsStyle == SplashScreen.SPLASH_SCREEN_STYLE_SOLID_COLOR) {
             return false;
-        }
-        if (sourceRecord == null) {
-            sourceRecord = searchCandidateLaunchingActivity();
-        }
-
-        if (sourceRecord != null && !sourceRecord.isActivityTypeHome()) {
-            return sourceRecord.mSplashScreenStyleSolidColor;
+        } else if (optionsStyle == SplashScreen.SPLASH_SCREEN_STYLE_ICON
+                    || isIconStylePreferred(resolvedTheme)) {
+            return true;
         }
 
-        // If this activity was launched from Launcher or System for first start, never use a
-        // solid color splash screen.
-        // Need to check sourceRecord before in case this activity is launched from service.
-        return !startActivity || !(mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEM
-                || mLaunchSourceType == LAUNCH_SOURCE_TYPE_HOME
-                || launchedFromUid == Process.SHELL_UID);
+        // Choose the default behavior when neither the ActivityRecord nor the activity theme have
+        // specified a splash screen style.
+
+        if (mLaunchSourceType == LAUNCH_SOURCE_TYPE_HOME || launchedFromUid == Process.SHELL_UID) {
+            return true;
+        } else if (mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEMUI) {
+            return false;
+        } else {
+            // Need to check sourceRecord in case this activity is launched from a service or a
+            // trampoline activity.
+            if (sourceRecord == null) {
+                sourceRecord = searchCandidateLaunchingActivity();
+            }
+
+            if (sourceRecord != null) {
+                return sourceRecord.mAllowIconSplashScreen;
+            }
+
+            // Use an icon if the activity was launched from System for the first start.
+            // Otherwise, can't use an icon splash screen.
+            return mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEM && startActivity;
+        }
     }
 
     private int getSplashscreenTheme(ActivityOptions options) {
@@ -7585,7 +7611,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final int resolvedTheme = evaluateStartingWindowTheme(prev, packageName, theme,
                 splashScreenTheme);
 
-        mSplashScreenStyleSolidColor = shouldUseSolidColorSplashScreen(sourceRecord, startActivity,
+        mAllowIconSplashScreen = canUseIconSplashScreen(sourceRecord, startActivity,
                 startOptions, resolvedTheme);
 
         final boolean activityCreated =
@@ -7597,7 +7623,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         final boolean scheduled = addStartingWindow(packageName, resolvedTheme,
                 prev, newTask || newSingleActivity, taskSwitch, processRunning,
-                allowTaskSnapshot(), activityCreated, mSplashScreenStyleSolidColor, allDrawn);
+                allowTaskSnapshot(), activityCreated, mAllowIconSplashScreen, allDrawn);
         if (DEBUG_STARTING_WINDOW_VERBOSE && scheduled) {
             Slog.d(TAG, "Scheduled starting window for " + this);
         }
@@ -9357,7 +9383,13 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     getRequestedOverrideWindowingMode() == WINDOWING_MODE_UNDEFINED
                             ? newParentConfig.windowConfiguration.getWindowingMode()
                             : getRequestedOverrideWindowingMode();
-            if (getWindowingMode() != projectedWindowingMode) {
+            if (getWindowingMode() != projectedWindowingMode
+                    // Do not collect a pip activity about to enter pinned mode
+                    // as a part of WindowOrganizerController#finishTransition().
+                    // If not checked the activity might be collected for the wrong transition,
+                    // such as a TRANSIT_OPEN transition requested right after TRANSIT_PIP.
+                    && !(mWaitForEnteringPinnedMode
+                    && mTransitionController.inFinishingTransition(this))) {
                 mTransitionController.collect(this);
             }
         }
@@ -10052,7 +10084,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             ProtoLog.i(WM_DEBUG_STATES, "Moving to %s Relaunching %s callers=%s" ,
                     (andResume ? "RESUMED" : "PAUSED"), this, Debug.getCallers(6));
             forceNewConfig = false;
-            startRelaunching();
             final ClientTransactionItem callbackItem = ActivityRelaunchItem.obtain(token,
                     pendingResults, pendingNewIntents, configChangeFlags,
                     new MergedConfiguration(getProcessGlobalConfiguration(),
@@ -10065,15 +10096,16 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             } else {
                 lifecycleItem = PauseActivityItem.obtain(token);
             }
-            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread(), token);
+            final ClientTransaction transaction = ClientTransaction.obtain(app.getThread());
             transaction.addCallback(callbackItem);
             transaction.setLifecycleStateRequest(lifecycleItem);
             mAtmService.getLifecycleManager().scheduleTransaction(transaction);
+            startRelaunching();
             // Note: don't need to call pauseIfSleepingLocked() here, because the caller will only
             // request resume if this activity is currently resumed, which implies we aren't
             // sleeping.
         } catch (RemoteException e) {
-            ProtoLog.i(WM_DEBUG_STATES, "Relaunch failed %s", e);
+            Slog.w(TAG, "Failed to relaunch " + this + ": " + e);
         }
 
         if (andResume) {
@@ -10161,7 +10193,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // The process will be killed until the activity reports stopped with saved state (see
         // {@link ActivityTaskManagerService.activityStopped}).
         try {
-            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(), token,
+            mAtmService.getLifecycleManager().scheduleTransaction(app.getThread(),
                     StopActivityItem.obtain(token, 0 /* configChanges */));
         } catch (RemoteException e) {
             Slog.w(TAG, "Exception thrown during restart " + this, e);

@@ -2549,6 +2549,15 @@ public abstract class PackageManager {
     public static final int DELETE_DONT_KILL_APP = 0x00000008;
 
     /**
+     * Flag parameter for {@link #deletePackage} to indicate that the deletion is an archival. This
+     * flag is only for internal usage as part of
+     * {@link PackageInstaller#requestArchive(String, IntentSender)}.
+     *
+     * @hide
+     */
+    public static final int DELETE_ARCHIVE = 0x00000010;
+
+    /**
      * Flag parameter for {@link #deletePackage} to indicate that package deletion
      * should be chatty.
      *
@@ -9865,6 +9874,18 @@ public abstract class PackageManager {
      */
     public @Nullable Bundle getSuspendedPackageAppExtras() {
         throw new UnsupportedOperationException("getSuspendedPackageAppExtras not implemented");
+    }
+
+    /**
+     * Query if an app is currently quarantined.
+     *
+     * @return {@code true} if the given package is quarantined, {@code false} otherwise
+     * @throws NameNotFoundException if the package could not be found.
+     *
+     * @hide
+     */
+    public boolean isPackageQuarantined(@NonNull String packageName) throws NameNotFoundException {
+        throw new UnsupportedOperationException("isPackageQuarantined not implemented");
     }
 
     /**
