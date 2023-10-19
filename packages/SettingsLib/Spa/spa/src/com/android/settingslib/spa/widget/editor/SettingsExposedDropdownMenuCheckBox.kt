@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,11 +51,12 @@ import com.android.settingslib.spa.framework.theme.SettingsTheme
 fun SettingsExposedDropdownMenuCheckBox(
     label: String,
     options: List<String>,
-    selectedOptionsState: SnapshotStateList<String>,
+    selectedOptionsState: SnapshotStateList<Int>,
+    emptyVal: String = "",
     enabled: Boolean,
     onSelectedOptionStateChange: () -> Unit,
 ) {
-    var dropDownWidth by remember { mutableStateOf(0) }
+    var dropDownWidth by remember { mutableIntStateOf(0) }
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -69,7 +71,8 @@ fun SettingsExposedDropdownMenuCheckBox(
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
-            value = selectedOptionsState.joinToString(", "),
+            value = if (selectedOptionsState.size == 0) emptyVal
+                    else selectedOptionsState.joinToString { options[it] },
             onValueChange = {},
             label = { Text(text = label) },
             trailingIcon = {
@@ -88,23 +91,23 @@ fun SettingsExposedDropdownMenuCheckBox(
                     .width(with(LocalDensity.current) { dropDownWidth.toDp() }),
                 onDismissRequest = { expanded = false },
             ) {
-                options.forEach { option ->
+                options.forEachIndexed { index, option ->
                     TextButton(
                         modifier = Modifier
                             .fillMaxHeight()
                             .fillMaxWidth(),
                         onClick = {
-                            if (selectedOptionsState.contains(option)) {
+                            if (selectedOptionsState.contains(index)) {
                                 selectedOptionsState.remove(
-                                    option
+                                    index
                                 )
                             } else {
                                 selectedOptionsState.add(
-                                    option
+                                    index
                                 )
                             }
                             onSelectedOptionStateChange()
-                    }) {
+                        }) {
                         Row(
                             modifier = Modifier
                                 .fillMaxHeight()
@@ -113,7 +116,7 @@ fun SettingsExposedDropdownMenuCheckBox(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
-                                checked = selectedOptionsState.contains(option),
+                                checked = selectedOptionsState.contains(index),
                                 onCheckedChange = null,
                             )
                             Text(text = option)
@@ -129,9 +132,10 @@ fun SettingsExposedDropdownMenuCheckBox(
 @Composable
 private fun ActionButtonsPreview() {
     val options = listOf("item1", "item2", "item3")
-    val selectedOptionsState = remember { mutableStateListOf("item1", "item2") }
+    val selectedOptionsState = remember { mutableStateListOf(0, 1) }
     SettingsTheme {
-        SettingsExposedDropdownMenuCheckBox(label = "label",
+        SettingsExposedDropdownMenuCheckBox(
+            label = "label",
             options = options,
             selectedOptionsState = selectedOptionsState,
             enabled = true,

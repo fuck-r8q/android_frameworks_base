@@ -17,7 +17,7 @@
 package com.android.systemui.bouncer.ui.viewmodel
 
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.model.AuthenticationMethodModel
 import com.android.systemui.coroutines.collectLastValue
@@ -153,6 +153,29 @@ class PasswordBouncerViewModelTest : SysuiTestCase() {
 
             assertThat(password).isEqualTo("")
             assertThat(message?.text).isEqualTo(WRONG_PASSWORD)
+            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+        }
+
+    @Test
+    fun onAuthenticateKeyPressed_whenEmpty() =
+        testScope.runTest {
+            val currentScene by collectLastValue(sceneInteractor.desiredScene)
+            val message by collectLastValue(bouncerViewModel.message)
+            val password by collectLastValue(underTest.password)
+            utils.authenticationRepository.setAuthenticationMethod(
+                AuthenticationMethodModel.Password
+            )
+            utils.authenticationRepository.setUnlocked(false)
+            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
+            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
+            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+            underTest.onShown()
+            // Enter nothing.
+
+            underTest.onAuthenticateKeyPressed()
+
+            assertThat(password).isEqualTo("")
+            assertThat(message?.text).isEqualTo(ENTER_YOUR_PASSWORD)
             assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
         }
 

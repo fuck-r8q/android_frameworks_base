@@ -920,6 +920,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private static boolean sCompatibilityDone = false;
 
+    /** @hide */
+    public HapticScrollFeedbackProvider mScrollFeedbackProvider = null;
+
     /**
      * Use the old (broken) way of building MeasureSpecs.
      */
@@ -1585,11 +1588,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     static final int DISABLED = 0x00000020;
 
-   /**
-    * Mask for use with setFlags indicating bits used for indicating whether
-    * this view is enabled
-    * {@hide}
-    */
+    /**
+     * Mask for use with setFlags indicating bits used for indicating whether
+     * this view is enabled
+     * {@hide}
+     */
     static final int ENABLED_MASK = 0x00000020;
 
     /**
@@ -3606,6 +3609,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *               1                  PFLAG4_IMPORTANT_FOR_CREDENTIAL_MANAGER
      *              1                   PFLAG4_TRAVERSAL_TRACING_ENABLED
      *             1                    PFLAG4_RELAYOUT_TRACING_ENABLED
+     *            1                     PFLAG4_ROTARY_HAPTICS_DETERMINED
+     *           1                      PFLAG4_ROTARY_HAPTICS_ENABLED
+     *          1                       PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT
+     *         1                        PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT
      * |-------|-------|-------|-------|
      */
 
@@ -3703,6 +3710,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * this class happens.
      */
     private static final int PFLAG4_RELAYOUT_TRACING_ENABLED = 0x000080000;
+
+    /** Indicates if rotary scroll haptics support for the view has been determined. */
+    private static final int PFLAG4_ROTARY_HAPTICS_DETERMINED = 0x100000;
+
+    /**
+     * Indicates if rotary scroll haptics is enabled for this view.
+     * The source of truth for this info is a ViewConfiguration API; this bit only caches the value.
+     */
+    private static final int PFLAG4_ROTARY_HAPTICS_ENABLED = 0x200000;
+
+    /** Indicates if there has been a scroll event since the last rotary input. */
+    private static final int PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT = 0x400000;
+
+    /**
+     * Indicates if there has been a rotary input that may generate a scroll event.
+     * This flag is important so that a scroll event can be properly attributed to a rotary input.
+     */
+    private static final int PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT = 0x800000;
 
     /* End of masks for mPrivateFlags4 */
 
@@ -15257,13 +15282,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
       }
     }
 
-   /**
-    * @see #performAccessibilityAction(int, Bundle)
-    *
-    * Note: Called from the default {@link AccessibilityDelegate}.
-    *
-    * @hide
-    */
+    /**
+     * @see #performAccessibilityAction(int, Bundle)
+     *
+     * Note: Called from the default {@link AccessibilityDelegate}.
+     *
+     * @hide
+     */
     @UnsupportedAppUsage
     public boolean performAccessibilityActionInternal(int action, @Nullable Bundle arguments) {
         if (isNestedScrollingEnabled()
@@ -15901,6 +15926,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     private boolean dispatchGenericMotionEventInternal(MotionEvent event) {
+        final boolean isRotaryEncoderEvent = event.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER);
+        if (isRotaryEncoderEvent) {
+            // Determine and cache rotary scroll haptics support if it's not yet determined.
+            // Caching the support is important for two reasons:
+            // 1) Limits call to `ViewConfiguration#get`, which we should avoid if possible.
+            // 2) Limits latency from the `ViewConfiguration` API, which may be slow due to feature
+            //    flag querying.
+            if ((mPrivateFlags4 & PFLAG4_ROTARY_HAPTICS_DETERMINED) == 0) {
+                if (ViewConfiguration.get(mContext)
+                        .isViewBasedRotaryEncoderHapticScrollFeedbackEnabled()) {
+                    mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_ENABLED;
+                }
+                mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_DETERMINED;
+            }
+        }
+        final boolean processForRotaryScrollHaptics =
+                isRotaryEncoderEvent && ((mPrivateFlags4 & PFLAG4_ROTARY_HAPTICS_ENABLED) != 0);
+        if (processForRotaryScrollHaptics) {
+            mPrivateFlags4 &= ~PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT;
+            mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT;
+        }
+
         //noinspection SimplifiableIfStatement
         ListenerInfo li = mListenerInfo;
         if (li != null && li.mOnGenericMotionListener != null
@@ -15909,7 +15956,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             return true;
         }
 
-        if (onGenericMotionEvent(event)) {
+        final boolean onGenericMotionEventResult = onGenericMotionEvent(event);
+        // Process scroll haptics after `onGenericMotionEvent`, since that's where scrolling usually
+        // happens. Some views may return false from `onGenericMotionEvent` even if they have done
+        // scrolling, so disregard the return value when processing for scroll haptics.
+        if (processForRotaryScrollHaptics) {
+            if ((mPrivateFlags4 & PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT) != 0) {
+                doRotaryProgressForScrollHaptics(event);
+            } else {
+                doRotaryLimitForScrollHaptics(event);
+            }
+        }
+        if (onGenericMotionEventResult) {
             return true;
         }
 
@@ -17401,7 +17459,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return attachInfo.mHandler.hasCallbacks(mPendingCheckForLongPress);
     }
 
-   /**
+    /**
      * Remove the pending click action
      */
     @UnsupportedAppUsage
@@ -17793,6 +17851,38 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
     }
 
+    private HapticScrollFeedbackProvider getScrollFeedbackProvider() {
+        if (mScrollFeedbackProvider == null) {
+            mScrollFeedbackProvider = new HapticScrollFeedbackProvider(this,
+                    ViewConfiguration.get(mContext), /* disabledIfViewPlaysScrollHaptics= */ false);
+        }
+        return mScrollFeedbackProvider;
+    }
+
+    private void doRotaryProgressForScrollHaptics(MotionEvent rotaryEvent) {
+        final float axisScrollValue = rotaryEvent.getAxisValue(MotionEvent.AXIS_SCROLL);
+        final float verticalScrollFactor =
+                ViewConfiguration.get(mContext).getScaledVerticalScrollFactor();
+        final int scrollAmount = -Math.round(axisScrollValue * verticalScrollFactor);
+        getScrollFeedbackProvider().onScrollProgress(
+                rotaryEvent.getDeviceId(), InputDevice.SOURCE_ROTARY_ENCODER,
+                MotionEvent.AXIS_SCROLL, scrollAmount);
+    }
+
+    private void doRotaryLimitForScrollHaptics(MotionEvent rotaryEvent) {
+        final boolean isStart = rotaryEvent.getAxisValue(MotionEvent.AXIS_SCROLL) > 0;
+        getScrollFeedbackProvider().onScrollLimit(
+                rotaryEvent.getDeviceId(), InputDevice.SOURCE_ROTARY_ENCODER,
+                MotionEvent.AXIS_SCROLL, isStart);
+    }
+
+    private void processScrollEventForRotaryEncoderHaptics() {
+        if ((mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT) != 0) {
+            mPrivateFlags4 |= PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT;
+            mPrivateFlags4 &= ~PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT;
+        }
+    }
+
     /**
      * This is called in response to an internal scroll in this view (i.e., the
      * view scrolled its own contents). This is typically as a result of
@@ -17807,6 +17897,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
         notifySubtreeAccessibilityStateChangedIfNeeded();
         postSendViewScrolledAccessibilityEventCallback(l - oldl, t - oldt);
+
+        processScrollEventForRotaryEncoderHaptics();
 
         mBackgroundSizeChanged = true;
         mDefaultFocusHighlightSizeChanged = true;

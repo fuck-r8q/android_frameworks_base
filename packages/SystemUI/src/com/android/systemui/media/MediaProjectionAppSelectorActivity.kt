@@ -46,7 +46,7 @@ import com.android.internal.app.chooser.TargetInfo
 import com.android.internal.widget.RecyclerView
 import com.android.internal.widget.RecyclerViewAccessibilityDelegate
 import com.android.internal.widget.ResolverDrawerLayout
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorComponent
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorController
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorResultHandler
@@ -91,7 +91,13 @@ class MediaProjectionAppSelectorActivity(
 
     public override fun onCreate(bundle: Bundle?) {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
-        component = componentFactory.create(activity = this, view = this, resultHandler = this)
+        component =
+            componentFactory.create(
+                hostUserHandle = hostUserHandle,
+                callingPackage = callingPackage,
+                view = this,
+                resultHandler = this
+            )
         component.lifecycleObservers.forEach { lifecycle.addObserver(it) }
 
         // Create a separate configuration controller for this activity as the configuration
@@ -274,7 +280,9 @@ class MediaProjectionAppSelectorActivity(
             recentsViewController.hasRecentTasks
         }
 
-    override fun shouldShowContentPreviewWhenEmpty() = shouldShowContentPreview()
+    override fun shouldShowStickyContentPreviewWhenEmpty() = shouldShowContentPreview()
+
+    override fun shouldShowServiceTargets() = false
 
     private fun hasWorkProfile() = mMultiProfilePagerAdapter.count > 1
 
@@ -285,6 +293,18 @@ class MediaProjectionAppSelectorActivity(
 
     override fun createContentPreviewView(parent: ViewGroup): ViewGroup =
         recentsViewController.createView(parent)
+
+    private val hostUserHandle: UserHandle
+        get() {
+            val extras =
+                intent.extras
+                    ?: error("MediaProjectionAppSelectorActivity should be launched with extras")
+            return extras.getParcelable(EXTRA_HOST_APP_USER_HANDLE)
+                ?: error(
+                    "MediaProjectionAppSelectorActivity should be provided with " +
+                        "$EXTRA_HOST_APP_USER_HANDLE extra"
+                )
+        }
 
     companion object {
         const val TAG = "MediaProjectionAppSelectorActivity"

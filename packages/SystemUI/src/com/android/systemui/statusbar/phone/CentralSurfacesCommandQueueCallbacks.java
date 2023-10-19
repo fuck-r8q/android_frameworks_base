@@ -36,7 +36,6 @@ import android.util.Log;
 import android.util.Slog;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
-import android.view.WindowInsets;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowInsetsController.Appearance;
 import android.view.WindowInsetsController.Behavior;
@@ -48,7 +47,7 @@ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.statusbar.LetterboxDetails;
 import com.android.internal.view.AppearanceRegion;
 import com.android.keyguard.KeyguardUpdateMonitor;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.assist.AssistManager;
 import com.android.systemui.camera.CameraIntents;
 import com.android.systemui.dagger.SysUISingleton;
@@ -59,6 +58,7 @@ import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.qs.QSHost;
 import com.android.systemui.qs.QSPanelController;
+import com.android.systemui.recents.ScreenPinningRequest;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.QuickSettingsController;
@@ -84,6 +84,7 @@ import javax.inject.Inject;
 public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callbacks {
     private final CentralSurfaces mCentralSurfaces;
     private final Context mContext;
+    private final ScreenPinningRequest mScreenPinningRequest;
     private final com.android.systemui.shade.ShadeController mShadeController;
     private final CommandQueue mCommandQueue;
     private final ShadeViewController mShadeViewController;
@@ -126,6 +127,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
             QuickSettingsController quickSettingsController,
             Context context,
             @Main Resources resources,
+            ScreenPinningRequest screenPinningRequest,
             ShadeController shadeController,
             CommandQueue commandQueue,
             ShadeViewController shadeViewController,
@@ -155,6 +157,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         mCentralSurfaces = centralSurfaces;
         mQsController = quickSettingsController;
         mContext = context;
+        mScreenPinningRequest = screenPinningRequest;
         mShadeController = shadeController;
         mCommandQueue = commandQueue;
         mShadeViewController = shadeViewController;
@@ -185,17 +188,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
                 mVibratorOptional, resources);
         mSystemBarAttributesListener = systemBarAttributesListener;
         mActivityStarter = activityStarter;
-    }
-
-    @Override
-    public void abortTransient(int displayId, @InsetsType int types) {
-        if (displayId != mDisplayId) {
-            return;
-        }
-        if ((types & WindowInsets.Type.statusBars()) == 0) {
-            return;
-        }
-        mCentralSurfaces.clearTransient();
     }
 
     @Override
@@ -483,17 +475,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     }
 
     @Override
-    public void showTransient(int displayId, @InsetsType int types, boolean isGestureOnSystemBar) {
-        if (displayId != mDisplayId) {
-            return;
-        }
-        if ((types & WindowInsets.Type.statusBars()) == 0) {
-            return;
-        }
-        mCentralSurfaces.showTransientUnchecked();
-    }
-
-    @Override
     public void toggleKeyboardShortcutsMenu(int deviceId) {
         mCentralSurfaces.resendMessage(new CentralSurfaces.KeyboardShortcutsMessage(deviceId));
     }
@@ -516,7 +497,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
             return;
         }
         // Show screen pinning request, since this comes from an app, show 'no thanks', button.
-        mCentralSurfaces.showScreenPinningRequest(taskId, true);
+        mScreenPinningRequest.showPrompt(taskId, true);
     }
 
     @Override

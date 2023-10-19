@@ -17,7 +17,7 @@
 package com.android.systemui.bouncer.domain.interactor
 
 import android.content.Context
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationThrottlingModel
@@ -223,6 +223,20 @@ constructor(
      */
     suspend fun showErrorMessage() {
         repository.setMessage(errorMessage(authenticationInteractor.getAuthenticationMethod()))
+    }
+
+    /** If the bouncer is showing, hides the bouncer and return to the lockscreen scene. */
+    fun hide(
+        loggingReason: String,
+    ) {
+        if (sceneInteractor.desiredScene.value.key != SceneKey.Bouncer) {
+            return
+        }
+
+        sceneInteractor.changeScene(
+            scene = SceneModel(SceneKey.Lockscreen),
+            loggingReason = loggingReason,
+        )
     }
 
     private fun promptMessage(authMethod: AuthenticationMethodModel): String {

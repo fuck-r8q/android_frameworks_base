@@ -12,30 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+aconfig_srcjars = [
+    ":android.app.usage.flags-aconfig-java{.generated_srcjars}",
+    ":android.content.pm.flags-aconfig-java{.generated_srcjars}",
+    ":android.nfc.flags-aconfig-java{.generated_srcjars}",
+    ":android.os.flags-aconfig-java{.generated_srcjars}",
+    ":android.os.vibrator.flags-aconfig-java{.generated_srcjars}",
+    ":android.security.flags-aconfig-java{.generated_srcjars}",
+    ":android.view.flags-aconfig-java{.generated_srcjars}",
+    ":camera_platform_flags_core_java_lib{.generated_srcjars}",
+    ":com.android.window.flags.window-aconfig-java{.generated_srcjars}",
+    ":android.hardware.biometrics.flags-aconfig-java{.generated_srcjars}",
+    ":com.android.hardware.input-aconfig-java{.generated_srcjars}",
+    ":com.android.text.flags-aconfig-java{.generated_srcjars}",
+    ":telecom_flags_core_java_lib{.generated_srcjars}",
+    ":telephony_flags_core_java_lib{.generated_srcjars}",
+    ":android.companion.virtual.flags-aconfig-java{.generated_srcjars}",
+    ":android.view.inputmethod.flags-aconfig-java{.generated_srcjars}",
+    ":android.widget.flags-aconfig-java{.generated_srcjars}",
+    ":com.android.media.flags.bettertogether-aconfig-java{.generated_srcjars}",
+    ":sdk_sandbox_flags_lib{.generated_srcjars}",
+    ":android.permission.flags-aconfig-java{.generated_srcjars}",
+    ":hwui_flags_java_lib{.generated_srcjars}",
+    ":display_flags_lib{.generated_srcjars}",
+    ":android.multiuser.flags-aconfig-java{.generated_srcjars}",
+]
+
+filegroup {
+    name: "framework-minus-apex-aconfig-srcjars",
+    srcs: aconfig_srcjars,
+}
+
 // Aconfig declarations and libraries for the core framework
 java_defaults {
     name: "framework-minus-apex-aconfig-libraries",
-
     // Add java_aconfig_libraries to here to add them to the core framework
-    srcs: [
-        ":android.app.usage.flags-aconfig-java{.generated_srcjars}",
-        ":android.content.pm.flags-aconfig-java{.generated_srcjars}",
-        ":android.os.flags-aconfig-java{.generated_srcjars}",
-        ":android.os.vibrator.flags-aconfig-java{.generated_srcjars}",
-        ":android.security.flags-aconfig-java{.generated_srcjars}",
-        ":android.view.flags-aconfig-java{.generated_srcjars}",
-        ":camera_platform_flags_core_java_lib{.generated_srcjars}",
-        ":com.android.window.flags.window-aconfig-java{.generated_srcjars}",
-        ":com.android.hardware.input-aconfig-java{.generated_srcjars}",
-        ":com.android.text.flags-aconfig-java{.generated_srcjars}",
-        ":telecom_flags_core_java_lib{.generated_srcjars}",
-        ":telephony_flags_core_java_lib{.generated_srcjars}",
-        ":android.companion.virtual.flags-aconfig-java{.generated_srcjars}",
-        ":android.view.inputmethod.flags-aconfig-java{.generated_srcjars}",
-        ":android.widget.flags-aconfig-java{.generated_srcjars}",
-        ":com.android.media.flags.bettertogether-aconfig-java{.generated_srcjars}",
-        ":sdk_sandbox_flags_lib{.generated_srcjars}",
-    ],
+    srcs: aconfig_srcjars,
     // Add aconfig-annotations-lib as a dependency for the optimization
     libs: ["aconfig-annotations-lib"],
 }
@@ -113,6 +125,19 @@ cc_aconfig_library {
     aconfig_declarations: "com.android.text.flags-aconfig",
 }
 
+// NFC
+aconfig_declarations {
+    name: "android.nfc.flags-aconfig",
+    package: "android.nfc",
+    srcs: ["core/java/android/nfc/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.nfc.flags-aconfig-java",
+    aconfig_declarations: "android.nfc.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // Security
 aconfig_declarations {
     name: "android.security.flags-aconfig",
@@ -130,7 +155,6 @@ java_aconfig_library {
     name: "android.security.flags-aconfig-java-host",
     aconfig_declarations: "android.security.flags-aconfig",
     host_supported: true,
-    test: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -229,7 +253,7 @@ java_aconfig_library {
 aconfig_declarations {
     name: "android.content.pm.flags-aconfig",
     package: "android.content.pm",
-    srcs: ["core/java/android/content/pm/*.aconfig"],
+    srcs: ["core/java/android/content/pm/flags.aconfig"],
 }
 
 java_aconfig_library {
@@ -248,5 +272,58 @@ aconfig_declarations {
 java_aconfig_library {
     name: "com.android.media.flags.bettertogether-aconfig-java",
     aconfig_declarations: "com.android.media.flags.bettertogether-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Permissions
+aconfig_declarations {
+    name: "android.permission.flags-aconfig",
+    package: "android.permission.flags",
+    srcs: ["core/java/android/permission/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.permission.flags-aconfig-java",
+    aconfig_declarations: "android.permission.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Biometrics
+aconfig_declarations {
+    name: "android.hardware.biometrics.flags-aconfig",
+    package: "android.hardware.biometrics",
+    srcs: ["core/java/android/hardware/biometrics/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.hardware.biometrics.flags-aconfig-java",
+    aconfig_declarations: "android.hardware.biometrics.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Graphics
+java_aconfig_library {
+    name: "hwui_flags_java_lib",
+    aconfig_declarations: "hwui_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Display
+java_aconfig_library {
+    name: "display_flags_lib",
+    aconfig_declarations: "display_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Multi user
+aconfig_declarations {
+    name: "android.multiuser.flags-aconfig",
+    package: "android.multiuser",
+    srcs: ["core/java/android/content/pm/multiuser.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.multiuser.flags-aconfig-java",
+    aconfig_declarations: "android.multiuser.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

@@ -40,6 +40,7 @@ import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
 import static android.system.OsConstants.O_CREAT;
 import static android.system.OsConstants.O_RDONLY;
 import static android.system.OsConstants.O_WRONLY;
+
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.internal.util.XmlUtils.readBitmapAttribute;
 import static com.android.internal.util.XmlUtils.readByteArrayAttribute;
@@ -137,6 +138,7 @@ import android.os.incremental.IncrementalFileStorages;
 import android.os.incremental.IncrementalManager;
 import android.os.incremental.PerUidReadTimeouts;
 import android.os.incremental.StorageHealthCheckParams;
+import android.os.incremental.V4Signature;
 import android.os.storage.StorageManager;
 import android.provider.DeviceConfig;
 import android.provider.Settings.Global;
@@ -809,6 +811,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // entries like "lost+found".
             if (file.isDirectory()) return false;
             if (file.getName().endsWith(REMOVE_MARKER_EXTENSION)) return false;
+            if (file.getName().endsWith(V4Signature.EXT)) return false;
             if (isAppMetadata(file)) return false;
             if (DexMetadataHelper.isDexMetadataFile(file)) return false;
             if (VerityUtils.isFsveritySignatureFile(file)) return false;
@@ -1173,11 +1176,6 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 throw new IllegalArgumentException(
                         "Archived installation can only use Streaming System DataLoader.");
             }
-            if (!TextUtils.isEmpty(params.appPackageName) && !isArchivedInstallationAllowed(
-                    params.appPackageName)) {
-                throw new IllegalArgumentException(
-                        "Archived installation of this package is not allowed.");
-            }
         }
     }
 
@@ -1514,6 +1512,21 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     @GuardedBy("mLock")
+    private void enableFsVerityToAddedApksWithIdsig() throws PackageManagerException {
+        try {
+            List<File> files = getAddedApksLocked();
+            for (var file : files) {
+                if (new File(file.getPath() + V4Signature.EXT).exists()) {
+                    VerityUtils.setUpFsverity(file.getPath());
+                }
+            }
+        } catch (IOException e) {
+            throw new PrepareFailure(PackageManager.INSTALL_FAILED_BAD_SIGNATURE,
+                    "Failed to enable fs-verity to verify with idsig: " + e);
+        }
+    }
+
+    @GuardedBy("mLock")
     private List<ApkLite> getAddedApkLitesLocked() throws PackageManagerException {
         if (!isArchivedInstallation()) {
             List<File> files = getAddedApksLocked();
@@ -1556,6 +1569,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
 
             var archPkg = metadata.getArchivedPackage();
+            if (archPkg == null) {
+                throw new PackageManagerException(INSTALL_FAILED_VERIFICATION_FAILURE,
+                        "Metadata does not contain ArchivedPackage: " + file);
+            }
             if (archPkg.packageName == null || archPkg.signingDetails == null) {
                 throw new PackageManagerException(INSTALL_FAILED_VERIFICATION_FAILURE,
                         "ArchivedPackage does not contain required info: " + file);
@@ -2934,15 +2951,40 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
      * @return a future that will be completed when the whole process is completed.
      */
     private CompletableFuture<Void> install() {
+        // `futures` either contains only one session (`this`) or contains one parent session
+        // (`this`) and n-1 child sessions.
         List<CompletableFuture<InstallResult>> futures = installNonStaged();
         CompletableFuture<InstallResult>[] arr = new CompletableFuture[futures.size()];
         return CompletableFuture.allOf(futures.toArray(arr)).whenComplete((r, t) -> {
             if (t == null) {
                 setSessionApplied();
+                var multiPackageWarnings = new ArrayList<String>();
+                if (isMultiPackage()) {
+                    // This is a parent session. Collect warnings from children.
+                    for (CompletableFuture<InstallResult> f : futures) {
+                        InstallResult result = f.join();
+                        if (result.session != this && result.extras != null) {
+                            ArrayList<String> childWarnings = result.extras.getStringArrayList(
+                                    PackageInstaller.EXTRA_WARNINGS);
+                            if (!ArrayUtils.isEmpty(childWarnings)) {
+                                multiPackageWarnings.addAll(childWarnings);
+                            }
+                        }
+                    }
+                }
                 for (CompletableFuture<InstallResult> f : futures) {
                     InstallResult result = f.join();
+                    Bundle extras = result.extras;
+                    if (isMultiPackage() && result.session == this
+                            && !multiPackageWarnings.isEmpty()) {
+                        if (extras == null) {
+                            extras = new Bundle();
+                        }
+                        extras.putStringArrayList(
+                                PackageInstaller.EXTRA_WARNINGS, multiPackageWarnings);
+                    }
                     result.session.dispatchSessionFinished(
-                            INSTALL_SUCCEEDED, "Session installed", result.extras);
+                            INSTALL_SUCCEEDED, "Session installed", extras);
                 }
             } else {
                 PackageManagerException e = (PackageManagerException) t.getCause();
@@ -3314,6 +3356,14 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         }
 
+        // Needs to happen before the first v4 signature verification, which happens in
+        // getAddedApkLitesLocked.
+        if (android.security.Flags.extendVbChainToUpdatedApk()) {
+            if (!isIncrementalInstallation()) {
+                enableFsVerityToAddedApksWithIdsig();
+            }
+        }
+
         final List<ApkLite> addedFiles = getAddedApkLitesLocked();
         if (addedFiles.isEmpty()
                 && (removeSplitList.size() == 0 || getStagedAppMetadataFile() != null)) {
@@ -3415,8 +3465,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         "Archived installation of this package is not allowed.");
             }
 
-            if (!isInstalledByAdb(getInstallSource().mInitiatingPackageName)
-                    && !mPm.mInstallerService.mPackageArchiver.verifySupportsUnarchival(
+            if (!mPm.mInstallerService.mPackageArchiver.verifySupportsUnarchival(
                     getInstallSource().mInstallerPackageName)) {
                 throw new PackageManagerException(
                         PackageManager.INSTALL_FAILED_SESSION_INVALID,
@@ -3677,6 +3726,16 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     @GuardedBy("mLock")
+    private void maybeStageV4SignatureLocked(File origFile, File targetFile)
+            throws PackageManagerException {
+        final File originalSignature = new File(origFile.getPath() + V4Signature.EXT);
+        if (originalSignature.exists()) {
+            final File stagedSignature = new File(targetFile.getPath() + V4Signature.EXT);
+            stageFileLocked(originalSignature, stagedSignature);
+        }
+    }
+
+    @GuardedBy("mLock")
     private void maybeStageDexMetadataLocked(File origFile, File targetFile)
             throws PackageManagerException {
         final File dexMetadataFile = DexMetadataHelper.findDexMetadataForFile(origFile);
@@ -3803,6 +3862,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // Stage APK's fs-verity signature if present.
         maybeStageFsveritySignatureLocked(origFile, targetFile,
                 isFsVerityRequiredForApk(origFile, targetFile));
+        // Stage APK's v4 signature if present, and fs-verity is supported.
+        if (android.security.Flags.extendVbChainToUpdatedApk()
+                && VerityUtils.isFsVeritySupported()) {
+            maybeStageV4SignatureLocked(origFile, targetFile);
+        }
         // Stage dex metadata (.dm) and corresponding fs-verity signature if present.
         maybeStageDexMetadataLocked(origFile, targetFile);
         // Stage checksums (.digests) if present.
@@ -3820,10 +3884,22 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     @GuardedBy("mLock")
+    private void maybeInheritV4SignatureLocked(File origFile) {
+        // Inherit the v4 signature file if present.
+        final File v4SignatureFile = new File(origFile.getPath() + V4Signature.EXT);
+        if (v4SignatureFile.exists()) {
+            mResolvedInheritedFiles.add(v4SignatureFile);
+        }
+    }
+
+    @GuardedBy("mLock")
     private void inheritFileLocked(File origFile) {
         mResolvedInheritedFiles.add(origFile);
 
         maybeInheritFsveritySignatureLocked(origFile);
+        if (android.security.Flags.extendVbChainToUpdatedApk()) {
+            maybeInheritV4SignatureLocked(origFile);
+        }
 
         // Inherit the dex metadata if present.
         final File dexMetadataFile =
@@ -5162,6 +5238,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     PackageManager.EXTRA_FAILURE_EXISTING_PACKAGE);
             if (!TextUtils.isEmpty(existing)) {
                 fillIn.putExtra(PackageInstaller.EXTRA_OTHER_PACKAGE_NAME, existing);
+            }
+            ArrayList<String> warnings = extras.getStringArrayList(PackageInstaller.EXTRA_WARNINGS);
+            if (!ArrayUtils.isEmpty(warnings)) {
+                fillIn.putStringArrayListExtra(PackageInstaller.EXTRA_WARNINGS, warnings);
             }
         }
         try {

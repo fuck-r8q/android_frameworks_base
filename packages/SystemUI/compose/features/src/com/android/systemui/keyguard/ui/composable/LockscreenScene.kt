@@ -36,7 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.isVisible
 import com.android.compose.animation.scene.SceneScope
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.qualifiers.KeyguardRootView
@@ -66,13 +66,19 @@ constructor(
 ) : ComposableScene {
     override val key = SceneKey.Lockscreen
 
-    override fun destinationScenes(): StateFlow<Map<UserAction, SceneModel>> =
+    override val destinationScenes: StateFlow<Map<UserAction, SceneModel>> =
         viewModel.upDestinationSceneKey
-            .map { pageKey -> destinationScenes(up = pageKey) }
+            .map { pageKey ->
+                destinationScenes(up = pageKey, left = viewModel.leftDestinationSceneKey)
+            }
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.Eagerly,
-                initialValue = destinationScenes(up = null)
+                initialValue =
+                    destinationScenes(
+                        up = viewModel.upDestinationSceneKey.value,
+                        left = viewModel.leftDestinationSceneKey,
+                    )
             )
 
     @Composable
@@ -88,9 +94,11 @@ constructor(
 
     private fun destinationScenes(
         up: SceneKey?,
+        left: SceneKey?,
     ): Map<UserAction, SceneModel> {
         return buildMap {
             up?.let { this[UserAction.Swipe(Direction.UP)] = SceneModel(up) }
+            left?.let { this[UserAction.Swipe(Direction.LEFT)] = SceneModel(left) }
             this[UserAction.Swipe(Direction.DOWN)] = SceneModel(SceneKey.Shade)
         }
     }

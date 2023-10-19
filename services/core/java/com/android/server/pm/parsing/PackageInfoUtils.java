@@ -54,6 +54,7 @@ import android.util.Slog;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.ArrayUtils;
 import com.android.server.SystemConfig;
+import com.android.server.pm.PackageArchiver;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
 import com.android.server.pm.parsing.pkg.PackageImpl;
 import com.android.server.pm.pkg.AndroidPackage;
@@ -378,7 +379,6 @@ public class PackageInfoUtils {
         ai.privateFlags |= flag(state.isInstantApp(), ApplicationInfo.PRIVATE_FLAG_INSTANT)
                 | flag(state.isVirtualPreload(), ApplicationInfo.PRIVATE_FLAG_VIRTUAL_PRELOAD)
                 | flag(state.isHidden(), ApplicationInfo.PRIVATE_FLAG_HIDDEN);
-
         if ((flags & PackageManager.FILTER_OUT_QUARANTINED_COMPONENTS) != 0
                 && state.isQuarantined()) {
             ai.enabled = false;
@@ -402,6 +402,7 @@ public class PackageInfoUtils {
             ai.resourceDirs = overlayPaths.getResourceDirs().toArray(new String[0]);
             ai.overlayPaths = overlayPaths.getOverlayPaths().toArray(new String[0]);
         }
+        ai.isArchived = PackageArchiver.isArchived(state);
     }
 
     @Nullable

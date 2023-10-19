@@ -834,17 +834,22 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             return false;
         }
 
-        // Try pausing the existing resumed activity in the same TaskFragment if any.
-        final TaskFragment taskFragment = r.getTaskFragment();
-        if (taskFragment != null && taskFragment.getResumedActivity() != null) {
-            if (taskFragment.startPausing(mUserLeaving, false /* uiSleeping */, r, "realStart")) {
+        final Task task = r.getTask();
+        if (andResume) {
+            // Try pausing the existing resumed activity in the Task if any.
+            if (task.pauseActivityIfNeeded(r, "realStart")) {
                 return false;
+            }
+            final TaskFragment taskFragment = r.getTaskFragment();
+            if (taskFragment != null && taskFragment.getResumedActivity() != null) {
+                if (taskFragment.startPausing(mUserLeaving, false /* uiSleeping */, r,
+                        "realStart")) {
+                    return false;
+                }
             }
         }
 
-        final Task task = r.getTask();
         final Task rootTask = task.getRootTask();
-
         beginDeferResume();
         // The LaunchActivityItem also contains process configuration, so the configuration change
         // from WindowProcessController#setProcess can be deferred. The major reason is that if
@@ -962,7 +967,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
                 // Create activity launch transaction.
                 final ClientTransaction clientTransaction = ClientTransaction.obtain(
-                        proc.getThread(), r.token);
+                        proc.getThread());
 
                 final boolean isTransitionForward = r.isTransitionForward();
                 final IBinder fragmentToken = r.getTaskFragment().getFragmentToken();

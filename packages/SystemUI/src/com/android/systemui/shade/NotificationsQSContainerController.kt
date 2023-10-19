@@ -26,7 +26,7 @@ import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
@@ -129,6 +129,9 @@ class NotificationsQSContainerController @Inject constructor(
 
         mView.setStackScroller(notificationStackScrollLayoutController.getView())
         mView.setMigratingNSSL(featureFlags.isEnabled(Flags.MIGRATE_NSSL))
+        if (featureFlags.isEnabled(Flags.QS_CONTAINER_GRAPH_OPTIMIZER)){
+            mView.enableGraphOptimization()
+        }
     }
 
     public override fun onViewAttached() {

@@ -39,7 +39,6 @@ abstract class CentralSurfacesEmptyImpl : CentralSurfaces {
     override fun getKeyguardMessageArea(): AuthKeyguardMessageArea? = null
     override fun isLaunchingActivityOverLockscreen() = false
     override fun onKeyguardViewManagerStatesUpdated() {}
-    override fun onInputFocusTransfer(start: Boolean, cancel: Boolean, velocity: Float) {}
     override fun getCommandQueuePanelsEnabled() = false
     override fun showWirelessChargingAnimation(batteryLevel: Int) {}
     override fun checkBarModes() {}
@@ -68,10 +67,8 @@ abstract class CentralSurfacesEmptyImpl : CentralSurfaces {
         cancelAction: Runnable?,
     ) {}
     override fun getNavigationBarView(): NavigationBarView? = null
-    override fun isOverviewEnabled() = false
     override fun setBouncerShowing(bouncerShowing: Boolean) {}
     override fun isScreenFullyOff() = false
-    override fun showScreenPinningRequest(taskId: Int, allowCancel: Boolean) {}
     override fun getEmergencyActionIntent(): Intent? = null
     override fun isCameraAllowedByAdmin() = false
     override fun isGoingToSleep() = false
@@ -84,12 +81,9 @@ abstract class CentralSurfacesEmptyImpl : CentralSurfaces {
     override fun awakenDreams() {}
     override fun isBouncerShowing() = false
     override fun isBouncerShowingScrimmed() = false
-    override fun isBouncerShowingOverDream() = false
     override fun updateNotificationPanelTouchState() {}
     override fun getRotation() = 0
     override fun setBarStateForTest(state: Int) {}
-    override fun showTransientUnchecked() {}
-    override fun clearTransient() {}
     override fun acquireGestureWakeLock(time: Long) {}
     override fun setAppearance(appearance: Int) = false
     override fun getBarMode() = 0

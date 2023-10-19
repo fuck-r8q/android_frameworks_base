@@ -36,7 +36,7 @@ import com.android.internal.logging.UiEventLogger
 import com.android.internal.widget.LockPatternUtils
 import com.android.keyguard.KeyguardSecurityContainer.UserSwitcherViewMode.UserSwitcherCallback
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
@@ -60,6 +60,7 @@ import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.statusbar.policy.ConfigurationController
+import com.android.systemui.statusbar.policy.DevicePostureController
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.policy.UserSwitcherController
@@ -140,6 +141,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     @Mock private lateinit var userInteractor: UserInteractor
     @Mock private lateinit var faceAuthAccessibilityDelegate: FaceAuthAccessibilityDelegate
     @Mock private lateinit var deviceProvisionedController: DeviceProvisionedController
+    @Mock private lateinit var postureController: DevicePostureController
 
     @Captor
     private lateinit var swipeListenerArgumentCaptor:
@@ -197,6 +199,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
         featureFlags.set(Flags.BOUNCER_USER_SWITCHER, false)
         featureFlags.set(Flags.KEYGUARD_WM_STATE_REFACTOR, false)
         featureFlags.set(Flags.REFACTOR_KEYGUARD_DISMISS_INTENT, false)
+        featureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
 
         keyguardPasswordViewController =
             KeyguardPasswordViewController(
@@ -213,6 +216,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 mock(),
                 null,
                 keyguardViewController,
+                postureController,
                 featureFlags
             )
 
@@ -806,7 +810,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     SceneKey.Lockscreen,
                     SceneKey.Bouncer,
-                    flowOf(.5f)
+                    flowOf(.5f),
+                    false,
                 )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer, null), "reason")
@@ -818,7 +823,12 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             // keyguard.
             sceneInteractor.changeScene(SceneModel(SceneKey.Gone, null), "reason")
             sceneTransitionStateFlow.value =
-                ObservableTransitionState.Transition(SceneKey.Bouncer, SceneKey.Gone, flowOf(.5f))
+                ObservableTransitionState.Transition(
+                    SceneKey.Bouncer,
+                    SceneKey.Gone,
+                    flowOf(.5f),
+                    false
+                )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Gone, null), "reason")
             sceneTransitionStateFlow.value = ObservableTransitionState.Idle(SceneKey.Gone)
@@ -830,7 +840,12 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             clearInvocations(viewMediatorCallback)
             sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer, null), "reason")
             sceneTransitionStateFlow.value =
-                ObservableTransitionState.Transition(SceneKey.Gone, SceneKey.Bouncer, flowOf(.5f))
+                ObservableTransitionState.Transition(
+                    SceneKey.Gone,
+                    SceneKey.Bouncer,
+                    flowOf(.5f),
+                    false
+                )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer, null), "reason")
             sceneTransitionStateFlow.value = ObservableTransitionState.Idle(SceneKey.Bouncer)
@@ -843,7 +858,12 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
             underTest.onViewDetached()
             sceneInteractor.changeScene(SceneModel(SceneKey.Gone, null), "reason")
             sceneTransitionStateFlow.value =
-                ObservableTransitionState.Transition(SceneKey.Bouncer, SceneKey.Gone, flowOf(.5f))
+                ObservableTransitionState.Transition(
+                    SceneKey.Bouncer,
+                    SceneKey.Gone,
+                    flowOf(.5f),
+                    false
+                )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Gone, null), "reason")
             sceneTransitionStateFlow.value = ObservableTransitionState.Idle(SceneKey.Gone)
@@ -856,7 +876,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     SceneKey.Gone,
                     SceneKey.Lockscreen,
-                    flowOf(.5f)
+                    flowOf(.5f),
+                    false,
                 )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Lockscreen, null), "reason")
@@ -872,7 +893,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 ObservableTransitionState.Transition(
                     SceneKey.Lockscreen,
                     SceneKey.Gone,
-                    flowOf(.5f)
+                    flowOf(.5f),
+                    false,
                 )
             runCurrent()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Gone, null), "reason")

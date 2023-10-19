@@ -378,15 +378,8 @@ public class CommandQueue extends IStatusBar.Stub implements
         /**
          * @see IStatusBar#showTransient(int, int, boolean).
          */
-        default void showTransient(int displayId, @InsetsType int types) { }
-
-        /**
-         * @see IStatusBar#showTransient(int, int, boolean).
-         */
         default void showTransient(int displayId, @InsetsType int types,
-                boolean isGestureOnSystemBar) {
-            showTransient(displayId, types);
-        }
+                boolean isGestureOnSystemBar) {}
 
         /**
          * @see IStatusBar#abortTransient(int, int).

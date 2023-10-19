@@ -2510,6 +2510,14 @@ public class WindowManagerService extends IWindowManager.Stub
                 outInsetsState.set(win.getCompatInsetsState(), true /* copySources */);
             }
 
+            // TODO (b/298562855): Remove this after identifying the reason why the frame is empty.
+            if (win.mAttrs.providedInsets != null && win.getFrame().isEmpty()) {
+                Slog.w(TAG, "Empty frame of " + win
+                        + " configChanged=" + configChanged
+                        + " frame=" + win.getFrame().toShortString()
+                        + " attrs=" + attrs);
+            }
+
             ProtoLog.v(WM_DEBUG_FOCUS, "Relayout of %s: focusMayChange=%b",
                     win, focusMayChange);
 
@@ -8449,6 +8457,11 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public boolean hasNavigationBar(int displayId) {
+            return WindowManagerService.this.hasNavigationBar(displayId);
+        }
+
+        @Override
         public void setInputMethodTargetChangeListener(@NonNull ImeTargetChangeListener listener) {
             synchronized (mGlobalLock) {
                 mImeTargetChangeListener = listener;
@@ -8910,6 +8923,11 @@ public class WindowManagerService extends IWindowManager.Stub
             h.inputConfig |= InputConfig.NOT_FOCUSABLE;
         }
 
+        //  Check private trusted overlay flag to set trustedOverlay field of input window handle.
+        if ((privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0) {
+            h.inputConfig |= InputConfig.TRUSTED_OVERLAY;
+        }
+
         h.dispatchingTimeoutMillis = DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
         h.ownerUid = callingUid;
         h.ownerPid = callingPid;
@@ -8929,8 +8947,6 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         final SurfaceControl.Transaction t = mTransactionFactory.get();
-        //  Check private trusted overlay flag to set trustedOverlay field of input window handle.
-        h.setTrustedOverlay(t, surface, (privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0);
         t.setInputWindowInfo(surface, h);
         t.apply();
         t.close();

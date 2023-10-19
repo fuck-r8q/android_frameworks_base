@@ -17,7 +17,7 @@
 package com.android.systemui.bouncer.domain.interactor
 
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.model.AuthenticationMethodModel
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
@@ -351,6 +351,34 @@ class BouncerInteractorTest : SysuiTestCase() {
             assertThat(currentScene?.key).isEqualTo(SceneKey.Gone)
             assertThat(isThrottled).isFalse()
             assertThat(throttling).isEqualTo(AuthenticationThrottlingModel())
+        }
+
+    @Test
+    fun hide_whenOnBouncerScene_hidesBouncerAndGoesToLockscreenScene() =
+        testScope.runTest {
+            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "")
+            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "")
+            val currentScene by collectLastValue(sceneInteractor.desiredScene)
+            val bouncerSceneKey = currentScene?.key
+            assertThat(bouncerSceneKey).isEqualTo(SceneKey.Bouncer)
+
+            underTest.hide("")
+
+            assertThat(currentScene?.key).isEqualTo(SceneKey.Lockscreen)
+        }
+
+    @Test
+    fun hide_whenNotOnBouncerScene_doesNothing() =
+        testScope.runTest {
+            sceneInteractor.changeScene(SceneModel(SceneKey.Shade), "")
+            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Shade), "")
+            val currentScene by collectLastValue(sceneInteractor.desiredScene)
+            val notBouncerSceneKey = currentScene?.key
+            assertThat(notBouncerSceneKey).isNotEqualTo(SceneKey.Bouncer)
+
+            underTest.hide("")
+
+            assertThat(currentScene?.key).isEqualTo(notBouncerSceneKey)
         }
 
     private fun assertTryAgainMessage(

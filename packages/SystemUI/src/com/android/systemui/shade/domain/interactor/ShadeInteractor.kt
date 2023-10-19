@@ -35,15 +35,19 @@ import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 
 /** Business logic for shade interactions. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,6 +58,7 @@ constructor(
     @Application scope: CoroutineScope,
     disableFlagsRepository: DisableFlagsRepository,
     sceneContainerFlags: SceneContainerFlags,
+    // TODO(b/300258424) convert to direct reference instead of provider
     sceneInteractorProvider: Provider<SceneInteractor>,
     keyguardRepository: KeyguardRepository,
     userSetupRepository: UserSetupRepository,
@@ -72,7 +77,7 @@ constructor(
      * Whether split shade, the combined notifications and quick settings shade used for large
      * screens, is enabled.
      */
-    val splitShadeEnabled: Flow<Boolean> =
+    val isSplitShadeEnabled: Flow<Boolean> =
         sharedNotificationContainerInteractor.configurationBasedDimensions
             .map { dimens -> dimens.useSplitShade }
             .distinctUntilChanged()
@@ -87,7 +92,7 @@ constructor(
                     keyguardRepository.statusBarState,
                     repository.legacyShadeExpansion,
                     repository.qsExpansion,
-                    splitShadeEnabled
+                    isSplitShadeEnabled
                 ) {
                     lockscreenShadeExpansion,
                     statusBarState,
@@ -119,16 +124,64 @@ constructor(
             repository.qsExpansion
         }
 
-    /** The amount [0-1] either QS or the shade has been opened */
+    /** The amount [0-1] either QS or the shade has been opened. */
     val anyExpansion: StateFlow<Float> =
         combine(shadeExpansion, qsExpansion) { shadeExp, qsExp -> maxOf(shadeExp, qsExp) }
             .stateIn(scope, SharingStarted.Eagerly, 0f)
 
     /** Whether either the shade or QS is expanding from a fully collapsed state. */
-    val anyExpanding =
+    val isAnyExpanding: Flow<Boolean> =
         anyExpansion
             .pairwise(1f)
             .map { (prev, curr) -> curr > 0f && curr < 1f && prev < 1f }
+            .distinctUntilChanged()
+
+    /**
+     * Whether either the shade or QS is partially or fully expanded, i.e. not fully collapsed. At
+     * this time, this is not simply a matter of checking if either value in shadeExpansion and
+     * qsExpansion is greater than zero, because it includes the legacy concept of whether input
+     * transfer is about to occur. If the scene container flag is enabled, it just checks whether
+     * either expansion value is positive.
+     *
+     * TODO(b/300258424) remove all but the first sentence of this comment
+     */
+    val isAnyExpanded: Flow<Boolean> =
+        if (sceneContainerFlags.isEnabled()) {
+            anyExpansion.map { it > 0f }.distinctUntilChanged()
+        } else {
+            repository.legacyExpandedOrAwaitingInputTransfer
+        }
+
+    /**
+     * Whether the user is expanding or collapsing the shade with user input. This will be true even
+     * if the user's input gesture has ended but a transition they initiated is animating.
+     */
+    val isUserInteractingWithShade: Flow<Boolean> =
+        if (sceneContainerFlags.isEnabled()) {
+            sceneBasedInteracting(sceneInteractorProvider.get(), SceneKey.Shade)
+        } else {
+            userInteractingFlow(repository.legacyShadeTracking, repository.legacyShadeExpansion)
+        }
+
+    /**
+     * Whether the user is expanding or collapsing quick settings with user input. This will be true
+     * even if the user's input gesture has ended but a transition they initiated is still
+     * animating.
+     */
+    val isUserInteractingWithQs: Flow<Boolean> =
+        if (sceneContainerFlags.isEnabled()) {
+            sceneBasedInteracting(sceneInteractorProvider.get(), SceneKey.QuickSettings)
+        } else {
+            userInteractingFlow(repository.legacyQsTracking, repository.qsExpansion)
+        }
+
+    /**
+     * Whether the user is expanding or collapsing either the shade or quick settings with user
+     * input (i.e. dragging a pointer). This will be true even if the user's input gesture had ended
+     * but a transition they initiated is still animating.
+     */
+    val isUserInteracting: Flow<Boolean> =
+        combine(isUserInteractingWithShade, isUserInteractingWithShade) { shade, qs -> shade || qs }
             .distinctUntilChanged()
 
     /** Emits true if the shade can be expanded from QQS to QS and false otherwise. */
@@ -169,4 +222,42 @@ constructor(
                 }
             }
             .distinctUntilChanged()
+
+    fun sceneBasedInteracting(sceneInteractor: SceneInteractor, sceneKey: SceneKey) =
+        sceneInteractor.transitionState
+            .map { state ->
+                when (state) {
+                    is ObservableTransitionState.Idle -> false
+                    is ObservableTransitionState.Transition ->
+                        state.isUserInputDriven &&
+                            (state.toScene == sceneKey || state.fromScene == sceneKey)
+                }
+            }
+            .distinctUntilChanged()
+
+    /**
+     * Return a flow for whether a user is interacting with an expandable shade component using
+     * tracking and expansion flows. NOTE: expansion must be a `StateFlow` to guarantee that
+     * [expansion.first] checks the current value of the flow.
+     */
+    private fun userInteractingFlow(
+        tracking: Flow<Boolean>,
+        expansion: StateFlow<Float>
+    ): Flow<Boolean> {
+        return flow {
+            // initial value is false
+            emit(false)
+            while (currentCoroutineContext().isActive) {
+                // wait for tracking to become true
+                tracking.first { it }
+                emit(true)
+                // wait for tracking to become false
+                tracking.first { !it }
+                // wait for expansion to complete in either direction
+                expansion.first { it <= 0f || it >= 1f }
+                // interaction complete
+                emit(false)
+            }
+        }
+    }
 }

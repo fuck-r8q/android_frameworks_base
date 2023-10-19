@@ -28,7 +28,6 @@ import static android.graphics.GraphicsProtos.dumpPointProto;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.PowerManager.DRAW_WAKE_LOCK;
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
-import static android.view.InputWindowHandle.USE_SURFACE_TRUSTED_OVERLAY;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.SurfaceControl.getGlobalTransaction;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_CONTENT;
@@ -100,6 +99,7 @@ import static android.view.WindowManager.LayoutParams.isSystemAlertWindowType;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_FIRST_TIME;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
+
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_APP_TRANSITIONS;
@@ -1119,9 +1119,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mInputWindowHandle.setName(getName());
         mInputWindowHandle.setPackageName(mAttrs.packageName);
         mInputWindowHandle.setLayoutParamsType(mAttrs.type);
-        if (!USE_SURFACE_TRUSTED_OVERLAY) {
-            mInputWindowHandle.setTrustedOverlay(isWindowTrustedOverlay());
-        }
+        mInputWindowHandle.setTrustedOverlay(shouldWindowHandleBeTrusted(s));
         if (DEBUG) {
             Slog.v(TAG, "Window " + this + " client=" + c.asBinder()
                             + " token=" + token + " (" + mAttrs.token + ")" + " params=" + a);
@@ -1202,12 +1200,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 : service.mAtmService.getProcessController(s.mPid, s.mUid);
     }
 
-    private boolean isWindowTrustedOverlay() {
+    boolean shouldWindowHandleBeTrusted(Session s) {
         return InputMonitor.isTrustedOverlay(mAttrs.type)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
-                        && mSession.mCanAddInternalSystemWindow)
+                        && s.mCanAddInternalSystemWindow)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                        && mSession.mCanCreateSystemApplicationOverlay);
+                        && s.mCanCreateSystemApplicationOverlay);
     }
 
     int getTouchOcclusionMode() {
@@ -5201,9 +5199,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             updateFrameRateSelectionPriorityIfNeeded();
             updateScaleIfNeeded();
             mWinAnimator.prepareSurfaceLocked(getSyncTransaction());
-            if (USE_SURFACE_TRUSTED_OVERLAY) {
-                getSyncTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
-            }
         }
         super.prepareSurfaces();
     }
@@ -5956,13 +5951,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean isTrustedOverlay() {
-        if (USE_SURFACE_TRUSTED_OVERLAY) {
-            WindowState parentWindow = getParentWindow();
-            return isWindowTrustedOverlay() || (parentWindow != null
-                    && parentWindow.isWindowTrustedOverlay());
-        } else {
-            return mInputWindowHandle.isTrustedOverlay();
-        }
+        return mInputWindowHandle.isTrustedOverlay();
     }
 
     public boolean receiveFocusFromTapOutside() {

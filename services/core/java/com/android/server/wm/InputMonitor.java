@@ -42,10 +42,12 @@ import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_BLACKSCREEN_OV
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DRAGDROP_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_VOICE_INTERACTION;
 import static android.view.WindowManager.LayoutParams.TYPE_WALLPAPER;
+
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_FOCUS_LIGHT;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_INPUT;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.LOGTAG_INPUT_FOCUS;
+
 import static java.lang.Integer.MAX_VALUE;
 
 import android.annotation.Nullable;
@@ -732,7 +734,7 @@ final class InputMonitor {
                 new InputWindowHandle(null /* inputApplicationHandle */, displayId));
         inputWindowHandle.setName(name);
         inputWindowHandle.setLayoutParamsType(TYPE_SECURE_SYSTEM_OVERLAY);
-        inputWindowHandle.setTrustedOverlay(t, sc, true);
+        inputWindowHandle.setTrustedOverlay(true);
         populateOverlayInputInfo(inputWindowHandle);
         setInputWindowInfoIfNeeded(t, sc, inputWindowHandle);
     }

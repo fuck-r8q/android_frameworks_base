@@ -53,7 +53,7 @@ import javax.inject.Inject;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
 import com.android.settingslib.mobile.TelephonyIcons;
 import com.android.settingslib.SignalIcon.MobileIconGroup;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.SysUISingleton;
 
 import com.qti.extphone.Client;

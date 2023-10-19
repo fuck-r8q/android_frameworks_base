@@ -28,7 +28,7 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
@@ -130,10 +130,6 @@ public class OneHandedModeTile extends QSTileImpl<BooleanState> {
         state.value = enabled;
         state.label = mContext.getString(R.string.quick_settings_onehanded_label);
         state.icon = mIcon;
-        if (state.slash == null) {
-            state.slash = new SlashState();
-        }
-        state.slash.isSlashed = !state.value;
         state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
         state.contentDescription = state.label;
         state.expandedAccessibilityClassName = Switch.class.getName();

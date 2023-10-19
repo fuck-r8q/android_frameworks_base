@@ -25,7 +25,7 @@ import android.view.ViewConfiguration;
 import android.widget.Button;
 
 import com.android.internal.util.EmergencyAffordanceManager;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 
 import java.util.List;
 

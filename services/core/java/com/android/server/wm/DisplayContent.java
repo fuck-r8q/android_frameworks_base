@@ -2161,6 +2161,16 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
+     * @see DisplayWindowPolicyController#getCustomHomeComponent() ()
+     */
+    @Nullable ComponentName getCustomHomeComponent() {
+        if (!supportsSystemDecorations() || mDwpcHelper == null) {
+            return null;
+        }
+        return mDwpcHelper.getCustomHomeComponent();
+    }
+
+    /**
      * Applies the rotation transaction. This must be called after {@link #updateRotationUnchecked}
      * (if it returned {@code true}) to actually finish the rotation.
      *
@@ -6038,8 +6048,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mOffTokenAcquirer.release(mDisplayId);
             }
             ProtoLog.v(WM_DEBUG_CONTENT_RECORDING,
-                    "Content Recording: Display %d state is now (%d), so update recording?",
-                    mDisplayId, displayState);
+                    "Content Recording: Display %d state was (%d), is now (%d), so update "
+                            + "recording?",
+                    mDisplayId, lastDisplayState, displayState);
             if (lastDisplayState != displayState) {
                 // If state is on due to surface being added, then start recording.
                 // If state is off due to surface being removed, then stop recording.

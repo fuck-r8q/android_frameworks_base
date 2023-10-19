@@ -1476,6 +1476,7 @@ public class AudioDeviceInventory {
                 }
             });
             new MediaMetrics.Item(mMetricsId + "disconnectA2dp")
+                    .set(MediaMetrics.Property.EVENT, "disconnectA2dp")
                     .record();
             if (toRemove.size() > 0) {
                 final int delay = checkSendBecomingNoisyIntentInt(
@@ -1498,6 +1499,7 @@ public class AudioDeviceInventory {
                 }
             });
             new MediaMetrics.Item(mMetricsId + "disconnectA2dpSink")
+                    .set(MediaMetrics.Property.EVENT, "disconnectA2dpSink")
                     .record();
             toRemove.stream().forEach(deviceAddress -> makeA2dpSrcUnavailable(deviceAddress));
         }
@@ -1513,6 +1515,7 @@ public class AudioDeviceInventory {
                 }
             });
             new MediaMetrics.Item(mMetricsId + "disconnectHearingAid")
+                    .set(MediaMetrics.Property.EVENT, "disconnectHearingAid")
                     .record();
             if (toRemove.size() > 0) {
                 final int delay = checkSendBecomingNoisyIntentInt(
@@ -1566,6 +1569,7 @@ public class AudioDeviceInventory {
                 }
             });
             new MediaMetrics.Item(mMetricsId + "disconnectLeAudio")
+                    .set(MediaMetrics.Property.EVENT, "disconnectLeAudio")
                     .record();
             if (toRemove.size() > 0) {
                 final int delay;

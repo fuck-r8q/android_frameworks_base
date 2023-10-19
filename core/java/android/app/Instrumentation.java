@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.hardware.input.InputManager;
 import android.hardware.input.InputManagerGlobal;
@@ -474,6 +475,56 @@ public class Instrumentation {
         sr.waitForComplete();
     }
 
+    boolean isSdkSandboxAllowedToStartActivities() {
+        return Process.isSdkSandbox()
+                && mThread != null
+                && mThread.mBoundApplication != null
+                && mThread.mBoundApplication.isSdkInSandbox
+                && getContext() != null
+                && (getContext()
+                                .checkSelfPermission(
+                                        android.Manifest.permission
+                                                .START_ACTIVITIES_FROM_SDK_SANDBOX)
+                        == PackageManager.PERMISSION_GRANTED);
+    }
+
+    /**
+     * Activity name resolution for CTS-in-SdkSandbox tests requires some adjustments. Intents
+     * generated using {@link Context#getPackageName()} use the SDK sandbox package name in the
+     * component field instead of the test package name. An SDK-in-sandbox test attempting to launch
+     * an activity in the test package will encounter name resolution errors when resolving the
+     * activity name in the SDK sandbox package.
+     *
+     * <p>This function replaces the package name of the input intent component to allow activities
+     * belonging to a CTS-in-sandbox test to resolve correctly.
+     *
+     * @param intent the intent to modify to allow CTS-in-sandbox activity resolution.
+     */
+    private void adjustIntentForCtsInSdkSandboxInstrumentation(@NonNull Intent intent) {
+        if (mComponent != null
+                && intent.getComponent() != null
+                && getContext()
+                        .getPackageManager()
+                        .getSdkSandboxPackageName()
+                        .equals(intent.getComponent().getPackageName())) {
+            // Resolve the intent target for the test package, not for the sandbox package.
+            intent.setComponent(
+                    new ComponentName(
+                            mComponent.getPackageName(), intent.getComponent().getClassName()));
+        }
+        // We match the intent identifier against the running instrumentations for the sandbox.
+        intent.setIdentifier(mComponent.getPackageName());
+    }
+
+    private ActivityInfo resolveActivityInfoForCtsInSandbox(@NonNull Intent intent) {
+        adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        ActivityInfo ai = intent.resolveActivityInfo(getTargetContext().getPackageManager(), 0);
+        if (ai != null) {
+            ai.processName = mThread.getProcessName();
+        }
+        return ai;
+    }
+
     /**
      * Start a new activity and wait for it to begin running before returning.
      * In addition to being synchronous, this method as some semantic
@@ -532,8 +583,10 @@ public class Instrumentation {
         synchronized (mSync) {
             intent = new Intent(intent);
 
-            ActivityInfo ai = intent.resolveActivityInfo(
-                getTargetContext().getPackageManager(), 0);
+            ActivityInfo ai =
+                    isSdkSandboxAllowedToStartActivities()
+                            ? resolveActivityInfoForCtsInSandbox(intent)
+                            : intent.resolveActivityInfo(getTargetContext().getPackageManager(), 0);
             if (ai == null) {
                 throw new RuntimeException("Unable to resolve activity for: " + intent);
             }
@@ -1844,6 +1897,9 @@ public class Instrumentation {
         if (referrer != null) {
             intent.putExtra(Intent.EXTRA_REFERRER, referrer);
         }
+        if (isSdkSandboxAllowedToStartActivities()) {
+            adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();
@@ -1917,6 +1973,11 @@ public class Instrumentation {
             int userId) {
         android.util.SeempLog.record_str(378, intents.toString());
         IApplicationThread whoThread = (IApplicationThread) contextThread;
+        if (isSdkSandboxAllowedToStartActivities()) {
+            for (Intent intent : intents) {
+                adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+            }
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();
@@ -1993,6 +2054,9 @@ public class Instrumentation {
         Intent intent, int requestCode, Bundle options) {
         android.util.SeempLog.record_str(377, intent.toString());
         IApplicationThread whoThread = (IApplicationThread) contextThread;
+        if (isSdkSandboxAllowedToStartActivities()) {
+            adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();
@@ -2065,6 +2129,9 @@ public class Instrumentation {
             Intent intent, int requestCode, Bundle options, UserHandle user) {
         android.util.SeempLog.record_str(377, intent.toString());
         IApplicationThread whoThread = (IApplicationThread) contextThread;
+        if (isSdkSandboxAllowedToStartActivities()) {
+            adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();
@@ -2115,6 +2182,9 @@ public class Instrumentation {
             Intent intent, int requestCode, Bundle options,
             boolean ignoreTargetSecurity, int userId) {
         IApplicationThread whoThread = (IApplicationThread) contextThread;
+        if (isSdkSandboxAllowedToStartActivities()) {
+            adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();
@@ -2167,6 +2237,9 @@ public class Instrumentation {
             Intent intent, Bundle options) {
         android.util.SeempLog.record_str(380, intent.toString());
         IApplicationThread whoThread = (IApplicationThread) contextThread;
+        if (isSdkSandboxAllowedToStartActivities()) {
+            adjustIntentForCtsInSdkSandboxInstrumentation(intent);
+        }
         if (mActivityMonitors != null) {
             synchronized (mSync) {
                 final int N = mActivityMonitors.size();

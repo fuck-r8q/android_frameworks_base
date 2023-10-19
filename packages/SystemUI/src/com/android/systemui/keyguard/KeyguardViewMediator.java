@@ -129,7 +129,7 @@ import com.android.systemui.DejankUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
 import com.android.systemui.EventLogTags;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.LaunchAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -1967,6 +1967,10 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             mExternallyEnabled = enabled;
 
             if (!enabled && mShowing) {
+                if (mLockPatternUtils.isUserInLockdown(KeyguardUpdateMonitor.getCurrentUser())) {
+                    Log.d(TAG, "keyguardEnabled(false) overridden by user lockdown");
+                    return;
+                }
                 // hiding keyguard that is showing, remember to reshow later
                 if (DEBUG) Log.d(TAG, "remembering to reshow, hiding keyguard, "
                         + "disabling status bar expansion");
@@ -2197,7 +2201,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      * Enable the keyguard if the settings are appropriate.
      */
     private void doKeyguardLocked(Bundle options) {
-        // if another app is disabling us, don't show unless we're in lockdown mode
+        // if another app is disabling us, don't show
         if (!mExternallyEnabled
                 && !mLockPatternUtils.isUserInLockdown(KeyguardUpdateMonitor.getCurrentUser())) {
             if (DEBUG) Log.d(TAG, "doKeyguard: not showing because externally disabled");
@@ -3243,7 +3247,11 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                         + "mPendingLock=" + mPendingLock + "."
                         + "One of these being false means we re-locked the device during unlock. "
                         + "Do not proceed to finish keyguard exit and unlock.");
+                doKeyguardLocked(null);
                 finishSurfaceBehindRemoteAnimation(true /* showKeyguard */);
+                // Ensure WM is notified that we made a decision to show
+                setShowingLocked(true /* showing */, true /* force */);
+
                 return;
             }
 
@@ -3790,6 +3798,13 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         public CharSequence getMessage() {
             return mMessage;
         }
+    }
+
+    /**
+     * Notify whether keyguard has created a remote animation runner for next app launch.
+     */
+    public void launchingActivityOverLockscreen(boolean isLaunchingActivityOverLockscreen) {
+        mKeyguardTransitions.setLaunchingActivityOverLockscreen(isLaunchingActivityOverLockscreen);
     }
 
     /**
