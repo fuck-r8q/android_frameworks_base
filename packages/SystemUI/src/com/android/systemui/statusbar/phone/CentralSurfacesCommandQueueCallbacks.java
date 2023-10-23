@@ -36,16 +36,11 @@ import android.util.Log;
 import android.util.Slog;
 import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
-import android.view.WindowInsets.Type.InsetsType;
-import android.view.WindowInsetsController.Appearance;
-import android.view.WindowInsetsController.Behavior;
 
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
-import com.android.internal.statusbar.LetterboxDetails;
-import com.android.internal.view.AppearanceRegion;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.res.R;
 import com.android.systemui.assist.AssistManager;
@@ -75,6 +70,7 @@ import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
 
 import dagger.Lazy;
 
+import java.util.Arrays;
 import java.util.Optional;
 
 import javax.inject.Inject;
@@ -108,7 +104,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     private final UserTracker mUserTracker;
     private final boolean mVibrateOnOpening;
     private final VibrationEffect mCameraLaunchGestureVibrationEffect;
-    private final SystemBarAttributesListener mSystemBarAttributesListener;
     private final ActivityStarter mActivityStarter;
     private final Lazy<CameraLauncher> mCameraLauncherLazy;
     private final QuickSettingsController mQsController;
@@ -148,7 +143,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
             Optional<Vibrator> vibratorOptional,
             DisableFlagsLogger disableFlagsLogger,
             @DisplayId int displayId,
-            SystemBarAttributesListener systemBarAttributesListener,
             Lazy<CameraLauncher> cameraLauncherLazy,
             UserTracker userTracker,
             QSHost qsHost,
@@ -186,7 +180,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         mVibrateOnOpening = resources.getBoolean(R.bool.config_vibrateOnIconAnimation);
         mCameraLaunchGestureVibrationEffect = getCameraGestureVibrationEffect(
                 mVibratorOptional, resources);
-        mSystemBarAttributesListener = systemBarAttributesListener;
         mActivityStarter = activityStarter;
     }
 
@@ -198,6 +191,11 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     @Override
     public void remQsTile(ComponentName tile) {
         mQSHost.removeTileByUser(tile);
+    }
+
+    @Override
+    public void setQsTiles(String[] tiles) {
+        mQSHost.changeTilesByUser(mQSHost.getSpecs(), Arrays.stream(tiles).toList());
     }
 
     @Override
@@ -449,29 +447,6 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     @Override
     public void onRecentsAnimationStateChanged(boolean running) {
         mCentralSurfaces.setInteracting(StatusBarManager.WINDOW_NAVIGATION_BAR, running);
-    }
-
-
-    @Override
-    public void onSystemBarAttributesChanged(int displayId, @Appearance int appearance,
-            AppearanceRegion[] appearanceRegions, boolean navbarColorManagedByIme,
-            @Behavior int behavior, @InsetsType int requestedVisibleTypes, String packageName,
-            LetterboxDetails[] letterboxDetails) {
-        if (displayId != mDisplayId) {
-            return;
-        }
-        // SystemBarAttributesListener should __always__ be the top-level listener for system bar
-        // attributes changed.
-        mSystemBarAttributesListener.onSystemBarAttributesChanged(
-                displayId,
-                appearance,
-                appearanceRegions,
-                navbarColorManagedByIme,
-                behavior,
-                requestedVisibleTypes,
-                packageName,
-                letterboxDetails
-        );
     }
 
     @Override

@@ -62,7 +62,7 @@ import android.app.servertransaction.ActivityLifecycleItem.LifecycleState;
 import android.app.servertransaction.ActivityRelaunchItem;
 import android.app.servertransaction.ActivityResultItem;
 import android.app.servertransaction.ClientTransaction;
-import android.app.servertransaction.ClientTransactionItem;
+import android.app.servertransaction.DestroyActivityItem;
 import android.app.servertransaction.PauseActivityItem;
 import android.app.servertransaction.PendingTransactionActions;
 import android.app.servertransaction.PendingTransactionActions.StopInfo;
@@ -264,6 +264,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TimeZone;
@@ -376,8 +377,8 @@ public final class ActivityThread extends ClientTransactionHandler
     @GuardedBy("mPendingOverrideConfigs")
     private final ArrayMap<IBinder, Configuration> mPendingOverrideConfigs = new ArrayMap<>();
     /** The activities to be truly destroyed (not include relaunch). */
-    final Map<IBinder, ClientTransactionItem> mActivitiesToBeDestroyed =
-            Collections.synchronizedMap(new ArrayMap<IBinder, ClientTransactionItem>());
+    final Map<IBinder, DestroyActivityItem> mActivitiesToBeDestroyed =
+            Collections.synchronizedMap(new ArrayMap<>());
     // List of new activities that should be reported when next we idle.
     final ArrayList<ActivityClientRecord> mNewActivities = new ArrayList<>();
     // Number of activities that are currently visible on-screen.
@@ -3034,7 +3035,7 @@ public final class ActivityThread extends ClientTransactionHandler
             "%13s %8s %8s %8s %8s %8s %8s %8s %8s";
     private static final String ONE_COUNT_COLUMN = "%21s %8d";
     private static final String TWO_COUNT_COLUMNS = "%21s %8d %21s %8d";
-    private static final String THREE_COUNT_COLUMNS = "%21s %8d %21s %8s %21s %8d";
+    private static final String THREE_COUNT_COLUMNS = "%21s %8d %21s %8d %21s %8d";
     private static final String TWO_COUNT_COLUMN_HEADER = "%21s %8s %21s %8s";
     private static final String ONE_ALT_COUNT_COLUMN = "%21s %8s %21s %8d";
 
@@ -3042,7 +3043,7 @@ public final class ActivityThread extends ClientTransactionHandler
     private static final int ACTIVITY_THREAD_CHECKIN_VERSION = 4;
 
     static void printRow(PrintWriter pw, String format, Object...objs) {
-        pw.println(String.format(format, objs));
+        pw.println(String.format(Locale.US, format, objs));
     }
 
     @NeverCompile
@@ -5800,7 +5801,7 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     @Override
-    public Map<IBinder, ClientTransactionItem> getActivitiesToBeDestroyed() {
+    public Map<IBinder, DestroyActivityItem> getActivitiesToBeDestroyed() {
         return mActivitiesToBeDestroyed;
     }
 

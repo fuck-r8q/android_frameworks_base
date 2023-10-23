@@ -1440,6 +1440,11 @@
     <!-- Is the lock-screen disabled for new users by default -->
     <bool name="config_disableLockscreenByDefault">false</bool>
 
+    <!-- Provides default value for double line clock in lock screen setting:
+         0 - Don't show double line clock
+         1 - Show double line clock in lock screen (default) -->
+    <integer name="config_doublelineClockDefault">1</integer>
+
     <!-- If true, enables verification of the lockscreen credential in the factory reset protection
         flow. This should be true if gatekeeper / weaver credentials can still be checked after a
         factory reset. -->
@@ -4836,7 +4841,7 @@
     <string translatable="false" name="config_deviceSpecificInputMethodManagerService"></string>
 
     <!-- Component name of media projection permission dialog -->
-    <string name="config_mediaProjectionPermissionDialogComponent" translatable="false">com.android.systemui/com.android.systemui.media.MediaProjectionPermissionActivity</string>
+    <string name="config_mediaProjectionPermissionDialogComponent" translatable="false">com.android.systemui/com.android.systemui.mediaprojection.permission.MediaProjectionPermissionActivity</string>
 
     <!-- Corner radius of system dialogs -->
     <dimen name="config_dialogCornerRadius">28dp</dimen>
@@ -5245,6 +5250,28 @@
          rates are available from hardware composer. Only has an effect if the value is
          non-zero. -->
     <integer name="config_defaultPeakRefreshRate">0</integer>
+
+    <!-- External display peak refresh rate for the given device. Change this value if you want to
+         prevent the framework from using higher refresh rates, even if display modes with higher
+         refresh rates are available from hardware composer. Only has an effect if this value and
+         config_externalDisplayPeakWidth and config_externalDisplayPeakHeight are non-zero. -->
+    <integer name="config_externalDisplayPeakRefreshRate">0</integer>
+
+    <!-- External display peak width for the given device. Change this value if you want
+         to prevent the framework from using higher resolution, even if display modes with higher
+         resolutions are available from hardware composer. Only has an effect if this value and
+         config_externalDisplayPeakRefreshRate and config_externalDisplayPeakHeight are non-zero.-->
+    <integer name="config_externalDisplayPeakWidth">0</integer>
+
+    <!-- External display peak height for the given device. Change this value if you want
+         to prevent the framework from using higher resolution, even if display modes with higher
+         resolutions are available from hardware composer. Only has an effect if this value and
+         config_externalDisplayPeakRefreshRate and config_externalDisplayPeakWidth are non-zero. -->
+    <integer name="config_externalDisplayPeakHeight">0</integer>
+
+    <!-- Enable synchronization of the displays refresh rates by applying the default low refresh
+         rate. -->
+    <bool name="config_refreshRateSynchronizationEnabled">false</bool>
 
     <!-- The display uses different gamma curves for different refresh rates. It's hard for panel
          vendors to tune the curves to have exact same brightness for different refresh rate. So

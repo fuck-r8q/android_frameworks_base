@@ -46,6 +46,7 @@ import static org.mockito.Mockito.when;
 import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.graphics.Point;
+import android.os.PowerManager;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.view.MotionEvent;
@@ -60,10 +61,8 @@ import com.android.keyguard.EmergencyButtonController;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.res.R;
 import com.android.systemui.flags.Flags;
-import com.android.systemui.keyguard.shared.model.WakeSleepReason;
-import com.android.systemui.keyguard.shared.model.WakefulnessModel;
-import com.android.systemui.keyguard.shared.model.WakefulnessState;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.ExpandableView.OnHeightChangedListener;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
@@ -1283,12 +1282,8 @@ public class NotificationPanelViewControllerTest extends NotificationPanelViewCo
 
     @Test
     public void getFalsingThreshold_deviceNotInteractive_isQsThreshold() {
-        mFakeKeyguardRepository.setWakefulnessModel(
-                new WakefulnessModel(
-                        WakefulnessState.ASLEEP,
-                        /* lastWakeReason= */ WakeSleepReason.TAP,
-                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
-        );
+        PowerInteractor.Companion.setAsleepForTest(
+                mPowerInteractor, PowerManager.GO_TO_SLEEP_REASON_POWER_BUTTON);
         when(mQsController.getFalsingThreshold()).thenReturn(14);
 
         assertThat(mNotificationPanelViewController.getFalsingThreshold()).isEqualTo(14);
@@ -1296,12 +1291,8 @@ public class NotificationPanelViewControllerTest extends NotificationPanelViewCo
 
     @Test
     public void getFalsingThreshold_lastWakeNotDueToTouch_isQsThreshold() {
-        mFakeKeyguardRepository.setWakefulnessModel(
-                new WakefulnessModel(
-                        WakefulnessState.AWAKE,
-                        /* lastWakeReason= */ WakeSleepReason.POWER_BUTTON,
-                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
-        );
+        PowerInteractor.Companion.setAwakeForTest(
+                mPowerInteractor, PowerManager.WAKE_REASON_POWER_BUTTON);
         when(mQsController.getFalsingThreshold()).thenReturn(14);
 
         assertThat(mNotificationPanelViewController.getFalsingThreshold()).isEqualTo(14);
@@ -1309,12 +1300,7 @@ public class NotificationPanelViewControllerTest extends NotificationPanelViewCo
 
     @Test
     public void getFalsingThreshold_lastWakeDueToTouch_greaterThanQsThreshold() {
-        mFakeKeyguardRepository.setWakefulnessModel(
-                new WakefulnessModel(
-                        WakefulnessState.AWAKE,
-                        /* lastWakeReason= */ WakeSleepReason.TAP,
-                        /* lastSleepReason= */ WakeSleepReason.POWER_BUTTON)
-        );
+        PowerInteractor.Companion.setAwakeForTest(mPowerInteractor, PowerManager.WAKE_REASON_TAP);
         when(mQsController.getFalsingThreshold()).thenReturn(14);
 
         assertThat(mNotificationPanelViewController.getFalsingThreshold()).isGreaterThan(14);

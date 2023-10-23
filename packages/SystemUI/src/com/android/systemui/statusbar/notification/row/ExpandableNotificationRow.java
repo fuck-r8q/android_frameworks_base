@@ -772,6 +772,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     /**
      * @return if the view is in heads up state, i.e either still heads upped or it's disappearing.
      */
+    @Override
     public boolean isHeadsUpState() {
         return mIsHeadsUp || mHeadsupDisappearRunning;
     }
@@ -2655,42 +2656,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     protected void expandNotification() {
         mExpandClickListener.onClick(this);
-    }
-
-    /**
-     * Returns the number of channels covered by the notification row (including its children if
-     * it's a summary notification).
-     */
-    public int getNumUniqueChannels() {
-        return getUniqueChannels().size();
-    }
-
-    /**
-     * Returns the channels covered by the notification row (including its children if
-     * it's a summary notification).
-     */
-    public ArraySet<NotificationChannel> getUniqueChannels() {
-        ArraySet<NotificationChannel> channels = new ArraySet<>();
-
-        channels.add(mEntry.getChannel());
-
-        // If this is a summary, then add in the children notification channels for the
-        // same user and pkg.
-        if (mIsSummaryWithChildren) {
-            final List<ExpandableNotificationRow> childrenRows = getAttachedChildren();
-            final int numChildren = childrenRows.size();
-            for (int i = 0; i < numChildren; i++) {
-                final ExpandableNotificationRow childRow = childrenRows.get(i);
-                final NotificationChannel childChannel = childRow.getEntry().getChannel();
-                final StatusBarNotification childSbn = childRow.getEntry().getSbn();
-                if (childSbn.getUser().equals(mEntry.getSbn().getUser())
-                        && childSbn.getPackageName().equals(mEntry.getSbn().getPackageName())) {
-                    channels.add(childChannel);
-                }
-            }
-        }
-
-        return channels;
     }
 
     /**

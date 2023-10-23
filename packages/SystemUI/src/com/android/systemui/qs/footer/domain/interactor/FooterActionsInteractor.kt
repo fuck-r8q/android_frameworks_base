@@ -38,10 +38,10 @@ import com.android.systemui.qs.FgsManagerController
 import com.android.systemui.qs.QSSecurityFooterUtils
 import com.android.systemui.qs.footer.data.model.UserSwitcherStatusModel
 import com.android.systemui.qs.footer.data.repository.ForegroundServicesRepository
-import com.android.systemui.qs.footer.data.repository.UserSwitcherRepository
 import com.android.systemui.qs.footer.domain.model.SecurityButtonConfig
 import com.android.systemui.security.data.repository.SecurityRepository
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
+import com.android.systemui.user.data.repository.UserSwitcherRepository
 import com.android.systemui.user.domain.interactor.UserInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -72,7 +72,7 @@ interface FooterActionsInteractor {
      * Show the device monitoring dialog, expanded from [expandable] if it's not null.
      *
      * Important: [quickSettingsContext] *must* be the [Context] associated to the
-     * [Quick Settings fragment][com.android.systemui.qs.QSFragment].
+     * [Quick Settings fragment][com.android.systemui.qs.QSFragmentLegacy].
      */
     fun showDeviceMonitoringDialog(quickSettingsContext: Context, expandable: Expandable?)
 

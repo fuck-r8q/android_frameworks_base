@@ -31,3 +31,31 @@ fun normalizeTextLine(s: String): String {
     // Remove surrounding whitespace.
     return uncommented.trim()
 }
+
+/**
+ * Concatenate list [a] and [b] and return it. As an optimization, it returns an input
+ * [List] as-is if the other [List] is empty, so do not modify input [List]'s.
+ */
+fun <T> addLists(a: List<T>, b: List<T>): List<T> {
+    if (a.isEmpty()) {
+        return b
+    }
+    if (b.isEmpty()) {
+        return a
+    }
+    return a + b
+}
+
+/**
+ * Add element [b] to list [a] if [b] is not null. Otherwise, just return [a].
+ * (because the method may return [a] as-is, do not modify it after passing it.)
+ */
+fun <T> addNonNullElement(a: List<T>, b: T?): List<T> {
+    if (b == null) {
+        return a
+    }
+    if (a.isEmpty()) {
+        return listOf(b)
+    }
+    return a + b
+}

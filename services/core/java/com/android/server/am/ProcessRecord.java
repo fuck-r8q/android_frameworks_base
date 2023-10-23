@@ -620,6 +620,10 @@ class ProcessRecord implements WindowProcessListener {
         mPkgList.put(_info.packageName, new ProcessStats.ProcessStateHolder(_info.longVersionCode));
     }
 
+    void resetCrashingOnRestart() {
+        mErrorState.setCrashing(false);
+    }
+
     @GuardedBy(anyOf = {"mService", "mProcLock"})
     UidRecord getUidRecord() {
         return mUidRecord;

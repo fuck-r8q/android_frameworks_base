@@ -283,8 +283,8 @@ public final class ProcessList {
     // don't have an oom adj assigned by the system).
     public static final int NATIVE_ADJ = -1000;
 
-    // Memory pages are 4K.
-    static final int PAGE_SIZE = 4 * 1024;
+    // Memory page size.
+    static final int PAGE_SIZE = (int) Os.sysconf(OsConstants._SC_PAGESIZE);
 
     // Activity manager's version of an undefined schedule group
     static final int SCHED_GROUP_UNDEFINED = Integer.MIN_VALUE;
@@ -3104,6 +3104,8 @@ public final class ProcessList {
             if (old == proc && proc.isPersistent()) {
                 // We are re-adding a persistent process.  Whatevs!  Just leave it there.
                 Slog.w(TAG, "Re-adding persistent process " + proc);
+                // Ensure that the mCrashing flag is cleared, since this is a restart
+                proc.resetCrashingOnRestart();
             } else if (old != null) {
                 if (old.isKilled()) {
                     // The old process has been killed, we probably haven't had

@@ -24,6 +24,7 @@ import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAUL
 import static android.companion.virtual.VirtualDeviceParams.NAVIGATION_POLICY_DEFAULT_ALLOWED;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_RECENTS;
+import static android.content.pm.PackageManager.ACTION_REQUEST_PERMISSIONS;
 import static android.view.WindowManager.LayoutParams.FLAG_SECURE;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
 
@@ -49,6 +50,7 @@ import android.companion.virtual.VirtualDeviceManager.ActivityListener;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.IAudioConfigChangedCallback;
 import android.companion.virtual.audio.IAudioRoutingCallback;
+import android.companion.virtual.camera.IVirtualCamera;
 import android.companion.virtual.flags.Flags;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtual.sensor.VirtualSensorEvent;
@@ -104,6 +106,7 @@ import com.android.internal.app.BlockedAppStreamingActivity;
 import com.android.server.LocalServices;
 import com.android.server.companion.virtual.GenericWindowPolicyController.RunningAppsChangedListener;
 import com.android.server.companion.virtual.audio.VirtualAudioController;
+import com.android.server.companion.virtual.camera.VirtualCameraController;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -112,7 +115,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-
 
 final class VirtualDeviceImpl extends IVirtualDevice.Stub
         implements IBinder.DeathRecipient, RunningAppsChangedListener {
@@ -177,6 +179,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     private final InputController mInputController;
     private final SensorController mSensorController;
     private final CameraAccessController mCameraAccessController;
+    @Nullable // Null if virtual camera flag is off.
+    private final VirtualCameraController mVirtualCameraController;
     private VirtualAudioController mVirtualAudioController;
     private final IBinder mAppToken;
     private final VirtualDeviceParams mParams;
@@ -204,6 +208,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
     @GuardedBy("mVirtualDeviceLock")
     @NonNull
     private final Set<ComponentName> mActivityPolicyExemptions;
+    private final ComponentName mPermissionDialogComponent;
 
     private ActivityListener createListenerAdapter() {
         return new ActivityListener() {
@@ -268,7 +273,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 soundEffectListener,
                 runningAppsChangedCallback,
                 params,
-                DisplayManagerGlobal.getInstance());
+                DisplayManagerGlobal.getInstance(),
+                Flags.virtualCamera() ? new VirtualCameraController(context) : null);
     }
 
     @VisibleForTesting
@@ -287,7 +293,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             IVirtualDeviceSoundEffectListener soundEffectListener,
             Consumer<ArraySet<Integer>> runningAppsChangedCallback,
             VirtualDeviceParams params,
-            DisplayManagerGlobal displayManager) {
+            DisplayManagerGlobal displayManager,
+            VirtualCameraController virtualCameraController) {
         super(PermissionEnforcer.fromContext(context));
         mVirtualDeviceLog = virtualDeviceLog;
         mOwnerPackageName = attributionSource.getPackageName();
@@ -317,6 +324,12 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 mParams.getVirtualSensorCallback(), mParams.getVirtualSensorConfigs());
         mCameraAccessController = cameraAccessController;
         mCameraAccessController.startObservingIfNeeded();
+        if (!Flags.streamPermissions()) {
+            mPermissionDialogComponent = getPermissionDialogComponent();
+        } else {
+            mPermissionDialogComponent = null;
+        }
+        mVirtualCameraController = virtualCameraController;
         try {
             token.linkToDeath(this, 0);
         } catch (RemoteException e) {
@@ -324,8 +337,14 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         }
         mVirtualDeviceLog.logCreated(deviceId, mOwnerUid);
 
-        mPublicVirtualDeviceObject = new VirtualDevice(
-                this, getDeviceId(), getPersistentDeviceId(), mParams.getName());
+        if (Flags.vdmPublicApis()) {
+            mPublicVirtualDeviceObject = new VirtualDevice(
+                    this, getDeviceId(), getPersistentDeviceId(), mParams.getName(),
+                    getDisplayName());
+        } else {
+            mPublicVirtualDeviceObject = new VirtualDevice(
+                    this, getDeviceId(), getPersistentDeviceId(), mParams.getName());
+        }
 
         if (Flags.dynamicPolicy()) {
             mActivityPolicyExemptions = new ArraySet<>(
@@ -550,6 +569,9 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
             mSensorController.close();
         } finally {
             Binder.restoreCallingIdentity(ident);
+        }
+        if (mVirtualCameraController != null) {
+            mVirtualCameraController.close();
         }
     }
 
@@ -907,24 +929,37 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
         }
     }
 
+    @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+    public void registerVirtualCamera(@NonNull IVirtualCamera camera) {
+        super.registerVirtualCamera_enforcePermission();
+        if (mVirtualCameraController == null) {
+            return;
+        }
+        mVirtualCameraController.registerCamera(Objects.requireNonNull(camera));
+    }
+
     @Override
     protected void dump(FileDescriptor fd, PrintWriter fout, String[] args) {
+        String indent = "    ";
         fout.println("  VirtualDevice: ");
-        fout.println("    mDeviceId: " + mDeviceId);
-        fout.println("    mAssociationId: " + mAssociationInfo.getId());
-        fout.println("    mOwnerPackageName: " + mOwnerPackageName);
-        fout.println("    mParams: ");
-        mParams.dump(fout, "        ");
-        fout.println("    mVirtualDisplayIds: ");
+        fout.println(indent + "mDeviceId: " + mDeviceId);
+        fout.println(indent + "mAssociationId: " + mAssociationInfo.getId());
+        fout.println(indent + "mOwnerPackageName: " + mOwnerPackageName);
+        fout.println(indent + "mParams: ");
+        mParams.dump(fout, indent + indent);
+        fout.println(indent + "mVirtualDisplayIds: ");
         synchronized (mVirtualDeviceLock) {
             fout.println("    mDevicePolicies: " + mDevicePolicies);
             for (int i = 0; i < mVirtualDisplays.size(); i++) {
-                fout.println("      " + mVirtualDisplays.keyAt(i));
+                fout.println(indent + "  " + mVirtualDisplays.keyAt(i));
             }
-            fout.println("    mDefaultShowPointerIcon: " + mDefaultShowPointerIcon);
+            fout.println(indent + "mDefaultShowPointerIcon: " + mDefaultShowPointerIcon);
         }
         mInputController.dump(fout);
         mSensorController.dump(fout);
+        if (mVirtualCameraController != null) {
+            mVirtualCameraController.dump(fout, indent);
+        }
     }
 
     @GuardedBy("mVirtualDeviceLock")
@@ -951,6 +986,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 /*crossTaskNavigationExemptions=*/crossTaskNavigationAllowedByDefault
                         ? mParams.getBlockedCrossTaskNavigations()
                         : mParams.getAllowedCrossTaskNavigations(),
+                mPermissionDialogComponent,
                 createListenerAdapter(),
                 this::onEnteringPipBlocked,
                 this::onActivityBlocked,
@@ -961,6 +997,13 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub
                 homeComponent);
         gwpc.registerRunningAppsChangedListener(/* listener= */ this);
         return gwpc;
+    }
+
+    private ComponentName getPermissionDialogComponent() {
+        Intent intent = new Intent(ACTION_REQUEST_PERMISSIONS);
+        PackageManager packageManager = mContext.getPackageManager();
+        intent.setPackage(packageManager.getPermissionControllerPackageName());
+        return intent.resolveActivity(packageManager);
     }
 
     int createVirtualDisplay(@NonNull VirtualDisplayConfig virtualDisplayConfig,

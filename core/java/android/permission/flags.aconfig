@@ -2,7 +2,22 @@ package: "android.permission.flags"
 
 flag {
   name: "device_aware_permission_apis"
+  is_fixed_read_only: true
   namespace: "permissions"
   description: "enable device aware permission APIs"
   bug: "274852670"
+}
+
+flag {
+  name: "voice_activation_permission_apis"
+  namespace: "permissions"
+  description: "enable voice activation permission APIs"
+  bug: "287264308"
+}
+
+flag {
+    name: "role_controller_in_system_server"
+    namespace: "permissions"
+    description: "enable role controller in system server"
+    bug: "302562590"
 }

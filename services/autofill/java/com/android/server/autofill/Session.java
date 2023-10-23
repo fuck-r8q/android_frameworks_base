@@ -4576,7 +4576,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
 
         getUiForShowing().showFillUi(filledId, response, filterText,
                 mService.getServicePackageName(), mComponentName,
-                targetLabel, targetIcon, this, mContext, id, mCompatMode);
+                targetLabel, targetIcon, this, mContext, id, mCompatMode,
+                mService.getMaster().getMaxInputLengthForAutofill());
 
         synchronized (mLock) {
             mPresentationStatsEventLogger.maybeSetCountShown(
@@ -4836,7 +4837,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                     public void onInflate() {
                         Session.this.onShown(UI_TYPE_INLINE);
                     }
-                });
+                }, mService.getMaster().getMaxInputLengthForAutofill());
         return mInlineSessionController.setInlineFillUiLocked(inlineFillUi);
     }
 

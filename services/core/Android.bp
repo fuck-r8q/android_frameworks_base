@@ -199,6 +199,7 @@ java_library_static {
         "notification_flags_lib",
         "camera_platform_flags_core_java_lib",
         "biometrics_flags_lib",
+        "am_flags_lib",
     ],
     javac_shard_size: 50,
     javacflags: [
@@ -216,6 +217,9 @@ java_library_static {
       "//packages/modules/AdServices/adservices/tests/unittest/service-core",
       "//packages/modules/AdServices/adservices/tests/unittest/system-service",
       "//packages/modules/AdServices/adservices/tests/unittest/ui",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/appsearch",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/appsetid",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/adid",
     ],
 }
 

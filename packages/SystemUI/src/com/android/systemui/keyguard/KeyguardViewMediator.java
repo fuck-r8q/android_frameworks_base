@@ -129,7 +129,6 @@ import com.android.systemui.DejankUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
 import com.android.systemui.EventLogTags;
-import com.android.systemui.res.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.LaunchAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -147,6 +146,7 @@ import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransition
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.res.R;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeExpansionStateManager;
@@ -182,7 +182,6 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 import dagger.Lazy;
-
 import kotlinx.coroutines.CoroutineDispatcher;
 
 /**
@@ -2837,7 +2836,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             // playing in-window animations for this particular unlock since a previous unlock might
             // have changed the Launcher state.
             if (mWakeAndUnlocking
-                    && KeyguardUnlockAnimationController.Companion.isNexusLauncherUnderneath()) {
+                    && mKeyguardUnlockAnimationControllerLazy.get()
+                            .isSupportedLauncherUnderneath()) {
                 flags |= KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
             }
 
@@ -2951,9 +2951,12 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             } else {
                 Log.d(TAG, "Hiding keyguard while occluded. Just hide the keyguard view and exit.");
 
-                mKeyguardViewControllerLazy.get().hide(
-                        mSystemClock.uptimeMillis() + mHideAnimation.getStartOffset(),
-                        mHideAnimation.getDuration());
+                if (!mFeatureFlags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR)) {
+                    mKeyguardViewControllerLazy.get().hide(
+                            mSystemClock.uptimeMillis() + mHideAnimation.getStartOffset(),
+                            mHideAnimation.getDuration());
+                }
+
                 onKeyguardExitFinished();
             }
 
@@ -3291,7 +3294,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             // of the in-window animations are reflected. This is needed even if we're not actually
             // playing in-window animations for this particular unlock since a previous unlock might
             // have changed the Launcher state.
-            if (KeyguardUnlockAnimationController.Companion.isNexusLauncherUnderneath()) {
+            if (mKeyguardUnlockAnimationControllerLazy.get().isSupportedLauncherUnderneath()) {
                 flags |= KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
             }
 

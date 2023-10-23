@@ -38,12 +38,14 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.res.Resources;
 import android.hardware.Sensor;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.display.BrightnessInfo;
+import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerCallbacks;
 import android.hardware.display.DisplayManagerInternal.DisplayPowerRequest;
 import android.os.Handler;
@@ -122,6 +124,8 @@ public final class DisplayPowerControllerTest {
     private Handler mHandler;
     private DisplayPowerControllerHolder mHolder;
     private Sensor mProxSensor;
+    private DisplayManagerInternal.DisplayOffloader mDisplayOffloader;
+    private DisplayManagerInternal.DisplayOffloadSession mDisplayOffloadSession;
 
     @Mock
     private DisplayPowerCallbacks mDisplayPowerCallbacksMock;
@@ -155,6 +159,7 @@ public final class DisplayPowerControllerTest {
                     .setStrictness(Strictness.LENIENT)
                     .spyStatic(SystemProperties.class)
                     .spyStatic(BatteryStatsService.class)
+                    .spyStatic(ActivityManager.class)
                     .build();
 
     @Rule
@@ -183,9 +188,14 @@ public final class DisplayPowerControllerTest {
 
         mContext.addMockSystemService(PowerManager.class, mPowerManagerMock);
 
+        mContext.getOrCreateTestableResources().addOverride(
+                com.android.internal.R.bool.config_displayColorFadeDisabled, false);
+
         doAnswer((Answer<Void>) invocationOnMock -> null).when(() ->
                 SystemProperties.set(anyString(), any()));
         doAnswer((Answer<Void>) invocationOnMock -> null).when(BatteryStatsService::getService);
+        doAnswer((Answer<Boolean>) invocationOnMock -> false)
+                .when(ActivityManager::isLowRamDeviceStatic);
 
         setUpSensors();
         mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
@@ -1363,6 +1373,110 @@ public final class DisplayPowerControllerTest {
 
         verify(mHolder.animator).setAnimationTimeLimits(BRIGHTNESS_RAMP_INCREASE_MAX_IDLE,
                 BRIGHTNESS_RAMP_DECREASE_MAX_IDLE);
+    }
+    @Test
+    public void testDozeScreenStateOverride_toSupportedOffloadStateFromDoze_DisplayStateChanges() {
+        // set up.
+        int initState = Display.STATE_DOZE;
+        int supportedTargetState = Display.STATE_DOZE_SUSPEND;
+        mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
+        when(mHolder.displayPowerState.getColorFadeLevel()).thenReturn(1.0f);
+        doAnswer(invocation -> {
+            when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
+            return null;
+        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        // init displayoffload session and support offloading.
+        initDisplayOffloadSession();
+        mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
+
+        // start with DOZE.
+        when(mHolder.displayPowerState.getScreenState()).thenReturn(initState);
+        DisplayPowerRequest dpr = new DisplayPowerRequest();
+        dpr.policy = DisplayPowerRequest.POLICY_DOZE;
+        mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
+        advanceTime(1); // Run updatePowerState
+
+        mHolder.dpc.overrideDozeScreenState(supportedTargetState);
+        advanceTime(1); // Run updatePowerState
+
+        verify(mHolder.displayPowerState).setScreenState(supportedTargetState);
+    }
+
+    @Test
+    public void testDozeScreenStateOverride_toUnSupportedOffloadStateFromDoze_stateRemains() {
+        // set up.
+        int initState = Display.STATE_DOZE;
+        int unSupportedTargetState = Display.STATE_ON;
+        mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
+        when(mHolder.displayPowerState.getColorFadeLevel()).thenReturn(1.0f);
+        doAnswer(invocation -> {
+            when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
+            return null;
+        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        // init displayoffload session and support offloading.
+        initDisplayOffloadSession();
+        mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
+
+        // start with DOZE.
+        when(mHolder.displayPowerState.getScreenState()).thenReturn(initState);
+        DisplayPowerRequest dpr = new DisplayPowerRequest();
+        dpr.policy = DisplayPowerRequest.POLICY_DOZE;
+        mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
+        advanceTime(1); // Run updatePowerState
+
+        mHolder.dpc.overrideDozeScreenState(unSupportedTargetState);
+        advanceTime(1); // Run updatePowerState
+
+        verify(mHolder.displayPowerState, never()).setScreenState(anyInt());
+    }
+
+    @Test
+    public void testDozeScreenStateOverride_toSupportedOffloadStateFromOFF_stateRemains() {
+        // set up.
+        int initState = Display.STATE_OFF;
+        int supportedTargetState = Display.STATE_DOZE_SUSPEND;
+        mHolder = createDisplayPowerController(DISPLAY_ID, UNIQUE_ID);
+        doAnswer(invocation -> {
+            when(mHolder.displayPowerState.getScreenState()).thenReturn(invocation.getArgument(0));
+            return null;
+        }).when(mHolder.displayPowerState).setScreenState(anyInt());
+        // init displayoffload session and support offloading.
+        initDisplayOffloadSession();
+        mHolder.dpc.setDisplayOffloadSession(mDisplayOffloadSession);
+
+        // start with OFF.
+        when(mHolder.displayPowerState.getScreenState()).thenReturn(initState);
+        DisplayPowerRequest dpr = new DisplayPowerRequest();
+        dpr.policy = DisplayPowerRequest.POLICY_OFF;
+        mHolder.dpc.requestPowerState(dpr, /* waitForNegativeProximity= */ false);
+        advanceTime(1); // Run updatePowerState
+
+        mHolder.dpc.overrideDozeScreenState(supportedTargetState);
+        advanceTime(1); // Run updatePowerState
+
+        verify(mHolder.displayPowerState, never()).setScreenState(anyInt());
+    }
+
+    private void initDisplayOffloadSession() {
+        mDisplayOffloader = spy(new DisplayManagerInternal.DisplayOffloader() {
+            @Override
+            public boolean startOffload() {
+                return true;
+            }
+
+            @Override
+            public void stopOffload() {}
+        });
+
+        mDisplayOffloadSession = new DisplayManagerInternal.DisplayOffloadSession() {
+            @Override
+            public void setDozeStateOverride(int displayState) {}
+
+            @Override
+            public DisplayManagerInternal.DisplayOffloader getDisplayOffloader() {
+                return mDisplayOffloader;
+            }
+        };
     }
 
     private void advanceTime(long timeMs) {

@@ -198,6 +198,10 @@ constructor(
             }
         )
     }
+
+    fun logOnSimStateChanged() {
+        buffer.log(TAG, LogLevel.INFO, "onSimStateChanged")
+    }
 }
 
 private const val TAG = "MobileInputLog"

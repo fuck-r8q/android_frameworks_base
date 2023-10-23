@@ -2400,6 +2400,9 @@
   <java-symbol type="dimen" name="popup_enter_animation_from_y_delta" />
   <java-symbol type="dimen" name="popup_exit_animation_to_y_delta" />
 
+  <!-- For double line clock in lock screen -->
+  <java-symbol type="integer" name="config_doublelineClockDefault"/>
+
   <!-- ImfTest -->
   <java-symbol type="layout" name="auto_complete_list" />
 
@@ -4267,6 +4270,10 @@
   <!-- For high refresh rate displays -->
   <java-symbol type="integer" name="config_defaultRefreshRate" />
   <java-symbol type="integer" name="config_defaultPeakRefreshRate" />
+  <java-symbol type="integer" name="config_externalDisplayPeakRefreshRate" />
+  <java-symbol type="integer" name="config_externalDisplayPeakWidth" />
+  <java-symbol type="integer" name="config_externalDisplayPeakHeight" />
+  <java-symbol type="bool" name="config_refreshRateSynchronizationEnabled" />
   <java-symbol type="integer" name="config_defaultRefreshRateInZone" />
   <java-symbol type="array" name="config_brightnessThresholdsOfPeakRefreshRate" />
   <java-symbol type="array" name="config_ambientThresholdsOfPeakRefreshRate" />

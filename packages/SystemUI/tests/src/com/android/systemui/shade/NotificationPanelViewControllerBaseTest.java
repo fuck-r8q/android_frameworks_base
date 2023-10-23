@@ -119,7 +119,8 @@ import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.qs.QS;
-import com.android.systemui.qs.QSFragment;
+import com.android.systemui.power.domain.interactor.PowerInteractor;
+import com.android.systemui.qs.QSFragmentLegacy;
 import com.android.systemui.screenrecord.RecordingController;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.data.repository.ShadeRepository;
@@ -182,8 +183,6 @@ import com.android.systemui.util.time.FakeSystemClock;
 import com.android.systemui.util.time.SystemClock;
 import com.android.wm.shell.animation.FlingAnimationUtils;
 
-import dagger.Lazy;
-
 import org.junit.After;
 import org.junit.Before;
 import org.mockito.ArgumentCaptor;
@@ -195,6 +194,7 @@ import org.mockito.stubbing.Answer;
 import java.util.List;
 import java.util.Optional;
 
+import dagger.Lazy;
 import kotlinx.coroutines.CoroutineDispatcher;
 
 public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
@@ -293,7 +293,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected UnlockedScreenOffAnimationController mUnlockedScreenOffAnimationController;
     @Mock protected ShadeTransitionController mShadeTransitionController;
     @Mock protected QS mQs;
-    @Mock protected QSFragment mQSFragment;
+    @Mock protected QSFragmentLegacy mQSFragment;
     @Mock protected ViewGroup mQsHeader;
     @Mock protected ViewParent mViewParent;
     @Mock protected ViewTreeObserver mViewTreeObserver;
@@ -334,6 +334,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
     protected FakeKeyguardRepository mFakeKeyguardRepository;
     protected KeyguardInteractor mKeyguardInteractor;
+    protected PowerInteractor mPowerInteractor;
     protected NotificationPanelViewController.TouchHandler mTouchHandler;
     protected ConfigurationController mConfigurationController;
     protected SysuiStatusBarStateController mStatusBarStateController;
@@ -367,6 +368,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mKeyguardBottomAreaInteractor = new KeyguardBottomAreaInteractor(mFakeKeyguardRepository);
         mKeyguardInteractor = keyguardInteractorDeps.getKeyguardInteractor();
         mShadeRepository = new FakeShadeRepository();
+        mPowerInteractor = keyguardInteractorDeps.getPowerInteractor();
 
         SystemClock systemClock = new FakeSystemClock();
         mStatusBarStateController = new StatusBarStateControllerImpl(mUiEventLogger, mDumpManager,
@@ -387,7 +389,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mFeatureFlags,
                 mInteractionJankMonitor,
                 mKeyguardInteractor,
-                mDumpManager));
+                mDumpManager,
+                mPowerInteractor));
 
         when(mAuthController.isUdfpsEnrolled(anyInt())).thenReturn(false);
         when(mHeadsUpCallback.getContext()).thenReturn(mContext);
@@ -665,7 +668,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mEmergencyButtonControllerFactory,
                 mKeyguardViewConfigurator,
                 mKeyguardFaceAuthInteractor,
-                new ResourcesSplitShadeStateController());
+                new ResourcesSplitShadeStateController(),
+                mPowerInteractor);
         mNotificationPanelViewController.initDependencies(
                 mCentralSurfaces,
                 null,

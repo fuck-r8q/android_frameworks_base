@@ -17,8 +17,8 @@
 package com.android.systemui.bouncer.domain.interactor
 
 import android.content.Context
-import com.android.systemui.res.R
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
+import com.android.systemui.authentication.domain.interactor.AuthenticationResult
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationThrottlingModel
 import com.android.systemui.bouncer.data.repository.BouncerRepository
@@ -26,6 +26,8 @@ import com.android.systemui.classifier.FalsingClassifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
+import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.model.SceneKey
@@ -34,6 +36,7 @@ import com.android.systemui.util.kotlin.pairwise
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -48,6 +51,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     @Application private val applicationContext: Context,
     private val repository: BouncerRepository,
+    private val deviceEntryInteractor: DeviceEntryInteractor,
     private val authenticationInteractor: AuthenticationInteractor,
     private val sceneInteractor: SceneInteractor,
     flags: SceneContainerFlags,
@@ -92,8 +96,8 @@ constructor(
     /** Whether the pattern should be visible for the currently-selected user. */
     val isPatternVisible: StateFlow<Boolean> = authenticationInteractor.isPatternVisible
 
-    /** The minimal length of a pattern. */
-    val minPatternLength = authenticationInteractor.minPatternLength
+    /** Whether the user switcher should be displayed within the bouncer UI on large screens. */
+    val isUserSwitcherVisible: Boolean = repository.isUserSwitcherVisible
 
     init {
         if (flags.isEnabled()) {
@@ -145,7 +149,7 @@ constructor(
         message: String? = null,
     ) {
         applicationScope.launch {
-            if (authenticationInteractor.isAuthenticationRequired()) {
+            if (deviceEntryInteractor.isAuthenticationRequired()) {
                 repository.setMessage(
                     message ?: promptMessage(authenticationInteractor.getAuthenticationMethod())
                 )
@@ -184,33 +188,44 @@ constructor(
      * dismissed and hidden.
      *
      * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
-     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
-     * `null` is returned.
+     * supports auto-confirming, and the input's length is at least the required length. Otherwise,
+     * `AuthenticationResult.SKIPPED` is returned.
      *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
      * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
      *   request to validate.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
-     *   authentication failed, `null` if the check was not performed.
+     * @return The result of this authentication attempt.
      */
     suspend fun authenticate(
         input: List<Any>,
         tryAutoConfirm: Boolean = false,
-    ): Boolean? {
-        val isAuthenticated =
-            authenticationInteractor.authenticate(input, tryAutoConfirm) ?: return null
-
-        if (isAuthenticated) {
-            sceneInteractor.changeScene(
-                scene = SceneModel(SceneKey.Gone),
-                loggingReason = "successful authentication",
-            )
-        } else {
-            showErrorMessage()
+    ): AuthenticationResult {
+        if (input.isEmpty()) {
+            return AuthenticationResult.SKIPPED
         }
-
-        return isAuthenticated
+        // Switching to the application scope here since this method is often called from
+        // view-models, whose lifecycle (and thus scope) is shorter than this interactor.
+        // This allows the task to continue running properly even when the calling scope has been
+        // cancelled.
+        return applicationScope
+            .async {
+                val authResult = authenticationInteractor.authenticate(input, tryAutoConfirm)
+                when (authResult) {
+                    // Authentication succeeded.
+                    AuthenticationResult.SUCCEEDED ->
+                        sceneInteractor.changeScene(
+                            scene = SceneModel(SceneKey.Gone),
+                            loggingReason = "successful authentication",
+                        )
+                    // Authentication failed.
+                    AuthenticationResult.FAILED -> showErrorMessage()
+                    // Authentication skipped.
+                    AuthenticationResult.SKIPPED -> if (!tryAutoConfirm) showErrorMessage()
+                }
+                authResult
+            }
+            .await()
     }
 
     /**
@@ -221,21 +236,20 @@ constructor(
      * For example, if the user entered a pattern that's too short, the system can show the error
      * message without having the attempt trigger throttling.
      */
-    suspend fun showErrorMessage() {
+    private suspend fun showErrorMessage() {
         repository.setMessage(errorMessage(authenticationInteractor.getAuthenticationMethod()))
     }
 
-    /** If the bouncer is showing, hides the bouncer and return to the lockscreen scene. */
-    fun hide(
-        loggingReason: String,
-    ) {
+    /** Notifies the interactor that the input method editor has been hidden. */
+    fun onImeHidden() {
+        // If the bouncer is showing, hide it and return to the lockscreen scene.
         if (sceneInteractor.desiredScene.value.key != SceneKey.Bouncer) {
             return
         }
 
         sceneInteractor.changeScene(
             scene = SceneModel(SceneKey.Lockscreen),
-            loggingReason = loggingReason,
+            loggingReason = "IME hidden",
         )
     }
 

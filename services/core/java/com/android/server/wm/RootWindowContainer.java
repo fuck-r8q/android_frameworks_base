@@ -2243,9 +2243,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             mService.getTaskChangeNotificationController().notifyActivityUnpinned();
         }
         mWindowManager.mPolicy.setPipVisibilityLw(inPip);
-        mWmService.mTransactionFactory.get()
-                .setTrustedOverlay(task.getSurfaceControl(), inPip)
-                .apply();
+        if (task.getSurfaceControl() != null) {
+            mWmService.mTransactionFactory.get()
+                    .setTrustedOverlay(task.getSurfaceControl(), inPip)
+                    .apply();
+        }
     }
 
     void executeAppTransitionForAllDisplay() {
@@ -3394,7 +3396,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
         }
         // End power mode launch when idle.
-        mService.endLaunchPowerMode(ActivityTaskManagerService.POWER_MODE_REASON_START_ACTIVITY);
+        mService.endPowerMode(ActivityTaskManagerService.POWER_MODE_REASON_START_ACTIVITY);
         return true;
     }
 
@@ -3600,7 +3602,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 reason |= ActivityTaskManagerService.POWER_MODE_REASON_UNKNOWN_VISIBILITY;
             }
         }
-        mService.startLaunchPowerMode(reason);
+        mService.startPowerMode(reason);
     }
 
     /**

@@ -19,10 +19,13 @@ package com.android.systemui.keyguard.domain.interactor
 
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
+import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
+import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.power.domain.interactor.PowerInteractorFactory
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.FakeSceneContainerFlags
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
@@ -42,34 +45,40 @@ object KeyguardInteractorFactory {
         sceneContainerFlags: SceneContainerFlags = FakeSceneContainerFlags(),
         repository: FakeKeyguardRepository = FakeKeyguardRepository(),
         commandQueue: FakeCommandQueue = FakeCommandQueue(),
+        deviceEntryRepository: FakeDeviceEntryRepository = FakeDeviceEntryRepository(),
         bouncerRepository: FakeKeyguardBouncerRepository = FakeKeyguardBouncerRepository(),
         configurationRepository: FakeConfigurationRepository = FakeConfigurationRepository(),
         shadeRepository: FakeShadeRepository = FakeShadeRepository(),
         sceneInteractor: SceneInteractor = mock(),
+        powerInteractor: PowerInteractor = PowerInteractorFactory.create().powerInteractor,
     ): WithDependencies {
         return WithDependencies(
             repository = repository,
             commandQueue = commandQueue,
             featureFlags = featureFlags,
             sceneContainerFlags = sceneContainerFlags,
+            deviceEntryRepository = deviceEntryRepository,
             bouncerRepository = bouncerRepository,
             configurationRepository = configurationRepository,
             shadeRepository = shadeRepository,
+            powerInteractor = powerInteractor,
             KeyguardInteractor(
                 repository = repository,
                 commandQueue = commandQueue,
                 featureFlags = featureFlags,
                 sceneContainerFlags = sceneContainerFlags,
+                deviceEntryRepository = deviceEntryRepository,
                 bouncerRepository = bouncerRepository,
                 configurationRepository = configurationRepository,
                 shadeRepository = shadeRepository,
                 sceneInteractorProvider = { sceneInteractor },
-            )
+                powerInteractor = powerInteractor,
+            ),
         )
     }
 
     /** Provide defaults, otherwise tests will throw an error */
-    fun createFakeFeatureFlags(): FakeFeatureFlags {
+    private fun createFakeFeatureFlags(): FakeFeatureFlags {
         return FakeFeatureFlags().apply { set(Flags.FACE_AUTH_REFACTOR, false) }
     }
 
@@ -78,9 +87,11 @@ object KeyguardInteractorFactory {
         val commandQueue: FakeCommandQueue,
         val featureFlags: FakeFeatureFlags,
         val sceneContainerFlags: SceneContainerFlags,
+        val deviceEntryRepository: FakeDeviceEntryRepository,
         val bouncerRepository: FakeKeyguardBouncerRepository,
         val configurationRepository: FakeConfigurationRepository,
         val shadeRepository: FakeShadeRepository,
+        val powerInteractor: PowerInteractor,
         val keyguardInteractor: KeyguardInteractor,
     )
 }
