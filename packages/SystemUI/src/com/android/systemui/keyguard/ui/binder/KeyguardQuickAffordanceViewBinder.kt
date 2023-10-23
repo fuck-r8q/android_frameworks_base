@@ -23,6 +23,8 @@ import android.util.Size
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.core.animation.CycleInterpolator
+import androidx.core.animation.ObjectAnimator
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -132,7 +134,14 @@ object KeyguardQuickAffordanceViewBinder {
         vibratorHelper: VibratorHelper?,
     ) {
         if (!viewModel.isVisible) {
-            view.isInvisible = true
+            view.alpha = 1f
+            view
+                    .animate()
+                    .alpha(0f)
+                    .setInterpolator(Interpolators.FAST_OUT_LINEAR_IN)
+                    .setDuration(EXIT_DOZE_BUTTON_REVEAL_ANIMATION_DURATION_MS)
+                    .withEndAction { view.isInvisible = true }
+                    .start()
             return
         }
 
@@ -140,11 +149,9 @@ object KeyguardQuickAffordanceViewBinder {
             view.isVisible = true
             if (viewModel.animateReveal) {
                 view.alpha = 0f
-                view.translationY = view.height / 2f
                 view
                     .animate()
                     .alpha(1f)
-                    .translationY(0f)
                     .setInterpolator(Interpolators.LINEAR_OUT_SLOW_IN)
                     .setDuration(EXIT_DOZE_BUTTON_REVEAL_ANIMATION_DURATION_MS)
                     .start()
@@ -216,6 +223,27 @@ object KeyguardQuickAffordanceViewBinder {
                     falsingManager,
                 )
                 view.setOnTouchListener(onTouchListener)
+                view.setOnClickListener {
+                    messageDisplayer.invoke(R.string.keyguard_affordance_press_too_short)
+                    val amplitude =
+                        view.context.resources
+                            .getDimensionPixelSize(R.dimen.keyguard_affordance_shake_amplitude)
+                            .toFloat()
+                    val shakeAnimator =
+                        ObjectAnimator.ofFloat(
+                            view,
+                            "translationX",
+                            -amplitude / 2,
+                            amplitude / 2,
+                        )
+                    shakeAnimator.duration =
+                        KeyguardBottomAreaVibrations.ShakeAnimationDuration.inWholeMilliseconds
+                    shakeAnimator.interpolator =
+                        CycleInterpolator(KeyguardBottomAreaVibrations.ShakeAnimationCycles)
+                    shakeAnimator.start()
+
+                    vibratorHelper?.vibrate(KeyguardBottomAreaVibrations.Shake)
+                }
                 view.onLongClickListener =
                     OnLongClickListener(falsingManager, viewModel, vibratorHelper, onTouchListener)
             } else {

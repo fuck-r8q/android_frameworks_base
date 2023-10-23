@@ -38,6 +38,10 @@ public class HostTestUtils {
     private static final boolean SKIP_METHOD_LOG = "1".equals(System.getenv(
             "HOSTTEST_SKIP_METHOD_LOG"));
 
+    /** If true, we won't print class load log. */
+    private static final boolean SKIP_CLASS_LOG = "1".equals(System.getenv(
+            "HOSTTEST_SKIP_CLASS_LOG"));
+
     /** If true, we won't perform non-stub method direct call check. */
     private static final boolean SKIP_NON_STUB_METHOD_CHECK = "1".equals(System.getenv(
             "HOSTTEST_SKIP_NON_STUB_METHOD_CHECK"));
@@ -57,17 +61,35 @@ public class HostTestUtils {
     }
 
     /**
-     * Called from methods with FilterPolicy.Log.
+     * Trampoline method for method-call-hook.
+     */
+    public static void callMethodCallHook(
+            Class<?> methodClass,
+            String methodName,
+            String methodDescriptor,
+            String callbackMethod
+    ) {
+        callStaticMethodByName(callbackMethod, "method call hook", methodClass,
+                methodName, methodDescriptor);
+    }
+
+    /**
+     * I can be used as
+     * {@code --default-method-call-hook
+     * com.android.hoststubgen.hosthelper.HostTestUtils.logMethodCall}.
+     *
+     * It logs every single methods called.
      */
     public static void logMethodCall(
-            String methodClass,
+            Class<?> methodClass,
             String methodName,
             String methodDescriptor
     ) {
         if (SKIP_METHOD_LOG) {
             return;
         }
-        logPrintStream.println("# " + methodClass + "." + methodName + methodDescriptor);
+        logPrintStream.println("# method called: " + methodClass.getCanonicalName() + "."
+                + methodName + methodDescriptor);
     }
 
     private static final StackWalker sStackWalker =
@@ -146,52 +168,81 @@ public class HostTestUtils {
         logPrintStream.println("! Class loaded: " + loadedClass.getCanonicalName()
                 + " calling hook " + callbackMethod);
 
-        // Forward the call to callbackMethod.
-        final int lastPeriod = callbackMethod.lastIndexOf(".");
-        final String className = callbackMethod.substring(0, lastPeriod);
-        final String methodName = callbackMethod.substring(lastPeriod + 1);
+        callStaticMethodByName(callbackMethod, "class load hook", loadedClass);
+    }
 
-        if (lastPeriod < 0 || className.isEmpty() || methodName.isEmpty()) {
+    private static void callStaticMethodByName(String classAndMethodName,
+            String description, Object... args) {
+        // Forward the call to callbackMethod.
+        final int lastPeriod = classAndMethodName.lastIndexOf(".");
+
+        if ((lastPeriod) < 0 || (lastPeriod == classAndMethodName.length() - 1)) {
             throw new HostTestException(String.format(
-                    "Unable to find class load hook: malformed method name \"%s\"",
-                    callbackMethod));
+                    "Unable to find %s: malformed method name \"%s\"",
+                    description,
+                    classAndMethodName));
         }
+
+        final String className = classAndMethodName.substring(0, lastPeriod);
+        final String methodName = classAndMethodName.substring(lastPeriod + 1);
 
         Class<?> clazz = null;
         try {
             clazz = Class.forName(className);
         } catch (Exception e) {
             throw new HostTestException(String.format(
-                    "Unable to find class load hook: Class %s not found", className), e);
+                    "Unable to find %s: Class %s not found",
+                    description,
+                    className), e);
         }
         if (!Modifier.isPublic(clazz.getModifiers())) {
             throw new HostTestException(String.format(
-                    "Unable to find class load hook: Class %s must be public", className));
+                    "Unable to find %s: Class %s must be public",
+                    description,
+                    className));
+        }
+
+        Class<?>[] argTypes = new Class[args.length];
+        for (int i = 0; i < args.length; i++) {
+            argTypes[i] = args[i].getClass();
         }
 
         Method method = null;
         try {
-            method = clazz.getMethod(methodName, Class.class);
+            method = clazz.getMethod(methodName, argTypes);
         } catch (Exception e) {
             throw new HostTestException(String.format(
-                    "Unable to find class load hook: class %s doesn't have method %s"
-                    + " (method must take exactly one parameter of type Class, and public static)",
-                    className,
-                    methodName), e);
+                    "Unable to find %s: class %s doesn't have method %s"
+                            + " (method must take exactly one parameter of type Class,"
+                            + " and public static)",
+                    description, className, methodName), e);
         }
         if (!(Modifier.isPublic(method.getModifiers())
                 && Modifier.isStatic(method.getModifiers()))) {
             throw new HostTestException(String.format(
-                    "Unable to find class load hook: Method %s in class %s must be public static",
-                    methodName, className));
+                    "Unable to find %s: Method %s in class %s must be public static",
+                    description, methodName, className));
         }
         try {
-            method.invoke(null, loadedClass);
+            method.invoke(null, args);
         } catch (Exception e) {
             throw new HostTestException(String.format(
-                    "Unable to invoke class load hook %s.%s",
-                    className,
-                    methodName), e);
+                    "Unable to invoke %s %s.%s",
+                    description, className, methodName), e);
         }
+    }
+
+    /**
+     * I can be used as
+     * {@code --default-class-load-hook
+     * com.android.hoststubgen.hosthelper.HostTestUtils.logClassLoaded}.
+     *
+     * It logs every loaded class.
+     */
+    public static void logClassLoaded(Class<?> clazz) {
+        if (SKIP_CLASS_LOG) {
+            return;
+        }
+        logPrintStream.println("# class loaded: " + clazz.getCanonicalName());
     }
 }

@@ -221,6 +221,7 @@
     <item type="id" name="split_shade_guideline" />
     <item type="id" name="lock_icon" />
     <item type="id" name="lock_icon_bg" />
+    <item type="id" name="burn_in_layer" />
 
     <!-- Privacy dialog -->
     <item type="id" name="privacy_dialog_close_app_button" />
@@ -231,6 +232,11 @@
 
     <!-- Values assigned to the views in Biometrics Prompt -->
     <item type="id" name="pin_pad"/>
+
+    <!--
+    Tag used to store pending intent registration listeners in NotificationTemplateViewWrapper
+    -->
+    <item type="id" name="pending_intent_listener_tag" />
 
     <!--
     Used to tag views programmatically added to the smartspace area so they can be more easily

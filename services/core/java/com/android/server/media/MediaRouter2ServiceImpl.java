@@ -22,6 +22,7 @@ import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.media.MediaRoute2ProviderService.REASON_UNKNOWN_ERROR;
 import static android.media.MediaRouter2Utils.getOriginalId;
 import static android.media.MediaRouter2Utils.getProviderId;
+
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
 import static com.android.server.media.MediaFeatureFlagManager.FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE;
 
@@ -487,12 +488,13 @@ class MediaRouter2ServiceImpl {
 
         final int callerUid = Binder.getCallingUid();
         final int callerPid = Binder.getCallingPid();
-        final int userId = UserHandle.getUserHandleForUid(callerUid).getIdentifier();
+        final int callerUserId = UserHandle.getUserHandleForUid(callerUid).getIdentifier();
 
         final long token = Binder.clearCallingIdentity();
         try {
             synchronized (mLock) {
-                registerManagerLocked(manager, callerUid, callerPid, callerPackageName, userId);
+                registerManagerLocked(
+                        manager, callerUid, callerPid, callerPackageName, callerUserId);
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -705,7 +707,8 @@ class MediaRouter2ServiceImpl {
     }
 
     private boolean checkCallerHasSystemRoutingPermissions(int pid, int uid) {
-        return checkCallerHasModifyAudioRoutingPermission(pid, uid);
+        return checkCallerHasModifyAudioRoutingPermission(pid, uid)
+                || checkCallerHasBluetoothPermissions(pid, uid);
     }
 
     private boolean checkCallerHasModifyAudioRoutingPermission(int pid, int uid) {
@@ -1156,8 +1159,12 @@ class MediaRouter2ServiceImpl {
     }
 
     @GuardedBy("mLock")
-    private void registerManagerLocked(@NonNull IMediaRouter2Manager manager,
-            int callerUid, int callerPid, @NonNull String callerPackageName, int userId) {
+    private void registerManagerLocked(
+            @NonNull IMediaRouter2Manager manager,
+            int callerUid,
+            int callerPid,
+            @NonNull String callerPackageName,
+            int callerUserId) {
         final IBinder binder = manager.asBinder();
         ManagerRecord managerRecord = mAllManagerRecords.get(binder);
 
@@ -1167,14 +1174,17 @@ class MediaRouter2ServiceImpl {
             return;
         }
 
-        Slog.i(TAG, TextUtils.formatSimple(
-                "registerManager | callerUid: %d, callerPid: %d, package: %s, user: %d",
-                callerUid, callerPid, callerPackageName, userId));
+        Slog.i(
+                TAG,
+                TextUtils.formatSimple(
+                        "registerManager | callerUid: %d, callerPid: %d, callerPackage: %s,"
+                            + " callerUserId: %d",
+                        callerUid, callerPid, callerPackageName, callerUserId));
 
         mContext.enforcePermission(Manifest.permission.MEDIA_CONTENT_CONTROL, callerPid, callerUid,
                 "Must hold MEDIA_CONTENT_CONTROL permission.");
 
-        UserRecord userRecord = getOrCreateUserRecordLocked(userId);
+        UserRecord userRecord = getOrCreateUserRecordLocked(callerUserId);
         managerRecord = new ManagerRecord(
                 userRecord, manager, callerUid, callerPid, callerPackageName);
         try {

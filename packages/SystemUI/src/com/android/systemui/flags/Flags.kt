@@ -40,8 +40,8 @@ object Flags {
 
     // 100 - notification
     // TODO(b/297792660): Tracking Bug
-    val ADD_TRANSIENT_HUN_IN_STACK_STATE_ANIMATOR =
-        unreleasedFlag("add_transient_hun_in_stack_state_animator", teamfood = false)
+    @JvmField val UNCLEARED_TRANSIENT_HUN_FIX =
+        unreleasedFlag("uncleared_transient_hun_fix", teamfood = false)
 
     // TODO(b/298308067): Tracking Bug
     @JvmField val SWIPE_UNCLEARED_TRANSIENT_VIEW_FIX =
@@ -80,16 +80,9 @@ object Flags {
     @JvmField
     val NOTIFICATION_INLINE_REPLY_ANIMATION = releasedFlag("notification_inline_reply_animation")
 
-    /** Makes sure notification panel is updated before the user switch is complete. */
-    // TODO(b/278873737): Tracking Bug
-    @JvmField
-    val LOAD_NOTIFICATIONS_BEFORE_THE_USER_SWITCH_IS_COMPLETE =
-        releasedFlag("load_notifications_before_the_user_switch_is_complete")
-
     // TODO(b/277338665): Tracking Bug
     @JvmField
-    val NOTIFICATION_SHELF_REFACTOR =
-        unreleasedFlag("notification_shelf_refactor", teamfood = true)
+    val NOTIFICATION_SHELF_REFACTOR = releasedFlag("notification_shelf_refactor")
 
     // TODO(b/290787599): Tracking Bug
     @JvmField
@@ -122,7 +115,7 @@ object Flags {
     // TODO(b/292213543): Tracking Bug
     @JvmField
     val NOTIFICATION_GROUP_EXPANSION_CHANGE =
-            unreleasedFlag("notification_group_expansion_change")
+            unreleasedFlag("notification_group_expansion_change", teamfood = true)
 
     // TODO(b/301955929)
     @JvmField
@@ -183,7 +176,11 @@ object Flags {
      */
     // TODO(b/281655028): Tracking bug
     @JvmField
-    val LIGHT_REVEAL_MIGRATION = unreleasedFlag("light_reveal_migration", teamfood = false)
+    val LIGHT_REVEAL_MIGRATION = unreleasedFlag("light_reveal_migration", teamfood = true)
+
+    // TODO(b/301915812): Tracking Bug
+    @JvmField
+    val NEW_AOD_TRANSITION = unreleasedFlag("new_aod_transition", teamfood = true)
 
     /** Flag to control the migration of face auth to modern architecture. */
     // TODO(b/262838215): Tracking bug
@@ -253,7 +250,8 @@ object Flags {
 
     /** Provide new auth messages on the bouncer. */
     // TODO(b/277961132): Tracking bug.
-    @JvmField val REVAMPED_BOUNCER_MESSAGES = unreleasedFlag("revamped_bouncer_messages")
+    @JvmField val REVAMPED_BOUNCER_MESSAGES = unreleasedFlag("revamped_bouncer_messages",
+            teamfood = true)
 
     /** Keyguard Migration */
 
@@ -296,6 +294,16 @@ object Flags {
     // TODO(b/299115332): Tracking Bug.
     @JvmField val MIGRATE_KEYGUARD_STATUS_BAR_VIEW =
         unreleasedFlag("migrate_keyguard_status_bar_view")
+
+    /** Migrate clocks from keyguard status view to keyguard root view*/
+    // TODO(b/301502635): Tracking Bug.
+    @JvmField val MIGRATE_CLOCKS_TO_BLUEPRINT =
+            unreleasedFlag("migrate_clocks_to_blueprint")
+
+    /** Migrate KeyguardRootView to use composables. */
+    // TODO(b/301969856): Tracking Bug.
+    @JvmField val KEYGUARD_ROOT_VIEW_USE_COMPOSE =
+        unreleasedFlag("keyguard_root_view_use_compose")
 
     /** Enables preview loading animation in the wallpaper picker. */
     // TODO(b/274443705): Tracking Bug
@@ -762,6 +770,13 @@ object Flags {
     // TODO(b/289573946): Tracking Bug
     @JvmField val PRECOMPUTED_TEXT = unreleasedFlag("precomputed_text", teamfood = true)
 
+    // TODO(b/302087895): Tracking Bug
+    @JvmField val CALL_LAYOUT_ASYNC_SET_DATA = unreleasedFlag("call_layout_async_set_data")
+
+    // TODO(b/302144438): Tracking Bug
+    @JvmField val DECOUPLE_REMOTE_INPUT_DELEGATE_AND_CALLBACK_UPDATE =
+            unreleasedFlag("decouple_remote_input_delegate_and_callback_update")
+
     // 2900 - CentralSurfaces-related flags
 
     // TODO(b/285174336): Tracking Bug
@@ -794,7 +809,7 @@ object Flags {
 
     /** Enable haptic slider component in the brightness slider */
     @JvmField
-    val HAPTIC_BRIGHTNESS_SLIDER = unreleasedFlag("haptic_brightness_slider")
+    val HAPTIC_BRIGHTNESS_SLIDER = unreleasedFlag("haptic_brightness_slider", teamfood = true)
 
     // TODO(b/287205379): Tracking bug
     @JvmField
@@ -806,7 +821,13 @@ object Flags {
     val BLUETOOTH_QS_TILE_DIALOG = unreleasedFlag("bluetooth_qs_tile_dialog", teamfood = true)
 
     // TODO(b/300995746): Tracking Bug
-    /** Enable communal hub features. */
+    /** A resource flag for whether the communal service is enabled. */
     @JvmField
-    val COMMUNAL_HUB = resourceBooleanFlag(R.bool.config_communalServiceEnabled, "communal_hub")
+    val COMMUNAL_SERVICE_ENABLED = resourceBooleanFlag(R.bool.config_communalServiceEnabled,
+        "communal_service_enabled")
+
+    // TODO(b/303131306): Tracking Bug
+    /** Whether communal hub features are enabled. */
+    @JvmField
+    val COMMUNAL_HUB = unreleasedFlag("communal_hub")
 }

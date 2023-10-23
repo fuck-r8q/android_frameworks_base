@@ -29,12 +29,18 @@ import com.android.systemui.log.LogcatEchoTrackerDebug;
 import com.android.systemui.log.LogcatEchoTrackerProd;
 import com.android.systemui.log.table.TableLogBuffer;
 import com.android.systemui.log.table.TableLogBufferFactory;
+import com.android.systemui.qs.QSFragmentLegacy;
+import com.android.systemui.qs.pipeline.shared.QSPipelineFlagsRepository;
+import com.android.systemui.qs.pipeline.shared.TileSpec;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.util.Compile;
 import com.android.systemui.util.wakelock.WakeLockLog;
 
 import dagger.Module;
 import dagger.Provides;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Dagger module for providing instances of {@link LogBuffer}.
@@ -172,8 +178,35 @@ public class LogModule {
     @Provides
     @SysUISingleton
     @QSLog
-    public static LogBuffer provideQuickSettingsLogBuffer(LogBufferFactory factory) {
-        return factory.create("QSLog", 700 /* maxSize */, false /* systrace */);
+    public static LogBuffer provideQuickSettingsLogBuffer(
+            LogBufferFactory factory,
+            QSPipelineFlagsRepository flags
+    ) {
+        if (flags.getPipelineTilesEnabled()) {
+            // we use
+            return factory.create("QSLog", 450 /* maxSize */, false /* systrace */);
+        } else {
+            return factory.create("QSLog", 700 /* maxSize */, false /* systrace */);
+        }
+    }
+
+    /**
+     * Provides a logging buffer for all logs related to Quick Settings tiles. This LogBuffer is
+     * unique for each tile.
+     * go/qs-tile-refactor
+     */
+    @Provides
+    @QSTilesDefaultLog
+    public static LogBuffer provideQuickSettingsTilesLogBuffer(LogBufferFactory factory) {
+        return factory.create("QSTileLog", 25 /* maxSize */, false /* systrace */);
+    }
+
+    @Provides
+    @QSTilesLogBuffers
+    public static Map<TileSpec, LogBuffer> provideQuickSettingsTilesLogBufferCache() {
+        final Map<TileSpec, LogBuffer> buffers = new HashMap<>();
+        // Add chatty buffers here
+        return buffers;
     }
 
     /** Provides a logging buffer for logs related to Quick Settings configuration. */
@@ -229,12 +262,12 @@ public class LogModule {
     }
 
     /**
-     * Provides a logging buffer for logs related to {@link com.android.systemui.qs.QSFragment}'s
+     * Provides a logging buffer for logs related to {@link QSFragmentLegacy}'s
      * disable flag adjustments.
      */
     @Provides
     @SysUISingleton
-    @QSFragmentDisableLog
+    @QSDisableLog
     public static LogBuffer provideQSFragmentDisableLogBuffer(LogBufferFactory factory) {
         return factory.create("QSFragmentDisableFlagsLog", 10 /* maxSize */,
                 false /* systrace */);
@@ -419,7 +452,7 @@ public class LogModule {
 
     /**
      * Provides a {@link LogBuffer} for use by
-     *  {@link com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthRepositoryImpl}.
+     * {@link com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthRepositoryImpl}.
      */
     @Provides
     @SysUISingleton
@@ -430,7 +463,7 @@ public class LogModule {
 
     /**
      * Provides a {@link LogBuffer} for use by classes in the
-     *  {@link com.android.systemui.keyguard.bouncer} package.
+     * {@link com.android.systemui.keyguard.bouncer} package.
      */
     @Provides
     @SysUISingleton

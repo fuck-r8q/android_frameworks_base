@@ -108,6 +108,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.mapNotNull
@@ -261,6 +262,7 @@ class MobileConnectionRepositoryImpl(
                     unregisterCapabilityAndRegistrationCallback()
                 }
             }
+            .flowOn(bgDispatcher)
             .scan(initial = initial) { state, event -> state.applyEvent(event) }
             .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initial)
     }
@@ -440,6 +442,7 @@ class MobileConnectionRepositoryImpl(
 
                 awaitClose { context.unregisterReceiver(receiver) }
             }
+            .flowOn(bgDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(), defaultNetworkName)
 
     override val dataEnabled = run {

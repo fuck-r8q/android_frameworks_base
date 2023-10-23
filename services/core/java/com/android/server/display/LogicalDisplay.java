@@ -137,6 +137,9 @@ final class LogicalDisplay {
     private final Rect mTempLayerStackRect = new Rect();
     private final Rect mTempDisplayRect = new Rect();
 
+    /** A session token that controls the offloading operations of this logical display. */
+    private DisplayManagerInternal.DisplayOffloadSession mDisplayOffloadSession;
+
     /**
      * Name of a display group to which the display is assigned.
      */
@@ -470,6 +473,7 @@ final class LogicalDisplay {
             mBaseDisplayInfo.modeId = deviceInfo.modeId;
             mBaseDisplayInfo.renderFrameRate = deviceInfo.renderFrameRate;
             mBaseDisplayInfo.defaultModeId = deviceInfo.defaultModeId;
+            mBaseDisplayInfo.userPreferredModeId = deviceInfo.userPreferredModeId;
             mBaseDisplayInfo.supportedModes = Arrays.copyOf(
                     deviceInfo.supportedModes, deviceInfo.supportedModes.length);
             mBaseDisplayInfo.colorMode = deviceInfo.colorMode;
@@ -938,6 +942,15 @@ final class LogicalDisplay {
      */
     public String getDisplayGroupNameLocked() {
         return mDisplayGroupName;
+    }
+
+    public void setDisplayOffloadSessionLocked(
+            DisplayManagerInternal.DisplayOffloadSession session) {
+        mDisplayOffloadSession = session;
+    }
+
+    public DisplayManagerInternal.DisplayOffloadSession getDisplayOffloadSessionLocked() {
+        return mDisplayOffloadSession;
     }
 
     public void dumpLocked(PrintWriter pw) {

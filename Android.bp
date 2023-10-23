@@ -413,6 +413,7 @@ java_defaults {
     static_libs: [
         "android.hardware.common.fmq-V1-java",
         "bouncycastle-repackaged-unbundled",
+        "com.android.sysprop.foldlockbehavior",
         "framework-internal-utils",
         // If MimeMap ever becomes its own APEX, then this dependency would need to be removed
         // in favor of an API stubs dependency in java_library "framework" below.
@@ -549,6 +550,7 @@ java_library {
     required: [
         "framework-minus-apex",
         "framework-platform-compat-config",
+        "framework-location-compat-config",
         "services-platform-compat-config",
         "icu4j-platform-compat-config",
         "TeleService-platform-compat-config",

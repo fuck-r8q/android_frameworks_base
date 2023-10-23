@@ -1548,7 +1548,6 @@ public final class CachedAppOptimizer {
             uidRec.setFrozen(false);
             postUidFrozenMessage(uidRec.getUid(), false);
         }
-        reportProcessFreezableChangedLocked(app);
 
         opt.setFreezerOverride(false);
         if (pid == 0 || !opt.isFrozen()) {
@@ -1587,6 +1586,7 @@ public final class CachedAppOptimizer {
         if (processKilled) {
             return;
         }
+        reportProcessFreezableChangedLocked(app);
 
         long freezeTime = opt.getFreezeUnfreezeTime();
 

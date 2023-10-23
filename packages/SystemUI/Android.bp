@@ -239,6 +239,9 @@ filegroup {
     srcs: [
         /* Status bar fakes */
         "tests/src/com/android/systemui/statusbar/pipeline/airplane/data/repository/FakeAirplaneModeRepository.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/mobile/data/repository/FakeMobileConnectionRepository.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/mobile/data/repository/FakeMobileConnectionsRepository.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/mobile/util/FakeMobileMappingsProxy.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/shared/data/repository/FakeConnectivityRepository.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/FakeWifiRepository.kt",
 
@@ -364,6 +367,8 @@ filegroup {
         "tests/src/com/android/systemui/qs/pipeline/data/**/*Test.kt",
         "tests/src/com/android/systemui/qs/pipeline/domain/**/*Test.kt",
         "tests/src/com/android/systemui/qs/pipeline/shared/TileSpecTest.kt",
+        "tests/src/com/android/systemui/qs/tiles/base/**/*.kt",
+        "tests/src/com/android/systemui/qs/tiles/viewmodel/**/*.kt",
     ],
     path: "tests/src",
 }

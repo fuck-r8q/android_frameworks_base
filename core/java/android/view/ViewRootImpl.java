@@ -84,6 +84,7 @@ import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_B
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CANCEL_AND_REDRAW;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
+import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 
@@ -155,6 +156,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.sysprop.DisplayProperties;
 import android.text.TextUtils;
 import android.util.AndroidRuntimeException;
@@ -1756,8 +1758,23 @@ public final class ViewRootImpl implements ViewParent,
         return getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
     }
 
-    private void updateForceDarkMode() {
-        if (mAttachInfo.mThreadedRenderer == null) return;
+    /** Returns true if force dark should be enabled according to various settings */
+    @VisibleForTesting
+    public boolean isForceDarkEnabled() {
+        if (forceInvertColor()) {
+            boolean isForceInvertEnabled = Settings.Secure.getIntForUser(
+                    mContext.getContentResolver(),
+                    Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED,
+                    /* def= */ 0,
+                    UserHandle.myUserId()) == 1;
+            // Force invert ignores all developer opt-outs.
+            // We also ignore dark theme, since the app developer can override the user's preference
+            // for dark mode in configuration.uiMode. Instead, we assume that the force invert
+            // setting will be enabled at the same time dark theme is in the Settings app.
+            if (isForceInvertEnabled) {
+                return true;
+            }
+        }
 
         boolean useAutoDark = getNightMode() == Configuration.UI_MODE_NIGHT_YES;
 
@@ -1769,8 +1786,12 @@ public final class ViewRootImpl implements ViewParent,
                     && a.getBoolean(R.styleable.Theme_forceDarkAllowed, forceDarkAllowedDefault);
             a.recycle();
         }
+        return useAutoDark;
+    }
 
-        if (mAttachInfo.mThreadedRenderer.setForceDark(useAutoDark)) {
+    private void updateForceDarkMode() {
+        if (mAttachInfo.mThreadedRenderer == null) return;
+        if (mAttachInfo.mThreadedRenderer.setForceDark(isForceDarkEnabled())) {
             // TODO: Don't require regenerating all display lists to apply this setting
             invalidateWorld(mView);
         }
@@ -3876,9 +3897,8 @@ public final class ViewRootImpl implements ViewParent,
                 mPendingTransitions.clear();
             }
 
-            if (mActiveSurfaceSyncGroup != null) {
-                mActiveSurfaceSyncGroup.markSyncReady();
-            }
+            handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mPendingTransaction,
+                    "view not visible");
         } else if (cancelAndRedraw) {
             mLastPerformTraversalsSkipDrawReason = cancelDueToPreDrawListener
                 ? "predraw_" + mAttachInfo.mTreeObserver.getLastDispatchOnPreDrawCanceledReason()
@@ -3892,8 +3912,9 @@ public final class ViewRootImpl implements ViewParent,
                 }
                 mPendingTransitions.clear();
             }
-            if (!performDraw(mActiveSurfaceSyncGroup) && mActiveSurfaceSyncGroup != null) {
-                mActiveSurfaceSyncGroup.markSyncReady();
+            if (!performDraw(mActiveSurfaceSyncGroup)) {
+                handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mPendingTransaction,
+                        mLastPerformDrawSkippedReason);
             }
         }
 
@@ -3908,6 +3929,7 @@ public final class ViewRootImpl implements ViewParent,
             mReportNextDraw = false;
             mLastReportNextDrawReason = null;
             mActiveSurfaceSyncGroup = null;
+            mHasPendingTransactions = false;
             mSyncBuffer = false;
             if (isInWMSRequestedSync()) {
                 mWmsRequestSyncGroup.markSyncReady();
@@ -4684,6 +4706,10 @@ public final class ViewRootImpl implements ViewParent,
 
                 return didProduceBuffer -> {
                     if (!didProduceBuffer) {
+                        Trace.instant(Trace.TRACE_TAG_VIEW,
+                                "Transaction not synced due to no frame drawn-" + mTag);
+                        Log.d(mTag, "Pending transaction will not be applied in sync with a draw "
+                                + "because there was nothing new to draw");
                         mBlastBufferQueue.applyPendingTransactions(frame);
                     }
                 };
@@ -4736,8 +4762,15 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mPendingAnimatingRenderNodes.clear();
         }
 
-        if (mReportNextDraw) {
+        final Transaction pendingTransaction;
+        if (!usingAsyncReport && mHasPendingTransactions) {
+            pendingTransaction = new Transaction();
+            pendingTransaction.merge(mPendingTransaction);
+        } else {
+            pendingTransaction = null;
+        }
 
+        if (mReportNextDraw) {
             // if we're using multi-thread renderer, wait for the window frame draws
             if (mWindowDrawCountDown != null) {
                 try {
@@ -4759,9 +4792,8 @@ public final class ViewRootImpl implements ViewParent,
             if (mSurfaceHolder != null && mSurface.isValid()) {
                 usingAsyncReport = true;
                 SurfaceCallbackHelper sch = new SurfaceCallbackHelper(() -> {
-                    if (surfaceSyncGroup != null) {
-                        surfaceSyncGroup.markSyncReady();
-                    }
+                    handleSyncRequestWhenNoAsyncDraw(surfaceSyncGroup, pendingTransaction,
+                            "SurfaceHolder");
                 });
 
                 SurfaceHolder.Callback callbacks[] = mSurfaceHolder.getCallbacks();
@@ -4774,15 +4806,34 @@ public final class ViewRootImpl implements ViewParent,
             }
         }
 
-        if (surfaceSyncGroup != null && !usingAsyncReport) {
-            surfaceSyncGroup.markSyncReady();
+        if (!usingAsyncReport) {
+            handleSyncRequestWhenNoAsyncDraw(surfaceSyncGroup, pendingTransaction,
+                    "no async report");
         }
+
         if (mPerformContentCapture) {
             performContentCaptureInitialReport();
         }
         return true;
     }
 
+    private void handleSyncRequestWhenNoAsyncDraw(SurfaceSyncGroup surfaceSyncGroup,
+            @Nullable Transaction pendingTransaction, String logReason) {
+        if (surfaceSyncGroup != null) {
+            if (pendingTransaction != null) {
+                surfaceSyncGroup.addTransaction(pendingTransaction);
+            }
+            surfaceSyncGroup.markSyncReady();
+        } else if (pendingTransaction != null) {
+            Trace.instant(Trace.TRACE_TAG_VIEW,
+                    "Transaction not synced due to " + logReason + "-" + mTag);
+            if (DEBUG_BLAST) {
+                Log.d(mTag, "Pending transaction will not be applied in sync with a draw due to "
+                        + logReason);
+            }
+            pendingTransaction.apply();
+        }
+    }
     /**
      * Checks (and caches) if content capture is enabled for this context.
      */
@@ -4868,8 +4919,8 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-    private boolean draw(boolean fullRedrawNeeded,
-            @Nullable SurfaceSyncGroup activeSyncGroup, boolean syncBuffer) {
+    private boolean draw(boolean fullRedrawNeeded, @Nullable SurfaceSyncGroup activeSyncGroup,
+            boolean syncBuffer) {
         Surface surface = mSurface;
         if (!surface.isValid()) {
             return false;
@@ -5013,12 +5064,11 @@ public final class ViewRootImpl implements ViewParent,
                         mAttachInfo.mThreadedRenderer.forceDrawNextFrame();
                     }
                 } else if (mHasPendingTransactions) {
-                    // Register a calback if there's no sync involved but there were calls to
+                    // Register a callback if there's no sync involved but there were calls to
                     // applyTransactionOnDraw. If there is a sync involved, the sync callback will
                     // handle merging the pending transaction.
                     registerCallbackForPendingTransactions();
                 }
-                mHasPendingTransactions = false;
 
                 mAttachInfo.mThreadedRenderer.draw(mView, mAttachInfo, this);
             } else {
@@ -8999,13 +9049,8 @@ public final class ViewRootImpl implements ViewParent,
             mAdded = false;
             AnimationHandler.removeRequestor(this);
         }
-        if (mActiveSurfaceSyncGroup != null) {
-            mActiveSurfaceSyncGroup.markSyncReady();
-            mActiveSurfaceSyncGroup = null;
-        }
-        if (mHasPendingTransactions) {
-            mPendingTransaction.apply();
-        }
+        handleSyncRequestWhenNoAsyncDraw(mActiveSurfaceSyncGroup, mPendingTransaction,
+                "shutting down VRI");
         WindowManagerGlobal.getInstance().doRemoveView(this);
     }
 
@@ -11390,15 +11435,15 @@ public final class ViewRootImpl implements ViewParent,
     @Override
     public boolean applyTransactionOnDraw(@NonNull SurfaceControl.Transaction t) {
         if (mRemoved || !isHardwareEnabled()) {
+            Trace.instant(Trace.TRACE_TAG_VIEW, "applyTransactionOnDraw applyImmediately-" + mTag);
+            Log.d(mTag, "applyTransactionOnDraw: Applying transaction immediately");
             t.apply();
         } else {
+            Trace.instant(Trace.TRACE_TAG_VIEW, "applyTransactionOnDraw-" + mTag);
             // Copy and clear the passed in transaction for thread safety. The new transaction is
             // accessed on the render thread.
             mPendingTransaction.merge(t);
             mHasPendingTransactions = true;
-            // Schedule the traversal to ensure there's an attempt to draw a frame and apply the
-            // pending transactions. This is also where the registerFrameCallback will be scheduled.
-            scheduleTraversals();
         }
         return true;
     }
@@ -11540,9 +11585,7 @@ public final class ViewRootImpl implements ViewParent,
             Log.d(mTag, "registerCallbacksForSync syncBuffer=" + syncBuffer);
         }
 
-        Transaction t = new Transaction();
-        t.merge(mPendingTransaction);
-
+        surfaceSyncGroup.addTransaction(mPendingTransaction);
         mAttachInfo.mThreadedRenderer.registerRtFrameCallback(new FrameDrawingCallback() {
             @Override
             public void onFrameDraw(long frame) {
@@ -11556,7 +11599,6 @@ public final class ViewRootImpl implements ViewParent,
                                     + frame + ".");
                 }
 
-                mergeWithNextTransaction(t, frame);
                 // If the syncResults are SYNC_LOST_SURFACE_REWARD_IF_FOUND or
                 // SYNC_CONTEXT_IS_STOPPED it means nothing will draw. There's no need to set up
                 // any blast sync or commit callback, and the code should directly call

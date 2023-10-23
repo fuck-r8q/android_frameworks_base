@@ -1564,6 +1564,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mTargetDisplays.add(dc);
         }
 
+        for (int i = 0; i < mTargets.size(); ++i) {
+            final DisplayArea da = mTargets.get(i).mContainer.asDisplayArea();
+            if (da == null) continue;
+            if (da.isVisibleRequested()) {
+                mController.mValidateDisplayVis.remove(da);
+            } else {
+                // In case something accidentally hides a displayarea and nothing shows it again.
+                mController.mValidateDisplayVis.add(da);
+            }
+        }
+
         if (mOverrideOptions != null) {
             info.setAnimationOptions(mOverrideOptions);
             if (mOverrideOptions.getType() == ANIM_OPEN_CROSS_PROFILE_APPS) {
@@ -1699,6 +1710,18 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mLogger.logOnSendAsync(mController.mLoggerHandler);
         if (mLogger.mInfo != null) {
             mController.mTransitionTracer.logSentTransition(this, mTargets);
+        }
+    }
+
+    @Override
+    public void onTransactionCommitTimeout() {
+        if (mCleanupTransaction == null) return;
+        for (int i = mTargetDisplays.size() - 1; i >= 0; --i) {
+            final DisplayContent dc = mTargetDisplays.get(i);
+            final AsyncRotationController asyncRotationController = dc.getAsyncRotationController();
+            if (asyncRotationController != null && containsChangeFor(dc, mTargets)) {
+                asyncRotationController.onTransactionCommitTimeout(mCleanupTransaction);
+            }
         }
     }
 

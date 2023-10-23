@@ -146,6 +146,7 @@ import android.window.ScreenCapture;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.display.BrightnessSynchronizer;
+import com.android.internal.foldables.FoldLockSettingAvailabilityProvider;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.DumpUtils;
@@ -559,6 +560,9 @@ public final class DisplayManagerService extends SystemService {
     @VisibleForTesting
     DisplayManagerService(Context context, Injector injector) {
         super(context);
+        FoldSettingProvider foldSettingProvider = new FoldSettingProvider(context,
+                new SettingsWrapper(),
+                new FoldLockSettingAvailabilityProvider(context.getResources()));
         mInjector = injector;
         mContext = context;
         mFlags = injector.getFlags();
@@ -566,9 +570,9 @@ public final class DisplayManagerService extends SystemService {
         mUiHandler = UiThread.getHandler();
         mDisplayDeviceRepo = new DisplayDeviceRepository(mSyncRoot, mPersistentDataStore);
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext,
-                new FoldSettingProvider(mContext, new SettingsWrapper()), mDisplayDeviceRepo,
-                new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags);
-        mDisplayModeDirector = new DisplayModeDirector(context, mHandler);
+                foldSettingProvider,
+                mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags);
+        mDisplayModeDirector = new DisplayModeDirector(context, mHandler, mFlags);
         mBrightnessSynchronizer = new BrightnessSynchronizer(mContext);
         Resources resources = mContext.getResources();
         mDefaultDisplayDefaultColorMode = mContext.getResources().getInteger(
@@ -1789,7 +1793,7 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             // main display adapter
             registerDisplayAdapterLocked(mInjector.getLocalDisplayAdapter(mSyncRoot, mContext,
-                    mHandler, mDisplayDeviceRepo));
+                    mHandler, mDisplayDeviceRepo, mFlags));
 
             // Standalone VR devices rely on a virtual display as their primary display for
             // 2D UI. We register virtual display adapter along side the main display adapter
@@ -2045,9 +2049,6 @@ public final class DisplayManagerService extends SystemService {
         mDisplayBrightnesses.delete(displayId);
         DisplayManagerGlobal.invalidateLocalDisplayInfoCaches();
 
-        sendDisplayEventLocked(display, event);
-        scheduleTraversalLocked(false);
-
         if (mDisplayWindowPolicyControllers.contains(displayId)) {
             final IVirtualDevice virtualDevice =
                     mDisplayWindowPolicyControllers.removeReturnOld(displayId).first;
@@ -2058,6 +2059,9 @@ public final class DisplayManagerService extends SystemService {
                 });
             }
         }
+
+        sendDisplayEventLocked(display, event);
+        scheduleTraversalLocked(false);
     }
 
     private void handleLogicalDisplaySwappedLocked(@NonNull LogicalDisplay display) {
@@ -2110,8 +2114,11 @@ public final class DisplayManagerService extends SystemService {
             // Only send a request for display state if display state has already been initialized.
             if (state != Display.STATE_UNKNOWN) {
                 final BrightnessPair brightnessPair = mDisplayBrightnesses.get(displayId);
-                return device.requestDisplayStateLocked(state, brightnessPair.brightness,
-                        brightnessPair.sdrBrightness);
+                return device.requestDisplayStateLocked(
+                        state,
+                        brightnessPair.brightness,
+                        brightnessPair.sdrBrightness,
+                        display.getDisplayOffloadSessionLocked());
             }
         }
         return null;
@@ -3211,9 +3218,10 @@ public final class DisplayManagerService extends SystemService {
         }
 
         LocalDisplayAdapter getLocalDisplayAdapter(SyncRoot syncRoot, Context context,
-                                                   Handler handler,
-                                                   DisplayAdapter.Listener displayAdapterListener) {
-            return new LocalDisplayAdapter(syncRoot, context, handler, displayAdapterListener);
+                Handler handler, DisplayAdapter.Listener displayAdapterListener,
+                DisplayManagerFlags flags) {
+            return new LocalDisplayAdapter(syncRoot, context, handler, displayAdapterListener,
+                    flags);
         }
 
         long getDefaultDisplayDelayTimeout() {
@@ -4833,6 +4841,49 @@ public final class DisplayManagerService extends SystemService {
                 });
             }
             return displayGroupIds;
+        }
+
+        @Override
+        public DisplayManagerInternal.DisplayOffloadSession registerDisplayOffloader(
+                int displayId, @NonNull DisplayManagerInternal.DisplayOffloader displayOffloader) {
+            if (!mFlags.isDisplayOffloadEnabled()) {
+                return null;
+            }
+            synchronized (mSyncRoot) {
+                LogicalDisplay logicalDisplay = mLogicalDisplayMapper.getDisplayLocked(displayId);
+                if (logicalDisplay == null) {
+                    Slog.w(TAG, "registering DisplayOffloader: LogicalDisplay for displayId="
+                            + displayId + " is not found. No Op.");
+                    return null;
+                }
+
+                DisplayPowerControllerInterface displayPowerController =
+                        mDisplayPowerControllers.get(logicalDisplay.getDisplayIdLocked());
+                if (displayPowerController == null) {
+                    Slog.w(TAG,
+                            "setting doze state override: DisplayPowerController for displayId="
+                                    + displayId + " is unavailable. No Op.");
+                    return null;
+                }
+
+                DisplayOffloadSession session =
+                        new DisplayOffloadSession() {
+                            @Override
+                            public void setDozeStateOverride(int displayState) {
+                                synchronized (mSyncRoot) {
+                                    displayPowerController.overrideDozeScreenState(displayState);
+                                }
+                            }
+
+                            @Override
+                            public DisplayOffloader getDisplayOffloader() {
+                                return displayOffloader;
+                            }
+                        };
+                logicalDisplay.setDisplayOffloadSessionLocked(session);
+                displayPowerController.setDisplayOffloadSession(session);
+                return session;
+            }
         }
     }
 

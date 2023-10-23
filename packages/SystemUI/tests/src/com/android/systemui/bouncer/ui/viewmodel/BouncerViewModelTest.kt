@@ -44,12 +44,15 @@ class BouncerViewModelTest : SysuiTestCase() {
 
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = utils.authenticationRepository(),
+    private val authenticationInteractor = utils.authenticationInteractor()
+    private val deviceEntryInteractor =
+        utils.deviceEntryInteractor(
+            authenticationInteractor = authenticationInteractor,
+            sceneInteractor = utils.sceneInteractor(),
         )
     private val bouncerInteractor =
         utils.bouncerInteractor(
+            deviceEntryInteractor = deviceEntryInteractor,
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = utils.sceneInteractor(),
         )
@@ -66,7 +69,8 @@ class BouncerViewModelTest : SysuiTestCase() {
 
             authMethodsToTest().forEach { authMethod ->
                 utils.authenticationRepository.setAuthenticationMethod(authMethod)
-                val job = underTest.authMethod.onEach { authMethodViewModel = it }.launchIn(this)
+                val job =
+                    underTest.authMethodViewModel.onEach { authMethodViewModel = it }.launchIn(this)
                 runCurrent()
 
                 if (authMethod.isSecure) {
@@ -86,22 +90,43 @@ class BouncerViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun authMethod_reusesInstances() =
+    fun authMethodChanged_doesNotReuseInstances() =
         testScope.runTest {
             val seen =
                 mutableMapOf<DomainLayerAuthenticationMethodModel, AuthMethodBouncerViewModel>()
             val authMethodViewModel: AuthMethodBouncerViewModel? by
-                collectLastValue(underTest.authMethod)
+                collectLastValue(underTest.authMethodViewModel)
+
             // First pass, populate our "seen" map:
             authMethodsToTest().forEach { authMethod ->
                 utils.authenticationRepository.setAuthenticationMethod(authMethod)
                 authMethodViewModel?.let { seen[authMethod] = it }
             }
 
-            // Second pass, assert same instances are reused:
+            // Second pass, assert same instances are not reused:
             authMethodsToTest().forEach { authMethod ->
                 utils.authenticationRepository.setAuthenticationMethod(authMethod)
-                authMethodViewModel?.let { assertThat(it).isSameInstanceAs(seen[authMethod]) }
+                authMethodViewModel?.let {
+                    assertThat(it.authenticationMethod).isEqualTo(authMethod)
+                    assertThat(it).isNotSameInstanceAs(seen[authMethod])
+                }
+            }
+        }
+
+    @Test
+    fun authMethodUnchanged_reusesInstances() =
+        testScope.runTest {
+            authMethodsToTest().forEach { authMethod ->
+                utils.authenticationRepository.setAuthenticationMethod(authMethod)
+                val firstInstance: AuthMethodBouncerViewModel? =
+                    collectLastValue(underTest.authMethodViewModel).invoke()
+
+                utils.authenticationRepository.setAuthenticationMethod(authMethod)
+                val secondInstance: AuthMethodBouncerViewModel? =
+                    collectLastValue(underTest.authMethodViewModel).invoke()
+
+                firstInstance?.let { assertThat(it.authenticationMethod).isEqualTo(authMethod) }
+                assertThat(secondInstance).isSameInstanceAs(firstInstance)
             }
         }
 
@@ -136,7 +161,7 @@ class BouncerViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val isInputEnabled by
                 collectLastValue(
-                    underTest.authMethod.flatMapLatest { authViewModel ->
+                    underTest.authMethodViewModel.flatMapLatest { authViewModel ->
                         authViewModel?.isInputEnabled ?: emptyFlow()
                     }
                 )
@@ -201,6 +226,8 @@ class BouncerViewModelTest : SysuiTestCase() {
                     DataLayerAuthenticationMethodModel.Pattern
             }
         )
-        setLockscreenEnabled(model !is DomainLayerAuthenticationMethodModel.None)
+        utils.deviceEntryRepository.setInsecureLockscreenEnabled(
+            model !is DomainLayerAuthenticationMethodModel.None
+        )
     }
 }

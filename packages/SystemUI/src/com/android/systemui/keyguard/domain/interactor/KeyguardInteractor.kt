@@ -23,7 +23,6 @@ import android.app.StatusBarManager
 import android.graphics.Point
 import android.util.MathUtils
 import com.android.app.animation.Interpolators
-import com.android.systemui.res.R
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.common.coroutine.ChannelExt.trySendWithFailureLogging
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
@@ -31,6 +30,7 @@ import com.android.systemui.common.shared.model.Position
 import com.android.systemui.common.shared.model.SharedNotificationContainerPosition
 import com.android.systemui.common.ui.data.repository.ConfigurationRepository
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.deviceentry.data.repository.DeviceEntryRepository
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
@@ -40,18 +40,15 @@ import com.android.systemui.keyguard.shared.model.DozeStateModel
 import com.android.systemui.keyguard.shared.model.DozeStateModel.Companion.isDozeOff
 import com.android.systemui.keyguard.shared.model.DozeTransitionModel
 import com.android.systemui.keyguard.shared.model.KeyguardRootViewVisibilityState
-import com.android.systemui.keyguard.shared.model.KeyguardState
-import com.android.systemui.keyguard.shared.model.ScreenModel
 import com.android.systemui.keyguard.shared.model.StatusBarState
-import com.android.systemui.keyguard.shared.model.WakefulnessModel
+import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.util.kotlin.sample
-import javax.inject.Inject
-import javax.inject.Provider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
@@ -67,6 +64,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
+import javax.inject.Inject
+import javax.inject.Provider
 
 /**
  * Encapsulates business-logic related to the keyguard but not to a more specific part within it.
@@ -77,8 +76,10 @@ class KeyguardInteractor
 constructor(
     private val repository: KeyguardRepository,
     private val commandQueue: CommandQueue,
+    private val powerInteractor: PowerInteractor,
     featureFlags: FeatureFlags,
     sceneContainerFlags: SceneContainerFlags,
+    deviceEntryRepository: DeviceEntryRepository,
     bouncerRepository: KeyguardBouncerRepository,
     configurationRepository: ConfigurationRepository,
     shadeRepository: ShadeRepository,
@@ -136,12 +137,6 @@ constructor(
         awaitClose { commandQueue.removeCallback(callback) }
     }
 
-    /** The device wake/sleep state */
-    val wakefulnessModel: StateFlow<WakefulnessModel> = repository.wakefulness
-
-    /** The device screen state */
-    val screenModel: StateFlow<ScreenModel> = repository.screenModel
-
     /**
      * Dozing and dreaming have overlapping events. If the doze state remains in FINISH, it means
      * that doze mode is not running and DREAMING is ok to commence.
@@ -153,8 +148,8 @@ constructor(
             .combine(dozeTransitionModel) { isDreaming, dozeTransitionModel ->
                 isDreaming && isDozeOff(dozeTransitionModel.to)
             }
-            .sample(wakefulnessModel) { isAbleToDream, wakefulnessModel ->
-                isAbleToDream && wakefulnessModel.isStartingToWakeOrAwake()
+            .sample(powerInteractor.isAwake) { isAbleToDream, isAwake ->
+                isAbleToDream && isAwake
             }
             .flatMapLatest { isAbleToDream ->
                 flow {
@@ -168,7 +163,7 @@ constructor(
     val isKeyguardShowing: Flow<Boolean> = repository.isKeyguardShowing
 
     /** Whether the keyguard is unlocked or not. */
-    val isKeyguardUnlocked: Flow<Boolean> = repository.isKeyguardUnlocked
+    val isKeyguardUnlocked: Flow<Boolean> = deviceEntryRepository.isUnlocked
 
     /** Whether the keyguard is occluded (covered by an activity). */
     val isKeyguardOccluded: Flow<Boolean> = repository.isKeyguardOccluded
@@ -323,26 +318,7 @@ constructor(
         repository.setAnimateDozingTransitions(animate)
     }
 
-    fun isKeyguardDismissable(): Boolean {
-        return repository.isKeyguardUnlocked.value
-    }
-
     companion object {
         private const val TAG = "KeyguardInteractor"
-
-        fun isKeyguardVisibleInState(state: KeyguardState): Boolean {
-            return when (state) {
-                KeyguardState.OFF -> true
-                KeyguardState.DOZING -> true
-                KeyguardState.DREAMING -> true
-                KeyguardState.AOD -> true
-                KeyguardState.ALTERNATE_BOUNCER -> true
-                KeyguardState.PRIMARY_BOUNCER -> true
-                KeyguardState.LOCKSCREEN -> true
-                KeyguardState.GONE -> false
-                KeyguardState.OCCLUDED -> true
-                KeyguardState.DREAMING_LOCKSCREEN_HOSTED -> false
-            }
-        }
     }
 }

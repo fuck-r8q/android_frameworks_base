@@ -113,13 +113,15 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
     private final boolean mCrossTaskNavigationAllowedByDefault;
     @NonNull
     private final ArraySet<ComponentName> mCrossTaskNavigationExemptions;
+    @Nullable
+    private final ComponentName mPermissionDialogComponent;
     private final Object mGenericWindowPolicyControllerLock = new Object();
     @Nullable private final ActivityBlockedCallback mActivityBlockedCallback;
     private int mDisplayId = Display.INVALID_DISPLAY;
 
     @NonNull
     @GuardedBy("mGenericWindowPolicyControllerLock")
-    final ArraySet<Integer> mRunningUids = new ArraySet<>();
+    private final ArraySet<Integer> mRunningUids = new ArraySet<>();
     @Nullable private final ActivityListener mActivityListener;
     @Nullable private final PipBlockedCallback mPipBlockedCallback;
     @Nullable private final IntentListenerCallback mIntentListenerCallback;
@@ -171,6 +173,7 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
             @NonNull Set<ComponentName> activityPolicyExemptions,
             boolean crossTaskNavigationAllowedByDefault,
             @NonNull Set<ComponentName> crossTaskNavigationExemptions,
+            @Nullable ComponentName permissionDialogComponent,
             @Nullable ActivityListener activityListener,
             @Nullable PipBlockedCallback pipBlockedCallback,
             @Nullable ActivityBlockedCallback activityBlockedCallback,
@@ -185,6 +188,7 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
         mActivityPolicyExemptions = activityPolicyExemptions;
         mCrossTaskNavigationAllowedByDefault = crossTaskNavigationAllowedByDefault;
         mCrossTaskNavigationExemptions = new ArraySet<>(crossTaskNavigationExemptions);
+        mPermissionDialogComponent = permissionDialogComponent;
         mActivityBlockedCallback = activityBlockedCallback;
         setInterestedWindowFlags(windowFlags, systemWindowFlags);
         mActivityListener = activityListener;
@@ -214,6 +218,9 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
 
     void setActivityLaunchDefaultAllowed(boolean activityLaunchDefaultAllowed) {
         synchronized (mGenericWindowPolicyControllerLock) {
+            if (mActivityLaunchAllowedByDefault != activityLaunchDefaultAllowed) {
+                mActivityPolicyExemptions.clear();
+            }
             mActivityLaunchAllowedByDefault = activityLaunchDefaultAllowed;
         }
     }
@@ -306,6 +313,13 @@ public class GenericWindowPolicyController extends DisplayWindowPolicyController
                         mCrossTaskNavigationExemptions, activityComponent)) {
             Slog.d(TAG, "Virtual device cross task navigation disallowed by policy: "
                     + activityComponent);
+            return false;
+        }
+
+        // mPermissionDialogComponent being null means we don't want to block permission Dialogs
+        // based on FLAG_STREAM_PERMISSIONS
+        if (mPermissionDialogComponent != null
+                && mPermissionDialogComponent.equals(activityComponent)) {
             return false;
         }
 

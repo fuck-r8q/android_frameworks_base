@@ -17,12 +17,13 @@
 package com.android.systemui.bouncer.ui.viewmodel
 
 import androidx.test.filters.SmallTest
-import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.model.AuthenticationMethodModel
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
+import com.android.systemui.authentication.domain.model.AuthenticationMethodModel as DomainAuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationPatternCoordinate as Point
 import com.android.systemui.coroutines.collectLastValue
+import com.android.systemui.res.R
 import com.android.systemui.scene.SceneTestUtils
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
@@ -46,13 +47,16 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
 
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = utils.authenticationRepository(),
-        )
+    private val authenticationInteractor = utils.authenticationInteractor()
     private val sceneInteractor = utils.sceneInteractor()
+    private val deviceEntryInteractor =
+        utils.deviceEntryInteractor(
+            authenticationInteractor = authenticationInteractor,
+            sceneInteractor = utils.sceneInteractor(),
+        )
     private val bouncerInteractor =
         utils.bouncerInteractor(
+            deviceEntryInteractor = deviceEntryInteractor,
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
         )
@@ -64,7 +68,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     private val underTest =
         PatternBouncerViewModel(
             applicationContext = context,
-            applicationScope = testScope.backgroundScope,
+            viewModelScope = testScope.backgroundScope,
             interactor = bouncerInteractor,
             isInputEnabled = MutableStateFlow(true).asStateFlow(),
         )
@@ -85,14 +89,14 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             val message by collectLastValue(bouncerViewModel.message)
             val selectedDots by collectLastValue(underTest.selectedDots)
             val currentDot by collectLastValue(underTest.currentDot)
-            transitionToPatternBouncer()
-
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             assertThat(message?.text).isEqualTo(ENTER_YOUR_PATTERN)
             assertThat(selectedDots).isEmpty()
             assertThat(currentDot).isNull()
             assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+            assertThat(underTest.authenticationMethod)
+                .isEqualTo(DomainAuthenticationMethodModel.Pattern)
         }
 
     @Test
@@ -102,9 +106,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             val message by collectLastValue(bouncerViewModel.message)
             val selectedDots by collectLastValue(underTest.selectedDots)
             val currentDot by collectLastValue(underTest.currentDot)
-            transitionToPatternBouncer()
-            underTest.onShown()
-            runCurrent()
+            lockDeviceAndOpenPatternBouncer()
 
             underTest.onDragStart()
 
@@ -120,8 +122,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val selectedDots by collectLastValue(underTest.selectedDots)
             val currentDot by collectLastValue(underTest.currentDot)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
             underTest.onDragStart()
             assertThat(currentDot).isNull()
             CORRECT_PATTERN.forEachIndexed { index, coordinate ->
@@ -158,8 +159,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             val message by collectLastValue(bouncerViewModel.message)
             val selectedDots by collectLastValue(underTest.selectedDots)
             val currentDot by collectLastValue(underTest.currentDot)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
             underTest.onDragStart()
             CORRECT_PATTERN.subList(0, 3).forEach { coordinate -> dragToCoordinate(coordinate) }
 
@@ -175,8 +175,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     fun onDrag_shouldIncludeDotsThatWereSkippedOverAlongTheSameRow() =
         testScope.runTest {
             val selectedDots by collectLastValue(underTest.selectedDots)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             /*
              * Pattern setup, coordinates are (column, row)
@@ -202,8 +201,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     fun onDrag_shouldIncludeDotsThatWereSkippedOverAlongTheSameColumn() =
         testScope.runTest {
             val selectedDots by collectLastValue(underTest.selectedDots)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             /*
              * Pattern setup, coordinates are (column, row)
@@ -229,8 +227,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     fun onDrag_shouldIncludeDotsThatWereSkippedOverAlongTheDiagonal() =
         testScope.runTest {
             val selectedDots by collectLastValue(underTest.selectedDots)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             /*
              * Pattern setup
@@ -258,8 +255,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     fun onDrag_shouldNotIncludeDotIfItIsNotOnTheLine() =
         testScope.runTest {
             val selectedDots by collectLastValue(underTest.selectedDots)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             /*
              * Pattern setup
@@ -287,8 +283,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     fun onDrag_shouldNotIncludeSkippedOverDotsIfTheyAreAlreadySelected() =
         testScope.runTest {
             val selectedDots by collectLastValue(underTest.selectedDots)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             /*
              * Pattern setup
@@ -315,20 +310,10 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onDragEnd_whenPatternTooShort() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val message by collectLastValue(bouncerViewModel.message)
-            val selectedDots by collectLastValue(underTest.selectedDots)
-            val currentDot by collectLastValue(underTest.currentDot)
             val throttlingDialogMessage by
                 collectLastValue(bouncerViewModel.throttlingDialogMessage)
-            utils.authenticationRepository.setAuthenticationMethod(
-                AuthenticationMethodModel.Pattern
-            )
-            utils.authenticationRepository.setUnlocked(false)
-            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
-            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
 
             // Enter a pattern that's too short more than enough times that would normally trigger
             // throttling if the pattern were not too short and wrong:
@@ -337,7 +322,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
                 underTest.onDragStart()
                 CORRECT_PATTERN.subList(
                         0,
-                        authenticationInteractor.minPatternLength - 1,
+                        utils.authenticationRepository.minPatternLength - 1,
                     )
                     .forEach { coordinate ->
                         underTest.onDrag(
@@ -362,10 +347,10 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             val message by collectLastValue(bouncerViewModel.message)
             val selectedDots by collectLastValue(underTest.selectedDots)
             val currentDot by collectLastValue(underTest.currentDot)
-            transitionToPatternBouncer()
-            underTest.onShown()
+            lockDeviceAndOpenPatternBouncer()
+
             underTest.onDragStart()
-            CORRECT_PATTERN.subList(2, 7).forEach { coordinate -> dragToCoordinate(coordinate) }
+            CORRECT_PATTERN.subList(2, 7).forEach(::dragToCoordinate)
             underTest.onDragEnd()
             assertThat(selectedDots).isEmpty()
             assertThat(currentDot).isNull()
@@ -373,7 +358,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
 
             // Enter the correct pattern:
-            CORRECT_PATTERN.forEach { coordinate -> dragToCoordinate(coordinate) }
+            CORRECT_PATTERN.forEach(::dragToCoordinate)
 
             underTest.onDragEnd()
 
@@ -382,7 +367,7 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
 
     private fun dragOverCoordinates(vararg coordinatesDragged: Point) {
         underTest.onDragStart()
-        coordinatesDragged.forEach { dragToCoordinate(it) }
+        coordinatesDragged.forEach(::dragToCoordinate)
     }
 
     private fun dragToCoordinate(coordinate: Point) {
@@ -394,13 +379,15 @@ class PatternBouncerViewModelTest : SysuiTestCase() {
         )
     }
 
-    private fun TestScope.transitionToPatternBouncer() {
+    private fun TestScope.lockDeviceAndOpenPatternBouncer() {
         utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pattern)
-        utils.authenticationRepository.setUnlocked(false)
+        utils.deviceEntryRepository.setUnlocked(false)
         sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
         sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
         assertThat(collectLastValue(sceneInteractor.desiredScene).invoke())
             .isEqualTo(SceneModel(SceneKey.Bouncer))
+        underTest.onShown()
+        runCurrent()
     }
 
     companion object {

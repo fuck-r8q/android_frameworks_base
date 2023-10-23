@@ -25,6 +25,7 @@ import static com.android.keyguard.LockIconView.ICON_UNLOCK;
 import static com.android.systemui.doze.util.BurnInHelperKt.getBurnInOffset;
 import static com.android.systemui.flags.Flags.DOZING_MIGRATION_1;
 import static com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED;
+import static com.android.systemui.flags.Flags.NEW_AOD_TRANSITION;
 import static com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
@@ -98,6 +99,8 @@ public class LockIconViewController implements Dumpable {
     private static final int sLockIconRadiusPx = (int) (sDefaultDensity * 36);
     private static final VibrationAttributes TOUCH_VIBRATION_ATTRIBUTES =
             VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH);
+
+    private static final long FADE_OUT_DURATION_MS = 250L;
 
     private final long mLongPressTimeout;
     @NonNull private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -388,6 +391,16 @@ public class LockIconViewController implements Dumpable {
             mView.updateIcon(ICON_LOCK, true);
             mView.setContentDescription(mLockedLabel);
             mView.setVisibility(View.VISIBLE);
+        } else if (mIsDozing && mFeatureFlags.isEnabled(NEW_AOD_TRANSITION)) {
+            mView.animate()
+                    .alpha(0f)
+                    .setDuration(FADE_OUT_DURATION_MS)
+                    .withEndAction(() -> {
+                        mView.clearIcon();
+                        mView.setVisibility(View.INVISIBLE);
+                        mView.setContentDescription(null);
+                    })
+                    .start();
         } else {
             mView.clearIcon();
             mView.setVisibility(View.INVISIBLE);
@@ -424,11 +437,11 @@ public class LockIconViewController implements Dumpable {
     private void updateConfiguration() {
         WindowManager windowManager = mContext.getSystemService(WindowManager.class);
         Rect bounds = windowManager.getCurrentWindowMetrics().getBounds();
-        WindowInsets insets = windowManager.getCurrentWindowMetrics().getWindowInsets();
         mWidthPixels = bounds.right;
         if (mFeatureFlags.isEnabled(Flags.LOCKSCREEN_ENABLE_LANDSCAPE)) {
             // Assumed to be initially neglected as there are no left or right insets in portrait
             // However, on landscape, these insets need to included when calculating the midpoint
+            WindowInsets insets = windowManager.getCurrentWindowMetrics().getWindowInsets();
             mWidthPixels -= insets.getSystemWindowInsetLeft() + insets.getSystemWindowInsetRight();
         }
         mHeightPixels = bounds.bottom;

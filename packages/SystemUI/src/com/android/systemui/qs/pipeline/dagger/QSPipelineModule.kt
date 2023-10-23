@@ -20,14 +20,20 @@ import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
+import com.android.systemui.qs.pipeline.data.repository.DefaultTilesQSHostRepository
+import com.android.systemui.qs.pipeline.data.repository.DefaultTilesRepository
 import com.android.systemui.qs.pipeline.data.repository.InstalledTilesComponentRepository
 import com.android.systemui.qs.pipeline.data.repository.InstalledTilesComponentRepositoryImpl
+import com.android.systemui.qs.pipeline.data.repository.QSSettingsRestoredBroadcastRepository
+import com.android.systemui.qs.pipeline.data.repository.QSSettingsRestoredRepository
 import com.android.systemui.qs.pipeline.data.repository.TileSpecRepository
 import com.android.systemui.qs.pipeline.data.repository.TileSpecSettingsRepository
 import com.android.systemui.qs.pipeline.domain.interactor.CurrentTilesInteractor
 import com.android.systemui.qs.pipeline.domain.interactor.CurrentTilesInteractorImpl
 import com.android.systemui.qs.pipeline.domain.startable.QSPipelineCoreStartable
 import com.android.systemui.qs.pipeline.shared.logging.QSPipelineLogger
+import com.android.systemui.qs.tiles.base.interactor.DisabledByPolicyInteractor
+import com.android.systemui.qs.tiles.base.interactor.DisabledByPolicyInteractorImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -42,6 +48,11 @@ abstract class QSPipelineModule {
     abstract fun provideTileSpecRepository(impl: TileSpecSettingsRepository): TileSpecRepository
 
     @Binds
+    abstract fun provideDefaultTilesRepository(
+        impl: DefaultTilesQSHostRepository
+    ): DefaultTilesRepository
+
+    @Binds
     abstract fun bindCurrentTilesInteractor(
         impl: CurrentTilesInteractorImpl
     ): CurrentTilesInteractor
@@ -52,9 +63,19 @@ abstract class QSPipelineModule {
     ): InstalledTilesComponentRepository
 
     @Binds
+    abstract fun provideDisabledByPolicyInteractor(
+        impl: DisabledByPolicyInteractorImpl
+    ): DisabledByPolicyInteractor
+
+    @Binds
     @IntoMap
     @ClassKey(QSPipelineCoreStartable::class)
     abstract fun provideCoreStartable(startable: QSPipelineCoreStartable): CoreStartable
+
+    @Binds
+    abstract fun provideQSSettingsRestoredRepository(
+        impl: QSSettingsRestoredBroadcastRepository
+    ): QSSettingsRestoredRepository
 
     companion object {
         /**
@@ -66,6 +87,13 @@ abstract class QSPipelineModule {
         @QSTileListLog
         fun provideQSTileListLogBuffer(factory: LogBufferFactory): LogBuffer {
             return factory.create(QSPipelineLogger.TILE_LIST_TAG, maxSize = 700, systrace = false)
+        }
+
+        @Provides
+        @SysUISingleton
+        @QSRestoreLog
+        fun providesQSRestoreLogBuffer(factory: LogBufferFactory): LogBuffer {
+            return factory.create(QSPipelineLogger.RESTORE_TAG, maxSize = 50, systrace = false)
         }
     }
 }

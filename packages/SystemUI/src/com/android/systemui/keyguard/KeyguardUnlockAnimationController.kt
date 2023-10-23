@@ -44,7 +44,6 @@ import com.android.systemui.flags.Flags
 import com.android.systemui.plugins.BcSmartspaceDataPlugin
 import com.android.systemui.shared.recents.utilities.Utilities
 import com.android.systemui.shared.system.ActivityManagerWrapper
-import com.android.systemui.shared.system.QuickStepContract
 import com.android.systemui.shared.system.smartspace.ILauncherUnlockAnimationController
 import com.android.systemui.shared.system.smartspace.ISysuiUnlockAnimationController
 import com.android.systemui.shared.system.smartspace.SmartspaceState
@@ -219,6 +218,11 @@ class KeyguardUnlockAnimationController @Inject constructor(
      */
     private var launcherUnlockController: ILauncherUnlockAnimationController? = null
 
+    /**
+     * Fully qualified class name of the launcher activity
+     */
+    private var launcherActivityClass: String? = null
+
     private val listeners = ArrayList<KeyguardUnlockAnimationListener>()
 
     /**
@@ -226,7 +230,11 @@ class KeyguardUnlockAnimationController @Inject constructor(
      * doesn't happen, we won't use in-window animations or the smartspace shared element
      * transition, but that's okay!
      */
-    override fun setLauncherUnlockController(callback: ILauncherUnlockAnimationController?) {
+    override fun setLauncherUnlockController(
+            activityClass: String,
+            callback: ILauncherUnlockAnimationController?
+    ) {
+        launcherActivityClass = activityClass
         launcherUnlockController = callback
     }
 
@@ -405,7 +413,7 @@ class KeyguardUnlockAnimationController @Inject constructor(
     fun canPerformInWindowLauncherAnimations(): Boolean {
         // TODO(b/278086361): Refactor in-window animations.
         return !featureFlags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR) &&
-                isNexusLauncherUnderneath() &&
+                isSupportedLauncherUnderneath() &&
                 // If the launcher is underneath, but we're about to launch an activity, don't do
                 // the animations since they won't be visible.
                 !notificationShadeWindowController.isLaunchingActivity &&
@@ -419,7 +427,7 @@ class KeyguardUnlockAnimationController @Inject constructor(
      */
     private fun logInWindowAnimationConditions() {
         Log.wtf(TAG, "canPerformInWindowLauncherAnimations expected all of these to be true: ")
-        Log.wtf(TAG, "  isNexusLauncherUnderneath: ${isNexusLauncherUnderneath()}")
+        Log.wtf(TAG, "  isNexusLauncherUnderneath: ${isSupportedLauncherUnderneath()}")
         Log.wtf(TAG, "  !notificationShadeWindowController.isLaunchingActivity: " +
                 "${!notificationShadeWindowController.isLaunchingActivity}")
         Log.wtf(TAG, "  launcherUnlockController != null: ${launcherUnlockController != null}")
@@ -545,7 +553,6 @@ class KeyguardUnlockAnimationController @Inject constructor(
         // gesture and the surface behind the keyguard should be made visible so that we can animate
         // it in.
         if (requestedShowSurfaceBehindKeyguard) {
-
             // If we're flinging to dismiss here, it means the touch gesture ended in a fling during
             // the time it takes the keyguard exit animation to start. This is an edge case race
             // condition, which we handle by just playing a canned animation on the now-visible
@@ -785,7 +792,6 @@ class KeyguardUnlockAnimationController @Inject constructor(
 
         if (dismissAmount >= DISMISS_AMOUNT_SHOW_SURFACE_THRESHOLD &&
             !keyguardViewMediator.get().requestedShowSurfaceBehindKeyguard()) {
-
             keyguardViewMediator.get().showSurfaceBehindKeyguard()
         } else if (dismissAmount < DISMISS_AMOUNT_SHOW_SURFACE_THRESHOLD &&
                 keyguardViewMediator.get().requestedShowSurfaceBehindKeyguard()) {
@@ -1044,7 +1050,7 @@ class KeyguardUnlockAnimationController @Inject constructor(
 
         // If our launcher isn't underneath, then we're unlocking to an app or custom launcher,
         // neither of which have a smartspace.
-        if (!isNexusLauncherUnderneath()) {
+        if (!isSupportedLauncherUnderneath()) {
             return false
         }
 
@@ -1113,17 +1119,18 @@ class KeyguardUnlockAnimationController @Inject constructor(
         return playingCannedUnlockAnimation
     }
 
+    /**
+     * Return whether a launcher which supports coordinated transition is underneath the keyguard,
+     * vs. some other launcher or an app. If so, we can communicate with it to perform
+     * in-window/shared element transitions!
+     */
+    fun isSupportedLauncherUnderneath(): Boolean {
+        return launcherActivityClass?.let { ActivityManagerWrapper.getInstance()
+                .runningTask?.topActivity?.className?.equals(it) }
+                ?: false
+    }
+
     companion object {
-        /**
-         * Return whether the Google Nexus launcher is underneath the keyguard, vs. some other
-         * launcher or an app. If so, we can communicate with it to perform in-window/shared element
-         * transitions!
-         */
-        fun isNexusLauncherUnderneath(): Boolean {
-            return ActivityManagerWrapper.getInstance()
-                    .runningTask?.topActivity?.className?.equals(
-                            QuickStepContract.LAUNCHER_ACTIVITY_CLASS_NAME) ?: false
-        }
 
         fun isFoldable(context: Context): Boolean {
             return context.resources.getIntArray(R.array.config_foldedDeviceStates).isNotEmpty()

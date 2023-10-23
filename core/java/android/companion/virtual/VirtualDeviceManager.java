@@ -33,6 +33,8 @@ import android.app.PendingIntent;
 import android.companion.AssociationInfo;
 import android.companion.virtual.audio.VirtualAudioDevice;
 import android.companion.virtual.audio.VirtualAudioDevice.AudioConfigurationChangeCallback;
+import android.companion.virtual.camera.VirtualCamera;
+import android.companion.virtual.camera.VirtualCameraConfig;
 import android.companion.virtual.flags.Flags;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.content.ComponentName;
@@ -635,15 +637,15 @@ public final class VirtualDeviceManager {
         /**
          * Specifies a component name to be exempt from the current activity launch policy.
          *
-         * <p>If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVIY} allows activity
-         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_DEFAULT},
+         * <p>If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} allows activity
+         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_DEFAULT}),
          * then the specified component will be blocked from launching.
-         * If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} blocks activity
-         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_CUSTOM}, then
-         * the specified component will be allowed to launch.</p>
+         * If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} blocks activity launches
+         * by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_CUSTOM}), then the
+         * specified component will be allowed to launch.</p>
          *
-         * <p>Note that changing the activity launch policy will not affect current set of exempt
-         * components and it needs to be updated separately.</p>
+         * <p>Note that changing the activity launch policy will clear current set of exempt
+         * components.</p>
          *
          * @see #removeActivityPolicyExemption
          * @see #setDevicePolicy
@@ -658,15 +660,15 @@ public final class VirtualDeviceManager {
         /**
          * Makes the specified component name to adhere to the default activity launch policy.
          *
-         * <p>If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVIY} allows activity
-         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_DEFAULT},
+         * <p>If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} allows activity
+         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_DEFAULT}),
          * then the specified component will be allowed to launch.
-         * If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} blocks activity
-         * launches by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_CUSTOM}, then
-         * the specified component will be blocked from launching.</p>
+         * If the current {@link VirtualDeviceParams#POLICY_TYPE_ACTIVITY} blocks activity launches
+         * by default, (i.e. it is {@link VirtualDeviceParams#DEVICE_POLICY_CUSTOM}), then the
+         * specified component will be blocked from launching.</p>
          *
-         * <p>Note that changing the activity launch policy will not affect current set of exempt
-         * components and it needs to be updated separately.</p>
+         * <p>Note that changing the activity launch policy will clear current set of exempt
+         * components.</p>
          *
          * @see #addActivityPolicyExemption
          * @see #setDevicePolicy
@@ -848,6 +850,24 @@ public final class VirtualDeviceManager {
                 @Nullable AudioConfigurationChangeCallback callback) {
             Objects.requireNonNull(display, "display must not be null");
             return mVirtualDeviceInternal.createVirtualAudioDevice(display, executor, callback);
+        }
+
+        /**
+         * Creates a new virtual camera. If a virtual camera was already created, it will be closed.
+         *
+         * @param config camera config.
+         * @return newly created camera;
+         * @hide
+         */
+        @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+        @NonNull
+        @FlaggedApi(Flags.FLAG_VIRTUAL_CAMERA)
+        public VirtualCamera createVirtualCamera(@NonNull VirtualCameraConfig config) {
+            if (!Flags.virtualCamera()) {
+                throw new UnsupportedOperationException(
+                        "Flag is not enabled: %s".formatted(Flags.FLAG_VIRTUAL_CAMERA));
+            }
+            return mVirtualDeviceInternal.createVirtualCamera(Objects.requireNonNull(config));
         }
 
         /**

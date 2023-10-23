@@ -313,6 +313,8 @@
     <!-- The space around a notification menu item  -->
     <dimen name="notification_menu_icon_padding">20dp</dimen>
 
+    <!-- scroll view the size of 3 channel rows -->
+    <dimen name="notification_blocker_channel_list_height">192dp</dimen>
     <!-- The vertical space around the buttons in the inline settings -->
     <dimen name="notification_guts_button_spacing">12dp</dimen>
 
@@ -545,7 +547,7 @@
     <!-- (volume_dialog_panel_width - rounded_slider_icon_size) / 2 -->
     <dimen name="volume_slider_icon_inset">11dp</dimen>
 
-    <dimen name="volume_dialog_track_width">4dp</dimen>
+    <dimen name="volume_dialog_track_width">40dp</dimen>
 
     <dimen name="volume_dialog_track_corner_radius">2dp</dimen>
 

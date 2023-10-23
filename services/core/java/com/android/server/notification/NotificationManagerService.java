@@ -177,6 +177,7 @@ import android.app.compat.CompatChanges;
 import android.app.role.OnRoleHoldersChangedListener;
 import android.app.role.RoleManager;
 import android.app.usage.UsageEvents;
+import android.app.usage.UsageStatsManager;
 import android.app.usage.UsageStatsManagerInternal;
 import android.companion.ICompanionDeviceManager;
 import android.compat.annotation.ChangeId;
@@ -263,6 +264,7 @@ import android.telecom.TelecomManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.AtomicFile;
@@ -538,6 +540,13 @@ public class NotificationManagerService extends SystemService {
     @ChangeId
     @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.S_V2)
     private static final long NOTIFICATION_LOG_ASSISTANT_CANCEL = 195579280L;
+
+    /**
+     * NO_CLEAR flag will be set for any media notification.
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    static final long ENFORCE_NO_CLEAR_FLAG_ON_MEDIA_NOTIFICATION = 264179692L;
 
     private static final Duration POST_WAKE_LOCK_TIMEOUT = Duration.ofSeconds(30);
 
@@ -4159,7 +4168,7 @@ public class NotificationManagerService extends SystemService {
                 String pkg) {
             checkCallerIsSystemOrSameApp(pkg);
             return mPreferencesHelper.getNotificationChannelGroups(
-                    pkg, Binder.getCallingUid(), false, false, true);
+                    pkg, Binder.getCallingUid(), false, false, true, true, null);
         }
 
         @Override
@@ -4280,7 +4289,36 @@ public class NotificationManagerService extends SystemService {
                 String pkg, int uid, boolean includeDeleted) {
             enforceSystemOrSystemUI("getNotificationChannelGroupsForPackage");
             return mPreferencesHelper.getNotificationChannelGroups(
-                    pkg, uid, includeDeleted, true, false);
+                    pkg, uid, includeDeleted, true, false, true, null);
+        }
+
+        @Override
+        public ParceledListSlice<NotificationChannelGroup>
+                getRecentBlockedNotificationChannelGroupsForPackage(String pkg, int uid) {
+            enforceSystemOrSystemUI("getRecentBlockedNotificationChannelGroupsForPackage");
+            Set<String> recentlySentChannels = new HashSet<>();
+            long now = System.currentTimeMillis();
+            long startTime = now - (DateUtils.DAY_IN_MILLIS * 14);
+            UsageEvents events = mUsageStatsManagerInternal.queryEventsForUser(
+                UserHandle.getUserId(uid),  startTime, now, UsageEvents.SHOW_ALL_EVENT_DATA);
+            // get all channelids that sent notifs in the past 2 weeks
+            if (events != null) {
+                UsageEvents.Event event = new UsageEvents.Event();
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event);
+                    if (event.getEventType() == UsageEvents.Event.NOTIFICATION_INTERRUPTION) {
+                        if (pkg.equals(event.mPackage)) {
+                            String channelId = event.mNotificationChannelId;
+                            if (channelId != null) {
+                                recentlySentChannels.add(channelId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            return mPreferencesHelper.getNotificationChannelGroups(
+                    pkg, uid, false, true, false, true, recentlySentChannels);
         }
 
         @Override
@@ -7157,6 +7195,12 @@ public class NotificationManagerService extends SystemService {
                     Slog.w(TAG, "Package " + pkg + ": Use of setRemotePlayback requires the "
                             + "MEDIA_CONTENT_CONTROL permission");
                 }
+            }
+
+            // Enforce NO_CLEAR flag on MediaStyle notification for apps with targetSdk >= V.
+            if (CompatChanges.isChangeEnabled(ENFORCE_NO_CLEAR_FLAG_ON_MEDIA_NOTIFICATION,
+                    notificationUid)) {
+                notification.flags |= Notification.FLAG_NO_CLEAR;
             }
         }
 
