@@ -404,15 +404,15 @@ public class PermissionManagerService extends IPermissionManager.Stub {
 
     @android.annotation.EnforcePermission(android.Manifest.permission.MANAGE_ONE_TIME_PERMISSION_SESSIONS)
     @Override
-    public void startOneTimePermissionSession(String packageName, @UserIdInt int userId,
-            long timeoutMillis, long revokeAfterKilledDelayMillis) {
+    public void startOneTimePermissionSession(String packageName, int deviceId,
+            @UserIdInt int userId, long timeoutMillis, long revokeAfterKilledDelayMillis) {
         startOneTimePermissionSession_enforcePermission();
         Objects.requireNonNull(packageName);
 
         final long token = Binder.clearCallingIdentity();
         try {
             getOneTimePermissionUserManager(userId).startPackageOneTimeSession(packageName,
-                    timeoutMillis, revokeAfterKilledDelayMillis);
+                    deviceId, timeoutMillis, revokeAfterKilledDelayMillis);
         } finally {
             Binder.restoreCallingIdentity(token);
         }
@@ -1028,7 +1028,9 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             }
 
             synchronized (mLock) {
-                mAttributions.put(source.getToken(), source);
+                // Change the token for the AttributionSource we're storing, so that we don't store
+                // a strong reference to the original token inside the map itself.
+                mAttributions.put(source.getToken(), source.withDefaultToken());
             }
         }
 
@@ -1036,7 +1038,7 @@ public class PermissionManagerService extends IPermissionManager.Stub {
             synchronized (mLock) {
                 final AttributionSource cachedSource = mAttributions.get(source.getToken());
                 if (cachedSource != null) {
-                    return cachedSource.equals(source);
+                    return cachedSource.equalsExceptToken(source);
                 }
                 return false;
             }

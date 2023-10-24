@@ -23,6 +23,8 @@
 
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -53,6 +55,7 @@ import android.telephony.ServiceState
 import android.telephony.SignalStrength
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
+import android.telephony.SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX
 import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyDisplayInfo
@@ -105,6 +108,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.mapNotNull
@@ -119,8 +123,8 @@ import kotlinx.coroutines.flow.stateIn
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MobileConnectionRepositoryImpl(
-    private val context: Context,
     override val subId: Int,
+    private val context: Context,
     subscriptionModel: StateFlow<SubscriptionModel?>,
     defaultNetworkName: NetworkNameModel,
     networkNameSeparator: String,
@@ -258,6 +262,7 @@ class MobileConnectionRepositoryImpl(
                     unregisterCapabilityAndRegistrationCallback()
                 }
             }
+            .flowOn(bgDispatcher)
             .scan(initial = initial) { state, event -> state.applyEvent(event) }
             .stateIn(scope = scope, started = SharingStarted.WhileSubscribed(), initial)
     }
@@ -408,16 +413,36 @@ class MobileConnectionRepositoryImpl(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), telephonyManager.simCarrierId)
 
+    /** BroadcastDispatcher does not handle sticky broadcasts, so we can't use it here */
+    @SuppressLint("RegisterReceiverViaContext")
     override val networkName: StateFlow<NetworkNameModel> =
-        broadcastDispatcher
-            .broadcastFlow(
-                filter = IntentFilter(TelephonyManager.ACTION_SERVICE_PROVIDERS_UPDATED),
-                map = { intent, _ -> intent },
-            )
-            .filter { intent ->
-                intent.getIntExtra(EXTRA_SUBSCRIPTION_ID, INVALID_SUBSCRIPTION_ID) == subId
+        conflatedCallbackFlow {
+                val receiver =
+                    object : BroadcastReceiver() {
+                        override fun onReceive(context: Context, intent: Intent) {
+                            if (
+                                intent.getIntExtra(
+                                    EXTRA_SUBSCRIPTION_INDEX,
+                                    INVALID_SUBSCRIPTION_ID
+                                ) == subId
+                            ) {
+                                logger.logServiceProvidersUpdatedBroadcast(intent)
+                                trySend(
+                                    intent.toNetworkNameModel(networkNameSeparator)
+                                        ?: defaultNetworkName
+                                )
+                            }
+                        }
+                    }
+
+                context.registerReceiver(
+                    receiver,
+                    IntentFilter(TelephonyManager.ACTION_SERVICE_PROVIDERS_UPDATED)
+                )
+
+                awaitClose { context.unregisterReceiver(receiver) }
             }
-            .map { intent -> intent.toNetworkNameModel(networkNameSeparator) ?: defaultNetworkName }
+            .flowOn(bgDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(), defaultNetworkName)
 
     override val dataEnabled = run {
@@ -532,10 +557,14 @@ class MobileConnectionRepositoryImpl(
         }
 
         try {
-            imsMmTelManager.registerImsRegistrationCallback(
-                context.mainExecutor, registrationCallback)
-            imsMmTelManager.registerMmTelCapabilityCallback(
-                context.mainExecutor, capabilityCallback)
+            registrationCallback?.let {
+                imsMmTelManager.registerImsRegistrationCallback(
+                    context.mainExecutor,it)
+            }
+            capabilityCallback?.let {
+                imsMmTelManager.registerMmTelCapabilityCallback(
+                    context.mainExecutor, it)
+            }
         } catch (e: ImsException) {
             Log.e(tag, "failed to call register ims callback ", e)
         }
@@ -600,17 +629,19 @@ class MobileConnectionRepositoryImpl(
     }
 
     private fun getSlotIndex(subId: Int): Int {
-        var subscriptionManager: SubscriptionManager =
+        var subscriptionManager: SubscriptionManager? =
                 context.getSystemService(SubscriptionManager::class.java)
-        var list: List<SubscriptionInfo> = subscriptionManager.completeActiveSubscriptionInfoList
+        var list: List<SubscriptionInfo>? = subscriptionManager?.completeActiveSubscriptionInfoList
         var slotIndex: Int = 0
-        for (subscriptionInfo in list.iterator()) {
-            if (subscriptionInfo.subscriptionId == subId) {
-                slotIndex = subscriptionInfo.simSlotIndex
-                break
+        list?.let{
+            for (subscriptionInfo in list.iterator()) {
+                if (subscriptionInfo.subscriptionId == subId) {
+                    slotIndex = subscriptionInfo.simSlotIndex
+                    break
+                }
             }
         }
-        Log.d(tag, "getSlotIndex subId: $subId slotIndex: $slotIndex list.size: ${list.size}")
+        Log.d(tag, "getSlotIndex subId: $subId slotIndex: $slotIndex list.size: ${list?.size}")
         return slotIndex
     }
 
@@ -620,8 +651,8 @@ class MobileConnectionRepositoryImpl(
     class Factory
     @Inject
     constructor(
-        private val broadcastDispatcher: BroadcastDispatcher,
         private val context: Context,
+        private val broadcastDispatcher: BroadcastDispatcher,
         private val telephonyManager: TelephonyManager,
         private val logger: MobileInputLogger,
         private val carrierConfigRepository: CarrierConfigRepository,
@@ -639,8 +670,8 @@ class MobileConnectionRepositoryImpl(
             networkNameSeparator: String,
         ): MobileConnectionRepository {
             return MobileConnectionRepositoryImpl(
-                context,
                 subId,
+                context,
                 subscriptionModel,
                 defaultNetworkName,
                 networkNameSeparator,

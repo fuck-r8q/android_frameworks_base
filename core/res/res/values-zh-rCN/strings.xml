@@ -501,6 +501,8 @@
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"这个具有特权的系统应用随时可以使用系统相机拍照及录制视频。另外，应用还需要获取 android.permission.CAMERA 权限"</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"允许应用或服务接收与打开或关闭摄像头设备有关的回调。"</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"此应用可在任何摄像头设备（被某些应用）打开或关闭时收到相应回调。"</string>
+    <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"允许应用或服务以无头系统用户的身份使用摄像头"</string>
+    <string name="permdesc_cameraHeadlessSystemUser" msgid="6963163319710996412">"此应用能够以无头系统用户的身份使用摄像头。"</string>
     <string name="permlab_vibrate" msgid="8596800035791962017">"控制振动"</string>
     <string name="permdesc_vibrate" msgid="8733343234582083721">"允许应用控制振动器。"</string>
     <string name="permdesc_vibrator_state" msgid="7050024956594170724">"允许该应用访问振动器状态。"</string>
@@ -669,14 +671,14 @@
   </string-array>
     <string name="fingerprint_error_vendor_unknown" msgid="4170002184907291065">"出了点问题。请重试。"</string>
     <string name="fingerprint_icon_content_description" msgid="4741068463175388817">"指纹图标"</string>
+    <string name="device_unlock_notification_name" msgid="2632928999862915709">"设备解锁"</string>
+    <string name="alternative_unlock_setup_notification_title" msgid="6241508547901933544">"试试其他解锁方式"</string>
+    <string name="alternative_face_setup_notification_content" msgid="3384959224091897331">"当系统无法识别您的指纹时，例如当您的手指潮湿时，可以使用人脸解锁功能"</string>
+    <string name="alternative_fp_setup_notification_content" msgid="7454096947415721639">"当系统无法识别您的面孔时，例如当光线不足时，可以使用指纹解锁功能"</string>
     <string name="face_recalibrate_notification_name" msgid="7311163114750748686">"人脸解锁"</string>
     <string name="face_recalibrate_notification_title" msgid="2524791952735579082">"人脸解锁存在问题"</string>
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"请点按以删除您的脸部模型，然后再添加您的脸部模型"</string>
-    <string name="face_setup_notification_title" msgid="8843461561970741790">"设置人脸解锁"</string>
-    <string name="face_setup_notification_content" msgid="5463999831057751676">"脸部对准手机即可将其解锁"</string>
     <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"如需使用人脸解锁功能，请在“设置”&gt;“隐私权”中开启"<b>"摄像头使用权限"</b></string>
-    <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"设置更多解锁方式"</string>
-    <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"点按即可添加指纹"</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"指纹解锁"</string>
     <string name="fingerprint_recalibrate_notification_title" msgid="2406561052064558497">"无法使用指纹传感器"</string>
     <string name="fingerprint_recalibrate_notification_content" msgid="8519935717822194943">"请联系维修服务提供商。"</string>
@@ -807,10 +809,10 @@
     <string name="policylab_limitPassword" msgid="4851829918814422199">"设置密码规则"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"控制锁屏密码和 PIN 码所允许的长度和字符。"</string>
     <string name="policylab_watchLogin" msgid="7599669460083719504">"监控屏幕解锁尝试次数"</string>
-    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"监视在解锁屏幕时输错密码的次数，如果输错次数过多，则锁定平板电脑或清除其所有数据。"</string>
+    <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定平板电脑或清除其所有数据。"</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"监控用户在解锁屏幕时输错密码的次数；如果用户输错密码的次数超出上限，系统就会锁定 Android TV 设备或清空 Android TV 设备上的所有数据。"</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定信息娱乐系统或清除信息娱乐系统上的所有数据。"</string>
-    <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"监视在解锁屏幕时输错密码的次数，如果输错次数过多，则锁定手机或清除其所有数据。"</string>
+    <string name="policydesc_watchLogin" product="default" msgid="4885030206253600299">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定手机或清除其所有数据。"</string>
     <string name="policydesc_watchLogin_secondaryUser" product="tablet" msgid="2049038943004297474">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定平板电脑或清空此用户的所有数据。"</string>
     <string name="policydesc_watchLogin_secondaryUser" product="tv" msgid="8965224107449407052">"监控用户在解锁屏幕时输错密码的次数；如果用户输错密码的次数超出上限，系统就会锁定 Android TV 设备或清空该用户的所有数据。"</string>
     <string name="policydesc_watchLogin_secondaryUser" product="automotive" msgid="7180857406058327941">"监控在解锁屏幕时输错密码的次数，并在输错次数过多时锁定信息娱乐系统或清除此个人资料的所有数据。"</string>
@@ -1867,6 +1869,7 @@
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"第二个工作<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"第三个工作<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g>克隆"</string>
+    <string name="private_profile_label_badge" msgid="1712086003787839183">"私人“<xliff:g id="LABEL">%1$s</xliff:g>”"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"取消时要求输入PIN码"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"取消时要求绘制解锁图案"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"取消时要求输入密码"</string>
@@ -2031,7 +2034,7 @@
     <string name="autofill_update_title" msgid="3630695947047069136">"要在"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"中更新吗？"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"要在"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"中更新<xliff:g id="TYPE">%1$s</xliff:g>吗？"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"要在"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>和<xliff:g id="TYPE_1">%2$s</xliff:g>吗？"</string>
-    <string name="autofill_update_title_with_3types" msgid="1312232153076212291">"要在"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>这些内容吗？"</string>
+    <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"要在"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>吗？"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"保存"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"不用了"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"以后再说"</string>

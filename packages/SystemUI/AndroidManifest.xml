@@ -352,6 +352,9 @@
 
     <uses-permission android:name="android.permission.MONITOR_KEYBOARD_BACKLIGHT" />
 
+    <!-- Listen to (dis-)connection of external displays and enable / disable them. -->
+    <uses-permission android:name="android.permission.MANAGE_DISPLAYS" />
+
     <protected-broadcast android:name="com.android.settingslib.action.REGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settingslib.action.UNREGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settings.flashlight.action.FLASHLIGHT_CHANGED" />
@@ -634,7 +637,7 @@
 
         <!-- started from MediaProjectionManager -->
         <activity
-            android:name=".media.MediaProjectionPermissionActivity"
+            android:name=".mediaprojection.permission.MediaProjectionPermissionActivity"
             android:exported="true"
             android:theme="@style/Theme.SystemUI.MediaProjectionAlertDialog"
             android:finishOnCloseSystemDialogs="true"
@@ -643,7 +646,7 @@
             android:visibleToInstantApps="true"/>
 
         <activity
-            android:name=".media.MediaProjectionAppSelectorActivity"
+            android:name=".mediaprojection.appselector.MediaProjectionAppSelectorActivity"
             android:theme="@style/Theme.SystemUI.MediaProjectionAppSelector"
             android:finishOnCloseSystemDialogs="true"
             android:excludeFromRecents="true"

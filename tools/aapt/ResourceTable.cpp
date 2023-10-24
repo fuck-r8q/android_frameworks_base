@@ -14,6 +14,7 @@
 #include "Utils.h"
 
 #include <algorithm>
+#include <androidfw/PathUtils.h>
 #include <androidfw/ResourceTypes.h>
 #include <utils/ByteOrder.h>
 #include <utils/TypeHelpers.h>
@@ -83,7 +84,7 @@ status_t compileXmlFile(const Bundle* bundle,
         sp<AaptDir> resDir = assets->getDirs().valueFor(String8("res"));
         sp<AaptDir> dir = resDir->getDirs().valueFor(target->getGroupEntry().toDirName(
                 target->getResourceType()));
-        dir->removeFile(target->getPath().getPathLeaf());
+        dir->removeFile(getPathLeaf(target->getPath()));
         return NO_ERROR;
     }
 
@@ -1363,11 +1364,11 @@ status_t compileResourceFile(Bundle* bundle,
                     size_t length;
                     const char16_t* attr = block.getAttributeName(i, &length);
                     if (strcmp16(attr, name16.c_str()) == 0) {
-                        name.setTo(block.getAttributeStringValue(i, &length));
+                        name = String16(block.getAttributeStringValue(i, &length));
                     } else if (strcmp16(attr, translatable16.c_str()) == 0) {
-                        translatable.setTo(block.getAttributeStringValue(i, &length));
+                        translatable = String16(block.getAttributeStringValue(i, &length));
                     } else if (strcmp16(attr, formatted16.c_str()) == 0) {
-                        formatted.setTo(block.getAttributeStringValue(i, &length));
+                        formatted = String16(block.getAttributeStringValue(i, &length));
                     }
                 }
                 
@@ -1541,7 +1542,7 @@ status_t compileResourceFile(Bundle* bundle,
                 } else {
                     ssize_t sep = ident.findLast('.');
                     if (sep >= 0) {
-                        parentIdent.setTo(ident, sep);
+                        parentIdent = String16(ident, sep);
                     }
                 }
 
@@ -1813,7 +1814,7 @@ status_t ResourceTable::addIncludedResources(Bundle* bundle, const sp<AaptAssets
     mTypeIdOffset = findLargestTypeIdForPackage(assets->getIncludedResources(), mAssetsPackage);
 
     const String8& featureAfter = bundle->getFeatureAfterPackage();
-    if (!featureAfter.isEmpty()) {
+    if (!featureAfter.empty()) {
         AssetManager featureAssetManager;
         if (!featureAssetManager.addAssetPath(featureAfter, NULL)) {
             fprintf(stderr, "ERROR: Feature package '%s' not found.\n",
@@ -1823,7 +1824,7 @@ status_t ResourceTable::addIncludedResources(Bundle* bundle, const sp<AaptAssets
 
         const ResTable& featureTable = featureAssetManager.getResources(false);
         mTypeIdOffset = std::max(mTypeIdOffset,
-                findLargestTypeIdForPackage(featureTable, mAssetsPackage)); 
+                findLargestTypeIdForPackage(featureTable, mAssetsPackage));
     }
 
     return NO_ERROR;
@@ -2831,10 +2832,10 @@ ResourceTable::validateLocalizations(void)
                 String8 config;
                 comma = strchr(start, ',');
                 if (comma != NULL) {
-                    config.setTo(start, comma - start);
+                    config = String8(start, comma - start);
                     start = comma + 1;
                 } else {
-                    config.setTo(start);
+                    config = start;
                 }
 
                 if (!locale.initFromFilterString(config)) {
@@ -3252,7 +3253,7 @@ status_t ResourceTable::flatten(Bundle* bundle, const sp<const ResourceFilter>& 
 
             // If we're building splits, then each invocation of the flattening
             // step will have 'missing' entries. Don't warn/error for this case.
-            if (bundle->getSplitConfigurations().isEmpty()) {
+            if (bundle->getSplitConfigurations().empty()) {
                 bool missing_entry = false;
                 const char* log_prefix = bundle->getErrorOnMissingConfigEntry() ?
                         "error" : "warning";
@@ -4858,7 +4859,7 @@ status_t ResourceTable::modifyForCompat(const Bundle* bundle,
 
     Vector<sp<XMLNode> > nodesToVisit;
     nodesToVisit.push(root);
-    while (!nodesToVisit.isEmpty()) {
+    while (!nodesToVisit.empty()) {
         sp<XMLNode> node = nodesToVisit.top();
         nodesToVisit.pop();
 

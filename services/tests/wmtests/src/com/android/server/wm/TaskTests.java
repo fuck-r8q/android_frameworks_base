@@ -571,26 +571,28 @@ public class TaskTests extends WindowTestsBase {
         final Task task = rootTask.getBottomMostTask();
         final ActivityRecord root = task.getTopNonFinishingActivity();
         spyOn(mWm.mLetterboxConfiguration);
-
-        // When device config flag is disabled the button is not enabled
-        doReturn(false).when(mWm.mLetterboxConfiguration)
-                .isUserAppAspectRatioSettingsEnabled();
-        doReturn(false).when(mWm.mLetterboxConfiguration)
-                .isTranslucentLetterboxingEnabled();
-        assertFalse(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
-
-        // The flag is enabled
-        doReturn(true).when(mWm.mLetterboxConfiguration)
-                .isUserAppAspectRatioSettingsEnabled();
         spyOn(root);
-        doReturn(task).when(root).getOrganizedTask();
-        // When the flag is enabled and the top activity is not in size compat mode.
+        spyOn(root.mLetterboxUiController);
+
+        doReturn(true).when(root.mLetterboxUiController)
+                .shouldEnableUserAspectRatioSettings();
         doReturn(false).when(root).inSizeCompatMode();
+        doReturn(task).when(root).getOrganizedTask();
+
+        // The button should be eligible to be displayed
         assertTrue(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+
+        // When shouldApplyUserMinAspectRatioOverride is disable the button is not enabled
+        doReturn(false).when(root.mLetterboxUiController)
+                .shouldEnableUserAspectRatioSettings();
+        assertFalse(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+        doReturn(true).when(root.mLetterboxUiController)
+                .shouldEnableUserAspectRatioSettings();
 
         // When in size compat mode the button is not enabled
         doReturn(true).when(root).inSizeCompatMode();
         assertFalse(task.getTaskInfo().topActivityEligibleForUserAspectRatioButton);
+        doReturn(false).when(root).inSizeCompatMode();
     }
 
     /**
@@ -608,7 +610,7 @@ public class TaskTests extends WindowTestsBase {
         // display.
         final DisplayRotation dr = display.mDisplayContent.getDisplayRotation();
         dr.setFixedToUserRotation(FIXED_TO_USER_ROTATION_ENABLED);
-        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_0);
+        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_0, /* caller= */ "TaskTests");
 
         final Task rootTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
                 .setWindowingMode(WINDOWING_MODE_FULLSCREEN).setDisplay(display).build();
@@ -640,7 +642,7 @@ public class TaskTests extends WindowTestsBase {
         // Setting app to fixed landscape and changing display
         top.setRequestedOrientation(SCREEN_ORIENTATION_LANDSCAPE);
         // Fix the display orientation to portrait which is 90 degrees for the test display.
-        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_90);
+        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_90, /* caller= */ "TaskTests");
 
         // Fixed orientation request should be resolved on activity level. Task fills display
         // bounds.
@@ -679,7 +681,7 @@ public class TaskTests extends WindowTestsBase {
         // display.
         final DisplayRotation dr = display.mDisplayContent.getDisplayRotation();
         dr.setFixedToUserRotation(FIXED_TO_USER_ROTATION_ENABLED);
-        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_0);
+        dr.setUserRotation(USER_ROTATION_FREE, ROTATION_0, /* caller= */ "TaskTests");
 
         final Task rootTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
                 .setWindowingMode(WINDOWING_MODE_FULLSCREEN).setDisplay(display).build();
@@ -1093,10 +1095,16 @@ public class TaskTests extends WindowTestsBase {
         final ActivityRecord activity0 = task.getBottomMostActivity();
         activity0.info.flags |= FLAG_RELINQUISH_TASK_IDENTITY;
         // Add an extra activity on top of the root one.
-        new ActivityBuilder(mAtm).setTask(task).build();
+        final ActivityRecord activity1 = new ActivityBuilder(mAtm).setTask(task).build();
 
         assertEquals("The root activity in the task must be reported.",
                 task.getBottomMostActivity(), task.getRootActivity());
+        assertEquals("The task id of root activity must be reported.",
+                task.mTaskId, mAtm.mActivityClientController.getTaskForActivity(
+                        activity0.token, true /* onlyRoot */));
+        assertEquals("No task must be reported for non root activity if onlyRoot.",
+                INVALID_TASK_ID, mAtm.mActivityClientController.getTaskForActivity(
+                        activity1.token, true /* onlyRoot */));
     }
 
     /**
@@ -1572,8 +1580,7 @@ public class TaskTests extends WindowTestsBase {
     }
 
     private Task getTestTask() {
-        final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
-        return task.getBottomMostTask();
+        return new TaskBuilder(mSupervisor).setCreateActivity(true).build();
     }
 
     private void testRootTaskBoundsConfiguration(int windowingMode, Rect parentBounds, Rect bounds,

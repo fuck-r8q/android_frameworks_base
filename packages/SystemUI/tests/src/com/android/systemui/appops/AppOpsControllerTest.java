@@ -59,6 +59,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.statusbar.policy.IndividualSensorPrivacyController;
+import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.time.FakeSystemClock;
 
 import org.junit.Before;
@@ -71,6 +72,7 @@ import org.mockito.MockitoAnnotations;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
@@ -107,6 +109,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
 
     private AppOpsControllerImpl mController;
     private TestableLooper mTestableLooper;
+    private final FakeExecutor mBgExecutor = new FakeExecutor(new FakeSystemClock());
 
     private String mExemptedRolePkgName;
 
@@ -138,6 +141,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         mController = new AppOpsControllerImpl(
                 mContext,
                 mTestableLooper.getLooper(),
+                mBgExecutor,
                 mDumpManager,
                 mAudioManager,
                 mSensorPrivacyController,
@@ -149,6 +153,8 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testOnlyListenForFewOps() {
         mController.setListening(true);
+        mBgExecutor.runAllReady();
+
         verify(mAppOpsManager, times(1)).startWatchingActive(AppOpsControllerImpl.OPS, mController);
         verify(mDispatcher, times(1)).registerReceiverWithHandler(eq(mController), any(), any());
         verify(mSensorPrivacyController, times(1)).addCallback(mController);
@@ -157,9 +163,214 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testStopListening() {
         mController.setListening(false);
+        mBgExecutor.runAllReady();
         verify(mAppOpsManager, times(1)).stopWatchingActive(mController);
         verify(mDispatcher, times(1)).unregisterReceiver(mController);
         verify(mSensorPrivacyController, times(1)).removeCallback(mController);
+    }
+
+    @Test
+    public void startListening_fetchesCurrentActive_none() {
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of());
+
+        mController.setListening(true);
+        mBgExecutor.runAllReady();
+
+        assertThat(mController.getActiveAppOps()).isEmpty();
+    }
+
+    /** Regression test for b/294104969. */
+    @Test
+    public void startListening_fetchesCurrentActive_oneActive() {
+        AppOpsManager.PackageOps packageOps = createPackageOp(
+                "package.test",
+                /* packageUid= */ 2,
+                AppOpsManager.OPSTR_FINE_LOCATION,
+                /* isRunning= */ true);
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of(packageOps));
+
+        // WHEN we start listening
+        mController.setListening(true);
+        mBgExecutor.runAllReady();
+
+        // THEN the active list has the op
+        List<AppOpItem> list = mController.getActiveAppOps();
+        assertEquals(1, list.size());
+        AppOpItem first = list.get(0);
+        assertThat(first.getPackageName()).isEqualTo("package.test");
+        assertThat(first.getUid()).isEqualTo(2);
+        assertThat(first.getCode()).isEqualTo(AppOpsManager.OP_FINE_LOCATION);
+    }
+
+    @Test
+    public void startListening_fetchesCurrentActive_multiplePackages() {
+        AppOpsManager.PackageOps packageOps1 = createPackageOp(
+                "package.one",
+                /* packageUid= */ 1,
+                AppOpsManager.OPSTR_FINE_LOCATION,
+                /* isRunning= */ true);
+        AppOpsManager.PackageOps packageOps2 = createPackageOp(
+                "package.two",
+                /* packageUid= */ 2,
+                AppOpsManager.OPSTR_FINE_LOCATION,
+                /* isRunning= */ false);
+        AppOpsManager.PackageOps packageOps3 = createPackageOp(
+                "package.three",
+                /* packageUid= */ 3,
+                AppOpsManager.OPSTR_FINE_LOCATION,
+                /* isRunning= */ true);
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of(packageOps1, packageOps2, packageOps3));
+
+        // WHEN we start listening
+        mController.setListening(true);
+        mBgExecutor.runAllReady();
+
+        // THEN the active list has the ops
+        List<AppOpItem> list = mController.getActiveAppOps();
+        assertEquals(2, list.size());
+
+        AppOpItem item0 = list.get(0);
+        assertThat(item0.getPackageName()).isEqualTo("package.one");
+        assertThat(item0.getUid()).isEqualTo(1);
+        assertThat(item0.getCode()).isEqualTo(AppOpsManager.OP_FINE_LOCATION);
+
+        AppOpItem item1 = list.get(1);
+        assertThat(item1.getPackageName()).isEqualTo("package.three");
+        assertThat(item1.getUid()).isEqualTo(3);
+        assertThat(item1.getCode()).isEqualTo(AppOpsManager.OP_FINE_LOCATION);
+    }
+
+    @Test
+    public void startListening_fetchesCurrentActive_multipleEntries() {
+        AppOpsManager.PackageOps packageOps = mock(AppOpsManager.PackageOps.class);
+        when(packageOps.getUid()).thenReturn(1);
+        when(packageOps.getPackageName()).thenReturn("package.one");
+
+        // Entry 1
+        AppOpsManager.OpEntry entry1 = mock(AppOpsManager.OpEntry.class);
+        when(entry1.getOpStr()).thenReturn(AppOpsManager.OPSTR_PHONE_CALL_MICROPHONE);
+        AppOpsManager.AttributedOpEntry attributed1 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed1.isRunning()).thenReturn(true);
+        when(entry1.getAttributedOpEntries()).thenReturn(Map.of("tag", attributed1));
+        // Entry 2
+        AppOpsManager.OpEntry entry2 = mock(AppOpsManager.OpEntry.class);
+        when(entry2.getOpStr()).thenReturn(AppOpsManager.OPSTR_CAMERA);
+        AppOpsManager.AttributedOpEntry attributed2 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed2.isRunning()).thenReturn(true);
+        when(entry2.getAttributedOpEntries()).thenReturn(Map.of("tag", attributed2));
+        // Entry 3
+        AppOpsManager.OpEntry entry3 = mock(AppOpsManager.OpEntry.class);
+        when(entry3.getOpStr()).thenReturn(AppOpsManager.OPSTR_FINE_LOCATION);
+        AppOpsManager.AttributedOpEntry attributed3 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed3.isRunning()).thenReturn(false);
+        when(entry3.getAttributedOpEntries()).thenReturn(Map.of("tag", attributed3));
+
+        when(packageOps.getOps()).thenReturn(List.of(entry1, entry2, entry3));
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of(packageOps));
+
+        // WHEN we start listening
+        mController.setListening(true);
+        mBgExecutor.runAllReady();
+
+        // THEN the active list has the ops
+        List<AppOpItem> list = mController.getActiveAppOps();
+        assertEquals(2, list.size());
+
+        AppOpItem first = list.get(0);
+        assertThat(first.getPackageName()).isEqualTo("package.one");
+        assertThat(first.getUid()).isEqualTo(1);
+        assertThat(first.getCode()).isEqualTo(AppOpsManager.OP_PHONE_CALL_MICROPHONE);
+
+        AppOpItem second = list.get(1);
+        assertThat(second.getPackageName()).isEqualTo("package.one");
+        assertThat(second.getUid()).isEqualTo(1);
+        assertThat(second.getCode()).isEqualTo(AppOpsManager.OP_CAMERA);
+    }
+
+    @Test
+    public void startListening_fetchesCurrentActive_multipleAttributes() {
+        AppOpsManager.PackageOps packageOps = mock(AppOpsManager.PackageOps.class);
+        when(packageOps.getUid()).thenReturn(1);
+        when(packageOps.getPackageName()).thenReturn("package.one");
+        AppOpsManager.OpEntry entry = mock(AppOpsManager.OpEntry.class);
+        when(entry.getOpStr()).thenReturn(AppOpsManager.OPSTR_RECORD_AUDIO);
+
+        AppOpsManager.AttributedOpEntry attributed1 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed1.isRunning()).thenReturn(false);
+        AppOpsManager.AttributedOpEntry attributed2 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed2.isRunning()).thenReturn(true);
+        AppOpsManager.AttributedOpEntry attributed3 = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed3.isRunning()).thenReturn(true);
+        when(entry.getAttributedOpEntries()).thenReturn(
+                Map.of("attr1", attributed1, "attr2", attributed2, "attr3", attributed3));
+
+        when(packageOps.getOps()).thenReturn(List.of(entry));
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of(packageOps));
+
+        // WHEN we start listening
+        mController.setListening(true);
+        mBgExecutor.runAllReady();
+
+        // THEN the active list has the ops
+        List<AppOpItem> list = mController.getActiveAppOps();
+        // Multiple attributes get merged into one entry in the active ops
+        assertEquals(1, list.size());
+
+        AppOpItem first = list.get(0);
+        assertThat(first.getPackageName()).isEqualTo("package.one");
+        assertThat(first.getUid()).isEqualTo(1);
+        assertThat(first.getCode()).isEqualTo(AppOpsManager.OP_RECORD_AUDIO);
+    }
+
+    /** Regression test for b/294104969. */
+    @Test
+    public void addCallback_existingCallbacksNotifiedOfCurrentActive() {
+        AppOpsManager.PackageOps packageOps1 = createPackageOp(
+                "package.one",
+                /* packageUid= */ 1,
+                AppOpsManager.OPSTR_FINE_LOCATION,
+                /* isRunning= */ true);
+        AppOpsManager.PackageOps packageOps2 = createPackageOp(
+                "package.two",
+                /* packageUid= */ 2,
+                AppOpsManager.OPSTR_RECORD_AUDIO,
+                /* isRunning= */ true);
+        AppOpsManager.PackageOps packageOps3 = createPackageOp(
+                "package.three",
+                /* packageUid= */ 3,
+                AppOpsManager.OPSTR_PHONE_CALL_MICROPHONE,
+                /* isRunning= */ true);
+        when(mAppOpsManager.getPackagesForOps(AppOpsControllerImpl.OPS))
+                .thenReturn(List.of(packageOps1, packageOps2, packageOps3));
+
+        // WHEN we start listening
+        mController.addCallback(
+                new int[]{AppOpsManager.OP_RECORD_AUDIO, AppOpsManager.OP_FINE_LOCATION},
+                mCallback);
+        mBgExecutor.runAllReady();
+        mTestableLooper.processAllMessages();
+
+        // THEN the callback is notified of the current active ops it cares about
+        verify(mCallback).onActiveStateChanged(
+                AppOpsManager.OP_FINE_LOCATION,
+                /* uid= */ 1,
+                "package.one",
+                true);
+        verify(mCallback).onActiveStateChanged(
+                AppOpsManager.OP_RECORD_AUDIO,
+                /* uid= */ 2,
+                "package.two",
+                true);
+        verify(mCallback, never()).onActiveStateChanged(
+                AppOpsManager.OP_PHONE_CALL_MICROPHONE,
+                /* uid= */ 3,
+                "package.three",
+                true);
     }
 
     @Test
@@ -167,11 +378,14 @@ public class AppOpsControllerTest extends SysuiTestCase {
         mController.addCallback(
                 new int[]{AppOpsManager.OP_RECORD_AUDIO, AppOpsManager.OP_FINE_LOCATION},
                 mCallback);
+        mBgExecutor.runAllReady();
+
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_RECORD_AUDIO, TEST_UID, TEST_PACKAGE_NAME, true);
         mController.onOpNoted(AppOpsManager.OP_FINE_LOCATION, TEST_UID, TEST_PACKAGE_NAME,
                 TEST_ATTRIBUTION_NAME, AppOpsManager.OP_FLAG_SELF, AppOpsManager.MODE_ALLOWED);
         mTestableLooper.processAllMessages();
+
         verify(mCallback).onActiveStateChanged(AppOpsManager.OP_RECORD_AUDIO,
                 TEST_UID, TEST_PACKAGE_NAME, true);
     }
@@ -184,6 +398,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     public void addCallback_partialIncludedCode() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECEIVE_SANDBOX_TRIGGER_AUDIO,
                 AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_RECORD_AUDIO, TEST_UID, TEST_PACKAGE_NAME, true);
         mController.onOpActiveChanged(
@@ -201,9 +416,12 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void addCallback_notIncludedCode() {
         mController.addCallback(new int[]{AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
+
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_RECORD_AUDIO, TEST_UID, TEST_PACKAGE_NAME, true);
         mTestableLooper.processAllMessages();
+
         verify(mCallback, never()).onActiveStateChanged(
                 anyInt(), anyInt(), anyString(), anyBoolean());
     }
@@ -211,7 +429,10 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void removeCallback_sameCode() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
+
         mController.removeCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_RECORD_AUDIO, TEST_UID, TEST_PACKAGE_NAME, true);
         mTestableLooper.processAllMessages();
@@ -222,7 +443,10 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void addCallback_notSameCode() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
+
         mController.removeCallback(new int[]{AppOpsManager.OP_CAMERA}, mCallback);
+        mBgExecutor.runAllReady();
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_RECORD_AUDIO, TEST_UID, TEST_PACKAGE_NAME, true);
         mTestableLooper.processAllMessages();
@@ -285,6 +509,8 @@ public class AppOpsControllerTest extends SysuiTestCase {
         assumeFalse(mExemptedRolePkgName == null || mExemptedRolePkgName.equals(""));
 
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
+
         mController.onOpActiveChanged(AppOpsManager.OPSTR_RECORD_AUDIO,
                 TEST_UID_NON_USER_SENSITIVE, mExemptedRolePkgName, true);
 
@@ -307,6 +533,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         mController.setBGHandler(mMockHandler);
 
         mController.setListening(true);
+        mBgExecutor.runAllReady();
         mController.onOpActiveChanged(AppOpsManager.OPSTR_FINE_LOCATION, TEST_UID,
                 TEST_PACKAGE_NAME, true);
         mController.onOpNoted(AppOpsManager.OP_FINE_LOCATION, TEST_UID, TEST_PACKAGE_NAME,
@@ -314,6 +541,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         assertFalse(mController.getActiveAppOps().isEmpty());
 
         mController.setListening(false);
+        mBgExecutor.runAllReady();
 
         verify(mMockHandler).removeCallbacksAndMessages(null);
         assertTrue(mController.getActiveAppOps().isEmpty());
@@ -384,6 +612,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         TestHandler testHandler = new TestHandler(mTestableLooper.getLooper());
 
         mController.addCallback(new int[]{AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
         mController.setBGHandler(testHandler);
 
         mController.onOpActiveChanged(
@@ -417,6 +646,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testNotedNotRemovedAfterActive() {
         mController.addCallback(new int[]{AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
 
         mController.onOpNoted(AppOpsManager.OP_FINE_LOCATION, TEST_UID, TEST_PACKAGE_NAME,
                 TEST_ATTRIBUTION_NAME, AppOpsManager.OP_FLAG_SELF, AppOpsManager.MODE_ALLOWED);
@@ -446,6 +676,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testNotedAndActiveOnlyOneCall() {
         mController.addCallback(new int[]{AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
 
         mController.onOpNoted(AppOpsManager.OP_FINE_LOCATION, TEST_UID, TEST_PACKAGE_NAME,
                 TEST_ATTRIBUTION_NAME, AppOpsManager.OP_FLAG_SELF, AppOpsManager.MODE_ALLOWED);
@@ -461,6 +692,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testActiveAndNotedOnlyOneCall() {
         mController.addCallback(new int[]{AppOpsManager.OP_FINE_LOCATION}, mCallback);
+        mBgExecutor.runAllReady();
 
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_FINE_LOCATION, TEST_UID, TEST_PACKAGE_NAME, true);
@@ -476,6 +708,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testPausedRecordingIsRetrievedOnCreation() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
 
         mController.onOpActiveChanged(
@@ -489,6 +722,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testPausedRecordingFilteredOut() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
 
         mController.onOpActiveChanged(
@@ -501,6 +735,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     @Test
     public void testPausedPhoneCallMicrophoneFilteredOut() {
         mController.addCallback(new int[]{AppOpsManager.OP_PHONE_CALL_MICROPHONE}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
 
         mController.onOpActiveChanged(
@@ -516,6 +751,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
                 AppOpsManager.OP_RECORD_AUDIO,
                 AppOpsManager.OP_CAMERA
         }, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
 
         mController.onOpActiveChanged(
@@ -552,6 +788,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         // Add callbacks for the micOp and nonMicOp, called for the micOp active state change,
         // verify the micOp is the only active op returned.
         mController.addCallback(new int[]{micOp, nonMicOp}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.opToPublicName(micOp), TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -580,6 +817,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         // Add callbacks for the micOp and nonMicOp, called for the micOp active state change,
         // verify the micOp is the only active op returned.
         mController.addCallback(new int[]{micOp, nonMicOp}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.opToPublicName(micOp), TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -608,6 +846,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         // Add callbacks for the micOp and nonMicOp, called for the micOp active state change,
         // verify the micOp is the only active op returned.
         mController.addCallback(new int[]{micOp, nonMicOp}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.opToPublicName(micOp), TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -636,6 +875,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         // Add callbacks for the micOp and nonMicOp, called for the micOp active state change,
         // verify the micOp is the only active op returned.
         mController.addCallback(new int[]{micOp, nonMicOp}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.opToPublicName(micOp), TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -660,6 +900,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
     public void testCameraFilteredWhenCameraDisabled() {
         mController.addCallback(new int[]{AppOpsManager.OP_RECORD_AUDIO, AppOpsManager.OP_CAMERA},
                 mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_CAMERA, TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -693,6 +934,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
         mController.addCallback(
                 new int[]{AppOpsManager.OP_RECORD_AUDIO, AppOpsManager.OP_PHONE_CALL_CAMERA},
                 mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(
                 AppOpsManager.OPSTR_PHONE_CALL_CAMERA, TEST_UID_OTHER, TEST_PACKAGE_NAME, true);
@@ -723,6 +965,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
 
     private void verifyUnPausedSentActive(int micOpCode) {
         mController.addCallback(new int[]{micOpCode}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(AppOpsManager.opToPublicName(micOpCode), TEST_UID,
                 TEST_PACKAGE_NAME, true);
@@ -737,6 +980,7 @@ public class AppOpsControllerTest extends SysuiTestCase {
 
     private void verifyAudioPausedSentInactive(int micOpCode) {
         mController.addCallback(new int[]{micOpCode}, mCallback);
+        mBgExecutor.runAllReady();
         mTestableLooper.processAllMessages();
         mController.onOpActiveChanged(AppOpsManager.opToPublicName(micOpCode), TEST_UID_OTHER,
                 TEST_PACKAGE_NAME, true);
@@ -770,6 +1014,22 @@ public class AppOpsControllerTest extends SysuiTestCase {
         assertThat(codes).containsExactly(micOp, nonMicOp);
         assertFalse(list.get(0).isDisabled());
         assertFalse(list.get(1).isDisabled());
+    }
+
+    private AppOpsManager.PackageOps createPackageOp(
+            String packageName, int packageUid, String opStr, boolean isRunning) {
+        AppOpsManager.PackageOps packageOps = mock(AppOpsManager.PackageOps.class);
+        when(packageOps.getPackageName()).thenReturn(packageName);
+        when(packageOps.getUid()).thenReturn(packageUid);
+        AppOpsManager.OpEntry entry = mock(AppOpsManager.OpEntry.class);
+        when(entry.getOpStr()).thenReturn(opStr);
+        AppOpsManager.AttributedOpEntry attributed = mock(AppOpsManager.AttributedOpEntry.class);
+        when(attributed.isRunning()).thenReturn(isRunning);
+
+        when(packageOps.getOps()).thenReturn(Collections.singletonList(entry));
+        when(entry.getAttributedOpEntries()).thenReturn(Map.of("tag", attributed));
+
+        return packageOps;
     }
 
     private class TestHandler extends AppOpsControllerImpl.H {

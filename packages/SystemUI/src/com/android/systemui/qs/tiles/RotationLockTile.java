@@ -36,7 +36,7 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.ActivityStarter;
@@ -133,7 +133,7 @@ public class RotationLockTile extends QSTileImpl<BooleanState> implements
     @Override
     protected void handleClick(@Nullable View view) {
         final boolean newState = !mState.value;
-        mController.setRotationLocked(!newState);
+        mController.setRotationLocked(!newState, /* caller= */ "RotationLockTile#handleClick");
         refreshState(newState);
     }
 

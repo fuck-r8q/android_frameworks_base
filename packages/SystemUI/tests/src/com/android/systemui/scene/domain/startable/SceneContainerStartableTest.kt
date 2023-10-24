@@ -18,16 +18,18 @@
 
 package com.android.systemui.scene.domain.startable
 
+import android.os.PowerManager
 import android.view.Display
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
+import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.shared.model.WakeSleepReason
-import com.android.systemui.keyguard.shared.model.WakefulnessModel
-import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.model.SysUiState
+import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
+import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
+import com.android.systemui.power.domain.interactor.PowerInteractorFactory
 import com.android.systemui.scene.SceneTestUtils
 import com.android.systemui.scene.SceneTestUtils.Companion.toDataLayer
 import com.android.systemui.scene.shared.model.ObservableTransitionState
@@ -41,10 +43,12 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import org.mockito.Mockito.clearInvocations
+import org.mockito.Mockito.never
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 
@@ -55,29 +59,31 @@ class SceneContainerStartableTest : SysuiTestCase() {
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
     private val sceneInteractor = utils.sceneInteractor()
-    private val featureFlags = utils.featureFlags
-    private val authenticationRepository = utils.authenticationRepository()
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = authenticationRepository,
+    private val sceneContainerFlags = utils.sceneContainerFlags
+    private val authenticationInteractor = utils.authenticationInteractor()
+    private val deviceEntryInteractor =
+        utils.deviceEntryInteractor(
+            authenticationInteractor = authenticationInteractor,
+            sceneInteractor = sceneInteractor,
         )
-    private val keyguardRepository = utils.keyguardRepository()
-    private val keyguardInteractor =
-        utils.keyguardInteractor(
-            repository = keyguardRepository,
-        )
+    private val keyguardInteractor = utils.keyguardInteractor()
     private val sysUiState: SysUiState = mock()
+    private val falsingCollector: FalsingCollector = mock()
+    private val powerInteractor = PowerInteractorFactory.create().powerInteractor
 
     private val underTest =
         SceneContainerStartable(
             applicationScope = testScope.backgroundScope,
             sceneInteractor = sceneInteractor,
+            deviceEntryInteractor = deviceEntryInteractor,
             authenticationInteractor = authenticationInteractor,
             keyguardInteractor = keyguardInteractor,
-            featureFlags = featureFlags,
+            flags = sceneContainerFlags,
             sysUiState = sysUiState,
             displayId = Display.DEFAULT_DISPLAY,
             sceneLogger = mock(),
+            falsingCollector = falsingCollector,
+            powerInteractor = powerInteractor,
         )
 
     @Test
@@ -103,6 +109,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
                     fromScene = SceneKey.Gone,
                     toScene = SceneKey.Shade,
                     progress = flowOf(0.5f),
+                    isUserInputDriven = false,
                 )
             assertThat(isVisible).isTrue()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Shade), "reason")
@@ -115,6 +122,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
                     fromScene = SceneKey.Shade,
                     toScene = SceneKey.Gone,
                     progress = flowOf(0.5f),
+                    isUserInputDriven = false,
                 )
             assertThat(isVisible).isTrue()
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Gone), "reason")
@@ -133,7 +141,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentSceneKey).isEqualTo(SceneKey.Gone)
             underTest.start()
 
-            authenticationRepository.setUnlocked(false)
+            utils.deviceEntryRepository.setUnlocked(false)
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -149,7 +157,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentSceneKey).isEqualTo(SceneKey.Bouncer)
             underTest.start()
 
-            authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Gone)
         }
@@ -165,7 +173,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
 
-            authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Gone)
         }
@@ -181,7 +189,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
 
-            authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -196,8 +204,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
             assertThat(currentSceneKey).isEqualTo(SceneKey.Shade)
             underTest.start()
-
-            keyguardRepository.setWakefulnessModel(STARTING_TO_SLEEP)
+            powerInteractor.setAsleepForTest()
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -242,8 +249,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
-
-            keyguardRepository.setWakefulnessModel(STARTING_TO_WAKE)
+            powerInteractor.setAwakeForTest()
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Gone)
         }
@@ -258,8 +264,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
-
-            keyguardRepository.setWakefulnessModel(STARTING_TO_WAKE)
+            powerInteractor.setAwakeForTest()
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -274,8 +279,7 @@ class SceneContainerStartableTest : SysuiTestCase() {
             )
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
-
-            keyguardRepository.setWakefulnessModel(STARTING_TO_WAKE)
+            powerInteractor.setAwakeForTest()
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -292,11 +296,217 @@ class SceneContainerStartableTest : SysuiTestCase() {
             assertThat(currentSceneKey).isEqualTo(SceneKey.Lockscreen)
             underTest.start()
 
-            authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
             runCurrent()
-            keyguardRepository.setWakefulnessModel(STARTING_TO_WAKE)
+            powerInteractor.setAwakeForTest()
 
             assertThat(currentSceneKey).isEqualTo(SceneKey.Gone)
+        }
+
+    @Test
+    fun collectFalsingSignals_onSuccessfulUnlock() =
+        testScope.runTest {
+            prepareState(
+                initialSceneKey = SceneKey.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+            )
+            underTest.start()
+            runCurrent()
+            verify(falsingCollector, never()).onSuccessfulUnlock()
+
+            // Move around scenes without unlocking.
+            listOf(
+                    SceneKey.Shade,
+                    SceneKey.QuickSettings,
+                    SceneKey.Shade,
+                    SceneKey.Lockscreen,
+                    SceneKey.Bouncer,
+                )
+                .forEach { sceneKey ->
+                    sceneInteractor.changeScene(SceneModel(sceneKey), "reason")
+                    runCurrent()
+                    verify(falsingCollector, never()).onSuccessfulUnlock()
+                }
+
+            // Changing to the Gone scene should report a successful unlock.
+            sceneInteractor.changeScene(SceneModel(SceneKey.Gone), "reason")
+            runCurrent()
+            verify(falsingCollector).onSuccessfulUnlock()
+
+            // Move around scenes without changing back to Lockscreen, shouldn't report another
+            // unlock.
+            listOf(
+                    SceneKey.Shade,
+                    SceneKey.QuickSettings,
+                    SceneKey.Shade,
+                    SceneKey.Gone,
+                )
+                .forEach { sceneKey ->
+                    sceneInteractor.changeScene(SceneModel(sceneKey), "reason")
+                    runCurrent()
+                    verify(falsingCollector, times(1)).onSuccessfulUnlock()
+                }
+
+            // Changing to the Lockscreen scene shouldn't report a successful unlock.
+            sceneInteractor.changeScene(SceneModel(SceneKey.Lockscreen), "reason")
+            runCurrent()
+            verify(falsingCollector, times(1)).onSuccessfulUnlock()
+
+            // Move around scenes without unlocking.
+            listOf(
+                    SceneKey.Shade,
+                    SceneKey.QuickSettings,
+                    SceneKey.Shade,
+                    SceneKey.Lockscreen,
+                    SceneKey.Bouncer,
+                )
+                .forEach { sceneKey ->
+                    sceneInteractor.changeScene(SceneModel(sceneKey), "reason")
+                    runCurrent()
+                    verify(falsingCollector, times(1)).onSuccessfulUnlock()
+                }
+
+            // Changing to the Gone scene should report a second successful unlock.
+            sceneInteractor.changeScene(SceneModel(SceneKey.Gone), "reason")
+            runCurrent()
+            verify(falsingCollector, times(2)).onSuccessfulUnlock()
+        }
+
+    @Test
+    fun collectFalsingSignals_setShowingAod() =
+        testScope.runTest {
+            prepareState(
+                initialSceneKey = SceneKey.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+            )
+            underTest.start()
+            runCurrent()
+            verify(falsingCollector).setShowingAod(false)
+
+            utils.keyguardRepository.setIsDozing(true)
+            runCurrent()
+            verify(falsingCollector).setShowingAod(true)
+
+            utils.keyguardRepository.setIsDozing(false)
+            runCurrent()
+            verify(falsingCollector, times(2)).setShowingAod(false)
+        }
+
+    @Test
+    fun collectFalsingSignals_screenOnAndOff_aodUnavailable() =
+        testScope.runTest {
+            utils.keyguardRepository.setAodAvailable(false)
+            runCurrent()
+            prepareState(
+                initialSceneKey = SceneKey.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+            )
+            underTest.start()
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_POWER_BUTTON)
+            runCurrent()
+            verify(falsingCollector, times(1)).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAsleepForTest()
+            runCurrent()
+            verify(falsingCollector, times(1)).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, times(1)).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_TAP)
+            runCurrent()
+            verify(falsingCollector, times(1)).onScreenTurningOn()
+            verify(falsingCollector, times(1)).onScreenOnFromTouch()
+            verify(falsingCollector, times(1)).onScreenOff()
+
+            powerInteractor.setAsleepForTest()
+            runCurrent()
+            verify(falsingCollector, times(1)).onScreenTurningOn()
+            verify(falsingCollector, times(1)).onScreenOnFromTouch()
+            verify(falsingCollector, times(2)).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_POWER_BUTTON)
+            runCurrent()
+            verify(falsingCollector, times(2)).onScreenTurningOn()
+            verify(falsingCollector, times(1)).onScreenOnFromTouch()
+            verify(falsingCollector, times(2)).onScreenOff()
+        }
+
+    @Test
+    fun collectFalsingSignals_screenOnAndOff_aodAvailable() =
+        testScope.runTest {
+            utils.keyguardRepository.setAodAvailable(true)
+            runCurrent()
+            prepareState(
+                initialSceneKey = SceneKey.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+            )
+            underTest.start()
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_POWER_BUTTON)
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAsleepForTest()
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_TAP)
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAsleepForTest()
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+
+            powerInteractor.setAwakeForTest(reason = PowerManager.WAKE_REASON_POWER_BUTTON)
+            runCurrent()
+            verify(falsingCollector, never()).onScreenTurningOn()
+            verify(falsingCollector, never()).onScreenOnFromTouch()
+            verify(falsingCollector, never()).onScreenOff()
+        }
+
+    @Test
+    fun collectFalsingSignals_bouncerVisibility() =
+        testScope.runTest {
+            prepareState(
+                initialSceneKey = SceneKey.Lockscreen,
+                authenticationMethod = AuthenticationMethodModel.Pin,
+                isDeviceUnlocked = false,
+            )
+            underTest.start()
+            runCurrent()
+            verify(falsingCollector).onBouncerHidden()
+
+            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
+            runCurrent()
+            verify(falsingCollector).onBouncerShown()
+
+            sceneInteractor.changeScene(SceneModel(SceneKey.Gone), "reason")
+            runCurrent()
+            verify(falsingCollector, times(2)).onBouncerHidden()
         }
 
     private fun prepareState(
@@ -305,9 +515,10 @@ class SceneContainerStartableTest : SysuiTestCase() {
         initialSceneKey: SceneKey? = null,
         authenticationMethod: AuthenticationMethodModel? = null,
     ): MutableStateFlow<ObservableTransitionState> {
-        featureFlags.set(Flags.SCENE_CONTAINER, true)
-        authenticationRepository.setUnlocked(isDeviceUnlocked)
-        keyguardRepository.setBypassEnabled(isBypassEnabled)
+        assumeTrue(Flags.SCENE_CONTAINER_ENABLED)
+        sceneContainerFlags.enabled = true
+        utils.deviceEntryRepository.setUnlocked(isDeviceUnlocked)
+        utils.deviceEntryRepository.setBypassEnabled(isBypassEnabled)
         val transitionStateFlow =
             MutableStateFlow<ObservableTransitionState>(
                 ObservableTransitionState.Idle(SceneKey.Lockscreen)
@@ -319,26 +530,13 @@ class SceneContainerStartableTest : SysuiTestCase() {
             sceneInteractor.onSceneChanged(SceneModel(it), "reason")
         }
         authenticationMethod?.let {
-            authenticationRepository.setAuthenticationMethod(authenticationMethod.toDataLayer())
-            authenticationRepository.setLockscreenEnabled(
+            utils.authenticationRepository.setAuthenticationMethod(
+                authenticationMethod.toDataLayer()
+            )
+            utils.deviceEntryRepository.setInsecureLockscreenEnabled(
                 authenticationMethod != AuthenticationMethodModel.None
             )
         }
         return transitionStateFlow
-    }
-
-    companion object {
-        private val STARTING_TO_SLEEP =
-            WakefulnessModel(
-                state = WakefulnessState.STARTING_TO_SLEEP,
-                lastWakeReason = WakeSleepReason.POWER_BUTTON,
-                lastSleepReason = WakeSleepReason.POWER_BUTTON
-            )
-        private val STARTING_TO_WAKE =
-            WakefulnessModel(
-                state = WakefulnessState.STARTING_TO_WAKE,
-                lastWakeReason = WakeSleepReason.POWER_BUTTON,
-                lastSleepReason = WakeSleepReason.POWER_BUTTON
-            )
     }
 }

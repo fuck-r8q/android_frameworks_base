@@ -20,7 +20,6 @@ import androidx.annotation.VisibleForTesting
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.phone.StatusBarLocation
-import com.android.systemui.statusbar.pipeline.StatusBarPipelineFlags
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
@@ -56,7 +55,6 @@ constructor(
     private val airplaneModeInteractor: AirplaneModeInteractor,
     private val constants: ConnectivityConstants,
     @Application private val scope: CoroutineScope,
-    private val statusBarPipelineFlags: StatusBarPipelineFlags,
 ) {
     @VisibleForTesting val mobileIconSubIdCache = mutableMapOf<Int, MobileIconViewModel>()
     @VisibleForTesting
@@ -101,7 +99,7 @@ constructor(
         val common = commonViewModelForSub(subId)
         return LocationBasedMobileViewModel.viewModelForLocation(
             common,
-            mobileIconInteractorForSub(subId),
+            interactor.getMobileConnectionInteractorForSubId(subId),
             verboseLogger,
             location,
             scope,
@@ -112,20 +110,12 @@ constructor(
         return mobileIconSubIdCache[subId]
             ?: MobileIconViewModel(
                     subId,
-                    mobileIconInteractorForSub(subId),
+                    interactor.getMobileConnectionInteractorForSubId(subId),
                     airplaneModeInteractor,
                     constants,
                     scope,
                 )
                 .also { mobileIconSubIdCache[subId] = it }
-    }
-
-    @VisibleForTesting
-    fun mobileIconInteractorForSub(subId: Int): MobileIconInteractor {
-        return mobileIconInteractorSubIdCache[subId]
-            ?: interactor.createMobileConnectionInteractorForSubId(subId).also {
-                mobileIconInteractorSubIdCache[subId] = it
-            }
     }
 
     private fun invalidateCaches(subIds: List<Int>) {

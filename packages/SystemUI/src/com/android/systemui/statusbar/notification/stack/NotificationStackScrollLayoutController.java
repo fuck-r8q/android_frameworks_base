@@ -66,7 +66,6 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.flags.ViewRefactorFlag;
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository;
-import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.shared.model.KeyguardState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.media.controls.ui.KeyguardMediaController;
@@ -76,6 +75,7 @@ import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin.OnMenuEventListener;
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -128,6 +128,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController.Configurati
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.OnHeadsUpChangedListener;
+import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.Compile;
@@ -180,7 +181,7 @@ public class NotificationStackScrollLayoutController {
     private final KeyguardMediaController mKeyguardMediaController;
     private final SysuiStatusBarStateController mStatusBarStateController;
     private final KeyguardBypassController mKeyguardBypassController;
-    private final KeyguardInteractor mKeyguardInteractor;
+    private final PowerInteractor mPowerInteractor;
     private final PrimaryBouncerInteractor mPrimaryBouncerInteractor;
     private final NotificationLockscreenUserManager mLockscreenUserManager;
     private final SectionHeaderController mSilentHeaderController;
@@ -455,7 +456,6 @@ public class NotificationStackScrollLayoutController {
 
                 @Override
                 public void onDragCancelled(View v) {
-                    mFalsingCollector.onNotificationStopDismissing();
                 }
 
                 /**
@@ -501,7 +501,6 @@ public class NotificationStackScrollLayoutController {
                     }
 
                     mView.addSwipedOutView(view);
-                    mFalsingCollector.onNotificationDismissed();
                     if (mFalsingCollector.shouldEnforceBouncer()) {
                         mActivityStarter.executeRunnableDismissingKeyguard(
                                 null,
@@ -549,7 +548,6 @@ public class NotificationStackScrollLayoutController {
 
                 @Override
                 public void onBeginDrag(View v) {
-                    mFalsingCollector.onNotificationStartDismissing();
                     mView.onSwipeBegin(v);
                 }
 
@@ -577,7 +575,7 @@ public class NotificationStackScrollLayoutController {
                 @Override
                 public float getFalsingThresholdFactor() {
                     return ShadeViewController.getFalsingThresholdFactor(
-                            mKeyguardInteractor.getWakefulnessModel().getValue());
+                            mPowerInteractor.getDetailedWakefulness().getValue());
                 }
 
                 @Override
@@ -642,7 +640,7 @@ public class NotificationStackScrollLayoutController {
             SysuiStatusBarStateController statusBarStateController,
             KeyguardMediaController keyguardMediaController,
             KeyguardBypassController keyguardBypassController,
-            KeyguardInteractor keyguardInteractor,
+            PowerInteractor powerInteractor,
             PrimaryBouncerInteractor primaryBouncerInteractor,
             KeyguardTransitionRepository keyguardTransitionRepo,
             ZenModeController zenModeController,
@@ -675,7 +673,8 @@ public class NotificationStackScrollLayoutController {
             NotificationTargetsHelper notificationTargetsHelper,
             SecureSettings secureSettings,
             NotificationDismissibilityProvider dismissibilityProvider,
-            ActivityStarter activityStarter) {
+            ActivityStarter activityStarter,
+            SplitShadeStateController splitShadeStateController) {
         mView = view;
         mKeyguardTransitionRepo = keyguardTransitionRepo;
         mStackStateLogger = stackLogger;
@@ -693,7 +692,7 @@ public class NotificationStackScrollLayoutController {
         mStatusBarStateController = statusBarStateController;
         mKeyguardMediaController = keyguardMediaController;
         mKeyguardBypassController = keyguardBypassController;
-        mKeyguardInteractor = keyguardInteractor;
+        mPowerInteractor = powerInteractor;
         mPrimaryBouncerInteractor = primaryBouncerInteractor;
         mZenModeController = zenModeController;
         mLockscreenUserManager = lockscreenUserManager;
@@ -725,6 +724,7 @@ public class NotificationStackScrollLayoutController {
         mSecureSettings = secureSettings;
         mDismissibilityProvider = dismissibilityProvider;
         mActivityStarter = activityStarter;
+        mView.passSplitShadeStateController(splitShadeStateController);
         updateResources();
         setUpView();
     }
@@ -1203,10 +1203,6 @@ public class NotificationStackScrollLayoutController {
         mView.setHeadsUpBoundaries(height, bottomBarHeight);
     }
 
-    public void setUnlockHintRunning(boolean running) {
-        mView.setUnlockHintRunning(running);
-    }
-
     public void setPanelFlinging(boolean flinging) {
         mView.setPanelFlinging(flinging);
     }
@@ -1662,8 +1658,9 @@ public class NotificationStackScrollLayoutController {
 
     @VisibleForTesting
     void onKeyguardTransitionChanged(TransitionStep transitionStep) {
-        boolean isTransitionToAod = transitionStep.getFrom().equals(KeyguardState.GONE)
-                && transitionStep.getTo().equals(KeyguardState.AOD);
+        boolean isTransitionToAod = transitionStep.getTo().equals(KeyguardState.AOD)
+                && (transitionStep.getFrom().equals(KeyguardState.GONE)
+                || transitionStep.getFrom().equals(KeyguardState.OCCLUDED));
         if (mIsInTransitionToAod != isTransitionToAod) {
             mIsInTransitionToAod = isTransitionToAod;
             updateShowEmptyShadeView();

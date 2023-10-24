@@ -115,9 +115,51 @@ public class SettingsToPropertiesMapper {
     };
 
     // All the aconfig flags under the listed DeviceConfig scopes will be synced to native level.
+    // The list is sorted.
     @VisibleForTesting
     static final String[] sDeviceConfigAconfigScopes = new String[] {
-        DeviceConfig.NAMESPACE_CORE_EXPERIMENTS_TEAM_INTERNAL,
+        "android_core_networking",
+        "angle",
+        "arc_next",
+        "bluetooth",
+        "biometrics_framework",
+        "biometrics_integration",
+        "camera_platform",
+        "car_framework",
+        "car_perception",
+        "car_security",
+        "car_telemetry",
+        "codec_fwk",
+        "companion",
+        "context_hub",
+        "core_experiments_team_internal",
+        "core_graphics",
+        "haptics",
+        "hardware_backed_security_mainline",
+        "machine_learning",
+        "media_audio",
+        "media_solutions",
+        "nfc",
+        "pixel_audio_android",
+        "pixel_system_sw_touch",
+        "pixel_watch",
+        "platform_security",
+        "power",
+        "preload_safety",
+        "responsible_apis",
+        "rust",
+        "system_performance",
+        "test_suites",
+        "text",
+        "threadnetwork",
+        "tv_system_ui",
+        "vibrator",
+        "virtual_devices",
+        "wear_frameworks",
+        "wear_system_health",
+        "wear_systems",
+        "window_surfaces",
+        "windowing_frontend"
     };
 
     private final String[] mGlobalSettings;

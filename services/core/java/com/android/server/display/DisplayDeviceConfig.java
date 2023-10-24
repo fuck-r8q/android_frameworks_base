@@ -53,6 +53,7 @@ import com.android.server.display.config.DisplayBrightnessPoint;
 import com.android.server.display.config.DisplayConfiguration;
 import com.android.server.display.config.DisplayQuirks;
 import com.android.server.display.config.HbmTiming;
+import com.android.server.display.config.HdrBrightnessData;
 import com.android.server.display.config.HighBrightnessMode;
 import com.android.server.display.config.IntegerArray;
 import com.android.server.display.config.LuxThrottling;
@@ -232,7 +233,22 @@ import javax.xml.datatype.DatatypeConfigurationException;
  *          </point>
  *        </sdrHdrRatioMap>
  *      </highBrightnessMode>
- *
+ *      <hdrBrightnessConfig>
+ *         <brightnessMap>
+ *             <point>
+ *                <first>500</first>
+ *                <second>0.3</second>
+ *             </point>
+ *             <point>
+ *                 <first>1200</first>
+ *                 <second>0.6</second>
+ *             </point>
+ *         </brightnessMap>
+ *         <brightnessIncreaseDebounceMillis>1000</brightnessIncreaseDebounceMillis>
+ *         <brightnessIncreaseDurationMillis>10000</brightnessIncreaseDurationMillis>
+ *         <brightnessDecreaseDebounceMillis>13000</brightnessDecreaseDebounceMillis>
+ *         <brightnessDecreaseDurationMillis>10000</brightnessDecreaseDurationMillis>
+ *      </hdrBrightnessConfig>
  *      <luxThrottling>
  *        <brightnessLimitMap>
  *          <type>default</type>
@@ -282,9 +298,13 @@ import javax.xml.datatype.DatatypeConfigurationException;
  *      <screenBrightnessRampFastIncrease>0.02</screenBrightnessRampFastIncrease>
  *      <screenBrightnessRampSlowDecrease>0.03</screenBrightnessRampSlowDecrease>
  *      <screenBrightnessRampSlowIncrease>0.04</screenBrightnessRampSlowIncrease>
+ *      <screenBrightnessRampSlowDecreaseIdle>0.05</screenBrightnessRampSlowDecreaseIdle>
+ *      <screenBrightnessRampSlowIncreaseIdle>0.06</screenBrightnessRampSlowIncreaseIdle>
  *
  *      <screenBrightnessRampIncreaseMaxMillis>2000</screenBrightnessRampIncreaseMaxMillis>
  *      <screenBrightnessRampDecreaseMaxMillis>3000</screenBrightnessRampDecreaseMaxMillis>
+ *      <screenBrightnessRampIncreaseMaxIdleMillis>2000</screenBrightnessRampIncreaseMaxIdleMillis>
+ *      <screenBrightnessRampDecreaseMaxIdleMillis>2000</screenBrightnessRampDecreaseMaxIdleMillis>
  *
  *      <lightSensor>
  *        <type>android.sensor.light</type>
@@ -480,6 +500,8 @@ public class DisplayDeviceConfig {
 
     public static final String DEFAULT_ID = "default";
 
+    public static final int DEFAULT_LOW_REFRESH_RATE = 60;
+
     private static final float BRIGHTNESS_DEFAULT = 0.5f;
     private static final String ETC_DIR = "etc";
     private static final String DISPLAY_CONFIG_DIR = "displayconfig";
@@ -493,7 +515,6 @@ public class DisplayDeviceConfig {
     private static final int DEFAULT_PEAK_REFRESH_RATE = 0;
     private static final int DEFAULT_REFRESH_RATE = 60;
     private static final int DEFAULT_REFRESH_RATE_IN_HBM = 0;
-    private static final int DEFAULT_LOW_REFRESH_RATE = 60;
     private static final int DEFAULT_HIGH_REFRESH_RATE = 0;
     private static final float[] DEFAULT_BRIGHTNESS_THRESHOLDS = new float[]{};
 
@@ -597,8 +618,12 @@ public class DisplayDeviceConfig {
     private float mBrightnessRampFastIncrease = Float.NaN;
     private float mBrightnessRampSlowDecrease = Float.NaN;
     private float mBrightnessRampSlowIncrease = Float.NaN;
+    private float mBrightnessRampSlowDecreaseIdle = Float.NaN;
+    private float mBrightnessRampSlowIncreaseIdle = Float.NaN;
     private long mBrightnessRampDecreaseMaxMillis = 0;
     private long mBrightnessRampIncreaseMaxMillis = 0;
+    private long mBrightnessRampDecreaseMaxIdleMillis = 0;
+    private long mBrightnessRampIncreaseMaxIdleMillis = 0;
     private int mAmbientHorizonLong = AMBIENT_LIGHT_LONG_HORIZON_MILLIS;
     private int mAmbientHorizonShort = AMBIENT_LIGHT_SHORT_HORIZON_MILLIS;
     private float mScreenBrighteningMinThreshold = 0.0f;     // Retain behaviour as though there is
@@ -764,6 +789,9 @@ public class DisplayDeviceConfig {
 
     @Nullable
     private HostUsiVersion mHostUsiVersion;
+
+    @Nullable
+    private HdrBrightnessData mHdrBrightnessData;
 
     @VisibleForTesting
     DisplayDeviceConfig(Context context) {
@@ -1039,12 +1067,28 @@ public class DisplayDeviceConfig {
         return mBrightnessRampSlowIncrease;
     }
 
+    public float getBrightnessRampSlowDecreaseIdle() {
+        return mBrightnessRampSlowDecreaseIdle;
+    }
+
+    public float getBrightnessRampSlowIncreaseIdle() {
+        return mBrightnessRampSlowIncreaseIdle;
+    }
+
     public long getBrightnessRampDecreaseMaxMillis() {
         return mBrightnessRampDecreaseMaxMillis;
     }
 
     public long getBrightnessRampIncreaseMaxMillis() {
         return mBrightnessRampIncreaseMaxMillis;
+    }
+
+    public long getBrightnessRampDecreaseMaxIdleMillis() {
+        return mBrightnessRampDecreaseMaxIdleMillis;
+    }
+
+    public long getBrightnessRampIncreaseMaxIdleMillis() {
+        return mBrightnessRampIncreaseMaxIdleMillis;
     }
 
     public int getAmbientHorizonLong() {
@@ -1532,6 +1576,14 @@ public class DisplayDeviceConfig {
     }
 
     /**
+     * @return HDR brightness related configuration
+     */
+    @Nullable
+    public HdrBrightnessData getHdrBrightnessData() {
+        return mHdrBrightnessData;
+    }
+
+    /**
      * @return Refresh rate range for specific profile id or null
      */
     @Nullable
@@ -1654,8 +1706,12 @@ public class DisplayDeviceConfig {
                 + ", mBrightnessRampFastIncrease=" + mBrightnessRampFastIncrease
                 + ", mBrightnessRampSlowDecrease=" + mBrightnessRampSlowDecrease
                 + ", mBrightnessRampSlowIncrease=" + mBrightnessRampSlowIncrease
+                + ", mBrightnessRampSlowDecreaseIdle=" + mBrightnessRampSlowDecreaseIdle
+                + ", mBrightnessRampSlowIncreaseIdle=" + mBrightnessRampSlowIncreaseIdle
                 + ", mBrightnessRampDecreaseMaxMillis=" + mBrightnessRampDecreaseMaxMillis
                 + ", mBrightnessRampIncreaseMaxMillis=" + mBrightnessRampIncreaseMaxMillis
+                + ", mBrightnessRampDecreaseMaxIdleMillis=" + mBrightnessRampDecreaseMaxIdleMillis
+                + ", mBrightnessRampIncreaseMaxIdleMillis=" + mBrightnessRampIncreaseMaxIdleMillis
                 + "\n"
                 + "mAmbientHorizonLong=" + mAmbientHorizonLong
                 + ", mAmbientHorizonShort=" + mAmbientHorizonShort
@@ -1745,7 +1801,8 @@ public class DisplayDeviceConfig {
                 + "mScreenOffBrightnessSensorValueToLux=" + Arrays.toString(
                 mScreenOffBrightnessSensorValueToLux)
                 + "\n"
-                + "mUsiVersion= " + mHostUsiVersion
+                + "mUsiVersion= " + mHostUsiVersion + "\n"
+                + "mHdrBrightnessData" + mHdrBrightnessData
                 + "}";
     }
 
@@ -1809,6 +1866,7 @@ public class DisplayDeviceConfig {
                 loadRefreshRateSetting(config);
                 loadScreenOffBrightnessSensorValueToLuxFromDdc(config);
                 loadUsiVersion(config);
+                mHdrBrightnessData = HdrBrightnessData.loadConfig(config);
             } else {
                 Slog.w(TAG, "DisplayDeviceConfig file is null");
             }
@@ -1845,8 +1903,12 @@ public class DisplayDeviceConfig {
         mBrightnessRampFastIncrease = PowerManager.BRIGHTNESS_MAX;
         mBrightnessRampSlowDecrease = PowerManager.BRIGHTNESS_MAX;
         mBrightnessRampSlowIncrease = PowerManager.BRIGHTNESS_MAX;
+        mBrightnessRampSlowDecreaseIdle = PowerManager.BRIGHTNESS_MAX;
+        mBrightnessRampSlowIncreaseIdle = PowerManager.BRIGHTNESS_MAX;
         mBrightnessRampDecreaseMaxMillis = 0;
         mBrightnessRampIncreaseMaxMillis = 0;
+        mBrightnessRampDecreaseMaxIdleMillis = 0;
+        mBrightnessRampIncreaseMaxIdleMillis = 0;
         setSimpleMappingStrategyValues();
         loadAmbientLightSensorFromConfigXml();
         setProxSensorUnspecified();
@@ -2665,6 +2727,12 @@ public class DisplayDeviceConfig {
     }
 
     private void loadBrightnessRamps(DisplayConfiguration config) {
+        // Interactive must come first, since idle falls back to it when values are unspecified.
+        loadBrightnessRampsInteractive(config);
+        loadBrightnessRampsIdle(config);
+    }
+
+    private void loadBrightnessRampsInteractive(DisplayConfiguration config) {
         // Priority 1: Value in the display device config (float)
         // Priority 2: Value in the config.xml (int)
         final BigDecimal fastDownDecimal = config.getScreenBrightnessRampFastDecrease();
@@ -2694,6 +2762,40 @@ public class DisplayDeviceConfig {
         final BigInteger decreaseMax = config.getScreenBrightnessRampDecreaseMaxMillis();
         if (decreaseMax != null) {
             mBrightnessRampDecreaseMaxMillis = decreaseMax.intValue();
+        }
+    }
+
+    private void loadBrightnessRampsIdle(DisplayConfiguration config) {
+        // Priority 1: Idle value in the display device config (float)
+        // Priority 2: Fallback - Interactive value from wherever.
+        final BigDecimal slowDownDecimalIdle = config.getScreenBrightnessRampSlowDecreaseIdle();
+        final BigDecimal slowUpDecimalIdle = config.getScreenBrightnessRampSlowIncreaseIdle();
+
+        if (slowDownDecimalIdle != null && slowUpDecimalIdle != null) {
+            mBrightnessRampSlowDecreaseIdle = slowDownDecimalIdle.floatValue();
+            mBrightnessRampSlowIncreaseIdle = slowUpDecimalIdle.floatValue();
+        } else {
+            if (slowDownDecimalIdle != null || slowUpDecimalIdle != null) {
+                Slog.w(TAG, "Per display idle brightness ramp values ignored because not all "
+                        + "values are present in display device config");
+            }
+            // If these values don't exist, fall back to interactive mode values, since
+            // there are no idle ramp values in config.xml
+            mBrightnessRampSlowDecreaseIdle = mBrightnessRampSlowDecrease;
+            mBrightnessRampSlowIncreaseIdle = mBrightnessRampSlowIncrease;
+        }
+
+        final BigInteger increaseMaxIdle = config.getScreenBrightnessRampIncreaseMaxIdleMillis();
+        if (increaseMaxIdle != null) {
+            mBrightnessRampIncreaseMaxIdleMillis = increaseMaxIdle.intValue();
+        } else {
+            mBrightnessRampIncreaseMaxIdleMillis = mBrightnessRampIncreaseMaxMillis;
+        }
+        final BigInteger decreaseMaxIdle = config.getScreenBrightnessRampDecreaseMaxIdleMillis();
+        if (decreaseMaxIdle != null) {
+            mBrightnessRampDecreaseMaxIdleMillis = decreaseMaxIdle.intValue();
+        } else {
+            mBrightnessRampDecreaseMaxIdleMillis = mBrightnessRampDecreaseMaxMillis;
         }
     }
 

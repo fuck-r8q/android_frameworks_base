@@ -503,6 +503,8 @@ class ActivityClientController extends IActivityClientController.Stub {
                 final boolean res;
                 final boolean finishWithRootActivity =
                         finishTask == Activity.FINISH_TASK_WITH_ROOT_ACTIVITY;
+                mTaskSupervisor.getBackgroundActivityLaunchController()
+                        .onActivityRequestedFinishing(r);
                 if (finishTask == Activity.FINISH_TASK_WITH_ACTIVITY
                         || (finishWithRootActivity && r == rootR)) {
                     // If requested, remove the task that is associated to this activity only if it
@@ -630,7 +632,15 @@ class ActivityClientController extends IActivityClientController.Stub {
     @Override
     public int getTaskForActivity(IBinder token, boolean onlyRoot) {
         synchronized (mGlobalLock) {
-            return ActivityRecord.getTaskForActivityLocked(token, onlyRoot);
+            final ActivityRecord r = ActivityRecord.forTokenLocked(token);
+            if (r == null) {
+                return INVALID_TASK_ID;
+            }
+            final Task task = r.getTask();
+            if (onlyRoot) {
+                return task.getRootActivity() == r ? task.mTaskId : INVALID_TASK_ID;
+            }
+            return task.mTaskId;
         }
     }
 
@@ -1023,9 +1033,8 @@ class ActivityClientController extends IActivityClientController.Stub {
         }
 
         try {
-            final ClientTransaction transaction = ClientTransaction.obtain(
-                    r.app.getThread(), r.token);
-            transaction.addCallback(EnterPipRequestedItem.obtain());
+            final ClientTransaction transaction = ClientTransaction.obtain(r.app.getThread());
+            transaction.addCallback(EnterPipRequestedItem.obtain(r.token));
             mService.getLifecycleManager().scheduleTransaction(transaction);
             return true;
         } catch (Exception e) {
@@ -1045,9 +1054,8 @@ class ActivityClientController extends IActivityClientController.Stub {
         }
 
         try {
-            final ClientTransaction transaction = ClientTransaction.obtain(
-                    r.app.getThread(), r.token);
-            transaction.addCallback(PipStateTransactionItem.obtain(pipState));
+            final ClientTransaction transaction = ClientTransaction.obtain(r.app.getThread());
+            transaction.addCallback(PipStateTransactionItem.obtain(r.token, pipState));
             mService.getLifecycleManager().scheduleTransaction(transaction);
         } catch (Exception e) {
             Slog.w(TAG, "Failed to send pip state transaction item: "
@@ -1177,9 +1185,7 @@ class ActivityClientController extends IActivityClientController.Stub {
                 fullscreenRequest, r);
         reportMultiwindowFullscreenRequestValidatingResult(callback, validateResult);
         if (validateResult != RESULT_APPROVED) {
-            if (queued) {
-                transition.abort();
-            }
+            transition.abort();
             return;
         }
         transition.collect(topFocusedRootTask);

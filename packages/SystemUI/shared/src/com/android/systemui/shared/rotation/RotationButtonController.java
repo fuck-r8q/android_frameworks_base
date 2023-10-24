@@ -17,6 +17,7 @@
 package com.android.systemui.shared.rotation;
 
 import static android.content.pm.PackageManager.FEATURE_PC;
+import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.internal.view.RotationPolicy.NATURAL_ROTATION;
@@ -37,6 +38,8 @@ import android.content.IntentFilter;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
+import android.os.HandlerExecutor;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.os.SystemProperties;
@@ -67,6 +70,7 @@ import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.io.PrintWriter;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
 /**
@@ -119,6 +123,8 @@ public class RotationButtonController {
     private final int mIconCwStart0ResId;
     @DrawableRes
     private final int mIconCwStart90ResId;
+    /** Defaults to mainExecutor if not set via {@link #setBgExecutor(Executor)}. */
+    private Executor mBgExecutor;
 
     @DrawableRes
     private int mIconResId;
@@ -178,6 +184,8 @@ public class RotationButtonController {
         mAccessibilityManager = AccessibilityManager.getInstance(context);
         mTaskStackListener = new TaskStackListenerImpl();
         mWindowRotationProvider = windowRotationProvider;
+
+        mBgExecutor = context.getMainExecutor();
     }
 
     public void setRotationButton(RotationButton rotationButton,
@@ -191,6 +199,10 @@ public class RotationButtonController {
 
     public Context getContext() {
         return mContext;
+    }
+
+    public void setBgExecutor(Executor bgExecutor) {
+        mBgExecutor = bgExecutor;
     }
 
     /**
@@ -219,8 +231,11 @@ public class RotationButtonController {
 
         mListenersRegistered = true;
 
-        updateDockedState(mContext.registerReceiver(mDockedReceiver,
-                new IntentFilter(Intent.ACTION_DOCK_EVENT)));
+        mBgExecutor.execute(() -> {
+            final Intent intent = mContext.registerReceiver(mDockedReceiver,
+                    new IntentFilter(Intent.ACTION_DOCK_EVENT));
+            mContext.getMainExecutor().execute(() -> updateDockedState(intent));
+        });
 
         if (registerRotationWatcher) {
             try {
@@ -246,11 +261,13 @@ public class RotationButtonController {
 
         mListenersRegistered = false;
 
-        try {
-            mContext.unregisterReceiver(mDockedReceiver);
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Docked receiver already unregistered", e);
-        }
+        mBgExecutor.execute(() -> {
+            try {
+                mContext.unregisterReceiver(mDockedReceiver);
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "Docked receiver already unregistered", e);
+            }
+        });
 
         if (mRotationWatcherRegistered) {
             try {
@@ -265,9 +282,9 @@ public class RotationButtonController {
         TaskStackChangeListeners.getInstance().unregisterTaskStackListener(mTaskStackListener);
     }
 
-    public void setRotationLockedAtAngle(int rotationSuggestion) {
+    public void setRotationLockedAtAngle(int rotationSuggestion, String caller) {
         RotationPolicy.setRotationLockAtAngle(mContext, /* enabled= */ isRotationLocked(),
-                /* rotation= */ rotationSuggestion);
+                /* rotation= */ rotationSuggestion, caller);
     }
 
     public boolean isRotationLocked() {
@@ -451,7 +468,8 @@ public class RotationButtonController {
         if (rotationLocked || mRotationButton.isVisible()) {
             // Do not allow a change in rotation to set user rotation when docked.
             if (shouldOverrideUserLockPrefs(rotation) && rotationLocked && !mDocked) {
-                setRotationLockedAtAngle(rotation);
+                setRotationLockedAtAngle(rotation, /* caller= */
+                        "RotationButtonController#onRotationWatcherChanged");
             }
             setRotateSuggestionButtonState(false /* visible */, true /* forced */);
         }
@@ -555,7 +573,8 @@ public class RotationButtonController {
     private void onRotateSuggestionClick(View v) {
         mUiEventLogger.log(RotationButtonEvent.ROTATION_SUGGESTION_ACCEPTED);
         incrementNumAcceptedRotationSuggestionsIfNeeded();
-        setRotationLockedAtAngle(mLastRotationSuggestion);
+        setRotationLockedAtAngle(mLastRotationSuggestion,
+                /* caller= */ "RotationButtonController#onRotateSuggestionClick");
         Log.i(TAG, "onRotateSuggestionClick() mLastRotationSuggestion=" + mLastRotationSuggestion);
         v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
     }

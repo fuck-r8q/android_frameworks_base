@@ -24,6 +24,8 @@ import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Build
+import android.os.Handler
 import android.os.Looper
 import android.os.RemoteException
 import android.util.Log
@@ -57,7 +59,14 @@ class ActivityLaunchAnimator(
     /** The animator used when animating a Dialog into an app. */
     // TODO(b/218989950): Remove this animator and instead set the duration of the dim fade out to
     // TIMINGS.contentBeforeFadeOutDuration.
-    private val dialogToAppAnimator: LaunchAnimator = DEFAULT_DIALOG_TO_APP_ANIMATOR
+    private val dialogToAppAnimator: LaunchAnimator = DEFAULT_DIALOG_TO_APP_ANIMATOR,
+
+    /**
+     * Whether we should disable the WindowManager timeout. This should be set to true in tests
+     * only.
+     */
+    // TODO(b/301385865): Remove this flag.
+    private val disableWmTimeout: Boolean = false,
 ) {
     companion object {
         /** The timings when animating a View into an app. */
@@ -87,6 +96,9 @@ class ActivityLaunchAnimator(
                 contentBeforeFadeOutInterpolator = Interpolators.LINEAR_OUT_SLOW_IN,
                 contentAfterFadeInInterpolator = PathInterpolator(0f, 0f, 0.6f, 1f)
             )
+
+        // TODO(b/288507023): Remove this flag.
+        @JvmField val DEBUG_LAUNCH_ANIMATION = Build.IS_DEBUGGABLE
 
         private val DEFAULT_LAUNCH_ANIMATOR = LaunchAnimator(TIMINGS, INTERPOLATORS)
         private val DEFAULT_DIALOG_TO_APP_ANIMATOR = LaunchAnimator(DIALOG_TIMINGS, INTERPOLATORS)
@@ -240,8 +252,17 @@ class ActivityLaunchAnimator(
 
     private fun Controller.callOnIntentStartedOnMainThread(willAnimate: Boolean) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            this.launchContainer.context.mainExecutor.execute { this.onIntentStarted(willAnimate) }
+            this.launchContainer.context.mainExecutor.execute {
+                callOnIntentStartedOnMainThread(willAnimate)
+            }
         } else {
+            if (DEBUG_LAUNCH_ANIMATION) {
+                Log.d(
+                    TAG,
+                    "Calling controller.onIntentStarted(willAnimate=$willAnimate) " +
+                        "[controller=$this]"
+                )
+            }
             this.onIntentStarted(willAnimate)
         }
     }
@@ -418,7 +439,8 @@ class ActivityLaunchAnimator(
         internal val delegate: AnimationDelegate
 
         init {
-            delegate = AnimationDelegate(controller, callback, listener, launchAnimator)
+            delegate =
+                AnimationDelegate(controller, callback, listener, launchAnimator, disableWmTimeout)
         }
 
         @BinderThread
@@ -448,13 +470,26 @@ class ActivityLaunchAnimator(
         /** Listener for animation lifecycle events. */
         private val listener: Listener? = null,
         /** The animator to use to animate the window launch. */
-        private val launchAnimator: LaunchAnimator = DEFAULT_LAUNCH_ANIMATOR
+        private val launchAnimator: LaunchAnimator = DEFAULT_LAUNCH_ANIMATOR,
+
+        /**
+         * Whether we should disable the WindowManager timeout. This should be set to true in tests
+         * only.
+         */
+        // TODO(b/301385865): Remove this flag.
+        disableWmTimeout: Boolean = false,
     ) : RemoteAnimationDelegate<IRemoteAnimationFinishedCallback> {
         private val launchContainer = controller.launchContainer
         private val context = launchContainer.context
         private val transactionApplierView =
             controller.openingWindowSyncView ?: controller.launchContainer
         private val transactionApplier = SyncRtSurfaceTransactionApplier(transactionApplierView)
+        private val timeoutHandler =
+            if (!disableWmTimeout) {
+                Handler(Looper.getMainLooper())
+            } else {
+                null
+            }
 
         private val matrix = Matrix()
         private val invertMatrix = Matrix()
@@ -474,11 +509,11 @@ class ActivityLaunchAnimator(
 
         @UiThread
         internal fun postTimeout() {
-            launchContainer.postDelayed(onTimeout, LAUNCH_TIMEOUT)
+            timeoutHandler?.postDelayed(onTimeout, LAUNCH_TIMEOUT)
         }
 
         private fun removeTimeout() {
-            launchContainer.removeCallbacks(onTimeout)
+            timeoutHandler?.removeCallbacks(onTimeout)
         }
 
         @UiThread
@@ -541,6 +576,13 @@ class ActivityLaunchAnimator(
                 Log.i(TAG, "Aborting the animation as no window is opening")
                 removeTimeout()
                 iCallback?.invoke()
+
+                if (DEBUG_LAUNCH_ANIMATION) {
+                    Log.d(
+                        TAG,
+                        "Calling controller.onLaunchAnimationCancelled() [no window opening]"
+                    )
+                }
                 controller.onLaunchAnimationCancelled()
                 return
             }
@@ -585,12 +627,28 @@ class ActivityLaunchAnimator(
                 object : Controller by delegate {
                     override fun onLaunchAnimationStart(isExpandingFullyAbove: Boolean) {
                         listener?.onLaunchAnimationStart()
+
+                        if (DEBUG_LAUNCH_ANIMATION) {
+                            Log.d(
+                                TAG,
+                                "Calling controller.onLaunchAnimationStart(isExpandingFullyAbove=" +
+                                    "$isExpandingFullyAbove) [controller=$delegate]"
+                            )
+                        }
                         delegate.onLaunchAnimationStart(isExpandingFullyAbove)
                     }
 
                     override fun onLaunchAnimationEnd(isExpandingFullyAbove: Boolean) {
                         listener?.onLaunchAnimationEnd()
                         iCallback?.invoke()
+
+                        if (DEBUG_LAUNCH_ANIMATION) {
+                            Log.d(
+                                TAG,
+                                "Calling controller.onLaunchAnimationEnd(isExpandingFullyAbove=" +
+                                    "$isExpandingFullyAbove) [controller=$delegate]"
+                            )
+                        }
                         delegate.onLaunchAnimationEnd(isExpandingFullyAbove)
                     }
 
@@ -758,6 +816,10 @@ class ActivityLaunchAnimator(
 
             Log.i(TAG, "Remote animation timed out")
             timedOut = true
+
+            if (DEBUG_LAUNCH_ANIMATION) {
+                Log.d(TAG, "Calling controller.onLaunchAnimationCancelled() [animation timed out]")
+            }
             controller.onLaunchAnimationCancelled()
         }
 
@@ -772,6 +834,13 @@ class ActivityLaunchAnimator(
             removeTimeout()
 
             animation?.cancel()
+
+            if (DEBUG_LAUNCH_ANIMATION) {
+                Log.d(
+                    TAG,
+                    "Calling controller.onLaunchAnimationCancelled() [remote animation cancelled]",
+                )
+            }
             controller.onLaunchAnimationCancelled()
         }
 

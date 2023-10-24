@@ -2568,6 +2568,22 @@ bool ResTable_config::isLocaleBetterThan(const ResTable_config& o,
     return false;
 }
 
+bool ResTable_config::isBetterThanBeforeLocale(const ResTable_config& o,
+        const ResTable_config* requested) const {
+    if (requested) {
+        if (imsi || o.imsi) {
+            if ((mcc != o.mcc) && requested->mcc) {
+                return (mcc);
+            }
+
+            if ((mnc != o.mnc) && requested->mnc) {
+                return (mnc);
+            }
+        }
+    }
+    return false;
+}
+
 bool ResTable_config::isBetterThan(const ResTable_config& o,
         const ResTable_config* requested) const {
     if (requested) {
@@ -5270,19 +5286,19 @@ bool ResTable::expandResourceRef(const char16_t* refStr, size_t refLen,
         *outType = *defType;
     }
     *outName = String16(p, end-p);
-    if(**outPackage == 0) {
+    if(outPackage->empty()) {
         if(outErrorMsg) {
             *outErrorMsg = "Resource package cannot be an empty string";
         }
         return false;
     }
-    if(**outType == 0) {
+    if(outType->empty()) {
         if(outErrorMsg) {
             *outErrorMsg = "Resource type cannot be an empty string";
         }
         return false;
     }
-    if(**outName == 0) {
+    if(outName->empty()) {
         if(outErrorMsg) {
             *outErrorMsg = "Resource id cannot be an empty string";
         }
@@ -6275,13 +6291,13 @@ bool ResTable::collectString(String16* outString,
         if (append) {
             outString->append(tmp);
         } else {
-            outString->setTo(tmp);
+            *outString = tmp;
         }
     } else {
         if (append) {
             outString->append(String16(s, len));
         } else {
-            outString->setTo(s, len);
+            *outString = String16(s, len);
         }
     }
 
@@ -7484,10 +7500,10 @@ bool ResTable::getIdmapInfo(const void* idmap, size_t sizeBytes,
         *pOverlayCrc = dtohl(map[3]);
     }
     if (pTargetPath) {
-        pTargetPath->setTo(reinterpret_cast<const char*>(map + 4));
+        *pTargetPath = reinterpret_cast<const char*>(map + 4);
     }
     if (pOverlayPath) {
-        pOverlayPath->setTo(reinterpret_cast<const char*>(map + 4 + 256 / sizeof(uint32_t)));
+        *pOverlayPath = reinterpret_cast<const char*>(map + 4 + 256 / sizeof(uint32_t));
     }
     return true;
 }

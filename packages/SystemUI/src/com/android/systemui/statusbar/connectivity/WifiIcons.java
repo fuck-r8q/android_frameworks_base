@@ -21,7 +21,7 @@
 package com.android.systemui.statusbar.connectivity;
 
 import com.android.settingslib.AccessibilityContentDescriptions;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.settingslib.SignalIcon.IconGroup;
 
 /** */

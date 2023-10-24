@@ -68,7 +68,6 @@ import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
-
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_CONFIGURATION;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_DREAM;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_FOCUS;
@@ -190,7 +189,6 @@ import android.database.ContentObserver;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.Rect;
-import android.hardware.power.Mode;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -317,6 +315,8 @@ import java.util.Set;
 public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private static final String GRAMMATICAL_GENDER_PROPERTY = "persist.sys.grammatical_gender";
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityTaskManagerService" : TAG_ATM;
+    private static final String ENABLE_PIP2_IMPLEMENTATION =
+            "persist.wm.debug.enable_pip2_implementation";
     static final String TAG_ROOT_TASK = TAG + POSTFIX_ROOT_TASK;
     static final String TAG_SWITCH = TAG + POSTFIX_SWITCH;
 
@@ -713,11 +713,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     static final int POWER_MODE_REASON_CHANGE_DISPLAY = 1 << 1;
     /** @see UnknownAppVisibilityController */
     static final int POWER_MODE_REASON_UNKNOWN_VISIBILITY = 1 << 2;
-    /** This can only be used by {@link #endLaunchPowerMode(int)}.*/
+    /**
+     * This can only be used by {@link #endPowerMode(int)}. Excluding UNKNOWN_VISIBILITY because
+     * that is guarded by a timeout while keyguard is locked.
+     */
     static final int POWER_MODE_REASON_ALL = (1 << 2) - 1;
 
-    /** The reasons to use {@link Mode#LAUNCH} power mode. */
-    private @PowerModeReason int mLaunchPowerModeReasons;
+    /** The reasons to apply power modes. */
+    @PowerModeReason
+    private int mPowerModeReasons;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({
@@ -1862,8 +1866,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             RemoteCallback navigationObserver, BackAnimationAdapter adapter) {
         mAmInternal.enforceCallingPermission(START_TASKS_FROM_RECENTS,
                 "startBackNavigation()");
-
-        return mBackNavigationController.startBackNavigation(navigationObserver, adapter);
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            return mBackNavigationController.startBackNavigation(navigationObserver, adapter);
+        } finally {
+            Binder.restoreCallingIdentity(origId);
+        }
     }
 
     /**
@@ -2241,7 +2249,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             callerApp = getProcessController(appThread);
         }
         final BackgroundActivityStartController balController =
-                getActivityStartController().getBackgroundActivityLaunchController();
+                mTaskSupervisor.getBackgroundActivityLaunchController();
         if (balController.shouldAbortBackgroundActivityStart(
                 callingUid,
                 callingPid,
@@ -2668,9 +2676,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mAmInternal.enforceCallingPermission(Manifest.permission.UPDATE_LOCK_TASK_PACKAGES,
                     "updateLockTaskPackages()");
         }
-        synchronized (mGlobalLock) {
-            ProtoLog.w(WM_DEBUG_LOCKTASK, "Allowlisting %d:%s", userId, Arrays.toString(packages));
-            getLockTaskController().updateLockTaskPackages(userId, packages);
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                ProtoLog.w(WM_DEBUG_LOCKTASK, "Allowlisting %d:%s", userId,
+                        Arrays.toString(packages));
+                getLockTaskController().updateLockTaskPackages(userId, packages);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(origId);
         }
     }
 
@@ -3628,6 +3642,28 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
+    /**
+     * Prepare to enter PiP mode after {@link TransitionController#requestStartTransition}.
+     *
+     * @param r activity auto entering pip
+     * @return true if the activity is about to auto-enter pip or is already in pip mode.
+     */
+    boolean prepareAutoEnterPictureAndPictureMode(ActivityRecord r) {
+        // If the activity is already in picture in picture mode, then just return early
+        if (r.inPinnedWindowingMode()) {
+            return true;
+        }
+
+        if (r.canAutoEnterPip() && getTransitionController().getCollectingTransition() != null) {
+            // This will be used later to construct TransitionRequestInfo for Shell to resolve.
+            // It will also be passed into a direct moveActivityToPinnedRootTask() call via
+            // startTransition()
+            getTransitionController().getCollectingTransition().setPipActivity(r);
+            return true;
+        }
+        return false;
+    }
+
     boolean enterPictureInPictureMode(@NonNull ActivityRecord r,
             @NonNull PictureInPictureParams params, boolean fromClient) {
         return enterPictureInPictureMode(r, params, fromClient, false /* isAutoEnter */);
@@ -3683,6 +3719,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mGlobalLock) {
                 if (r.getParent() == null) {
                     Slog.e(TAG, "Skip enterPictureInPictureMode, destroyed " + r);
+                    if (transition != null) {
+                        transition.abort();
+                    }
                     return;
                 }
                 EventLogTags.writeWmEnterPip(r.mUserId, System.identityHashCode(r),
@@ -4075,10 +4114,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     /** Pokes the task persister. */
     void notifyTaskPersisterLocked(Task task, boolean flush) {
         mRecentTasks.notifyTaskPersisterLocked(task, flush);
-    }
-
-    boolean isKeyguardLocked(int displayId) {
-        return mKeyguardController.isKeyguardLocked(displayId);
     }
 
     /**
@@ -4617,6 +4652,20 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     /**
+     * Updates the {@link ApplicationInfo}s of the package activities th that are attached in the
+     * WM hierarchy.
+     */
+    public void updateActivityApplicationInfo(int userId,
+            ArrayMap<String, ApplicationInfo> applicationInfoByPackage) {
+        synchronized (mGlobalLock) {
+            if (mRootWindowContainer != null) {
+                mRootWindowContainer.updateActivityApplicationInfo(userId,
+                        applicationInfoByPackage);
+            }
+        }
+    }
+
+    /**
      * Update the asset configuration and increase the assets sequence number.
      * @param processes the processes that needs to update the asset configuration
      */
@@ -4640,11 +4689,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
-    void startLaunchPowerMode(@PowerModeReason int reason) {
-        if (mPowerManagerInternal != null) {
-            mPowerManagerInternal.setPowerMode(Mode.LAUNCH, true);
-        }
-        mLaunchPowerModeReasons |= reason;
+    void startPowerMode(@PowerModeReason int reason) {
+        final int prevReasons = mPowerModeReasons;
+        mPowerModeReasons |= reason;
         if ((reason & POWER_MODE_REASON_UNKNOWN_VISIBILITY) != 0) {
             if (mRetainPowerModeAndTopProcessState) {
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
@@ -4654,27 +4701,56 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     POWER_MODE_UNKNOWN_VISIBILITY_TIMEOUT_MS);
             Slog.d(TAG, "Temporarily retain top process state for launching app");
         }
+        if (mPowerManagerInternal == null) {
+            return;
+        }
+
+        // START_ACTIVITY can be used with UNKNOWN_VISIBILITY. CHANGE_DISPLAY should be used alone.
+        if ((reason & POWER_MODE_REASON_START_ACTIVITY) != 0
+                && (prevReasons & POWER_MODE_REASON_START_ACTIVITY) == 0) {
+            Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER, "StartModeLaunch");
+            mPowerManagerInternal.setPowerMode(PowerManagerInternal.MODE_LAUNCH, true);
+        } else if (reason == POWER_MODE_REASON_CHANGE_DISPLAY
+                && (prevReasons & POWER_MODE_REASON_CHANGE_DISPLAY) == 0) {
+            Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER, "StartModeDisplayChange");
+            mPowerManagerInternal.setPowerMode(PowerManagerInternal.MODE_DISPLAY_CHANGE, true);
+        }
     }
 
-    void endLaunchPowerMode(@PowerModeReason int reason) {
-        if (mLaunchPowerModeReasons == 0) return;
-        mLaunchPowerModeReasons &= ~reason;
+    void endPowerMode(@PowerModeReason int reason) {
+        if (mPowerModeReasons == 0) return;
+        final int prevReasons = mPowerModeReasons;
+        mPowerModeReasons &= ~reason;
 
-        if ((mLaunchPowerModeReasons & POWER_MODE_REASON_UNKNOWN_VISIBILITY) != 0) {
+        if ((mPowerModeReasons & POWER_MODE_REASON_UNKNOWN_VISIBILITY) != 0) {
             boolean allResolved = true;
             for (int i = mRootWindowContainer.getChildCount() - 1; i >= 0; i--) {
                 allResolved &= mRootWindowContainer.getChildAt(i).mUnknownAppVisibilityController
                         .allResolved();
             }
             if (allResolved) {
-                mLaunchPowerModeReasons &= ~POWER_MODE_REASON_UNKNOWN_VISIBILITY;
+                mPowerModeReasons &= ~POWER_MODE_REASON_UNKNOWN_VISIBILITY;
                 mRetainPowerModeAndTopProcessState = false;
                 mH.removeMessages(H.END_POWER_MODE_UNKNOWN_VISIBILITY_MSG);
             }
         }
+        if (mPowerManagerInternal == null) {
+            return;
+        }
 
-        if (mLaunchPowerModeReasons == 0 && mPowerManagerInternal != null) {
-            mPowerManagerInternal.setPowerMode(Mode.LAUNCH, false);
+        // If the launching apps have unknown visibility, only end launch power mode until the
+        // states are resolved.
+        final int endLaunchModeReasons = POWER_MODE_REASON_START_ACTIVITY
+                | POWER_MODE_REASON_UNKNOWN_VISIBILITY;
+        if ((prevReasons & endLaunchModeReasons) != 0
+                && (mPowerModeReasons & endLaunchModeReasons) == 0) {
+            Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER, "EndModeLaunch");
+            mPowerManagerInternal.setPowerMode(PowerManagerInternal.MODE_LAUNCH, false);
+        }
+        if ((prevReasons & POWER_MODE_REASON_CHANGE_DISPLAY) != 0
+                && (mPowerModeReasons & POWER_MODE_REASON_CHANGE_DISPLAY) == 0) {
+            Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER, "EndModeDisplayChange");
+            mPowerManagerInternal.setPowerMode(PowerManagerInternal.MODE_DISPLAY_CHANGE, false);
         }
     }
 
@@ -5653,6 +5729,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
+    void registerCompatScaleProvider(@CompatScaleProvider.CompatScaleModeOrderId int id,
+            @NonNull CompatScaleProvider provider) {
+        mCompatModePackages.registerCompatScaleProvider(id, provider);
+    }
+
+    void unregisterCompatScaleProvider(@CompatScaleProvider.CompatScaleModeOrderId int id) {
+        mCompatModePackages.unregisterCompatScaleProvider(id);
+    }
+
     /**
      * Returns {@code true} if the process represented by the pid passed as argument is
      * instrumented and the instrumentation source was granted with the permission also
@@ -5737,7 +5822,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 case END_POWER_MODE_UNKNOWN_VISIBILITY_MSG: {
                     synchronized (mGlobalLock) {
                         mRetainPowerModeAndTopProcessState = false;
-                        endLaunchPowerMode(POWER_MODE_REASON_UNKNOWN_VISIBILITY);
+                        endPowerMode(POWER_MODE_REASON_UNKNOWN_VISIBILITY);
                         if (mTopApp != null
                                 && mTopProcessState == ActivityManager.PROCESS_STATE_TOP_SLEEPING) {
                             // Restore the scheduling group for sleeping.
@@ -6208,6 +6293,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public void onPackageReplaced(ApplicationInfo aInfo) {
             synchronized (mGlobalLock) {
+                // In case if setWindowManager hasn't been called yet when booting.
+                if (mRootWindowContainer == null) return;
                 mRootWindowContainer.updateActivityApplicationInfo(aInfo);
             }
         }
@@ -6404,6 +6491,11 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (!restarting && hasVisibleActivities) {
                     deferWindowLayout();
                     try {
+                        final Task topTask = mRootWindowContainer.getTopDisplayFocusedRootTask();
+                        if (topTask != null
+                                && topTask.topRunningActivity(true /* focusableOnly */) == null) {
+                            topTask.adjustFocusToNextFocusableTask("handleAppDied");
+                        }
                         if (!mRootWindowContainer.resumeFocusedTasksTopActivities()) {
                             // If there was nothing to resume, and we are not already restarting
                             // this process, but there is a visible activity that is hosted by the
@@ -7194,5 +7286,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         public void unregisterTaskStackListener(ITaskStackListener listener) {
             ActivityTaskManagerService.this.unregisterTaskStackListener(listener);
         }
+    }
+
+    static boolean isPip2ExperimentEnabled() {
+        return SystemProperties.getBoolean(ENABLE_PIP2_IMPLEMENTATION, false);
     }
 }

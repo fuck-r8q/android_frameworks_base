@@ -501,6 +501,8 @@
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"Denne privilegerte appen eller systemappen kan når som helst ta bilder og spille inn videoer med et systemkamera. Dette krever at appen også har tillatelsen android.permission.CAMERA"</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"Tillat at en app eller tjeneste mottar tilbakekallinger om kameraenheter som åpnes eller lukkes."</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"Denne appen kan motta tilbakekallinger når en kameraenhet blir åpnet (av hvilken app) eller lukket."</string>
+    <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"Tillat at en app eller tjeneste bruker kameraet som en hodeløs systembruker."</string>
+    <string name="permdesc_cameraHeadlessSystemUser" msgid="6963163319710996412">"Denne appen kan bruke kameraet som en hodeløs systembruker."</string>
     <string name="permlab_vibrate" msgid="8596800035791962017">"kontrollere vibreringen"</string>
     <string name="permdesc_vibrate" msgid="8733343234582083721">"Lar appen kontrollere vibreringsfunksjonen."</string>
     <string name="permdesc_vibrator_state" msgid="7050024956594170724">"Gir appen tilgang til vibreringstilstanden."</string>
@@ -669,14 +671,14 @@
   </string-array>
     <string name="fingerprint_error_vendor_unknown" msgid="4170002184907291065">"Noe gikk galt. Prøv på nytt."</string>
     <string name="fingerprint_icon_content_description" msgid="4741068463175388817">"Ikon for fingeravtrykk"</string>
+    <string name="device_unlock_notification_name" msgid="2632928999862915709">"Enhetsopplåsing"</string>
+    <string name="alternative_unlock_setup_notification_title" msgid="6241508547901933544">"Prøv å låse opp på en annen måte"</string>
+    <string name="alternative_face_setup_notification_content" msgid="3384959224091897331">"Bruk ansiktslåsen når fingeravtrykket ditt ikke gjenkjennes, for eksempel når du har våte fingre"</string>
+    <string name="alternative_fp_setup_notification_content" msgid="7454096947415721639">"Bruk opplåsing med fingeravtrykk når ansiktet ditt ikke gjenkjennes, for eksempel når det ikke er nok lys rundt deg"</string>
     <string name="face_recalibrate_notification_name" msgid="7311163114750748686">"Ansiktslås"</string>
     <string name="face_recalibrate_notification_title" msgid="2524791952735579082">"Problem med ansiktslås"</string>
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"Trykk for å slette ansiktsmodellen din, og legg deretter til ansiktet på nytt"</string>
-    <string name="face_setup_notification_title" msgid="8843461561970741790">"Konfigurer ansiktslås"</string>
-    <string name="face_setup_notification_content" msgid="5463999831057751676">"Lås opp telefonen ved å se på den"</string>
     <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"For å bruke ansiktslås, slå på "<b>"Kameratilgang"</b>" i Innstillinger &gt; Personvern"</string>
-    <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"Konfigurer flere måter å låse opp på"</string>
-    <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"Trykk for å legge til et fingeravtrykk"</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"Opplåsing med fingeravtrykk"</string>
     <string name="fingerprint_recalibrate_notification_title" msgid="2406561052064558497">"Kan ikke bruke fingeravtrykkssensoren"</string>
     <string name="fingerprint_recalibrate_notification_content" msgid="8519935717822194943">"Gå til en reparasjonsleverandør."</string>
@@ -806,7 +808,7 @@
     <string name="permdesc_updatePackagesWithoutUserAction" msgid="4567739631260526366">"Lar innehaveren oppdatere appen hen tidligere installerte, uten brukerhandling"</string>
     <string name="policylab_limitPassword" msgid="4851829918814422199">"Angi passordregler"</string>
     <string name="policydesc_limitPassword" msgid="4105491021115793793">"Kontrollerer tillatt lengde og tillatte tegn i passord og PIN-koder for opplåsing av skjermen."</string>
-    <string name="policylab_watchLogin" msgid="7599669460083719504">"Overvåk forsøk på å låse opp skjermen"</string>
+    <string name="policylab_watchLogin" msgid="7599669460083719504">"Overvåking av forsøk på å låse opp skjermen"</string>
     <string name="policydesc_watchLogin" product="tablet" msgid="2388436408621909298">"Overvåk antall feil passordforsøk ved opplåsing av skjerm, og lås nettbrettet eller slett alle data fra nettbrettet ved for mange feil passordforsøk."</string>
     <string name="policydesc_watchLogin" product="tv" msgid="2140588224468517507">"Følg med på hvor mange ganger feil passord skrives inn når skjermen skal låses opp, og lås Android TV-enheten eller tøm alle dataene når feil passord skrives inn for mange ganger."</string>
     <string name="policydesc_watchLogin" product="automotive" msgid="7011438994051251521">"Overvåk antall feil passord som er skrevet inn ved opplåsing av skjermen, og lås infotainment-systemet eller tøm alle dataene i infotainment-systemet hvis feil passord skrives inn for mange ganger."</string>
@@ -1288,13 +1290,13 @@
     <string name="volume_call" msgid="7625321655265747433">"Samtalevolum"</string>
     <string name="volume_bluetooth_call" msgid="2930204618610115061">"Bluetooth-samtalevolum"</string>
     <string name="volume_alarm" msgid="4486241060751798448">"Alarmvolum"</string>
-    <string name="volume_notification" msgid="6864412249031660057">"Varslingsvolum"</string>
+    <string name="volume_notification" msgid="6864412249031660057">"Varselvolum"</string>
     <string name="volume_unknown" msgid="4041914008166576293">"Volum"</string>
     <string name="volume_icon_description_bluetooth" msgid="7540388479345558400">"Bluetooth-volum"</string>
     <string name="volume_icon_description_ringer" msgid="2187800636867423459">"Ringetonevolum"</string>
     <string name="volume_icon_description_incall" msgid="4491255105381227919">"Samtalevolum"</string>
     <string name="volume_icon_description_media" msgid="4997633254078171233">"Medievolum"</string>
-    <string name="volume_icon_description_notification" msgid="579091344110747279">"Varslingsvolum"</string>
+    <string name="volume_icon_description_notification" msgid="579091344110747279">"Varselvolum"</string>
     <string name="ringtone_default" msgid="9118299121288174597">"Standard ringetone"</string>
     <string name="ringtone_default_with_actual" msgid="2709686194556159773">"Standard (<xliff:g id="ACTUAL_RINGTONE">%1$s</xliff:g>)"</string>
     <string name="ringtone_silent" msgid="397111123930141876">"Ingen"</string>
@@ -1867,6 +1869,7 @@
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"Andre <xliff:g id="LABEL">%1$s</xliff:g> for jobben"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Tredje <xliff:g id="LABEL">%1$s</xliff:g> for jobben"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Klon <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="private_profile_label_badge" msgid="1712086003787839183">"Privat <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Krev PIN-kode for å løsne app"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Krev opplåsingsmønster for å løsne apper"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Krev passord for å løsne apper"</string>
@@ -2031,7 +2034,7 @@
     <string name="autofill_update_title" msgid="3630695947047069136">"Vil du oppdatere i "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Vil du oppdatere <xliff:g id="TYPE">%1$s</xliff:g> i "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Vil du oppdatere <xliff:g id="TYPE_0">%1$s</xliff:g> og <xliff:g id="TYPE_1">%2$s</xliff:g> i "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
-    <string name="autofill_update_title_with_3types" msgid="1312232153076212291">"Vil du oppdatere disse elementene i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Vil du oppdatere disse elementene i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Lagre"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Nei takk"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Ikke nå"</string>

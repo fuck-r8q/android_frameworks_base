@@ -501,6 +501,8 @@
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"Bu icazəli və ya sistem tətbiqi istənilən vaxt sistem kamerasından istifadə edərək şəkil və videolar çəkə bilər. android.permission.CAMERA icazəsinin də tətbiq tərəfindən saxlanılmasını tələb edir"</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"Tətbiqə və ya xidmətə kamera cihazlarının açılması və ya bağlanması haqqında geri zənglər qəbul etməyə icazə verin."</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"Hansısa kamera cihazı açıldıqda və ya bağlandıqda (hansısa tətbiq tərəfindən) bu tətbiq geri çağırışlar qəbul edə bilər."</string>
+    <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"Tətbiq və ya xidmətə kameraya Monitorsuz Sistem İstifadəçisi kimi daxil olmaq icazəsi verin."</string>
+    <string name="permdesc_cameraHeadlessSystemUser" msgid="6963163319710996412">"Bu tətbiq kameraya Monitorsuz Sistem İstifadəçisi kimi daxil ola bilər."</string>
     <string name="permlab_vibrate" msgid="8596800035791962017">"vibrasiyaya nəzarət edir"</string>
     <string name="permdesc_vibrate" msgid="8733343234582083721">"Tətbiqə vibratoru idarə etmə icazəsi verir."</string>
     <string name="permdesc_vibrator_state" msgid="7050024956594170724">"Tətbiqə vibrasiya vəziyyətinə daxil olmaq imkanı verir."</string>
@@ -669,14 +671,14 @@
   </string-array>
     <string name="fingerprint_error_vendor_unknown" msgid="4170002184907291065">"Xəta oldu. Yenə cəhd edin."</string>
     <string name="fingerprint_icon_content_description" msgid="4741068463175388817">"Barmaq izi ikonası"</string>
+    <string name="device_unlock_notification_name" msgid="2632928999862915709">"Cihazın kiliddən çıxarılması"</string>
+    <string name="alternative_unlock_setup_notification_title" msgid="6241508547901933544">"Başqa yolla kiliddən çıxarın"</string>
+    <string name="alternative_face_setup_notification_content" msgid="3384959224091897331">"Məsələn, barmaqlar yaş olduğu üçün barmaq izi tanınmadıqda Üzlə Kilidaçmadan istifadə edin"</string>
+    <string name="alternative_fp_setup_notification_content" msgid="7454096947415721639">"Məsələn, kifayət qədər işıq olmadığı üçün üz tanınmadıqda Barmaqla Kilidaçmadan istifadə edin"</string>
     <string name="face_recalibrate_notification_name" msgid="7311163114750748686">"Üz ilə kiliddən çıxarma"</string>
     <string name="face_recalibrate_notification_title" msgid="2524791952735579082">"Üz ilə kiliddən çıxarma problemi"</string>
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"Üz modelinizi silmək üçün toxunun, sonra yenidən üzünüzü əlavə edin"</string>
-    <string name="face_setup_notification_title" msgid="8843461561970741790">"Üz ilə kiliddən çıxarmanı ayarlayın"</string>
-    <string name="face_setup_notification_content" msgid="5463999831057751676">"Telefona baxaraq onu kiliddən çıxarın"</string>
     <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"Üz ilə Kiliddən Açma funksiyasını istifadə etmək üçün Ayarlar &gt; Məxfilik bölməsində "<b>"Kameraya girişi"</b>" aktiv edin"</string>
-    <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"Kiliddən çıxarmağın daha çox yolunu ayarlayın"</string>
-    <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"Barmaq izi əlavə etmək üçün toxunun"</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"Barmaq izi ilə kiliddən çıxarma"</string>
     <string name="fingerprint_recalibrate_notification_title" msgid="2406561052064558497">"Barmaq izi sensorundan istifadə etmək mümkün deyil"</string>
     <string name="fingerprint_recalibrate_notification_content" msgid="8519935717822194943">"Təmir provayderini ziyarət edin."</string>
@@ -1867,6 +1869,7 @@
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"2-ci İş <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3-cü İş <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Kopyalayın: <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="private_profile_label_badge" msgid="1712086003787839183">"Şəxsi <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Ayırmadan öncə PIN istənilsin"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Qrafik açar istənilsin"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Ayırmadan öncə parol istənilsin"</string>
@@ -2031,7 +2034,7 @@
     <string name="autofill_update_title" msgid="3630695947047069136"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ünvanında yenilənsin?"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"<xliff:g id="TYPE">%1$s</xliff:g> "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ünvanında yenilənsin?"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"<xliff:g id="TYPE_0">%1$s</xliff:g> və <xliff:g id="TYPE_1">%2$s</xliff:g> "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ünvanında yenilənsin?"</string>
-    <string name="autofill_update_title_with_3types" msgid="1312232153076212291">"Bu elementlər "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ünvanında yenilənsin: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> və <xliff:g id="TYPE_2">%3$s</xliff:g> ?"</string>
+    <string name="autofill_update_title_with_3types" msgid="8285767070604652626"><b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> və <xliff:g id="TYPE_2">%3$s</xliff:g> bölmələrində bu elementlər yenilənsin?"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Yadda saxlayın"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Xeyr, çox sağ olun"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"İndi yox"</string>

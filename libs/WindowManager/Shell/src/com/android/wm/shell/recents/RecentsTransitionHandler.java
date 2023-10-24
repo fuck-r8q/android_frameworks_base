@@ -76,6 +76,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
     private final RecentTasksController mRecentTasksController;
     private IApplicationThread mAnimApp = null;
     private final ArrayList<RecentsController> mControllers = new ArrayList<>();
+    private final ArrayList<RecentsTransitionStateListener> mStateListeners = new ArrayList<>();
 
     /**
      * List of other handlers which might need to mix recents with other things. These are checked
@@ -106,6 +107,11 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
         mMixers.remove(mixer);
     }
 
+    /** Adds the callback for receiving the state change of transition. */
+    public void addTransitionStateListener(RecentsTransitionStateListener listener) {
+        mStateListeners.add(listener);
+    }
+
     @VisibleForTesting
     public IBinder startRecentsTransition(PendingIntent intent, Intent fillIn, Bundle options,
             IApplicationThread appThread, IRecentsAnimationRunner listener) {
@@ -128,6 +134,9 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
         }
         final IBinder transition = mTransitions.startTransition(TRANSIT_TO_FRONT, wct,
                 mixedHandler == null ? this : mixedHandler);
+        for (int i = 0; i < mStateListeners.size(); i++) {
+            mStateListeners.get(i).onTransitionStarted(transition);
+        }
         if (mixer != null) {
             mixer.setRecentsTransition(transition);
         }
@@ -171,13 +180,14 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
             return false;
         }
         final RecentsController controller = mControllers.get(controllerIdx);
-        Transitions.setRunningRemoteTransitionDelegate(mAnimApp);
+        final IApplicationThread animApp = mAnimApp;
         mAnimApp = null;
         if (!controller.start(info, startTransaction, finishTransaction, finishCallback)) {
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                     "RecentsTransitionHandler.startAnimation: failed to start animation");
             return false;
         }
+        Transitions.setRunningRemoteTransitionDelegate(animApp);
         return true;
     }
 
@@ -223,6 +233,13 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
          * These need to be ordered since the order must be restored if there is no task-switch.
          */
         private ArrayList<TaskState> mPausingTasks = null;
+
+        /**
+         * List of tasks were pausing but closed in a subsequent merged transition. If a
+         * closing task is reopened, the leash is not initially hidden since it is already
+         * visible.
+         */
+        private ArrayList<TaskState> mClosingTasks = null;
 
         /**
          * List of tasks that we are switching to. Upon finish, these will remain visible and
@@ -375,11 +392,15 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
             }
             mFinishTransaction = null;
             mPausingTasks = null;
+            mClosingTasks = null;
             mOpeningTasks = null;
             mInfo = null;
             mTransition = null;
             mPendingPauseSnapshotsForCancel = null;
             mControllers.remove(this);
+            for (int i = 0; i < mStateListeners.size(); i++) {
+                mStateListeners.get(i).onAnimationStateChanged(false);
+            }
         }
 
         boolean start(TransitionInfo info, SurfaceControl.Transaction t,
@@ -419,6 +440,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
             mFinishCB = finishCB;
             mFinishTransaction = finishT;
             mPausingTasks = new ArrayList<>();
+            mClosingTasks = new ArrayList<>();
             mOpeningTasks = new ArrayList<>();
             mLeashMap = new ArrayMap<>();
             mKeyguardLocked = (info.getFlags() & TRANSIT_FLAG_KEYGUARD_LOCKED) != 0;
@@ -518,6 +540,9 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                         apps.toArray(new RemoteAnimationTarget[apps.size()]),
                         wallpapers.toArray(new RemoteAnimationTarget[wallpapers.size()]),
                         new Rect(0, 0, 0, 0), new Rect(), b);
+                for (int i = 0; i < mStateListeners.size(); i++) {
+                    mStateListeners.get(i).onAnimationStateChanged(true);
+                }
             } catch (RemoteException e) {
                 Slog.e(TAG, "Error starting recents animation", e);
                 cancel("onAnimationStart() failed");
@@ -670,7 +695,10 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                     final TransitionInfo.Change change = closingTasks.get(i);
                     final int pausingIdx = TaskState.indexOf(mPausingTasks, change);
                     if (pausingIdx >= 0) {
-                        mPausingTasks.remove(pausingIdx);
+                        // We are closing the pausing task, but it is still visible and can be
+                        // restart by another transition prior to this transition finishing
+                        final TaskState closingTask = mPausingTasks.remove(pausingIdx);
+                        mClosingTasks.add(closingTask);
                         didMergeThings = true;
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                                 "  closing pausing taskId=%d", change.getTaskInfo().taskId);
@@ -706,7 +734,12 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                 for (int i = 0; i < openingTasks.size(); ++i) {
                     final TransitionInfo.Change change = openingTasks.get(i);
                     final boolean isLeaf = openingTaskIsLeafs.get(i) == 1;
-                    int pausingIdx = TaskState.indexOf(mPausingTasks, change);
+                    final int closingIdx = TaskState.indexOf(mClosingTasks, change);
+                    if (closingIdx >= 0) {
+                        // Remove opening tasks from closing set
+                        mClosingTasks.remove(closingIdx);
+                    }
+                    final int pausingIdx = TaskState.indexOf(mPausingTasks, change);
                     if (pausingIdx >= 0) {
                         // Something is showing/opening a previously-pausing app.
                         if (isLeaf) {
@@ -729,12 +762,23 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler {
                         appearedTargets[nextTargetIdx++] = target;
                         // reparent into the original `mInfo` since that's where we are animating.
                         final int rootIdx = TransitionUtil.rootIndexFor(change, mInfo);
+                        final boolean wasClosing = closingIdx >= 0;
                         t.reparent(target.leash, mInfo.getRoot(rootIdx).getLeash());
                         t.setLayer(target.leash, layer);
-                        // Hide the animation leash, let listener show it.
-                        t.hide(target.leash);
+                        if (wasClosing) {
+                            // App was previously visible and is closing
+                            t.show(target.leash);
+                            t.setAlpha(target.leash, 1f);
+                            // Also override the task alpha as it was set earlier when dispatching
+                            // the transition and setting up the leash to hide the
+                            t.setAlpha(change.getLeash(), 1f);
+                        } else {
+                            // Hide the animation leash, let the listener show it
+                            t.hide(target.leash);
+                        }
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
-                                "  opening new leaf taskId=%d", target.taskId);
+                                "  opening new leaf taskId=%d wasClosing=%b",
+                                target.taskId, wasClosing);
                         mOpeningTasks.add(new TaskState(change, target.leash));
                     } else {
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,

@@ -20,6 +20,7 @@ import android.platform.test.annotations.Presubmit
 import android.tools.device.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.device.flicker.legacy.FlickerBuilder
 import android.tools.device.flicker.legacy.LegacyFlickerTest
+import com.android.wm.shell.flicker.pip.common.EnterPipTransition
 import org.junit.Assume
 import org.junit.FixMethodOrder
 import org.junit.Test
@@ -54,8 +55,6 @@ class EnterPipOnUserLeaveHintTest(flicker: LegacyFlickerTest) : EnterPipTransiti
 
     override val defaultTeardown: FlickerBuilder.() -> Unit = {
         teardown {
-            // close gracefully so that onActivityUnpinned() can be called before force exit
-            pipApp.closePipWindow(wmHelper)
             pipApp.exit(wmHelper)
         }
     }

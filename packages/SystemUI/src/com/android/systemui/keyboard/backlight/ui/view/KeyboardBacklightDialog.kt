@@ -38,13 +38,14 @@ import android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
 import androidx.annotation.IdRes
 import androidx.core.view.setPadding
 import com.android.settingslib.Utils
-import com.android.systemui.R
+import com.android.systemui.res.R
 
 class KeyboardBacklightDialog(
     context: Context,
     initialCurrentLevel: Int,
     initialMaxLevel: Int,
-) : Dialog(context, R.style.Theme_SystemUI_Dialog) {
+    theme: Int = R.style.Theme_SystemUI_Dialog,
+) : Dialog(context, theme) {
 
     private data class RootProperties(
         val cornerRadius: Float,

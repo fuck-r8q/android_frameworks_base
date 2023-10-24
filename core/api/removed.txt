@@ -23,6 +23,11 @@ package android.app {
     method @Deprecated public android.app.Notification.Builder setTimeout(long);
   }
 
+  public static final class Notification.WearableExtender implements android.app.Notification.Extender {
+    method @Deprecated public android.graphics.Bitmap getBackground();
+    method @Deprecated public android.app.Notification.WearableExtender setBackground(android.graphics.Bitmap);
+  }
+
 }
 
 package android.app.slice {
@@ -466,6 +471,10 @@ package android.speech.tts {
 }
 
 package android.telephony {
+
+  public class CarrierConfigManager {
+    field @Deprecated public static final String KEY_HIDE_ENABLE_2G = "hide_enable_2g_bool";
+  }
 
   public class NetworkScan {
     method @Deprecated public void stop() throws android.os.RemoteException;

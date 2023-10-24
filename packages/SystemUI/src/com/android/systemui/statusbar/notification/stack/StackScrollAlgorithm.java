@@ -27,7 +27,7 @@ import android.view.ViewGroup;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.SystemBarUtils;
 import com.android.keyguard.BouncerPanelExpansionCalculator;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.animation.ShadeInterpolation;
 import com.android.systemui.shade.transition.LargeScreenShadeInterpolator;
 import com.android.systemui.statusbar.EmptyShadeView;
@@ -142,7 +142,15 @@ public class StackScrollAlgorithm {
                 viewState.setAlpha(1f);
             } else if (ambientState.isOnKeyguard()) {
                 // Adjust alpha for wakeup to lockscreen.
-                viewState.setAlpha(1f - ambientState.getHideAmount());
+                if (view.isHeadsUpState()) {
+                    // Pulsing HUN should be visible on AOD and stay visible during 
+                    // AOD=>lockscreen transition
+                    viewState.setAlpha(1f - ambientState.getHideAmount());
+                } else {
+                    // Normal notifications are hidden on AOD and should fade in during 
+                    // AOD=>lockscreen transition
+                    viewState.setAlpha(1f - ambientState.getDozeAmount());
+                }
             } else if (ambientState.isExpansionChanging()) {
                 // Adjust alpha for shade open & close.
                 float expansion = ambientState.getExpansionFraction();

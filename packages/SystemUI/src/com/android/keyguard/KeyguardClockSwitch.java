@@ -22,7 +22,7 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.app.animation.Interpolators;
 import com.android.keyguard.dagger.KeyguardStatusViewScope;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.log.LogBuffer;
 import com.android.systemui.log.core.LogLevel;
 import com.android.systemui.plugins.ClockController;
@@ -48,6 +48,7 @@ public class KeyguardClockSwitch extends RelativeLayout {
     private static final long STATUS_AREA_MOVE_UP_MILLIS = 967;
     private static final long STATUS_AREA_MOVE_DOWN_MILLIS = 467;
     private static final float SMARTSPACE_TRANSLATION_CENTER_MULTIPLIER = 1.4f;
+    private static final float SMARTSPACE_TOP_PADDING_MULTIPLIER = 2.625f;
 
     @IntDef({LARGE, SMALL})
     @Retention(RetentionPolicy.SOURCE)
@@ -96,12 +97,22 @@ public class KeyguardClockSwitch extends RelativeLayout {
     private KeyguardClockFrame mLargeClockFrame;
     private ClockController mClock;
 
+    // It's bc_smartspace_view, assigned by KeyguardClockSwitchController
+    // to get the top padding for translating smartspace for weather clock
+    private View mSmartspace;
+
+    // Smartspace in weather clock is translated by this value
+    // to compensate for the position invisible dateWeatherView
+    private int mSmartspaceTop = -1;
+
     private KeyguardStatusAreaView mStatusArea;
     private int mSmartspaceTopOffset;
     private float mWeatherClockSmartspaceScaling = 1f;
     private int mWeatherClockSmartspaceTranslateX = 0;
     private int mWeatherClockSmartspaceTranslateY = 0;
     private int mDrawAlpha = 255;
+
+    private int mStatusBarHeight = 0;
 
     /**
      * Maintain state so that a newly connected plugin can be initialized.
@@ -134,15 +145,26 @@ public class KeyguardClockSwitch extends RelativeLayout {
     public void onConfigChanged() {
         mClockSwitchYAmount = mContext.getResources().getDimensionPixelSize(
                 R.dimen.keyguard_clock_switch_y_shift);
-        mSmartspaceTopOffset = mContext.getResources().getDimensionPixelSize(
-                R.dimen.keyguard_smartspace_top_offset);
+        mSmartspaceTopOffset = (int) (mContext.getResources().getDimensionPixelSize(
+                        R.dimen.keyguard_smartspace_top_offset)
+                * mContext.getResources().getConfiguration().fontScale
+                / mContext.getResources().getDisplayMetrics().density
+                * SMARTSPACE_TOP_PADDING_MULTIPLIER);
         mWeatherClockSmartspaceScaling = ResourcesCompat.getFloat(
                 mContext.getResources(), R.dimen.weather_clock_smartspace_scale);
         mWeatherClockSmartspaceTranslateX = mContext.getResources().getDimensionPixelSize(
                 R.dimen.weather_clock_smartspace_translateX);
         mWeatherClockSmartspaceTranslateY = mContext.getResources().getDimensionPixelSize(
                 R.dimen.weather_clock_smartspace_translateY);
+        mStatusBarHeight = mContext.getResources().getDimensionPixelSize(
+                R.dimen.status_bar_height);
         updateStatusArea(/* animate= */false);
+    }
+
+    /** Get bc_smartspace_view from KeyguardClockSwitchController
+     * Use its top to decide the translation value */
+    public void setSmartspace(View smartspace) {
+        mSmartspace = smartspace;
     }
 
     /** Sets whether the large clock is being shown on a connected display. */
@@ -160,6 +182,10 @@ public class KeyguardClockSwitch extends RelativeLayout {
             mSplitShadeCentered = splitShadeCentered;
             updateStatusArea(/* animate= */true);
         }
+    }
+
+    public boolean getSplitShadeCentered() {
+        return mSplitShadeCentered;
     }
 
     @Override
@@ -281,6 +307,8 @@ public class KeyguardClockSwitch extends RelativeLayout {
         mStatusAreaAnim = null;
 
         View in, out;
+        // statusAreaYTranslation uses for the translation for both mStatusArea and mSmallClockFrame
+        // statusAreaClockTranslateY only uses for mStatusArea
         float statusAreaYTranslation, statusAreaClockScale = 1f;
         float statusAreaClockTranslateX = 0f, statusAreaClockTranslateY = 0f;
         float clockInYTranslation, clockOutYTranslation;
@@ -295,10 +323,21 @@ public class KeyguardClockSwitch extends RelativeLayout {
                     && mClock.getLargeClock().getConfig().getHasCustomWeatherDataDisplay()) {
                 statusAreaClockScale = mWeatherClockSmartspaceScaling;
                 statusAreaClockTranslateX = mWeatherClockSmartspaceTranslateX;
-                statusAreaClockTranslateY = mWeatherClockSmartspaceTranslateY;
                 if (mSplitShadeCentered) {
                     statusAreaClockTranslateX *= SMARTSPACE_TRANSLATION_CENTER_MULTIPLIER;
                 }
+
+                // On large weather clock,
+                // top padding for time is status bar height from top of the screen.
+                // On small one,
+                // it's screenOffsetYPadding (translationY for KeyguardStatusView),
+                // Cause smartspace is positioned according to the smallClockFrame
+                // we need to translate the difference between bottom of large clock and small clock
+                // Also, we need to counter offset the empty date weather view, mSmartspaceTop
+                // mWeatherClockSmartspaceTranslateY is only for Felix
+                statusAreaClockTranslateY = mStatusBarHeight - 0.6F *  mSmallClockFrame.getHeight()
+                        - mSmartspaceTop - screenOffsetYPadding
+                        - statusAreaYTranslation + mWeatherClockSmartspaceTranslateY;
             }
             clockInYTranslation = 0;
             clockOutYTranslation = 0; // Small clock translation is handled with statusArea
@@ -418,10 +457,14 @@ public class KeyguardClockSwitch extends RelativeLayout {
             post(() -> updateClockTargetRegions());
         }
 
-        if (mDisplayedClockSize != null && !mChildrenAreLaidOut) {
+        if (mSmartspace != null && mSmartspaceTop != mSmartspace.getTop()) {
+            mSmartspaceTop = mSmartspace.getTop();
             post(() -> updateClockViews(mDisplayedClockSize == LARGE, mAnimateOnLayout));
         }
 
+        if (mDisplayedClockSize != null && !mChildrenAreLaidOut) {
+            post(() -> updateClockViews(mDisplayedClockSize == LARGE, mAnimateOnLayout));
+        }
         mChildrenAreLaidOut = true;
     }
 

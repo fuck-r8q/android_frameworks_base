@@ -57,7 +57,7 @@ import com.android.app.animation.Interpolators;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.util.ContrastColorUtil;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.notification.NotificationIconDozeHelper;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.util.drawable.DrawableSize;
@@ -244,12 +244,16 @@ public class StatusBarIconView extends AnimatedImageView implements StatusIconDi
             }
             final float scaledImageWidth = drawableWidth * scaleToFitIconView;
             final float scaledImageHeight = drawableHeight * scaleToFitIconView;
-            // if the scaled image size <= mOriginalStatusBarIconSize, we don't need to enlarge it
             scaleToOriginalDrawingSize = Math.min(
                     (float) mOriginalStatusBarIconSize / scaledImageWidth,
                     (float) mOriginalStatusBarIconSize / scaledImageHeight);
             if (scaleToOriginalDrawingSize > 1.0f) {
-                scaleToOriginalDrawingSize = 1.0f;
+                // per b/296026932, if the scaled image size <= mOriginalStatusBarIconSize, we need
+                // to scale up the scaled image to fit in mOriginalStatusBarIconSize. But if both
+                // the raw drawable intrinsic width/height are less than mOriginalStatusBarIconSize,
+                // then we just scale up the scaled image back to the raw drawable size.
+                scaleToOriginalDrawingSize = Math.min(
+                        scaleToOriginalDrawingSize, 1f / scaleToFitIconView);
             }
         }
         iconScale = scaleToOriginalDrawingSize;

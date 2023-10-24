@@ -33,6 +33,7 @@ import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
 import static android.content.pm.PackageManager.INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_NEVER;
 import static android.content.pm.PackageManager.MATCH_ANY_USER;
 import static android.content.pm.PackageManager.MATCH_APEX;
+import static android.content.pm.PackageManager.MATCH_ARCHIVED_PACKAGES;
 import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_AWARE;
 import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
 import static android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS;
@@ -57,6 +58,7 @@ import static com.android.server.pm.PackageManagerService.DEBUG_PREFERRED;
 import static com.android.server.pm.PackageManagerService.EMPTY_INT_ARRAY;
 import static com.android.server.pm.PackageManagerService.HIDE_EPHEMERAL_APIS;
 import static com.android.server.pm.PackageManagerService.TAG;
+import static com.android.server.pm.PackageManagerServiceUtils.compareSignatureArrays;
 import static com.android.server.pm.PackageManagerServiceUtils.compareSignatures;
 import static com.android.server.pm.PackageManagerServiceUtils.isSystemOrRootOrShell;
 import static com.android.server.pm.resolution.ComponentResolver.RESOLVE_PRIORITY_SORTER;
@@ -578,7 +580,7 @@ public class ComputerEngine implements Computer {
                     list.add(ri);
                     PackageManagerServiceUtils.applyEnforceIntentFilterMatching(
                             mInjector.getCompatibility(), mComponentResolver,
-                            list, false, intent, resolvedType, filterCallingUid);
+                            list, false, intent, resolvedType, flags, filterCallingUid);
                 }
             }
         } else {
@@ -608,7 +610,7 @@ public class ComputerEngine implements Computer {
             // We also have to ensure all components match the original intent
             PackageManagerServiceUtils.applyEnforceIntentFilterMatching(
                     mInjector.getCompatibility(), mComponentResolver,
-                    list, false, originalIntent, resolvedType, filterCallingUid);
+                    list, false, originalIntent, resolvedType, flags, filterCallingUid);
         }
 
         return skipPostResolution ? list : applyPostResolutionFilter(
@@ -697,7 +699,7 @@ public class ComputerEngine implements Computer {
                     list.add(ri);
                     PackageManagerServiceUtils.applyEnforceIntentFilterMatching(
                             mInjector.getCompatibility(), mComponentResolver,
-                            list, false, intent, resolvedType, callingUid);
+                            list, false, intent, resolvedType, flags, callingUid);
                 }
             }
         } else {
@@ -709,7 +711,7 @@ public class ComputerEngine implements Computer {
             // We also have to ensure all components match the original intent
             PackageManagerServiceUtils.applyEnforceIntentFilterMatching(
                     mInjector.getCompatibility(), mComponentResolver,
-                    list, false, originalIntent, resolvedType, callingUid);
+                    list, false, originalIntent, resolvedType, flags, callingUid);
         }
 
         return list;
@@ -1022,7 +1024,7 @@ public class ComputerEngine implements Computer {
         if ("android".equals(packageName) || "system".equals(packageName)) {
             return androidApplication();
         }
-        if ((flags & MATCH_KNOWN_PACKAGES) != 0) {
+        if ((flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0) {
             // Already generates the external package name
             return generateApplicationInfoFromSettings(packageName,
                     flags, filterCallingUid, userId);
@@ -1507,7 +1509,7 @@ public class ComputerEngine implements Computer {
                     resolveExternalPackageName(p);
 
             return packageInfo;
-        } else if ((flags & MATCH_UNINSTALLED_PACKAGES) != 0
+        } else if ((flags & (MATCH_UNINSTALLED_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0
                 && PackageUserStateUtils.isAvailable(state, flags)) {
             PackageInfo pi = new PackageInfo();
             pi.packageName = ps.getPackageName();
@@ -1614,7 +1616,7 @@ public class ComputerEngine implements Computer {
 
             return generatePackageInfo(ps, flags, userId);
         }
-        if (!matchFactoryOnly && (flags & MATCH_KNOWN_PACKAGES) != 0) {
+        if (!matchFactoryOnly && (flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0) {
             final PackageStateInternal ps = mSettings.getPackage(packageName);
             if (ps == null) return null;
             if (filterSharedLibPackage(ps, filterCallingUid, userId, flags)) {
@@ -1678,9 +1680,11 @@ public class ComputerEngine implements Computer {
         final boolean listUninstalled = (flags & MATCH_KNOWN_PACKAGES) != 0;
         final boolean listApex = (flags & MATCH_APEX) != 0;
         final boolean listFactory = (flags & MATCH_FACTORY_ONLY) != 0;
+        // Only list archived apps, not fully uninstalled ones. Other entries are unaffected.
+        final boolean listArchivedOnly = !listUninstalled && (flags & MATCH_ARCHIVED_PACKAGES) != 0;
 
         ArrayList<PackageInfo> list;
-        if (listUninstalled) {
+        if (listUninstalled || listArchivedOnly) {
             list = new ArrayList<>(mSettings.getPackages().size());
             for (PackageStateInternal ps : mSettings.getPackages().values()) {
                 if (listFactory) {
@@ -1694,6 +1698,11 @@ public class ComputerEngine implements Computer {
                     }
                 }
                 if (!listApex && ps.getPkg() != null && ps.getPkg().isApex()) {
+                    continue;
+                }
+                PackageUserStateInternal userState = ps.getUserStateOrDefault(userId);
+                if (listArchivedOnly && !userState.isInstalled()
+                        && userState.getArchiveState() == null) {
                     continue;
                 }
                 if (filterSharedLibPackage(ps, callingUid, userId, flags)) {
@@ -2612,7 +2621,7 @@ public class ComputerEngine implements Computer {
                 return UserHandle.getUid(userId, p.getUid());
             }
         }
-        if ((flags & MATCH_KNOWN_PACKAGES) != 0) {
+        if ((flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0) {
             final PackageStateInternal ps = mSettings.getPackage(packageName);
             if (ps != null && PackageStateUtils.isMatch(ps, flags)
                     && !shouldFilterApplication(ps, callingUid, userId)) {
@@ -3671,7 +3680,7 @@ public class ComputerEngine implements Computer {
                         ps.getAppId()));
             }
         }
-        if ((flags & MATCH_KNOWN_PACKAGES) != 0) {
+        if ((flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0) {
             if (PackageStateUtils.isMatch(ps, flags)
                     && !shouldFilterApplication(ps, callingUid, userId)) {
                 return mPermissionManager.getGidsForUid(
@@ -4201,8 +4210,7 @@ public class ComputerEngine implements Computer {
         if (p2SigningDetails == null) {
             return PackageManager.SIGNATURE_SECOND_NOT_SIGNED;
         }
-        int result = compareSignatures(p1SigningDetails.getSignatures(),
-                p2SigningDetails.getSignatures());
+        int result = compareSignatures(p1SigningDetails, p2SigningDetails);
         if (result == PackageManager.SIGNATURE_MATCH) {
             return result;
         }
@@ -4217,7 +4225,7 @@ public class ComputerEngine implements Computer {
             Signature[] p2Signatures = p2SigningDetails.hasPastSigningCertificates()
                     ? new Signature[]{p2SigningDetails.getPastSigningCertificates()[0]}
                     : p2SigningDetails.getSignatures();
-            result = compareSignatures(p1Signatures, p2Signatures);
+            result = compareSignatureArrays(p1Signatures, p2Signatures);
         }
         return result;
     }
@@ -4525,7 +4533,8 @@ public class ComputerEngine implements Computer {
         flags = updateFlagsForPackage(flags, userId);
         enforceCrossUserPermission(Binder.getCallingUid(), userId, true /* requireFullPermission */,
                 false /* checkShell */, "get packages holding permissions");
-        final boolean listUninstalled = (flags & MATCH_KNOWN_PACKAGES) != 0;
+        final boolean listUninstalled =
+                (flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0;
 
         ArrayList<PackageInfo> list = new ArrayList<>();
         boolean[] tmpBools = new boolean[permissions.length];

@@ -19,7 +19,7 @@
             "name": "CtsAppOpsTestCases",
             "options": [
                 {
-                    "exclude-annotation": "android.platform.test.annotations.FlakyTest"
+                    "exclude-annotation": "androidx.test.filters.FlakyTest"
                 }
             ]
         },
@@ -138,7 +138,7 @@
                     "include-annotation": "android.platform.test.annotations.Presubmit"
                 },
                 {
-                    "exclude-annotation": "android.platform.test.annotations.LargeTest"
+                    "exclude-annotation": "androidx.test.filters.LargeTest"
                 },
                 {
                     "exclude-annotation": "androidx.test.filters.FlakyTest"
@@ -336,21 +336,6 @@
         },
         {
             "name": "CtsWindowManagerDeviceTaskFragment",
-            "options": [
-                {
-                    "exclude-annotation": "androidx.test.filters.FlakyTest"
-                },
-                {
-                    "exclude-annotation": "org.junit.Ignore"
-                },
-                {
-                    "include-filter": "android.content.wm.cts"
-                }
-            ],
-            "file_patterns": ["(/|^)ContextImpl.java"]
-        },
-        {
-            "name": "CtsWindowManagerDeviceScvh",
             "options": [
                 {
                     "exclude-annotation": "androidx.test.filters.FlakyTest"

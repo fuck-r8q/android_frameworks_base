@@ -175,6 +175,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private final Token mToken;
     private IApplicationThread mRemoteAnimApp;
 
+    private @Nullable ActivityRecord mPipActivity;
+
     /** Only use for clean-up after binder death! */
     private SurfaceControl.Transaction mStartTransaction = null;
     private SurfaceControl.Transaction mFinishTransaction = null;
@@ -449,10 +451,11 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     boolean canApplyDim(@NonNull Task task) {
         if (mTransientLaunches == null) return true;
         final Dimmer dimmer = task.getDimmer();
-        final WindowContainer<?> dimmerHost = dimmer != null ? dimmer.getHost() : null;
-        if (dimmerHost == null) return false;
-        if (isInTransientHide(dimmerHost)) {
-            // The layer of dimmer is inside transient-hide task, then allow to dim.
+        if (dimmer == null) {
+            return false;
+        }
+        if (dimmer.getHost().asTask() != null) {
+            // Always allow to dim if the host only affects its task.
             return true;
         }
         // The dimmer host of a translucent task can be a display, then it is not in transient-hide.
@@ -515,6 +518,21 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS, "Override sync-method for %s "
                     + "because seamless rotating", top.getName());
         }
+    }
+
+    /**
+     * Set the pip-able activity participating in this transition.
+     * @param pipActivity activity about to enter pip
+     */
+    void setPipActivity(@Nullable ActivityRecord pipActivity) {
+        mPipActivity = pipActivity;
+    }
+
+    /**
+     * @return pip-able activity participating in this transition.
+     */
+    @Nullable ActivityRecord getPipActivity() {
+        return mPipActivity;
     }
 
     /**
@@ -1142,6 +1160,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         // though, notify the controller to prevent degenerate cases.
                         if (!r.isVisibleRequested()) {
                             mController.mValidateCommitVis.add(r);
+                        } else {
+                            // Make sure onAppTransitionFinished can be notified.
+                            mParticipants.add(r);
                         }
                         return;
                     }
@@ -1502,6 +1523,11 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             return;
         }
 
+        if (mState != STATE_STARTED) {
+            Slog.e(TAG, "Playing a Transition which hasn't started! #" + mSyncId + " This will "
+                    + "likely cause an exception in Shell");
+        }
+
         mState = STATE_PLAYING;
         mStartTransaction = transaction;
         mFinishTransaction = mController.mAtm.mWindowManager.mTransactionFactory.get();
@@ -1536,6 +1562,17 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final DisplayContent dc = mController.mAtm.mRootWindowContainer.getDisplayContent(
                     info.getRoot(i).getDisplayId());
             mTargetDisplays.add(dc);
+        }
+
+        for (int i = 0; i < mTargets.size(); ++i) {
+            final DisplayArea da = mTargets.get(i).mContainer.asDisplayArea();
+            if (da == null) continue;
+            if (da.isVisibleRequested()) {
+                mController.mValidateDisplayVis.remove(da);
+            } else {
+                // In case something accidentally hides a displayarea and nothing shows it again.
+                mController.mValidateDisplayVis.add(da);
+            }
         }
 
         if (mOverrideOptions != null) {
@@ -1607,13 +1644,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             }
         }
 
-        // Take task snapshots before the animation so that we can capture IME before it gets
-        // transferred. If transition is transient, IME won't be moved during the transition and
-        // the tasks are still live, so we take the snapshot at the end of the transition instead.
-        if (mTransientLaunches == null) {
-            mController.mSnapshotController.onTransactionReady(mType, mTargets);
-        }
-
         // This is non-null only if display has changes. It handles the visible windows that don't
         // need to be participated in the transition.
         for (int i = 0; i < mTargetDisplays.size(); ++i) {
@@ -1664,12 +1694,34 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         reportStartReasonsToLogger();
 
+        // Take snapshots for closing tasks/activities before the animation finished but after
+        // dispatching onTransitionReady, so IME (if there is) can be captured together and the
+        // time spent on snapshot won't delay the start of animation. Note that if this transition
+        // is transient (mTransientLaunches != null), the snapshot will be captured at the end of
+        // the transition, because IME won't move be moved during the transition and the tasks are
+        // still live.
+        if (mTransientLaunches == null) {
+            mController.mSnapshotController.onTransactionReady(mType, mTargets);
+        }
+
         // Since we created root-leash but no longer reference it from core, release it now
         info.releaseAnimSurfaces();
 
         mLogger.logOnSendAsync(mController.mLoggerHandler);
         if (mLogger.mInfo != null) {
             mController.mTransitionTracer.logSentTransition(this, mTargets);
+        }
+    }
+
+    @Override
+    public void onTransactionCommitTimeout() {
+        if (mCleanupTransaction == null) return;
+        for (int i = mTargetDisplays.size() - 1; i >= 0; --i) {
+            final DisplayContent dc = mTargetDisplays.get(i);
+            final AsyncRotationController asyncRotationController = dc.getAsyncRotationController();
+            if (asyncRotationController != null && containsChangeFor(dc, mTargets)) {
+                asyncRotationController.onTransactionCommitTimeout(mCleanupTransaction);
+            }
         }
     }
 

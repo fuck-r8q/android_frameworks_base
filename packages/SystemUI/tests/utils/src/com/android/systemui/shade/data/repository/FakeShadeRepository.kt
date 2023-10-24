@@ -17,12 +17,17 @@
 
 package com.android.systemui.shade.data.repository
 
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.shade.domain.model.ShadeModel
+import dagger.Binds
+import dagger.Module
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Fake implementation of [ShadeRepository] */
-class FakeShadeRepository : ShadeRepository {
+@SysUISingleton
+class FakeShadeRepository @Inject constructor() : ShadeRepository {
 
     private val _shadeModel = MutableStateFlow(ShadeModel())
     override val shadeModel: Flow<ShadeModel> = _shadeModel
@@ -32,6 +37,41 @@ class FakeShadeRepository : ShadeRepository {
 
     private val _udfpsTransitionToFullShadeProgress = MutableStateFlow(0f)
     override val udfpsTransitionToFullShadeProgress = _udfpsTransitionToFullShadeProgress
+
+    private val _lockscreenShadeExpansion = MutableStateFlow(0f)
+    override val lockscreenShadeExpansion = _lockscreenShadeExpansion
+
+    private val _legacyShadeExpansion = MutableStateFlow(0f)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyShadeExpansion = _legacyShadeExpansion
+
+    private val _legacyShadeTracking = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyShadeTracking = _legacyShadeTracking
+
+    private val _legacyQsTracking = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead") override val legacyQsTracking = _legacyQsTracking
+
+    private val _legacyExpandedOrAwaitingInputTransfer = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyExpandedOrAwaitingInputTransfer = _legacyExpandedOrAwaitingInputTransfer
+
+    @Deprecated("Use ShadeInteractor instead")
+    override fun setLegacyExpandedOrAwaitingInputTransfer(
+        legacyExpandedOrAwaitingInputTransfer: Boolean
+    ) {
+        _legacyExpandedOrAwaitingInputTransfer.value = legacyExpandedOrAwaitingInputTransfer
+    }
+
+    @Deprecated("Should only be called by NPVC and tests")
+    override fun setLegacyQsTracking(legacyQsTracking: Boolean) {
+        _legacyQsTracking.value = legacyQsTracking
+    }
+
+    @Deprecated("Should only be called by NPVC and tests")
+    override fun setLegacyShadeTracking(tracking: Boolean) {
+        _legacyShadeTracking.value = tracking
+    }
 
     fun setShadeModel(model: ShadeModel) {
         _shadeModel.value = model
@@ -44,4 +84,18 @@ class FakeShadeRepository : ShadeRepository {
     override fun setUdfpsTransitionToFullShadeProgress(progress: Float) {
         _udfpsTransitionToFullShadeProgress.value = progress
     }
+
+    override fun setLockscreenShadeExpansion(lockscreenShadeExpansion: Float) {
+        _lockscreenShadeExpansion.value = lockscreenShadeExpansion
+    }
+
+    @Deprecated("Should only be called by NPVC and tests")
+    override fun setLegacyShadeExpansion(expandedFraction: Float) {
+        _legacyShadeExpansion.value = expandedFraction
+    }
+}
+
+@Module
+interface FakeShadeRepositoryModule {
+    @Binds fun bindFake(fake: FakeShadeRepository): ShadeRepository
 }

@@ -17,11 +17,13 @@
 package com.android.systemui.bouncer.ui.composable
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
@@ -30,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -45,7 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.android.systemui.bouncer.ui.viewmodel.PasswordBouncerViewModel
 
 /** UI for the input part of a password-requiring version of the bouncer. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PasswordBouncer(
     viewModel: PasswordBouncerViewModel,
@@ -55,6 +58,10 @@ internal fun PasswordBouncer(
     val password: String by viewModel.password.collectAsState()
     val isInputEnabled: Boolean by viewModel.isInputEnabled.collectAsState()
     val animateFailure: Boolean by viewModel.animateFailure.collectAsState()
+
+    val density = LocalDensity.current
+    val isImeVisible by rememberUpdatedState(WindowInsets.imeAnimationTarget.getBottom(density) > 0)
+    LaunchedEffect(isImeVisible) { viewModel.onImeVisibilityChanged(isImeVisible) }
 
     LaunchedEffect(Unit) {
         // When the UI comes up, request focus on the TextField to bring up the software keyboard.

@@ -22,14 +22,14 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel as DomainLayerAuthenticationMethodModel
-import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.flags.FakeFeatureFlags
-import com.android.systemui.flags.Flags
-import com.android.systemui.keyguard.shared.model.WakefulnessState
+import com.android.systemui.keyguard.ui.viewmodel.KeyguardLongPressViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenSceneViewModel
 import com.android.systemui.model.SysUiState
+import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
+import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
+import com.android.systemui.power.domain.interactor.PowerInteractorFactory
 import com.android.systemui.scene.SceneTestUtils.Companion.toDataLayer
 import com.android.systemui.scene.domain.startable.SceneContainerStartable
 import com.android.systemui.scene.shared.model.ObservableTransitionState
@@ -37,12 +37,21 @@ import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.settings.FakeDisplayTracker
+import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
+import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
+import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
+import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
+import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -69,13 +78,13 @@ import org.junit.runners.JUnit4
  *   being used when the state is as required (e.g. cannot unlock an already unlocked device, cannot
  *   put to sleep a device that's already asleep, etc.).
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RunWith(JUnit4::class)
 class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
-
     private val sceneContainerConfig = utils.fakeSceneContainerConfig()
     private val sceneRepository =
         utils.fakeSceneContainerRepository(
@@ -85,13 +94,13 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         utils.sceneInteractor(
             repository = sceneRepository,
         )
-
-    private val authenticationRepository = utils.authenticationRepository()
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = authenticationRepository,
+    private val authenticationInteractor = utils.authenticationInteractor()
+    private val deviceEntryInteractor =
+        utils.deviceEntryInteractor(
+            authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
         )
+    private val communalInteractor = utils.communalInteractor()
 
     private val transitionState =
         MutableStateFlow<ObservableTransitionState>(
@@ -99,12 +108,14 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         )
     private val sceneContainerViewModel =
         SceneContainerViewModel(
-                interactor = sceneInteractor,
+                sceneInteractor = sceneInteractor,
+                falsingInteractor = utils.falsingInteractor(),
             )
             .apply { setTransitionState(transitionState) }
 
     private val bouncerInteractor =
         utils.bouncerInteractor(
+            deviceEntryInteractor = deviceEntryInteractor,
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
         )
@@ -116,28 +127,64 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     private val lockscreenSceneViewModel =
         LockscreenSceneViewModel(
-            authenticationInteractor = authenticationInteractor,
-            bouncerInteractor = bouncerInteractor,
-        )
-
-    private val shadeSceneViewModel =
-        ShadeSceneViewModel(
             applicationScope = testScope.backgroundScope,
-            authenticationInteractor = authenticationInteractor,
-            bouncerInteractor = bouncerInteractor,
+            deviceEntryInteractor = deviceEntryInteractor,
+            communalInteractor = communalInteractor,
+            longPress =
+                KeyguardLongPressViewModel(
+                    interactor = mock(),
+                ),
         )
 
-    private val keyguardRepository = utils.keyguardRepository()
+    private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
+
+    private var mobileIconsViewModel: MobileIconsViewModel =
+        MobileIconsViewModel(
+            logger = mock(),
+            verboseLogger = mock(),
+            interactor = mobileIconsInteractor,
+            airplaneModeInteractor =
+                AirplaneModeInteractor(
+                    FakeAirplaneModeRepository(),
+                    FakeConnectivityRepository(),
+                ),
+            constants = mock(),
+            scope = testScope.backgroundScope,
+        )
+
+    private lateinit var shadeHeaderViewModel: ShadeHeaderViewModel
+    private lateinit var shadeSceneViewModel: ShadeSceneViewModel
+
+    private val keyguardRepository = utils.keyguardRepository
     private val keyguardInteractor =
         utils.keyguardInteractor(
             repository = keyguardRepository,
         )
+    private val powerInteractor = PowerInteractorFactory.create().powerInteractor
+
+    private var bouncerSceneJob: Job? = null
 
     @Before
     fun setUp() {
-        val featureFlags = FakeFeatureFlags().apply { set(Flags.SCENE_CONTAINER, true) }
+        shadeHeaderViewModel =
+            ShadeHeaderViewModel(
+                applicationScope = testScope.backgroundScope,
+                context = context,
+                sceneInteractor = sceneInteractor,
+                mobileIconsInteractor = mobileIconsInteractor,
+                mobileIconsViewModel = mobileIconsViewModel,
+                broadcastDispatcher = fakeBroadcastDispatcher,
+            )
 
-        authenticationRepository.setUnlocked(false)
+        shadeSceneViewModel =
+            ShadeSceneViewModel(
+                applicationScope = testScope.backgroundScope,
+                deviceEntryInteractor = deviceEntryInteractor,
+                bouncerInteractor = bouncerInteractor,
+                shadeHeaderViewModel = shadeHeaderViewModel,
+            )
+
+        utils.deviceEntryRepository.setUnlocked(false)
 
         val displayTracker = FakeDisplayTracker(context)
         val sysUiState = SysUiState(displayTracker)
@@ -145,12 +192,15 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             SceneContainerStartable(
                 applicationScope = testScope.backgroundScope,
                 sceneInteractor = sceneInteractor,
+                deviceEntryInteractor = deviceEntryInteractor,
                 authenticationInteractor = authenticationInteractor,
                 keyguardInteractor = keyguardInteractor,
-                featureFlags = featureFlags,
+                flags = utils.sceneContainerFlags,
                 sysUiState = sysUiState,
                 displayId = displayTracker.defaultDisplayId,
                 sceneLogger = mock(),
+                falsingCollector = utils.falsingCollector(),
+                powerInteractor = powerInteractor,
             )
         startable.start()
 
@@ -165,9 +215,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     @Test
     fun clickLockButtonAndEnterCorrectPin_unlocksDevice() =
         testScope.runTest {
-            lockscreenSceneViewModel.onLockButtonClicked()
-            assertCurrentScene(SceneKey.Bouncer)
-            emulateUiSceneTransition()
+            emulateUserDrivenTransition(SceneKey.Bouncer)
 
             enterPin()
             assertCurrentScene(SceneKey.Gone)
@@ -247,7 +295,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     @Test
     fun withAuthMethodNone_deviceWakeUp_skipsLockscreen() =
         testScope.runTest {
-            setAuthMethod(AuthenticationMethodModel.None)
+            setAuthMethod(DomainLayerAuthenticationMethodModel.None)
             putDeviceToSleep(instantlyLockDevice = false)
             assertCurrentScene(SceneKey.Lockscreen)
 
@@ -258,7 +306,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     @Test
     fun withAuthMethodSwipe_deviceWakeUp_doesNotSkipLockscreen() =
         testScope.runTest {
-            setAuthMethod(AuthenticationMethodModel.Swipe)
+            setAuthMethod(DomainLayerAuthenticationMethodModel.Swipe)
             putDeviceToSleep(instantlyLockDevice = false)
             assertCurrentScene(SceneKey.Lockscreen)
 
@@ -323,6 +371,23 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             assertCurrentScene(SceneKey.Lockscreen)
         }
 
+    @Test
+    fun dismissingIme_whileOnPasswordBouncer_navigatesToLockscreen() =
+        testScope.runTest {
+            setAuthMethod(DomainLayerAuthenticationMethodModel.Password)
+            val upDestinationSceneKey by
+                collectLastValue(lockscreenSceneViewModel.upDestinationSceneKey)
+            assertThat(upDestinationSceneKey).isEqualTo(SceneKey.Bouncer)
+            emulateUserDrivenTransition(
+                to = upDestinationSceneKey,
+            )
+
+            dismissIme()
+
+            assertCurrentScene(SceneKey.Lockscreen)
+            emulateUiSceneTransition()
+        }
+
     /**
      * Asserts that the current scene in the view-model matches what's expected.
      *
@@ -355,11 +420,13 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         // Set the lockscreen enabled bit _before_ set the auth method as the code picks up on the
         // lockscreen enabled bit _after_ the auth method is changed and the lockscreen enabled bit
         // is not an observable that can trigger a new evaluation.
-        authenticationRepository.setLockscreenEnabled(authMethod !is AuthenticationMethodModel.None)
-        authenticationRepository.setAuthenticationMethod(authMethod.toDataLayer())
+        utils.deviceEntryRepository.setInsecureLockscreenEnabled(
+            authMethod !is DomainLayerAuthenticationMethodModel.None
+        )
+        utils.authenticationRepository.setAuthenticationMethod(authMethod.toDataLayer())
         if (!authMethod.isSecure) {
             // When the auth method is not secure, the device is never considered locked.
-            authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
         }
         runCurrent()
     }
@@ -395,6 +462,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 fromScene = getCurrentSceneInUi(),
                 toScene = to.key,
                 progress = progressFlow,
+                isUserInputDriven = false,
             )
         runCurrent()
 
@@ -413,6 +481,19 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         assertWithMessage("Visibility mismatch after scene transition from $from to ${to.key}!")
             .that(sceneContainerViewModel.isVisible.value)
             .isEqualTo(expectedVisible)
+
+        bouncerSceneJob =
+            if (to.key == SceneKey.Bouncer) {
+                testScope.backgroundScope.launch {
+                    bouncerViewModel.authMethodViewModel.collect {
+                        // Do nothing. Need this to turn this otherwise cold flow, hot.
+                    }
+                }
+            } else {
+                bouncerSceneJob?.cancel()
+                null
+            }
+        runCurrent()
     }
 
     /**
@@ -450,20 +531,17 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             .that(authMethod.isSecure)
             .isTrue()
 
-        authenticationRepository.setUnlocked(false)
+        utils.deviceEntryRepository.setUnlocked(false)
         runCurrent()
     }
 
     /** Unlocks the device by entering the correct PIN. Ends up in the Gone scene. */
     private fun TestScope.unlockDevice() {
         assertWithMessage("Cannot unlock a device that's already unlocked!")
-            .that(authenticationInteractor.isUnlocked.value)
+            .that(deviceEntryInteractor.isUnlocked.value)
             .isFalse()
 
-        lockscreenSceneViewModel.onLockButtonClicked()
-        runCurrent()
-        emulateUiSceneTransition()
-
+        emulateUserDrivenTransition(SceneKey.Bouncer)
         enterPin()
         emulateUiSceneTransition(
             expectedVisible = false,
@@ -482,7 +560,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         assertWithMessage("Cannot enter PIN when not on the Bouncer scene!")
             .that(getCurrentSceneInUi())
             .isEqualTo(SceneKey.Bouncer)
-        val authMethodViewModel by collectLastValue(bouncerViewModel.authMethod)
+        val authMethodViewModel by collectLastValue(bouncerViewModel.authMethodViewModel)
         assertWithMessage("Cannot enter PIN when not using a PIN authentication method!")
             .that(authMethodViewModel)
             .isInstanceOf(PinBouncerViewModel::class.java)
@@ -497,18 +575,12 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     /** Changes device wakefulness state from asleep to awake, going through intermediary states. */
     private fun TestScope.wakeUpDevice() {
-        val wakefulnessModel = keyguardRepository.wakefulness.value
+        val wakefulnessModel = powerInteractor.detailedWakefulness.value
         assertWithMessage("Cannot wake up device as it's already awake!")
-            .that(wakefulnessModel.isStartingToWakeOrAwake())
+            .that(wakefulnessModel.isAwake())
             .isFalse()
 
-        keyguardRepository.setWakefulnessModel(
-            wakefulnessModel.copy(state = WakefulnessState.STARTING_TO_WAKE)
-        )
-        runCurrent()
-        keyguardRepository.setWakefulnessModel(
-            wakefulnessModel.copy(state = WakefulnessState.AWAKE)
-        )
+        powerInteractor.setAwakeForTest()
         runCurrent()
     }
 
@@ -516,22 +588,29 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     private suspend fun TestScope.putDeviceToSleep(
         instantlyLockDevice: Boolean = true,
     ) {
-        val wakefulnessModel = keyguardRepository.wakefulness.value
+        val wakefulnessModel = powerInteractor.detailedWakefulness.value
         assertWithMessage("Cannot put device to sleep as it's already asleep!")
-            .that(wakefulnessModel.isStartingToWakeOrAwake())
+            .that(wakefulnessModel.isAwake())
             .isTrue()
 
-        keyguardRepository.setWakefulnessModel(
-            wakefulnessModel.copy(state = WakefulnessState.STARTING_TO_SLEEP)
-        )
-        runCurrent()
-        keyguardRepository.setWakefulnessModel(
-            wakefulnessModel.copy(state = WakefulnessState.ASLEEP)
-        )
+        powerInteractor.setAsleepForTest()
         runCurrent()
 
         if (instantlyLockDevice) {
             lockDevice()
+        }
+    }
+
+    /** Emulates the dismissal of the IME (soft keyboard). */
+    private fun TestScope.dismissIme(
+        showImeBeforeDismissing: Boolean = true,
+    ) {
+        bouncerViewModel.authMethodViewModel.value?.apply {
+            if (showImeBeforeDismissing) {
+                onImeVisibilityChanged(true)
+            }
+            onImeVisibilityChanged(false)
+            runCurrent()
         }
     }
 }

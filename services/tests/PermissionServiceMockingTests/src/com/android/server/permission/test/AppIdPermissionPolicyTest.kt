@@ -16,521 +16,415 @@
 
 package com.android.server.permission.test
 
-import android.content.pm.PackageManager
 import android.content.pm.PermissionGroupInfo
 import android.content.pm.PermissionInfo
-import android.os.Bundle
-import android.util.ArrayMap
-import android.util.ArraySet
-import android.util.SparseArray
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.android.modules.utils.testing.ExtendedMockitoRule
-import com.android.server.extendedtestutils.wheneverStatic
-import com.android.server.permission.access.MutableAccessState
-import com.android.server.permission.access.MutableUserState
-import com.android.server.permission.access.MutateStateScope
+import com.android.server.permission.access.GetStateScope
 import com.android.server.permission.access.immutable.* // ktlint-disable no-wildcard-imports
 import com.android.server.permission.access.permission.AppIdPermissionPolicy
 import com.android.server.permission.access.permission.Permission
 import com.android.server.permission.access.permission.PermissionFlags
-import com.android.server.pm.parsing.PackageInfoUtils
-import com.android.server.pm.pkg.AndroidPackage
-import com.android.server.pm.pkg.PackageState
-import com.android.server.pm.pkg.PackageUserState
-import com.android.server.pm.pkg.component.ParsedPermission
-import com.android.server.pm.pkg.component.ParsedPermissionGroup
 import com.android.server.testutils.mock
-import com.android.server.testutils.whenever
+import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 
-/**
- * Mocking unit test for AppIdPermissionPolicy.
- */
-@RunWith(AndroidJUnit4::class)
-class AppIdPermissionPolicyTest {
-    private lateinit var oldState: MutableAccessState
-    private lateinit var newState: MutableAccessState
-
-    private lateinit var androidPackage0: AndroidPackage
-    private lateinit var androidPackage1: AndroidPackage
-
-    private lateinit var packageState0: PackageState
-    private lateinit var packageState1: PackageState
-
-    private val appIdPermissionPolicy = AppIdPermissionPolicy()
-
-    @Rule
-    @JvmField
-    val extendedMockitoRule = ExtendedMockitoRule.Builder(this)
-        .spyStatic(PackageInfoUtils::class.java)
-        .build()
-
-    @Before
-    fun init() {
-        oldState = MutableAccessState()
-        createUserState(USER_ID_0)
-        createUserState(USER_ID_1)
-        oldState.mutateExternalState().setPackageStates(ArrayMap())
-
-        androidPackage0 = mockAndroidPackage(
-            PACKAGE_NAME_0,
-            PERMISSION_GROUP_NAME_0,
-            PERMISSION_NAME_0
-        )
-        androidPackage1 = mockAndroidPackage(
-            PACKAGE_NAME_1,
-            PERMISSION_GROUP_NAME_1,
-            PERMISSION_NAME_1
-        )
-
-        packageState0 = mockPackageState(APP_ID_0, androidPackage0)
-        packageState1 = mockPackageState(APP_ID_1, androidPackage1)
-    }
-
-    private fun mockAndroidPackage(
-        packageName: String,
-        permissionGroupName: String,
-        permissionName: String,
-    ): AndroidPackage {
-        val parsedPermissionGroup = mock<ParsedPermissionGroup> {
-            whenever(name).thenReturn(permissionGroupName)
-            whenever(metaData).thenReturn(Bundle())
-        }
-
-        @Suppress("DEPRECATION")
-        val permissionGroupInfo = PermissionGroupInfo().apply {
-            name = permissionGroupName
-            this.packageName = packageName
-        }
-        wheneverStatic {
-            PackageInfoUtils.generatePermissionGroupInfo(
-                parsedPermissionGroup,
-                PackageManager.GET_META_DATA.toLong()
-            )
-        }.thenReturn(permissionGroupInfo)
-
-        val parsedPermission = mock<ParsedPermission> {
-            whenever(name).thenReturn(permissionName)
-            whenever(isTree).thenReturn(false)
-            whenever(metaData).thenReturn(Bundle())
-        }
-
-        @Suppress("DEPRECATION")
-        val permissionInfo = PermissionInfo().apply {
-            name = permissionName
-            this.packageName = packageName
-        }
-        wheneverStatic {
-            PackageInfoUtils.generatePermissionInfo(
-                parsedPermission,
-                PackageManager.GET_META_DATA.toLong()
-            )
-        }.thenReturn(permissionInfo)
-
-        val requestedPermissions = ArraySet<String>()
-        return mock {
-            whenever(this.packageName).thenReturn(packageName)
-            whenever(this.requestedPermissions).thenReturn(requestedPermissions)
-            whenever(permissionGroups).thenReturn(listOf(parsedPermissionGroup))
-            whenever(permissions).thenReturn(listOf(parsedPermission))
-            whenever(signingDetails).thenReturn(mock {})
-        }
-    }
-
-    private fun mockPackageState(
-        appId: Int,
-        androidPackage: AndroidPackage,
-    ): PackageState {
-        val packageName = androidPackage.packageName
-        oldState.mutateExternalState().mutateAppIdPackageNames().mutateOrPut(appId) {
-            MutableIndexedListSet()
-        }.add(packageName)
-
-        val userStates = SparseArray<PackageUserState>().apply {
-            put(USER_ID_0, mock { whenever(isInstantApp).thenReturn(false) })
-        }
-        val mockPackageState: PackageState = mock {
-            whenever(this.packageName).thenReturn(packageName)
-            whenever(this.appId).thenReturn(appId)
-            whenever(this.androidPackage).thenReturn(androidPackage)
-            whenever(isSystem).thenReturn(false)
-            whenever(this.userStates).thenReturn(userStates)
-        }
-        oldState.mutateExternalState().setPackageStates(
-            oldState.mutateExternalState().packageStates.toMutableMap().apply {
-                put(packageName, mockPackageState)
-            }
-        )
-        return mockPackageState
-    }
-
-    private fun createUserState(userId: Int) {
-        oldState.mutateUserStatesNoWrite().put(userId, MutableUserState())
-    }
-
+class AppIdPermissionPolicyTest : BaseAppIdPermissionPolicyTest() {
     @Test
-    fun testResetRuntimePermissions_runtimeGranted_getsRevoked() {
-        val oldFlags = PermissionFlags.RUNTIME_GRANTED
-        val expectedNewFlags = 0
-        testResetRuntimePermissions(oldFlags, expectedNewFlags) {}
-    }
-
-    @Test
-    fun testResetRuntimePermissions_roleGranted_getsGranted() {
-        val oldFlags = PermissionFlags.ROLE
-        val expectedNewFlags = PermissionFlags.ROLE or PermissionFlags.RUNTIME_GRANTED
-        testResetRuntimePermissions(oldFlags, expectedNewFlags) {}
-    }
-
-    @Test
-    fun testResetRuntimePermissions_nullAndroidPackage_remainsUnchanged() {
-        val oldFlags = PermissionFlags.RUNTIME_GRANTED
-        val expectedNewFlags = PermissionFlags.RUNTIME_GRANTED
-        testResetRuntimePermissions(oldFlags, expectedNewFlags) {
-            whenever(packageState0.androidPackage).thenReturn(null)
-        }
-    }
-
-    private inline fun testResetRuntimePermissions(
-        oldFlags: Int,
-        expectedNewFlags: Int,
-        additionalSetup: () -> Unit
-    ) {
-        createSystemStatePermission(
+    fun testOnAppIdRemoved_appIdIsRemoved_permissionFlagsCleared() {
+        val parsedPermission = mockParsedPermission(PERMISSION_NAME_0, PACKAGE_NAME_0)
+        val permissionOwnerPackageState = mockPackageState(
             APP_ID_0,
-            PACKAGE_NAME_0,
-            PERMISSION_NAME_0,
-            PermissionInfo.PROTECTION_DANGEROUS
+            mockAndroidPackage(PACKAGE_NAME_0, permissions = listOf(parsedPermission))
         )
-        androidPackage0.requestedPermissions.add(PERMISSION_NAME_0)
-        oldState.mutateUserState(USER_ID_0)!!.mutateAppIdPermissionFlags().mutateOrPut(APP_ID_0) {
-            MutableIndexedMap()
-        }.put(PERMISSION_NAME_0, oldFlags)
-
-        additionalSetup()
+        val requestingPackageState = mockPackageState(
+            APP_ID_1,
+            mockAndroidPackage(PACKAGE_NAME_1, requestedPermissions = setOf(PERMISSION_NAME_0))
+        )
+        addPackageState(permissionOwnerPackageState)
+        addPackageState(requestingPackageState)
+        addPermission(parsedPermission)
+        setPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0, PermissionFlags.INSTALL_GRANTED)
 
         mutateState {
             with(appIdPermissionPolicy) {
-                resetRuntimePermissions(PACKAGE_NAME_0, USER_ID_0)
+                onAppIdRemoved(APP_ID_1)
             }
         }
 
-        val actualFlags = getPermissionFlags(APP_ID_0, USER_ID_0, PERMISSION_NAME_0)
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = 0
         assertWithMessage(
-            "After resetting runtime permissions, permission flags did not match" +
-            " expected values: expectedNewFlags is $expectedNewFlags," +
-            " actualFlags is $actualFlags, while the oldFlags is $oldFlags"
+            "After onAppIdRemoved() is called for appId $APP_ID_1 that requests a permission" +
+                " owns by appId $APP_ID_0 with existing permission flags. The actual permission" +
+                " flags $actualFlags should be null"
         )
             .that(actualFlags)
             .isEqualTo(expectedNewFlags)
     }
 
     @Test
-    fun testOnPackageAdded_permissionsOfMissingSystemApp_getsAdopted() {
-        testOnPackageAdded {
-            adoptPermissionTestSetup()
-            whenever(packageState1.androidPackage).thenReturn(null)
-        }
-
-        val permission0 = newState.systemState.permissions[PERMISSION_NAME_0]
-        assertWithMessage(
-            "After onPackageAdded() is called for a null adopt permission package," +
-            " the permission package name: ${permission0!!.packageName} did not match" +
-            " the expected package name: $PACKAGE_NAME_0"
-        )
-            .that(permission0.packageName)
-            .isEqualTo(PACKAGE_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_permissionsOfExistingSystemApp_notAdopted() {
-        testOnPackageAdded {
-            adoptPermissionTestSetup()
-        }
-
-        val permission0 = newState.systemState.permissions[PERMISSION_NAME_0]
-        assertWithMessage(
-            "After onPackageAdded() is called for a non-null adopt permission" +
-            " package, the permission package name: ${permission0!!.packageName} should" +
-            " not match the package name: $PACKAGE_NAME_0"
-        )
-            .that(permission0.packageName)
-            .isNotEqualTo(PACKAGE_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_permissionsOfNonSystemApp_notAdopted() {
-        testOnPackageAdded {
-            adoptPermissionTestSetup()
-            whenever(packageState1.isSystem).thenReturn(false)
-        }
-
-        val permission0 = newState.systemState.permissions[PERMISSION_NAME_0]
-        assertWithMessage(
-            "After onPackageAdded() is called for a non-system adopt permission" +
-                " package, the permission package name: ${permission0!!.packageName} should" +
-                " not match the package name: $PACKAGE_NAME_0"
-        )
-            .that(permission0.packageName)
-            .isNotEqualTo(PACKAGE_NAME_0)
-    }
-
-    private fun adoptPermissionTestSetup() {
-        createSystemStatePermission(
+    fun testOnStorageVolumeMounted_nonSystemAppAfterNonSystemUpdate_remainsRevoked() {
+        val permissionOwnerPackageState = mockPackageState(APP_ID_0, mockSimpleAndroidPackage())
+        val installedPackageState = mockPackageState(
             APP_ID_1,
-            PACKAGE_NAME_1,
-            PERMISSION_NAME_0,
-            PermissionInfo.PROTECTION_SIGNATURE
+            mockAndroidPackage(PACKAGE_NAME_1, requestedPermissions = setOf(PERMISSION_NAME_0))
         )
-        whenever(androidPackage0.adoptPermissions).thenReturn(listOf(PACKAGE_NAME_1))
-        whenever(packageState1.isSystem).thenReturn(true)
-    }
-
-    @Test
-    fun testOnPackageAdded_newPermissionGroup_getsDeclared() {
-        testOnPackageAdded {}
-
-        assertWithMessage(
-            "After onPackageAdded() is called when there is no existing" +
-            " permission groups, the new permission group $PERMISSION_GROUP_NAME_0 is not added"
-        )
-            .that(newState.systemState.permissionGroups[PERMISSION_GROUP_NAME_0]?.name)
-            .isEqualTo(PERMISSION_GROUP_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_systemAppTakingOverPermissionGroupDefinition_getsTakenOver() {
-        testOnPackageAdded {
-            whenever(packageState0.isSystem).thenReturn(true)
-            createSystemStatePermissionGroup(PACKAGE_NAME_1, PERMISSION_GROUP_NAME_0)
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_GROUP_NAME_0 already" +
-            " exists in the system, the system app $PACKAGE_NAME_0 didn't takeover the ownership" +
-            " of this permission group"
-        )
-            .that(newState.systemState.permissionGroups[PERMISSION_GROUP_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_instantApps_remainsUnchanged() {
-        testOnPackageAdded {
-            (packageState0.userStates as SparseArray<PackageUserState>).apply {
-                put(0, mock { whenever(isInstantApp).thenReturn(true) })
-            }
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called for an instant app," +
-            " the new permission group $PERMISSION_GROUP_NAME_0 should not be added"
-        )
-            .that(newState.systemState.permissionGroups[PERMISSION_GROUP_NAME_0])
-            .isNull()
-    }
-
-    @Test
-    fun testOnPackageAdded_nonSystemAppTakingOverPermissionGroupDefinition_remainsUnchanged() {
-        testOnPackageAdded {
-            createSystemStatePermissionGroup(PACKAGE_NAME_1, PERMISSION_GROUP_NAME_0)
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_GROUP_NAME_0 already" +
-            " exists in the system, non-system app $PACKAGE_NAME_0 shouldn't takeover ownership" +
-            " of this permission group"
-        )
-            .that(newState.systemState.permissionGroups[PERMISSION_GROUP_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_1)
-    }
-
-    @Test
-    fun testOnPackageAdded_takingOverPermissionGroupDeclaredBySystemApp_remainsUnchanged() {
-        testOnPackageAdded {
-            whenever(packageState1.isSystem).thenReturn(true)
-            createSystemStatePermissionGroup(PACKAGE_NAME_1, PERMISSION_GROUP_NAME_0)
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_GROUP_NAME_0 already" +
-            " exists in the system and is owned by a system app, app $PACKAGE_NAME_0 shouldn't" +
-            " takeover ownership of this permission group"
-        )
-            .that(newState.systemState.permissionGroups[PERMISSION_GROUP_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_1)
-    }
-
-    @Test
-    fun testOnPackageAdded_newPermission_getsDeclared() {
-        testOnPackageAdded {}
-
-        assertWithMessage(
-            "After onPackageAdded() is called when there is no existing" +
-            " permissions, the new permission $PERMISSION_NAME_0 is not added"
-        )
-            .that(newState.systemState.permissions[PERMISSION_NAME_0]?.name)
-            .isEqualTo(PERMISSION_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_configPermission_getsTakenOver() {
-        testOnPackageAdded {
-            whenever(packageState0.isSystem).thenReturn(true)
-            createSystemStatePermission(
-                APP_ID_0,
-                PACKAGE_NAME_1,
-                PERMISSION_NAME_0,
-                PermissionInfo.PROTECTION_DANGEROUS,
-                Permission.TYPE_CONFIG,
-                false
-            )
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called for a config permission with" +
-            " no owner, the ownership is not taken over by a system app $PACKAGE_NAME_0"
-        )
-            .that(newState.systemState.permissions[PERMISSION_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_systemAppTakingOverPermissionDefinition_getsTakenOver() {
-        testOnPackageAdded {
-            whenever(packageState0.isSystem).thenReturn(true)
-            createSystemStatePermission(
-                APP_ID_1,
-                PACKAGE_NAME_1,
-                PERMISSION_NAME_0,
-                PermissionInfo.PROTECTION_DANGEROUS
-            )
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_NAME_0 already" +
-            " exists in the system, the system app $PACKAGE_NAME_0 didn't takeover the ownership" +
-            " of this permission"
-        )
-            .that(newState.systemState.permissions[PERMISSION_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_0)
-    }
-
-    @Test
-    fun testOnPackageAdded_nonSystemAppTakingOverPermissionDefinition_remainsUnchanged() {
-        testOnPackageAdded {
-            createSystemStatePermission(
-                APP_ID_1,
-                PACKAGE_NAME_1,
-                PERMISSION_NAME_0,
-                PermissionInfo.PROTECTION_DANGEROUS
-            )
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_NAME_0 already" +
-            " exists in the system, the non-system app $PACKAGE_NAME_0 shouldn't takeover" +
-            " ownership of this permission"
-        )
-            .that(newState.systemState.permissions[PERMISSION_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_1)
-    }
-
-    @Test
-    fun testOnPackageAdded_takingOverPermissionDeclaredBySystemApp_remainsUnchanged() {
-        testOnPackageAdded {
-            whenever(packageState1.isSystem).thenReturn(true)
-            createSystemStatePermission(
-                APP_ID_1,
-                PACKAGE_NAME_1,
-                PERMISSION_NAME_0,
-                PermissionInfo.PROTECTION_DANGEROUS
-            )
-        }
-
-        assertWithMessage(
-            "After onPackageAdded() is called when $PERMISSION_NAME_0 already" +
-            " exists in system and is owned by a system app, the app $PACKAGE_NAME_0 shouldn't" +
-            " takeover ownership of this permission"
-        )
-            .that(newState.systemState.permissions[PERMISSION_NAME_0]?.packageName)
-            .isEqualTo(PACKAGE_NAME_1)
-    }
-
-    private inline fun testOnPackageAdded(mockBehaviorOverride: () -> Unit) {
-        mockBehaviorOverride()
+        addPackageState(permissionOwnerPackageState)
+        addPackageState(installedPackageState)
+        addPermission(defaultPermission)
+        val oldFlags = PermissionFlags.INSTALL_REVOKED
+        setPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0, oldFlags)
 
         mutateState {
             with(appIdPermissionPolicy) {
-                onPackageAdded(packageState0)
+                onStorageVolumeMounted(null, listOf(installedPackageState.packageName), false)
+            }
+        }
+
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = oldFlags
+        assertWithMessage(
+            "After onStorageVolumeMounted() is called for a non-system app that requests a normal" +
+                " permission with existing INSTALL_REVOKED flag after a non-system-update" +
+                " (such as an OTA update), the actual permission flags should remain revoked." +
+                " The actual permission flags $actualFlags should match the expected flags" +
+                " $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageRemoved_packageIsRemoved_permissionDefinitionsAndStatesAreUpdated() {
+        val permissionOwnerPackageState = mockPackageState(
+            APP_ID_0,
+            mockAndroidPackage(
+                PACKAGE_NAME_0,
+                requestedPermissions = setOf(PERMISSION_NAME_0),
+                permissions = listOf(defaultPermission)
+            )
+        )
+        val requestingPackageState = mockPackageState(
+            APP_ID_1,
+            mockAndroidPackage(PACKAGE_NAME_1, requestedPermissions = setOf(PERMISSION_NAME_0))
+        )
+        addPackageState(permissionOwnerPackageState)
+        addPackageState(requestingPackageState)
+        addPermission(defaultPermission)
+        val oldFlags = PermissionFlags.INSTALL_GRANTED
+        setPermissionFlags(APP_ID_0, USER_ID_0, PERMISSION_NAME_0, oldFlags)
+        setPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0, oldFlags)
+
+        mutateState {
+            removePackageState(permissionOwnerPackageState)
+            with(appIdPermissionPolicy) {
+                onPackageRemoved(PACKAGE_NAME_0, APP_ID_0)
+            }
+        }
+
+        assertWithMessage(
+            "After onPackageRemoved() is called for a permission owner, the permission" +
+                " definitions owned by this package should be removed"
+        )
+            .that(getPermission(PERMISSION_NAME_0))
+            .isNull()
+
+        val app0ActualFlags = getPermissionFlags(APP_ID_0, USER_ID_0, PERMISSION_NAME_0)
+        val app0ExpectedNewFlags = 0
+        assertWithMessage(
+            "After onPackageRemoved() is called for a permission owner, the permission states of" +
+                " this app should be trimmed. The actual permission flags $app0ActualFlags should" +
+                " match the expected flags $app0ExpectedNewFlags"
+        )
+            .that(app0ActualFlags)
+            .isEqualTo(app0ExpectedNewFlags)
+
+        val app1ActualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val app1ExpectedNewFlags = PermissionFlags.INSTALL_REVOKED
+        assertWithMessage(
+            "After onPackageRemoved() is called for a permission owner, the permission states of" +
+                " the permission requester should remain unchanged. The actual permission flags" +
+                " $app1ActualFlags should match the expected flags $app1ExpectedNewFlags"
+        )
+            .that(app1ActualFlags)
+            .isEqualTo(app1ExpectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageInstalled_nonSystemAppIsInstalled_upgradeExemptFlagIsCleared() {
+        val oldFlags = PermissionFlags.SOFT_RESTRICTED or PermissionFlags.UPGRADE_EXEMPT
+        testOnPackageInstalled(
+            oldFlags,
+            permissionInfoFlags = PermissionInfo.FLAG_SOFT_RESTRICTED
+        ) {}
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = PermissionFlags.SOFT_RESTRICTED
+        assertWithMessage(
+            "After onPackageInstalled() is called for a non-system app that requests a runtime" +
+                " soft restricted permission, UPGRADE_EXEMPT flag should be removed. The actual" +
+                " permission flags $actualFlags should match the expected flags $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageInstalled_systemAppIsInstalled_upgradeExemptFlagIsRetained() {
+        val oldFlags = PermissionFlags.SOFT_RESTRICTED or PermissionFlags.UPGRADE_EXEMPT
+        testOnPackageInstalled(
+            oldFlags,
+            permissionInfoFlags = PermissionInfo.FLAG_SOFT_RESTRICTED,
+            isInstalledPackageSystem = true
+        ) {}
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = oldFlags
+        assertWithMessage(
+            "After onPackageInstalled() is called for a system app that requests a runtime" +
+                " soft restricted permission, UPGRADE_EXEMPT flag should be retained. The actual" +
+                " permission flags $actualFlags should match the expected flags $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageInstalled_requestedPermissionAlsoRequestedBySystemApp_exemptFlagIsRetained() {
+        val oldFlags = PermissionFlags.SOFT_RESTRICTED or PermissionFlags.UPGRADE_EXEMPT
+        testOnPackageInstalled(
+            oldFlags,
+            permissionInfoFlags = PermissionInfo.FLAG_SOFT_RESTRICTED
+        ) {
+            val systemAppPackageState = mockPackageState(
+                APP_ID_1,
+                mockAndroidPackage(PACKAGE_NAME_2, requestedPermissions = setOf(PERMISSION_NAME_0)),
+                isSystem = true
+            )
+            addPackageState(systemAppPackageState)
+        }
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = oldFlags
+        assertWithMessage(
+            "After onPackageInstalled() is called for a non-system app that requests a runtime" +
+                " soft restricted permission, and that permission is also requested by a system" +
+                " app in the same appId, UPGRADE_EXEMPT flag should be retained. The actual" +
+                " permission flags $actualFlags should match the expected flags $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageInstalled_restrictedPermissionsNotExempt_getsRestrictionFlags() {
+        val oldFlags = PermissionFlags.RESTRICTION_REVOKED
+        testOnPackageInstalled(
+            oldFlags,
+            permissionInfoFlags = PermissionInfo.FLAG_HARD_RESTRICTED
+        ) {}
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = oldFlags
+        assertWithMessage(
+            "After onPackageInstalled() is called for a non-system app that requests a runtime" +
+                " hard restricted permission that is not exempted. The actual permission flags" +
+                " $actualFlags should match the expected flags $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    @Test
+    fun testOnPackageInstalled_restrictedPermissionsIsExempted_clearsRestrictionFlags() {
+        val oldFlags = PermissionFlags.SOFT_RESTRICTED or PermissionFlags.INSTALLER_EXEMPT
+        testOnPackageInstalled(
+            oldFlags,
+            permissionInfoFlags = PermissionInfo.FLAG_SOFT_RESTRICTED
+        ) {}
+        val actualFlags = getPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0)
+        val expectedNewFlags = PermissionFlags.INSTALLER_EXEMPT
+        assertWithMessage(
+            "After onPackageInstalled() is called for a non-system app that requests a runtime" +
+                " soft restricted permission that is exempted. The actual permission flags" +
+                " $actualFlags should match the expected flags $expectedNewFlags"
+        )
+            .that(actualFlags)
+            .isEqualTo(expectedNewFlags)
+    }
+
+    private fun testOnPackageInstalled(
+        oldFlags: Int,
+        permissionInfoFlags: Int = 0,
+        isInstalledPackageSystem: Boolean = false,
+        additionalSetup: () -> Unit
+    ) {
+        val parsedPermission = mockParsedPermission(
+            PERMISSION_NAME_0,
+            PACKAGE_NAME_0,
+            protectionLevel = PermissionInfo.PROTECTION_DANGEROUS,
+            flags = permissionInfoFlags
+        )
+        val permissionOwnerPackageState = mockPackageState(
+            APP_ID_0,
+            mockAndroidPackage(PACKAGE_NAME_0, permissions = listOf(parsedPermission))
+        )
+        addPackageState(permissionOwnerPackageState)
+        addPermission(parsedPermission)
+
+        additionalSetup()
+
+        mutateState {
+            val installedPackageState = mockPackageState(
+                APP_ID_1,
+                mockAndroidPackage(
+                    PACKAGE_NAME_1,
+                    requestedPermissions = setOf(PERMISSION_NAME_0),
+                ),
+                isSystem = isInstalledPackageSystem,
+            )
+            addPackageState(installedPackageState, newState)
+            setPermissionFlags(APP_ID_1, USER_ID_0, PERMISSION_NAME_0, oldFlags, newState)
+            with(appIdPermissionPolicy) {
+                onPackageInstalled(installedPackageState, USER_ID_0)
             }
         }
     }
 
-    private inline fun mutateState(action: MutateStateScope.() -> Unit) {
-        newState = oldState.toMutable()
-        MutateStateScope(oldState, newState).action()
+    @Test
+    fun testOnStateMutated_notEmpty_isCalledForEachListener() {
+        val mockListener = mock<AppIdPermissionPolicy.OnPermissionFlagsChangedListener> {}
+        appIdPermissionPolicy.addOnPermissionFlagsChangedListener(mockListener)
+
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                onStateMutated()
+            }
+        }
+
+        verify(mockListener, times(1)).onStateMutated()
     }
 
-    private fun createSystemStatePermission(
-        appId: Int,
-        packageName: String,
-        permissionName: String,
-        protectionLevel: Int,
-        type: Int = Permission.TYPE_MANIFEST,
-        isReconciled: Boolean = true,
-        isTree: Boolean = false
-    ) {
-        @Suppress("DEPRECATION")
-        val permissionInfo = PermissionInfo().apply {
-            name = permissionName
-            this.packageName = packageName
-            this.protectionLevel = protectionLevel
+    @Test
+    fun testGetPermissionTrees() {
+        val permissionTrees: IndexedMap<String, Permission>
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                permissionTrees = getPermissionTrees()
+            }
         }
-        val permission = Permission(permissionInfo, isReconciled, type, appId)
-        if (isTree) {
-            oldState.mutateSystemState().mutatePermissionTrees().put(permissionName, permission)
-        } else {
-            oldState.mutateSystemState().mutatePermissions().put(permissionName, permission)
-        }
+
+        assertThat(oldState.systemState.permissionTrees).isEqualTo(permissionTrees)
     }
 
-    private fun createSystemStatePermissionGroup(packageName: String, permissionGroupName: String) {
-        @Suppress("DEPRECATION")
-        val permissionGroupInfo = PermissionGroupInfo().apply {
-            name = permissionGroupName
-            this.packageName = packageName
+    @Test
+    fun testFindPermissionTree() {
+        val permissionTree = createSimplePermission(isTree = true)
+        val actualPermissionTree: Permission?
+        oldState.mutateSystemState().mutatePermissionTrees()[PERMISSION_TREE_NAME] = permissionTree
+
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                actualPermissionTree = findPermissionTree(PERMISSION_BELONGS_TO_A_TREE)
+            }
         }
-        oldState.mutateSystemState().mutatePermissionGroups()[permissionGroupName] =
-            permissionGroupInfo
+
+        assertThat(actualPermissionTree).isEqualTo(permissionTree)
     }
 
-    fun getPermissionFlags(
-        appId: Int,
-        userId: Int,
-        permissionName: String,
-        state: MutableAccessState = newState
-    ): Int =
-        state.userStates[userId]?.appIdPermissionFlags?.get(appId).getWithDefault(permissionName, 0)
+    @Test
+    fun testAddPermissionTree() {
+        val permissionTree = createSimplePermission(isTree = true)
 
-    companion object {
-        private const val PACKAGE_NAME_0 = "packageName0"
-        private const val PACKAGE_NAME_1 = "packageName1"
+        mutateState {
+            with(appIdPermissionPolicy) {
+                addPermissionTree(permissionTree)
+            }
+        }
 
-        private const val APP_ID_0 = 0
-        private const val APP_ID_1 = 1
+        assertThat(newState.systemState.permissionTrees[PERMISSION_TREE_NAME])
+            .isEqualTo(permissionTree)
+    }
 
-        private const val PERMISSION_NAME_0 = "permissionName0"
-        private const val PERMISSION_NAME_1 = "permissionName1"
+    @Test
+    fun testGetPermissionGroups() {
+        val permissionGroups: IndexedMap<String, PermissionGroupInfo>
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                permissionGroups = getPermissionGroups()
+            }
+        }
 
-        private const val PERMISSION_GROUP_NAME_0 = "permissionGroupName0"
-        private const val PERMISSION_GROUP_NAME_1 = "permissionGroupName1"
+        assertThat(oldState.systemState.permissionGroups).isEqualTo(permissionGroups)
+    }
 
-        private const val USER_ID_0 = 0
-        private const val USER_ID_1 = 1
+    @Test
+    fun testGetPermissions() {
+        val permissions: IndexedMap<String, Permission>
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                permissions = getPermissions()
+            }
+        }
+
+        assertThat(oldState.systemState.permissions).isEqualTo(permissions)
+    }
+
+    @Test
+    fun testAddPermission() {
+        val permission = createSimplePermission()
+
+        mutateState {
+            with(appIdPermissionPolicy) {
+                addPermission(permission)
+            }
+        }
+
+        assertThat(newState.systemState.permissions[PERMISSION_NAME_0]).isEqualTo(permission)
+    }
+
+    @Test
+    fun testRemovePermission() {
+        val permission = createSimplePermission()
+
+        mutateState {
+            with(appIdPermissionPolicy) {
+                addPermission(permission)
+                removePermission(permission)
+            }
+        }
+
+        assertThat(newState.systemState.permissions[PERMISSION_NAME_0]).isNull()
+    }
+
+    @Test
+    fun testGetUidPermissionFlags() {
+        val uidPermissionFlags: IndexedMap<String, Int>?
+        GetStateScope(oldState).apply {
+            with(appIdPermissionPolicy) {
+                uidPermissionFlags = getUidPermissionFlags(APP_ID_0, USER_ID_0)
+            }
+        }
+
+        assertThat(oldState.userStates[USER_ID_0]!!.appIdPermissionFlags[APP_ID_0])
+            .isEqualTo(uidPermissionFlags)
+    }
+
+    @Test
+    fun testUpdateAndGetPermissionFlags() {
+        val flags = PermissionFlags.INSTALL_GRANTED
+        var actualFlags = 0
+        mutateState {
+            with(appIdPermissionPolicy) {
+                updatePermissionFlags(
+                    APP_ID_0,
+                    USER_ID_0,
+                    PERMISSION_NAME_0,
+                    PermissionFlags.MASK_ALL,
+                    flags
+                )
+                actualFlags = getPermissionFlags(APP_ID_0, USER_ID_0, PERMISSION_NAME_0)
+            }
+        }
+
+        assertThat(actualFlags).isEqualTo(flags)
     }
 }

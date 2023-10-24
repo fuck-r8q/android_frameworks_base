@@ -51,6 +51,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -487,7 +488,7 @@ public class ApkSignatureVerifier {
 
                                 // make sure all entries use the same signing certs
                                 final Signature[] entrySigs = convertToSignatures(entryCerts);
-                                if (!Signature.areExactMatch(lastSigs, entrySigs)) {
+                                if (!Arrays.equals(lastSigs, entrySigs)) {
                                      throw new Exception("Package " + apkPath + " has mismatched certificates at entry "
                                             + entry.getName());
                                 }

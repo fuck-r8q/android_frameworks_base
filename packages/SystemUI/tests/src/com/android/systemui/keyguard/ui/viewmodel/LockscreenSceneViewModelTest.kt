@@ -23,15 +23,13 @@ import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.scene.SceneTestUtils
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RunWith(JUnit4::class)
 class LockscreenSceneViewModelTest : SysuiTestCase() {
@@ -39,28 +37,16 @@ class LockscreenSceneViewModelTest : SysuiTestCase() {
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
     private val sceneInteractor = utils.sceneInteractor()
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = utils.authenticationRepository(),
-        )
 
-    private val underTest =
-        LockscreenSceneViewModel(
-            authenticationInteractor = authenticationInteractor,
-            bouncerInteractor =
-                utils.bouncerInteractor(
-                    authenticationInteractor = authenticationInteractor,
-                    sceneInteractor = sceneInteractor,
-                ),
-        )
+    private val underTest = createLockscreenSceneViewModel()
 
     @Test
     fun upTransitionSceneKey_canSwipeToUnlock_gone() =
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.None)
-            utils.authenticationRepository.setLockscreenEnabled(true)
-            utils.authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setInsecureLockscreenEnabled(true)
+            utils.deviceEntryRepository.setUnlocked(true)
             sceneInteractor.changeScene(SceneModel(SceneKey.Lockscreen), "reason")
 
             assertThat(upTransitionSceneKey).isEqualTo(SceneKey.Gone)
@@ -71,35 +57,43 @@ class LockscreenSceneViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(false)
+            utils.deviceEntryRepository.setUnlocked(false)
             sceneInteractor.changeScene(SceneModel(SceneKey.Lockscreen), "reason")
 
             assertThat(upTransitionSceneKey).isEqualTo(SceneKey.Bouncer)
         }
 
     @Test
-    fun onLockButtonClicked_deviceLockedSecurely_switchesToBouncer() =
+    fun leftTransitionSceneKey_communalIsEnabled_communal() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
-            utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(false)
-            runCurrent()
+            utils.communalRepository.setIsCommunalEnabled(true)
+            val underTest = createLockscreenSceneViewModel()
 
-            underTest.onLockButtonClicked()
-
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+            assertThat(underTest.leftDestinationSceneKey).isEqualTo(SceneKey.Communal)
         }
 
     @Test
-    fun onLockButtonClicked_deviceUnlocked_switchesToGone() =
+    fun leftTransitionSceneKey_communalIsDisabled_null() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
-            utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(true)
-            runCurrent()
+            utils.communalRepository.setIsCommunalEnabled(false)
+            val underTest = createLockscreenSceneViewModel()
 
-            underTest.onLockButtonClicked()
-
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Gone))
+            assertThat(underTest.leftDestinationSceneKey).isNull()
         }
+
+    private fun createLockscreenSceneViewModel(): LockscreenSceneViewModel {
+        return LockscreenSceneViewModel(
+            applicationScope = testScope.backgroundScope,
+            deviceEntryInteractor =
+                utils.deviceEntryInteractor(
+                    authenticationInteractor = utils.authenticationInteractor(),
+                    sceneInteractor = utils.sceneInteractor(),
+                ),
+            communalInteractor = utils.communalInteractor(),
+            longPress =
+                KeyguardLongPressViewModel(
+                    interactor = mock(),
+                ),
+        )
+    }
 }

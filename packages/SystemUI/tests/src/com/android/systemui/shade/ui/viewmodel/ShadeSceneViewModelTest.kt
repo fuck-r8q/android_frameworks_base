@@ -23,10 +23,18 @@ import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.scene.SceneTestUtils
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
+import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
+import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
+import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
+import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
@@ -39,29 +47,65 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
     private val sceneInteractor = utils.sceneInteractor()
-    private val authenticationInteractor =
-        utils.authenticationInteractor(
-            repository = utils.authenticationRepository(),
+    private val authenticationInteractor = utils.authenticationInteractor()
+    private val deviceEntryInteractor =
+        utils.deviceEntryInteractor(
+            authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
         )
 
-    private val underTest =
-        ShadeSceneViewModel(
-            applicationScope = testScope.backgroundScope,
-            authenticationInteractor = authenticationInteractor,
-            bouncerInteractor =
-                utils.bouncerInteractor(
-                    authenticationInteractor = authenticationInteractor,
-                    sceneInteractor = sceneInteractor,
+    private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
+
+    private var mobileIconsViewModel: MobileIconsViewModel =
+        MobileIconsViewModel(
+            logger = mock(),
+            verboseLogger = mock(),
+            interactor = mobileIconsInteractor,
+            airplaneModeInteractor =
+                AirplaneModeInteractor(
+                    FakeAirplaneModeRepository(),
+                    FakeConnectivityRepository(),
                 ),
+            constants = mock(),
+            scope = testScope.backgroundScope,
         )
+
+    private lateinit var shadeHeaderViewModel: ShadeHeaderViewModel
+
+    private lateinit var underTest: ShadeSceneViewModel
+
+    @Before
+    fun setUp() {
+        shadeHeaderViewModel =
+            ShadeHeaderViewModel(
+                applicationScope = testScope.backgroundScope,
+                context = context,
+                sceneInteractor = sceneInteractor,
+                mobileIconsInteractor = mobileIconsInteractor,
+                mobileIconsViewModel = mobileIconsViewModel,
+                broadcastDispatcher = fakeBroadcastDispatcher,
+            )
+
+        underTest =
+            ShadeSceneViewModel(
+                applicationScope = testScope.backgroundScope,
+                deviceEntryInteractor = deviceEntryInteractor,
+                bouncerInteractor =
+                    utils.bouncerInteractor(
+                        deviceEntryInteractor = deviceEntryInteractor,
+                        authenticationInteractor = authenticationInteractor,
+                        sceneInteractor = sceneInteractor,
+                    ),
+                shadeHeaderViewModel = shadeHeaderViewModel,
+            )
+    }
 
     @Test
     fun upTransitionSceneKey_deviceLocked_lockScreen() =
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(false)
+            utils.deviceEntryRepository.setUnlocked(false)
 
             assertThat(upTransitionSceneKey).isEqualTo(SceneKey.Lockscreen)
         }
@@ -71,7 +115,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
 
             assertThat(upTransitionSceneKey).isEqualTo(SceneKey.Gone)
         }
@@ -80,7 +124,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
     fun upTransitionSceneKey_authMethodSwipe_lockscreenNotDismissed_goesToLockscreen() =
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
-            utils.authenticationRepository.setLockscreenEnabled(true)
+            utils.deviceEntryRepository.setInsecureLockscreenEnabled(true)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.None)
             sceneInteractor.changeScene(SceneModel(SceneKey.Lockscreen), "reason")
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Lockscreen), "reason")
@@ -92,7 +136,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
     fun upTransitionSceneKey_authMethodSwipe_lockscreenDismissed_goesToGone() =
         testScope.runTest {
             val upTransitionSceneKey by collectLastValue(underTest.upDestinationSceneKey)
-            utils.authenticationRepository.setLockscreenEnabled(true)
+            utils.deviceEntryRepository.setInsecureLockscreenEnabled(true)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.None)
             sceneInteractor.changeScene(SceneModel(SceneKey.Gone), "reason")
             sceneInteractor.onSceneChanged(SceneModel(SceneKey.Gone), "reason")
@@ -105,7 +149,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val currentScene by collectLastValue(sceneInteractor.desiredScene)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(true)
+            utils.deviceEntryRepository.setUnlocked(true)
             runCurrent()
 
             underTest.onContentClicked()
@@ -118,7 +162,7 @@ class ShadeSceneViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val currentScene by collectLastValue(sceneInteractor.desiredScene)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setUnlocked(false)
+            utils.deviceEntryRepository.setUnlocked(false)
             runCurrent()
 
             underTest.onContentClicked()

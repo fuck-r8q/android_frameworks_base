@@ -15,6 +15,7 @@
  */
 package com.android.systemui.shade
 
+import android.os.Handler
 import android.os.SystemClock
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
@@ -23,27 +24,41 @@ import android.widget.FrameLayout
 import androidx.test.filters.SmallTest
 import com.android.keyguard.KeyguardMessageAreaController
 import com.android.keyguard.KeyguardSecurityContainerController
+import com.android.keyguard.KeyguardSecurityModel
+import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.LockIconViewController
 import com.android.keyguard.dagger.KeyguardBouncerComponent
-import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.back.domain.interactor.BackActionInteractor
-import com.android.systemui.bouncer.data.factory.BouncerMessageFactory
-import com.android.systemui.bouncer.data.repository.FakeBouncerMessageRepository
+import com.android.systemui.biometrics.data.repository.FakeFacePropertyRepository
+import com.android.systemui.bouncer.data.repository.BouncerMessageRepositoryImpl
+import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
 import com.android.systemui.bouncer.domain.interactor.CountDownTimerUtil
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerCallbackInteractor
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
+import com.android.systemui.bouncer.ui.BouncerView
 import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel
+import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.dock.DockManager
+import com.android.systemui.dump.DumpManager
 import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.flags.SystemPropertiesHelper
 import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor
+import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
+import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
+import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFaceAuthRepository
+import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFingerprintAuthRepository
+import com.android.systemui.keyguard.data.repository.FakeTrustRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel
 import com.android.systemui.log.BouncerLogger
 import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.res.R
 import com.android.systemui.shade.NotificationShadeWindowView.InteractionEventHandler
 import com.android.systemui.statusbar.DragDownHelper
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
@@ -56,7 +71,10 @@ import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
 import com.android.systemui.statusbar.phone.CentralSurfaces
+import com.android.systemui.statusbar.phone.DozeScrimController
+import com.android.systemui.statusbar.phone.DozeServiceHost
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
+import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider
 import com.android.systemui.user.data.repository.FakeUserRepository
@@ -89,6 +107,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock private lateinit var statusBarStateController: SysuiStatusBarStateController
     @Mock private lateinit var shadeController: ShadeController
     @Mock private lateinit var centralSurfaces: CentralSurfaces
+    @Mock private lateinit var dozeServiceHost: DozeServiceHost
+    @Mock private lateinit var dozeScrimController: DozeScrimController
     @Mock private lateinit var backActionInteractor: BackActionInteractor
     @Mock private lateinit var powerInteractor: PowerInteractor
     @Mock private lateinit var dockManager: DockManager
@@ -107,6 +127,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     @Mock private lateinit var keyguardUnlockAnimationController: KeyguardUnlockAnimationController
     @Mock private lateinit var ambientState: AmbientState
     @Mock private lateinit var shadeLogger: ShadeLogger
+    @Mock private lateinit var dumpManager: DumpManager
     @Mock private lateinit var pulsingGestureListener: PulsingGestureListener
     @Mock
     private lateinit var mLockscreenHostedDreamGestureListener: LockscreenHostedDreamGestureListener
@@ -158,6 +179,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         featureFlags.set(Flags.SPLIT_SHADE_SUBPIXEL_OPTIMIZATION, true)
         featureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
         featureFlags.set(Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false)
+        featureFlags.set(Flags.MIGRATE_NSSL, false)
         testScope = TestScope()
         controller =
             NotificationShadeWindowViewController(
@@ -174,6 +196,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 statusBarWindowStateController,
                 lockIconViewController,
                 centralSurfaces,
+                dozeServiceHost,
+                dozeScrimController,
                 backActionInteractor,
                 powerInteractor,
                 notificationShadeWindowController,
@@ -182,6 +206,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 notificationInsetsController,
                 ambientState,
                 shadeLogger,
+                dumpManager,
                 pulsingGestureListener,
                 mLockscreenHostedDreamGestureListener,
                 keyguardBouncerViewModel,
@@ -193,11 +218,35 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 featureFlags,
                 FakeSystemClock(),
                 BouncerMessageInteractor(
-                    FakeBouncerMessageRepository(),
-                    Mockito.mock(BouncerMessageFactory::class.java),
-                    FakeUserRepository(),
-                    CountDownTimerUtil(),
-                    featureFlags
+                    repository = BouncerMessageRepositoryImpl(),
+                    userRepository = FakeUserRepository(),
+                    countDownTimerUtil = Mockito.mock(CountDownTimerUtil::class.java),
+                    featureFlags = featureFlags,
+                    updateMonitor = Mockito.mock(KeyguardUpdateMonitor::class.java),
+                    biometricSettingsRepository = FakeBiometricSettingsRepository(),
+                    applicationScope = testScope.backgroundScope,
+                    trustRepository = FakeTrustRepository(),
+                    systemPropertiesHelper = Mockito.mock(SystemPropertiesHelper::class.java),
+                    primaryBouncerInteractor =
+                        PrimaryBouncerInteractor(
+                            FakeKeyguardBouncerRepository(),
+                            Mockito.mock(BouncerView::class.java),
+                            Mockito.mock(Handler::class.java),
+                            Mockito.mock(KeyguardStateController::class.java),
+                            Mockito.mock(KeyguardSecurityModel::class.java),
+                            Mockito.mock(PrimaryBouncerCallbackInteractor::class.java),
+                            Mockito.mock(FalsingCollector::class.java),
+                            Mockito.mock(DismissCallbackRegistry::class.java),
+                            context,
+                            Mockito.mock(KeyguardUpdateMonitor::class.java),
+                            FakeTrustRepository(),
+                            testScope.backgroundScope,
+                        ),
+                    facePropertyRepository = FakeFacePropertyRepository(),
+                    deviceEntryFingerprintAuthRepository =
+                        FakeDeviceEntryFingerprintAuthRepository(),
+                    faceAuthRepository = FakeDeviceEntryFaceAuthRepository(),
+                    securityModel = Mockito.mock(KeyguardSecurityModel::class.java),
                 ),
                 BouncerLogger(logcatLogBuffer("BouncerLog")),
                 Mockito.mock(KeyEventInteractor::class.java),

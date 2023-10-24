@@ -253,12 +253,6 @@
       "group": "WM_DEBUG_BOOT",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
-    "-1883484959": {
-      "message": "Content Recording: Display %d state is now (%d), so update recording?",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_CONTENT_RECORDING",
-      "at": "com\/android\/server\/wm\/DisplayContent.java"
-    },
     "-1872288685": {
       "message": "applyAnimation: anim=%s nextAppTransition=%s transit=%s isEntrance=%b Callers=%s",
       "level": "VERBOSE",
@@ -444,6 +438,12 @@
       "level": "WARN",
       "group": "WM_DEBUG_TASKS",
       "at": "com\/android\/server\/wm\/ResetTargetTaskHelper.java"
+    },
+    "-1700778361": {
+      "message": "Content Recording: Going ahead with updating recording for display %d to new bounds %s and\/or orientation %d and\/or surface size %s",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
     },
     "-1699018375": {
       "message": "Adding activity %s to task %s callers: %s",
@@ -648,12 +648,6 @@
       "level": "VERBOSE",
       "group": "WM_DEBUG_ORIENTATION",
       "at": "com\/android\/server\/wm\/DisplayContent.java"
-    },
-    "-1480264178": {
-      "message": "Content Recording: Unable to update recording for display %d to new bounds %s and\/or orientation %d, since the surface is not available.",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_CONTENT_RECORDING",
-      "at": "com\/android\/server\/wm\/ContentRecorder.java"
     },
     "-1478175541": {
       "message": "No longer animating wallpaper targets!",
@@ -1021,6 +1015,12 @@
       "group": "WM_DEBUG_REMOTE_ANIMATIONS",
       "at": "com\/android\/server\/wm\/NonAppWindowAnimationAdapter.java"
     },
+    "-1152771606": {
+      "message": "Content Recording: Display %d was already recording, but pause capture since the task is in PIP",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
+    },
     "-1145384901": {
       "message": "shouldWaitAnimatingExit: isTransition: %s",
       "level": "DEBUG",
@@ -1123,12 +1123,6 @@
       "group": "WM_SHOW_TRANSACTIONS",
       "at": "com\/android\/server\/wm\/WindowSurfaceController.java"
     },
-    "-1076978367": {
-      "message": "thawRotation: mRotation=%d",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_ORIENTATION",
-      "at": "com\/android\/server\/wm\/WindowManagerService.java"
-    },
     "-1075136930": {
       "message": "startLockTaskMode: Can't lock due to auth",
       "level": "WARN",
@@ -1230,6 +1224,12 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_STARTING_WINDOW",
       "at": "com\/android\/server\/wm\/WindowState.java"
+    },
+    "-962760979": {
+      "message": "thawRotation: mRotation=%d, caller=%s",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_ORIENTATION",
+      "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
     "-961053385": {
       "message": "attachWindowContextToDisplayArea: calling from non-existing process pid=%d uid=%d",
@@ -1849,12 +1849,6 @@
       "group": "WM_DEBUG_ADD_REMOVE",
       "at": "com\/android\/server\/wm\/Task.java"
     },
-    "-452750194": {
-      "message": "Content Recording: Going ahead with updating recording for display %d to new bounds %s and\/or orientation %d.",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_CONTENT_RECORDING",
-      "at": "com\/android\/server\/wm\/ContentRecorder.java"
-    },
     "-451552570": {
       "message": "Current focused window being animated by recents. Overriding back callback to recents controller callback.",
       "level": "DEBUG",
@@ -2076,12 +2070,6 @@
       "level": "VERBOSE",
       "group": "WM_DEBUG_WINDOW_TRANSITIONS_MIN",
       "at": "com\/android\/server\/wm\/TransitionController.java"
-    },
-    "-262984451": {
-      "message": "Relaunch failed %s",
-      "level": "INFO",
-      "group": "WM_DEBUG_STATES",
-      "at": "com\/android\/server\/wm\/ActivityRecord.java"
     },
     "-251259736": {
       "message": "No longer freezing: %s",
@@ -2347,6 +2335,12 @@
       "group": "WM_DEBUG_SYNC_ENGINE",
       "at": "com\/android\/server\/wm\/WindowState.java"
     },
+    "1877956": {
+      "message": "Content Recording: Display %d should start recording, but don't yet since the task is in PIP",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
+    },
     "3593205": {
       "message": "commitVisibility: %s: visible=%b mVisibleRequested=%b",
       "level": "VERBOSE",
@@ -2376,6 +2370,12 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_RECENTS_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RecentsAnimationController.java"
+    },
+    "34106798": {
+      "message": "Content Recording: Display %d state was (%d), is now (%d), so update recording?",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/DisplayContent.java"
     },
     "34682671": {
       "message": "Not moving display (displayId=%d) to top. Top focused displayId=%d. Reason: FLAG_STEAL_TOP_FOCUS_DISABLED",
@@ -2413,6 +2413,12 @@
       "group": "WM_DEBUG_TASKS",
       "at": "com\/android\/server\/wm\/RootWindowContainer.java"
     },
+    "61363198": {
+      "message": "Auto-PIP allowed, requesting PIP mode via requestStartTransition(): %s, willAutoPip: %b",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_STATES",
+      "at": "com\/android\/server\/wm\/TaskFragment.java"
+    },
     "74885950": {
       "message": "Waiting for top state to be released by %s",
       "level": "VERBOSE",
@@ -2424,12 +2430,6 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_RECENTS_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RecentsAnimationController.java"
-    },
-    "90764070": {
-      "message": "Could not report token removal to the window token client.",
-      "level": "WARN",
-      "group": "WM_ERROR",
-      "at": "com\/android\/server\/wm\/WindowContextListenerController.java"
     },
     "95216706": {
       "message": "hideIme target: %s ",
@@ -2788,6 +2788,12 @@
     "355720268": {
       "message": "stopFreezingDisplayLocked: Unfreezing now",
       "level": "DEBUG",
+      "group": "WM_DEBUG_ORIENTATION",
+      "at": "com\/android\/server\/wm\/WindowManagerService.java"
+    },
+    "364992694": {
+      "message": "freezeDisplayRotation: current rotation=%d, new rotation=%d, caller=%s",
+      "level": "VERBOSE",
       "group": "WM_DEBUG_ORIENTATION",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
@@ -3991,12 +3997,6 @@
       "group": "WM_ERROR",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
-    "1563836923": {
-      "message": "Content Recording: Unable to record task since feature is disabled %d",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_CONTENT_RECORDING",
-      "at": "com\/android\/server\/wm\/ContentRecorder.java"
-    },
     "1577579529": {
       "message": "win=%s destroySurfaces: appStopped=%b win.mWindowRemovalAllowed=%b win.mRemoveOnExit=%b",
       "level": "ERROR",
@@ -4104,6 +4104,12 @@
       "level": "VERBOSE",
       "group": "WM_DEBUG_CONFIGURATION",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
+    },
+    "1687944543": {
+      "message": "Content Recording: Unable to update recording for display %d to new bounds %s and\/or orientation %d and\/or surface size %s, since the surface is not available.",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
     },
     "1699269281": {
       "message": "Don't organize or trigger events for untrusted displayId=%d",
@@ -4345,6 +4351,12 @@
       "group": "WM_DEBUG_REMOTE_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RemoteAnimationController.java"
     },
+    "1936800105": {
+      "message": "Content Recording: Apply transformations of shift %d x %d, scale %f, crop (aka recorded content size) %d x %d for display %d; display has size %d x %d; surface has size %d x %d",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
+    },
     "1945495497": {
       "message": "Focused window didn't have a valid surface drawn.",
       "level": "DEBUG",
@@ -4362,12 +4374,6 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_TASKS",
       "at": "com\/android\/server\/wm\/RootWindowContainer.java"
-    },
-    "1948483534": {
-      "message": "Could not report config changes to the window token client.",
-      "level": "WARN",
-      "group": "WM_ERROR",
-      "at": "com\/android\/server\/wm\/WindowContextListenerController.java"
     },
     "1964565370": {
       "message": "Starting remote animation",

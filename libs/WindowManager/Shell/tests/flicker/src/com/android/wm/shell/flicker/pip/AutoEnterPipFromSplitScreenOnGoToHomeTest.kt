@@ -80,12 +80,12 @@ class AutoEnterPipFromSplitScreenOnGoToHomeTest(flicker: LegacyFlickerTest) :
                 secondAppForSplitScreen.launchViaIntent(wmHelper)
                 pipApp.launchViaIntent(wmHelper)
                 tapl.goHome()
-                SplitScreenUtils.enterSplit(wmHelper, tapl, device, pipApp, secondAppForSplitScreen)
+                SplitScreenUtils.enterSplit(
+                    wmHelper, tapl, device, pipApp, secondAppForSplitScreen,
+                    flicker.scenario.startRotation)
                 pipApp.enableAutoEnterForPipActivity()
             }
             teardown {
-                // close gracefully so that onActivityUnpinned() can be called before force exit
-                pipApp.closePipWindow(wmHelper)
                 pipApp.exit(wmHelper)
                 secondAppForSplitScreen.exit(wmHelper)
             }
@@ -126,9 +126,20 @@ class AutoEnterPipFromSplitScreenOnGoToHomeTest(flicker: LegacyFlickerTest) :
         if (tapl.isTablet) {
             flicker.assertWmVisibleRegion(pipApp) { coversAtMost(displayBounds) }
         } else {
-            // on phones home does not rotate in landscape, PiP enters back to portrait
-            // orientation so use display bounds from that orientation for assertion
-            flicker.assertWmVisibleRegion(pipApp) { coversAtMost(portraitDisplayBounds) }
+            // on phones home screen does not rotate in landscape, PiP enters back to portrait
+            // orientation - if we go from landscape to portrait it should switch between the bounds
+            // otherwise it should be the same as tablet (i.e. portrait to portrait)
+            if (flicker.scenario.isLandscapeOrSeascapeAtStart) {
+                flicker.assertWmVisibleRegion(pipApp) {
+                    // first check against landscape bounds then against portrait bounds
+                    coversAtMost(displayBounds).then().coversAtMost(
+                        portraitDisplayBounds
+                    )
+                }
+            } else {
+                // always check against the display bounds which do not change during transition
+                flicker.assertWmVisibleRegion(pipApp) { coversAtMost(displayBounds) }
+            }
         }
     }
 

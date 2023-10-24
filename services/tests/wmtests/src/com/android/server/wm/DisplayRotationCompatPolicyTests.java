@@ -571,10 +571,10 @@ public final class DisplayRotationCompatPolicyTests extends WindowTestsBase {
         verify(mActivity.mLetterboxUiController, times(refreshRequested ? 1 : 0))
                 .setIsRefreshAfterRotationRequested(true);
 
-        final ClientTransaction transaction = ClientTransaction.obtain(
-                mActivity.app.getThread(), mActivity.token);
-        transaction.addCallback(RefreshCallbackItem.obtain(cycleThroughStop ? ON_STOP : ON_PAUSE));
-        transaction.setLifecycleStateRequest(ResumeActivityItem.obtain(
+        final ClientTransaction transaction = ClientTransaction.obtain(mActivity.app.getThread());
+        transaction.addCallback(RefreshCallbackItem.obtain(mActivity.token,
+                cycleThroughStop ? ON_STOP : ON_PAUSE));
+        transaction.setLifecycleStateRequest(ResumeActivityItem.obtain(mActivity.token,
                 /* isForward */ false, /* shouldSendCompatFakeFocus */ false));
 
         verify(mActivity.mAtmService.getLifecycleManager(), times(refreshRequested ? 1 : 0))

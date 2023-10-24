@@ -59,6 +59,7 @@ import android.view.accessibility.IWindowMagnificationConnectionCallback;
 import android.view.accessibility.MagnificationAnimationCallback;
 
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.filters.FlakyTest;
 
 import com.android.internal.util.test.FakeSettingsProvider;
 import com.android.server.LocalServices;
@@ -307,6 +308,7 @@ public class WindowMagnificationManagerTest {
                 MagnificationScaleProvider.MAX_SCALE);
     }
 
+    @FlakyTest(bugId = 297879435)
     @Test
     public void logTrackingTypingFocus_processScroll_logDuration() {
         WindowMagnificationManager spyWindowMagnificationManager = spy(mWindowMagnificationManager);

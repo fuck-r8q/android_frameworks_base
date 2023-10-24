@@ -24,7 +24,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 
 import com.android.systemui.Dependency;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 
 import java.util.HashMap;
 import java.util.Map;

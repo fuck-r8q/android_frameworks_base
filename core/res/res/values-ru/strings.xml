@@ -503,6 +503,8 @@
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"Это привилегированное или системное приложение может в любое время делать фотографии и записывать видео с помощью камеры. Для этого приложению также требуется разрешение android.permission.CAMERA."</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"Разрешить приложению или сервису получать обратные вызовы при открытии и закрытии камер"</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"Это приложение сможет получать обратные вызовы при открытии (с указанием открывающего приложения) и закрытии любых камер."</string>
+    <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"Разрешить приложению или сервису доступ к камере на правах консольного системного пользователя"</string>
+    <string name="permdesc_cameraHeadlessSystemUser" msgid="6963163319710996412">"У этого приложения есть доступ к камере на правах консольного системного пользователя."</string>
     <string name="permlab_vibrate" msgid="8596800035791962017">"Управление функцией вибросигнала"</string>
     <string name="permdesc_vibrate" msgid="8733343234582083721">"Приложение сможет контролировать вибросигналы."</string>
     <string name="permdesc_vibrator_state" msgid="7050024956594170724">"Приложение сможет получать доступ к состоянию виброотклика."</string>
@@ -671,14 +673,14 @@
   </string-array>
     <string name="fingerprint_error_vendor_unknown" msgid="4170002184907291065">"Произошла ошибка. Повторите попытку."</string>
     <string name="fingerprint_icon_content_description" msgid="4741068463175388817">"Значок отпечатка пальца"</string>
+    <string name="device_unlock_notification_name" msgid="2632928999862915709">"Разблокировка устройства"</string>
+    <string name="alternative_unlock_setup_notification_title" msgid="6241508547901933544">"Попробуйте другой способ разблокировки"</string>
+    <string name="alternative_face_setup_notification_content" msgid="3384959224091897331">"Когда устройство не распознает ваш отпечаток пальца, используйте фейсконтроль. Например, это пригодится, когда палец мокрый."</string>
+    <string name="alternative_fp_setup_notification_content" msgid="7454096947415721639">"Когда устройство не распознает ваше лицо, используйте разблокировку по отпечатку пальца. Например, это пригодится при плохом освещении."</string>
     <string name="face_recalibrate_notification_name" msgid="7311163114750748686">"Фейсконтроль"</string>
     <string name="face_recalibrate_notification_title" msgid="2524791952735579082">"Ошибка фейсконтроля"</string>
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"Нажмите, чтобы удалить модель лица, а затем добавьте ее снова."</string>
-    <string name="face_setup_notification_title" msgid="8843461561970741790">"Настройка фейсконтроля"</string>
-    <string name="face_setup_notification_content" msgid="5463999831057751676">"Вы сможете разблокировать телефон, просто посмотрев на него."</string>
     <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"Чтобы использовать фейсконтроль, разрешите "<b>"доступ к камере"</b>". Для этого перейдите в настройки и нажмите \"Конфиденциальность\"."</string>
-    <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"Настройте другие способы разблокировки"</string>
-    <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"Нажмите, чтобы добавить отпечаток пальца."</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"Разблокировка по отпечатку пальца"</string>
     <string name="fingerprint_recalibrate_notification_title" msgid="2406561052064558497">"Невозможно использовать сканер отпечатков пальцев"</string>
     <string name="fingerprint_recalibrate_notification_content" msgid="8519935717822194943">"Обратитесь в сервисный центр."</string>
@@ -1598,7 +1600,7 @@
     <string name="data_usage_restricted_body" msgid="5338694433686077733">"Нажмите, чтобы отменить ограничение."</string>
     <string name="data_usage_rapid_title" msgid="2950192123248740375">"Высокое потребление трафика"</string>
     <string name="data_usage_rapid_body" msgid="3886676853263693432">"В ваших приложениях было передано больше трафика, чем обычно."</string>
-    <string name="data_usage_rapid_app_body" msgid="5425779218506513861">"В приложении \"<xliff:g id="APP">%s</xliff:g>\" было передано больше трафика, чем обычно."</string>
+    <string name="data_usage_rapid_app_body" msgid="5425779218506513861">"Приложение \"<xliff:g id="APP">%s</xliff:g>\" использовало больше трафика, чем обычно."</string>
     <string name="ssl_certificate" msgid="5690020361307261997">"Сертификат безопасности"</string>
     <string name="ssl_certificate_is_valid" msgid="7293675884598527081">"Этот сертификат действителен."</string>
     <string name="issued_to" msgid="5975877665505297662">"Кому выдан:"</string>
@@ -1865,10 +1867,11 @@
     <string name="select_day" msgid="2060371240117403147">"Выберите месяц и число"</string>
     <string name="select_year" msgid="1868350712095595393">"Выберите год"</string>
     <string name="deleted_key" msgid="9130083334943364001">"Цифра <xliff:g id="KEY">%1$s</xliff:g> удалена"</string>
-    <string name="managed_profile_label_badge" msgid="6762559569999499495">"Рабочий <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="managed_profile_label_badge" msgid="6762559569999499495">"<xliff:g id="LABEL">%1$s</xliff:g> (рабочий профиль)"</string>
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"Задача 2: <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Задача 3: <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Клонировать <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> (личный профиль)"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Запрашивать PIN-код"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Запрашивать графический ключ"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Запрашивать пароль"</string>
@@ -2033,7 +2036,7 @@
     <string name="autofill_update_title" msgid="3630695947047069136">"Обновить в сервисе "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Обновить данные (<xliff:g id="TYPE">%1$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Обновить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
-    <string name="autofill_update_title_with_3types" msgid="1312232153076212291">"Обновить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Обновить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Сохранить"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Нет, спасибо"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Не сейчас"</string>

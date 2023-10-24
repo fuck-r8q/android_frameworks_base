@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"파일 전송"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"입력 장치"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"인터넷 액세스"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"연락처 및 통화 기록에 대한 액세스를 허용합니다."</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"정보는 전화 알림 등에 사용됩니다."</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"인터넷 연결 공유"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"문자 메시지"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"SIM 액세스"</string>
@@ -159,6 +157,8 @@
     <string name="accessibility_wifi_two_bars" msgid="687800024970972270">"Wi-Fi 신호 막대가 두 개입니다."</string>
     <string name="accessibility_wifi_three_bars" msgid="779895671061950234">"Wi-Fi 신호 막대가 세 개입니다."</string>
     <string name="accessibility_wifi_signal_full" msgid="7165262794551355617">"Wi-Fi 신호가 강합니다."</string>
+    <!-- no translation found for accessibility_wifi_other_device (2815627624555795918) -->
+    <skip />
     <string name="accessibility_wifi_security_type_none" msgid="162352241518066966">"개방형 네트워크"</string>
     <string name="accessibility_wifi_security_type_secured" msgid="2399774097343238942">"보안 네트워크"</string>
     <string name="process_kernel_label" msgid="950292573930336765">"Android OS"</string>
@@ -405,7 +405,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"모든 활동을 매니페스트 값에 관계없이 멀티 윈도우용으로 크기 조정 가능하도록 설정"</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"자유 형식 창 사용"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"자유 형식 창 지원 사용"</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"데스크톱 모드"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"데스크톱 백업 비밀번호"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"데스크톱 전체 백업에 비밀번호가 설정되어 있지 않음"</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"데스크톱 전체 백업에 대한 비밀번호를 변경하거나 삭제하려면 탭하세요."</string>
@@ -520,7 +519,7 @@
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"등록되지 않음"</string>
     <string name="status_unavailable" msgid="5279036186589861608">"사용할 수 없음"</string>
     <string name="wifi_status_mac_randomized" msgid="466382542497832189">"MAC가 임의 선택됨"</string>
-    <string name="wifi_tether_connected_summary" msgid="5282919920463340158">"{count,plural, =0{기기 0대 연결됨}=1{기기 1대 연결됨}other{기기 #대 연결됨}}"</string>
+    <string name="wifi_tether_connected_summary" msgid="5100712926640492336">"{count,plural, =1{기기 1대 연결됨}other{기기 #대 연결됨}}"</string>
     <string name="accessibility_manual_zen_more_time" msgid="5141801092071134235">"시간 늘리기"</string>
     <string name="accessibility_manual_zen_less_time" msgid="6828877595848229965">"시간 줄이기"</string>
     <string name="cancel" msgid="5665114069455378395">"취소"</string>
@@ -554,9 +553,9 @@
     <string name="media_transfer_default_device_name" msgid="4315604017399871828">"연결된 기기"</string>
     <string name="media_transfer_this_phone" msgid="7194341457812151531">"이 휴대전화"</string>
     <string name="media_output_status_unknown_error" msgid="5098565887497902222">"이 기기에서 재생할 수 없음"</string>
-    <string name="media_output_status_require_premium" msgid="8411255800047014822">"전환하려면 계정을 업그레이드하세요."</string>
+    <string name="media_output_status_require_premium" msgid="8411255800047014822">"계정을 업그레이드하여 전환하기"</string>
     <string name="media_output_status_not_support_downloads" msgid="4523828729240373315">"여기서 다운로드한 콘텐츠를 재생할 수 없습니다."</string>
-    <string name="media_output_status_try_after_ad" msgid="8312579066856015441">"광고 후에 다시 시도해 주세요."</string>
+    <string name="media_output_status_try_after_ad" msgid="8312579066856015441">"광고 후에 다시 시도하기"</string>
     <string name="media_output_status_device_in_low_power_mode" msgid="8184631698321758451">"기기 절전 모드 해제 후 여기에서 재생"</string>
     <string name="media_output_status_unauthorized" msgid="5880222828273853838">"기기에서 재생을 승인하지 않음"</string>
     <string name="media_output_status_track_unsupported" msgid="5576313219317709664">"여기에서 이 미디어를 재생할 수 없음"</string>
@@ -583,7 +582,7 @@
     <string name="user_add_profile_item_title" msgid="3111051717414643029">"제한된 프로필"</string>
     <string name="user_add_user_title" msgid="5457079143694924885">"신규 사용자를 추가할까요?"</string>
     <string name="user_add_user_message_long" msgid="1527434966294733380">"추가 사용자를 만들어 다른 사용자와 기기를 공유할 수 있습니다. 각 사용자는 앱, 배경화면 등으로 맞춤설정할 수 있는 자신만의 공간을 갖게 됩니다. 또한 모든 사용자에게 영향을 미치는 Wi‑Fi와 같은 기기 설정도 조정할 수 있습니다.\n\n추가된 신규 사용자는 자신의 공간을 설정해야 합니다.\n\n모든 사용자가 앱을 업데이트할 수 있으며, 업데이트는 다른 사용자에게도 적용됩니다. 접근성 설정 및 서비스는 신규 사용자에게 이전되지 않을 수도 있습니다."</string>
-    <string name="user_add_user_message_short" msgid="3295959985795716166">"추가된 새로운 사용자는 자신의 공간을 설정해야 합니다.\n\n모든 사용자는 다른 사용자들을 위하여 앱을 업데이트할 수 있습니다."</string>
+    <string name="user_add_user_message_short" msgid="3295959985795716166">"추가된 신규 사용자는 자신의 공간을 설정해야 합니다.\n\n모든 사용자가 앱을 업데이트할 수 있으며, 업데이트는 다른 사용자에게도 적용됩니다."</string>
     <string name="user_grant_admin_title" msgid="5157031020083343984">"이 사용자에게 관리자 권한을 부여하시겠습니까?"</string>
     <string name="user_grant_admin_message" msgid="1673791931033486709">"관리자는 다른 사용자가 가지지 못한 특별한 권한을 보유합니다. 관리자는 모든 사용자를 관리하고, 기기를 업데이트하거나 재설정하고, 설정을 변경하고, 설치된 모든 앱을 확인하고, 다른 사용자에게 관리자 권한을 부여하거나 취소할 수 있습니다."</string>
     <string name="user_grant_admin_button" msgid="5441486731331725756">"관리자 권한 부여"</string>
@@ -687,12 +686,6 @@
     <string name="back_navigation_animation" msgid="8105467568421689484">"예측된 뒤로 동작 애니메이션"</string>
     <string name="back_navigation_animation_summary" msgid="741292224121599456">"예측된 뒤로 동작에 시스템 애니메이션을 사용하도록 설정합니다."</string>
     <string name="back_navigation_animation_dialog" msgid="8696966520944625596">"이 설정은 예측된 동작 애니메이션에 시스템 애니메이션을 사용하도록 합니다. 매니페스트 파일에서 앱별 enableOnBackInvokedCallback을 True로 설정해야 합니다."</string>
-  <string-array name="udfps_accessibility_touch_hints">
-    <item msgid="1737722959616802157">"왼쪽으로 이동"</item>
-    <item msgid="5425394847942513942">"아래로 이동"</item>
-    <item msgid="7728484337962740316">"오른쪽으로 이동"</item>
-    <item msgid="324200556467459329">"위로 이동"</item>
-  </string-array>
     <string name="font_scale_percentage" msgid="2624057443622817886">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
     <string name="not_specified" msgid="5423502443185110328">"지정되지 않음"</string>
     <string name="neuter" msgid="2075249330106127310">"중성"</string>

@@ -74,6 +74,7 @@ import android.companion.IOnAssociationsChangedListener;
 import android.companion.IOnMessageReceivedListener;
 import android.companion.IOnTransportsChangedListener;
 import android.companion.ISystemDataTransferCallback;
+import android.companion.datatransfer.PermissionSyncRequest;
 import android.companion.utils.FeatureUtils;
 import android.content.ComponentName;
 import android.content.Context;
@@ -154,6 +155,7 @@ public class CompanionDeviceManagerService extends SystemService {
             "debug.cdm.cdmservice.removal_time_window";
 
     private static final long ASSOCIATION_REMOVAL_TIME_WINDOW_DEFAULT = DAYS.toMillis(90);
+    private static final int MAX_CN_LENGTH = 500;
 
     private final ActivityManager mActivityManager;
     private final OnPackageVisibilityChangeListener mOnPackageVisibilityChangeListener;
@@ -756,6 +758,9 @@ public class CompanionDeviceManagerService extends SystemService {
             String callingPackage = component.getPackageName();
             checkCanCallNotificationApi(callingPackage);
             // TODO: check userId.
+            if (component.flattenToString().length() > MAX_CN_LENGTH) {
+                throw new IllegalArgumentException("Component name is too long.");
+            }
             final long identity = Binder.clearCallingIdentity();
             try {
                 return PendingIntent.getActivityAsUser(getContext(),
@@ -870,6 +875,29 @@ public class CompanionDeviceManagerService extends SystemService {
         public void disableSystemDataSync(int associationId, int flags) {
             getAssociationWithCallerChecks(associationId);
             mAssociationRequestsProcessor.disableSystemDataSync(associationId, flags);
+        }
+
+        @Override
+        public void enablePermissionsSync(int associationId) {
+            getAssociationWithCallerChecks(associationId);
+            mSystemDataTransferProcessor.enablePermissionsSync(associationId);
+        }
+
+        @Override
+        public void disablePermissionsSync(int associationId) {
+            getAssociationWithCallerChecks(associationId);
+            mSystemDataTransferProcessor.disablePermissionsSync(associationId);
+        }
+
+        @Override
+        public PermissionSyncRequest getPermissionSyncRequest(int associationId) {
+            // TODO: temporary fix, will remove soon
+            AssociationInfo association = mAssociationStore.getAssociationById(associationId);
+            if (association == null) {
+                return null;
+            }
+            getAssociationWithCallerChecks(associationId);
+            return mSystemDataTransferProcessor.getPermissionSyncRequest(associationId);
         }
 
         @Override
@@ -1041,7 +1069,7 @@ public class CompanionDeviceManagerService extends SystemService {
                 String[] args, ShellCallback callback, ResultReceiver resultReceiver)
                 throws RemoteException {
             new CompanionDeviceShellCommand(CompanionDeviceManagerService.this, mAssociationStore,
-                    mDevicePresenceMonitor, mTransportManager, mSystemDataTransferRequestStore,
+                    mDevicePresenceMonitor, mTransportManager, mSystemDataTransferProcessor,
                     mAssociationRequestsProcessor)
                     .exec(this, in, out, err, args, callback, resultReceiver);
         }

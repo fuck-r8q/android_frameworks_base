@@ -25,58 +25,68 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.flags.FakeFeatureFlags
+import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags.FACE_AUTH_REFACTOR
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue
-import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.shared.model.CameraLaunchSourceModel
+import com.android.systemui.power.domain.interactor.PowerInteractorFactory
+import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.scene.shared.model.ObservableTransitionState
+import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.shade.data.repository.FakeShadeRepository
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.MockitoAnnotations
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RoboPilotTest
 @RunWith(AndroidJUnit4::class)
 class KeyguardInteractorTest : SysuiTestCase() {
-    private lateinit var commandQueue: FakeCommandQueue
-    private lateinit var featureFlags: FakeFeatureFlags
-    private lateinit var testScope: TestScope
 
-    private lateinit var underTest: KeyguardInteractor
-    private lateinit var repository: FakeKeyguardRepository
-    private lateinit var bouncerRepository: FakeKeyguardBouncerRepository
-    private lateinit var configurationRepository: FakeConfigurationRepository
+    private val testUtils = SceneTestUtils(this)
+    private val testScope = testUtils.testScope
+    private val repository = testUtils.keyguardRepository
+    private val sceneInteractor = testUtils.sceneInteractor()
+    private val commandQueue = FakeCommandQueue()
+    private val featureFlags = FakeFeatureFlagsClassic().apply { set(FACE_AUTH_REFACTOR, true) }
+    private val bouncerRepository = FakeKeyguardBouncerRepository()
+    private val configurationRepository = FakeConfigurationRepository()
+    private val shadeRepository = FakeShadeRepository()
+    private val transitionState: MutableStateFlow<ObservableTransitionState> =
+        MutableStateFlow(ObservableTransitionState.Idle(SceneKey.Gone))
+
+    private val underTest =
+        KeyguardInteractor(
+            repository = repository,
+            commandQueue = commandQueue,
+            powerInteractor = PowerInteractorFactory.create().powerInteractor,
+            featureFlags = featureFlags,
+            sceneContainerFlags = testUtils.sceneContainerFlags,
+            deviceEntryRepository = testUtils.deviceEntryRepository,
+            bouncerRepository = bouncerRepository,
+            configurationRepository = configurationRepository,
+            shadeRepository = shadeRepository,
+            sceneInteractorProvider = { sceneInteractor },
+        )
 
     @Before
     fun setUp() {
-        MockitoAnnotations.initMocks(this)
-        featureFlags = FakeFeatureFlags().apply { set(FACE_AUTH_REFACTOR, true) }
-        commandQueue = FakeCommandQueue()
-        testScope = TestScope()
-        repository = FakeKeyguardRepository()
-        bouncerRepository = FakeKeyguardBouncerRepository()
-        configurationRepository = FakeConfigurationRepository()
-        underTest =
-            KeyguardInteractor(
-                repository,
-                commandQueue,
-                featureFlags,
-                bouncerRepository,
-                configurationRepository,
-            )
+        sceneInteractor.setTransitionState(transitionState)
     }
 
     @Test
     fun onCameraLaunchDetected() =
         testScope.runTest {
             val flow = underTest.onCameraLaunchDetected
-            var cameraLaunchSource = collectLastValue(flow)
+            val cameraLaunchSource = collectLastValue(flow)
             runCurrent()
 
             commandQueue.doForEachCallback {
@@ -154,7 +164,7 @@ class KeyguardInteractorTest : SysuiTestCase() {
 
     @Test
     fun keyguardVisibilityIsDefinedAsKeyguardShowingButNotOccluded() = runTest {
-        var isVisible = collectLastValue(underTest.isKeyguardVisible)
+        val isVisible = collectLastValue(underTest.isKeyguardVisible)
         repository.setKeyguardShowing(true)
         repository.setKeyguardOccluded(false)
 
@@ -175,5 +185,30 @@ class KeyguardInteractorTest : SysuiTestCase() {
             runCurrent()
 
             assertThat(secureCameraActive()).isFalse()
+        }
+
+    @Test
+    fun animationDozingTransitions() =
+        testScope.runTest {
+            val isAnimate by collectLastValue(underTest.animateDozingTransitions)
+
+            underTest.setAnimateDozingTransitions(true)
+            runCurrent()
+            assertThat(isAnimate).isTrue()
+
+            underTest.setAnimateDozingTransitions(false)
+            runCurrent()
+            assertThat(isAnimate).isFalse()
+
+            underTest.setAnimateDozingTransitions(true)
+            transitionState.value =
+                ObservableTransitionState.Transition(
+                    fromScene = SceneKey.Gone,
+                    toScene = SceneKey.Lockscreen,
+                    progress = flowOf(0f),
+                    isUserInputDriven = false,
+                )
+            runCurrent()
+            assertThat(isAnimate).isFalse()
         }
 }

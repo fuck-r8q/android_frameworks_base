@@ -45,31 +45,34 @@ public class AuthenticationStatsCollector {
     private static final String TAG = "AuthenticationStatsCollector";
 
     // The minimum number of attempts that will calculate the FRR and trigger the notification.
-    private static final int MINIMUM_ATTEMPTS = 500;
+    private static final int MINIMUM_ATTEMPTS = 150;
     // Upload the data every 50 attempts (average number of daily authentications).
     private static final int AUTHENTICATION_UPLOAD_INTERVAL = 50;
     // The maximum number of eligible biometric enrollment notification can be sent.
     @VisibleForTesting
-    static final int MAXIMUM_ENROLLMENT_NOTIFICATIONS = 2;
+    static final int MAXIMUM_ENROLLMENT_NOTIFICATIONS = 1;
 
     @NonNull private final Context mContext;
+    @NonNull private final PackageManager mPackageManager;
+    @NonNull private final FaceManager mFaceManager;
+    @NonNull private final FingerprintManager mFingerprintManager;
 
+    private final boolean mEnabled;
     private final float mThreshold;
     private final int mModality;
-    private boolean mPersisterInitialized = false;
 
     @NonNull private final Map<Integer, AuthenticationStats> mUserAuthenticationStatsMap;
-
-    // TODO(b/295582896): Find a way to make this NonNull
-    @Nullable private AuthenticationStatsPersister mAuthenticationStatsPersister;
+    @NonNull private AuthenticationStatsPersister mAuthenticationStatsPersister;
     @NonNull private BiometricNotification mBiometricNotification;
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(@NonNull Context context, @NonNull Intent intent) {
             final int userId = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+
             if (userId != UserHandle.USER_NULL
                     && intent.getAction().equals(Intent.ACTION_USER_REMOVED)) {
+                Slog.d(TAG, "Removing data for user: " + userId);
                 onUserRemoved(userId);
             }
         }
@@ -78,30 +81,48 @@ public class AuthenticationStatsCollector {
     public AuthenticationStatsCollector(@NonNull Context context, int modality,
             @NonNull BiometricNotification biometricNotification) {
         mContext = context;
+        mEnabled = context.getResources().getBoolean(R.bool.config_biometricFrrNotificationEnabled);
         mThreshold = context.getResources()
                 .getFraction(R.fraction.config_biometricNotificationFrrThreshold, 1, 1);
         mUserAuthenticationStatsMap = new HashMap<>();
         mModality = modality;
         mBiometricNotification = biometricNotification;
 
-        context.registerReceiver(mBroadcastReceiver, new IntentFilter(Intent.ACTION_USER_REMOVED));
+        mPackageManager = context.getPackageManager();
+        mFaceManager = mContext.getSystemService(FaceManager.class);
+        mFingerprintManager = mContext.getSystemService(FingerprintManager.class);
+
+        mAuthenticationStatsPersister = new AuthenticationStatsPersister(mContext);
+
+        initializeUserAuthenticationStatsMap();
+        mAuthenticationStatsPersister.persistFrrThreshold(mThreshold);
+
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_USER_REMOVED);
+        context.registerReceiver(mBroadcastReceiver, intentFilter);
     }
 
     private void initializeUserAuthenticationStatsMap() {
-        try {
-            mAuthenticationStatsPersister = new AuthenticationStatsPersister(mContext);
-            for (AuthenticationStats stats :
-                    mAuthenticationStatsPersister.getAllFrrStats(mModality)) {
-                mUserAuthenticationStatsMap.put(stats.getUserId(), stats);
-            }
-            mPersisterInitialized = true;
-        } catch (IllegalStateException e) {
-            Slog.w(TAG, "Failed to initialize AuthenticationStatsPersister.", e);
+        for (AuthenticationStats stats :
+                mAuthenticationStatsPersister.getAllFrrStats(mModality)) {
+            mUserAuthenticationStatsMap.put(stats.getUserId(), stats);
         }
     }
 
     /** Update total authentication and rejected attempts. */
     public void authenticate(int userId, boolean authenticated) {
+
+        // Don't collect data if the feature is disabled.
+        if (!mEnabled) {
+            return;
+        }
+
+        // Don't collect data for single-modality devices or user has both biometrics enrolled.
+        if (isSingleModalityDevice()
+                || (hasEnrolledFace(userId) && hasEnrolledFingerprint(userId))) {
+            return;
+        }
+
         // SharedPreference is not ready when starting system server, initialize
         // mUserAuthenticationStatsMap in authentication to ensure SharedPreference
         // is ready for application use.
@@ -121,10 +142,9 @@ public class AuthenticationStatsCollector {
 
         authenticationStats.authenticate(authenticated);
 
-        if (mPersisterInitialized) {
-            persistDataIfNeeded(userId);
-        }
         sendNotificationIfNeeded(userId);
+
+        persistDataIfNeeded(userId);
     }
 
     /** Check if a notification should be sent after a calculation cycle. */
@@ -143,29 +163,15 @@ public class AuthenticationStatsCollector {
 
         authenticationStats.resetData();
 
-        final PackageManager packageManager = mContext.getPackageManager();
+        final boolean hasEnrolledFace = hasEnrolledFace(userId);
+        final boolean hasEnrolledFingerprint = hasEnrolledFingerprint(userId);
 
-        // Don't send notification to single-modality devices.
-        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
-                || !packageManager.hasSystemFeature(PackageManager.FEATURE_FACE)) {
-            return;
-        }
-
-        final FaceManager faceManager = mContext.getSystemService(FaceManager.class);
-        final boolean hasEnrolledFace = faceManager.hasEnrolledTemplates(userId);
-
-        final FingerprintManager fingerprintManager = mContext
-                .getSystemService(FingerprintManager.class);
-        final boolean hasEnrolledFingerprint = fingerprintManager.hasEnrolledTemplates(userId);
-
-        // Don't send notification when both face and fingerprint are enrolled.
-        if (hasEnrolledFace && hasEnrolledFingerprint) {
-            return;
-        }
         if (hasEnrolledFace && !hasEnrolledFingerprint) {
             mBiometricNotification.sendFpEnrollNotification(mContext);
+            authenticationStats.updateNotificationCounter();
         } else if (!hasEnrolledFace && hasEnrolledFingerprint) {
             mBiometricNotification.sendFaceEnrollNotification(mContext);
+            authenticationStats.updateNotificationCounter();
         }
     }
 
@@ -181,13 +187,21 @@ public class AuthenticationStatsCollector {
     }
 
     private void onUserRemoved(final int userId) {
-        if (!mPersisterInitialized) {
-            initializeUserAuthenticationStatsMap();
-        }
-        if (mPersisterInitialized) {
-            mUserAuthenticationStatsMap.remove(userId);
-            mAuthenticationStatsPersister.removeFrrStats(userId);
-        }
+        mUserAuthenticationStatsMap.remove(userId);
+        mAuthenticationStatsPersister.removeFrrStats(userId);
+    }
+
+    private boolean isSingleModalityDevice() {
+        return !mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
+                || !mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE);
+    }
+
+    private boolean hasEnrolledFace(int userId) {
+        return mFaceManager.hasEnrolledTemplates(userId);
+    }
+
+    private boolean hasEnrolledFingerprint(int userId) {
+        return mFingerprintManager.hasEnrolledTemplates(userId);
     }
 
     /**

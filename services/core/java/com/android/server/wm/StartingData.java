@@ -76,7 +76,7 @@ public abstract class StartingData {
      * This starting window should be removed after applying the start transaction of transition,
      * which ensures the app window has shown.
      */
-    @AfterTransaction int mRemoveAfterTransaction;
+    @AfterTransaction int mRemoveAfterTransaction = AFTER_TRANSACTION_IDLE;
 
     /** Whether to prepare the removal animation. */
     boolean mPrepareRemoveAnimation;
@@ -107,5 +107,14 @@ public abstract class StartingData {
     /** @see android.window.TaskSnapshot#hasImeSurface() */
     boolean hasImeSurface() {
         return false;
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + "{"
+                + Integer.toHexString(System.identityHashCode(this))
+                + " waitForSyncTransactionCommit=" + mWaitForSyncTransactionCommit
+                + " removeAfterTransaction= " + mRemoveAfterTransaction
+                + "}";
     }
 }

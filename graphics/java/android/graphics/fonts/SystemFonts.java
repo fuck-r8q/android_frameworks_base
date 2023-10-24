@@ -48,6 +48,8 @@ public final class SystemFonts {
     private static final String TAG = "SystemFonts";
 
     private static final String FONTS_XML = "/system/etc/font_fallback.xml";
+    private static final String LEGACY_FONTS_XML = "/system/etc/fonts.xml";
+
     /** @hide */
     public static final String SYSTEM_FONT_DIR = "/system/fonts/";
     private static final String OEM_XML = "/product/etc/fonts_customization.xml";
@@ -119,7 +121,8 @@ public final class SystemFonts {
 
 
         final FontFamily defaultFamily = defaultFonts.isEmpty() ? null : createFontFamily(
-                defaultFonts, languageTags, variant, false, cache);
+                defaultFonts, languageTags, variant, xmlFamily.getVariableFontFamilyType(), false,
+                cache);
         // Insert family into fallback map.
         for (int i = 0; i < fallbackMap.size(); i++) {
             final String name = fallbackMap.keyAt(i);
@@ -136,8 +139,8 @@ public final class SystemFonts {
                     familyListSet.familyList.add(defaultFamily);
                 }
             } else {
-                final FontFamily family = createFontFamily(fallback, languageTags, variant, false,
-                        cache);
+                final FontFamily family = createFontFamily(fallback, languageTags, variant,
+                        xmlFamily.getVariableFontFamilyType(), false, cache);
                 if (family != null) {
                     familyListSet.familyList.add(family);
                 } else if (defaultFamily != null) {
@@ -153,6 +156,7 @@ public final class SystemFonts {
             @NonNull List<FontConfig.Font> fonts,
             @NonNull String languageTags,
             @FontConfig.FontFamily.Variant int variant,
+            int varFamilyType,
             boolean isDefaultFallback,
             @NonNull Map<String, ByteBuffer> cache) {
         if (fonts.size() == 0) {
@@ -194,7 +198,7 @@ public final class SystemFonts {
             }
         }
         return b == null ? null : b.build(languageTags, variant, false /* isCustomFallback */,
-                isDefaultFallback, FontFamily.Builder.VARIABLE_FONT_FAMILY_TYPE_NONE);
+                isDefaultFallback, varFamilyType);
     }
 
     private static void appendNamedFamilyList(@NonNull FontConfig.NamedFamilyList namedFamilyList,
@@ -208,6 +212,7 @@ public final class SystemFonts {
             final FontFamily family = createFontFamily(
                     xmlFamily.getFontList(),
                     xmlFamily.getLocaleList().toLanguageTags(), xmlFamily.getVariant(),
+                    xmlFamily.getVariableFontFamilyType(),
                     true, // named family is always default
                     bufferCache);
             if (family == null) {
@@ -230,7 +235,13 @@ public final class SystemFonts {
             long lastModifiedDate,
             int configVersion
     ) {
-        return getSystemFontConfigInternal(FONTS_XML, SYSTEM_FONT_DIR, OEM_XML, OEM_FONT_DIR,
+        final String fontsXml;
+        if (com.android.text.flags.Flags.deprecateFontsXml()) {
+            fontsXml = FONTS_XML;
+        } else {
+            fontsXml = LEGACY_FONTS_XML;
+        }
+        return getSystemFontConfigInternal(fontsXml, SYSTEM_FONT_DIR, OEM_XML, OEM_FONT_DIR,
                 updatableFontMap, lastModifiedDate, configVersion);
     }
 
@@ -255,8 +266,22 @@ public final class SystemFonts {
      * @hide
      */
     public static @NonNull FontConfig getSystemPreinstalledFontConfig() {
-        return getSystemFontConfigInternal(FONTS_XML, SYSTEM_FONT_DIR, OEM_XML, OEM_FONT_DIR, null,
+        final String fontsXml;
+        if (com.android.text.flags.Flags.deprecateFontsXml()) {
+            fontsXml = FONTS_XML;
+        } else {
+            fontsXml = LEGACY_FONTS_XML;
+        }
+        return getSystemFontConfigInternal(fontsXml, SYSTEM_FONT_DIR, OEM_XML, OEM_FONT_DIR, null,
                 0, 0);
+    }
+
+    /**
+     * @hide
+     */
+    public static @NonNull FontConfig getSystemPreinstalledFontConfigFromLegacyXml() {
+        return getSystemFontConfigInternal(LEGACY_FONTS_XML, SYSTEM_FONT_DIR, OEM_XML, OEM_FONT_DIR,
+                null, 0, 0);
     }
 
     /* package */ static @NonNull FontConfig getSystemFontConfigInternal(
@@ -269,6 +294,7 @@ public final class SystemFonts {
             int configVersion
     ) {
         try {
+            Log.i(TAG, "Loading font config from " + fontsXml);
             return FontListParser.parse(fontsXml, systemFontDir, oemXml, productFontDir,
                                                 updatableFontMap, lastModifiedDate, configVersion);
         } catch (IOException e) {

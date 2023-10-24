@@ -19,10 +19,11 @@ package com.android.systemui.statusbar.notification.stack.domain.interactor
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -43,6 +44,7 @@ class SharedNotificationContainerInteractorTest : SysuiTestCase() {
             SharedNotificationContainerInteractor(
                 configurationRepository,
                 mContext,
+                ResourcesSplitShadeStateController()
             )
     }
 

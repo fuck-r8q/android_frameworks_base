@@ -41,6 +41,7 @@ import android.os.RemoteException
 import android.os.ServiceManager
 import android.os.UserHandle
 import android.os.UserManager
+import android.permission.flags.Flags
 import android.permission.IOnPermissionsChangeListener
 import android.permission.PermissionControllerManager
 import android.permission.PermissionManager
@@ -985,7 +986,7 @@ class PermissionService(
     ) {
         val appOpPolicy = service.getSchemePolicy(UidUri.SCHEME, AppOpUri.SCHEME) as
             AppIdAppOpPolicy
-        val appOpName = checkNotNull(AppOpsManager.permissionToOp(permissionName))
+        val appOpName = AppOpsManager.permissionToOp(permissionName)!!
         val mode = if (isGranted) AppOpsManager.MODE_ALLOWED else AppOpsManager.MODE_ERRORED
         with(appOpPolicy) { setAppOpMode(packageState.appId, userId, appOpName, mode) }
     }
@@ -1409,9 +1410,14 @@ class PermissionService(
         permissionName: String,
         deviceId: Int,
     ): Int {
-        return if (deviceId == Context.DEVICE_ID_DEFAULT) {
+        return if (!Flags.deviceAwarePermissionApis() || deviceId == Context.DEVICE_ID_DEFAULT) {
             with(policy) { getPermissionFlags(appId, userId, permissionName) }
         } else {
+            if (permissionName !in DevicePermissionPolicy.DEVICE_AWARE_PERMISSIONS) {
+                Slog.i(LOG_TAG, "$permissionName is not device aware permission, " +
+                        " get the flags for default device.")
+                return with(policy) { getPermissionFlags(appId, userId, permissionName) }
+            }
             val virtualDeviceManagerInternal = virtualDeviceManagerInternal
             if (virtualDeviceManagerInternal == null) {
                 Slog.e(LOG_TAG, "Virtual device manager service is not available.")
@@ -1437,11 +1443,17 @@ class PermissionService(
         deviceId: Int,
         flags: Int
     ): Boolean {
-        return if (deviceId == Context.DEVICE_ID_DEFAULT) {
+        return if (!Flags.deviceAwarePermissionApis() || deviceId == Context.DEVICE_ID_DEFAULT) {
             with(policy) {
                setPermissionFlags(appId, userId, permissionName, flags)
             }
         } else {
+            if (permissionName !in DevicePermissionPolicy.DEVICE_AWARE_PERMISSIONS) {
+                Slog.i(LOG_TAG, "$permissionName is not device aware permission, " +
+                        " set the flags for default device.")
+                return with(policy) { setPermissionFlags(appId, userId, permissionName, flags) }
+            }
+
             val virtualDeviceManagerInternal = virtualDeviceManagerInternal
             if (virtualDeviceManagerInternal == null) {
                 Slog.e(LOG_TAG, "Virtual device manager service is not available.")
@@ -1742,10 +1754,19 @@ class PermissionService(
     }
 
     override fun addOnPermissionsChangeListener(listener: IOnPermissionsChangeListener) {
+        context.enforceCallingOrSelfPermission(
+            Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS, "addOnPermissionsChangeListener"
+        )
+
         onPermissionsChangeListeners.addListener(listener)
     }
 
     override fun removeOnPermissionsChangeListener(listener: IOnPermissionsChangeListener) {
+        context.enforceCallingOrSelfPermission(
+            Manifest.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS,
+            "removeOnPermissionsChangeListener"
+        )
+
         onPermissionsChangeListeners.removeListener(listener)
     }
 

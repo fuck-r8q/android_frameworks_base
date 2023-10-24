@@ -251,6 +251,9 @@ public class JobSchedulerService extends com.android.server.SystemService
         }
     };
 
+    @VisibleForTesting
+    public static UsageStatsManagerInternal sUsageStatsManagerInternal;
+
     /** Global local for all job scheduler state. */
     final Object mLock = new Object();
     /** Master list of jobs. */
@@ -358,8 +361,8 @@ public class JobSchedulerService extends com.android.server.SystemService
     DeviceIdleInternal mLocalDeviceIdleController;
     @VisibleForTesting
     AppStateTrackerImpl mAppStateTracker;
-    final UsageStatsManagerInternal mUsageStats;
     private final AppStandbyInternal mAppStandbyInternal;
+    private final BatteryStatsInternal mBatteryStatsInternal;
 
     /**
      * Set to true once we are allowed to run third party apps.
@@ -1759,8 +1762,16 @@ public class JobSchedulerService extends com.android.server.SystemService
                 sEnqueuedJwiHighWaterMarkLogger.logSampleWithUid(uId, jobStatus.getWorkCount());
             }
 
-            FrameworkStatsLog.write_non_chained(FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED,
-                    uId, null, jobStatus.getBatteryName(),
+            final int sourceUid = uId;
+            FrameworkStatsLog.write(FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED,
+                    jobStatus.isProxyJob()
+                            ? new int[]{sourceUid, jobStatus.getUid()} : new int[]{sourceUid},
+                    // Given that the source tag is set by the calling app, it should be connected
+                    // to the calling app in the attribution for a proxied job.
+                    jobStatus.isProxyJob()
+                            ? new String[]{null, jobStatus.getSourceTag()}
+                            : new String[]{jobStatus.getSourceTag()},
+                    jobStatus.getBatteryName(),
                     FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED__STATE__SCHEDULED,
                     JobProtoEnums.INTERNAL_STOP_REASON_UNKNOWN, jobStatus.getStandbyBucket(),
                     jobStatus.getLoggingJobId(),
@@ -2188,8 +2199,16 @@ public class JobSchedulerService extends com.android.server.SystemService
                 cancelled, reason, internalReasonCode, debugReason);
         // If the job was running, the JobServiceContext should log with state FINISHED.
         if (!wasRunning) {
-            FrameworkStatsLog.write_non_chained(FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED,
-                    cancelled.getSourceUid(), null, cancelled.getBatteryName(),
+            final int sourceUid = cancelled.getSourceUid();
+            FrameworkStatsLog.write(FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED,
+                    cancelled.isProxyJob()
+                            ? new int[]{sourceUid, cancelled.getUid()} : new int[]{sourceUid},
+                    // Given that the source tag is set by the calling app, it should be connected
+                    // to the calling app in the attribution for a proxied job.
+                    cancelled.isProxyJob()
+                            ? new String[]{null, cancelled.getSourceTag()}
+                            : new String[]{cancelled.getSourceTag()},
+                    cancelled.getBatteryName(),
                     FrameworkStatsLog.SCHEDULED_JOB_STATE_CHANGED__STATE__CANCELLED,
                     internalReasonCode, cancelled.getStandbyBucket(),
                     cancelled.getLoggingJobId(),
@@ -2416,7 +2435,7 @@ public class JobSchedulerService extends com.android.server.SystemService
 
         // Set up the app standby bucketing tracker
         mStandbyTracker = new StandbyTracker();
-        mUsageStats = LocalServices.getService(UsageStatsManagerInternal.class);
+        sUsageStatsManagerInternal = LocalServices.getService(UsageStatsManagerInternal.class);
 
         final Categorizer quotaCategorizer = (userId, packageName, tag) -> {
             if (QUOTA_TRACKER_TIMEOUT_UIJ_TAG.equals(tag)) {
@@ -2466,6 +2485,8 @@ public class JobSchedulerService extends com.android.server.SystemService
 
         mAppStandbyInternal = LocalServices.getService(AppStandbyInternal.class);
         mAppStandbyInternal.addListener(mStandbyTracker);
+
+        mBatteryStatsInternal = LocalServices.getService(BatteryStatsInternal.class);
 
         // The job store needs to call back
         publishLocalService(JobSchedulerInternal.class, new LocalService());
@@ -4127,7 +4148,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                 return;
             }
 
-            long sinceLast = mUsageStats.getTimeSinceLastJobRun(packageName, userId);
+            long sinceLast = sUsageStatsManagerInternal.getTimeSinceLastJobRun(packageName, userId);
             if (sinceLast > 2 * DateUtils.DAY_IN_MILLIS) {
                 // Too long ago, not worth logging
                 sinceLast = 0L;
@@ -4137,8 +4158,6 @@ public class JobSchedulerService extends com.android.server.SystemService
                 mJobs.forEachJobForSourceUid(uid, counter);
             }
             if (counter.numDeferred() > 0 || sinceLast > 0) {
-                BatteryStatsInternal mBatteryStatsInternal = LocalServices.getService
-                        (BatteryStatsInternal.class);
                 mBatteryStatsInternal.noteJobsDeferred(uid, counter.numDeferred(), sinceLast);
                 FrameworkStatsLog.write_non_chained(
                         FrameworkStatsLog.DEFERRED_JOB_STATS_REPORTED, uid, null,
@@ -4183,10 +4202,8 @@ public class JobSchedulerService extends com.android.server.SystemService
 
     // Static to support external callers
     public static int standbyBucketForPackage(String packageName, int userId, long elapsedNow) {
-        UsageStatsManagerInternal usageStats = LocalServices.getService(
-                UsageStatsManagerInternal.class);
-        int bucket = usageStats != null
-                ? usageStats.getAppStandbyBucket(packageName, userId, elapsedNow)
+        int bucket = sUsageStatsManagerInternal != null
+                ? sUsageStatsManagerInternal.getAppStandbyBucket(packageName, userId, elapsedNow)
                 : 0;
 
         bucket = standbyBucketToBucketIndex(bucket);

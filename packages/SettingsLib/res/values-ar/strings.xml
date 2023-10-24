@@ -107,10 +107,8 @@
     <string name="bluetooth_profile_opp" msgid="6692618568149493430">"نقل الملف"</string>
     <string name="bluetooth_profile_hid" msgid="2969922922664315866">"جهاز الإرسال"</string>
     <string name="bluetooth_profile_pan" msgid="1006235139308318188">"الوصول إلى الإنترنت"</string>
-    <!-- no translation found for bluetooth_profile_pbap (2103406516858653017) -->
-    <skip />
-    <!-- no translation found for bluetooth_profile_pbap_summary (402819589201138227) -->
-    <skip />
+    <string name="bluetooth_profile_pbap" msgid="2103406516858653017">"السماح بالوصول إلى جهات الاتصال وسجلّ المكالمات"</string>
+    <string name="bluetooth_profile_pbap_summary" msgid="402819589201138227">"سيتم استخدام المعلومات لإرسال إشعارات المكالمات وغيرها"</string>
     <string name="bluetooth_profile_pan_nap" msgid="7871974753822470050">"مشاركة اتصال الإنترنت"</string>
     <string name="bluetooth_profile_map" msgid="8907204701162107271">"الرسائل النصية"</string>
     <string name="bluetooth_profile_sap" msgid="8304170950447934386">"‏الوصول إلى شريحة SIM"</string>
@@ -159,6 +157,8 @@
     <string name="accessibility_wifi_two_bars" msgid="687800024970972270">"‏إشارة Wi-Fi تتكون من شريطين."</string>
     <string name="accessibility_wifi_three_bars" msgid="779895671061950234">"‏إشارة Wi-Fi تتكون من ثلاثة أشرطة."</string>
     <string name="accessibility_wifi_signal_full" msgid="7165262794551355617">"‏إشارة Wi-Fi كاملة."</string>
+    <!-- no translation found for accessibility_wifi_other_device (2815627624555795918) -->
+    <skip />
     <string name="accessibility_wifi_security_type_none" msgid="162352241518066966">"شبكة مفتوحة"</string>
     <string name="accessibility_wifi_security_type_secured" msgid="2399774097343238942">"شبكة محمية بكلمة مرور"</string>
     <string name="process_kernel_label" msgid="950292573930336765">"‏نظام التشغيل Android"</string>
@@ -405,7 +405,6 @@
     <string name="force_resizable_activities_summary" msgid="2490382056981583062">"السماح بتغيير حجم جميع الأنشطة لتناسب تعدد النوافذ، بغض النظر عن قيم البيان"</string>
     <string name="enable_freeform_support" msgid="7599125687603914253">"تفعيل النوافذ الحرة"</string>
     <string name="enable_freeform_support_summary" msgid="1822862728719276331">"إتاحة استخدام النوافذ الحرة التجريبية"</string>
-    <string name="desktop_mode" msgid="2389067840550544462">"وضع سطح المكتب"</string>
     <string name="local_backup_password_title" msgid="4631017948933578709">"كلمة مرور احتياطية للكمبيوتر"</string>
     <string name="local_backup_password_summary_none" msgid="7646898032616361714">"النُسخ الاحتياطية الكاملة لسطح المكتب غير محمية في الوقت الحالي."</string>
     <string name="local_backup_password_summary_change" msgid="1707357670383995567">"انقر لتغيير كلمة مرور النسخ الاحتياطية الكاملة لسطح المكتب أو إزالتها."</string>
@@ -520,7 +519,7 @@
     <string name="ims_reg_status_not_registered" msgid="2989287366045704694">"غير مُسجَّل"</string>
     <string name="status_unavailable" msgid="5279036186589861608">"غير متاح"</string>
     <string name="wifi_status_mac_randomized" msgid="466382542497832189">"‏يتم اختيار عنوان MAC بشكل انتقائي."</string>
-    <string name="wifi_tether_connected_summary" msgid="5282919920463340158">"{count,plural, =0{لم يتم اتصال أي أجهزة.}=1{تم اتصال جهاز واحد.}two{تم اتصال جهازين.}few{تم اتصال # أجهزة.}many{تم اتصال # جهازًا.}other{تم اتصال # جهاز.}}"</string>
+    <string name="wifi_tether_connected_summary" msgid="5100712926640492336">"{count,plural, =1{هناك جهاز واحد متصل.}zero{هناك # جهاز متصل.}two{هناك جهازان متصلان.}few{هناك # أجهزة متصلة.}many{هناك # جهازًا متصلاً.}other{هناك # جهاز متصل.}}"</string>
     <string name="accessibility_manual_zen_more_time" msgid="5141801092071134235">"وقت أكثر."</string>
     <string name="accessibility_manual_zen_less_time" msgid="6828877595848229965">"وقت أقل."</string>
     <string name="cancel" msgid="5665114069455378395">"إلغاء"</string>
@@ -687,12 +686,6 @@
     <string name="back_navigation_animation" msgid="8105467568421689484">"صور متحركة تعرض إيماءة الرجوع إلى الخلف التنبؤية"</string>
     <string name="back_navigation_animation_summary" msgid="741292224121599456">"تفعيل الصور المتحركة في النظام لإيماءة الرجوع إلى الخلف التنبؤية"</string>
     <string name="back_navigation_animation_dialog" msgid="8696966520944625596">"‏يفعّل هذا الإعداد الصور المتحركة في النظام للصور المتحركة التي تعرض إيماءة الرجوع إلى الخلف التنبؤية. يتطلب الإعداد ضبط enableOnBackInvokedCallback إلى true لكل تطبيق في ملف البيان."</string>
-  <string-array name="udfps_accessibility_touch_hints">
-    <item msgid="1737722959616802157">"نقل لليسار"</item>
-    <item msgid="5425394847942513942">"نقل للأسفل"</item>
-    <item msgid="7728484337962740316">"نقل لليمين"</item>
-    <item msgid="324200556467459329">"نقل للأعلى"</item>
-  </string-array>
     <string name="font_scale_percentage" msgid="2624057443622817886">"%% <xliff:g id="PERCENTAGE">%1$d</xliff:g>"</string>
     <string name="not_specified" msgid="5423502443185110328">"صيغة مخاطبة غير محدَّدة"</string>
     <string name="neuter" msgid="2075249330106127310">"صيغة مخاطبة محايدة"</string>

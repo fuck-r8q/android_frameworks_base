@@ -37,7 +37,7 @@ import androidx.annotation.NonNull;
 import com.android.internal.graphics.ColorUtils;
 import com.android.settingslib.Utils;
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 
 import java.io.PrintWriter;
 
@@ -134,19 +134,19 @@ public class LockIconView extends FrameLayout implements Dumpable {
         mLockIcon.setPadding(mLockIconPadding, mLockIconPadding, mLockIconPadding,
                 mLockIconPadding);
 
-        // mSensorProps coordinates assume portrait mode which is OK b/c the keyguard is always in
-        // portrait.
         mSensorRect.set(mLockIconCenter.x - mRadius,
                 mLockIconCenter.y - mRadius,
                 mLockIconCenter.x + mRadius,
                 mLockIconCenter.y + mRadius);
 
         final FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
-        lp.width = (int) (mSensorRect.right - mSensorRect.left);
-        lp.height = (int) (mSensorRect.bottom - mSensorRect.top);
-        lp.topMargin = (int) mSensorRect.top;
-        lp.setMarginStart((int) mSensorRect.left);
-        setLayoutParams(lp);
+        if (lp != null) {
+            lp.width = (int) (mSensorRect.right - mSensorRect.left);
+            lp.height = (int) (mSensorRect.bottom - mSensorRect.top);
+            lp.topMargin = (int) mSensorRect.top;
+            lp.setMarginStart((int) mSensorRect.left);
+            setLayoutParams(lp);
+        }
     }
 
     @Override

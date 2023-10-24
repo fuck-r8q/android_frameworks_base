@@ -28,7 +28,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.qs.customize.QSCustomizer;
 import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.util.LargeScreenUtils;
@@ -235,11 +235,15 @@ public class QSContainerImpl extends FrameLayout implements Dumpable {
                 quickStatusBarHeaderController.setContentMargins(mContentHorizontalPadding,
                         mContentHorizontalPadding);
             } else {
-                view.setPaddingRelative(
-                        mContentHorizontalPadding,
-                        view.getPaddingTop(),
-                        mContentHorizontalPadding,
-                        view.getPaddingBottom());
+                // Set the horizontal paddings unless the view is the Compose implementation of the
+                // footer actions.
+                if (view.getTag(R.id.tag_compose_qs_footer_actions) == null) {
+                    view.setPaddingRelative(
+                            mContentHorizontalPadding,
+                            view.getPaddingTop(),
+                            mContentHorizontalPadding,
+                            view.getPaddingBottom());
+                }
             }
         }
     }

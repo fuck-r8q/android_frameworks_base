@@ -35,7 +35,7 @@ import android.view.ViewGroupOverlay
 import androidx.annotation.VisibleForTesting
 import com.android.app.animation.Interpolators
 import com.android.keyguard.KeyguardViewController
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.dreams.DreamOverlayStateController
@@ -52,7 +52,7 @@ import com.android.systemui.statusbar.notification.stack.StackStateAnimator
 import com.android.systemui.statusbar.phone.KeyguardBypassController
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.KeyguardStateController
-import com.android.systemui.util.LargeScreenUtils
+import com.android.systemui.statusbar.policy.SplitShadeStateController
 import com.android.systemui.util.animation.UniqueObjectHostView
 import com.android.systemui.util.settings.SecureSettings
 import com.android.systemui.util.traceSection
@@ -101,6 +101,8 @@ constructor(
     panelEventsEvents: ShadeStateEvents,
     private val secureSettings: SecureSettings,
     @Main private val handler: Handler,
+    private val splitShadeStateController: SplitShadeStateController,
+    private val logger: MediaViewLogger,
 ) {
 
     /** Track the media player setting status on lock screen. */
@@ -568,7 +570,7 @@ constructor(
             context.resources.getDimensionPixelSize(
                 R.dimen.lockscreen_shade_media_transition_distance
             )
-        inSplitShade = LargeScreenUtils.shouldUseSplitNotificationShade(context.resources)
+        inSplitShade = splitShadeStateController.shouldUseSplitNotificationShade(context.resources)
     }
 
     /**
@@ -1056,6 +1058,7 @@ constructor(
                     // that and directly set the mediaFrame's bounds within the premeasured host.
                     targetHost.addView(mediaFrame)
                 }
+                logger.logMediaHostAttachment(currentAttachmentLocation)
                 if (isCrossFadeAnimatorRunning) {
                     // When cross-fading with an animation, we only notify the media carousel of the
                     // location change, once the view is reattached to the new place and not

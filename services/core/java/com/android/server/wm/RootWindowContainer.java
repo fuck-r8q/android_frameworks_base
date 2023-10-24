@@ -267,10 +267,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      */
     final SparseArray<SleepToken> mSleepTokens = new SparseArray<>();
 
-    // The default minimal size that will be used if the activity doesn't specify its minimal size.
-    // It will be calculated when the default display gets added.
-    int mDefaultMinSizeOfResizeableTaskDp = -1;
-
     // Whether tasks have moved and we need to rank the tasks before next OOM scoring
     private boolean mTaskLayersChanged = true;
     private int mTmpTaskLayerRank;
@@ -1526,10 +1522,30 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             throw new IllegalArgumentException(
                     "resolveSecondaryHomeActivity: Should not be default task container");
         }
-        // Resolve activities in the same package as currently selected primary home activity.
+
         Intent homeIntent = mService.getHomeIntent();
         ActivityInfo aInfo = resolveHomeActivity(userId, homeIntent);
-        if (aInfo != null) {
+        boolean lookForSecondaryHomeActivityInPrimaryHomePackage = aInfo != null;
+
+        if (android.companion.virtual.flags.Flags.vdmCustomHome()) {
+            // Resolve the externally set home activity for this display, if any. If it is unset or
+            // we fail to resolve it, fallback to the default secondary home activity.
+            final ComponentName customHomeComponent =
+                    taskDisplayArea.getDisplayContent() != null
+                            ? taskDisplayArea.getDisplayContent().getCustomHomeComponent()
+                            : null;
+            if (customHomeComponent != null) {
+                homeIntent.setComponent(customHomeComponent);
+                ActivityInfo customHomeActivityInfo = resolveHomeActivity(userId, homeIntent);
+                if (customHomeActivityInfo != null) {
+                    aInfo = customHomeActivityInfo;
+                    lookForSecondaryHomeActivityInPrimaryHomePackage = false;
+                }
+            }
+        }
+
+        if (lookForSecondaryHomeActivityInPrimaryHomePackage) {
+            // Resolve activities in the same package as currently selected primary home activity.
             if (ResolverActivity.class.getName().equals(aInfo.name)) {
                 // Always fallback to secondary home component if default home is not set.
                 aInfo = null;
@@ -1617,6 +1633,19 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     /**
+     * Check if the display is valid for primary home activity.
+     *
+     * @param displayId The target display ID
+     * @return {@code true} if allowed to launch, {@code false} otherwise.
+     */
+    boolean shouldPlacePrimaryHomeOnDisplay(int displayId) {
+        // No restrictions to default display, vr 2d display or main display for visible users.
+        return displayId == DEFAULT_DISPLAY || (displayId != INVALID_DISPLAY
+                && (displayId == mService.mVr2dDisplayId
+                || mWmService.shouldPlacePrimaryHomeOnDisplay(displayId)));
+    }
+
+    /**
      * Check if the display area is valid for secondary home activity.
      *
      * @param taskDisplayArea The target display area.
@@ -1689,10 +1718,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
         final int displayId = taskDisplayArea != null ? taskDisplayArea.getDisplayId()
                 : INVALID_DISPLAY;
-        if (displayId == DEFAULT_DISPLAY || (displayId != INVALID_DISPLAY
-                && (displayId == mService.mVr2dDisplayId
-                || mWmService.shouldPlacePrimaryHomeOnDisplay(displayId)))) {
-            // No restrictions to default display, vr 2d display or main display for visible users.
+        if (shouldPlacePrimaryHomeOnDisplay(displayId)) {
             return true;
         }
 
@@ -2217,9 +2243,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             mService.getTaskChangeNotificationController().notifyActivityUnpinned();
         }
         mWindowManager.mPolicy.setPipVisibilityLw(inPip);
-        mWmService.mTransactionFactory.get()
-                .setTrustedOverlay(task.getSurfaceControl(), inPip)
-                .apply();
+        if (task.getSurfaceControl() != null) {
+            mWmService.mTransactionFactory.get()
+                    .setTrustedOverlay(task.getSurfaceControl(), inPip)
+                    .apply();
+        }
     }
 
     void executeAppTransitionForAllDisplay() {
@@ -2529,6 +2557,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Prepare transition before resume top activity, so it can be collected.
             if (!displayShouldSleep && display.mTransitionController.isShellTransitionsEnabled()
                     && !display.mTransitionController.isCollecting()) {
+                // Use NONE if keyguard is not showing.
                 int transit = TRANSIT_NONE;
                 Task startTask = null;
                 if (!display.getDisplayPolicy().isAwake()) {
@@ -2540,11 +2569,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     transit = WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
                     startTask = display.getTaskOccludingKeyguard();
                 }
-                if (transit != TRANSIT_NONE) {
-                    display.mTransitionController.requestStartTransition(
-                            display.mTransitionController.createTransition(transit),
-                            startTask, null /* remoteTransition */, null /* displayChange */);
-                }
+                display.mTransitionController.requestStartTransition(
+                        display.mTransitionController.createTransition(transit),
+                        startTask, null /* remoteTransition */, null /* displayChange */);
             }
             // Set the sleeping state of the root tasks on the display.
             display.forAllRootTasks(rootTask -> {
@@ -2824,7 +2851,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // transition exists, so this affects only when no lock screen is set. Otherwise
             // keyguard going away animation will be played.
             // See also AppTransitionController#getTransitCompatType for more details.
-            if ((!mTaskSupervisor.getKeyguardController().isDisplayOccluded(display.mDisplayId)
+            if ((!mTaskSupervisor.getKeyguardController().isKeyguardOccluded(display.mDisplayId)
                     && token.mTag.equals(KEYGUARD_SLEEP_TOKEN_TAG))
                     || token.mTag.equals(DISPLAY_OFF_SLEEP_TOKEN_TAG)) {
                 display.mSkipAppTransitionAnimation = true;
@@ -3297,6 +3324,20 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         });
     }
 
+    void updateActivityApplicationInfo(int userId,
+            ArrayMap<String, ApplicationInfo> applicationInfoByPackage) {
+        forAllActivities(r -> {
+            if (r.mUserId != userId) {
+                return;
+            }
+
+            final ApplicationInfo aInfo = applicationInfoByPackage.get(r.packageName);
+            if (aInfo != null) {
+                r.updateApplicationInfo(aInfo);
+            }
+        });
+    }
+
     void finishVoiceTask(IVoiceInteractionSession session) {
         final IBinder binder = session.asBinder();
         forAllLeafTasks(t -> t.finishIfVoiceTask(binder), true /* traverseTopToBottom */);
@@ -3355,7 +3396,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
         }
         // End power mode launch when idle.
-        mService.endLaunchPowerMode(ActivityTaskManagerService.POWER_MODE_REASON_START_ACTIVITY);
+        mService.endPowerMode(ActivityTaskManagerService.POWER_MODE_REASON_START_ACTIVITY);
         return true;
     }
 
@@ -3561,7 +3602,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 reason |= ActivityTaskManagerService.POWER_MODE_REASON_UNKNOWN_VISIBILITY;
             }
         }
-        mService.startLaunchPowerMode(reason);
+        mService.startPowerMode(reason);
     }
 
     /**

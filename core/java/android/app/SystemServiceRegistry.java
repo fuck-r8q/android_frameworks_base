@@ -869,10 +869,6 @@ public final class SystemServiceRegistry {
             @Override
             public VirtualDeviceManager createService(ContextImpl ctx)
                     throws ServiceNotFoundException {
-                if (!ctx.getPackageManager().hasSystemFeature(
-                        PackageManager.FEATURE_COMPANION_DEVICE_SETUP)) {
-                    return null;
-                }
                 if (!ctx.getResources().getBoolean(R.bool.config_enableVirtualDeviceManager)) {
                     return null;
                 }
@@ -1665,6 +1661,12 @@ public final class SystemServiceRegistry {
                 case Context.VIRTUALIZATION_SERVICE:
                 case Context.VIRTUAL_DEVICE_SERVICE:
                     return null;
+                case Context.SEARCH_SERVICE:
+                    // Wear device does not support SEARCH_SERVICE so we do not print WTF here
+                    PackageManager manager = ctx.getPackageManager();
+                    if (manager != null && manager.hasSystemFeature(PackageManager.FEATURE_WATCH)) {
+                        return null;
+                    }
             }
             Slog.wtf(TAG, "Manager wrapper not available: " + name);
             return null;

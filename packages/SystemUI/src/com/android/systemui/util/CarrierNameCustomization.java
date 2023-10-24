@@ -11,7 +11,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.systemui.dagger.SysUISingleton;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 
 import java.util.HashMap;
 import javax.inject.Inject;

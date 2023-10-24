@@ -26,7 +26,7 @@ import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
@@ -39,6 +39,7 @@ import com.android.systemui.recents.OverviewProxyService
 import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener
 import com.android.systemui.shared.system.QuickStepContract
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
+import com.android.systemui.statusbar.policy.SplitShadeStateController
 import com.android.systemui.util.LargeScreenUtils
 import com.android.systemui.util.ViewController
 import com.android.systemui.util.concurrency.DelayableExecutor
@@ -61,6 +62,7 @@ class NotificationsQSContainerController @Inject constructor(
         private val featureFlags: FeatureFlags,
         private val
             notificationStackScrollLayoutController: NotificationStackScrollLayoutController,
+        private val splitShadeStateController: SplitShadeStateController
 ) : ViewController<NotificationsQuickSettingsContainer>(view), QSContainerController {
 
     private var qsExpanded = false
@@ -127,6 +129,9 @@ class NotificationsQSContainerController @Inject constructor(
 
         mView.setStackScroller(notificationStackScrollLayoutController.getView())
         mView.setMigratingNSSL(featureFlags.isEnabled(Flags.MIGRATE_NSSL))
+        if (featureFlags.isEnabled(Flags.QS_CONTAINER_GRAPH_OPTIMIZER)){
+            mView.enableGraphOptimization()
+        }
     }
 
     public override fun onViewAttached() {
@@ -149,7 +154,8 @@ class NotificationsQSContainerController @Inject constructor(
     }
 
     fun updateResources() {
-        val newSplitShadeEnabled = LargeScreenUtils.shouldUseSplitNotificationShade(resources)
+        val newSplitShadeEnabled =
+                splitShadeStateController.shouldUseSplitNotificationShade(resources)
         val splitShadeEnabledChanged = newSplitShadeEnabled != splitShadeEnabled
         splitShadeEnabled = newSplitShadeEnabled
         largeScreenShadeHeaderActive = LargeScreenUtils.shouldUseLargeScreenShadeHeader(resources)

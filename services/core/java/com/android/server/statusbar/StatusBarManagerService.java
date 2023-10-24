@@ -956,6 +956,17 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         }
     }
 
+    public void setTiles(String tiles) {
+        enforceStatusBarOrShell();
+
+        if (mBar != null) {
+            try {
+                mBar.setQsTiles(tiles.split(","));
+            } catch (RemoteException ex) {
+            }
+        }
+    }
+
     public void clickTile(ComponentName component) {
         enforceStatusBarOrShell();
 
@@ -2105,7 +2116,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         IStatusBar bar = mBar;
         if (bar != null) {
             try {
-                bar.requestAddTile(componentName, appName, label, icon, proxyCallback);
+                bar.requestAddTile(callingUid, componentName, appName, label, icon, proxyCallback);
                 return;
             } catch (RemoteException e) {
                 Slog.e(TAG, "requestAddTile", e);

@@ -723,6 +723,9 @@ public final class AutofillManager {
     // Indicate whether should include all view in assist structure
     private boolean mShouldIncludeAllChildrenViewInAssistStructure;
 
+    // Indicate whether WebView should always be included in the assist structure
+    private boolean mShouldAlwaysIncludeWebviewInAssistStructure;
+
     // Indicates whether called the showAutofillDialog() method.
     private boolean mShowAutofillDialogCalled = false;
 
@@ -938,6 +941,9 @@ public final class AutofillManager {
 
         mShouldIncludeAllChildrenViewInAssistStructure
             = AutofillFeatureFlags.shouldIncludeAllChildrenViewInAssistStructure();
+
+        mShouldAlwaysIncludeWebviewInAssistStructure =
+                AutofillFeatureFlags.shouldAlwaysIncludeWebviewInAssistStructure();
     }
 
     /**
@@ -1013,6 +1019,13 @@ public final class AutofillManager {
      */
     public boolean shouldIncludeAllChildrenViewInAssistStructure() {
         return mShouldIncludeAllChildrenViewInAssistStructure;
+    }
+
+    /**
+     * @hide
+     */
+    public boolean shouldAlwaysIncludeWebviewInAssistStructure() {
+        return mShouldAlwaysIncludeWebviewInAssistStructure;
     }
 
     /**
@@ -1444,7 +1457,7 @@ public final class AutofillManager {
             throw new IllegalArgumentException("No VirtualViewInfo found");
         }
         if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
-                && view.isCredential()) {
+                && isCredmanRequested(view)) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
                         + view.getAutofillId().toString());
@@ -1453,7 +1466,7 @@ public final class AutofillManager {
         }
         for (int i = 0; i < infos.size(); i++) {
             final VirtualViewFillInfo info = infos.valueAt(i);
-            final int virtualId = infos.indexOfKey(i);
+            final int virtualId = infos.keyAt(i);
             notifyViewReadyInner(getAutofillId(view, virtualId),
                     (info == null) ? null : info.getAutofillHints());
         }
@@ -1467,11 +1480,8 @@ public final class AutofillManager {
      * @hide
      */
     public void notifyViewEnteredForFillDialog(View v) {
-        if (sDebug) {
-            Log.d(TAG, "notifyViewEnteredForFillDialog:" + v.getAutofillId());
-        }
         if (AutofillFeatureFlags.isFillAndSaveDialogDisabledForCredentialManager()
-                && v.isCredential()) {
+                && isCredmanRequested(v)) {
             if (sDebug) {
                 Log.d(TAG, "Ignoring Fill Dialog request since important for credMan:"
                         + v.getAutofillId().toString());
@@ -1481,11 +1491,14 @@ public final class AutofillManager {
         notifyViewReadyInner(v.getAutofillId(), v.getAutofillHints());
     }
 
-    private void notifyViewReadyInner(AutofillId id, String[] autofillHints) {
+    private void notifyViewReadyInner(AutofillId id, @Nullable String[] autofillHints) {
+        if (sDebug) {
+            Log.d(TAG, "notifyViewReadyInner:" + id);
+        }
+
         if (!hasAutofillFeature()) {
             return;
         }
-
         synchronized (mLock) {
             if (mAllTrackedViews.contains(id)) {
                 // The id is tracked and will not trigger pre-fill request again.
@@ -1521,26 +1534,38 @@ public final class AutofillManager {
                     final boolean clientAdded = tryAddServiceClientIfNeededLocked();
                     if (clientAdded) {
                         startSessionLocked(/* id= */ AutofillId.NO_AUTOFILL_ID, /* bounds= */ null,
-                                /* value= */ null, /* flags= */ FLAG_PCC_DETECTION);
+                            /* value= */ null, /* flags= */ FLAG_PCC_DETECTION);
                     } else {
                         if (sVerbose) {
                             Log.v(TAG, "not starting session: no service client");
                         }
                     }
-
                 }
             }
         }
 
-        if (mIsFillDialogEnabled
-                || ArrayUtils.containsAny(autofillHints, mFillDialogEnabledHints)) {
+        // Check if framework should send pre-fill request for fill dialog
+        boolean shouldSendPreFillRequestForFillDialog = false;
+        if (mIsFillDialogEnabled) {
+            shouldSendPreFillRequestForFillDialog = true;
+        } else if (autofillHints != null) {
+            // check if supported autofill hint is present
+            for (String autofillHint : autofillHints) {
+                for (String filldialogEnabledHint : mFillDialogEnabledHints) {
+                    if (filldialogEnabledHint.equalsIgnoreCase(autofillHint)) {
+                        shouldSendPreFillRequestForFillDialog = true;
+                        break;
+                    }
+                }
+                if (shouldSendPreFillRequestForFillDialog) break;
+            }
+        }
+        if (shouldSendPreFillRequestForFillDialog) {
             if (sDebug) {
                 Log.d(TAG, "Trigger fill request when the view is ready.");
             }
-
             int flags = FLAG_SUPPORTS_FILL_DIALOG;
             flags |= FLAG_VIEW_NOT_FOCUSED;
-
             synchronized (mLock) {
                 // To match the id of the IME served view, used AutofillId.NO_AUTOFILL_ID on prefill
                 // request, because IME will reset the id of IME served view to 0 when activity
@@ -1548,9 +1573,10 @@ public final class AutofillManager {
                 // not match the IME served view's, Autofill will be blocking to wait inline
                 // request from the IME.
                 notifyViewEnteredLocked(/* view= */ null, AutofillId.NO_AUTOFILL_ID,
-                        /* bounds= */ null,  /* value= */ null, flags);
+                    /* bounds= */ null,  /* value= */ null, flags);
             }
         }
+        return;
     }
 
     private boolean hasFillDialogUiFeature() {
@@ -3387,6 +3413,22 @@ public final class AutofillManager {
                 callback.onAutofillEvent(anchor, event);
             }
         }
+    }
+
+    private boolean isCredmanRequested(View view) {
+        if (view.isCredential()) {
+            return true;
+        }
+        String[] hints = view.getAutofillHints();
+        if (hints == null) {
+            return false;
+        }
+        for (String hint : hints) {
+            if (Objects.equals(hint, View.AUTOFILL_HINT_CREDENTIAL_MANAGER)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

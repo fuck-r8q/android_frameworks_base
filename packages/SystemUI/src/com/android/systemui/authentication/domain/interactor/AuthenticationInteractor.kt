@@ -26,9 +26,7 @@ import com.android.systemui.authentication.shared.model.AuthenticationThrottling
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
-import com.android.systemui.keyguard.data.repository.KeyguardRepository
-import com.android.systemui.scene.domain.interactor.SceneInteractor
-import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.deviceentry.data.repository.DeviceEntryRepository
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
@@ -42,15 +40,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Hosts application business logic related to authentication. */
+/**
+ * Hosts application business logic related to user authentication.
+ *
+ * Note: there is a distinction between authentication (determining a user's identity) and device
+ * entry (dismissing the lockscreen). For logic that is specific to device entry, please use
+ * `DeviceEntryInteractor` instead.
+ */
 @SysUISingleton
 class AuthenticationInteractor
 @Inject
@@ -59,8 +61,7 @@ constructor(
     private val repository: AuthenticationRepository,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val userRepository: UserRepository,
-    private val keyguardRepository: KeyguardRepository,
-    sceneInteractor: SceneInteractor,
+    private val deviceEntryRepository: DeviceEntryRepository,
     private val clock: SystemClock,
 ) {
     /**
@@ -77,75 +78,12 @@ constructor(
      * Note: this layer adds the synthetic authentication method of "swipe" which is special. When
      * the current authentication method is "swipe", the user does not need to complete any
      * authentication challenge to unlock the device; they just need to dismiss the lockscreen to
-     * get past it. This also means that the value of [isUnlocked] remains `false` even when the
-     * lockscreen is showing and still needs to be dismissed by the user to proceed.
+     * get past it. This also means that the value of `DeviceEntryInteractor#isUnlocked` remains
+     * `true` even when the lockscreen is showing and still needs to be dismissed by the user to
+     * proceed.
      */
     val authenticationMethod: Flow<DomainLayerAuthenticationMethodModel> =
         repository.authenticationMethod.map { rawModel -> rawModel.toDomainLayer() }
-
-    /**
-     * Whether the device is unlocked.
-     *
-     * A device that is not yet unlocked requires unlocking by completing an authentication
-     * challenge according to the current authentication method, unless in cases when the current
-     * authentication method is not "secure" (for example, None and Swipe); in such cases, the value
-     * of this flow will always be `true`, even if the lockscreen is showing and still needs to be
-     * dismissed by the user to proceed.
-     */
-    val isUnlocked: StateFlow<Boolean> =
-        combine(
-                repository.isUnlocked,
-                authenticationMethod,
-            ) { isUnlocked, authenticationMethod ->
-                !authenticationMethod.isSecure || isUnlocked
-            }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.Eagerly,
-                initialValue = false,
-            )
-
-    /**
-     * Whether the lockscreen has been dismissed (by any method). This can be false even when the
-     * device is unlocked, e.g. when swipe to unlock is enabled.
-     *
-     * Note:
-     * - `false` doesn't mean the lockscreen is visible (it may be occluded or covered by other UI).
-     * - `true` doesn't mean the lockscreen is invisible (since this state changes before the
-     *   transition occurs).
-     */
-    val isLockscreenDismissed: StateFlow<Boolean> =
-        sceneInteractor.desiredScene
-            .map { it.key }
-            .filter { currentScene ->
-                currentScene == SceneKey.Gone || currentScene == SceneKey.Lockscreen
-            }
-            .map { it == SceneKey.Gone }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue = false,
-            )
-
-    /**
-     * Whether it's currently possible to swipe up to dismiss the lockscreen without requiring
-     * authentication. This returns false whenever the lockscreen has been dismissed.
-     *
-     * Note: `true` doesn't mean the lockscreen is visible. It may be occluded or covered by other
-     * UI.
-     */
-    val canSwipeToDismiss =
-        combine(authenticationMethod, isLockscreenDismissed) {
-                authenticationMethod,
-                isLockscreenDismissed ->
-                authenticationMethod is DomainLayerAuthenticationMethodModel.Swipe &&
-                    !isLockscreenDismissed
-            }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue = false,
-            )
 
     /** The current authentication throttling state, only meaningful if [isThrottled] is `true`. */
     val throttling: StateFlow<AuthenticationThrottlingModel> = repository.throttling
@@ -211,68 +149,58 @@ constructor(
      * Note: this layer adds the synthetic authentication method of "swipe" which is special. When
      * the current authentication method is "swipe", the user does not need to complete any
      * authentication challenge to unlock the device; they just need to dismiss the lockscreen to
-     * get past it. This also means that the value of [isUnlocked] remains `false` even when the
-     * lockscreen is showing and still needs to be dismissed by the user to proceed.
+     * get past it. This also means that the value of `DeviceEntryInteractor#isUnlocked` remains
+     * `true` even when the lockscreen is showing and still needs to be dismissed by the user to
+     * proceed.
      */
     suspend fun getAuthenticationMethod(): DomainLayerAuthenticationMethodModel {
         return repository.getAuthenticationMethod().toDomainLayer()
     }
 
     /**
-     * Returns `true` if the device currently requires authentication before content can be viewed;
-     * `false` if content can be displayed without unlocking first.
-     */
-    suspend fun isAuthenticationRequired(): Boolean {
-        return !isUnlocked.value && getAuthenticationMethod().isSecure
-    }
-
-    /**
-     * Whether lock screen bypass is enabled. When enabled, the lock screen will be automatically
-     * dismisses once the authentication challenge is completed. For example, completing a biometric
-     * authentication challenge via face unlock or fingerprint sensor can automatically bypass the
-     * lock screen.
-     */
-    fun isBypassEnabled(): Boolean {
-        return keyguardRepository.isBypassEnabled()
-    }
-
-    /**
      * Attempts to authenticate the user and unlock the device.
      *
      * If [tryAutoConfirm] is `true`, authentication is attempted if and only if the auth method
-     * supports auto-confirming, and the input's length is at least the code's length. Otherwise,
-     * `null` is returned.
+     * supports auto-confirming, and the input's length is at least the required length. Otherwise,
+     * `AuthenticationResult.SKIPPED` is returned.
      *
      * @param input The input from the user to try to authenticate with. This can be a list of
      *   different things, based on the current authentication method.
      * @param tryAutoConfirm `true` if called while the user inputs the code, without an explicit
      *   request to validate.
-     * @return `true` if the authentication succeeded and the device is now unlocked; `false` when
-     *   authentication failed, `null` if the check was not performed.
+     * @return The result of this authentication attempt.
      */
-    suspend fun authenticate(input: List<Any>, tryAutoConfirm: Boolean = false): Boolean? {
+    suspend fun authenticate(
+        input: List<Any>,
+        tryAutoConfirm: Boolean = false
+    ): AuthenticationResult {
         if (input.isEmpty()) {
             throw IllegalArgumentException("Input was empty!")
         }
 
+        val authMethod = getAuthenticationMethod()
         val skipCheck =
             when {
                 // We're being throttled, the UI layer should not have called this; skip the
                 // attempt.
                 isThrottled.value -> true
+                // The pattern is too short; skip the attempt.
+                authMethod == DomainLayerAuthenticationMethodModel.Pattern &&
+                    input.size < repository.minPatternLength -> true
                 // Auto-confirm attempt when the feature is not enabled; skip the attempt.
                 tryAutoConfirm && !isAutoConfirmEnabled.value -> true
                 // Auto-confirm should skip the attempt if the pin entered is too short.
-                tryAutoConfirm && input.size < repository.getPinLength() -> true
+                tryAutoConfirm &&
+                    authMethod == DomainLayerAuthenticationMethodModel.Pin &&
+                    input.size < repository.getPinLength() -> true
                 else -> false
             }
         if (skipCheck) {
-            return null
+            return AuthenticationResult.SKIPPED
         }
 
         // Attempt to authenticate:
-        val authMethod = getAuthenticationMethod()
-        val credential = authMethod.createCredential(input) ?: return null
+        val credential = authMethod.createCredential(input) ?: return AuthenticationResult.SKIPPED
         val authenticationResult = repository.checkCredential(credential)
         credential.zeroize()
 
@@ -296,12 +224,16 @@ constructor(
             refreshThrottling()
         }
 
-        return authenticationResult.isSuccessful
+        return if (authenticationResult.isSuccessful) {
+            AuthenticationResult.SUCCEEDED
+        } else {
+            AuthenticationResult.FAILED
+        }
     }
 
     /** Starts refreshing the throttling state every second. */
     private suspend fun startThrottlingCountdown() {
-        cancelCountdown()
+        cancelThrottlingCountdown()
         throttlingCountdownJob =
             applicationScope.launch {
                 while (refreshThrottling() > 0) {
@@ -311,14 +243,14 @@ constructor(
     }
 
     /** Cancels any throttling state countdown started in [startThrottlingCountdown]. */
-    private fun cancelCountdown() {
+    private fun cancelThrottlingCountdown() {
         throttlingCountdownJob?.cancel()
         throttlingCountdownJob = null
     }
 
     /** Notifies that the currently-selected user has changed. */
     private suspend fun onSelectedUserChanged() {
-        cancelCountdown()
+        cancelThrottlingCountdown()
         if (refreshThrottling() > 0) {
             startThrottlingCountdown()
         }
@@ -367,7 +299,7 @@ constructor(
         DomainLayerAuthenticationMethodModel {
         return when (this) {
             is DataLayerAuthenticationMethodModel.None ->
-                if (repository.isLockscreenEnabled()) {
+                if (deviceEntryRepository.isInsecureLockscreenEnabled()) {
                     DomainLayerAuthenticationMethodModel.Swipe
                 } else {
                     DomainLayerAuthenticationMethodModel.None
@@ -379,4 +311,14 @@ constructor(
                 DomainLayerAuthenticationMethodModel.Pattern
         }
     }
+}
+
+/** Result of a user authentication attempt. */
+enum class AuthenticationResult {
+    /** Authentication succeeded. */
+    SUCCEEDED,
+    /** Authentication failed. */
+    FAILED,
+    /** Authentication was not performed, e.g. due to insufficient input. */
+    SKIPPED,
 }

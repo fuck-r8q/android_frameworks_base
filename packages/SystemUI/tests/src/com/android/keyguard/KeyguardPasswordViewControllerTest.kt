@@ -16,19 +16,21 @@
 
 package com.android.keyguard
 
-import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageView
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.util.LatencyTracker
 import com.android.internal.widget.LockPatternUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
+import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.statusbar.policy.DevicePostureController
 import com.android.systemui.util.concurrency.DelayableExecutor
 import com.android.systemui.util.mockito.whenever
 import org.junit.Before
@@ -45,7 +47,8 @@ import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 
 @SmallTest
-@RunWith(AndroidTestingRunner::class)
+@RoboPilotTest
+@RunWith(AndroidJUnit4::class)
 @TestableLooper.RunWithLooper
 class KeyguardPasswordViewControllerTest : SysuiTestCase() {
     @Mock private lateinit var keyguardPasswordView: KeyguardPasswordView
@@ -65,6 +68,7 @@ class KeyguardPasswordViewControllerTest : SysuiTestCase() {
     @Mock
     private lateinit var mKeyguardMessageAreaController:
         KeyguardMessageAreaController<BouncerKeyguardMessageArea>
+    @Mock private lateinit var postureController: DevicePostureController
 
     private lateinit var keyguardPasswordViewController: KeyguardPasswordViewController
 
@@ -87,6 +91,7 @@ class KeyguardPasswordViewControllerTest : SysuiTestCase() {
         `when`(keyguardPasswordView.resources).thenReturn(context.resources)
         val fakeFeatureFlags = FakeFeatureFlags()
         fakeFeatureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
+        fakeFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
         keyguardPasswordViewController =
             KeyguardPasswordViewController(
                 keyguardPasswordView,
@@ -102,6 +107,7 @@ class KeyguardPasswordViewControllerTest : SysuiTestCase() {
                 mContext.resources,
                 falsingCollector,
                 keyguardViewController,
+                postureController,
                 fakeFeatureFlags
             )
     }

@@ -20,6 +20,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
 
 import android.content.pm.ApplicationInfo;
+import android.os.Process;
 import android.os.SystemClock;
 import android.os.Message;
 import android.os.Handler;
@@ -318,6 +319,7 @@ class AnrHelper {
     private class AnrRecord {
         final ProcessRecord mApp;
         final int mPid;
+        final int mUid;
         final String mActivityShortComponentName;
         final String mParentShortComponentName;
         final TimeoutRecord mTimeoutRecord;
@@ -334,6 +336,7 @@ class AnrHelper {
                 Future<File> firstPidFilePromise) {
             mApp = anrProcess;
             mPid = anrProcess.mPid;
+            mUid = anrProcess.uid;
             mActivityShortComponentName = activityShortComponentName;
             mParentShortComponentName = parentShortComponentName;
             mTimeoutRecord = timeoutRecord;

@@ -153,7 +153,7 @@ public abstract class Vibrator {
      *
      * @hide
      */
-    protected VibratorInfo getInfo() {
+    public VibratorInfo getInfo() {
         return VibratorInfo.EMPTY_VIBRATOR_INFO;
     }
 
@@ -508,6 +508,28 @@ public abstract class Vibrator {
     @RequiresPermission(android.Manifest.permission.VIBRATE)
     public abstract void vibrate(int uid, String opPkg, @NonNull VibrationEffect vibe,
             String reason, @NonNull VibrationAttributes attributes);
+
+    /**
+     * Performs a haptic feedback.
+     *
+     * <p>A haptic feedback is a short vibration feedback. The type of feedback is identified via
+     * the {@code constant}, which should be one of the effect constants provided in
+     * {@link HapticFeedbackConstants}. The haptic feedback provided for a given effect ID is
+     * consistent across all usages on the same device.
+     *
+     * @param constant the ID for the haptic feedback. This should be one of the constants defined
+     *          in {@link HapticFeedbackConstants}.
+     * @param always {@code true} if the haptic feedback should be played regardless of the user
+     *          vibration intensity settings applicable to the corresponding vibration.
+     *          {@code false} if the vibration for the haptic feedback should respect the applicable
+     *          vibration intensity settings.
+     * @param reason the reason for this haptic feedback.
+     *
+     * @hide
+     */
+    public void performHapticFeedback(int constant, boolean always, String reason) {
+        Log.w(TAG, "performHapticFeedback is not supported");
+    }
 
     /**
      * Query whether the vibrator natively supports the given effects.

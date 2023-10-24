@@ -26,6 +26,7 @@ import static android.window.TaskFragmentTransaction.TYPE_TASK_FRAGMENT_PARENT_I
 import static android.window.TaskFragmentTransaction.TYPE_TASK_FRAGMENT_VANISHED;
 
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_WINDOW_ORGANIZER;
+import static com.android.server.wm.ActivityTaskManagerService.enforceTaskPermission;
 import static com.android.server.wm.TaskFragment.EMBEDDING_ALLOWED;
 import static com.android.server.wm.WindowOrganizerController.configurationsAreEqualForOrganizer;
 
@@ -50,12 +51,15 @@ import android.window.ITaskFragmentOrganizer;
 import android.window.ITaskFragmentOrganizerController;
 import android.window.TaskFragmentInfo;
 import android.window.TaskFragmentOperation;
+import android.window.TaskFragmentOrganizerToken;
 import android.window.TaskFragmentParentInfo;
 import android.window.TaskFragmentTransaction;
 import android.window.WindowContainerTransaction;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLogGroup;
 import com.android.internal.protolog.common.ProtoLog;
+import com.android.window.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -133,6 +137,13 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                 new WeakHashMap<>();
 
         /**
+         * Whether this {@link android.window.TaskFragmentOrganizer} is a system organizer. If true,
+         * the {@link android.view.SurfaceControl} of the {@link TaskFragment} is provided to the
+         * client in the {@link TYPE_TASK_FRAGMENT_APPEARED} event.
+         */
+        private final boolean mIsSystemOrganizer;
+
+        /**
          * {@link RemoteAnimationDefinition} for embedded activities transition animation that is
          * organized by this organizer.
          */
@@ -147,10 +158,12 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
          */
         private final ArrayMap<IBinder, Integer> mDeferredTransitions = new ArrayMap<>();
 
-        TaskFragmentOrganizerState(ITaskFragmentOrganizer organizer, int pid, int uid) {
+        TaskFragmentOrganizerState(@NonNull ITaskFragmentOrganizer organizer, int pid, int uid,
+                boolean isSystemOrganizer) {
             mOrganizer = organizer;
             mOrganizerPid = pid;
             mOrganizerUid = uid;
+            mIsSystemOrganizer = isSystemOrganizer;
             try {
                 mOrganizer.asBinder().linkToDeath(this, 0 /*flags*/);
             } catch (RemoteException e) {
@@ -184,14 +197,31 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
         }
 
         void dispose() {
+            boolean wasVisible = false;
             for (int i = mOrganizedTaskFragments.size() - 1; i >= 0; i--) {
+                final TaskFragment taskFragment = mOrganizedTaskFragments.get(i);
+                if (taskFragment.isVisibleRequested()) {
+                    wasVisible = true;
+                }
                 // Cleanup the TaskFragmentOrganizer from all TaskFragments it organized before
                 // removing the windows to prevent it from adding any additional TaskFragment
                 // pending event.
-                final TaskFragment taskFragment = mOrganizedTaskFragments.get(i);
                 taskFragment.onTaskFragmentOrganizerRemoved();
             }
 
+            final TransitionController transitionController = mAtmService.getTransitionController();
+            if (wasVisible && transitionController.isShellTransitionsEnabled()
+                    && !transitionController.isCollecting()) {
+                final Task task = mOrganizedTaskFragments.get(0).getTask();
+                final boolean containsNonEmbeddedActivity =
+                        task != null && task.getActivity(a -> !a.isEmbedded()) != null;
+                transitionController.requestStartTransition(
+                        transitionController.createTransition(WindowManager.TRANSIT_CLOSE),
+                        // The task will be removed if all its activities are embedded, then the
+                        // task is the trigger.
+                        containsNonEmbeddedActivity ? null : task,
+                        null /* remoteTransition */, null /* displayChange */);
+            }
             // Defer to avoid unnecessary layout when there are multiple TaskFragments removal.
             mAtmService.deferWindowLayout();
             try {
@@ -218,11 +248,15 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
             tf.mTaskFragmentAppearedSent = true;
             mLastSentTaskFragmentInfos.put(tf, info);
             mTaskFragmentTaskIds.put(tf, taskId);
-            return new TaskFragmentTransaction.Change(
+            final TaskFragmentTransaction.Change change = new TaskFragmentTransaction.Change(
                     TYPE_TASK_FRAGMENT_APPEARED)
                     .setTaskFragmentToken(tf.getFragmentToken())
                     .setTaskFragmentInfo(info)
                     .setTaskId(taskId);
+            if (mIsSystemOrganizer) {
+                change.setTaskFragmentSurfaceControl(tf.getSurfaceControl());
+            }
+            return change;
         }
 
         @NonNull
@@ -418,8 +452,25 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                 : null;
     }
 
+    @VisibleForTesting
+    void registerOrganizer(@NonNull ITaskFragmentOrganizer organizer) {
+        registerOrganizerInternal(organizer, false /* isSystemOrganizer */);
+    }
+
     @Override
-    public void registerOrganizer(@NonNull ITaskFragmentOrganizer organizer) {
+    public void registerOrganizer(
+            @NonNull ITaskFragmentOrganizer organizer, boolean isSystemOrganizer) {
+        registerOrganizerInternal(
+                organizer,
+                Flags.taskFragmentSystemOrganizerFlag() && isSystemOrganizer);
+    }
+
+    @VisibleForTesting
+    void registerOrganizerInternal(
+            @NonNull ITaskFragmentOrganizer organizer, boolean isSystemOrganizer) {
+        if (isSystemOrganizer) {
+            enforceTaskPermission("registerSystemOrganizer()");
+        }
         final int pid = Binder.getCallingPid();
         final int uid = Binder.getCallingUid();
         synchronized (mGlobalLock) {
@@ -431,7 +482,7 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                         "Replacing existing organizer currently unsupported");
             }
             mTaskFragmentOrganizerState.put(organizer.asBinder(),
-                    new TaskFragmentOrganizerState(organizer, pid, uid));
+                    new TaskFragmentOrganizerState(organizer, pid, uid, isSystemOrganizer));
             mPendingTaskFragmentEvents.put(organizer.asBinder(), new ArrayList<>());
         }
     }
@@ -692,6 +743,12 @@ public class TaskFragmentOrganizerController extends ITaskFragmentOrganizerContr
                     .setTask(task)
                     .build());
         }
+    }
+
+    boolean isSystemOrganizer(@NonNull TaskFragmentOrganizerToken token) {
+        final TaskFragmentOrganizerState state =
+                mTaskFragmentOrganizerState.get(token.asBinder());
+        return state != null && state.mIsSystemOrganizer;
     }
 
     @Nullable

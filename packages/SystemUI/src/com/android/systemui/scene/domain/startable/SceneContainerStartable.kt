@@ -14,21 +14,25 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalCoroutinesApi::class)
+
 package com.android.systemui.scene.domain.startable
 
 import com.android.systemui.CoreStartable
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
+import com.android.systemui.classifier.FalsingCollector
+import com.android.systemui.classifier.FalsingCollectorActual
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.DisplayId
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
-import com.android.systemui.keyguard.shared.model.WakefulnessState
 import com.android.systemui.model.SysUiState
 import com.android.systemui.model.updateFlags
+import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
+import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
@@ -38,12 +42,16 @@ import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICA
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Hooks up business logic that manipulates the state of the [SceneInteractor] for the system UI
@@ -55,22 +63,29 @@ class SceneContainerStartable
 constructor(
     @Application private val applicationScope: CoroutineScope,
     private val sceneInteractor: SceneInteractor,
+    private val deviceEntryInteractor: DeviceEntryInteractor,
     private val authenticationInteractor: AuthenticationInteractor,
     private val keyguardInteractor: KeyguardInteractor,
-    private val featureFlags: FeatureFlags,
+    private val flags: SceneContainerFlags,
     private val sysUiState: SysUiState,
     @DisplayId private val displayId: Int,
     private val sceneLogger: SceneLogger,
+    @FalsingCollectorActual private val falsingCollector: FalsingCollector,
+    private val powerInteractor: PowerInteractor,
 ) : CoreStartable {
 
     override fun start() {
-        if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
+        if (flags.isEnabled()) {
             sceneLogger.logFrameworkEnabled(isEnabled = true)
             hydrateVisibility()
             automaticallySwitchScenes()
             hydrateSystemUiState()
+            collectFalsingSignals()
         } else {
-            sceneLogger.logFrameworkEnabled(isEnabled = false)
+            sceneLogger.logFrameworkEnabled(
+                isEnabled = false,
+                reason = flags.requirementDescription(),
+            )
         }
     }
 
@@ -106,7 +121,7 @@ constructor(
     /** Switches between scenes based on ever-changing application state. */
     private fun automaticallySwitchScenes() {
         applicationScope.launch {
-            authenticationInteractor.isUnlocked
+            deviceEntryInteractor.isUnlocked
                 .mapNotNull { isUnlocked ->
                     val renderedScenes =
                         when (val transitionState = sceneInteractor.transitionState.value) {
@@ -117,7 +132,6 @@ constructor(
                                     transitionState.toScene,
                                 )
                         }
-                    val isBypassEnabled = authenticationInteractor.isBypassEnabled()
                     when {
                         isUnlocked ->
                             when {
@@ -128,7 +142,7 @@ constructor(
                                 // When the device becomes unlocked in Lockscreen, go to Gone if
                                 // bypass is enabled.
                                 renderedScenes.contains(SceneKey.Lockscreen) ->
-                                    if (isBypassEnabled) {
+                                    if (deviceEntryInteractor.isBypassEnabled()) {
                                         SceneKey.Gone to
                                             "device unlocked in Lockscreen scene with bypass"
                                     } else {
@@ -165,40 +179,34 @@ constructor(
         }
 
         applicationScope.launch {
-            keyguardInteractor.wakefulnessModel
-                .map { wakefulnessModel -> wakefulnessModel.state }
-                .distinctUntilChanged()
-                .collect { wakefulnessState ->
-                    when (wakefulnessState) {
-                        WakefulnessState.STARTING_TO_SLEEP -> {
-                            switchToScene(
+            powerInteractor.isAsleep
+                .collect { isAsleep ->
+                    if (isAsleep) {
+                        switchToScene(
                                 targetSceneKey = SceneKey.Lockscreen,
                                 loggingReason = "device is starting to sleep",
-                            )
-                        }
-                        WakefulnessState.STARTING_TO_WAKE -> {
-                            val authMethod = authenticationInteractor.getAuthenticationMethod()
-                            val isUnlocked = authenticationInteractor.isUnlocked.value
-                            when {
-                                authMethod == AuthenticationMethodModel.None -> {
-                                    switchToScene(
+                        )
+                    } else {
+                        val authMethod = authenticationInteractor.getAuthenticationMethod()
+                        val isUnlocked = deviceEntryInteractor.isUnlocked.value
+                        when {
+                            authMethod == AuthenticationMethodModel.None -> {
+                                switchToScene(
                                         targetSceneKey = SceneKey.Gone,
                                         loggingReason =
-                                            "device is starting to wake up while auth method is" +
+                                        "device is starting to wake up while auth method is" +
                                                 " none",
-                                    )
-                                }
-                                authMethod.isSecure && isUnlocked -> {
-                                    switchToScene(
+                                )
+                            }
+                            authMethod.isSecure && isUnlocked -> {
+                                switchToScene(
                                         targetSceneKey = SceneKey.Gone,
                                         loggingReason =
-                                            "device is starting to wake up while unlocked with a" +
+                                        "device is starting to wake up while unlocked with a" +
                                                 " secure auth method",
-                                    )
-                                }
+                                )
                             }
                         }
-                        else -> Unit
                     }
                 }
         }
@@ -221,6 +229,55 @@ constructor(
                         SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING to
                             (sceneKey == SceneKey.Lockscreen),
                     )
+                }
+        }
+    }
+
+    /** Collects and reports signals into the falsing system. */
+    private fun collectFalsingSignals() {
+        applicationScope.launch {
+            deviceEntryInteractor.isDeviceEntered.collect { isLockscreenDismissed ->
+                if (isLockscreenDismissed) {
+                    falsingCollector.onSuccessfulUnlock()
+                }
+            }
+        }
+
+        applicationScope.launch {
+            keyguardInteractor.isDozing.distinctUntilChanged().collect { isDozing ->
+                falsingCollector.setShowingAod(isDozing)
+            }
+        }
+
+        applicationScope.launch {
+            keyguardInteractor.isAodAvailable
+                .flatMapLatest { isAodAvailable ->
+                    if (!isAodAvailable) {
+                        powerInteractor.detailedWakefulness
+                    } else {
+                        emptyFlow()
+                    }
+                }
+                .distinctUntilChangedBy { it.isAwake() }
+                .collect { wakefulness ->
+                    when {
+                        wakefulness.isAwakeFromTouch() -> falsingCollector.onScreenOnFromTouch()
+                        wakefulness.isAwake() -> falsingCollector.onScreenTurningOn()
+                        wakefulness.isAsleep() -> falsingCollector.onScreenOff()
+                    }
+                }
+        }
+
+        applicationScope.launch {
+            sceneInteractor.desiredScene
+                .map { it.key == SceneKey.Bouncer }
+                .distinctUntilChanged()
+                .collect { switchedToBouncerScene ->
+                    if (switchedToBouncerScene) {
+                        falsingCollector.onBouncerShown()
+                    } else {
+                        falsingCollector.onBouncerHidden()
+                    }
                 }
         }
     }

@@ -6,17 +6,14 @@ package {
     //   SPDX-license-identifier-Apache-2.0
     default_applicable_licenses: ["frameworks_base_license"],
 }
-
 soong_config_module_type_import {
     from: "device/qcom/qssi/Android.bp",
     module_types: [
          "bredr_vs_btadva_java_defaults",
     ],
 }
-
 bredr_vs_btadva_java_defaults {
     name: "btadva_settings_lib_java_defaults",
-
     soong_config_variables: {
         bredr_or_btadva: {
            btadva: {
@@ -27,16 +24,12 @@ bredr_vs_btadva_java_defaults {
        }
    }
 }
-
 android_library {
-
     name: "SettingsLib",
-
     defaults: [
         "framework-wifi-vendor-hide-access-defaults",
         "btadva_settings_lib_java_defaults",
     ],
-
     static_libs: [
         "androidx.annotation_annotation",
         "androidx.appcompat_appcompat",
@@ -66,7 +59,6 @@ android_library {
         "SettingsLibBarChartPreference",
         "SettingsLibProgressBar",
         "SettingsLibAdaptiveIcon",
-        "SettingsLibRadioButtonPreference",
         "SettingsLibSelectorWithWidgetPreference",
         "SettingsLibDisplayUtils",
         "SettingsLibUtils",
@@ -85,13 +77,9 @@ android_library {
         "zxing-core-1.7",
         "androidx.room_room-runtime",
         "settingslib_flags_lib",
-
     ],
-
     plugins: ["androidx.room_room-compiler-plugin"],
-
     resource_dirs: ["res"],
-
     srcs: [
         "src/**/*.java",
         "src/**/*.kt",
@@ -115,7 +103,6 @@ java_defaults {
         "SettingsLib",
     ],
 }
-
 aconfig_declarations {
     name: "settingslib_media_flags",
     package: "com.android.settingslib.media.flags",
@@ -123,7 +110,6 @@ aconfig_declarations {
         "aconfig/settingslib_media_flag_declarations.aconfig",
     ],
 }
-
 java_aconfig_library {
     name: "settingslib_flags_lib",
     aconfig_declarations: "settingslib_media_flags",

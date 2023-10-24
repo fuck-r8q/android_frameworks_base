@@ -12,6 +12,7 @@
 #include "ResourceTable.h"
 #include "XMLNode.h"
 
+#include <androidfw/PathUtils.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/List.h>
@@ -400,7 +401,7 @@ static void printUsesImpliedPermission(const String8& name, const String8& reaso
 Vector<String8> getNfcAidCategories(AssetManager& assets, const String8& xmlPath, bool offHost,
         String8 *outError = NULL)
 {
-    Asset* aidAsset = assets.openNonAsset(xmlPath, Asset::ACCESS_BUFFER);
+    Asset* aidAsset = assets.openNonAsset(xmlPath.c_str(), Asset::ACCESS_BUFFER);
     if (aidAsset == NULL) {
         if (outError != NULL) *outError = "xml resource does not exist";
         return Vector<String8>();
@@ -1133,7 +1134,7 @@ int doDump(Bundle* bundle)
                 if (code == ResXMLTree::END_TAG) {
                     depth--;
                     if (depth < 2) {
-                        if (withinSupportsInput && !supportedInput.isEmpty()) {
+                        if (withinSupportsInput && !supportedInput.empty()) {
                             printf("supports-input: '");
                             const size_t N = supportedInput.size();
                             for (size_t i=0; i<N; i++) {
@@ -1300,7 +1301,7 @@ int doDump(Bundle* bundle)
                             ResTable::normalizeForOutput(versionName.c_str()).c_str());
 
                     String8 splitName = AaptXml::getAttribute(tree, NULL, "split");
-                    if (!splitName.isEmpty()) {
+                    if (!splitName.empty()) {
                         printf(" split='%s'", ResTable::normalizeForOutput(
                                     splitName.c_str()).c_str());
                     }
@@ -2486,12 +2487,12 @@ int doAdd(Bundle* bundle)
     for (int i = 1; i < bundle->getFileSpecCount(); i++) {
         const char* fileName = bundle->getFileSpecEntry(i);
 
-        if (strcasecmp(String8(fileName).getPathExtension().c_str(), ".gz") == 0) {
+        if (strcasecmp(getPathExtension(String8(fileName)).c_str(), ".gz") == 0) {
             printf(" '%s'... (from gzip)\n", fileName);
-            result = zip->addGzip(fileName, String8(fileName).getBasePath().c_str(), NULL);
+            result = zip->addGzip(fileName, getBasePath(String8(fileName)).c_str(), NULL);
         } else {
             if (bundle->getJunkPath()) {
-                String8 storageName = String8(fileName).getPathLeaf();
+                String8 storageName = getPathLeaf(String8(fileName));
                 printf(" '%s' as '%s'...\n", fileName,
                         ResTable::normalizeForOutput(storageName.c_str()).c_str());
                 result = zip->add(fileName, storageName.c_str(),
@@ -2617,10 +2618,10 @@ static String8 buildApkName(const String8& original, const sp<ApkSplit>& split) 
         return original;
     }
 
-    String8 ext(original.getPathExtension());
+    String8 ext(getPathExtension(original));
     if (ext == String8(".apk")) {
         return String8::format("%s_%s%s",
-                original.getBasePath().c_str(),
+                getBasePath(original).c_str(),
                 split->getDirectorySafeName().c_str(),
                 ext.c_str());
     }
@@ -2756,10 +2757,10 @@ int doPackage(Bundle* bundle)
             // generate the dependency file in the R.java package subdirectory
             // e.g. gen/com/foo/app/R.java.d
             dependencyFile = String8(bundle->getRClassDir());
-            dependencyFile.appendPath("R.java.d");
+            appendPath(dependencyFile, "R.java.d");
         }
         // Make sure we have a clean dependency file to start with
-        fp = fopen(dependencyFile, "w");
+        fp = fopen(dependencyFile.c_str(), "w");
         fclose(fp);
     }
 
@@ -2848,7 +2849,7 @@ int doPackage(Bundle* bundle)
     if (bundle->getGenDependencies()) {
         // Now that writeResourceSymbols or writeAPK has taken care of writing
         // the targets to our dependency file, we'll write the prereqs
-        fp = fopen(dependencyFile, "a+");
+        fp = fopen(dependencyFile.c_str(), "a+");
         fprintf(fp, " : ");
         bool includeRaw = (outputAPKFile != NULL);
         err = writeDependencyPreReqs(bundle, assets, fp, includeRaw);

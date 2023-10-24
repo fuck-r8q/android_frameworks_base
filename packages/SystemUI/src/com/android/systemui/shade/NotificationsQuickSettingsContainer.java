@@ -16,6 +16,8 @@
 
 package com.android.systemui.shade;
 
+import static androidx.constraintlayout.core.widgets.Optimizer.OPTIMIZATION_GRAPH;
+
 import android.app.Fragment;
 import android.content.Context;
 import android.content.res.Configuration;
@@ -24,14 +26,13 @@ import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup.MarginLayoutParams;
 import android.view.WindowInsets;
 
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.constraintlayout.widget.ConstraintSet;
 
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.fragments.FragmentHostManager.FragmentListener;
 import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.statusbar.notification.AboveShelfObserver;
@@ -181,6 +182,10 @@ public class NotificationsQuickSettingsContainer extends ConstraintLayout
 
     void setMigratingNSSL(boolean isMigrating) {
         mIsMigratingNSSL = isMigrating;
+    }
+
+    void enableGraphOptimization() {
+        setOptimizationLevel(getOptimizationLevel() | OPTIMIZATION_GRAPH);
     }
 
     @Override

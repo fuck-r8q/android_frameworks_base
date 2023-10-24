@@ -36,7 +36,7 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.jank.InteractionJankMonitor.Configuration;
 import com.android.settingslib.Utils;
 import com.android.systemui.Gefingerpoken;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.notification.FakeShadowView;
 import com.android.systemui.statusbar.notification.NotificationUtils;
@@ -188,12 +188,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         return super.onInterceptTouchEvent(ev);
     }
 
-    /**
-     * Called by the TouchHandler when this view is tapped. This will be called for actual taps
-     * only, i.e. taps that have been filtered by the FalsingManager.
-     */
-    public void onTap() {}
-
     /** Sets the last action up time this view was touched. */
     public void setLastActionUpTime(long eventTime) {
         mLastActionUpTime = eventTime;
@@ -225,10 +219,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     protected void drawableStateChanged() {
         super.drawableStateChanged();
         mBackgroundNormal.setState(getDrawableState());
-    }
-
-    void setRippleAllowed(boolean allowed) {
-        mBackgroundNormal.setPressedAllowed(allowed);
     }
 
     private void updateOutlineAlpha() {

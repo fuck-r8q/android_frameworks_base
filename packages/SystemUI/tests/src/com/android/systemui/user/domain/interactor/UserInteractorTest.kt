@@ -34,7 +34,6 @@ import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.GuestResetOrExitSessionReceiver
 import com.android.systemui.GuestResumeSessionReceiver
-import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Text
@@ -45,6 +44,7 @@ import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.qs.user.UserSwitchDialogController
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
 import com.android.systemui.telephony.data.repository.FakeTelephonyRepository
 import com.android.systemui.telephony.domain.interactor.TelephonyInteractor
@@ -120,7 +120,7 @@ class UserInteractorTest : SysuiTestCase() {
         whenever(manager.getUserIcon(anyInt())).thenReturn(ICON)
         whenever(manager.canAddMoreUsers(any())).thenReturn(true)
 
-        overrideResource(R.drawable.ic_account_circle, GUEST_ICON)
+        overrideResource(com.android.settingslib.R.drawable.ic_account_circle, GUEST_ICON)
         overrideResource(R.dimen.max_avatar_size, 10)
         overrideResource(
             com.android.internal.R.string.config_supervisedUserCreationPackage,
@@ -1120,6 +1120,7 @@ class UserInteractorTest : SysuiTestCase() {
                     ),
                 uiEventLogger = uiEventLogger,
                 featureFlags = featureFlags,
+                userRestrictionChecker = mock(),
             )
     }
 

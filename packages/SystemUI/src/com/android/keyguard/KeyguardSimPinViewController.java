@@ -39,7 +39,7 @@ import android.widget.ImageView;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.flags.FeatureFlags;
 
@@ -148,10 +148,10 @@ public class KeyguardSimPinViewController
         // GSM 02.17 version 5.0.1, Section 5.6 PIN Management
         if ((entry.length() < 4) || (entry.length() > 8)) {
             // otherwise, display a message to the user, and don't submit.
-            mMessageAreaController.setMessage(
-                    com.android.systemui.R.string.kg_invalid_sim_pin_hint);
             mView.resetPasswordText(true /* animate */, true /* announce */);
             getKeyguardSecurityCallback().userActivity();
+            mMessageAreaController.setMessage(
+                    com.android.systemui.res.R.string.kg_invalid_sim_pin_hint);
             return;
         }
 

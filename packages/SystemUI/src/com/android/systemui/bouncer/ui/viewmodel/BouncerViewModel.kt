@@ -17,17 +17,29 @@
 package com.android.systemui.bouncer.ui.viewmodel
 
 import android.content.Context
-import com.android.systemui.R
+import android.graphics.Bitmap
+import androidx.core.graphics.drawable.toBitmap
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
+import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.common.shared.model.Text
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
-import javax.inject.Inject
+import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.scene.shared.flag.SceneContainerFlags
+import com.android.systemui.telephony.domain.interactor.TelephonyInteractor
+import com.android.systemui.user.ui.viewmodel.UserActionViewModel
+import com.android.systemui.user.ui.viewmodel.UserSwitcherViewModel
+import com.android.systemui.user.ui.viewmodel.UserViewModel
+import dagger.Module
+import dagger.Provides
 import kotlin.math.ceil
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,19 +48,59 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 /** Holds UI state and handles user input on bouncer UIs. */
-@SysUISingleton
-class BouncerViewModel
-@Inject
-constructor(
+class BouncerViewModel(
     @Application private val applicationContext: Context,
     @Application private val applicationScope: CoroutineScope,
+    @Main private val mainDispatcher: CoroutineDispatcher,
     private val bouncerInteractor: BouncerInteractor,
-    private val authenticationInteractor: AuthenticationInteractor,
-    featureFlags: FeatureFlags,
+    authenticationInteractor: AuthenticationInteractor,
+    flags: SceneContainerFlags,
+    private val telephonyInteractor: TelephonyInteractor,
+    selectedUser: Flow<UserViewModel>,
+    users: Flow<List<UserViewModel>>,
+    userSwitcherMenu: Flow<List<UserActionViewModel>>,
 ) {
+    val selectedUserImage: StateFlow<Bitmap?> =
+        selectedUser
+            .map { it.image.toBitmap() }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = null,
+            )
+
+    val userSwitcherDropdown: StateFlow<List<UserSwitcherDropdownItemViewModel>> =
+        combine(
+                users,
+                userSwitcherMenu,
+            ) { users, actions ->
+                users.map { user ->
+                    UserSwitcherDropdownItemViewModel(
+                        icon = Icon.Loaded(user.image, contentDescription = null),
+                        text = user.name,
+                        onClick = user.onClicked ?: {},
+                    )
+                } +
+                    actions.map { action ->
+                        UserSwitcherDropdownItemViewModel(
+                            icon = Icon.Resource(action.iconResourceId, contentDescription = null),
+                            text = Text.Resource(action.textResourceId),
+                            onClick = action.onClicked,
+                        )
+                    }
+            }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = emptyList(),
+            )
+
+    val isUserSwitcherVisible: Boolean = bouncerInteractor.isUserSwitcherVisible
+
     private val isInputEnabled: StateFlow<Boolean> =
         bouncerInteractor.isThrottled
             .map { !it }
@@ -58,91 +110,34 @@ constructor(
                 initialValue = !bouncerInteractor.isThrottled.value,
             )
 
-    private val pin: PinBouncerViewModel by lazy {
-        PinBouncerViewModel(
-            applicationContext = applicationContext,
-            applicationScope = applicationScope,
-            interactor = bouncerInteractor,
-            isInputEnabled = isInputEnabled,
-        )
-    }
-
-    private val password: PasswordBouncerViewModel by lazy {
-        PasswordBouncerViewModel(
-            applicationScope = applicationScope,
-            interactor = bouncerInteractor,
-            isInputEnabled = isInputEnabled,
-        )
-    }
-
-    private val pattern: PatternBouncerViewModel by lazy {
-        PatternBouncerViewModel(
-            applicationContext = applicationContext,
-            applicationScope = applicationScope,
-            interactor = bouncerInteractor,
-            isInputEnabled = isInputEnabled,
-        )
-    }
+    // Handle to the scope of the child ViewModel (stored in [authMethod]).
+    private var childViewModelScope: CoroutineScope? = null
+    private val _throttlingDialogMessage = MutableStateFlow<String?>(null)
 
     /** View-model for the current UI, based on the current authentication method. */
-    val authMethod: StateFlow<AuthMethodBouncerViewModel?> =
+    val authMethodViewModel: StateFlow<AuthMethodBouncerViewModel?> =
         authenticationInteractor.authenticationMethod
-            .map { authenticationMethod ->
-                when (authenticationMethod) {
-                    is AuthenticationMethodModel.Pin -> pin
-                    is AuthenticationMethodModel.Password -> password
-                    is AuthenticationMethodModel.Pattern -> pattern
-                    else -> null
-                }
-            }
+            .map(::getChildViewModel)
             .stateIn(
                 scope = applicationScope,
                 started = SharingStarted.WhileSubscribed(),
                 initialValue = null,
             )
 
-    init {
-        if (featureFlags.isEnabled(Flags.SCENE_CONTAINER)) {
-            applicationScope.launch {
-                bouncerInteractor.isThrottled
-                    .map { isThrottled ->
-                        if (isThrottled) {
-                            when (authenticationInteractor.getAuthenticationMethod()) {
-                                is AuthenticationMethodModel.Pin ->
-                                    R.string.kg_too_many_failed_pin_attempts_dialog_message
-                                is AuthenticationMethodModel.Password ->
-                                    R.string.kg_too_many_failed_password_attempts_dialog_message
-                                is AuthenticationMethodModel.Pattern ->
-                                    R.string.kg_too_many_failed_pattern_attempts_dialog_message
-                                else -> null
-                            }?.let { stringResourceId ->
-                                applicationContext.getString(
-                                    stringResourceId,
-                                    bouncerInteractor.throttling.value.failedAttemptCount,
-                                    ceil(bouncerInteractor.throttling.value.remainingMs / 1000f)
-                                        .toInt(),
-                                )
-                            }
-                        } else {
-                            null
-                        }
-                    }
-                    .distinctUntilChanged()
-                    .collect { dialogMessageOrNull ->
-                        if (dialogMessageOrNull != null) {
-                            _throttlingDialogMessage.value = dialogMessageOrNull
-                        }
-                    }
-            }
-        }
-    }
+    /**
+     * A message for a throttling dialog to show when the user has attempted the wrong credential
+     * too many times and now must wait a while before attempting again.
+     *
+     * If `null`, no dialog should be shown.
+     *
+     * Once the dialog is shown, the UI should call [onThrottlingDialogDismissed] when the user
+     * dismisses this dialog.
+     */
+    val throttlingDialogMessage: StateFlow<String?> = _throttlingDialogMessage.asStateFlow()
 
     /** The user-facing message to show in the bouncer. */
     val message: StateFlow<MessageViewModel> =
-        combine(
-                bouncerInteractor.message,
-                bouncerInteractor.isThrottled,
-            ) { message, isThrottled ->
+        combine(bouncerInteractor.message, bouncerInteractor.isThrottled) { message, isThrottled ->
                 toMessageViewModel(message, isThrottled)
             }
             .stateIn(
@@ -155,17 +150,31 @@ constructor(
                     ),
             )
 
-    private val _throttlingDialogMessage = MutableStateFlow<String?>(null)
-    /**
-     * A message for a throttling dialog to show when the user has attempted the wrong credential
-     * too many times and now must wait a while before attempting again.
-     *
-     * If `null`, no dialog should be shown.
-     *
-     * Once the dialog is shown, the UI should call [onThrottlingDialogDismissed] when the user
-     * dismisses this dialog.
-     */
-    val throttlingDialogMessage: StateFlow<String?> = _throttlingDialogMessage.asStateFlow()
+    val isEmergencyButtonVisible: Boolean
+        get() = telephonyInteractor.hasTelephonyRadio
+
+    init {
+        if (flags.isEnabled()) {
+            applicationScope.launch {
+                combine(bouncerInteractor.isThrottled, authMethodViewModel) {
+                        isThrottled,
+                        authMethodViewModel ->
+                        if (isThrottled && authMethodViewModel != null) {
+                            applicationContext.getString(
+                                authMethodViewModel.throttlingMessageId,
+                                bouncerInteractor.throttling.value.failedAttemptCount,
+                                ceil(bouncerInteractor.throttling.value.remainingMs / 1000f)
+                                    .toInt(),
+                            )
+                        } else {
+                            null
+                        }
+                    }
+                    .distinctUntilChanged()
+                    .collect { dialogMessage -> _throttlingDialogMessage.value = dialogMessage }
+            }
+        }
+    }
 
     /** Notifies that the emergency services button was clicked. */
     fun onEmergencyServicesButtonClicked() {
@@ -187,6 +196,50 @@ constructor(
         )
     }
 
+    private fun getChildViewModel(
+        authenticationMethod: AuthenticationMethodModel,
+    ): AuthMethodBouncerViewModel? {
+        // If the current child view-model matches the authentication method, reuse it instead of
+        // creating a new instance.
+        val childViewModel = authMethodViewModel.value
+        if (authenticationMethod == childViewModel?.authenticationMethod) {
+            return childViewModel
+        }
+
+        childViewModelScope?.cancel()
+        val newViewModelScope = createChildCoroutineScope(applicationScope)
+        childViewModelScope = newViewModelScope
+        return when (authenticationMethod) {
+            is AuthenticationMethodModel.Pin ->
+                PinBouncerViewModel(
+                    applicationContext = applicationContext,
+                    viewModelScope = newViewModelScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = isInputEnabled,
+                )
+            is AuthenticationMethodModel.Password ->
+                PasswordBouncerViewModel(
+                    viewModelScope = newViewModelScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = isInputEnabled,
+                )
+            is AuthenticationMethodModel.Pattern ->
+                PatternBouncerViewModel(
+                    applicationContext = applicationContext,
+                    viewModelScope = newViewModelScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = isInputEnabled,
+                )
+            else -> null
+        }
+    }
+
+    private fun createChildCoroutineScope(parentScope: CoroutineScope): CoroutineScope {
+        return CoroutineScope(
+            SupervisorJob(parent = parentScope.coroutineContext.job) + mainDispatcher
+        )
+    }
+
     data class MessageViewModel(
         val text: String,
 
@@ -198,4 +251,40 @@ constructor(
          */
         val isUpdateAnimated: Boolean,
     )
+
+    data class UserSwitcherDropdownItemViewModel(
+        val icon: Icon,
+        val text: Text,
+        val onClick: () -> Unit,
+    )
+}
+
+@Module
+object BouncerViewModelModule {
+
+    @Provides
+    @SysUISingleton
+    fun viewModel(
+        @Application applicationContext: Context,
+        @Application applicationScope: CoroutineScope,
+        @Main mainDispatcher: CoroutineDispatcher,
+        bouncerInteractor: BouncerInteractor,
+        authenticationInteractor: AuthenticationInteractor,
+        flags: SceneContainerFlags,
+        telephonyInteractor: TelephonyInteractor,
+        userSwitcherViewModel: UserSwitcherViewModel,
+    ): BouncerViewModel {
+        return BouncerViewModel(
+            applicationContext = applicationContext,
+            applicationScope = applicationScope,
+            mainDispatcher = mainDispatcher,
+            bouncerInteractor = bouncerInteractor,
+            authenticationInteractor = authenticationInteractor,
+            flags = flags,
+            telephonyInteractor = telephonyInteractor,
+            selectedUser = userSwitcherViewModel.selectedUser,
+            users = userSwitcherViewModel.users,
+            userSwitcherMenu = userSwitcherViewModel.menu,
+        )
+    }
 }

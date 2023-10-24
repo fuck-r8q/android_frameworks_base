@@ -150,6 +150,13 @@ class TransitionController {
     final ArrayList<ActivityRecord> mValidateActivityCompat = new ArrayList<>();
 
     /**
+     * List of display areas which were last sent as "closing"-type and haven't yet had a
+     * corresponding "opening"-type transition. A mismatch here is usually related to issues in
+     * keyguard unlock.
+     */
+    final ArrayList<DisplayArea> mValidateDisplayVis = new ArrayList<>();
+
+    /**
      * Currently playing transitions (in the order they were started). When finished, records are
      * removed from this list.
      */
@@ -705,13 +712,21 @@ class TransitionController {
         try {
             ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS,
                     "Requesting StartTransition: %s", transition);
-            ActivityManager.RunningTaskInfo info = null;
+            ActivityManager.RunningTaskInfo startTaskInfo = null;
+            ActivityManager.RunningTaskInfo pipTaskInfo = null;
             if (startTask != null) {
-                info = new ActivityManager.RunningTaskInfo();
-                startTask.fillTaskInfo(info);
+                startTaskInfo = startTask.getTaskInfo();
             }
-            final TransitionRequestInfo request = new TransitionRequestInfo(
-                    transition.mType, info, remoteTransition, displayChange);
+
+            // set the pip task in the request if provided
+            if (mCollectingTransition.getPipActivity() != null) {
+                pipTaskInfo = mCollectingTransition.getPipActivity().getTask().getTaskInfo();
+            }
+
+            final TransitionRequestInfo request = new TransitionRequestInfo(transition.mType,
+                    startTaskInfo, pipTaskInfo, remoteTransition, displayChange,
+                    transition.getFlags());
+
             transition.mLogger.mRequestTimeNs = SystemClock.elapsedRealtimeNanos();
             transition.mLogger.mRequest = request;
             mTransitionPlayer.requestStartTransition(transition.getToken(), request);
@@ -864,7 +879,7 @@ class TransitionController {
         // It is usually a no-op but make sure that the metric consumer is removed.
         mTransitionMetricsReporter.reportAnimationStart(record.getToken(), 0 /* startTime */);
         // It is a no-op if the transition did not change the display.
-        mAtm.endLaunchPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
+        mAtm.endPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
         if (!mPlayingTransitions.contains(record)) {
             Slog.e(TAG, "Trying to finish a non-playing transition " + record);
             return;
@@ -933,6 +948,15 @@ class TransitionController {
             ar.getSyncTransaction().setPosition(ar.getSurfaceControl(), tmpPos.x, tmpPos.y);
         }
         mValidateActivityCompat.clear();
+        for (int i = 0; i < mValidateDisplayVis.size(); ++i) {
+            final DisplayArea da = mValidateDisplayVis.get(i);
+            if (!da.isAttached() || da.getSurfaceControl() == null) continue;
+            if (da.isVisibleRequested()) {
+                Slog.e(TAG, "DisplayArea became visible outside of a transition: " + da);
+                da.getSyncTransaction().show(da.getSurfaceControl());
+            }
+        }
+        mValidateDisplayVis.clear();
     }
 
     /**
@@ -1147,7 +1171,7 @@ class TransitionController {
             Transition.asyncTraceBegin("animating", 0x41bfaf1 /* hashcode of TAG */);
         } else if (!animatingState && mAnimatingState) {
             t.setEarlyWakeupEnd();
-            mAtm.mWindowManager.requestTraversal();
+            mAtm.mWindowManager.scheduleAnimationLocked();
             mSnapshotController.setPause(false);
             mAnimatingState = false;
             Transition.asyncTraceEnd(0x41bfaf1 /* hashcode of TAG */);

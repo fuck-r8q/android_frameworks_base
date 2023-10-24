@@ -227,10 +227,10 @@ final class DisplayRotationCompatPolicy {
                     "Refreshing activity for camera compatibility treatment, "
                             + "activityRecord=%s", activity);
             final ClientTransaction transaction = ClientTransaction.obtain(
-                    activity.app.getThread(), activity.token);
-            transaction.addCallback(
-                    RefreshCallbackItem.obtain(cycleThroughStop ? ON_STOP : ON_PAUSE));
-            transaction.setLifecycleStateRequest(ResumeActivityItem.obtain(
+                    activity.app.getThread());
+            transaction.addCallback(RefreshCallbackItem.obtain(activity.token,
+                            cycleThroughStop ? ON_STOP : ON_PAUSE));
+            transaction.setLifecycleStateRequest(ResumeActivityItem.obtain(activity.token,
                     /* isForward */ false, /* shouldSendCompatFakeFocus */ false));
             activity.mAtmService.getLifecycleManager().scheduleTransaction(transaction);
             mHandler.postDelayed(

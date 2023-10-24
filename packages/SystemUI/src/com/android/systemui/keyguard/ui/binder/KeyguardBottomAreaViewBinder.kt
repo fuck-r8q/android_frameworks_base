@@ -25,6 +25,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewPropertyAnimator
 import android.widget.ImageView
+import androidx.core.animation.CycleInterpolator
+import androidx.core.animation.ObjectAnimator
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -33,7 +35,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.android.app.animation.Interpolators
 import com.android.keyguard.EmergencyCarrierArea
 import com.android.settingslib.Utils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.animation.ActivityLaunchAnimator
 import com.android.systemui.animation.Expandable
 import com.android.systemui.animation.view.LaunchableLinearLayout
@@ -80,12 +82,6 @@ object KeyguardBottomAreaViewBinder {
     //If updated, be sure to update [KeyguardQuickAffordanceViewBinder.kt]
     @Deprecated("Deprecated as part of b/278057014")
     interface Binding {
-        /**
-         * Returns a collection of [ViewPropertyAnimator] instances that can be used to animate the
-         * indication areas.
-         */
-        fun getIndicationAreaAnimators(): List<ViewPropertyAnimator>
-
         /** Notifies that device configuration has changed. */
         fun onConfigurationChanged()
 
@@ -295,10 +291,6 @@ object KeyguardBottomAreaViewBinder {
             }
 
         return object : Binding {
-            override fun getIndicationAreaAnimators(): List<ViewPropertyAnimator> {
-                return listOf(ambientIndicationArea).mapNotNull { it?.animate() }
-            }
-
             override fun onConfigurationChanged() {
                 configurationBasedDimensions.value = loadFromResources(view)
             }
@@ -407,6 +399,27 @@ object KeyguardBottomAreaViewBinder {
                     falsingManager,
                 )
                 view.setOnTouchListener(onTouchListener)
+                view.setOnClickListener {
+                    messageDisplayer.invoke(R.string.keyguard_affordance_press_too_short)
+                    val amplitude =
+                        view.context.resources
+                            .getDimensionPixelSize(R.dimen.keyguard_affordance_shake_amplitude)
+                            .toFloat()
+                    val shakeAnimator =
+                        ObjectAnimator.ofFloat(
+                            view,
+                            "translationX",
+                            -amplitude / 2,
+                            amplitude / 2,
+                        )
+                    shakeAnimator.duration =
+                        KeyguardBottomAreaVibrations.ShakeAnimationDuration.inWholeMilliseconds
+                    shakeAnimator.interpolator =
+                        CycleInterpolator(KeyguardBottomAreaVibrations.ShakeAnimationCycles)
+                    shakeAnimator.start()
+
+                    vibratorHelper?.vibrate(KeyguardBottomAreaVibrations.Shake)
+                }
                 view.onLongClickListener =
                     OnLongClickListener(falsingManager, viewModel, vibratorHelper, onTouchListener)
             } else {

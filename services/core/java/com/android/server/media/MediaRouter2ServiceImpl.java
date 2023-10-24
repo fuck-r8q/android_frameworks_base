@@ -214,17 +214,16 @@ class MediaRouter2ServiceImpl {
     @NonNull
     public List<MediaRoute2Info> getSystemRoutes() {
         final int uid = Binder.getCallingUid();
+        final int pid = Binder.getCallingPid();
         final int userId = UserHandle.getUserHandleForUid(uid).getIdentifier();
-        final boolean hasModifyAudioRoutingPermission = mContext.checkCallingOrSelfPermission(
-                android.Manifest.permission.MODIFY_AUDIO_ROUTING)
-                == PackageManager.PERMISSION_GRANTED;
+        final boolean hasSystemRoutingPermission = checkCallerHasSystemRoutingPermissions(pid, uid);
 
         final long token = Binder.clearCallingIdentity();
         try {
             Collection<MediaRoute2Info> systemRoutes;
             synchronized (mLock) {
                 UserRecord userRecord = getOrCreateUserRecordLocked(userId);
-                if (hasModifyAudioRoutingPermission) {
+                if (hasSystemRoutingPermission) {
                     MediaRoute2ProviderInfo providerInfo =
                             userRecord.mHandler.mSystemProvider.getProviderInfo();
                     if (providerInfo != null) {
@@ -255,9 +254,8 @@ class MediaRouter2ServiceImpl {
         final boolean hasConfigureWifiDisplayPermission = mContext.checkCallingOrSelfPermission(
                 android.Manifest.permission.CONFIGURE_WIFI_DISPLAY)
                 == PackageManager.PERMISSION_GRANTED;
-        final boolean hasModifyAudioRoutingPermission = mContext.checkCallingOrSelfPermission(
-                android.Manifest.permission.MODIFY_AUDIO_ROUTING)
-                == PackageManager.PERMISSION_GRANTED;
+        final boolean hasModifyAudioRoutingPermission =
+                checkCallerHasModifyAudioRoutingPermission(pid, uid);
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -490,12 +488,13 @@ class MediaRouter2ServiceImpl {
 
         final int callerUid = Binder.getCallingUid();
         final int callerPid = Binder.getCallingPid();
-        final int userId = UserHandle.getUserHandleForUid(callerUid).getIdentifier();
+        final int callerUserId = UserHandle.getUserHandleForUid(callerUid).getIdentifier();
 
         final long token = Binder.clearCallingIdentity();
         try {
             synchronized (mLock) {
-                registerManagerLocked(manager, callerUid, callerPid, callerPackageName, userId);
+                registerManagerLocked(
+                        manager, callerUid, callerPid, callerPackageName, callerUserId);
             }
         } finally {
             Binder.restoreCallingIdentity(token);
@@ -666,17 +665,17 @@ class MediaRouter2ServiceImpl {
     public RoutingSessionInfo getSystemSessionInfo(
             @Nullable String packageName, boolean setDeviceRouteSelected) {
         final int uid = Binder.getCallingUid();
+        final int pid = Binder.getCallingPid();
         final int userId = UserHandle.getUserHandleForUid(uid).getIdentifier();
-        final boolean hasModifyAudioRoutingPermission = mContext.checkCallingOrSelfPermission(
-                android.Manifest.permission.MODIFY_AUDIO_ROUTING)
-                == PackageManager.PERMISSION_GRANTED;
+        final boolean hasSystemRoutingPermissions =
+                checkCallerHasSystemRoutingPermissions(pid, uid);
 
         final long token = Binder.clearCallingIdentity();
         try {
             synchronized (mLock) {
                 UserRecord userRecord = getOrCreateUserRecordLocked(userId);
                 List<RoutingSessionInfo> sessionInfos;
-                if (hasModifyAudioRoutingPermission) {
+                if (hasSystemRoutingPermissions) {
                     if (setDeviceRouteSelected) {
                         // Return a fake system session that shows the device route as selected and
                         // available bluetooth routes as transferable.
@@ -705,6 +704,26 @@ class MediaRouter2ServiceImpl {
         } finally {
             Binder.restoreCallingIdentity(token);
         }
+    }
+
+    private boolean checkCallerHasSystemRoutingPermissions(int pid, int uid) {
+        return checkCallerHasModifyAudioRoutingPermission(pid, uid)
+                || checkCallerHasBluetoothPermissions(pid, uid);
+    }
+
+    private boolean checkCallerHasModifyAudioRoutingPermission(int pid, int uid) {
+        return mContext.checkPermission(Manifest.permission.MODIFY_AUDIO_ROUTING, pid, uid)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean checkCallerHasBluetoothPermissions(int pid, int uid) {
+        boolean hasBluetoothRoutingPermission = true;
+        for (String permission : BLUETOOTH_PERMISSIONS_FOR_SYSTEM_ROUTING) {
+            hasBluetoothRoutingPermission &=
+                    mContext.checkPermission(permission, pid, uid)
+                            == PackageManager.PERMISSION_GRANTED;
+        }
+        return hasBluetoothRoutingPermission;
     }
 
     // End of methods that implements operations for both MediaRouter2 and MediaRouter2Manager.
@@ -1140,8 +1159,12 @@ class MediaRouter2ServiceImpl {
     }
 
     @GuardedBy("mLock")
-    private void registerManagerLocked(@NonNull IMediaRouter2Manager manager,
-            int callerUid, int callerPid, @NonNull String callerPackageName, int userId) {
+    private void registerManagerLocked(
+            @NonNull IMediaRouter2Manager manager,
+            int callerUid,
+            int callerPid,
+            @NonNull String callerPackageName,
+            int callerUserId) {
         final IBinder binder = manager.asBinder();
         ManagerRecord managerRecord = mAllManagerRecords.get(binder);
 
@@ -1151,14 +1174,17 @@ class MediaRouter2ServiceImpl {
             return;
         }
 
-        Slog.i(TAG, TextUtils.formatSimple(
-                "registerManager | callerUid: %d, callerPid: %d, package: %s, user: %d",
-                callerUid, callerPid, callerPackageName, userId));
+        Slog.i(
+                TAG,
+                TextUtils.formatSimple(
+                        "registerManager | callerUid: %d, callerPid: %d, callerPackage: %s,"
+                            + " callerUserId: %d",
+                        callerUid, callerPid, callerPackageName, callerUserId));
 
         mContext.enforcePermission(Manifest.permission.MEDIA_CONTENT_CONTROL, callerPid, callerUid,
                 "Must hold MEDIA_CONTENT_CONTROL permission.");
 
-        UserRecord userRecord = getOrCreateUserRecordLocked(userId);
+        UserRecord userRecord = getOrCreateUserRecordLocked(callerUserId);
         managerRecord = new ManagerRecord(
                 userRecord, manager, callerUid, callerPid, callerPackageName);
         try {
@@ -1587,18 +1613,9 @@ class MediaRouter2ServiceImpl {
             mPid = pid;
             mHasConfigureWifiDisplayPermission = hasConfigureWifiDisplayPermission;
             mHasModifyAudioRoutingPermission = hasModifyAudioRoutingPermission;
-            mHasBluetoothRoutingPermission = new AtomicBoolean(fetchBluetoothPermission());
+            mHasBluetoothRoutingPermission =
+                    new AtomicBoolean(checkCallerHasBluetoothPermissions(mPid, mUid));
             mRouterId = mNextRouterOrManagerId.getAndIncrement();
-        }
-
-        private boolean fetchBluetoothPermission() {
-            boolean hasBluetoothRoutingPermission = true;
-            for (String permission : BLUETOOTH_PERMISSIONS_FOR_SYSTEM_ROUTING) {
-                hasBluetoothRoutingPermission &=
-                        mContext.checkPermission(permission, mPid, mUid)
-                                == PackageManager.PERMISSION_GRANTED;
-            }
-            return hasBluetoothRoutingPermission;
         }
 
         /**
@@ -1611,7 +1628,7 @@ class MediaRouter2ServiceImpl {
 
         public void maybeUpdateSystemRoutingPermissionLocked() {
             boolean oldSystemRoutingPermissionValue = hasSystemRoutingPermission();
-            mHasBluetoothRoutingPermission.set(fetchBluetoothPermission());
+            mHasBluetoothRoutingPermission.set(checkCallerHasBluetoothPermissions(mPid, mUid));
             boolean newSystemRoutingPermissionValue = hasSystemRoutingPermission();
             if (oldSystemRoutingPermissionValue != newSystemRoutingPermissionValue) {
                 Map<String, MediaRoute2Info> routesToReport =
@@ -2093,34 +2110,36 @@ class MediaRouter2ServiceImpl {
             if (!hasAddedOrModifiedRoutes && !hasRemovedRoutes) {
                 return;
             }
-            List<RouterRecord> routerRecordsWithModifyAudioRoutingPermission =
-                    getRouterRecords(true);
-            List<RouterRecord> routerRecordsWithoutModifyAudioRoutingPermission =
-                    getRouterRecords(false);
+            List<RouterRecord> routerRecordsWithSystemRoutingPermission =
+                    getRouterRecords(/* hasSystemRoutingPermission= */ true);
+            List<RouterRecord> routerRecordsWithoutSystemRoutingPermission =
+                    getRouterRecords(/* hasSystemRoutingPermission= */ false);
             List<IMediaRouter2Manager> managers = getManagers();
 
             // Managers receive all provider updates with all routes.
             notifyRoutesUpdatedToManagers(
                     managers, new ArrayList<>(mLastNotifiedRoutesToPrivilegedRouters.values()));
 
-            // Routers with modify audio permission (usually system routers) receive all provider
-            // updates with all routes.
+            // Routers with system routing access (either via {@link MODIFY_AUDIO_ROUTING} or
+            // {@link BLUETOOTH_CONNECT} + {@link BLUETOOTH_SCAN}) receive all provider updates
+            // with all routes.
             notifyRoutesUpdatedToRouterRecords(
-                    routerRecordsWithModifyAudioRoutingPermission,
+                    routerRecordsWithSystemRoutingPermission,
                     new ArrayList<>(mLastNotifiedRoutesToPrivilegedRouters.values()));
 
             if (!isSystemProvider) {
                 // Regular routers receive updates from all non-system providers with all non-system
                 // routes.
                 notifyRoutesUpdatedToRouterRecords(
-                        routerRecordsWithoutModifyAudioRoutingPermission,
+                        routerRecordsWithoutSystemRoutingPermission,
                         new ArrayList<>(mLastNotifiedRoutesToNonPrivilegedRouters.values()));
             } else if (hasAddedOrModifiedRoutes) {
-                // On system provider updates, regular routers receive the updated default route.
-                // This is the only system route they should receive.
+                // On system provider updates, routers without system routing access
+                // receive the updated default route. This is the only system route they should
+                // receive.
                 mLastNotifiedRoutesToNonPrivilegedRouters.put(defaultRoute.getId(), defaultRoute);
                 notifyRoutesUpdatedToRouterRecords(
-                        routerRecordsWithoutModifyAudioRoutingPermission,
+                        routerRecordsWithoutSystemRoutingPermission,
                         new ArrayList<>(mLastNotifiedRoutesToNonPrivilegedRouters.values()));
             }
         }
@@ -2526,7 +2545,7 @@ class MediaRouter2ServiceImpl {
             }
         }
 
-        private List<RouterRecord> getRouterRecords(boolean hasModifyAudioRoutingPermission) {
+        private List<RouterRecord> getRouterRecords(boolean hasSystemRoutingPermission) {
             MediaRouter2ServiceImpl service = mServiceRef.get();
             List<RouterRecord> routerRecords = new ArrayList<>();
             if (service == null) {
@@ -2534,7 +2553,7 @@ class MediaRouter2ServiceImpl {
             }
             synchronized (service.mLock) {
                 for (RouterRecord routerRecord : mUserRecord.mRouterRecords) {
-                    if (hasModifyAudioRoutingPermission
+                    if (hasSystemRoutingPermission
                             == routerRecord.hasSystemRoutingPermission()) {
                         routerRecords.add(routerRecord);
                     }

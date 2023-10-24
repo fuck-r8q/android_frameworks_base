@@ -16,6 +16,7 @@
 
 package com.android.server.permission.access.permission
 
+import android.permission.PermissionManager
 import android.util.Slog
 import com.android.modules.utils.BinaryXmlPullParser
 import com.android.modules.utils.BinaryXmlSerializer
@@ -164,9 +165,18 @@ class DevicePermissionPolicy : SchemePolicy() {
         deviceId: String,
         userId: Int,
         permissionName: String
-    ): Int =
-        state.userStates[userId]?.appIdDevicePermissionFlags?.get(appId)?.get(deviceId)
-            ?.getWithDefault(permissionName, 0) ?: 0
+    ): Int {
+        val flags = state.userStates[userId]?.appIdDevicePermissionFlags?.get(appId)?.get(deviceId)
+                ?.getWithDefault(permissionName, 0) ?: 0
+        if (PermissionManager.DEBUG_DEVICE_PERMISSIONS) {
+            Slog.i(
+                LOG_TAG, "getPermissionFlags: appId=$appId, userId=$userId," +
+                    " deviceId=$deviceId, permissionName=$permissionName," +
+                    " flags=${PermissionFlags.toString(flags)}"
+            )
+        }
+        return flags
+    }
 
     fun MutateStateScope.setPermissionFlags(
         appId: Int,
@@ -202,6 +212,13 @@ class DevicePermissionPolicy : SchemePolicy() {
         val devicePermissionFlags = appIdDevicePermissionFlags.mutateOrPut(appId) {
             MutableIndexedReferenceMap()
         }
+        if (PermissionManager.DEBUG_DEVICE_PERMISSIONS) {
+            Slog.i(
+                LOG_TAG, "setPermissionFlags(): appId=$appId, userId=$userId," +
+                    " deviceId=$deviceId, permissionName=$permissionName," +
+                    " newFlags=${PermissionFlags.toString(newFlags)}"
+            )
+        }
         val permissionFlags = devicePermissionFlags.mutateOrPut(deviceId) { MutableIndexedMap() }
         permissionFlags.putWithDefault(permissionName, newFlags, 0)
         if (permissionFlags.isEmpty()) {
@@ -231,7 +248,7 @@ class DevicePermissionPolicy : SchemePolicy() {
     }
 
     private fun isDeviceAwarePermission(permissionName: String): Boolean =
-        DEVICE_SUPPORTED_PERMISSIONS.contains(permissionName)
+            DEVICE_AWARE_PERMISSIONS.contains(permissionName)
 
     companion object {
         private val LOG_TAG = DevicePermissionPolicy::class.java.simpleName
@@ -239,10 +256,8 @@ class DevicePermissionPolicy : SchemePolicy() {
         /**
          * These permissions are supported for virtual devices.
          */
-        private val DEVICE_SUPPORTED_PERMISSIONS = indexedSetOf(
-            android.Manifest.permission.CAMERA,
-            android.Manifest.permission.RECORD_AUDIO
-        )
+        // TODO: b/298661870 - Use new API to get the list of device aware permissions.
+        val DEVICE_AWARE_PERMISSIONS = emptySet<String>()
     }
 
     /**

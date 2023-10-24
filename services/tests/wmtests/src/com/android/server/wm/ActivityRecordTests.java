@@ -147,14 +147,12 @@ import android.view.DisplayInfo;
 import android.view.IRemoteAnimationFinishedCallback;
 import android.view.IRemoteAnimationRunner.Stub;
 import android.view.IWindowManager;
-import android.view.IWindowSession;
 import android.view.InsetsSource;
 import android.view.InsetsState;
 import android.view.RemoteAnimationAdapter;
 import android.view.RemoteAnimationTarget;
 import android.view.Surface;
 import android.view.WindowManager;
-import android.view.WindowManagerGlobal;
 import android.window.TaskSnapshot;
 
 import androidx.test.filters.MediumTest;
@@ -489,7 +487,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         ensureActivityConfiguration(activity);
 
         verify(mAtm.getLifecycleManager(), never())
-                .scheduleTransaction(any(), any(), isA(ActivityConfigurationChangeItem.class));
+                .scheduleTransaction(any(), isA(ActivityConfigurationChangeItem.class));
     }
 
     @Test
@@ -517,9 +515,9 @@ public class ActivityRecordTests extends WindowTestsBase {
 
         // The configuration change is still sent to the activity, even if it doesn't relaunch.
         final ActivityConfigurationChangeItem expected =
-                ActivityConfigurationChangeItem.obtain(newConfig);
+                ActivityConfigurationChangeItem.obtain(activity.token, newConfig);
         verify(mAtm.getLifecycleManager()).scheduleTransaction(
-                eq(activity.app.getThread()), eq(activity.token), eq(expected));
+                eq(activity.app.getThread()), eq(expected));
     }
 
     @Test
@@ -597,9 +595,9 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.setRequestedOrientation(requestedOrientation);
 
         final ActivityConfigurationChangeItem expected =
-                ActivityConfigurationChangeItem.obtain(newConfig);
+                ActivityConfigurationChangeItem.obtain(activity.token, newConfig);
         verify(mAtm.getLifecycleManager()).scheduleTransaction(eq(activity.app.getThread()),
-                eq(activity.token), eq(expected));
+                eq(expected));
 
         verify(displayRotation).onSetRequestedOrientation();
     }
@@ -815,9 +813,9 @@ public class ActivityRecordTests extends WindowTestsBase {
                     false /* preserveWindow */, true /* ignoreStopState */);
 
             final ActivityConfigurationChangeItem expected =
-                    ActivityConfigurationChangeItem.obtain(newConfig);
+                    ActivityConfigurationChangeItem.obtain(activity.token, newConfig);
             verify(mAtm.getLifecycleManager()).scheduleTransaction(
-                    eq(activity.app.getThread()), eq(activity.token), eq(expected));
+                    eq(activity.app.getThread()), eq(expected));
         } finally {
             stack.getDisplayArea().removeChild(stack);
         }
@@ -1541,7 +1539,8 @@ public class ActivityRecordTests extends WindowTestsBase {
         // Make keyguard locked and set the top activity show-when-locked.
         KeyguardController keyguardController = activity.mTaskSupervisor.getKeyguardController();
         int displayId = activity.getDisplayId();
-        doReturn(true).when(keyguardController).isKeyguardLocked(eq(displayId));
+        keyguardController.setKeyguardShown(displayId, true /* keyguardShowing */,
+                false /* aodShowing */);
         final ActivityRecord topActivity = new ActivityBuilder(mAtm).setTask(task).build();
         topActivity.setVisibleRequested(true);
         topActivity.nowVisible = true;
@@ -1553,7 +1552,7 @@ public class ActivityRecordTests extends WindowTestsBase {
 
         // Verify the stack-top activity is occluded keyguard.
         assertEquals(topActivity, task.topRunningActivity());
-        assertTrue(keyguardController.isDisplayOccluded(DEFAULT_DISPLAY));
+        assertTrue(keyguardController.isKeyguardOccluded(displayId));
 
         // Finish the top activity
         topActivity.setState(PAUSED, "true");
@@ -1562,7 +1561,7 @@ public class ActivityRecordTests extends WindowTestsBase {
 
         // Verify new top activity does not occlude keyguard.
         assertEquals(activity, task.topRunningActivity());
-        assertFalse(keyguardController.isDisplayOccluded(DEFAULT_DISPLAY));
+        assertFalse(keyguardController.isKeyguardOccluded(displayId));
     }
 
     /**
@@ -1786,9 +1785,10 @@ public class ActivityRecordTests extends WindowTestsBase {
             final ActivityRecord activity = createActivityWithTask();
             final WindowProcessController wpc = activity.app;
             setup.accept(activity);
+            clearInvocations(mAtm.getLifecycleManager());
             activity.getTask().removeImmediately("test");
             try {
-                verify(mAtm.getLifecycleManager()).scheduleTransaction(any(), eq(activity.token),
+                verify(mAtm.getLifecycleManager()).scheduleTransaction(any(),
                         isA(DestroyActivityItem.class));
             } catch (RemoteException ignored) {
             }
@@ -2071,7 +2071,7 @@ public class ActivityRecordTests extends WindowTestsBase {
                 WindowManager.LayoutParams.TYPE_APPLICATION_STARTING);
         params.width = params.height = WindowManager.LayoutParams.MATCH_PARENT;
         final TestWindowState w = new TestWindowState(
-                mAtm.mWindowManager, mock(Session.class), new TestIWindow(), params, activity);
+                mAtm.mWindowManager, getTestSession(), new TestIWindow(), params, activity);
         activity.addWindow(w);
 
         // Assume the activity is launching in different rotation, and there was an available
@@ -2081,23 +2081,8 @@ public class ActivityRecordTests extends WindowTestsBase {
                 .build();
         setRotatedScreenOrientationSilently(activity);
         activity.setVisible(false);
-
-        final IWindowSession session = WindowManagerGlobal.getWindowSession();
-        spyOn(session);
-        try {
-            // Return error to skip unnecessary operation.
-            doReturn(WindowManagerGlobal.ADD_STARTING_NOT_NEEDED).when(session).addToDisplay(
-                    any() /* window */,  any() /* attrs */,
-                    anyInt() /* viewVisibility */, anyInt() /* displayId */,
-                    anyInt() /* requestedVisibleTypes */, any() /* outInputChannel */,
-                    any() /* outInsetsState */, any() /* outActiveControls */,
-                    any() /* outAttachedFrame */, any() /* outSizeCompatScale */);
-            mAtm.mWindowManager.mStartingSurfaceController
-                    .createTaskSnapshotSurface(activity, snapshot);
-        } catch (RemoteException ignored) {
-        } finally {
-            reset(session);
-        }
+        mAtm.mWindowManager.mStartingSurfaceController
+                .createTaskSnapshotSurface(activity, snapshot);
 
         // Because the rotation of snapshot and the corresponding top activity are different, fixed
         // rotation should be applied when creating snapshot surface if the display rotation may be

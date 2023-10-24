@@ -16,6 +16,7 @@
 
 package android.content;
 
+import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -31,6 +32,7 @@ import android.os.Parcelable;
 import android.os.Process;
 import android.os.UserHandle;
 import android.permission.PermissionManager;
+import android.permission.flags.Flags;
 import android.util.ArraySet;
 
 import com.android.internal.annotations.Immutable;
@@ -163,6 +165,7 @@ public final class AttributionSource implements Parcelable {
 
     /** @hide */
     @TestApi
+    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
     public AttributionSource(int uid, int pid, @Nullable String packageName,
             @Nullable String attributionTag, @NonNull IBinder token,
             @Nullable String[] renouncedPermissions,
@@ -223,6 +226,11 @@ public final class AttributionSource implements Parcelable {
     public AttributionSource withToken(@NonNull Binder token) {
         return new AttributionSource(getUid(), getPid(), getPackageName(), getAttributionTag(),
                 token, mAttributionSourceState.renouncedPermissions, getDeviceId(), getNext());
+    }
+
+    /** @hide */
+    public AttributionSource withDefaultToken() {
+        return withToken(sDefaultToken);
     }
 
     /** @hide */
@@ -523,6 +531,7 @@ public final class AttributionSource implements Parcelable {
      * <p>
      * This device ID is used for permissions checking during attribution source validation.
      */
+    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
     public int getDeviceId() {
         return mAttributionSourceState.deviceId;
     }
@@ -552,16 +561,28 @@ public final class AttributionSource implements Parcelable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         AttributionSource that = (AttributionSource) o;
-        return mAttributionSourceState.uid == that.mAttributionSourceState.uid
+        return equalsExceptToken(that) && Objects.equals(
+                mAttributionSourceState.token, that.mAttributionSourceState.token);
+    }
+
+    /**
+     * We store trusted attribution sources without their token (the token is the key to the map)
+     * to avoid having a strong reference to the token. This means, when checking the equality of a
+     * supplied AttributionSource in PermissionManagerService.isTrustedAttributionSource, we want to
+     * compare everything except the token.
+     *
+     * @hide
+     */
+    public boolean equalsExceptToken(@Nullable AttributionSource o) {
+        if (o == null) return false;
+        return mAttributionSourceState.uid == o.mAttributionSourceState.uid
                 && Objects.equals(mAttributionSourceState.packageName,
-                        that.mAttributionSourceState.packageName)
+                o.mAttributionSourceState.packageName)
                 && Objects.equals(mAttributionSourceState.attributionTag,
-                        that.mAttributionSourceState.attributionTag)
-                && Objects.equals(mAttributionSourceState.token,
-                        that.mAttributionSourceState.token)
+                o.mAttributionSourceState.attributionTag)
                 && Arrays.equals(mAttributionSourceState.renouncedPermissions,
-                        that.mAttributionSourceState.renouncedPermissions)
-                && Objects.equals(getNext(), that.getNext());
+                o.mAttributionSourceState.renouncedPermissions)
+                && Objects.equals(getNext(), o.getNext());
     }
 
     @Override
@@ -698,6 +719,7 @@ public final class AttributionSource implements Parcelable {
          *
          * @return the builder
          */
+        @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
         public @NonNull Builder setDeviceId(int deviceId) {
             checkNotUsed();
             mBuilderFieldsSet |= 0x12;

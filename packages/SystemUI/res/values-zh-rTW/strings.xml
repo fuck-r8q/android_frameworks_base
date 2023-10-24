@@ -57,6 +57,7 @@
     <string name="hdmi_cec_set_menu_language_description" msgid="8176716678074126619">"另一部裝置要求變更系統語言"</string>
     <string name="hdmi_cec_set_menu_language_accept" msgid="2513689457281009578">"變更語言"</string>
     <string name="hdmi_cec_set_menu_language_decline" msgid="7650721096558646011">"繼續使用目前的語言"</string>
+    <string name="share_wifi_button_text" msgid="1285273973812029240">"分享 Wi-Fi"</string>
     <string name="wifi_debugging_title" msgid="7300007687492186076">"要允許透過這個網路執行無線偵錯嗎？"</string>
     <string name="wifi_debugging_message" msgid="5461204211731802995">"網路名稱 (SSID)\n<xliff:g id="SSID_0">%1$s</xliff:g>\n\nWi‑Fi 位址 (BSSID)\n<xliff:g id="BSSID_1">%2$s</xliff:g>"</string>
     <string name="wifi_debugging_always" msgid="2968383799517975155">"一律允許透過這個網路執行"</string>
@@ -158,6 +159,7 @@
     <string name="biometric_dialog_wrong_pattern" msgid="8954812279840889029">"圖案錯誤"</string>
     <string name="biometric_dialog_wrong_password" msgid="69477929306843790">"密碼錯誤"</string>
     <string name="biometric_dialog_credential_too_many_attempts" msgid="3083141271737748716">"錯誤次數過多，\n請於 <xliff:g id="NUMBER">%d</xliff:g> 秒後再試。"</string>
+    <string name="work_challenge_emergency_button_text" msgid="8946588434515599288">"緊急"</string>
     <string name="biometric_dialog_credential_attempts_before_wipe" msgid="6751859711975516999">"請再試一次。你目前已嘗試 <xliff:g id="ATTEMPTS_0">%1$d</xliff:g> 次，最多可試 <xliff:g id="MAX_ATTEMPTS">%2$d</xliff:g> 次。"</string>
     <string name="biometric_dialog_last_attempt_before_wipe_dialog_title" msgid="2874250099278693477">"你的資料將遭到刪除"</string>
     <string name="biometric_dialog_last_pattern_attempt_before_wipe_device" msgid="6562299244825817598">"如果下次輸入的解鎖圖案仍不正確，系統將刪除這部裝置中的資料。"</string>
@@ -192,6 +194,8 @@
     <string name="keyguard_suggest_fingerprint" msgid="8742015961962702960">"請改用指紋"</string>
     <string name="keyguard_face_unlock_unavailable" msgid="1581949044193418736">"無法使用人臉解鎖功能"</string>
     <string name="accessibility_bluetooth_connected" msgid="4745196874551115205">"藍牙連線已建立。"</string>
+    <string name="accessibility_bluetooth_device_icon" msgid="9163840051642587982">"「藍牙裝置」圖示"</string>
+    <string name="accessibility_bluetooth_device_settings_gear" msgid="4188853273831773436">"藍牙裝置設定齒輪"</string>
     <string name="accessibility_battery_unknown" msgid="1807789554617976440">"電池電量不明。"</string>
     <string name="accessibility_bluetooth_name" msgid="7300973230214067678">"已連線至<xliff:g id="BLUETOOTH">%s</xliff:g>。"</string>
     <string name="accessibility_cast_name" msgid="7344437925388773685">"已連線至 <xliff:g id="CAST">%s</xliff:g>。"</string>
@@ -244,6 +248,12 @@
     <string name="quick_settings_dnd_label" msgid="7728690179108024338">"零打擾"</string>
     <string name="quick_settings_bluetooth_label" msgid="7018763367142041481">"藍牙"</string>
     <string name="quick_settings_bluetooth_detail_empty_text" msgid="5760239584390514322">"找不到配對的裝置"</string>
+    <string name="quick_settings_bluetooth_tile_subtitle" msgid="6869579539763980182">"輕觸要連線的裝置"</string>
+    <string name="pair_new_bluetooth_devices" msgid="4601767620843349645">"配對新裝置"</string>
+    <string name="see_all_bluetooth_devices" msgid="1761596816620200433">"查看全部"</string>
+    <string name="turn_on_bluetooth" msgid="5681370462180289071">"使用藍牙"</string>
+    <string name="quick_settings_bluetooth_device_connected" msgid="7884777006729260996">"已連線"</string>
+    <string name="quick_settings_bluetooth_device_saved" msgid="7549938728928069477">"已儲存"</string>
     <string name="quick_settings_bluetooth_secondary_label_battery_level" msgid="4182034939479344093">"電量：<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%s</xliff:g>"</string>
     <string name="quick_settings_bluetooth_secondary_label_audio" msgid="780333390310051161">"音訊"</string>
     <string name="quick_settings_bluetooth_secondary_label_headset" msgid="2332093067553000852">"耳機"</string>
@@ -411,6 +421,7 @@
     <string name="media_projection_entry_app_permission_dialog_warning_entire_screen" msgid="8736391633234144237">"當你分享、錄製或投放內容時，「<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g>」可存取畫面上顯示的任何資訊或裝置播放的任何內容。因此，請謹慎處理密碼、付款資料、訊息、相片和影音內容等資訊。"</string>
     <string name="media_projection_entry_app_permission_dialog_warning_single_app" msgid="5211695779082563959">"當你分享、錄製或投放應用程式內容時，「<xliff:g id="APP_SEEKING_PERMISSION">%s</xliff:g>」可存取應用程式中顯示的任何資訊或播放的任何內容。因此，請謹慎處理密碼、付款資料、訊息、相片和影音內容等資訊。"</string>
     <string name="media_projection_entry_app_permission_dialog_continue" msgid="295463518195075840">"開始"</string>
+    <string name="media_projection_entry_app_permission_dialog_single_app_disabled" msgid="8999903044874669995">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」已停用此選項"</string>
     <string name="media_projection_entry_cast_permission_dialog_title" msgid="8860150223172993547">"要開始投放嗎？"</string>
     <string name="media_projection_entry_cast_permission_dialog_warning_entire_screen" msgid="1986212276016817231">"當你投放內容時，Android 可存取畫面上顯示的任何資訊或裝置播放的任何內容。因此，請謹慎處理密碼、付款資料、訊息、相片和影音內容等資訊。"</string>
     <string name="media_projection_entry_cast_permission_dialog_warning_single_app" msgid="9900961380294292">"當你投放應用程式內容時，Android 可存取應用程式中顯示的任何資訊或播放的任何內容。因此，請謹慎處理密碼、付款資料、訊息、相片和影音內容等資訊。"</string>
@@ -860,6 +871,10 @@
     <string name="accessibility_control_move_down" msgid="5390922476900974512">"向下移"</string>
     <string name="accessibility_control_move_left" msgid="8156206978511401995">"向左移"</string>
     <string name="accessibility_control_move_right" msgid="8926821093629582888">"向右移"</string>
+    <string name="accessibility_control_increase_window_width" msgid="6992249470832493283">"增加放大鏡寬度"</string>
+    <string name="accessibility_control_decrease_window_width" msgid="5740401560105929681">"縮減放大鏡寬度"</string>
+    <string name="accessibility_control_increase_window_height" msgid="2200966116612324260">"增加放大鏡高度"</string>
+    <string name="accessibility_control_decrease_window_height" msgid="2054479949445332761">"縮減放大鏡高度"</string>
     <string name="magnification_mode_switch_description" msgid="2698364322069934733">"切換放大模式"</string>
     <string name="magnification_mode_switch_state_full_screen" msgid="5229653514979530561">"放大整個螢幕畫面"</string>
     <string name="magnification_mode_switch_state_window" msgid="8597100249594076965">"放大局部螢幕畫面"</string>
@@ -1136,7 +1151,7 @@
     <string name="wallet_quick_affordance_unavailable_install_the_app" msgid="7298552910007208368">"如要將錢包應用程式新增為捷徑，請確認已安裝該應用程式"</string>
     <string name="wallet_quick_affordance_unavailable_configure_the_app" msgid="4387433357429873258">"如要將錢包應用程式新增為捷徑，請確認已新增至少一張卡片"</string>
     <string name="home_quick_affordance_unavailable_install_the_app" msgid="6187820778998446168">"如要將 Google Home 應用程式新增為捷徑，請確認已安裝該應用程式"</string>
-    <string name="home_quick_affordance_unavailable_configure_the_app" msgid="7953595390775156839">"• 至少要有一部可用裝置"</string>
+    <string name="home_quick_affordance_unavailable_configure_the_app" msgid="604424593994493281">"• 至少要有一部可用裝置或一個裝置面板"</string>
     <string name="notes_app_quick_affordance_unavailable_explanation" msgid="4796955161600178530">"選取預設的記事應用程式，即可使用筆記捷徑"</string>
     <string name="keyguard_affordance_enablement_dialog_notes_app_action" msgid="6821710209675089470">"選取應用程式"</string>
     <string name="keyguard_affordance_press_too_short" msgid="8145437175134998864">"按住快速鍵"</string>
@@ -1167,6 +1182,11 @@
     <string name="assistant_attention_content_description" msgid="6830215897604642875">"Google 助理感知功能已開啟"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"在「設定」中指定預設記事應用程式"</string>
     <string name="install_app" msgid="5066668100199613936">"安裝應用程式"</string>
+    <string name="connected_display_dialog_start_mirroring" msgid="6237895789920854982">"要以鏡像方式投放至外部螢幕嗎？"</string>
+    <!-- no translation found for mirror_display (2515262008898122928) -->
+    <skip />
+    <!-- no translation found for dismiss_dialog (2195508495854675882) -->
+    <skip />
     <string name="privacy_dialog_title" msgid="7839968133469098311">"麥克風和相機"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"最近曾使用感應器的應用程式"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"查看近期存取記錄"</string>

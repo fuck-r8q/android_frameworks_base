@@ -22,7 +22,7 @@ import android.content.Intent
 import android.os.UserHandle
 import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.DialogLaunchAnimator
 import com.android.systemui.animation.Expandable
@@ -57,11 +57,12 @@ import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.settings.FakeSettings
 import com.google.common.truth.Truth
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,8 +71,6 @@ import org.mockito.ArgumentMatchers
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
-import kotlin.math.max
-import kotlin.math.min
 
 @SmallTest
 @RunWith(JUnit4::class)
@@ -105,9 +104,11 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
         overrideResource(
             R.array.config_keyguardQuickAffordanceDefaults,
             arrayOf(
-                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START + ":" +
+                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START +
+                    ":" +
                     BuiltInKeyguardQuickAffordanceKeys.HOME_CONTROLS,
-                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_END + ":" +
+                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_END +
+                    ":" +
                     BuiltInKeyguardQuickAffordanceKeys.QUICK_ACCESS_WALLET
             )
         )
@@ -144,16 +145,16 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
             KeyguardQuickAffordanceLocalUserSelectionManager(
                 context = context,
                 userFileManager =
-                mock<UserFileManager>().apply {
-                    whenever(
-                        getSharedPreferences(
-                            ArgumentMatchers.anyString(),
-                            ArgumentMatchers.anyInt(),
-                            ArgumentMatchers.anyInt(),
-                        )
-                    )
-                        .thenReturn(FakeSharedPreferences())
-                },
+                    mock<UserFileManager>().apply {
+                        whenever(
+                                getSharedPreferences(
+                                    ArgumentMatchers.anyString(),
+                                    ArgumentMatchers.anyInt(),
+                                    ArgumentMatchers.anyInt(),
+                                )
+                            )
+                            .thenReturn(FakeSharedPreferences())
+                    },
                 userTracker = userTracker,
                 broadcastDispatcher = fakeBroadcastDispatcher,
             )
@@ -172,42 +173,43 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 remoteUserSelectionManager = remoteUserSelectionManager,
                 userTracker = userTracker,
                 legacySettingSyncer =
-                KeyguardQuickAffordanceLegacySettingSyncer(
-                    scope = testScope.backgroundScope,
-                    backgroundDispatcher = testDispatcher,
-                    secureSettings = FakeSettings(),
-                    selectionsManager = localUserSelectionManager,
-                ),
+                    KeyguardQuickAffordanceLegacySettingSyncer(
+                        scope = testScope.backgroundScope,
+                        backgroundDispatcher = testDispatcher,
+                        secureSettings = FakeSettings(),
+                        selectionsManager = localUserSelectionManager,
+                    ),
                 configs =
-                setOf(
-                    homeControlsQuickAffordanceConfig,
-                    quickAccessWalletAffordanceConfig,
-                    qrCodeScannerAffordanceConfig,
-                ),
+                    setOf(
+                        homeControlsQuickAffordanceConfig,
+                        quickAccessWalletAffordanceConfig,
+                        qrCodeScannerAffordanceConfig,
+                    ),
                 dumpManager = mock(),
                 userHandle = UserHandle.SYSTEM,
             )
 
-        underTest = KeyguardQuickAffordancesCombinedViewModel(
-            quickAffordanceInteractor =
-            KeyguardQuickAffordanceInteractor(
-                keyguardInteractor = keyguardInteractor,
-                lockPatternUtils = lockPatternUtils,
-                keyguardStateController = keyguardStateController,
-                userTracker = userTracker,
-                activityStarter = activityStarter,
-                featureFlags = featureFlags,
-                repository = { quickAffordanceRepository },
-                launchAnimator = launchAnimator,
-                logger = logger,
-                devicePolicyManager = devicePolicyManager,
-                dockManager = dockManager,
-                biometricSettingsRepository = biometricSettingsRepository,
-                backgroundDispatcher = testDispatcher,
-                appContext = mContext,
-            ),
-            keyguardInteractor = keyguardInteractor
-        )
+        underTest =
+            KeyguardQuickAffordancesCombinedViewModel(
+                quickAffordanceInteractor =
+                    KeyguardQuickAffordanceInteractor(
+                        keyguardInteractor = keyguardInteractor,
+                        lockPatternUtils = lockPatternUtils,
+                        keyguardStateController = keyguardStateController,
+                        userTracker = userTracker,
+                        activityStarter = activityStarter,
+                        featureFlags = featureFlags,
+                        repository = { quickAffordanceRepository },
+                        launchAnimator = launchAnimator,
+                        logger = logger,
+                        devicePolicyManager = devicePolicyManager,
+                        dockManager = dockManager,
+                        biometricSettingsRepository = biometricSettingsRepository,
+                        backgroundDispatcher = testDispatcher,
+                        appContext = mContext,
+                    ),
+                keyguardInteractor = keyguardInteractor
+            )
     }
 
     @Test
@@ -242,9 +244,8 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
     @Test
     fun startButton_hiddenWhenDevicePolicyDisablesAllKeyguardFeatures() =
         testScope.runTest {
-            whenever(
-                devicePolicyManager.getKeyguardDisabledFeatures(null, userTracker.userId)
-            ).thenReturn(DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL)
+            whenever(devicePolicyManager.getKeyguardDisabledFeatures(null, userTracker.userId))
+                .thenReturn(DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_ALL)
             repository.setKeyguardShowing(true)
             val latest by collectLastValue(underTest.startButton)
 
@@ -267,10 +268,10 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
             assertQuickAffordanceViewModel(
                 viewModel = latest,
                 testConfig =
-                TestConfig(
-                    isVisible = false,
-                    slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
-                ),
+                    TestConfig(
+                        isVisible = false,
+                        slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
+                    ),
                 configKey = configKey,
             )
         }
@@ -278,9 +279,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
     @Test
     fun startButton_inPreviewMode_visibleEvenWhenKeyguardNotShowing() =
         testScope.runTest {
-            underTest.onPreviewSlotSelected(
-                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START
-            )
+            underTest.onPreviewSlotSelected(KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START)
             underTest.enablePreviewMode(KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START, true)
 
             repository.setKeyguardShowing(false)
@@ -291,30 +290,30 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 setUpQuickAffordanceModel(
                     position = KeyguardQuickAffordancePosition.BOTTOM_START,
                     testConfig =
-                    TestConfig(
-                        isVisible = true,
-                        isClickable = true,
-                        isActivated = true,
-                        icon = icon,
-                        canShowWhileLocked = false,
-                        intent = Intent("action"),
-                        slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
-                    ),
+                        TestConfig(
+                            isVisible = true,
+                            isClickable = true,
+                            isActivated = true,
+                            icon = icon,
+                            canShowWhileLocked = false,
+                            intent = Intent("action"),
+                            slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
+                        ),
                 )
 
             assertQuickAffordanceViewModel(
                 viewModel = latest(),
                 testConfig =
-                TestConfig(
-                    isVisible = true,
-                    isClickable = false,
-                    isActivated = false,
-                    icon = icon,
-                    canShowWhileLocked = false,
-                    intent = Intent("action"),
-                    isSelected = true,
-                    slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
-                ),
+                    TestConfig(
+                        isVisible = true,
+                        isClickable = false,
+                        isActivated = false,
+                        icon = icon,
+                        canShowWhileLocked = false,
+                        intent = Intent("action"),
+                        isSelected = true,
+                        slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
+                    ),
                 configKey = configKey,
             )
             Truth.assertThat(latest()?.isSelected).isTrue()
@@ -323,9 +322,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
     @Test
     fun endButton_inHiglightedPreviewMode_dimmedWhenOtherIsSelected() =
         testScope.runTest {
-            underTest.onPreviewSlotSelected(
-                KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START
-            )
+            underTest.onPreviewSlotSelected(KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START)
             underTest.enablePreviewMode(KeyguardQuickAffordanceSlots.SLOT_ID_BOTTOM_START, true)
 
             repository.setKeyguardShowing(false)
@@ -335,20 +332,6 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
             setUpQuickAffordanceModel(
                 position = KeyguardQuickAffordancePosition.BOTTOM_START,
                 testConfig =
-                TestConfig(
-                    isVisible = true,
-                    isClickable = true,
-                    isActivated = true,
-                    icon = icon,
-                    canShowWhileLocked = false,
-                    intent = Intent("action"),
-                    slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
-                ),
-            )
-            val configKey =
-                setUpQuickAffordanceModel(
-                    position = KeyguardQuickAffordancePosition.BOTTOM_END,
-                    testConfig =
                     TestConfig(
                         isVisible = true,
                         isClickable = true,
@@ -356,23 +339,37 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                         icon = icon,
                         canShowWhileLocked = false,
                         intent = Intent("action"),
-                        slotId = KeyguardQuickAffordancePosition.BOTTOM_END.toSlotId(),
+                        slotId = KeyguardQuickAffordancePosition.BOTTOM_START.toSlotId(),
                     ),
+            )
+            val configKey =
+                setUpQuickAffordanceModel(
+                    position = KeyguardQuickAffordancePosition.BOTTOM_END,
+                    testConfig =
+                        TestConfig(
+                            isVisible = true,
+                            isClickable = true,
+                            isActivated = true,
+                            icon = icon,
+                            canShowWhileLocked = false,
+                            intent = Intent("action"),
+                            slotId = KeyguardQuickAffordancePosition.BOTTOM_END.toSlotId(),
+                        ),
                 )
 
             assertQuickAffordanceViewModel(
                 viewModel = endButton(),
                 testConfig =
-                TestConfig(
-                    isVisible = true,
-                    isClickable = false,
-                    isActivated = false,
-                    icon = icon,
-                    canShowWhileLocked = false,
-                    intent = Intent("action"),
-                    isDimmed = true,
-                    slotId = KeyguardQuickAffordancePosition.BOTTOM_END.toSlotId(),
-                ),
+                    TestConfig(
+                        isVisible = true,
+                        isClickable = false,
+                        isActivated = false,
+                        icon = icon,
+                        canShowWhileLocked = false,
+                        intent = Intent("action"),
+                        isDimmed = true,
+                        slotId = KeyguardQuickAffordancePosition.BOTTOM_END.toSlotId(),
+                    ),
                 configKey = configKey,
             )
         }
@@ -390,7 +387,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                     icon = mock(),
                     canShowWhileLocked = false,
                     intent =
-                    null, // This will cause it to tell the system that the click was handled.
+                        null, // This will cause it to tell the system that the click was handled.
                     slotId = KeyguardQuickAffordancePosition.BOTTOM_END.toSlotId(),
                 )
             val configKey =
@@ -610,10 +607,10 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 KeyguardQuickAffordanceConfig.LockScreenState.Visible(
                     icon = testConfig.icon ?: error("Icon is unexpectedly null!"),
                     activationState =
-                    when (testConfig.isActivated) {
-                        true -> ActivationState.Active
-                        false -> ActivationState.Inactive
-                    }
+                        when (testConfig.isActivated) {
+                            true -> ActivationState.Active
+                            false -> ActivationState.Inactive
+                        }
                 )
             } else {
                 KeyguardQuickAffordanceConfig.LockScreenState.Hidden
@@ -644,9 +641,7 @@ class KeyguardQuickAffordancesCombinedViewModelTest : SysuiTestCase() {
                 )
             )
             if (testConfig.intent != null) {
-                Truth.assertThat(
-                    Mockito.mockingDetails(activityStarter).invocations
-                ).hasSize(1)
+                Truth.assertThat(Mockito.mockingDetails(activityStarter).invocations).hasSize(1)
             } else {
                 Mockito.verifyZeroInteractions(activityStarter)
             }

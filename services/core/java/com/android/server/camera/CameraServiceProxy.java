@@ -77,6 +77,7 @@ import android.view.WindowManagerGlobal;
 import com.android.framework.protobuf.nano.MessageNano;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.camera.flags.Flags;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
@@ -244,6 +245,7 @@ public class CameraServiceProxy extends SystemService
         public List<CameraStreamStats> mStreamStats;
         public String mUserTag;
         public int mVideoStabilizationMode;
+        public boolean mUsedUltraWide;
         public final long mLogId;
         public final int mSessionIndex;
 
@@ -271,7 +273,8 @@ public class CameraServiceProxy extends SystemService
         public void markCompleted(int internalReconfigure, long requestCount,
                 long resultErrorCount, boolean deviceError,
                 List<CameraStreamStats>  streamStats, String userTag,
-                int videoStabilizationMode, CameraExtensionSessionStats extStats) {
+                int videoStabilizationMode, boolean usedUltraWide,
+                CameraExtensionSessionStats extStats) {
             if (mCompleted) {
                 return;
             }
@@ -284,6 +287,7 @@ public class CameraServiceProxy extends SystemService
             mStreamStats = streamStats;
             mUserTag = userTag;
             mVideoStabilizationMode = videoStabilizationMode;
+            mUsedUltraWide = usedUltraWide;
             mExtSessionStats = extStats;
             if (CameraServiceProxy.DEBUG) {
                 Slog.v(TAG, "A camera facing " + cameraFacingToString(mCameraFacing) +
@@ -873,6 +877,10 @@ public class CameraServiceProxy extends SystemService
                 streamCount = e.mStreamStats.size();
             }
             if (CameraServiceProxy.DEBUG) {
+                String ultrawideDebug = Flags.logUltrawideUsage()
+                        ? ", wideAngleUsage " + e.mUsedUltraWide
+                        : "";
+
                 Slog.v(TAG, "CAMERA_ACTION_EVENT: action " + e.mAction
                         + " clientName " + e.mClientName
                         + ", duration " + e.getDuration()
@@ -889,6 +897,7 @@ public class CameraServiceProxy extends SystemService
                         + ", streamCount is " + streamCount
                         + ", userTag is " + e.mUserTag
                         + ", videoStabilizationMode " + e.mVideoStabilizationMode
+                        + ultrawideDebug
                         + ", logId " + e.mLogId
                         + ", sessionIndex " + e.mSessionIndex
                         + ", mExtSessionStats {type " + extensionType
@@ -952,8 +961,9 @@ public class CameraServiceProxy extends SystemService
                     MessageNano.toByteArray(streamProtos[2]),
                     MessageNano.toByteArray(streamProtos[3]),
                     MessageNano.toByteArray(streamProtos[4]),
-                    e.mUserTag, e.mVideoStabilizationMode, e.mLogId, e.mSessionIndex,
-                    extensionType, extensionIsAdvanced);
+                    e.mUserTag, e.mVideoStabilizationMode,
+                    e.mLogId, e.mSessionIndex,
+                    extensionType, extensionIsAdvanced, e.mUsedUltraWide);
         }
     }
 
@@ -1015,10 +1025,12 @@ public class CameraServiceProxy extends SystemService
             handles.add(id);
         }
 
-        // If the device is running in headless system user mode then allow
-        // User 0 to access camera.
-        if (UserManager.isHeadlessSystemUserMode()) {
-            handles.add(UserHandle.USER_SYSTEM);
+        if (Flags.cameraHsumPermission()) {
+            // If the device is running in headless system user mode then allow
+            // User 0 to access camera.
+            if (UserManager.isHeadlessSystemUserMode()) {
+                handles.add(UserHandle.USER_SYSTEM);
+            }
         }
 
         return handles;
@@ -1148,6 +1160,7 @@ public class CameraServiceProxy extends SystemService
         List<CameraStreamStats> streamStats = cameraState.getStreamStats();
         String userTag = cameraState.getUserTag();
         int videoStabilizationMode = cameraState.getVideoStabilizationMode();
+        boolean usedUltraWide = Flags.logUltrawideUsage() ? cameraState.getUsedUltraWide() : false;
         long logId = cameraState.getLogId();
         int sessionIdx = cameraState.getSessionIndex();
         CameraExtensionSessionStats extSessionStats = cameraState.getExtensionSessionStats();
@@ -1205,7 +1218,7 @@ public class CameraServiceProxy extends SystemService
                         Slog.w(TAG, "Camera " + cameraId + " was already marked as active");
                         oldEvent.markCompleted(/*internalReconfigure*/0, /*requestCount*/0,
                                 /*resultErrorCount*/0, /*deviceError*/false, streamStats,
-                                /*userTag*/"", /*videoStabilizationMode*/-1,
+                                /*userTag*/"", /*videoStabilizationMode*/-1, /*usedUltraWide*/false,
                                 new CameraExtensionSessionStats());
                         mCameraUsageHistory.add(oldEvent);
                     }
@@ -1217,7 +1230,7 @@ public class CameraServiceProxy extends SystemService
 
                         doneEvent.markCompleted(internalReconfigureCount, requestCount,
                                 resultErrorCount, deviceError, streamStats, userTag,
-                                videoStabilizationMode, extSessionStats);
+                                videoStabilizationMode, usedUltraWide, extSessionStats);
                         mCameraUsageHistory.add(doneEvent);
                         // Do not double count device error
                         deviceError = false;

@@ -71,7 +71,6 @@ filegroup {
         ":framework-jobscheduler-sources", // jobscheduler is not a module for R
         ":framework-keystore-sources",
         ":framework-identity-sources",
-        ":framework-location-sources",
         ":framework-mca-effect-sources",
         ":framework-mca-filterfw-sources",
         ":framework-mca-filterpacks-sources",
@@ -164,6 +163,12 @@ java_library {
         //same purpose.
         "//external/robolectric:__subpackages__",
         "//frameworks/layoutlib:__subpackages__",
+
+        // This is for the same purpose as robolectric -- to build "framework.jar" for host-side
+        // testing.
+        // TODO: Once Ravenwood is stable, move the host side jar targets to this directory,
+        // and remove this line.
+        "//frameworks/base/tools/hoststubgen:__subpackages__",
     ],
 }
 
@@ -178,7 +183,6 @@ java_defaults {
             "graphics/java",
             "identity/java",
             "keystore/java",
-            "location/java",
             "media/java",
             "media/mca/effect/java",
             "media/mca/filterfw/java",
@@ -312,7 +316,6 @@ java_defaults {
             ":framework-jobscheduler-sources",
             ":framework-keystore-sources",
             ":framework-identity-sources",
-            ":framework-location-sources",
             ":framework-mca-effect-sources",
             ":framework-mca-filterfw-sources",
             ":framework-mca-filterpacks-sources",
@@ -410,6 +413,7 @@ java_defaults {
     static_libs: [
         "android.hardware.common.fmq-V1-java",
         "bouncycastle-repackaged-unbundled",
+        "com.android.sysprop.foldlockbehavior",
         "framework-internal-utils",
         // If MimeMap ever becomes its own APEX, then this dependency would need to be removed
         // in favor of an API stubs dependency in java_library "framework" below.
@@ -429,6 +433,7 @@ java_defaults {
         "audiopolicy-aidl-java",
         "sounddose-aidl-java",
         "modules-utils-expresslog",
+        "hoststubgen-annotations",
     ],
 }
 
@@ -545,6 +550,7 @@ java_library {
     required: [
         "framework-minus-apex",
         "framework-platform-compat-config",
+        "framework-location-compat-config",
         "services-platform-compat-config",
         "icu4j-platform-compat-config",
         "TeleService-platform-compat-config",
@@ -641,6 +647,7 @@ metalava_framework_docs_args = "" +
     "--api-lint-ignore-prefix org. " +
     "--error NoSettingsProvider " +
     "--error UnhiddenSystemApi " +
+    "--error UnflaggedApi " +
     "--force-convert-to-warning-nullability-annotations +*:-android.*:+android.icu.*:-dalvik.* " +
     "--hide BroadcastBehavior " +
     "--hide CallbackInterface " +

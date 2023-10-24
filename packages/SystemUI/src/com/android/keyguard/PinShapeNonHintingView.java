@@ -40,7 +40,7 @@ import androidx.core.graphics.drawable.DrawableCompat;
 
 import com.android.app.animation.Interpolators;
 import com.android.settingslib.Utils;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 
 /**
  * This class contains implementation for methods that will be used when user has set a
@@ -61,7 +61,7 @@ public class PinShapeNonHintingView extends LinearLayout implements PinShapeInpu
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        if (getChildCount() > 0) {
+        if (getChildCount() > 2) {
             View firstChild = getChildAt(0);
             boolean isVisible = firstChild.getLocalVisibleRect(mFirstChildVisibleRect);
             boolean clipped = mFirstChildVisibleRect.left > 0

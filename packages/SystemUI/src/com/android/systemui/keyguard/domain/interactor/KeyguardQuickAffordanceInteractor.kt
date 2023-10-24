@@ -23,7 +23,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.android.internal.widget.LockPatternUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.animation.DialogLaunchAnimator
 import com.android.systemui.animation.Expandable
 import com.android.systemui.dagger.SysUISingleton
@@ -379,10 +379,6 @@ constructor(
 
     suspend fun getPickerFlags(): List<KeyguardPickerFlag> {
         return listOf(
-            KeyguardPickerFlag(
-                name = Contract.FlagsTable.FLAG_NAME_REVAMPED_WALLPAPER_UI,
-                value = featureFlags.isEnabled(Flags.REVAMPED_WALLPAPER_UI),
-            ),
             KeyguardPickerFlag(
                 name = Contract.FlagsTable.FLAG_NAME_CUSTOM_LOCK_SCREEN_QUICK_AFFORDANCES_ENABLED,
                 value =

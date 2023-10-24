@@ -27,7 +27,7 @@ import androidx.annotation.IdRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
@@ -39,6 +39,7 @@ import com.android.systemui.plugins.qs.QS
 import com.android.systemui.recents.OverviewProxyService
 import com.android.systemui.recents.OverviewProxyService.OverviewProxyListener
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.mockito.capture
 import com.android.systemui.util.mockito.whenever
@@ -99,7 +100,11 @@ class NotificationsQSContainerControllerTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
         fakeSystemClock = FakeSystemClock()
         delayableExecutor = FakeExecutor(fakeSystemClock)
-        featureFlags = FakeFeatureFlags().apply { set(Flags.MIGRATE_NSSL, true) }
+        featureFlags =
+            FakeFeatureFlags().apply {
+                set(Flags.MIGRATE_NSSL, true)
+                set(Flags.QS_CONTAINER_GRAPH_OPTIMIZER, true)
+            }
         mContext.ensureTestableResources()
         whenever(view.context).thenReturn(mContext)
         whenever(view.resources).thenReturn(mContext.resources)
@@ -117,6 +122,7 @@ class NotificationsQSContainerControllerTest : SysuiTestCase() {
                 delayableExecutor,
                 featureFlags,
                 notificationStackScrollLayoutController,
+                ResourcesSplitShadeStateController()
             )
 
         overrideResource(R.dimen.split_shade_notifications_scrim_margin_bottom, SCRIM_MARGIN)
@@ -457,6 +463,7 @@ class NotificationsQSContainerControllerTest : SysuiTestCase() {
                 delayableExecutor,
                 featureFlags,
                 notificationStackScrollLayoutController,
+                ResourcesSplitShadeStateController()
             )
         controller.updateConstraints()
 

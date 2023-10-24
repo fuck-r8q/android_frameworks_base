@@ -19,7 +19,7 @@ package com.android.systemui.keyguard.data.quickaffordance
 
 import android.app.Activity
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.controls.ControlsServiceInfo
 import com.android.systemui.controls.controller.ControlsController
@@ -176,7 +176,7 @@ class HomeControlsKeyguardQuickAffordanceConfigParameterizedStateTest : SysuiTes
                     !isFeatureEnabled ->
                         KeyguardQuickAffordanceConfig.PickerScreenState.UnavailableOnDevice::class
                             .java
-                    hasServiceInfos && hasFavorites ->
+                    hasServiceInfos && (hasFavorites || hasPanels) ->
                         KeyguardQuickAffordanceConfig.PickerScreenState.Default::class.java
                     else -> KeyguardQuickAffordanceConfig.PickerScreenState.Disabled::class.java
                 }

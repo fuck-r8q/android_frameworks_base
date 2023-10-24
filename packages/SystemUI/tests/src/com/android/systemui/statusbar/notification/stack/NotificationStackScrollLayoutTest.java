@@ -65,7 +65,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.keyguard.BouncerPanelExpansionCalculator;
 import com.android.systemui.ExpandHelper;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
@@ -87,6 +87,7 @@ import com.android.systemui.statusbar.notification.row.FooterView;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
+import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -153,6 +154,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         assertFalse(Flags.NSSL_DEBUG_REMOVE_ANIMATION.getDefault());
         mFeatureFlags.set(Flags.NSSL_DEBUG_LINES, false);
         mFeatureFlags.set(Flags.NSSL_DEBUG_REMOVE_ANIMATION, false);
+        mFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false);
 
         // Register the feature flags we use
         // TODO: Ideally we wouldn't need to set these unless a test actually reads them,
@@ -161,6 +163,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         mFeatureFlags.setDefault(Flags.SENSITIVE_REVEAL_ANIM);
         mFeatureFlags.setDefault(Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
         mFeatureFlags.setDefault(Flags.NOTIFICATION_SHELF_REFACTOR);
+        mFeatureFlags.setDefault(Flags.NEW_AOD_TRANSITION);
 
         // Inject dependencies before initializing the layout
         mDependency.injectTestDependency(FeatureFlags.class, mFeatureFlags);
@@ -245,25 +248,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    public void testUpdateStackHeight_withDozeAmount_whenDozeChanging() {
-        final float dozeAmount = 0.5f;
-        mAmbientState.setDozeAmount(dozeAmount);
-
-        final float endHeight = 8f;
-        final float expansionFraction = 1f;
-        float expected = MathUtils.lerp(
-                endHeight * StackScrollAlgorithm.START_FRACTION,
-                endHeight, dozeAmount);
-
-        mStackScroller.updateStackHeight(endHeight, expansionFraction);
-        assertThat(mAmbientState.getStackHeight()).isEqualTo(expected);
-    }
-
-    @Test
     public void testUpdateStackHeight_withExpansionAmount_whenDozeNotChanging() {
-        final float dozeAmount = 1f;
-        mAmbientState.setDozeAmount(dozeAmount);
-
         final float endHeight = 8f;
         final float expansionFraction = 0.5f;
         final float expected = MathUtils.lerp(
@@ -317,26 +302,6 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         clearInvocations(mAmbientState);
         mStackScroller.setPanelFlinging(false);
         verify(mAmbientState).setFlinging(eq(false));
-        verify(mAmbientState).setStackEndHeight(anyFloat());
-        verify(mAmbientState).setStackHeight(anyFloat());
-    }
-
-    @Test
-    public void setUnlockHintRunning_updatesStackEndHeightOnlyOnFinish() {
-        final float expansionFraction = 0.5f;
-        mAmbientState.setStatusBarState(StatusBarState.KEYGUARD);
-        mStackScroller.setUnlockHintRunning(true);
-
-        // Validate that when the animation is running, we update only the stackHeight
-        clearInvocations(mAmbientState);
-        mStackScroller.updateStackEndHeightAndStackHeight(expansionFraction);
-        verify(mAmbientState, never()).setStackEndHeight(anyFloat());
-        verify(mAmbientState).setStackHeight(anyFloat());
-
-        // Validate that when the animation ends the stackEndHeight is recalculated immediately
-        clearInvocations(mAmbientState);
-        mStackScroller.setUnlockHintRunning(false);
-        verify(mAmbientState).setUnlockHintRunning(eq(false));
         verify(mAmbientState).setStackEndHeight(anyFloat());
         verify(mAmbientState).setStackHeight(anyFloat());
     }
@@ -865,6 +830,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     public void testSplitShade_hasTopOverscroll() {
         mTestableResources
                 .addOverride(R.bool.config_use_split_notification_shade, /* value= */ true);
+        mStackScroller.passSplitShadeStateController(new ResourcesSplitShadeStateController());
         mStackScroller.updateSplitNotificationShade();
         mAmbientState.setExpansionFraction(1f);
 
@@ -880,6 +846,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     public void testNormalShade_hasNoTopOverscroll() {
         mTestableResources
                 .addOverride(R.bool.config_use_split_notification_shade, /* value= */ false);
+        mStackScroller.passSplitShadeStateController(new ResourcesSplitShadeStateController());
         mStackScroller.updateSplitNotificationShade();
         mAmbientState.setExpansionFraction(1f);
 

@@ -18,7 +18,9 @@ package com.android.systemui.bouncer.ui.viewmodel
 
 import android.content.Context
 import com.android.keyguard.PinShapeAdapter
+import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
+import com.android.systemui.res.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,16 +28,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 
 /** Holds UI state and handles user input for the PIN code bouncer UI. */
 class PinBouncerViewModel(
     applicationContext: Context,
-    private val applicationScope: CoroutineScope,
-    private val interactor: BouncerInteractor,
+    viewModelScope: CoroutineScope,
+    interactor: BouncerInteractor,
     isInputEnabled: StateFlow<Boolean>,
 ) :
     AuthMethodBouncerViewModel(
+        viewModelScope = viewModelScope,
+        interactor = interactor,
         isInputEnabled = isInputEnabled,
     ) {
 
@@ -60,7 +63,7 @@ class PinBouncerViewModel(
                 )
             }
             .stateIn(
-                scope = applicationScope,
+                scope = viewModelScope,
                 // Make sure this is kept as WhileSubscribed or we can run into a bug where the
                 // downstream continues to receive old/stale/cached values.
                 started = SharingStarted.WhileSubscribed(),
@@ -70,23 +73,16 @@ class PinBouncerViewModel(
     /** Appearance of the confirm button. */
     val confirmButtonAppearance: StateFlow<ActionButtonAppearance> =
         interactor.isAutoConfirmEnabled
-            .map {
-                if (it) {
-                    ActionButtonAppearance.Hidden
-                } else {
-                    ActionButtonAppearance.Shown
-                }
-            }
+            .map { if (it) ActionButtonAppearance.Hidden else ActionButtonAppearance.Shown }
             .stateIn(
-                scope = applicationScope,
+                scope = viewModelScope,
                 started = SharingStarted.Eagerly,
                 initialValue = ActionButtonAppearance.Hidden,
             )
 
-    /** Notifies that the UI has been shown to the user. */
-    fun onShown() {
-        interactor.resetMessage()
-    }
+    override val authenticationMethod = AuthenticationMethodModel.Pin
+
+    override val throttlingMessageId = R.string.kg_too_many_failed_pin_attempts_dialog_message
 
     /** Notifies that the user clicked on a PIN button with the given digit value. */
     fun onPinButtonClicked(input: Int) {
@@ -94,6 +90,8 @@ class PinBouncerViewModel(
         if (pinInput.isEmpty()) {
             interactor.clearMessage()
         }
+
+        interactor.onIntentionalUserInput()
 
         mutablePinInput.value = pinInput.append(input)
         tryAuthenticate(useAutoConfirm = true)
@@ -106,7 +104,8 @@ class PinBouncerViewModel(
 
     /** Notifies that the user long-pressed the backspace button. */
     fun onBackspaceButtonLongPressed() {
-        mutablePinInput.value = mutablePinInput.value.clearAll()
+        clearInput()
+        interactor.clearMessage()
     }
 
     /** Notifies that the user clicked the "enter" button. */
@@ -114,20 +113,12 @@ class PinBouncerViewModel(
         tryAuthenticate(useAutoConfirm = false)
     }
 
-    private fun tryAuthenticate(useAutoConfirm: Boolean) {
-        val pinCode = mutablePinInput.value.getPin()
+    override fun clearInput() {
+        mutablePinInput.value = mutablePinInput.value.clearAll()
+    }
 
-        applicationScope.launch {
-            val isSuccess = interactor.authenticate(pinCode, useAutoConfirm) ?: return@launch
-
-            if (!isSuccess) {
-                showFailureAnimation()
-            }
-
-            // TODO(b/291528545): this should not be cleared on success (at least until the view
-            // is animated away).
-            mutablePinInput.value = mutablePinInput.value.clearAll()
-        }
+    override fun getInput(): List<Any> {
+        return mutablePinInput.value.getPin()
     }
 
     private fun computeBackspaceButtonAppearance(
@@ -148,8 +139,10 @@ class PinBouncerViewModel(
 enum class ActionButtonAppearance {
     /** Button must not be shown. */
     Hidden,
+
     /** Button is shown, but with no background to make it less prominent. */
     Subtle,
+
     /** Button is shown. */
     Shown,
 }

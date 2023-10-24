@@ -2510,6 +2510,14 @@ public class WindowManagerService extends IWindowManager.Stub
                 outInsetsState.set(win.getCompatInsetsState(), true /* copySources */);
             }
 
+            // TODO (b/298562855): Remove this after identifying the reason why the frame is empty.
+            if (win.mAttrs.providedInsets != null && win.getFrame().isEmpty()) {
+                Slog.w(TAG, "Empty frame of " + win
+                        + " configChanged=" + configChanged
+                        + " frame=" + win.getFrame().toShortString()
+                        + " attrs=" + attrs);
+            }
+
             ProtoLog.v(WM_DEBUG_FOCUS, "Relayout of %s: focusMayChange=%b",
                     win, focusMayChange);
 
@@ -4306,8 +4314,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public void freezeRotation(int rotation) {
-        freezeDisplayRotation(Display.DEFAULT_DISPLAY, rotation);
+    public void freezeRotation(int rotation, String caller) {
+        freezeDisplayRotation(Display.DEFAULT_DISPLAY, rotation, caller);
     }
 
     /**
@@ -4317,7 +4325,7 @@ public class WindowManagerService extends IWindowManager.Stub
      * @param rotation The desired rotation to freeze to, or -1 to use the current rotation.
      */
     @Override
-    public void freezeDisplayRotation(int displayId, int rotation) {
+    public void freezeDisplayRotation(int displayId, int rotation, String caller) {
         // TODO(multi-display): Track which display is rotated.
         if (!checkCallingPermission(android.Manifest.permission.SET_ORIENTATION,
                 "freezeRotation()")) {
@@ -4327,6 +4335,9 @@ public class WindowManagerService extends IWindowManager.Stub
             throw new IllegalArgumentException("Rotation argument must be -1 or a valid "
                     + "rotation constant.");
         }
+        ProtoLog.v(WM_DEBUG_ORIENTATION,
+                "freezeDisplayRotation: current rotation=%d, new rotation=%d, caller=%s",
+                getDefaultDisplayRotation(), rotation, caller);
 
         final long origId = Binder.clearCallingIdentity();
         try {
@@ -4336,7 +4347,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     Slog.w(TAG, "Trying to freeze rotation for a missing display.");
                     return;
                 }
-                display.getDisplayRotation().freezeRotation(rotation);
+                display.getDisplayRotation().freezeRotation(rotation, caller);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -4346,8 +4357,8 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public void thawRotation() {
-        thawDisplayRotation(Display.DEFAULT_DISPLAY);
+    public void thawRotation(String caller) {
+        thawDisplayRotation(Display.DEFAULT_DISPLAY, caller);
     }
 
     /**
@@ -4355,13 +4366,14 @@ public class WindowManagerService extends IWindowManager.Stub
      * Persists across reboots.
      */
     @Override
-    public void thawDisplayRotation(int displayId) {
+    public void thawDisplayRotation(int displayId, String caller) {
         if (!checkCallingPermission(android.Manifest.permission.SET_ORIENTATION,
                 "thawRotation()")) {
             throw new SecurityException("Requires SET_ORIENTATION permission");
         }
 
-        ProtoLog.v(WM_DEBUG_ORIENTATION, "thawRotation: mRotation=%d", getDefaultDisplayRotation());
+        ProtoLog.v(WM_DEBUG_ORIENTATION, "thawRotation: mRotation=%d, caller=%s",
+                getDefaultDisplayRotation(), caller);
 
         final long origId = Binder.clearCallingIdentity();
         try {
@@ -4371,7 +4383,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     Slog.w(TAG, "Trying to thaw rotation for a missing display.");
                     return;
                 }
-                display.getDisplayRotation().thawRotation();
+                display.getDisplayRotation().thawRotation(caller);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -5262,16 +5274,17 @@ public class WindowManagerService extends IWindowManager.Stub
             applyForcedPropertiesForDefaultDisplay();
             mAnimator.ready();
             mDisplayReady = true;
-            // Reconfigure all displays to make sure that forced properties and
-            // DisplayWindowSettings are applied.
-            mRoot.forAllDisplays(DisplayContent::reconfigureDisplayLocked);
+            mHasWideColorGamutSupport = queryWideColorGamutSupport();
+            mHasHdrSupport = queryHdrSupport();
             mIsTouchDevice = mContext.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_TOUCHSCREEN);
             mIsFakeTouchDevice = mContext.getPackageManager().hasSystemFeature(
                     PackageManager.FEATURE_FAKETOUCH);
+            // Reconfigure all displays to make sure that the forced properties and
+            // DisplayWindowSettings are applied. In addition, wide-color/hdr/isTouchDevice also
+            // affect the Configuration.
+            mRoot.forAllDisplays(DisplayContent::reconfigureDisplayLocked);
         }
-
-        mAtmService.updateConfiguration(null /* request to compute config */);
     }
 
     public void systemReady() {
@@ -5279,8 +5292,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mPolicy.systemReady();
         mRoot.forAllDisplayPolicies(DisplayPolicy::systemReady);
         mSnapshotController.systemReady();
-        mHasWideColorGamutSupport = queryWideColorGamutSupport();
-        mHasHdrSupport = queryHdrSupport();
         UiThread.getHandler().post(mSettingsObserver::loadSettings);
         IVrManager vrManager = IVrManager.Stub.asInterface(
                 ServiceManager.getService(Context.VR_SERVICE));
@@ -6225,7 +6236,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mScreenFrozenLock.acquire();
         // Apply launch power mode to reduce screen frozen time because orientation change may
         // relaunch activity and redraw windows. This may also help speed up user switching.
-        mAtmService.startLaunchPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
+        mAtmService.startPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
 
         mDisplayFrozen = true;
         mDisplayFreezeTime = SystemClock.elapsedRealtime();
@@ -6373,7 +6384,7 @@ public class WindowManagerService extends IWindowManager.Stub
         if (configChanged) {
             displayContent.sendNewConfiguration();
         }
-        mAtmService.endLaunchPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
+        mAtmService.endPowerMode(POWER_MODE_REASON_CHANGE_DISPLAY);
         mLatencyTracker.onActionEnd(ACTION_ROTATE_SCREEN);
         if (mPerf != null) {
             mPerf.perfLockRelease();
@@ -8446,6 +8457,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
             }
             return null;
+        }
+
+        @Override
+        public boolean hasNavigationBar(int displayId) {
+            return WindowManagerService.this.hasNavigationBar(displayId);
         }
 
         @Override

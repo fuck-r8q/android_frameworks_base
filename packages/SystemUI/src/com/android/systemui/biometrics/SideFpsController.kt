@@ -54,7 +54,7 @@ import com.android.app.animation.Interpolators
 import com.android.internal.annotations.VisibleForTesting
 import com.android.keyguard.KeyguardPINView
 import com.android.systemui.Dumpable
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.biometrics.domain.interactor.DisplayStateInteractor
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.dagger.SysUISingleton
@@ -446,7 +446,9 @@ private fun LottieAnimationView.addOverlayDynamicColor(
             for (key in listOf(".blue600", ".blue400")) {
                 addValueCallback(KeyPath(key, "**"), LottieProperty.COLOR_FILTER) {
                     PorterDuffColorFilter(
-                        context.getColor(com.android.settingslib.R.color.settingslib_color_blue400),
+                        context.getColor(
+                            com.android.settingslib.color.R.color.settingslib_color_blue400
+                        ),
                         PorterDuff.Mode.SRC_ATOP
                     )
                 }

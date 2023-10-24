@@ -144,7 +144,6 @@ object KeyguardBouncerViewBinder {
                                     )
                                 }
                             } else {
-                                bouncerMessageInteractor.onBouncerBeingHidden()
                                 securityContainerController.onBouncerVisibilityChanged(
                                     /* isVisible= */ false
                                 )
@@ -221,7 +220,6 @@ object KeyguardBouncerViewBinder {
                     launch {
                         viewModel.keyguardAuthenticated.collect {
                             securityContainerController.finish(
-                                it,
                                 KeyguardUpdateMonitor.getCurrentUser()
                             )
                             viewModel.notifyKeyguardAuthenticated()

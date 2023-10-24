@@ -23,6 +23,7 @@ import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_CL
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.animation.Animator;
+import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.annotation.Nullable;
 import android.content.res.Configuration;
@@ -49,14 +50,14 @@ import com.android.internal.jank.InteractionJankMonitor;
 import com.android.keyguard.KeyguardClockSwitch.ClockSize;
 import com.android.keyguard.logging.KeyguardLogger;
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
-import com.android.systemui.keyguard.shared.model.ScreenModel;
-import com.android.systemui.keyguard.shared.model.ScreenState;
+import com.android.systemui.power.shared.model.ScreenPowerState;
 import com.android.systemui.plugins.ClockController;
+import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.statusbar.notification.AnimatableProperty;
 import com.android.systemui.statusbar.notification.PropertyAnimator;
 import com.android.systemui.statusbar.notification.stack.AnimationProperties;
@@ -67,12 +68,12 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.ViewController;
 
-import kotlin.coroutines.CoroutineContext;
-import kotlin.coroutines.EmptyCoroutineContext;
-
 import java.io.PrintWriter;
 
 import javax.inject.Inject;
+
+import kotlin.coroutines.CoroutineContext;
+import kotlin.coroutines.EmptyCoroutineContext;
 
 /**
  * Injectable controller for {@link KeyguardStatusView}.
@@ -100,7 +101,9 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
     private final InteractionJankMonitor mInteractionJankMonitor;
     private final Rect mClipBounds = new Rect();
     private final KeyguardInteractor mKeyguardInteractor;
+    private final PowerInteractor mPowerInteractor;
 
+    private Boolean mSplitShadeEnabled = false;
     private Boolean mStatusViewCentered = true;
 
     private DumpManager mDumpManager;
@@ -132,7 +135,8 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
             FeatureFlags featureFlags,
             InteractionJankMonitor interactionJankMonitor,
             KeyguardInteractor keyguardInteractor,
-            DumpManager dumpManager) {
+            DumpManager dumpManager,
+            PowerInteractor powerInteractor) {
         super(keyguardStatusView);
         mKeyguardSliceViewController = keyguardSliceViewController;
         mKeyguardClockSwitchController = keyguardClockSwitchController;
@@ -145,11 +149,54 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
         mFeatureFlags = featureFlags;
         mDumpManager = dumpManager;
         mKeyguardInteractor = keyguardInteractor;
+        mPowerInteractor = powerInteractor;
     }
 
     @Override
     public void onInit() {
         mKeyguardClockSwitchController.init();
+        final View mediaHostContainer = mView.findViewById(R.id.status_view_media_container);
+        if (mediaHostContainer != null) {
+            mKeyguardClockSwitchController.getView().addOnLayoutChangeListener(
+                    (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                        if (!mSplitShadeEnabled
+                                || mKeyguardClockSwitchController.getView().getSplitShadeCentered()
+                                // Note: isKeyguardVisible() returns false after Launcher -> AOD.
+                                || !mKeyguardUpdateMonitor.isKeyguardVisible()) {
+                            return;
+                        }
+
+                        int oldHeight = oldBottom - oldTop;
+                        if (v.getHeight() == oldHeight) return;
+
+                        if (mediaHostContainer.getVisibility() != View.VISIBLE
+                                // If the media is appearing, also don't do the transition.
+                                || mediaHostContainer.getHeight() == 0) {
+                            return;
+                        }
+
+                        final LayoutTransition mediaLayoutTransition =
+                                ((ViewGroup) mediaHostContainer).getLayoutTransition();
+                        if (mediaLayoutTransition == null) return;
+
+                        mediaLayoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+                    });
+
+            mediaHostContainer.addOnLayoutChangeListener(
+                    (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                        final LayoutTransition mediaLayoutTransition =
+                                ((ViewGroup) mediaHostContainer).getLayoutTransition();
+                        if (mediaLayoutTransition == null) return;
+                        if (!mediaLayoutTransition.isTransitionTypeEnabled(
+                                LayoutTransition.CHANGING)) {
+                            return;
+                        }
+                        // Note: when this is called, the LayoutTransition is already been set up.
+                        // Disables the LayoutTransition until it's explicitly enabled again.
+                        mediaLayoutTransition.disableTransitionType(LayoutTransition.CHANGING);
+                    }
+            );
+        }
 
         mDumpManager.registerDumpable(getInstanceName(), this);
         if (mFeatureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)) {
@@ -163,9 +210,9 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
                         dozeTimeTick();
                 }, context);
 
-        collectFlow(mView, mKeyguardInteractor.getScreenModel(),
-                (ScreenModel model) -> {
-                    if (model.getState() == ScreenState.SCREEN_TURNING_ON) {
+        collectFlow(mView, mPowerInteractor.getScreenPowerState(),
+                (ScreenPowerState powerState) -> {
+                    if (powerState == ScreenPowerState.SCREEN_TURNING_ON) {
                         dozeTimeTick();
                     }
                 }, context);
@@ -385,6 +432,7 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
      */
     public void setSplitShadeEnabled(boolean enabled) {
         mKeyguardClockSwitchController.setSplitShadeEnabled(enabled);
+        mSplitShadeEnabled = enabled;
     }
 
     /**
@@ -502,6 +550,10 @@ public class KeyguardStatusViewController extends ViewController<KeyguardStatusV
         }
 
         constraintSet.applyTo(layout);
+    }
+
+    public ClockController getClockController() {
+        return mKeyguardClockSwitchController.getClock();
     }
 
     @Override

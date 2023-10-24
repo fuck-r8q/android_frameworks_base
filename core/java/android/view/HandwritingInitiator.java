@@ -24,6 +24,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -80,6 +81,10 @@ public class HandwritingInitiator {
      */
     private int mConnectionCount = 0;
     private final InputMethodManager mImm;
+
+    private final int[] mTempLocation = new int[2];
+
+    private final Rect mTempRect = new Rect();
 
     private final RectF mTempRectF = new RectF();
 
@@ -401,8 +406,9 @@ public class HandwritingInitiator {
 
             final View cachedHoverTarget = getCachedHoverTarget();
             if (cachedHoverTarget != null) {
-                final Rect handwritingArea = getViewHandwritingArea(cachedHoverTarget);
-                if (isInHandwritingArea(handwritingArea, hoverX, hoverY, cachedHoverTarget,
+                final Rect handwritingArea = mTempRect;
+                if (getViewHandwritingArea(cachedHoverTarget, handwritingArea)
+                        && isInHandwritingArea(handwritingArea, hoverX, hoverY, cachedHoverTarget,
                         /* isHover */ true)
                         && shouldTriggerStylusHandwritingForView(cachedHoverTarget)) {
                     return cachedHoverTarget;
@@ -421,7 +427,19 @@ public class HandwritingInitiator {
         return null;
     }
 
-    private static void requestFocusWithoutReveal(View view) {
+    private void requestFocusWithoutReveal(View view) {
+        if (view instanceof EditText editText && !mState.mStylusDownWithinEditorBounds) {
+            // If the stylus down point was inside the EditText's bounds, then the EditText will
+            // automatically set its cursor position nearest to the stylus down point when it
+            // gains focus. If the stylus down point was outside the EditText's bounds (within
+            // the extended handwriting bounds), then we must calculate and set the cursor
+            // position manually.
+            view.getLocationInWindow(mTempLocation);
+            int offset = editText.getOffsetForPosition(
+                    mState.mStylusDownX - mTempLocation[0],
+                    mState.mStylusDownY - mTempLocation[1]);
+            editText.setSelection(offset);
+        }
         if (view.getRevealOnFocusHint()) {
             view.setRevealOnFocusHint(false);
             view.requestFocus();
@@ -445,9 +463,14 @@ public class HandwritingInitiator {
         // directly return the connectedView.
         final View connectedView = getConnectedView();
         if (connectedView != null) {
-            Rect handwritingArea = getViewHandwritingArea(connectedView);
-            if (isInHandwritingArea(handwritingArea, x, y, connectedView, isHover)
+            Rect handwritingArea = mTempRect;
+            if (getViewHandwritingArea(connectedView, handwritingArea)
+                    && isInHandwritingArea(handwritingArea, x, y, connectedView, isHover)
                     && shouldTriggerStylusHandwritingForView(connectedView)) {
+                if (!isHover && mState != null) {
+                    mState.mStylusDownWithinEditorBounds =
+                            contains(handwritingArea, x, y, 0f, 0f, 0f, 0f);
+                }
                 return connectedView;
             }
         }
@@ -466,7 +489,12 @@ public class HandwritingInitiator {
             }
 
             final float distance = distance(handwritingArea, x, y);
-            if (distance == 0f) return view;
+            if (distance == 0f) {
+                if (!isHover && mState != null) {
+                    mState.mStylusDownWithinEditorBounds = true;
+                }
+                return view;
+            }
             if (distance < minDistance) {
                 minDistance = distance;
                 bestCandidate = view;
@@ -528,28 +556,30 @@ public class HandwritingInitiator {
     /**
      * Return the handwriting area of the given view, represented in the window's coordinate.
      * If the view didn't set any handwriting area, it will return the view's boundary.
-     * It will return null if the view or its handwriting area is not visible.
      *
-     * The handwriting area is clipped to its visible part.
+     * <p> The handwriting area is clipped to its visible part.
      * Notice that the returned rectangle is the view's original handwriting area without the
-     * view's handwriting area extends.
+     * view's handwriting area extends. </p>
+     *
+     * @param view the {@link View} whose handwriting area we want to compute.
+     * @param rect the {@link Rect} to receive the result.
+     *
+     * @return true if the view's handwriting area is still visible, or false if it's clipped and
+     * fully invisible. This method only consider the clip by given view's parents, but not the case
+     * where a view is covered by its sibling view.
      */
-    @Nullable
-    private static Rect getViewHandwritingArea(@NonNull View view) {
+    private static boolean getViewHandwritingArea(@NonNull View view, @NonNull Rect rect) {
         final ViewParent viewParent = view.getParent();
         if (viewParent != null && view.isAttachedToWindow() && view.isAggregatedVisible()) {
             final Rect localHandwritingArea = view.getHandwritingArea();
-            final Rect globalHandwritingArea = new Rect();
             if (localHandwritingArea != null) {
-                globalHandwritingArea.set(localHandwritingArea);
+                rect.set(localHandwritingArea);
             } else {
-                globalHandwritingArea.set(0, 0, view.getWidth(), view.getHeight());
+                rect.set(0, 0, view.getWidth(), view.getHeight());
             }
-            if (viewParent.getChildVisibleRect(view, globalHandwritingArea, null)) {
-                return globalHandwritingArea;
-            }
+            return viewParent.getChildVisibleRect(view, rect, null);
         }
-        return null;
+        return false;
     }
 
     /**
@@ -645,6 +675,12 @@ public class HandwritingInitiator {
          * built InputConnection.
          */
         private boolean mExceedHandwritingSlop;
+
+        /**
+         * Whether the stylus down point of the MotionEvent sequence was within the editor's bounds
+         * (not including the extended handwriting bounds).
+         */
+        private boolean mStylusDownWithinEditorBounds;
 
         /**
          * A view which has requested focus and is pending input connection creation. When an input

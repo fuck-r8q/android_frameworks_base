@@ -24,6 +24,7 @@ import static android.content.Context.DEVICE_ID_DEFAULT;
 import static android.content.Context.DEVICE_ID_INVALID;
 import static android.content.Intent.ACTION_VIEW;
 import static android.content.pm.ActivityInfo.FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES;
+import static android.content.pm.PackageManager.ACTION_REQUEST_PERMISSIONS;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -57,6 +58,7 @@ import android.companion.virtual.IVirtualDeviceSoundEffectListener;
 import android.companion.virtual.VirtualDeviceParams;
 import android.companion.virtual.audio.IAudioConfigChangedCallback;
 import android.companion.virtual.audio.IAudioRoutingCallback;
+import android.companion.virtual.flags.Flags;
 import android.companion.virtual.sensor.IVirtualSensorCallback;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.companion.virtual.sensor.VirtualSensorCallback;
@@ -69,6 +71,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.DisplayManagerInternal;
@@ -100,6 +103,7 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.os.WorkSource;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.util.ArraySet;
@@ -114,6 +118,7 @@ import com.android.compatibility.common.util.AdoptShellPermissionsRule;
 import com.android.internal.app.BlockedAppStreamingActivity;
 import com.android.internal.os.BackgroundThread;
 import com.android.server.LocalServices;
+import com.android.server.companion.virtual.camera.VirtualCameraController;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.sensors.SensorManagerInternal;
 
@@ -129,7 +134,6 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -210,6 +214,9 @@ public class VirtualDeviceManagerServiceTest {
                     .setAssociatedDisplayId(DISPLAY_ID_1)
                     .build();
     private static final String TEST_SITE = "http://test";
+
+    @Rule
+    public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     @Rule
     public AdoptShellPermissionsRule mAdoptShellPermissionsRule = new AdoptShellPermissionsRule(
@@ -296,29 +303,30 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 NONBLOCKED_APP_PACKAGE_NAME,
                 NONBLOCKED_APP_PACKAGE_NAME,
-                /* displayOnRemoveDevices= */ true,
+                /* displayOnRemoteDevices= */ true,
                 targetDisplayCategory);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
         return blockedAppIntent;
     }
 
 
-    private ArrayList<ActivityInfo> getActivityInfoList(
-            String packageName, String name, boolean displayOnRemoveDevices,
+    private ActivityInfo getActivityInfo(
+            String packageName, String name, boolean displayOnRemoteDevices,
             String requiredDisplayCategory) {
         ActivityInfo activityInfo = new ActivityInfo();
         activityInfo.packageName = packageName;
         activityInfo.name = name;
-        activityInfo.flags = displayOnRemoveDevices
+        activityInfo.flags = displayOnRemoteDevices
                 ? FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES : FLAG_CANNOT_DISPLAY_ON_REMOTE_DEVICES;
         activityInfo.applicationInfo = mApplicationInfoMock;
         activityInfo.requiredDisplayCategory = requiredDisplayCategory;
-        return new ArrayList<>(Arrays.asList(activityInfo));
+        return activityInfo;
     }
 
     @Before
@@ -327,6 +335,11 @@ public class VirtualDeviceManagerServiceTest {
 
         LocalServices.removeServiceForTest(DisplayManagerInternal.class);
         LocalServices.addService(DisplayManagerInternal.class, mDisplayManagerInternalMock);
+
+        mSetFlagsRule.disableFlags(Flags.FLAG_VDM_PUBLIC_APIS);
+        mSetFlagsRule.disableFlags(Flags.FLAG_DYNAMIC_POLICY);
+        mSetFlagsRule.disableFlags(Flags.FLAG_STREAM_PERMISSIONS);
+        mSetFlagsRule.disableFlags(Flags.FLAG_VDM_CUSTOM_HOME);
 
         doReturn(true).when(mInputManagerInternalMock).setVirtualMousePointerDisplayId(anyInt());
         doNothing().when(mInputManagerInternalMock).setPointerAcceleration(anyFloat(), anyInt());
@@ -1414,14 +1427,15 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 NONBLOCKED_APP_PACKAGE_NAME,
                 NONBLOCKED_APP_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext, never()).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1434,14 +1448,59 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 PERMISSION_CONTROLLER_PACKAGE_NAME,
                 PERMISSION_CONTROLLER_PACKAGE_NAME,
-                /* displayOnRemoveDevices */  false,
+                /* displayOnRemoteDevices */  false,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
+
+        verify(mContext).startActivityAsUser(argThat(intent ->
+                intent.filterEquals(blockedAppIntent)), any(), any());
+    }
+
+    @Test
+    public void openPermissionControllerOnVirtualDisplay_displayOnRemoteDevices_startsWhenFlagIsEnabled() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_STREAM_PERMISSIONS);
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
+                DISPLAY_ID_1);
+        doNothing().when(mContext).startActivityAsUser(any(), any(), any());
+
+        ActivityInfo activityInfo = getActivityInfo(
+                PERMISSION_CONTROLLER_PACKAGE_NAME,
+                PERMISSION_CONTROLLER_PACKAGE_NAME,
+                /* displayOnRemoveDevices */ true,
+                /* targetDisplayCategory */ null);
+        Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
+
+        verify(mContext, never()).startActivityAsUser(argThat(intent ->
+                intent.filterEquals(blockedAppIntent)), any(), any());
+    }
+
+    @Test
+    public void openPermissionControllerOnVirtualDisplay_dontDisplayOnRemoteDevices_startsWhenFlagIsEnabled() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_STREAM_PERMISSIONS);
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
+                DISPLAY_ID_1);
+        doNothing().when(mContext).startActivityAsUser(any(), any(), any());
+
+        ActivityInfo activityInfo = getActivityInfo(
+                PERMISSION_CONTROLLER_PACKAGE_NAME,
+                PERMISSION_CONTROLLER_PACKAGE_NAME,
+                /* displayOnRemoveDevices */ false,
+                /* targetDisplayCategory */ null);
+        Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1454,14 +1513,15 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 SETTINGS_PACKAGE_NAME,
                 SETTINGS_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1474,14 +1534,15 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 VENDING_PACKAGE_NAME,
                 VENDING_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1494,14 +1555,15 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 GOOGLE_DIALER_PACKAGE_NAME,
                 GOOGLE_DIALER_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1514,14 +1576,15 @@ public class VirtualDeviceManagerServiceTest {
                 DISPLAY_ID_1);
         doNothing().when(mContext).startActivityAsUser(any(), any(), any());
 
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 GOOGLE_MAPS_PACKAGE_NAME,
                 GOOGLE_MAPS_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
         Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
-                activityInfos.get(0), mAssociationInfo.getDisplayName());
-        gwpc.canContainActivities(activityInfos, WindowConfiguration.WINDOWING_MODE_FULLSCREEN);
+                activityInfo, mAssociationInfo.getDisplayName());
+        gwpc.canActivityBeLaunched(activityInfo, blockedAppIntent,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false);
 
         verify(mContext).startActivityAsUser(argThat(intent ->
                 intent.filterEquals(blockedAppIntent)), any(), any());
@@ -1556,17 +1619,65 @@ public class VirtualDeviceManagerServiceTest {
     }
 
     @Test
+    public void canActivityBeLaunched_permissionDialog_flagDisabled_isBlocked() {
+        mSetFlagsRule.disableFlags(Flags.FLAG_STREAM_PERMISSIONS);
+        VirtualDeviceParams params = new VirtualDeviceParams.Builder().build();
+        mDeviceImpl.close();
+        mDeviceImpl = createVirtualDevice(VIRTUAL_DEVICE_ID_1, DEVICE_OWNER_UID_1, params);
+        doNothing().when(mContext).startActivityAsUser(any(), any(), any());
+
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
+                DISPLAY_ID_1);
+        ComponentName permissionComponent = getPermissionDialogComponent();
+        ActivityInfo activityInfo = getActivityInfo(
+                permissionComponent.getPackageName(),
+                permissionComponent.getClassName(),
+                /* displayOnRemoteDevices */ true,
+                /* targetDisplayCategory */ null);
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, null,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
+                .isFalse();
+
+        Intent blockedAppIntent = BlockedAppStreamingActivity.createIntent(
+                activityInfo, mAssociationInfo.getDisplayName());
+        verify(mContext).startActivityAsUser(argThat(intent ->
+                intent.filterEquals(blockedAppIntent)), any(), any());
+    }
+
+    @Test
+    public void canActivityBeLaunched_permissionDialog_flagEnabled_isStreamed() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_STREAM_PERMISSIONS);
+        VirtualDeviceParams params = new VirtualDeviceParams.Builder().build();
+        mDeviceImpl.close();
+        mDeviceImpl = createVirtualDevice(VIRTUAL_DEVICE_ID_1, DEVICE_OWNER_UID_1, params);
+
+        addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
+        GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
+                DISPLAY_ID_1);
+        ComponentName permissionComponent = getPermissionDialogComponent();
+        ActivityInfo activityInfo = getActivityInfo(
+                permissionComponent.getPackageName(),
+                permissionComponent.getClassName(),
+                /* displayOnRemoteDevices */ true,
+                /* targetDisplayCategory */ null);
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, null,
+                WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
+                .isTrue();
+    }
+
+    @Test
     public void canActivityBeLaunched_activityCanLaunch() {
         Intent intent = new Intent(ACTION_VIEW, Uri.parse(TEST_SITE));
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
                 DISPLAY_ID_1);
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 NONBLOCKED_APP_PACKAGE_NAME,
                 NONBLOCKED_APP_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
-        assertThat(gwpc.canActivityBeLaunched(activityInfos.get(0), intent,
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, intent,
                 WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
                 .isTrue();
     }
@@ -1585,10 +1696,10 @@ public class VirtualDeviceManagerServiceTest {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
                 DISPLAY_ID_1);
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 NONBLOCKED_APP_PACKAGE_NAME,
                 NONBLOCKED_APP_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
 
         IntentFilter intentFilter = new IntentFilter(Intent.ACTION_VIEW);
@@ -1597,7 +1708,7 @@ public class VirtualDeviceManagerServiceTest {
 
         // register interceptor and intercept intent
         mDeviceImpl.registerIntentInterceptor(interceptor, intentFilter);
-        assertThat(gwpc.canActivityBeLaunched(activityInfos.get(0), intent,
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, intent,
                 WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
                 .isFalse();
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
@@ -1609,7 +1720,7 @@ public class VirtualDeviceManagerServiceTest {
 
         // unregister interceptor and launch activity
         mDeviceImpl.unregisterIntentInterceptor(interceptor);
-        assertThat(gwpc.canActivityBeLaunched(activityInfos.get(0), intent,
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, intent,
                 WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
                 .isTrue();
     }
@@ -1628,10 +1739,10 @@ public class VirtualDeviceManagerServiceTest {
         addVirtualDisplay(mDeviceImpl, DISPLAY_ID_1);
         GenericWindowPolicyController gwpc = mDeviceImpl.getDisplayWindowPolicyControllerForTest(
                 DISPLAY_ID_1);
-        ArrayList<ActivityInfo> activityInfos = getActivityInfoList(
+        ActivityInfo activityInfo = getActivityInfo(
                 NONBLOCKED_APP_PACKAGE_NAME,
                 NONBLOCKED_APP_PACKAGE_NAME,
-                /* displayOnRemoveDevices */ true,
+                /* displayOnRemoteDevices */ true,
                 /* targetDisplayCategory */ null);
 
         IntentFilter intentFilter = new IntentFilter(Intent.ACTION_VIEW);
@@ -1640,7 +1751,7 @@ public class VirtualDeviceManagerServiceTest {
         // register interceptor with different filter
         mDeviceImpl.registerIntentInterceptor(interceptor, intentFilter);
 
-        assertThat(gwpc.canActivityBeLaunched(activityInfos.get(0), intent,
+        assertThat(gwpc.canActivityBeLaunched(activityInfo, intent,
                 WindowConfiguration.WINDOWING_MODE_FULLSCREEN, DISPLAY_ID_1, /*isNewTask=*/false))
                 .isTrue();
     }
@@ -1731,13 +1842,25 @@ public class VirtualDeviceManagerServiceTest {
 
     private VirtualDeviceImpl createVirtualDevice(int virtualDeviceId, int ownerUid,
             VirtualDeviceParams params) {
-        VirtualDeviceImpl virtualDeviceImpl = new VirtualDeviceImpl(mContext,
-                mAssociationInfo, mVdms, mVirtualDeviceLog, new Binder(),
-                new AttributionSource(ownerUid, "com.android.virtualdevice.test", "virtualdevice"),
-                virtualDeviceId,
-                mInputController, mCameraAccessController,
-                mPendingTrampolineCallback, mActivityListener, mSoundEffectListener,
-                mRunningAppsChangedCallback, params, new DisplayManagerGlobal(mIDisplayManager));
+        VirtualDeviceImpl virtualDeviceImpl =
+                new VirtualDeviceImpl(
+                        mContext,
+                        mAssociationInfo,
+                        mVdms,
+                        mVirtualDeviceLog,
+                        new Binder(),
+                        new AttributionSource(
+                                ownerUid, "com.android.virtualdevice.test", "virtualdevice"),
+                        virtualDeviceId,
+                        mInputController,
+                        mCameraAccessController,
+                        mPendingTrampolineCallback,
+                        mActivityListener,
+                        mSoundEffectListener,
+                        mRunningAppsChangedCallback,
+                        params,
+                        new DisplayManagerGlobal(mIDisplayManager),
+                        new VirtualCameraController(mContext));
         mVdms.addVirtualDevice(virtualDeviceImpl);
         assertThat(virtualDeviceImpl.getAssociationId()).isEqualTo(mAssociationInfo.getId());
         assertThat(virtualDeviceImpl.getPersistentDeviceId())
@@ -1750,6 +1873,13 @@ public class VirtualDeviceManagerServiceTest {
                 eq(virtualDevice), any(), any())).thenReturn(displayId);
         virtualDevice.createVirtualDisplay(VIRTUAL_DISPLAY_CONFIG, mVirtualDisplayCallback,
                 NONBLOCKED_APP_PACKAGE_NAME);
+    }
+
+    private ComponentName getPermissionDialogComponent() {
+        Intent intent = new Intent(ACTION_REQUEST_PERMISSIONS);
+        PackageManager packageManager = mContext.getPackageManager();
+        intent.setPackage(packageManager.getPermissionControllerPackageName());
+        return intent.resolveActivity(packageManager);
     }
 
     /** Helper class to drop permissions temporarily and restore them at the end of a test. */

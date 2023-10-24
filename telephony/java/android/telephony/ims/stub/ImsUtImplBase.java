@@ -345,7 +345,7 @@ public class ImsUtImplBase {
     /**
      * Retrieves the configuration of the call forward for specified service class.
      */
-    @SuppressLint("AcronymName")
+    @SuppressLint({"AcronymName", "UnflaggedApi"})
     public int queryCFForServiceClass(int condition, String number,
             int serviceClass) {
         return -1;

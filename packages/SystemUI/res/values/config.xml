@@ -70,6 +70,16 @@
     <!-- The number of rows in the QuickSettings -->
     <integer name="quick_settings_max_rows">4</integer>
 
+    <!-- Override column number for quick settings.
+    For now, this value has effect only when flag lockscreen.enable_landscape is enabled.
+    TODO (b/293252410) - change this comment/resource when flag is enabled -->
+    <integer name="small_land_lockscreen_quick_settings_num_columns">2</integer>
+
+    <!-- Override row number for quick settings.
+    For now, this value has effect only when flag lockscreen.enable_landscape is enabled.
+    TODO (b/293252410) - change this comment/resource when flag is enabled -->
+    <integer name="small_land_lockscreen_quick_settings_max_rows">2</integer>
+
     <!-- If the dp width of the available space is <= this value, potentially adjust the number
          of media recommendation items-->
     <integer name="default_qs_media_rec_width_dp">380</integer>
@@ -78,7 +88,7 @@
 
     <!-- The default tiles to display in QuickSettings -->
     <string name="quick_settings_tiles_default" translatable="false">
-        internet,bt,flashlight,dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,custom(com.android.permissioncontroller/.permission.service.SafetyCenterQsTileService)
+        internet,bt,flashlight,dnd,alarm,airplane,controls,wallet,rotation,battery,cast,screenrecord,mictoggle,cameratoggle,custom(com.android.permissioncontroller/.permission.service.v33.SafetyCenterQsTileService)
     </string>
 
     <!-- The class path of the Safety Quick Settings Tile -->
@@ -595,6 +605,11 @@
     <!-- Whether to use the split 2-column notification shade -->
     <bool name="config_use_split_notification_shade">false</bool>
 
+    <!-- Whether to force split shade.
+    For now, this value has effect only when flag lockscreen.enable_landscape is enabled.
+    TODO (b/293252410) - change this comment/resource when flag is enabled -->
+    <bool name="force_config_use_split_notification_shade">false</bool>
+
     <!-- Whether we use large screen shade header which takes only one row compared to QS header -->
     <bool name="config_use_large_screen_shade_header">false</bool>
 
@@ -937,4 +952,12 @@
 
     <!-- Flag controlling whether visual query attention detection has been enabled. -->
     <bool name="config_enableVisualQueryAttentionDetection">false</bool>
+
+    <!--
+    Whether the scene container framework is enabled.
+
+    The scene container framework is a newer (2023) way to organize the various "scenes" between the
+    bouncer, lockscreen, shade, and quick settings.
+    -->
+    <bool name="config_sceneContainerFrameworkEnabled">true</bool>
 </resources>

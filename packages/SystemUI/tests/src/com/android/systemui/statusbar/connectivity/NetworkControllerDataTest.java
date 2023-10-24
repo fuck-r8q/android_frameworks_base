@@ -338,7 +338,7 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
     public void testIsDataInService_notInService_false() {
         setupDefaultSignal();
         setVoiceRegState(ServiceState.STATE_OUT_OF_SERVICE);
-        setDataRegState(ServiceState.STATE_OUT_OF_SERVICE);
+        setDataRegInService(false);
         assertFalse(mNetworkController.isMobileDataNetworkInService());
     }
 
@@ -406,3 +406,4 @@ public class NetworkControllerDataTest extends NetworkControllerBaseTest {
                 false);
     }
 }
+

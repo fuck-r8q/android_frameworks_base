@@ -16,22 +16,26 @@
 
 package com.android.systemui.common.ui.data.repository
 
-import kotlinx.coroutines.channels.Channel
+import com.android.systemui.dagger.SysUISingleton
+import dagger.Binds
+import dagger.Module
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 
-class FakeConfigurationRepository : ConfigurationRepository {
-    private val onAnyConfigurationChangeChannel = Channel<Unit>()
-    override val onAnyConfigurationChange: Flow<Unit> =
-        onAnyConfigurationChangeChannel.receiveAsFlow()
+@SysUISingleton
+class FakeConfigurationRepository @Inject constructor() : ConfigurationRepository {
+    private val _onAnyConfigurationChange = MutableSharedFlow<Unit>()
+    override val onAnyConfigurationChange: Flow<Unit> = _onAnyConfigurationChange.asSharedFlow()
 
     private val _scaleForResolution = MutableStateFlow(1f)
     override val scaleForResolution: Flow<Float> = _scaleForResolution.asStateFlow()
 
     suspend fun onAnyConfigurationChange() {
-        onAnyConfigurationChangeChannel.send(Unit)
+        _onAnyConfigurationChange.tryEmit(Unit)
     }
 
     fun setScaleForResolution(scale: Float) {
@@ -41,4 +45,13 @@ class FakeConfigurationRepository : ConfigurationRepository {
     override fun getResolutionScale(): Float {
         return _scaleForResolution.value
     }
+
+    override fun getDimensionPixelSize(id: Int): Int {
+        throw IllegalStateException("Don't use for tests")
+    }
+}
+
+@Module
+interface FakeConfigurationRepositoryModule {
+    @Binds fun bindFake(fake: FakeConfigurationRepository): ConfigurationRepository
 }

@@ -16,8 +16,6 @@
 
 package com.android.systemui.statusbar;
 
-import static android.view.WindowInsetsController.APPEARANCE_LOW_PROFILE_BARS;
-
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_TRANSITION_FROM_AOD;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_LOCKSCREEN_TRANSITION_TO_AOD;
 
@@ -31,13 +29,7 @@ import android.text.format.DateFormat;
 import android.util.FloatProperty;
 import android.util.Log;
 import android.view.Choreographer;
-import android.view.InsetsFlags;
 import android.view.View;
-import android.view.ViewDebug;
-import android.view.WindowInsets;
-import android.view.WindowInsets.Type.InsetsType;
-import android.view.WindowInsetsController.Appearance;
-import android.view.WindowInsetsController.Behavior;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.NonNull;
@@ -51,7 +43,7 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.keyguard.KeyguardClockSwitch;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController.StateListener;
@@ -112,8 +104,9 @@ public class StatusBarStateControllerImpl implements
     // Record the HISTORY_SIZE most recent states
     private int mHistoryIndex = 0;
     private HistoricalState[] mHistoricalRecords = new HistoricalState[HISTORY_SIZE];
-    // This is used by InteractionJankMonitor to get callback from HWUI.
+    // These views are used by InteractionJankMonitor to get callback from HWUI.
     private View mView;
+    private KeyguardClockSwitch mClockSwitchView;
 
     /**
      * If any of the system bars is hidden.
@@ -342,6 +335,7 @@ public class StatusBarStateControllerImpl implements
         if ((mView == null || !mView.isAttachedToWindow())
                 && (view != null && view.isAttachedToWindow())) {
             mView = view;
+            mClockSwitchView = view.findViewById(R.id.keyguard_clock_container);
         }
         mDozeAmountTarget = dozeAmount;
         if (animated) {
@@ -424,21 +418,12 @@ public class StatusBarStateControllerImpl implements
 
     /** Returns the id of the currently rendering clock */
     public String getClockId() {
-        if (mView == null) {
-            return KeyguardClockSwitch.MISSING_CLOCK_ID;
-        }
-
-        View clockSwitch = mView.findViewById(R.id.keyguard_clock_container);
-        if (clockSwitch == null) {
+        if (mClockSwitchView == null) {
             Log.e(TAG, "Clock container was missing");
             return KeyguardClockSwitch.MISSING_CLOCK_ID;
         }
-        if (!(clockSwitch instanceof KeyguardClockSwitch)) {
-            Log.e(TAG, "Clock container was incorrect type: " + clockSwitch);
-            return KeyguardClockSwitch.MISSING_CLOCK_ID;
-        }
 
-        return ((KeyguardClockSwitch) clockSwitch).getClockId();
+        return mClockSwitchView.getClockId();
     }
 
     private void beginInteractionJankMonitor() {
@@ -551,34 +536,6 @@ public class StatusBarStateControllerImpl implements
     @Override
     public boolean isKeyguardRequested() {
         return mKeyguardRequested;
-    }
-
-    @Override
-    public void setSystemBarAttributes(@Appearance int appearance, @Behavior int behavior,
-            @InsetsType int requestedVisibleTypes, String packageName) {
-        boolean isFullscreen = (requestedVisibleTypes & WindowInsets.Type.statusBars()) == 0
-                || (requestedVisibleTypes & WindowInsets.Type.navigationBars()) == 0;
-        if (mIsFullscreen != isFullscreen) {
-            mIsFullscreen = isFullscreen;
-            synchronized (mListeners) {
-                for (RankedListener rl : new ArrayList<>(mListeners)) {
-                    rl.mListener.onFullscreenStateChanged(isFullscreen);
-                }
-            }
-        }
-
-        // TODO (b/190543382): Finish the logging logic.
-        // This section can be removed if we don't need to print it on logcat.
-        if (DEBUG_IMMERSIVE_APPS) {
-            boolean dim = (appearance & APPEARANCE_LOW_PROFILE_BARS) != 0;
-            String behaviorName = ViewDebug.flagsToString(InsetsFlags.class, "behavior", behavior);
-            String requestedVisibleTypesString = WindowInsets.Type.toString(requestedVisibleTypes);
-            if (requestedVisibleTypesString.isEmpty()) {
-                requestedVisibleTypesString = "none";
-            }
-            Log.d(TAG, packageName + " dim=" + dim + " behavior=" + behaviorName
-                    + " requested visible types: " + requestedVisibleTypesString);
-        }
     }
 
     @Override

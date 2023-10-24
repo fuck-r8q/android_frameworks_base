@@ -29,6 +29,7 @@ filegroup {
 
 android_app {
     name: "AccessibilityMenu",
+    use_resource_processor: true,
 
     static_libs: [
         "androidx.coordinatorlayout_coordinatorlayout",
@@ -36,6 +37,7 @@ android_app {
         "androidx.preference_preference",
         "androidx.viewpager_viewpager",
         "SettingsLibDisplayUtils",
+        "com_android_a11y_menu_flags_lib",
     ],
 
     optimize: {

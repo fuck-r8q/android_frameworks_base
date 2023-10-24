@@ -22,12 +22,13 @@ import android.testing.TestableLooper
 import android.view.View
 import android.widget.Spinner
 import androidx.test.filters.SmallTest
-import com.android.systemui.R
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.animation.DialogLaunchAnimator
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
+import com.android.systemui.mediaprojection.permission.ENTIRE_SCREEN
+import com.android.systemui.mediaprojection.permission.SINGLE_APP
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.res.R
 import com.android.systemui.settings.UserContextProvider
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
@@ -48,7 +49,6 @@ class ScreenRecordPermissionDialogTest : SysuiTestCase() {
     @Mock private lateinit var controller: RecordingController
     @Mock private lateinit var userContextProvider: UserContextProvider
     @Mock private lateinit var flags: FeatureFlags
-    @Mock private lateinit var dialogLaunchAnimator: DialogLaunchAnimator
     @Mock private lateinit var onStartRecordingClicked: Runnable
 
     private lateinit var dialog: ScreenRecordPermissionDialog
@@ -63,7 +63,6 @@ class ScreenRecordPermissionDialogTest : SysuiTestCase() {
                 UserHandle.of(0),
                 controller,
                 starter,
-                dialogLaunchAnimator,
                 userContextProvider,
                 onStartRecordingClicked
             )

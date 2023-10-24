@@ -21,6 +21,7 @@ import static com.android.server.biometrics.AuthenticationStatsCollector.MAXIMUM
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -78,12 +79,16 @@ public class AuthenticationStatsCollectorTest {
     @Mock
     private SharedPreferences mSharedPreferences;
     @Mock
+    private SharedPreferences.Editor mEditor;
+    @Mock
     private BiometricNotification mBiometricNotification;
 
     @Before
     public void setUp() {
 
         when(mContext.getResources()).thenReturn(mResources);
+        when(mResources.getBoolean(eq(R.bool.config_biometricFrrNotificationEnabled)))
+                .thenReturn(true);
         when(mResources.getFraction(eq(R.fraction.config_biometricNotificationFrrThreshold),
                 anyInt(), anyInt())).thenReturn(FRR_THRESHOLD);
 
@@ -99,16 +104,23 @@ public class AuthenticationStatsCollectorTest {
         when(mContext.getSharedPreferences(any(File.class), anyInt()))
                 .thenReturn(mSharedPreferences);
         when(mSharedPreferences.getStringSet(anyString(), anySet())).thenReturn(emptySet());
+        when(mSharedPreferences.edit()).thenReturn(mEditor);
+        when(mEditor.putFloat(anyString(), anyFloat())).thenReturn(mEditor);
+        when(mEditor.putStringSet(anyString(), anySet())).thenReturn(mEditor);
 
         mAuthenticationStatsCollector = new AuthenticationStatsCollector(mContext,
                 0 /* modality */, mBiometricNotification);
     }
 
-
     @Test
     public void authenticate_authenticationSucceeded_mapShouldBeUpdated() {
         // Assert that the user doesn't exist in the map initially.
         assertThat(mAuthenticationStatsCollector.getAuthenticationStatsForUser(USER_ID_1)).isNull();
+
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFaceManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
 
         mAuthenticationStatsCollector.authenticate(USER_ID_1, true /* authenticated */);
 
@@ -124,6 +136,11 @@ public class AuthenticationStatsCollectorTest {
     public void authenticate_authenticationFailed_mapShouldBeUpdated() {
         // Assert that the user doesn't exist in the map initially.
         assertThat(mAuthenticationStatsCollector.getAuthenticationStatsForUser(USER_ID_1)).isNull();
+
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFingerprintManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
 
         mAuthenticationStatsCollector.authenticate(USER_ID_1, false /* authenticated */);
 
@@ -171,6 +188,11 @@ public class AuthenticationStatsCollectorTest {
                         40 /* rejectedAttempts */, 0 /* enrollmentNotifications */,
                         0 /* modality */));
 
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT))
+                .thenReturn(true);
+        when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_FACE)).thenReturn(true);
+        when(mFingerprintManager.hasEnrolledTemplates(anyInt())).thenReturn(true);
+
         mAuthenticationStatsCollector.authenticate(USER_ID_1, false /* authenticated */);
 
         // Assert that no notification should be sent.
@@ -181,6 +203,7 @@ public class AuthenticationStatsCollectorTest {
                 .getAuthenticationStatsForUser(USER_ID_1);
         assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
         assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
         assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
     }
 
@@ -203,6 +226,8 @@ public class AuthenticationStatsCollectorTest {
                 .getAuthenticationStatsForUser(USER_ID_1);
         assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
         assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
+        assertThat(authenticationStats.getEnrollmentNotifications())
+                .isEqualTo(MAXIMUM_ENROLLMENT_NOTIFICATIONS);
         assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 
@@ -225,12 +250,13 @@ public class AuthenticationStatsCollectorTest {
         // Assert that no notification should be sent.
         verify(mBiometricNotification, never()).sendFaceEnrollNotification(any());
         verify(mBiometricNotification, never()).sendFpEnrollNotification(any());
-        // Assert that data has been reset.
+        // Assert that data hasn't been reset.
         AuthenticationStats authenticationStats = mAuthenticationStatsCollector
                 .getAuthenticationStatsForUser(USER_ID_1);
-        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
+        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
+        assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 
     @Test
@@ -251,12 +277,13 @@ public class AuthenticationStatsCollectorTest {
         // Assert that no notification should be sent.
         verify(mBiometricNotification, never()).sendFaceEnrollNotification(any());
         verify(mBiometricNotification, never()).sendFpEnrollNotification(any());
-        // Assert that data has been reset.
+        // Assert that data hasn't been reset.
         AuthenticationStats authenticationStats = mAuthenticationStatsCollector
                 .getAuthenticationStatsForUser(USER_ID_1);
-        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
-        assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
+        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
+        assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 
     @Test
@@ -284,6 +311,8 @@ public class AuthenticationStatsCollectorTest {
         assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
         assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
         assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        // Assert that notification count has been updated.
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(1);
     }
 
     @Test
@@ -311,5 +340,35 @@ public class AuthenticationStatsCollectorTest {
         assertThat(authenticationStats.getTotalAttempts()).isEqualTo(0);
         assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(0);
         assertThat(authenticationStats.getFrr()).isWithin(0f).of(-1.0f);
+        // Assert that notification count has been updated.
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(1);
+    }
+
+    @Test
+    public void authenticate_featureDisabled_mapMustNotBeUpdated() {
+        // Disable the feature.
+        when(mResources.getBoolean(eq(R.bool.config_biometricFrrNotificationEnabled)))
+                .thenReturn(false);
+        AuthenticationStatsCollector authenticationStatsCollector =
+                new AuthenticationStatsCollector(mContext, 0 /* modality */,
+                        mBiometricNotification);
+
+        authenticationStatsCollector.setAuthenticationStatsForUser(USER_ID_1,
+                new AuthenticationStats(USER_ID_1, 500 /* totalAttempts */,
+                        400 /* rejectedAttempts */, 0 /* enrollmentNotifications */,
+                        0 /* modality */));
+
+        authenticationStatsCollector.authenticate(USER_ID_1, false /* authenticated */);
+
+        // Assert that no notification should be sent.
+        verify(mBiometricNotification, never()).sendFaceEnrollNotification(any());
+        verify(mBiometricNotification, never()).sendFpEnrollNotification(any());
+        // Assert that data hasn't been updated.
+        AuthenticationStats authenticationStats = authenticationStatsCollector
+                .getAuthenticationStatsForUser(USER_ID_1);
+        assertThat(authenticationStats.getTotalAttempts()).isEqualTo(500);
+        assertThat(authenticationStats.getRejectedAttempts()).isEqualTo(400);
+        assertThat(authenticationStats.getEnrollmentNotifications()).isEqualTo(0);
+        assertThat(authenticationStats.getFrr()).isWithin(0f).of(0.8f);
     }
 }

@@ -40,9 +40,10 @@ import android.view.View;
 
 import androidx.test.filters.SmallTest;
 
-import com.android.settingslib.udfps.UdfpsOverlayParams;
 import com.android.systemui.biometrics.UdfpsController;
+import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
 import com.android.systemui.doze.util.BurnInHelperKt;
+import com.android.systemui.statusbar.StatusBarState;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -51,6 +52,12 @@ import org.junit.runner.RunWith;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 public class LockIconViewControllerTest extends LockIconViewControllerBaseTest {
+
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        when(mLockIconView.isAttachedToWindow()).thenReturn(true);
+    }
 
     @Test
     public void testUpdateFingerprintLocationOnInit() {
@@ -176,13 +183,14 @@ public class LockIconViewControllerTest extends LockIconViewControllerBaseTest {
     }
 
     @Test
-    public void testLockIcon_clearsIconOnAod_whenUdfpsNotEnrolled() {
+    public void testLockIcon_clearsIconWhenUnlocked() {
         // GIVEN udfps not enrolled
         setupUdfps();
         when(mKeyguardUpdateMonitor.isUdfpsEnrolled()).thenReturn(false);
 
         // GIVEN starting state for the lock icon
         setupShowLockIcon();
+        when(mStatusBarStateController.getState()).thenReturn(StatusBarState.SHADE);
 
         // GIVEN lock icon controller is initialized and view is attached
         init(/* useMigrationFlag= */false);
@@ -190,7 +198,7 @@ public class LockIconViewControllerTest extends LockIconViewControllerBaseTest {
         reset(mLockIconView);
 
         // WHEN the dozing state changes
-        mStatusBarStateListener.onDozingChanged(true /* isDozing */);
+        mStatusBarStateListener.onDozingChanged(false /* isDozing */);
 
         // THEN the icon is cleared
         verify(mLockIconView).clearIcon();

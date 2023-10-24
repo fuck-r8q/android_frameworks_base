@@ -23,6 +23,7 @@ import static android.os.UserManager.DISALLOW_USER_SWITCH;
 import static android.os.UserManager.SYSTEM_USER_MODE_EMULATION_PROPERTY;
 import static android.os.UserManager.USER_OPERATION_ERROR_UNKNOWN;
 
+import static com.android.internal.util.ConcurrentUtils.DIRECT_EXECUTOR;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_ABORTED;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_UNSPECIFIED;
 import static com.android.server.pm.UserJourneyLogger.ERROR_CODE_USER_ALREADY_AN_ADMIN;
@@ -80,6 +81,7 @@ import android.os.Bundle;
 import android.os.Debug;
 import android.os.Environment;
 import android.os.FileUtils;
+import android.os.Flags;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IProgressListener;
@@ -1331,29 +1333,49 @@ public class UserManagerService extends IUserManager.Stub {
                 && user.profileGroupId == profile.profileGroupId);
     }
 
-    private void broadcastProfileAvailabilityChanges(UserHandle profileHandle,
-            UserHandle parentHandle, boolean inQuietMode) {
+    private Intent buildProfileAvailabilityIntent(UserInfo profile, boolean enableQuietMode,
+            boolean useManagedActions) {
         Intent intent = new Intent();
-        if (inQuietMode) {
-            intent.setAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
-        } else {
-            intent.setAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE);
+        intent.setAction(getAvailabilityIntentAction(enableQuietMode, useManagedActions));
+        intent.putExtra(Intent.EXTRA_QUIET_MODE, enableQuietMode);
+        intent.putExtra(Intent.EXTRA_USER, profile.getUserHandle());
+        intent.putExtra(Intent.EXTRA_USER_HANDLE, profile.getUserHandle().getIdentifier());
+        intent.addFlags(
+                Intent.FLAG_RECEIVER_REGISTERED_ONLY | Intent.FLAG_RECEIVER_FOREGROUND);
+        return intent;
+    }
+
+    private String getAvailabilityIntentAction(boolean enableQuietMode, boolean useManagedActions) {
+        return useManagedActions ?
+                enableQuietMode ?
+                        Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE
+                        : Intent.ACTION_MANAGED_PROFILE_AVAILABLE
+                : enableQuietMode ?
+                        Intent.ACTION_PROFILE_UNAVAILABLE
+                        : Intent.ACTION_PROFILE_AVAILABLE;
+    }
+
+    private void broadcastProfileAvailabilityChanges(UserInfo profileInfo,
+            UserHandle parentHandle, boolean enableQuietMode, boolean useManagedActions) {
+        Intent availabilityIntent = buildProfileAvailabilityIntent(profileInfo, enableQuietMode,
+                useManagedActions);
+        if (profileInfo.isManagedProfile()) {
+            getDevicePolicyManagerInternal().broadcastIntentToManifestReceivers(
+                    availabilityIntent, parentHandle, /* requiresPermission= */ true);
         }
-        intent.putExtra(Intent.EXTRA_QUIET_MODE, inQuietMode);
-        intent.putExtra(Intent.EXTRA_USER, profileHandle);
-        intent.putExtra(Intent.EXTRA_USER_HANDLE, profileHandle.getIdentifier());
-        getDevicePolicyManagerInternal().broadcastIntentToManifestReceivers(
-                intent, parentHandle, /* requiresPermission= */ true);
-        intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY | Intent.FLAG_RECEIVER_FOREGROUND);
+        // TODO(b/302708423): Restrict the apps that can receive these intents in case of a private
+        //  profile.
         final Bundle options = new BroadcastOptions()
                 .setDeferralPolicy(BroadcastOptions.DEFERRAL_POLICY_UNTIL_ACTIVE)
                 .setDeliveryGroupPolicy(BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT)
                 // Both actions use single namespace because only the final state matters.
                 .setDeliveryGroupMatchingKey(
-                        Intent.ACTION_MANAGED_PROFILE_AVAILABLE /* namespace */,
-                        String.valueOf(profileHandle.getIdentifier()) /* key */)
+                        useManagedActions ? Intent.ACTION_MANAGED_PROFILE_AVAILABLE
+                                : Intent.ACTION_PROFILE_AVAILABLE,
+                        String.valueOf(profileInfo.getUserHandle().getIdentifier()) /* key */)
                 .toBundle();
-        mContext.sendBroadcastAsUser(intent, parentHandle, /* receiverPermission= */ null, options);
+        mContext.sendBroadcastAsUser(availabilityIntent, parentHandle, /* receiverPermission= */
+                null, options);
     }
 
     @Override
@@ -1480,7 +1502,7 @@ public class UserManagerService extends IUserManager.Stub {
             profile = getUserInfoLU(userId);
             parent = getProfileParentLU(userId);
 
-            if (profile == null || !profile.isManagedProfile()) {
+            if (profile == null || !profile.isProfile()) {
                 throw new IllegalArgumentException("User " + userId + " is not a profile");
             }
             if (profile.isQuietModeEnabled() == enableQuietMode) {
@@ -1533,8 +1555,17 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         logQuietModeEnabled(userId, enableQuietMode, callingPackage);
-        broadcastProfileAvailabilityChanges(profile.getUserHandle(), parent.getUserHandle(),
-                enableQuietMode);
+
+        // Broadcast generic intents for all profiles
+        if (Flags.allowPrivateProfile()) {
+            broadcastProfileAvailabilityChanges(profile, parent.getUserHandle(),
+                    enableQuietMode, false);
+        }
+        // Broadcast Managed profile availability intents too for managed profiles.
+        if (profile.isManagedProfile()){
+            broadcastProfileAvailabilityChanges(profile, parent.getUserHandle(),
+                     enableQuietMode, true);
+        }
     }
 
     private void setAppOpsRestrictedForQuietMode(@UserIdInt int userId, boolean restrict) {
@@ -1581,7 +1612,7 @@ public class UserManagerService extends IUserManager.Stub {
             synchronized (mUsersLock) {
                 info = getUserInfoLU(userId);
             }
-            if (info == null || !info.isManagedProfile()) {
+            if (info == null || !info.isProfile()) {
                 return false;
             }
             return info.isQuietModeEnabled();
@@ -2749,7 +2780,8 @@ public class UserManagerService extends IUserManager.Stub {
         }
     }
 
-    private void setUserRestrictionInner(int userId, @NonNull String key, boolean value) {
+    @VisibleForTesting
+    void setUserRestrictionInner(int userId, @NonNull String key, boolean value) {
         if (!UserRestrictionsUtils.isValidRestriction(key)) {
             Slog.e(LOG_TAG, "Setting invalid restriction " + key);
             return;
@@ -2938,8 +2970,10 @@ public class UserManagerService extends IUserManager.Stub {
                     UserHandle.USER_NULL, UserManager.RESTRICTION_SOURCE_SYSTEM));
         }
 
-        result.addAll(getDevicePolicyManagerInternal()
-                .getUserRestrictionSources(restrictionKey, userId));
+        final DevicePolicyManagerInternal dpmi = getDevicePolicyManagerInternal();
+        if (dpmi != null) {
+            result.addAll(dpmi.getUserRestrictionSources(restrictionKey, userId));
+        }
         return result;
     }
 
@@ -4357,11 +4391,11 @@ public class UserManagerService extends IUserManager.Stub {
 
             UserRestrictionsUtils.writeRestrictions(serializer,
                     mDevicePolicyUserRestrictions.getRestrictions(UserHandle.USER_ALL),
-                    TAG_DEVICE_POLICY_RESTRICTIONS);
+                    TAG_DEVICE_POLICY_GLOBAL_RESTRICTIONS);
 
             UserRestrictionsUtils.writeRestrictions(serializer,
                     mDevicePolicyUserRestrictions.getRestrictions(userInfo.id),
-                    TAG_DEVICE_POLICY_RESTRICTIONS);
+                    TAG_DEVICE_POLICY_LOCAL_RESTRICTIONS);
         }
 
         if (userData.account != null) {
@@ -4787,11 +4821,14 @@ public class UserManagerService extends IUserManager.Stub {
         // default check is for DISALLOW_ADD_USER
         // If new user is of type CLONE, check if creation of clone profile is allowed
         // If new user is of type MANAGED, check if creation of managed profile is allowed
+        // If new user is of type PRIVATE, check if creation of private profile is allowed
         String restriction = UserManager.DISALLOW_ADD_USER;
         if (UserManager.isUserTypeCloneProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_CLONE_PROFILE;
         } else if (UserManager.isUserTypeManagedProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_MANAGED_PROFILE;
+        } else if (UserManager.isUserTypePrivateProfile(userType)) {
+            restriction = UserManager.DISALLOW_ADD_PRIVATE_PROFILE;
         }
 
         enforceUserRestriction(restriction, UserHandle.getCallingUserId(),
@@ -5329,12 +5366,12 @@ public class UserManagerService extends IUserManager.Stub {
         statsManager.setPullAtomCallback(
                 FrameworkStatsLog.USER_INFO,
                 null, // use default PullAtomMetadata values
-                BackgroundThread.getExecutor(),
+                DIRECT_EXECUTOR,
                 this::onPullAtom);
         statsManager.setPullAtomCallback(
                 FrameworkStatsLog.MULTI_USER_INFO,
                 null, // use default PullAtomMetadata values
-                BackgroundThread.getExecutor(),
+                DIRECT_EXECUTOR,
                 this::onPullAtom);
     }
 

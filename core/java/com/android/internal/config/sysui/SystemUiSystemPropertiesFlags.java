@@ -74,16 +74,21 @@ public class SystemUiSystemPropertiesFlags {
         public static final Flag LOG_DND_STATE_EVENTS =
                 releasedFlag("persist.sysui.notification.log_dnd_state_events");
 
-        /** Gating the holding of WakeLocks until NLSes are told about a new notification. */
-        public static final Flag WAKE_LOCK_FOR_POSTING_NOTIFICATION =
-                releasedFlag("persist.sysui.notification.wake_lock_for_posting_notification");
-
         /** Gating storing NotificationRankingUpdate ranking map in shared memory. */
         public static final Flag RANKING_UPDATE_ASHMEM = devFlag(
                 "persist.sysui.notification.ranking_update_ashmem");
 
         public static final Flag PROPAGATE_CHANNEL_UPDATES_TO_CONVERSATIONS = releasedFlag(
                 "persist.sysui.notification.propagate_channel_updates_to_conversations");
+
+        // TODO: b/291907312 - remove feature flags
+        /** Gating the NMS->NotificationAttentionHelper buzzBeepBlink refactor */
+        public static final Flag ENABLE_ATTENTION_HELPER_REFACTOR = devFlag(
+                "persist.debug.sysui.notification.enable_attention_helper_refactor");
+
+        /** b/301242692: Visit extra URIs used in notifications to prevent security issues. */
+        public static final Flag VISIT_RISKY_URIS = devFlag(
+                "persist.sysui.notification.visit_risky_uris");
     }
 
     //// == End of flags.  Everything below this line is the implementation. == ////

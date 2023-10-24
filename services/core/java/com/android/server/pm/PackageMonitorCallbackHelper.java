@@ -50,13 +50,7 @@ class PackageMonitorCallbackHelper {
 
     @NonNull
     private final Object mLock = new Object();
-    final IActivityManager mActivityManager = ActivityManager.getService();
-
-    final Handler mHandler;
-
-    PackageMonitorCallbackHelper(PackageManagerServiceInjector injector) {
-        mHandler = injector.getHandler();
-    }
+    IActivityManager mActivityManager;
 
     @NonNull
     @GuardedBy("mLock")
@@ -100,19 +94,23 @@ class PackageMonitorCallbackHelper {
 
     public void notifyPackageAddedForNewUsers(String packageName,
             @AppIdInt int appId, @NonNull int[] userIds, @NonNull int[] instantUserIds,
-            int dataLoaderType, SparseArray<int[]> broadcastAllowList) {
+            boolean isArchived, int dataLoaderType, SparseArray<int[]> broadcastAllowList,
+            @NonNull Handler handler) {
         Bundle extras = new Bundle(2);
         // Set to UID of the first user, EXTRA_UID is automatically updated in sendPackageBroadcast
         final int uid = UserHandle.getUid(
                 (ArrayUtils.isEmpty(userIds) ? instantUserIds[0] : userIds[0]), appId);
         extras.putInt(Intent.EXTRA_UID, uid);
+        if (isArchived) {
+            extras.putBoolean(Intent.EXTRA_ARCHIVAL, true);
+        }
         extras.putInt(PackageInstaller.EXTRA_DATA_LOADER_TYPE, dataLoaderType);
         notifyPackageMonitor(Intent.ACTION_PACKAGE_ADDED, packageName, extras ,
-                userIds /* userIds */, instantUserIds, broadcastAllowList);
+                userIds /* userIds */, instantUserIds, broadcastAllowList, handler);
     }
 
     public void notifyResourcesChanged(boolean mediaStatus, boolean replacing,
-            @NonNull String[] pkgNames, @NonNull int[] uids) {
+            @NonNull String[] pkgNames, @NonNull int[] uids, @NonNull Handler handler) {
         Bundle extras = new Bundle();
         extras.putStringArray(Intent.EXTRA_CHANGED_PACKAGE_LIST, pkgNames);
         extras.putIntArray(Intent.EXTRA_CHANGED_UID_LIST, uids);
@@ -122,12 +120,12 @@ class PackageMonitorCallbackHelper {
         String action = mediaStatus ? Intent.ACTION_EXTERNAL_APPLICATIONS_AVAILABLE
                 : Intent.ACTION_EXTERNAL_APPLICATIONS_UNAVAILABLE;
         notifyPackageMonitor(action, null /* pkg */, extras, null /* userIds */,
-                null /* instantUserIds */, null /* broadcastAllowList */);
+                null /* instantUserIds */, null /* broadcastAllowList */, handler);
     }
 
     public void notifyPackageChanged(String packageName, boolean dontKillApp,
             ArrayList<String> componentNames, int packageUid, String reason, int[] userIds,
-            int[] instantUserIds, SparseArray<int[]> broadcastAllowList) {
+            int[] instantUserIds, SparseArray<int[]> broadcastAllowList, Handler handler) {
         Bundle extras = new Bundle(4);
         extras.putString(Intent.EXTRA_CHANGED_COMPONENT_NAME, componentNames.get(0));
         String[] nameList = new String[componentNames.size()];
@@ -139,17 +137,21 @@ class PackageMonitorCallbackHelper {
             extras.putString(Intent.EXTRA_REASON, reason);
         }
         notifyPackageMonitor(Intent.ACTION_PACKAGE_CHANGED, packageName, extras, userIds,
-                instantUserIds, broadcastAllowList);
+                instantUserIds, broadcastAllowList, handler);
     }
 
     public void notifyPackageMonitor(String action, String pkg, Bundle extras,
-            int[] userIds, int[] instantUserIds, SparseArray<int[]> broadcastAllowList) {
+            int[] userIds, int[] instantUserIds, SparseArray<int[]> broadcastAllowList,
+            Handler handler) {
         if (!isAllowedCallbackAction(action)) {
             return;
         }
         try {
             final int[] resolvedUserIds;
             if (userIds == null) {
+                if (mActivityManager == null) {
+                    mActivityManager = ActivityManager.getService();
+                }
                 if (mActivityManager == null) return;
                 resolvedUserIds = mActivityManager.getRunningUserIds();
             } else {
@@ -157,9 +159,10 @@ class PackageMonitorCallbackHelper {
             }
 
             if (ArrayUtils.isEmpty(instantUserIds)) {
-                doNotifyCallbacks(action, pkg, extras, resolvedUserIds, broadcastAllowList);
+                doNotifyCallbacks(
+                        action, pkg, extras, resolvedUserIds, broadcastAllowList, handler);
             } else {
-                doNotifyCallbacks(action, pkg, extras, instantUserIds, broadcastAllowList);
+                doNotifyCallbacks(action, pkg, extras, instantUserIds, broadcastAllowList, handler);
             }
         } catch (RemoteException e) {
             // do nothing
@@ -178,7 +181,7 @@ class PackageMonitorCallbackHelper {
     }
 
     private void doNotifyCallbacks(String action, String pkg, Bundle extras, int[] userIds,
-            SparseArray<int[]> broadcastAllowList) {
+            SparseArray<int[]> broadcastAllowList, Handler handler) {
         RemoteCallbackList<IRemoteCallback> callbacks;
         synchronized (mLock) {
             callbacks = mCallbacks;
@@ -199,7 +202,7 @@ class PackageMonitorCallbackHelper {
             final int[] allowUids =
                     broadcastAllowList != null ? broadcastAllowList.get(userId) : new int[]{};
 
-            mHandler.post(() -> callbacks.broadcast((callback, user) -> {
+            handler.post(() -> callbacks.broadcast((callback, user) -> {
                 RegisterUser registerUser = (RegisterUser) user;
                 if ((registerUser.getUserId() != UserHandle.USER_ALL) && (registerUser.getUserId()
                         != userId)) {

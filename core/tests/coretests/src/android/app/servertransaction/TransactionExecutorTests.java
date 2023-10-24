@@ -28,6 +28,7 @@ import static android.app.servertransaction.ActivityLifecycleItem.UNDEFINED;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import android.annotation.NonNull;
 import android.app.Activity;
 import android.app.ActivityThread.ActivityClientRecord;
 import android.app.ClientTransactionHandler;
@@ -227,10 +229,10 @@ public class TransactionExecutorTests {
         when(callback2.getPostExecutionState()).thenReturn(UNDEFINED);
         ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
         IBinder token = mock(IBinder.class);
+        when(stateRequest.getActivityToken()).thenReturn(token);
         when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
 
-        ClientTransaction transaction = ClientTransaction.obtain(null /* client */,
-                token /* activityToken */);
+        ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         transaction.addCallback(callback1);
         transaction.addCallback(callback2);
         transaction.setLifecycleStateRequest(stateRequest);
@@ -239,42 +241,41 @@ public class TransactionExecutorTests {
         mExecutor.execute(transaction);
 
         InOrder inOrder = inOrder(mTransactionHandler, callback1, callback2, stateRequest);
-        inOrder.verify(callback1).execute(eq(mTransactionHandler), eq(token), any());
-        inOrder.verify(callback2).execute(eq(mTransactionHandler), eq(token), any());
+        inOrder.verify(callback1).execute(eq(mTransactionHandler), any());
+        inOrder.verify(callback2).execute(eq(mTransactionHandler), any());
         inOrder.verify(stateRequest).execute(eq(mTransactionHandler), eq(mClientRecord), any());
     }
 
     @Test
     public void testDoNotLaunchDestroyedActivity() {
-        final Map<IBinder, ClientTransactionItem> activitiesToBeDestroyed = new ArrayMap<>();
+        final Map<IBinder, DestroyActivityItem> activitiesToBeDestroyed = new ArrayMap<>();
         when(mTransactionHandler.getActivitiesToBeDestroyed()).thenReturn(activitiesToBeDestroyed);
         // Assume launch transaction is still in queue, so there is no client record.
         when(mTransactionHandler.getActivityClient(any())).thenReturn(null);
 
         // An incoming destroy transaction enters binder thread (preExecute).
         final IBinder token = mock(IBinder.class);
-        final ClientTransaction destroyTransaction = ClientTransaction.obtain(null /* client */,
-                token /* activityToken */);
+        final ClientTransaction destroyTransaction = ClientTransaction.obtain(null /* client */);
         destroyTransaction.setLifecycleStateRequest(
-                DestroyActivityItem.obtain(false /* finished */, 0 /* configChanges */));
+                DestroyActivityItem.obtain(token, false /* finished */, 0 /* configChanges */));
         destroyTransaction.preExecute(mTransactionHandler);
         // The activity should be added to to-be-destroyed container.
-        assertEquals(1, mTransactionHandler.getActivitiesToBeDestroyed().size());
+        assertEquals(1, activitiesToBeDestroyed.size());
 
         // A previous queued launch transaction runs on main thread (execute).
-        final ClientTransaction launchTransaction = ClientTransaction.obtain(null /* client */,
-                token /* activityToken */);
-        final LaunchActivityItem launchItem = spy(new LaunchActivityItemBuilder().build());
+        final ClientTransaction launchTransaction = ClientTransaction.obtain(null /* client */);
+        final LaunchActivityItem launchItem =
+                spy(new LaunchActivityItemBuilder().setActivityToken(token).build());
         launchTransaction.addCallback(launchItem);
         mExecutor.execute(launchTransaction);
 
         // The launch transaction should not be executed because its token is in the
         // to-be-destroyed container.
-        verify(launchItem, never()).execute(any(), any(), any());
+        verify(launchItem, never()).execute(any(), any());
 
         // After the destroy transaction has been executed, the token should be removed.
         mExecutor.execute(destroyTransaction);
-        assertEquals(0, mTransactionHandler.getActivitiesToBeDestroyed().size());
+        assertTrue(activitiesToBeDestroyed.isEmpty());
     }
 
     @Test
@@ -284,8 +285,7 @@ public class TransactionExecutorTests {
         PostExecItem postExecItem = new PostExecItem(ON_RESUME);
 
         IBinder token = mock(IBinder.class);
-        ClientTransaction transaction = ClientTransaction.obtain(null /* client */,
-                token /* activityToken */);
+        ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         transaction.addCallback(postExecItem);
 
         // Verify resolution that should get to onPause
@@ -437,7 +437,7 @@ public class TransactionExecutorTests {
         final ActivityTransactionItem activityItem = mock(ActivityTransactionItem.class);
         when(activityItem.getPostExecutionState()).thenReturn(UNDEFINED);
         final IBinder token = mock(IBinder.class);
-        final ClientTransaction transaction = ClientTransaction.obtain(null /* client */, token);
+        final ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         transaction.addCallback(activityItem);
         when(mTransactionHandler.getActivityClient(token)).thenReturn(null);
 
@@ -447,12 +447,14 @@ public class TransactionExecutorTests {
     @Test
     public void testActivityItemExecute() {
         final IBinder token = mock(IBinder.class);
-        final ClientTransaction transaction = ClientTransaction.obtain(null /* client */, token);
+        final ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         final ActivityTransactionItem activityItem = mock(ActivityTransactionItem.class);
         when(activityItem.getPostExecutionState()).thenReturn(UNDEFINED);
+        when(activityItem.getActivityToken()).thenReturn(token);
         transaction.addCallback(activityItem);
         final ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
         transaction.setLifecycleStateRequest(stateRequest);
+        when(stateRequest.getActivityToken()).thenReturn(token);
         when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
 
         mExecutor.execute(transaction);
@@ -500,12 +502,12 @@ public class TransactionExecutorTests {
         private StubItem() {
         }
 
-        private StubItem(Parcel in) {
+        private StubItem(@NonNull Parcel in) {
         }
 
         @Override
-        public void execute(ClientTransactionHandler client, IBinder token,
-                PendingTransactionActions pendingActions) {
+        public void execute(@NonNull ClientTransactionHandler client,
+                @NonNull PendingTransactionActions pendingActions) {
         }
 
         @Override
@@ -513,12 +515,11 @@ public class TransactionExecutorTests {
         }
 
         @Override
-        public void writeToParcel(Parcel dest, int flags) {
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
         }
 
-        public static final Parcelable.Creator<StubItem> CREATOR =
-                new Parcelable.Creator<StubItem>() {
-            public StubItem createFromParcel(Parcel in) {
+        public static final Parcelable.Creator<StubItem> CREATOR = new Parcelable.Creator<>() {
+            public StubItem createFromParcel(@NonNull Parcel in) {
                 return new StubItem(in);
             }
 

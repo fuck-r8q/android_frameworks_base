@@ -22,6 +22,8 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.PendingIntent;
 import android.companion.virtual.audio.VirtualAudioDevice;
+import android.companion.virtual.camera.VirtualCamera;
+import android.companion.virtual.camera.VirtualCameraConfig;
 import android.companion.virtual.sensor.VirtualSensor;
 import android.content.ComponentName;
 import android.content.Context;
@@ -238,6 +240,31 @@ public class VirtualDeviceInternal {
         }
     }
 
+    void setDevicePolicy(@VirtualDeviceParams.DynamicPolicyType int policyType,
+            @VirtualDeviceParams.DevicePolicy int devicePolicy) {
+        try {
+            mVirtualDevice.setDevicePolicy(policyType, devicePolicy);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    void addActivityPolicyExemption(@NonNull ComponentName componentName) {
+        try {
+            mVirtualDevice.addActivityPolicyExemption(componentName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    void removeActivityPolicyExemption(@NonNull ComponentName componentName) {
+        try {
+            mVirtualDevice.removeActivityPolicyExemption(componentName);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     @NonNull
     VirtualDpad createVirtualDpad(@NonNull VirtualDpadConfig config) {
         try {
@@ -311,6 +338,11 @@ public class VirtualDeviceInternal {
                     executor, callback, () -> mVirtualAudioDevice = null);
         }
         return mVirtualAudioDevice;
+    }
+
+    @NonNull
+    VirtualCamera createVirtualCamera(@NonNull VirtualCameraConfig config) {
+        return new VirtualCamera(mVirtualDevice, config);
     }
 
     @NonNull

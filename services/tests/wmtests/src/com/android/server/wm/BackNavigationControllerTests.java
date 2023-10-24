@@ -337,6 +337,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
         WindowState appWindow = task.getTopVisibleAppMainWindow();
         WindowOnBackInvokedDispatcher dispatcher =
                 new WindowOnBackInvokedDispatcher(context);
+        spyOn(appWindow.mSession);
         doAnswer(invocation -> {
             appWindow.setOnBackInvokedCallbackInfo(invocation.getArgument(1));
             return null;
@@ -562,7 +563,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
     private void setupKeyguardOccluded() {
         final KeyguardController kc = mRootHomeTask.mTaskSupervisor.getKeyguardController();
         doReturn(true).when(kc).isKeyguardLocked(anyInt());
-        doReturn(true).when(kc).isDisplayOccluded(anyInt());
+        doReturn(true).when(kc).isKeyguardOccluded(anyInt());
     }
 
     private void testPrepareAnimation(boolean preferWindowlessSurface) {

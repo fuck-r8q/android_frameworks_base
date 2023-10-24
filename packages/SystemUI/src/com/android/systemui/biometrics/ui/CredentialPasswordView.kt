@@ -10,7 +10,7 @@ import android.view.WindowInsets.Type.ime
 import android.view.accessibility.AccessibilityManager
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.biometrics.AuthPanelController
 import com.android.systemui.biometrics.ui.binder.CredentialViewBinder
 import com.android.systemui.biometrics.ui.viewmodel.CredentialViewModel
@@ -52,7 +52,7 @@ class CredentialPasswordView(context: Context, attrs: AttributeSet?) :
                     titleView.ellipsize = TextUtils.TruncateAt.MARQUEE
                     titleView.marqueeRepeatLimit = -1
                     // select to enable marquee unless a screen reader is enabled
-                    titleView.isSelected = accessibilityManager.shouldMarquee()
+                    titleView.isSelected = accessibilityManager?.shouldMarquee() ?: false
                 } else {
                     titleView.isSingleLine = false
                     titleView.ellipsize = null

@@ -44,6 +44,7 @@ import android.media.AudioManager;
 import android.os.SystemClock;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.MotionEvent;
@@ -55,8 +56,9 @@ import androidx.test.filters.SmallTest;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.systemui.Prefs;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.animation.AnimatorTestRule;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.media.dialog.MediaOutputDialogFactory;
@@ -71,6 +73,7 @@ import com.android.systemui.statusbar.policy.FakeConfigurationController;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -82,7 +85,7 @@ import java.util.function.Predicate;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
-@TestableLooper.RunWithLooper
+@TestableLooper.RunWithLooper(setAsMainLooper = true)
 public class VolumeDialogImplTest extends SysuiTestCase {
     VolumeDialogImpl mDialog;
     View mActiveRinger;
@@ -95,6 +98,8 @@ public class VolumeDialogImplTest extends SysuiTestCase {
     private TestableLooper mTestableLooper;
     private ConfigurationController mConfigurationController;
     private int mOriginalOrientation;
+
+    private static final String TAG = "VolumeDialogImplTest";
 
     @Mock
     VolumeDialogController mVolumeDialogController;
@@ -129,6 +134,9 @@ public class VolumeDialogImplTest extends SysuiTestCase {
     private FakeFeatureFlags mFeatureFlags;
     private int mLongestHideShowAnimationDuration = 250;
 
+    @Rule
+    public final AnimatorTestRule mAnimatorTestRule = new AnimatorTestRule();
+
     @Before
     public void setup() throws Exception {
         MockitoAnnotations.initMocks(this);
@@ -136,6 +144,7 @@ public class VolumeDialogImplTest extends SysuiTestCase {
         getContext().addMockSystemService(KeyguardManager.class, mKeyguard);
 
         mTestableLooper = TestableLooper.get(this);
+        allowTestableLooperAsMainThread();
 
         when(mPostureController.getDevicePosture())
                 .thenReturn(DevicePostureController.DEVICE_POSTURE_CLOSED);
@@ -241,7 +250,6 @@ public class VolumeDialogImplTest extends SysuiTestCase {
                 AccessibilityManager.FLAG_CONTENT_CONTROLS
                 | AccessibilityManager.FLAG_CONTENT_TEXT);
     }
-
 
     @Test
     public void testComputeTimeout_withHovering() {
@@ -669,11 +677,20 @@ public class VolumeDialogImplTest extends SysuiTestCase {
 
     @After
     public void teardown() {
-        cleanUp(mDialog);
+        // Detailed logs to track down timeout issues in b/299491332
+        Log.d(TAG, "teardown: entered");
         setOrientation(mOriginalOrientation);
+        Log.d(TAG, "teardown: after setOrientation");
+        mAnimatorTestRule.advanceTimeBy(mLongestHideShowAnimationDuration);
+        Log.d(TAG, "teardown: after advanceTimeBy");
         mTestableLooper.moveTimeForward(mLongestHideShowAnimationDuration);
+        Log.d(TAG, "teardown: after moveTimeForward");
         mTestableLooper.processAllMessages();
+        Log.d(TAG, "teardown: after processAllMessages");
         reset(mPostureController);
+        Log.d(TAG, "teardown: after reset");
+        cleanUp(mDialog);
+        Log.d(TAG, "teardown: after cleanUp");
     }
 
     private void cleanUp(VolumeDialogImpl dialog) {

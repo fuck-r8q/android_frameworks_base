@@ -31,6 +31,7 @@ import static android.content.pm.PackageManager.INSTALL_FAILED_INVALID_APK;
 import static android.content.pm.PackageManager.INSTALL_FAILED_MEDIA_UNAVAILABLE;
 import static android.content.pm.PackageManager.INSTALL_FAILED_MISSING_SPLIT;
 import static android.content.pm.PackageManager.INSTALL_FAILED_PRE_APPROVAL_NOT_AVAILABLE;
+import static android.content.pm.PackageManager.INSTALL_FAILED_VERIFICATION_FAILURE;
 import static android.content.pm.PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFICATES;
 import static android.content.pm.PackageManager.INSTALL_STAGED;
 import static android.content.pm.PackageManager.INSTALL_SUCCEEDED;
@@ -52,6 +53,7 @@ import static com.android.internal.util.XmlUtils.writeUriAttribute;
 import static com.android.server.pm.PackageInstallerService.prepareStageDir;
 import static com.android.server.pm.PackageManagerService.APP_METADATA_FILE_NAME;
 import static com.android.server.pm.PackageManagerServiceUtils.isInstalledByAdb;
+import static com.android.server.pm.PackageManagerShellCommandDataLoader.Metadata;
 
 import android.Manifest;
 import android.annotation.AnyThread;
@@ -136,6 +138,7 @@ import android.os.incremental.IncrementalFileStorages;
 import android.os.incremental.IncrementalManager;
 import android.os.incremental.PerUidReadTimeouts;
 import android.os.incremental.StorageHealthCheckParams;
+import android.os.incremental.V4Signature;
 import android.os.storage.StorageManager;
 import android.provider.DeviceConfig;
 import android.provider.Settings.Global;
@@ -808,6 +811,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // entries like "lost+found".
             if (file.isDirectory()) return false;
             if (file.getName().endsWith(REMOVE_MARKER_EXTENSION)) return false;
+            if (file.getName().endsWith(V4Signature.EXT)) return false;
             if (isAppMetadata(file)) return false;
             if (DexMetadataHelper.isDexMetadataFile(file)) return false;
             if (VerityUtils.isFsveritySignatureFile(file)) return false;
@@ -844,6 +848,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         }
         return SYSTEM_DATA_LOADER_PACKAGE.equals(
                 params.dataLoaderParams.getComponentName().getPackageName());
+    }
+
+    static boolean isArchivedInstallation(int installFlags) {
+        return (installFlags & PackageManager.INSTALL_ARCHIVED) != 0;
     }
 
     private final Handler.Callback mHandlerCallback = new Handler.Callback() {
@@ -902,6 +910,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     private boolean isSystemDataLoaderInstallation() {
         return isSystemDataLoaderInstallation(this.params);
+    }
+
+    private boolean isArchivedInstallation() {
+        return isArchivedInstallation(this.params.installFlags);
     }
 
     /**
@@ -1153,6 +1165,36 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
         if (isIncrementalInstallation() && !IncrementalManager.isAllowed()) {
             throw new IllegalArgumentException("Incremental installation not allowed.");
+        }
+
+        if (isArchivedInstallation()) {
+            if (params.mode != SessionParams.MODE_FULL_INSTALL) {
+                throw new IllegalArgumentException(
+                        "Archived installation can only be full install.");
+            }
+            if (!isStreamingInstallation() || !isSystemDataLoaderInstallation()) {
+                throw new IllegalArgumentException(
+                        "Archived installation can only use Streaming System DataLoader.");
+            }
+        }
+    }
+
+    PackageInstallerHistoricalSession createHistoricalSession() {
+        final float progress;
+        final float clientProgress;
+        synchronized (mProgressLock) {
+            progress = mProgress;
+            clientProgress = mClientProgress;
+        }
+        synchronized (mLock) {
+            return new PackageInstallerHistoricalSession(sessionId, userId, mOriginalInstallerUid,
+                    mOriginalInstallerPackageName, mInstallSource, mInstallerUid, createdMillis,
+                    updatedMillis, committedMillis, stageDir, stageCid, clientProgress, progress,
+                    isCommitted(), isPreapprovalRequested(), mSealed, mPermissionsManuallyAccepted,
+                    mStageDirInUse, mDestroyed, mFds.size(), mBridges.size(), mFinalStatus,
+                    mFinalMessage, params, mParentSessionId, getChildSessionIdsLocked(),
+                    mSessionApplied, mSessionFailed, mSessionReady, mSessionErrorCode,
+                    mSessionErrorMessage, mPreapprovalDetails);
         }
     }
 
@@ -1467,6 +1509,77 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private List<File> getAddedApksLocked() {
         String[] names = getNamesLocked();
         return filterFiles(stageDir, names, sAddedApkFilter);
+    }
+
+    @GuardedBy("mLock")
+    private void enableFsVerityToAddedApksWithIdsig() throws PackageManagerException {
+        try {
+            List<File> files = getAddedApksLocked();
+            for (var file : files) {
+                if (new File(file.getPath() + V4Signature.EXT).exists()) {
+                    VerityUtils.setUpFsverity(file.getPath());
+                }
+            }
+        } catch (IOException e) {
+            throw new PrepareFailure(PackageManager.INSTALL_FAILED_BAD_SIGNATURE,
+                    "Failed to enable fs-verity to verify with idsig: " + e);
+        }
+    }
+
+    @GuardedBy("mLock")
+    private List<ApkLite> getAddedApkLitesLocked() throws PackageManagerException {
+        if (!isArchivedInstallation()) {
+            List<File> files = getAddedApksLocked();
+            final List<ApkLite> result = new ArrayList<>(files.size());
+
+            final ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
+            for (int i = 0, size = files.size(); i < size; ++i) {
+                final ParseResult<ApkLite> parseResult = ApkLiteParseUtils.parseApkLite(
+                        input.reset(), files.get(i),
+                        ParsingPackageUtils.PARSE_COLLECT_CERTIFICATES);
+                if (parseResult.isError()) {
+                    throw new PackageManagerException(parseResult.getErrorCode(),
+                            parseResult.getErrorMessage(), parseResult.getException());
+                }
+                result.add(parseResult.getResult());
+            }
+
+            return result;
+        }
+
+        InstallationFile[] files = getInstallationFilesLocked();
+        final List<ApkLite> result = new ArrayList<>(files.length);
+
+        for (int i = 0, size = files.length; i < size; ++i) {
+            File file = new File(stageDir, files[i].getName());
+            if (!sAddedApkFilter.accept(file)) {
+                continue;
+            }
+
+            final Metadata metadata;
+            try {
+                metadata = Metadata.fromByteArray(files[i].getMetadata());
+            } catch (IOException e) {
+                throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                        "Failed to ", e);
+            }
+            if (metadata.getMode() != Metadata.ARCHIVED) {
+                throw new PackageManagerException(INSTALL_FAILED_VERIFICATION_FAILURE,
+                        "File metadata is not for ARCHIVED package: " + file);
+            }
+
+            var archPkg = metadata.getArchivedPackage();
+            if (archPkg == null) {
+                throw new PackageManagerException(INSTALL_FAILED_VERIFICATION_FAILURE,
+                        "Metadata does not contain ArchivedPackage: " + file);
+            }
+            if (archPkg.packageName == null || archPkg.signingDetails == null) {
+                throw new PackageManagerException(INSTALL_FAILED_VERIFICATION_FAILURE,
+                        "ArchivedPackage does not contain required info: " + file);
+            }
+            result.add(new ApkLite(file.getAbsolutePath(), archPkg));
+        }
+        return result;
     }
 
     @GuardedBy("mLock")
@@ -2148,6 +2261,19 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     /**
+     * Check if this package can be installed archived.
+     */
+    private static boolean isArchivedInstallationAllowed(String packageName) {
+        final PackageManagerInternal pmi = LocalServices.getService(PackageManagerInternal.class);
+        final PackageStateInternal existingPkgSetting = pmi.getPackageStateInternal(packageName);
+        if (existingPkgSetting == null) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Checks if the package can be installed on IncFs.
      */
     private static boolean isIncrementalInstallationAllowed(String packageName) {
@@ -2343,14 +2469,13 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     private void onSystemDataLoaderUnrecoverable() {
-        final DeletePackageHelper deletePackageHelper = new DeletePackageHelper(mPm);
         final String packageName = getPackageName();
         if (TextUtils.isEmpty(packageName)) {
             // The package has not been installed.
             return;
         }
         mHandler.post(() -> {
-            if (deletePackageHelper.deletePackageX(packageName,
+            if (mPm.deletePackageX(packageName,
                     PackageManager.VERSION_CODE_HIGHEST, UserHandle.USER_SYSTEM,
                     PackageManager.DELETE_ALL_USERS, true /*removedBySystem*/)
                     != PackageManager.DELETE_SUCCEEDED) {
@@ -2752,9 +2877,18 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
                         "Session not sealed");
             }
-            Objects.requireNonNull(mPackageName);
-            Objects.requireNonNull(mSigningDetails);
-            Objects.requireNonNull(mResolvedBaseFile);
+            if (mPackageName == null) {
+                throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                        "Session no package name");
+            }
+            if (mSigningDetails == null) {
+                throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                        "Session no signing data");
+            }
+            if (mResolvedBaseFile == null) {
+                throw new PackageManagerException(INSTALL_FAILED_INTERNAL_ERROR,
+                        "Session no resolved base file");
+            }
             final PackageLite result;
             if (!isApexSession()) {
                 // For mode inherit existing, it would link/copy existing files to stage dir in
@@ -2816,15 +2950,40 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
      * @return a future that will be completed when the whole process is completed.
      */
     private CompletableFuture<Void> install() {
+        // `futures` either contains only one session (`this`) or contains one parent session
+        // (`this`) and n-1 child sessions.
         List<CompletableFuture<InstallResult>> futures = installNonStaged();
         CompletableFuture<InstallResult>[] arr = new CompletableFuture[futures.size()];
         return CompletableFuture.allOf(futures.toArray(arr)).whenComplete((r, t) -> {
             if (t == null) {
                 setSessionApplied();
+                var multiPackageWarnings = new ArrayList<String>();
+                if (isMultiPackage()) {
+                    // This is a parent session. Collect warnings from children.
+                    for (CompletableFuture<InstallResult> f : futures) {
+                        InstallResult result = f.join();
+                        if (result.session != this && result.extras != null) {
+                            ArrayList<String> childWarnings = result.extras.getStringArrayList(
+                                    PackageInstaller.EXTRA_WARNINGS);
+                            if (!ArrayUtils.isEmpty(childWarnings)) {
+                                multiPackageWarnings.addAll(childWarnings);
+                            }
+                        }
+                    }
+                }
                 for (CompletableFuture<InstallResult> f : futures) {
                     InstallResult result = f.join();
+                    Bundle extras = result.extras;
+                    if (isMultiPackage() && result.session == this
+                            && !multiPackageWarnings.isEmpty()) {
+                        if (extras == null) {
+                            extras = new Bundle();
+                        }
+                        extras.putStringArrayList(
+                                PackageInstaller.EXTRA_WARNINGS, multiPackageWarnings);
+                    }
                     result.session.dispatchSessionFinished(
-                            INSTALL_SUCCEEDED, "Session installed", result.extras);
+                            INSTALL_SUCCEEDED, "Session installed", extras);
                 }
             } else {
                 PackageManagerException e = (PackageManagerException) t.getCause();
@@ -3196,7 +3355,15 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
         }
 
-        final List<File> addedFiles = getAddedApksLocked();
+        // Needs to happen before the first v4 signature verification, which happens in
+        // getAddedApkLitesLocked.
+        if (android.security.Flags.extendVbChainToUpdatedApk()) {
+            if (!isIncrementalInstallation()) {
+                enableFsVerityToAddedApksWithIdsig();
+            }
+        }
+
+        final List<ApkLite> addedFiles = getAddedApkLitesLocked();
         if (addedFiles.isEmpty()
                 && (removeSplitList.size() == 0 || getStagedAppMetadataFile() != null)) {
             throw new PackageManagerException(INSTALL_FAILED_INVALID_APK,
@@ -3210,15 +3377,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         final ArraySet<String> requiredSplitTypes = new ArraySet<>();
         final ArrayMap<String, ApkLite> splitApks = new ArrayMap<>();
         final ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
-        for (File addedFile : addedFiles) {
-            final ParseResult<ApkLite> result = ApkLiteParseUtils.parseApkLite(input.reset(),
-                    addedFile, ParsingPackageUtils.PARSE_COLLECT_CERTIFICATES);
-            if (result.isError()) {
-                throw new PackageManagerException(result.getErrorCode(),
-                        result.getErrorMessage(), result.getException());
-            }
-
-            final ApkLite apk = result.getResult();
+        for (ApkLite apk : addedFiles) {
             if (!stagedSplits.add(apk.getSplitName())) {
                 throw new PackageManagerException(INSTALL_FAILED_INVALID_APK,
                         "Split " + apk.getSplitName() + " was defined multiple times");
@@ -3234,7 +3393,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
             mHasDeviceAdminReceiver = apk.isHasDeviceAdminReceiver();
 
-            assertApkConsistentLocked(String.valueOf(addedFile), apk);
+            assertApkConsistentLocked(String.valueOf(apk), apk);
 
             // Take this opportunity to enforce uniform naming
             final String targetName = ApkLiteParseUtils.splitNameToFileName(apk);
@@ -3255,7 +3414,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             }
 
             final File targetFile = new File(stageDir, targetName);
-            resolveAndStageFileLocked(addedFile, targetFile, apk.getSplitName());
+            if (!isArchivedInstallation()) {
+                final File sourceFile = new File(apk.getPath());
+                resolveAndStageFileLocked(sourceFile, targetFile, apk.getSplitName());
+            }
 
             // Base is coming from session
             if (apk.getSplitName() == null) {
@@ -3292,6 +3454,22 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             if (mSigningDetails == SigningDetails.UNKNOWN) {
                 mSigningDetails = unsafeGetCertsWithoutVerification(
                         pkgInfo.applicationInfo.sourceDir);
+            }
+        }
+
+        if (isArchivedInstallation()) {
+            if (!isArchivedInstallationAllowed(mPackageName)) {
+                throw new PackageManagerException(
+                        PackageManager.INSTALL_FAILED_SESSION_INVALID,
+                        "Archived installation of this package is not allowed.");
+            }
+
+            if (!mPm.mInstallerService.mPackageArchiver.verifySupportsUnarchival(
+                    getInstallSource().mInstallerPackageName)) {
+                throw new PackageManagerException(
+                        PackageManager.INSTALL_FAILED_SESSION_INVALID,
+                        "Installer has to support unarchival in order to install archived "
+                                + "packages.");
             }
         }
 
@@ -3531,6 +3709,9 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private void maybeStageFsveritySignatureLocked(File origFile, File targetFile,
             boolean fsVerityRequired) throws PackageManagerException {
+        if (android.security.Flags.deprecateFsvSig()) {
+            return;
+        }
         final File originalSignature = new File(
                 VerityUtils.getFsveritySignatureFilePath(origFile.getPath()));
         if (originalSignature.exists()) {
@@ -3540,6 +3721,16 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         } else if (fsVerityRequired) {
             throw new PackageManagerException(INSTALL_FAILED_BAD_SIGNATURE,
                     "Missing corresponding fs-verity signature to " + origFile);
+        }
+    }
+
+    @GuardedBy("mLock")
+    private void maybeStageV4SignatureLocked(File origFile, File targetFile)
+            throws PackageManagerException {
+        final File originalSignature = new File(origFile.getPath() + V4Signature.EXT);
+        if (originalSignature.exists()) {
+            final File stagedSignature = new File(targetFile.getPath() + V4Signature.EXT);
+            stageFileLocked(originalSignature, stagedSignature);
         }
     }
 
@@ -3670,6 +3861,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // Stage APK's fs-verity signature if present.
         maybeStageFsveritySignatureLocked(origFile, targetFile,
                 isFsVerityRequiredForApk(origFile, targetFile));
+        // Stage APK's v4 signature if present, and fs-verity is supported.
+        if (android.security.Flags.extendVbChainToUpdatedApk()
+                && VerityUtils.isFsVeritySupported()) {
+            maybeStageV4SignatureLocked(origFile, targetFile);
+        }
         // Stage dex metadata (.dm) and corresponding fs-verity signature if present.
         maybeStageDexMetadataLocked(origFile, targetFile);
         // Stage checksums (.digests) if present.
@@ -3687,10 +3883,22 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     @GuardedBy("mLock")
+    private void maybeInheritV4SignatureLocked(File origFile) {
+        // Inherit the v4 signature file if present.
+        final File v4SignatureFile = new File(origFile.getPath() + V4Signature.EXT);
+        if (v4SignatureFile.exists()) {
+            mResolvedInheritedFiles.add(v4SignatureFile);
+        }
+    }
+
+    @GuardedBy("mLock")
     private void inheritFileLocked(File origFile) {
         mResolvedInheritedFiles.add(origFile);
 
         maybeInheritFsveritySignatureLocked(origFile);
+        if (android.security.Flags.extendVbChainToUpdatedApk()) {
+            maybeInheritV4SignatureLocked(origFile);
+        }
 
         // Inherit the dex metadata if present.
         final File dexMetadataFile =
@@ -4023,6 +4231,11 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         if (!inherit) {
             // Start from a clean slate
             NativeLibraryHelper.removeNativeBinariesFromDirLI(libDir, true);
+        }
+
+        // Skip native libraries processing for archival installation.
+        if (isArchivedInstallation()) {
+            return;
         }
 
         NativeLibraryHelper.Handle handle = null;
@@ -5024,6 +5237,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     PackageManager.EXTRA_FAILURE_EXISTING_PACKAGE);
             if (!TextUtils.isEmpty(existing)) {
                 fillIn.putExtra(PackageInstaller.EXTRA_OTHER_PACKAGE_NAME, existing);
+            }
+            ArrayList<String> warnings = extras.getStringArrayList(PackageInstaller.EXTRA_WARNINGS);
+            if (!ArrayUtils.isEmpty(warnings)) {
+                fillIn.putStringArrayListExtra(PackageInstaller.EXTRA_WARNINGS, warnings);
             }
         }
         try {

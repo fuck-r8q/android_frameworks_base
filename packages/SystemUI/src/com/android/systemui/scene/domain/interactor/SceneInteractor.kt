@@ -18,6 +18,7 @@ package com.android.systemui.scene.domain.interactor
 
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.power.data.repository.PowerRepository
 import com.android.systemui.scene.data.repository.SceneContainerRepository
 import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.ObservableTransitionState
@@ -42,8 +43,9 @@ import kotlinx.coroutines.flow.stateIn
 class SceneInteractor
 @Inject
 constructor(
-    @Application applicationScope: CoroutineScope,
+    @Application private val applicationScope: CoroutineScope,
     private val repository: SceneContainerRepository,
+    private val powerRepository: PowerRepository,
     private val logger: SceneLogger,
 ) {
 
@@ -144,6 +146,28 @@ constructor(
         return repository.setVisible(isVisible)
     }
 
+    /** True if there is a transition happening from and to the specified scenes. */
+    fun transitioning(from: SceneKey, to: SceneKey): StateFlow<Boolean> {
+        fun transitioning(
+            state: ObservableTransitionState,
+            from: SceneKey,
+            to: SceneKey,
+        ): Boolean {
+            return (state as? ObservableTransitionState.Transition)?.let {
+                it.fromScene == from && it.toScene == to
+            }
+                ?: false
+        }
+
+        return transitionState
+            .map { state -> transitioning(state, from, to) }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = transitioning(transitionState.value, from, to),
+            )
+    }
+
     /**
      * Binds the given flow so the system remembers it.
      *
@@ -151,6 +175,11 @@ constructor(
      */
     fun setTransitionState(transitionState: Flow<ObservableTransitionState>?) {
         repository.setTransitionState(transitionState)
+    }
+
+    /** Handles a user input event. */
+    fun onUserInput() {
+        powerRepository.userTouch()
     }
 
     /**
@@ -161,7 +190,7 @@ constructor(
      * Once a transition between one scene and another passes a threshold, the UI invokes this
      * method to report it, updating the value in [desiredScene] to match what the UI shows.
      */
-    internal fun onSceneChanged(scene: SceneModel, loggingReason: String) {
+    fun onSceneChanged(scene: SceneModel, loggingReason: String) {
         updateDesiredScene(scene, loggingReason, logger::logSceneChangeCommitted)
     }
 

@@ -34,7 +34,7 @@ import androidx.annotation.Nullable;
 
 import com.android.app.animation.Interpolators;
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.notification.Roundable;
 import com.android.systemui.statusbar.notification.RoundableState;
@@ -618,6 +618,10 @@ public abstract class ExpandableView extends FrameLayout implements Dumpable, Ro
     }
 
     public boolean showingPulsing() {
+        return false;
+    }
+
+    public boolean isHeadsUpState() {
         return false;
     }
 

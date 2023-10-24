@@ -303,6 +303,7 @@ public class FullScreenMagnificationGestureHandlerTest {
         });
     }
 
+    @FlakyTest(bugId = 297879316)
     @Test
     public void testStates_areMutuallyExclusive() {
         forEachState(state1 -> {
@@ -523,6 +524,7 @@ public class FullScreenMagnificationGestureHandlerTest {
         });
     }
 
+    @FlakyTest(bugId = 297879316)
     @Test
     public void testTwoFingersOneTap_activatedState_dispatchMotionEvents() {
         goFromStateIdleTo(STATE_ACTIVATED);
@@ -583,6 +585,7 @@ public class FullScreenMagnificationGestureHandlerTest {
         returnToNormalFrom(STATE_ACTIVATED);
     }
 
+    @FlakyTest(bugId = 297879316)
     @Test
     public void testFirstFingerSwipe_twoPointerDownAndActivatedState_panningState() {
         goFromStateIdleTo(STATE_ACTIVATED);
@@ -684,7 +687,7 @@ public class FullScreenMagnificationGestureHandlerTest {
         swipeAndHold(initCoords, edgeCoords);
 
         assertTrue(mMgh.mCurrentState == mMgh.mSinglePanningState);
-        assertTrue(mMgh.mSinglePanningState.mOverscrollState == mMgh.OVERSCROLL_LEFT_EDGE);
+        assertTrue(mMgh.mOverscrollHandler.mOverscrollState == mMgh.OVERSCROLL_LEFT_EDGE);
         assertTrue(isZoomed());
     }
 
@@ -708,7 +711,7 @@ public class FullScreenMagnificationGestureHandlerTest {
         swipeAndHold(initCoords, edgeCoords);
 
         assertTrue(mMgh.mCurrentState == mMgh.mSinglePanningState);
-        assertTrue(mMgh.mSinglePanningState.mOverscrollState == mMgh.OVERSCROLL_RIGHT_EDGE);
+        assertTrue(mMgh.mOverscrollHandler.mOverscrollState == mMgh.OVERSCROLL_RIGHT_EDGE);
         assertTrue(isZoomed());
     }
 
@@ -731,7 +734,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
         swipeAndHold(initCoords, edgeCoords);
 
-        assertTrue(mMgh.mSinglePanningState.mOverscrollState == mMgh.OVERSCROLL_VERTICAL_EDGE);
+        assertTrue(mMgh.mOverscrollHandler.mOverscrollState == mMgh.OVERSCROLL_VERTICAL_EDGE);
         assertTrue(isZoomed());
     }
 
@@ -753,7 +756,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
         swipeAndHold(initCoords, edgeCoords);
 
-        assertTrue(mMgh.mSinglePanningState.mOverscrollState == mMgh.OVERSCROLL_NONE);
+        assertTrue(mMgh.mOverscrollHandler.mOverscrollState == mMgh.OVERSCROLL_NONE);
         assertTrue(isZoomed());
     }
 

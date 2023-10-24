@@ -28,10 +28,10 @@ import android.testing.AndroidTestingRunner
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.WindowManager
 import android.view.WindowManager.TRANSIT_CHANGE
-import android.view.WindowManager.TRANSIT_NONE
 import android.view.WindowManager.TRANSIT_OPEN
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.DisplayAreaInfo
+import android.window.RemoteTransition
 import android.window.TransitionRequestInfo
 import android.window.WindowContainerTransaction
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER
@@ -43,6 +43,7 @@ import com.android.wm.shell.MockToken
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
+import com.android.wm.shell.transition.TestRemoteTransition
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.DisplayController
@@ -52,11 +53,15 @@ import com.android.wm.shell.common.SyncTransactionQueue
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFreeformTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createFullscreenTask
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createHomeTask
+import com.android.wm.shell.desktopmode.DesktopTestHelpers.Companion.createSplitScreenTask
+import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.sysui.ShellCommandHandler
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
+import com.android.wm.shell.transition.OneShotRemoteHandler
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.ENABLE_SHELL_TRANSITIONS
+import com.android.wm.shell.transition.Transitions.TransitionHandler
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -67,6 +72,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.eq
+import org.mockito.ArgumentMatchers.isA
 import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mock
 import org.mockito.Mockito
@@ -94,6 +100,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
             ToggleResizeDesktopTaskTransitionHandler
     @Mock lateinit var launchAdjacentController: LaunchAdjacentController
     @Mock lateinit var desktopModeWindowDecoration: DesktopModeWindowDecoration
+    @Mock lateinit var splitScreenController: SplitScreenController
 
     private lateinit var mockitoSession: StaticMockitoSession
     private lateinit var controller: DesktopTasksController
@@ -107,7 +114,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
     @Before
     fun setUp() {
         mockitoSession = mockitoSession().mockStatic(DesktopModeStatus::class.java).startMocking()
-        whenever(DesktopModeStatus.isProto2Enabled()).thenReturn(true)
+        whenever(DesktopModeStatus.isEnabled()).thenReturn(true)
 
         shellInit = Mockito.spy(ShellInit(testExecutor))
         desktopModeTaskRepository = DesktopModeTaskRepository()
@@ -116,6 +123,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         whenever(transitions.startTransition(anyInt(), any(), isNull())).thenAnswer { Binder() }
 
         controller = createController()
+        controller.splitScreenController = splitScreenController
 
         shellInit.init()
     }
@@ -154,7 +162,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
     @Test
     fun instantiate_flagOff_doNotAddInitCallback() {
-        whenever(DesktopModeStatus.isProto2Enabled()).thenReturn(false)
+        whenever(DesktopModeStatus.isEnabled()).thenReturn(false)
         clearInvocations(shellInit)
 
         createController()
@@ -170,9 +178,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
         markTaskHidden(task1)
         markTaskHidden(task2)
 
-        controller.showDesktopApps(DEFAULT_DISPLAY)
+        controller.showDesktopApps(DEFAULT_DISPLAY, RemoteTransition(TestRemoteTransition()))
 
-        val wct = getLatestWct(expectTransition = TRANSIT_NONE)
+        val wct =
+            getLatestWct(type = TRANSIT_TO_FRONT, handlerClass = OneShotRemoteHandler::class.java)
         assertThat(wct.hierarchyOps).hasSize(3)
         // Expect order to be from bottom: home, task1, task2
         wct.assertReorderAt(index = 0, homeTask)
@@ -188,9 +197,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
         markTaskVisible(task1)
         markTaskVisible(task2)
 
-        controller.showDesktopApps(DEFAULT_DISPLAY)
+        controller.showDesktopApps(DEFAULT_DISPLAY, RemoteTransition(TestRemoteTransition()))
 
-        val wct = getLatestWct(expectTransition = TRANSIT_NONE)
+        val wct =
+            getLatestWct(type = TRANSIT_TO_FRONT, handlerClass = OneShotRemoteHandler::class.java)
         assertThat(wct.hierarchyOps).hasSize(3)
         // Expect order to be from bottom: home, task1, task2
         wct.assertReorderAt(index = 0, homeTask)
@@ -206,9 +216,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
         markTaskHidden(task1)
         markTaskVisible(task2)
 
-        controller.showDesktopApps(DEFAULT_DISPLAY)
+        controller.showDesktopApps(DEFAULT_DISPLAY, RemoteTransition(TestRemoteTransition()))
 
-        val wct = getLatestWct(expectTransition = TRANSIT_NONE)
+        val wct =
+            getLatestWct(type = TRANSIT_TO_FRONT, handlerClass = OneShotRemoteHandler::class.java)
         assertThat(wct.hierarchyOps).hasSize(3)
         // Expect order to be from bottom: home, task1, task2
         wct.assertReorderAt(index = 0, homeTask)
@@ -220,9 +231,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
     fun showDesktopApps_noActiveTasks_reorderHomeToTop() {
         val homeTask = setUpHomeTask()
 
-        controller.showDesktopApps(DEFAULT_DISPLAY)
+        controller.showDesktopApps(DEFAULT_DISPLAY, RemoteTransition(TestRemoteTransition()))
 
-        val wct = getLatestWct(expectTransition = TRANSIT_NONE)
+        val wct =
+            getLatestWct(type = TRANSIT_TO_FRONT, handlerClass = OneShotRemoteHandler::class.java)
         assertThat(wct.hierarchyOps).hasSize(1)
         wct.assertReorderAt(index = 0, homeTask)
     }
@@ -236,9 +248,10 @@ class DesktopTasksControllerTest : ShellTestCase() {
         markTaskHidden(taskDefaultDisplay)
         markTaskHidden(taskSecondDisplay)
 
-        controller.showDesktopApps(DEFAULT_DISPLAY)
+        controller.showDesktopApps(DEFAULT_DISPLAY, RemoteTransition(TestRemoteTransition()))
 
-        val wct = getLatestWct(expectTransition = TRANSIT_NONE)
+        val wct =
+            getLatestWct(type = TRANSIT_TO_FRONT, handlerClass = OneShotRemoteHandler::class.java)
         assertThat(wct.hierarchyOps).hasSize(2)
         // Expect order to be from bottom: home, task
         wct.assertReorderAt(index = 0, homeTaskDefaultDisplay)
@@ -341,11 +354,35 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     @Test
+    fun moveToDesktop_splitTaskExitsSplit() {
+        var task = setUpSplitScreenTask()
+        controller.moveToDesktop(desktopModeWindowDecoration, task)
+        val wct = getLatestMoveToDesktopWct()
+        assertThat(wct.changes[task.token.asBinder()]?.windowingMode)
+            .isEqualTo(WINDOWING_MODE_FREEFORM)
+        verify(splitScreenController).prepareExitSplitScreen(any(), anyInt(),
+            eq(SplitScreenController.EXIT_REASON_ENTER_DESKTOP)
+        )
+    }
+
+    @Test
+    fun moveToDesktop_fullscreenTaskDoesNotExitSplit() {
+        var task = setUpFullscreenTask()
+        controller.moveToDesktop(desktopModeWindowDecoration, task)
+        val wct = getLatestMoveToDesktopWct()
+        assertThat(wct.changes[task.token.asBinder()]?.windowingMode)
+            .isEqualTo(WINDOWING_MODE_FREEFORM)
+        verify(splitScreenController, never()).prepareExitSplitScreen(any(), anyInt(),
+            eq(SplitScreenController.EXIT_REASON_ENTER_DESKTOP)
+        )
+    }
+
+    @Test
     fun moveToFullscreen_displayFullscreen_windowingModeSetToUndefined() {
         val task = setUpFreeformTask()
         task.configuration.windowConfiguration.displayWindowingMode = WINDOWING_MODE_FULLSCREEN
         controller.moveToFullscreen(task)
-        val wct = getLatestWct(expectTransition = TRANSIT_CHANGE)
+        val wct = getLatestWct(type = TRANSIT_CHANGE)
         assertThat(wct.changes[task.token.asBinder()]?.windowingMode)
             .isEqualTo(WINDOWING_MODE_UNDEFINED)
     }
@@ -355,7 +392,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         val task = setUpFreeformTask()
         task.configuration.windowConfiguration.displayWindowingMode = WINDOWING_MODE_FREEFORM
         controller.moveToFullscreen(task)
-        val wct = getLatestWct(expectTransition = TRANSIT_CHANGE)
+        val wct = getLatestWct(type = TRANSIT_CHANGE)
         assertThat(wct.changes[task.token.asBinder()]?.windowingMode)
                 .isEqualTo(WINDOWING_MODE_FULLSCREEN)
     }
@@ -373,7 +410,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveToFullscreen(taskDefaultDisplay)
 
-        with(getLatestWct(expectTransition = TRANSIT_CHANGE)) {
+        with(getLatestWct(type = TRANSIT_CHANGE)) {
             assertThat(changes.keys).contains(taskDefaultDisplay.token.asBinder())
             assertThat(changes.keys).doesNotContain(taskSecondDisplay.token.asBinder())
         }
@@ -386,7 +423,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         controller.moveTaskToFront(task1)
 
-        val wct = getLatestWct(expectTransition = TRANSIT_TO_FRONT)
+        val wct = getLatestWct(type = TRANSIT_TO_FRONT)
         assertThat(wct.hierarchyOps).hasSize(1)
         wct.assertReorderAt(index = 0, task1)
     }
@@ -411,7 +448,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
 
         val task = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
         controller.moveToNextDisplay(task.taskId)
-        with(getLatestWct(expectTransition = TRANSIT_CHANGE)) {
+        with(getLatestWct(type = TRANSIT_CHANGE)) {
             assertThat(hierarchyOps).hasSize(1)
             assertThat(hierarchyOps[0].container).isEqualTo(task.token.asBinder())
             assertThat(hierarchyOps[0].isReparent).isTrue()
@@ -433,7 +470,7 @@ class DesktopTasksControllerTest : ShellTestCase() {
         val task = setUpFreeformTask(displayId = SECOND_DISPLAY)
         controller.moveToNextDisplay(task.taskId)
 
-        with(getLatestWct(expectTransition = TRANSIT_CHANGE)) {
+        with(getLatestWct(type = TRANSIT_CHANGE)) {
             assertThat(hierarchyOps).hasSize(1)
             assertThat(hierarchyOps[0].container).isEqualTo(task.token.asBinder())
             assertThat(hierarchyOps[0].isReparent).isTrue()
@@ -695,6 +732,13 @@ class DesktopTasksControllerTest : ShellTestCase() {
         return task
     }
 
+    private fun setUpSplitScreenTask(displayId: Int = DEFAULT_DISPLAY): RunningTaskInfo {
+        val task = createSplitScreenTask(displayId)
+        whenever(shellTaskOrganizer.getRunningTaskInfo(task.taskId)).thenReturn(task)
+        runningTasks.add(task)
+        return task
+    }
+
     private fun markTaskVisible(task: RunningTaskInfo) {
         desktopModeTaskRepository.updateVisibleFreeformTasks(
             task.displayId,
@@ -712,11 +756,16 @@ class DesktopTasksControllerTest : ShellTestCase() {
     }
 
     private fun getLatestWct(
-        @WindowManager.TransitionType expectTransition: Int = TRANSIT_OPEN
+            @WindowManager.TransitionType type: Int = TRANSIT_OPEN,
+            handlerClass: Class<out TransitionHandler>? = null
     ): WindowContainerTransaction {
         val arg = ArgumentCaptor.forClass(WindowContainerTransaction::class.java)
         if (ENABLE_SHELL_TRANSITIONS) {
-            verify(transitions).startTransition(eq(expectTransition), arg.capture(), isNull())
+            if (handlerClass == null) {
+                verify(transitions).startTransition(eq(type), arg.capture(), isNull())
+            } else {
+                verify(transitions).startTransition(eq(type), arg.capture(), isA(handlerClass))
+            }
         } else {
             verify(shellTaskOrganizer).applyTransaction(arg.capture())
         }

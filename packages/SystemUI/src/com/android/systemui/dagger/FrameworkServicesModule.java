@@ -25,10 +25,12 @@ import android.app.AppOpsManager;
 import android.app.IActivityManager;
 import android.app.IActivityTaskManager;
 import android.app.INotificationManager;
+import android.app.IUriGrantsManager;
 import android.app.IWallpaperManager;
 import android.app.KeyguardManager;
 import android.app.NotificationManager;
 import android.app.StatsManager;
+import android.app.StatusBarManager;
 import android.app.UiModeManager;
 import android.app.WallpaperManager;
 import android.app.admin.DevicePolicyManager;
@@ -680,5 +682,19 @@ public class FrameworkServicesModule {
     @Singleton
     static TextClassificationManager provideTextClassificationManager(Context context) {
         return context.getSystemService(TextClassificationManager.class);
+    }
+
+    @Provides
+    @Singleton
+    static StatusBarManager provideStatusBarManager(Context context) {
+        return context.getSystemService(StatusBarManager.class);
+    }
+
+    @Provides
+    @Singleton
+    static IUriGrantsManager provideIUriGrantsManager() {
+        return IUriGrantsManager.Stub.asInterface(
+                ServiceManager.getService(Context.URI_GRANTS_SERVICE)
+        );
     }
 }

@@ -20,9 +20,14 @@ import static org.mockito.Mockito.verify;
 
 import android.app.ClientTransactionHandler;
 import android.os.IBinder;
+import android.platform.test.annotations.Presubmit;
+
+import androidx.test.filters.SmallTest;
+import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -32,12 +37,13 @@ import org.mockito.MockitoAnnotations;
  * Build/Install/Run:
  *  atest FrameworksCoreTests:WindowContextWindowRemovalItemTest
  */
+@RunWith(AndroidJUnit4.class)
+@SmallTest
+@Presubmit
 public class WindowContextWindowRemovalItemTest {
 
     @Mock
     private ClientTransactionHandler mHandler;
-    @Mock
-    private IBinder mToken;
     @Mock
     private PendingTransactionActions mPendingActions;
     @Mock
@@ -52,7 +58,7 @@ public class WindowContextWindowRemovalItemTest {
     public void testExecute() {
         final WindowContextWindowRemovalItem item = WindowContextWindowRemovalItem.obtain(
                 mClientToken);
-        item.execute(mHandler, mToken, mPendingActions);
+        item.execute(mHandler, mPendingActions);
 
         verify(mHandler).handleWindowContextWindowRemoval(mClientToken);
     }

@@ -501,6 +501,8 @@
     <string name="permdesc_systemCamera" msgid="5938360914419175986">"ამ პრივილეგირებულ ან სისტემის აპს შეუძლია ფოტოების გადაღება და ვიდეოების ჩაწერა ნებისმიერ დროს სისტემის კამერის გამოყენებით. საჭიროა, რომ აპს ჰქოდეს android.permission.CAMERA ნებართვაც"</string>
     <string name="permlab_cameraOpenCloseListener" msgid="5548732769068109315">"ნება დაერთოს აპლიკაციას ან სერვისს, მიიღოს გადმორეკვები კამერის მოწყობილობის გახსნის ან დახურვისას."</string>
     <string name="permdesc_cameraOpenCloseListener" msgid="2002636131008772908">"ამ აპს შეუძლია მიიღოს გადმორეკვები, როდესაც რომელიმე კამერის მოწყობილობა იხსნება (რომელიმე აპლიკაციით) ან იხურება."</string>
+    <string name="permlab_cameraHeadlessSystemUser" msgid="680194666834500050">"დაუშვით აპლიკაციის ან სერვისის, როგორც სისტემის (გრაფიკული ინტერფეისის გარეშე) მომხმარებლის, წვდომა კამერაზე."</string>
+    <string name="permdesc_cameraHeadlessSystemUser" msgid="6963163319710996412">"ამ აპს შეუძლია კამერაზე წვდომა, როგორც სისტემის (გრაფიკული ინტერფეისის გარეშე) მომხმარებელს."</string>
     <string name="permlab_vibrate" msgid="8596800035791962017">"ვიბრაციის კონტროლი"</string>
     <string name="permdesc_vibrate" msgid="8733343234582083721">"აპს შეეძლება, მართოს ვიბრირება."</string>
     <string name="permdesc_vibrator_state" msgid="7050024956594170724">"ნებას რთავს აპს, ჰქონდეს წვდომა ვიბრაციის მდგომარეობაზე."</string>
@@ -669,14 +671,14 @@
   </string-array>
     <string name="fingerprint_error_vendor_unknown" msgid="4170002184907291065">"რაღაც შეცდომა მოხდა. ცადეთ ხელახლა."</string>
     <string name="fingerprint_icon_content_description" msgid="4741068463175388817">"თითის ანაბეჭდის ხატულა"</string>
+    <string name="device_unlock_notification_name" msgid="2632928999862915709">"მოწყობილობის განბლოკვა"</string>
+    <string name="alternative_unlock_setup_notification_title" msgid="6241508547901933544">"ცადეთ სხვა გზით განბლოკვა"</string>
+    <string name="alternative_face_setup_notification_content" msgid="3384959224091897331">"გამოიყენეთ სახით განბლოკვა, როდესაც თქვენი თითის ანაბეჭდის ამოცნობა ვერ ხდება, მაგალითად, როდესაც თქვენი თითები სველია"</string>
+    <string name="alternative_fp_setup_notification_content" msgid="7454096947415721639">"გამოიყენეთ ანაბეჭდით განბლოკვა, როდესაც თქვენი სახის ამოცნობა ვერ ხდება, მაგალითად, არასაკმარისი განათების დროს"</string>
     <string name="face_recalibrate_notification_name" msgid="7311163114750748686">"განბლოკვა სახით"</string>
     <string name="face_recalibrate_notification_title" msgid="2524791952735579082">"პრობლემა სახით განბლოკვასთან დაკავშირებით"</string>
     <string name="face_recalibrate_notification_content" msgid="3064513770251355594">"შეეხეთ თქვენი სახის მოდელის წასაშლელად, შემდეგ დაამატეთ სახე ხელახლა"</string>
-    <string name="face_setup_notification_title" msgid="8843461561970741790">"სახით განბლოკვის პარამეტრების დაყენება"</string>
-    <string name="face_setup_notification_content" msgid="5463999831057751676">"განბლოკეთ თქვენი ტელეფონი შეხედვით"</string>
     <string name="face_sensor_privacy_enabled" msgid="7407126963510598508">"იმისთვის, რომ სახით განბლოკვით ისარგებლოთ, ჩართეთ "<b>"კამერაზე წვდომა"</b>" პარამეტრებსა და კონფიდენციალურობაში"</string>
-    <string name="fingerprint_setup_notification_title" msgid="2002630611398849495">"დააყენეთ განბლოკვის სხვა ხერხები"</string>
-    <string name="fingerprint_setup_notification_content" msgid="205578121848324852">"შეეხეთ თითის ანაბეჭდის დასამატებლად"</string>
     <string name="fingerprint_recalibrate_notification_name" msgid="1414578431898579354">"თითის ანაბეჭდით განბლოკვა"</string>
     <string name="fingerprint_recalibrate_notification_title" msgid="2406561052064558497">"თითის ანაბეჭდის სენსორის გამოყენება ვერ ხერხდება"</string>
     <string name="fingerprint_recalibrate_notification_content" msgid="8519935717822194943">"ეწვიეთ შეკეთების სერვისის პროვაიდერს."</string>
@@ -1867,6 +1869,7 @@
     <string name="managed_profile_label_badge_2" msgid="5673187309555352550">"მე-2 სამსახური <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"მე-3 სამსახური <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g> კლონის შექმნა"</string>
+    <string name="private_profile_label_badge" msgid="1712086003787839183">"პირადი <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"ფიქსაციის მოხსნამდე PIN-ის მოთხოვნა"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"ფიქსაციის მოხსნამდე განბლოკვის ნიმუშის მოთხოვნა"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"ფიქსაციის მოხსნამდე პაროლის მოთხოვნა"</string>
@@ -2031,7 +2034,7 @@
     <string name="autofill_update_title" msgid="3630695947047069136">"გსურთ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"-ში განახლება?"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"გსურთ, "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"-ში განაახლოთ <xliff:g id="TYPE">%1$s</xliff:g>?"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"გსურთ, "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"-ში განაახლოთ <xliff:g id="TYPE_0">%1$s</xliff:g> და <xliff:g id="TYPE_1">%2$s</xliff:g>?"</string>
-    <string name="autofill_update_title_with_3types" msgid="1312232153076212291">"გსურთ, "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"-ში განაახლოთ <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> და <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"განახლდეს ეს ერთეულები "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"-ში: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> და <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"შენახვა"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"არა, გმადლობთ"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"ახლა არა"</string>

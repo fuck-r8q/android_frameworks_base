@@ -18,6 +18,7 @@ package com.android.server.display.mode;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.os.Trace;
 import android.util.Slog;
 import android.util.SparseArray;
 
@@ -30,7 +31,8 @@ class VotesStorage {
     private static final String TAG = "VotesStorage";
     // Special ID used to indicate that given vote is to be applied globally, rather than to a
     // specific display.
-    private static final int GLOBAL_ID = -1;
+    @VisibleForTesting
+    static final int GLOBAL_ID = -1;
 
     private boolean mLoggingEnabled;
 
@@ -90,6 +92,7 @@ class VotesStorage {
                     + ", vote=" + vote);
             return;
         }
+        boolean changed = false;
         SparseArray<Vote> votes;
         synchronized (mStorageLock) {
             if (mVotesByDisplay.contains(displayId)) {
@@ -98,16 +101,24 @@ class VotesStorage {
                 votes = new SparseArray<>();
                 mVotesByDisplay.put(displayId, votes);
             }
-            if (vote != null) {
+            var currentVote = votes.get(priority);
+            if (vote != null && !vote.equals(currentVote)) {
                 votes.put(priority, vote);
-            } else {
+                changed = true;
+            } else if (vote == null && currentVote != null) {
                 votes.remove(priority);
+                changed = true;
             }
         }
+        Trace.traceCounter(Trace.TRACE_TAG_POWER,
+                TAG + "." + displayId + ":" + Vote.priorityToString(priority),
+                getMaxPhysicalRefreshRate(vote));
         if (mLoggingEnabled) {
             Slog.i(TAG, "Updated votes for display=" + displayId + " votes=" + votes);
         }
-        mListener.onChanged();
+        if (changed) {
+            mListener.onChanged();
+        }
     }
 
     /** dump class values, for debugging */
@@ -144,6 +155,15 @@ class VotesStorage {
                 mVotesByDisplay.put(votesByDisplay.keyAt(i), votesByDisplay.valueAt(i));
             }
         }
+    }
+
+    private int getMaxPhysicalRefreshRate(@Nullable Vote vote) {
+        if (vote == null) {
+            return -1;
+        } else if (vote.refreshRateRanges.physical.max == Float.POSITIVE_INFINITY) {
+            return 1000; // for visualisation, otherwise e.g. -1 -> 60 will be unnoticeable
+        }
+        return (int) vote.refreshRateRanges.physical.max;
     }
 
     interface Listener {

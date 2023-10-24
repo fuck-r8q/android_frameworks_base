@@ -4464,7 +4464,7 @@ package android.app {
     method public void onProvideAssistData(android.os.Bundle);
     method public android.net.Uri onProvideReferrer();
     method public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[]);
-    method public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[], int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public void onRequestPermissionsResult(int, @NonNull String[], @NonNull int[], int);
     method @CallSuper protected void onRestart();
     method protected void onRestoreInstanceState(@NonNull android.os.Bundle);
     method public void onRestoreInstanceState(@Nullable android.os.Bundle, @Nullable android.os.PersistableBundle);
@@ -4506,7 +4506,7 @@ package android.app {
     method public android.view.DragAndDropPermissions requestDragAndDropPermissions(android.view.DragEvent);
     method public void requestFullscreenMode(int, @Nullable android.os.OutcomeReceiver<java.lang.Void,java.lang.Throwable>);
     method public final void requestPermissions(@NonNull String[], int);
-    method public final void requestPermissions(@NonNull String[], int, int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public final void requestPermissions(@NonNull String[], int, int);
     method public final void requestShowKeyboardShortcuts();
     method @Deprecated public boolean requestVisibleBehind(boolean);
     method public final boolean requestWindowFeature(int);
@@ -4554,7 +4554,7 @@ package android.app {
     method public void setVrModeEnabled(boolean, @NonNull android.content.ComponentName) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean shouldDockBigOverlays();
     method public boolean shouldShowRequestPermissionRationale(@NonNull String);
-    method public boolean shouldShowRequestPermissionRationale(@NonNull String, int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public boolean shouldShowRequestPermissionRationale(@NonNull String, int);
     method public boolean shouldUpRecreateTask(android.content.Intent);
     method public boolean showAssist(android.os.Bundle);
     method @Deprecated public final void showDialog(int);
@@ -4617,9 +4617,9 @@ package android.app {
 
   public class ActivityManager {
     method public int addAppTask(@NonNull android.app.Activity, @NonNull android.content.Intent, @Nullable android.app.ActivityManager.TaskDescription, @NonNull android.graphics.Bitmap);
-    method public void addStartInfoTimestamp(@IntRange(from=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER_START, to=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER) int, long);
+    method @FlaggedApi("android.app.app_start_info") public void addStartInfoTimestamp(@IntRange(from=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER_START, to=android.app.ApplicationStartInfo.START_TIMESTAMP_RESERVED_RANGE_DEVELOPER) int, long);
     method public void appNotResponding(@NonNull String);
-    method public void clearApplicationStartInfoCompletionListener();
+    method @FlaggedApi("android.app.app_start_info") public void clearApplicationStartInfoCompletionListener();
     method public boolean clearApplicationUserData();
     method public void clearWatchHeapLimit();
     method @RequiresPermission(android.Manifest.permission.DUMP) public void dumpPackageState(java.io.FileDescriptor, String);
@@ -4627,7 +4627,7 @@ package android.app {
     method public java.util.List<android.app.ActivityManager.AppTask> getAppTasks();
     method public android.content.pm.ConfigurationInfo getDeviceConfigurationInfo();
     method @NonNull public java.util.List<android.app.ApplicationExitInfo> getHistoricalProcessExitReasons(@Nullable String, @IntRange(from=0) int, @IntRange(from=0) int);
-    method @NonNull public java.util.List<android.app.ApplicationStartInfo> getHistoricalProcessStartReasons(@IntRange(from=0) int);
+    method @FlaggedApi("android.app.app_start_info") @NonNull public java.util.List<android.app.ApplicationStartInfo> getHistoricalProcessStartReasons(@IntRange(from=0) int);
     method public int getLargeMemoryClass();
     method public int getLauncherLargeIconDensity();
     method public int getLauncherLargeIconSize();
@@ -4654,7 +4654,7 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int);
     method @RequiresPermission(android.Manifest.permission.REORDER_TASKS) public void moveTaskToFront(int, int, android.os.Bundle);
     method @Deprecated public void restartPackage(String);
-    method public void setApplicationStartInfoCompletionListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.app.ApplicationStartInfo>);
+    method @FlaggedApi("android.app.app_start_info") public void setApplicationStartInfoCompletionListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.app.ApplicationStartInfo>);
     method public void setProcessStateSummary(@Nullable byte[]);
     method public static void setVrThread(int);
     method public void setWatchHeapLimit(long);
@@ -5235,7 +5235,7 @@ package android.app {
     field public static final int REASON_USER_STOPPED = 11; // 0xb
   }
 
-  public final class ApplicationStartInfo implements android.os.Parcelable {
+  @FlaggedApi("android.app.app_start_info") public final class ApplicationStartInfo implements android.os.Parcelable {
     method public int describeContents();
     method public int getDefiningUid();
     method @Nullable public android.content.Intent getIntent();
@@ -5966,6 +5966,7 @@ package android.app {
 
   public class GrammaticalInflectionManager {
     method public int getApplicationGrammaticalGender();
+    method @FlaggedApi("android.app.system_terms_of_address_enabled") public int getSystemGrammaticalGender();
     method public void setRequestedApplicationGrammaticalGender(int);
   }
 
@@ -6763,7 +6764,6 @@ package android.app {
     method public android.app.Notification.WearableExtender clone();
     method public android.app.Notification.Builder extend(android.app.Notification.Builder);
     method public java.util.List<android.app.Notification.Action> getActions();
-    method @Deprecated public android.graphics.Bitmap getBackground();
     method public String getBridgeTag();
     method public int getContentAction();
     method @Deprecated public int getContentIcon();
@@ -6782,7 +6782,6 @@ package android.app {
     method @Deprecated public boolean getHintShowBackgroundOnly();
     method @Deprecated public java.util.List<android.app.Notification> getPages();
     method public boolean getStartScrollBottom();
-    method @Deprecated public android.app.Notification.WearableExtender setBackground(android.graphics.Bitmap);
     method public android.app.Notification.WearableExtender setBridgeTag(String);
     method public android.app.Notification.WearableExtender setContentAction(int);
     method @Deprecated public android.app.Notification.WearableExtender setContentIcon(int);
@@ -9764,14 +9763,25 @@ package android.companion.virtual {
   public final class VirtualDevice implements android.os.Parcelable {
     method public int describeContents();
     method public int getDeviceId();
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") @NonNull public int[] getDisplayIds();
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") @Nullable public CharSequence getDisplayName();
     method @Nullable public String getName();
     method @Nullable public String getPersistentDeviceId();
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public boolean hasCustomSensorSupport();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.virtual.VirtualDevice> CREATOR;
   }
 
   public final class VirtualDeviceManager {
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") @Nullable public android.companion.virtual.VirtualDevice getVirtualDevice(int);
     method @NonNull public java.util.List<android.companion.virtual.VirtualDevice> getVirtualDevices();
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public void registerVirtualDeviceListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.VirtualDeviceManager.VirtualDeviceListener);
+    method @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public void unregisterVirtualDeviceListener(@NonNull android.companion.virtual.VirtualDeviceManager.VirtualDeviceListener);
+  }
+
+  @FlaggedApi("android.companion.virtual.flags.vdm_public_apis") public static interface VirtualDeviceManager.VirtualDeviceListener {
+    method public default void onVirtualDeviceClosed(int);
+    method public default void onVirtualDeviceCreated(int);
   }
 
 }
@@ -9842,7 +9852,7 @@ package android.content {
     method public int describeContents();
     method public void enforceCallingUid();
     method @Nullable public String getAttributionTag();
-    method public int getDeviceId();
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") public int getDeviceId();
     method @Nullable public android.content.AttributionSource getNext();
     method @Nullable public String getPackageName();
     method public int getPid();
@@ -9858,7 +9868,7 @@ package android.content {
     ctor public AttributionSource.Builder(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource build();
     method @NonNull public android.content.AttributionSource.Builder setAttributionTag(@Nullable String);
-    method @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis") @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
     method @Deprecated @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setPackageName(@Nullable String);
@@ -10643,6 +10653,7 @@ package android.content {
   public final class ContextParams {
     method @Nullable public String getAttributionTag();
     method @Nullable public android.content.AttributionSource getNextAttributionSource();
+    method @NonNull public boolean shouldRegisterAttributionSource();
   }
 
   public static final class ContextParams.Builder {
@@ -10651,6 +10662,7 @@ package android.content {
     method @NonNull public android.content.ContextParams build();
     method @NonNull public android.content.ContextParams.Builder setAttributionTag(@Nullable String);
     method @NonNull public android.content.ContextParams.Builder setNextAttributionSource(@Nullable android.content.AttributionSource);
+    method @NonNull public android.content.ContextParams.Builder setShouldRegisterAttributionSource(boolean);
   }
 
   public class ContextWrapper extends android.content.Context {
@@ -11073,8 +11085,10 @@ package android.content {
     field public static final String ACTION_PROCESS_TEXT = "android.intent.action.PROCESS_TEXT";
     field public static final String ACTION_PROFILE_ACCESSIBLE = "android.intent.action.PROFILE_ACCESSIBLE";
     field public static final String ACTION_PROFILE_ADDED = "android.intent.action.PROFILE_ADDED";
+    field @FlaggedApi("android.os.allow_private_profile") public static final String ACTION_PROFILE_AVAILABLE = "android.intent.action.PROFILE_AVAILABLE";
     field public static final String ACTION_PROFILE_INACCESSIBLE = "android.intent.action.PROFILE_INACCESSIBLE";
     field public static final String ACTION_PROFILE_REMOVED = "android.intent.action.PROFILE_REMOVED";
+    field @FlaggedApi("android.os.allow_private_profile") public static final String ACTION_PROFILE_UNAVAILABLE = "android.intent.action.PROFILE_UNAVAILABLE";
     field public static final String ACTION_PROVIDER_CHANGED = "android.intent.action.PROVIDER_CHANGED";
     field public static final String ACTION_QUICK_CLOCK = "android.intent.action.QUICK_CLOCK";
     field public static final String ACTION_QUICK_VIEW = "android.intent.action.QUICK_VIEW";
@@ -11165,6 +11179,7 @@ package android.content {
     field public static final String EXTRA_ALLOW_MULTIPLE = "android.intent.extra.ALLOW_MULTIPLE";
     field @Deprecated public static final String EXTRA_ALLOW_REPLACE = "android.intent.extra.ALLOW_REPLACE";
     field public static final String EXTRA_ALTERNATE_INTENTS = "android.intent.extra.ALTERNATE_INTENTS";
+    field public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
     field public static final String EXTRA_ASSIST_CONTEXT = "android.intent.extra.ASSIST_CONTEXT";
     field public static final String EXTRA_ASSIST_INPUT_DEVICE_ID = "android.intent.extra.ASSIST_INPUT_DEVICE_ID";
     field public static final String EXTRA_ASSIST_INPUT_HINT_KEYBOARD = "android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD";
@@ -15166,7 +15181,7 @@ package android.graphics {
     method public int getByteCount();
     method @NonNull public android.graphics.Color getColor(int, int);
     method @Nullable public android.graphics.ColorSpace getColorSpace();
-    method @NonNull public android.graphics.Bitmap.Config getConfig();
+    method @Nullable public android.graphics.Bitmap.Config getConfig();
     method public int getDensity();
     method @Nullable public android.graphics.Gainmap getGainmap();
     method public int getGenerationId();
@@ -15292,6 +15307,7 @@ package android.graphics {
     method public int getMaxAnisotropy();
     method public void setFilterMode(int);
     method public void setMaxAnisotropy(@IntRange(from=1) int);
+    method @FlaggedApi("com.android.graphics.hwui.flags.gainmap_animations") public void setOverrideGainmap(@Nullable android.graphics.Gainmap);
     field public static final int FILTER_MODE_DEFAULT = 0; // 0x0
     field public static final int FILTER_MODE_LINEAR = 2; // 0x2
     field public static final int FILTER_MODE_NEAREST = 1; // 0x1
@@ -16369,7 +16385,8 @@ package android.graphics {
     method public void arcTo(@NonNull android.graphics.RectF, float, float);
     method public void arcTo(float, float, float, float, float, float, boolean);
     method public void close();
-    method public void computeBounds(@NonNull android.graphics.RectF, boolean);
+    method @Deprecated public void computeBounds(@NonNull android.graphics.RectF, boolean);
+    method public void computeBounds(@NonNull android.graphics.RectF);
     method public void conicTo(float, float, float, float, float);
     method public void cubicTo(float, float, float, float, float, float);
     method @NonNull public android.graphics.Path.FillType getFillType();
@@ -17632,7 +17649,7 @@ package android.graphics.fonts {
     ctor public FontFamily.Builder(@NonNull android.graphics.fonts.Font);
     method @NonNull public android.graphics.fonts.FontFamily.Builder addFont(@NonNull android.graphics.fonts.Font);
     method @NonNull public android.graphics.fonts.FontFamily build();
-    method @Nullable public android.graphics.fonts.FontFamily buildVariableFamily();
+    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") @Nullable public android.graphics.fonts.FontFamily buildVariableFamily();
   }
 
   public final class FontStyle {
@@ -17722,23 +17739,28 @@ package android.graphics.pdf {
 package android.graphics.text {
 
   public final class LineBreakConfig {
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public int getHyphenation();
     method public int getLineBreakStyle();
     method public int getLineBreakWordStyle();
-    method @NonNull public android.graphics.text.LineBreakConfig merge(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig merge(@NonNull android.graphics.text.LineBreakConfig);
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_DISABLED = 0; // 0x0
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_ENABLED = 1; // 0x1
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_UNSPECIFIED = -1; // 0xffffffff
     field public static final int LINE_BREAK_STYLE_LOOSE = 1; // 0x1
     field public static final int LINE_BREAK_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_STYLE_NORMAL = 2; // 0x2
     field public static final int LINE_BREAK_STYLE_STRICT = 3; // 0x3
-    field public static final int LINE_BREAK_STYLE_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_UNSPECIFIED = -1; // 0xffffffff
     field public static final int LINE_BREAK_WORD_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_WORD_STYLE_PHRASE = 1; // 0x1
-    field public static final int LINE_BREAK_WORD_STYLE_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_WORD_STYLE_UNSPECIFIED = -1; // 0xffffffff
   }
 
   public static final class LineBreakConfig.Builder {
     ctor public LineBreakConfig.Builder();
     method @NonNull public android.graphics.text.LineBreakConfig build();
-    method @NonNull public android.graphics.text.LineBreakConfig.Builder merge(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig.Builder merge(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig.Builder setHyphenation(int);
     method @NonNull public android.graphics.text.LineBreakConfig.Builder setLineBreakStyle(int);
     method @NonNull public android.graphics.text.LineBreakConfig.Builder setLineBreakWordStyle(int);
   }
@@ -17762,6 +17784,7 @@ package android.graphics.text {
     method @NonNull public android.graphics.text.LineBreaker.Builder setHyphenationFrequency(int);
     method @NonNull public android.graphics.text.LineBreaker.Builder setIndents(@Nullable int[]);
     method @NonNull public android.graphics.text.LineBreaker.Builder setJustificationMode(int);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.graphics.text.LineBreaker.Builder setUseBoundsForWidth(boolean);
   }
 
   public static class LineBreaker.ParagraphConstraints {
@@ -17813,18 +17836,18 @@ package android.graphics.text {
     method public float getAdvance();
     method public float getAscent();
     method public float getDescent();
-    method public boolean getFakeBold(@IntRange(from=0) int);
-    method public boolean getFakeItalic(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public boolean getFakeBold(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public boolean getFakeItalic(@IntRange(from=0) int);
     method @NonNull public android.graphics.fonts.Font getFont(@IntRange(from=0) int);
     method @IntRange(from=0) public int getGlyphId(@IntRange(from=0) int);
     method public float getGlyphX(@IntRange(from=0) int);
     method public float getGlyphY(@IntRange(from=0) int);
-    method public float getItalicOverride(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public float getItalicOverride(@IntRange(from=0) int);
     method public float getOffsetX();
     method public float getOffsetY();
-    method public float getWeightOverride(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public float getWeightOverride(@IntRange(from=0) int);
     method @IntRange(from=0) public int glyphCount();
-    field public static final float NO_OVERRIDE = 1.4E-45f;
+    field @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public static final float NO_OVERRIDE = 1.4E-45f;
   }
 
   public class TextRunShaper {
@@ -18709,6 +18732,10 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Boolean> FLASH_INFO_AVAILABLE;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_INFO_STRENGTH_DEFAULT_LEVEL;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_INFO_STRENGTH_MAXIMUM_LEVEL;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_SINGLE_STRENGTH_MAX_LEVEL;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_TORCH_STRENGTH_DEFAULT_LEVEL;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> FLASH_TORCH_STRENGTH_MAX_LEVEL;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<int[]> HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<android.hardware.camera2.params.DeviceStateSensorOrientationMap> INFO_DEVICE_STATE_SENSOR_ORIENTATION_MAP;
     field @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<java.lang.Integer> INFO_SUPPORTED_HARDWARE_LEVEL;
@@ -19278,6 +19305,7 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> EDGE_MODE;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> EXTENSION_STRENGTH;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> FLASH_MODE;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> FLASH_STRENGTH_LEVEL;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> HOT_PIXEL_MODE;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<android.location.Location> JPEG_GPS_LOCATION;
     field @NonNull public static final android.hardware.camera2.CaptureRequest.Key<java.lang.Integer> JPEG_ORIENTATION;
@@ -19373,6 +19401,7 @@ package android.hardware.camera2 {
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> EXTENSION_STRENGTH;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> FLASH_MODE;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> FLASH_STATE;
+    field @FlaggedApi("com.android.internal.camera.flags.camera_manual_flash_strength_control") @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> FLASH_STRENGTH_LEVEL;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> HOT_PIXEL_MODE;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<android.location.Location> JPEG_GPS_LOCATION;
     field @NonNull public static final android.hardware.camera2.CaptureResult.Key<java.lang.Integer> JPEG_ORIENTATION;
@@ -20485,513 +20514,6 @@ package android.inputmethodservice {
 
 package android.location {
 
-  public class Address implements android.os.Parcelable {
-    ctor public Address(java.util.Locale);
-    method public void clearLatitude();
-    method public void clearLongitude();
-    method public int describeContents();
-    method public String getAddressLine(int);
-    method public String getAdminArea();
-    method public String getCountryCode();
-    method public String getCountryName();
-    method public android.os.Bundle getExtras();
-    method public String getFeatureName();
-    method public double getLatitude();
-    method public java.util.Locale getLocale();
-    method public String getLocality();
-    method public double getLongitude();
-    method public int getMaxAddressLineIndex();
-    method public String getPhone();
-    method public String getPostalCode();
-    method public String getPremises();
-    method public String getSubAdminArea();
-    method public String getSubLocality();
-    method public String getSubThoroughfare();
-    method public String getThoroughfare();
-    method public String getUrl();
-    method public boolean hasLatitude();
-    method public boolean hasLongitude();
-    method public void setAddressLine(int, String);
-    method public void setAdminArea(String);
-    method public void setCountryCode(String);
-    method public void setCountryName(String);
-    method public void setExtras(android.os.Bundle);
-    method public void setFeatureName(String);
-    method public void setLatitude(double);
-    method public void setLocality(String);
-    method public void setLongitude(double);
-    method public void setPhone(String);
-    method public void setPostalCode(String);
-    method public void setPremises(String);
-    method public void setSubAdminArea(String);
-    method public void setSubLocality(String);
-    method public void setSubThoroughfare(String);
-    method public void setThoroughfare(String);
-    method public void setUrl(String);
-    method public void writeToParcel(android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.Address> CREATOR;
-  }
-
-  @Deprecated public class Criteria implements android.os.Parcelable {
-    ctor @Deprecated public Criteria();
-    ctor @Deprecated public Criteria(android.location.Criteria);
-    method @Deprecated public int describeContents();
-    method @Deprecated public int getAccuracy();
-    method @Deprecated public int getBearingAccuracy();
-    method @Deprecated public int getHorizontalAccuracy();
-    method @Deprecated public int getPowerRequirement();
-    method @Deprecated public int getSpeedAccuracy();
-    method @Deprecated public int getVerticalAccuracy();
-    method @Deprecated public boolean isAltitudeRequired();
-    method @Deprecated public boolean isBearingRequired();
-    method @Deprecated public boolean isCostAllowed();
-    method @Deprecated public boolean isSpeedRequired();
-    method @Deprecated public void setAccuracy(int);
-    method @Deprecated public void setAltitudeRequired(boolean);
-    method @Deprecated public void setBearingAccuracy(int);
-    method @Deprecated public void setBearingRequired(boolean);
-    method @Deprecated public void setCostAllowed(boolean);
-    method @Deprecated public void setHorizontalAccuracy(int);
-    method @Deprecated public void setPowerRequirement(int);
-    method @Deprecated public void setSpeedAccuracy(int);
-    method @Deprecated public void setSpeedRequired(boolean);
-    method @Deprecated public void setVerticalAccuracy(int);
-    method @Deprecated public void writeToParcel(android.os.Parcel, int);
-    field @Deprecated public static final int ACCURACY_COARSE = 2; // 0x2
-    field @Deprecated public static final int ACCURACY_FINE = 1; // 0x1
-    field @Deprecated public static final int ACCURACY_HIGH = 3; // 0x3
-    field @Deprecated public static final int ACCURACY_LOW = 1; // 0x1
-    field @Deprecated public static final int ACCURACY_MEDIUM = 2; // 0x2
-    field @Deprecated @NonNull public static final android.os.Parcelable.Creator<android.location.Criteria> CREATOR;
-    field @Deprecated public static final int NO_REQUIREMENT = 0; // 0x0
-    field @Deprecated public static final int POWER_HIGH = 3; // 0x3
-    field @Deprecated public static final int POWER_LOW = 1; // 0x1
-    field @Deprecated public static final int POWER_MEDIUM = 2; // 0x2
-  }
-
-  public final class Geocoder {
-    ctor public Geocoder(@NonNull android.content.Context);
-    ctor public Geocoder(@NonNull android.content.Context, @NonNull java.util.Locale);
-    method @Deprecated @Nullable public java.util.List<android.location.Address> getFromLocation(@FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double, @IntRange int) throws java.io.IOException;
-    method public void getFromLocation(@FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double, @IntRange int, @NonNull android.location.Geocoder.GeocodeListener);
-    method @Deprecated @Nullable public java.util.List<android.location.Address> getFromLocationName(@NonNull String, @IntRange int) throws java.io.IOException;
-    method public void getFromLocationName(@NonNull String, @IntRange int, @NonNull android.location.Geocoder.GeocodeListener);
-    method @Deprecated @Nullable public java.util.List<android.location.Address> getFromLocationName(@NonNull String, @IntRange int, @FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double, @FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double) throws java.io.IOException;
-    method public void getFromLocationName(@NonNull String, @IntRange int, @FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double, @FloatRange(from=-90.0, to=90.0) double, @FloatRange(from=-180.0, to=180.0) double, @NonNull android.location.Geocoder.GeocodeListener);
-    method public static boolean isPresent();
-  }
-
-  public static interface Geocoder.GeocodeListener {
-    method public default void onError(@Nullable String);
-    method public void onGeocode(@NonNull java.util.List<android.location.Address>);
-  }
-
-  public final class GnssAntennaInfo implements android.os.Parcelable {
-    method public int describeContents();
-    method @FloatRange(from=0.0f) public double getCarrierFrequencyMHz();
-    method @NonNull public android.location.GnssAntennaInfo.PhaseCenterOffset getPhaseCenterOffset();
-    method @Nullable public android.location.GnssAntennaInfo.SphericalCorrections getPhaseCenterVariationCorrections();
-    method @Nullable public android.location.GnssAntennaInfo.SphericalCorrections getSignalGainCorrections();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssAntennaInfo> CREATOR;
-  }
-
-  public static class GnssAntennaInfo.Builder {
-    ctor @Deprecated public GnssAntennaInfo.Builder();
-    ctor public GnssAntennaInfo.Builder(double, @NonNull android.location.GnssAntennaInfo.PhaseCenterOffset);
-    ctor public GnssAntennaInfo.Builder(@NonNull android.location.GnssAntennaInfo);
-    method @NonNull public android.location.GnssAntennaInfo build();
-    method @NonNull public android.location.GnssAntennaInfo.Builder setCarrierFrequencyMHz(@FloatRange(from=0.0f) double);
-    method @NonNull public android.location.GnssAntennaInfo.Builder setPhaseCenterOffset(@NonNull android.location.GnssAntennaInfo.PhaseCenterOffset);
-    method @NonNull public android.location.GnssAntennaInfo.Builder setPhaseCenterVariationCorrections(@Nullable android.location.GnssAntennaInfo.SphericalCorrections);
-    method @NonNull public android.location.GnssAntennaInfo.Builder setSignalGainCorrections(@Nullable android.location.GnssAntennaInfo.SphericalCorrections);
-  }
-
-  public static interface GnssAntennaInfo.Listener {
-    method public void onGnssAntennaInfoReceived(@NonNull java.util.List<android.location.GnssAntennaInfo>);
-  }
-
-  public static final class GnssAntennaInfo.PhaseCenterOffset implements android.os.Parcelable {
-    ctor public GnssAntennaInfo.PhaseCenterOffset(double, double, double, double, double, double);
-    method public int describeContents();
-    method @FloatRange public double getXOffsetMm();
-    method @FloatRange public double getXOffsetUncertaintyMm();
-    method @FloatRange public double getYOffsetMm();
-    method @FloatRange public double getYOffsetUncertaintyMm();
-    method @FloatRange public double getZOffsetMm();
-    method @FloatRange public double getZOffsetUncertaintyMm();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssAntennaInfo.PhaseCenterOffset> CREATOR;
-  }
-
-  public static final class GnssAntennaInfo.SphericalCorrections implements android.os.Parcelable {
-    ctor public GnssAntennaInfo.SphericalCorrections(@NonNull double[][], @NonNull double[][]);
-    method public int describeContents();
-    method @NonNull public double[][] getCorrectionUncertaintiesArray();
-    method @NonNull public double[][] getCorrectionsArray();
-    method @FloatRange(from=0.0f, to=180.0f) public double getDeltaPhi();
-    method @FloatRange(from=0.0f, to=360.0f) public double getDeltaTheta();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssAntennaInfo.SphericalCorrections> CREATOR;
-  }
-
-  public final class GnssAutomaticGainControl implements android.os.Parcelable {
-    method public int describeContents();
-    method @IntRange(from=0) public long getCarrierFrequencyHz();
-    method public int getConstellationType();
-    method @FloatRange(from=0xffffd8f0, to=10000) public double getLevelDb();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssAutomaticGainControl> CREATOR;
-  }
-
-  public static final class GnssAutomaticGainControl.Builder {
-    ctor public GnssAutomaticGainControl.Builder();
-    ctor public GnssAutomaticGainControl.Builder(@NonNull android.location.GnssAutomaticGainControl);
-    method @NonNull public android.location.GnssAutomaticGainControl build();
-    method @NonNull public android.location.GnssAutomaticGainControl.Builder setCarrierFrequencyHz(@IntRange(from=0) long);
-    method @NonNull public android.location.GnssAutomaticGainControl.Builder setConstellationType(int);
-    method @NonNull public android.location.GnssAutomaticGainControl.Builder setLevelDb(@FloatRange(from=0xffffd8f0, to=10000) double);
-  }
-
-  public final class GnssCapabilities implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public java.util.List<android.location.GnssSignalType> getGnssSignalTypes();
-    method public int hasAccumulatedDeltaRange();
-    method public boolean hasAntennaInfo();
-    method public boolean hasGeofencing();
-    method @Deprecated public boolean hasGnssAntennaInfo();
-    method public boolean hasLowPowerMode();
-    method public boolean hasMeasurementCorrections();
-    method public boolean hasMeasurementCorrectionsExcessPathLength();
-    method public boolean hasMeasurementCorrectionsForDriving();
-    method public boolean hasMeasurementCorrectionsLosSats();
-    method public boolean hasMeasurementCorrectionsReflectingPlane();
-    method public boolean hasMeasurementCorrelationVectors();
-    method public boolean hasMeasurements();
-    method public boolean hasMsa();
-    method public boolean hasMsb();
-    method public boolean hasNavigationMessages();
-    method public boolean hasOnDemandTime();
-    method public boolean hasPowerMultibandAcquisition();
-    method public boolean hasPowerMultibandTracking();
-    method public boolean hasPowerOtherModes();
-    method public boolean hasPowerSinglebandAcquisition();
-    method public boolean hasPowerSinglebandTracking();
-    method public boolean hasPowerTotal();
-    method public boolean hasSatelliteBlocklist();
-    method public boolean hasSatellitePvt();
-    method public boolean hasScheduling();
-    method public boolean hasSingleShotFix();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int CAPABILITY_SUPPORTED = 1; // 0x1
-    field public static final int CAPABILITY_UNKNOWN = 0; // 0x0
-    field public static final int CAPABILITY_UNSUPPORTED = 2; // 0x2
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssCapabilities> CREATOR;
-  }
-
-  public static final class GnssCapabilities.Builder {
-    ctor public GnssCapabilities.Builder();
-    ctor public GnssCapabilities.Builder(@NonNull android.location.GnssCapabilities);
-    method @NonNull public android.location.GnssCapabilities build();
-    method @NonNull public android.location.GnssCapabilities.Builder setGnssSignalTypes(@NonNull java.util.List<android.location.GnssSignalType>);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasAccumulatedDeltaRange(int);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasAntennaInfo(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasGeofencing(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasLowPowerMode(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrections(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrectionsExcessPathLength(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrectionsForDriving(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrectionsLosSats(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrectionsReflectingPlane(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurementCorrelationVectors(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMeasurements(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMsa(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasMsb(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasNavigationMessages(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasOnDemandTime(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerMultibandAcquisition(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerMultibandTracking(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerOtherModes(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerSinglebandAcquisition(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerSinglebandTracking(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasPowerTotal(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasSatelliteBlocklist(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasSatellitePvt(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasScheduling(boolean);
-    method @NonNull public android.location.GnssCapabilities.Builder setHasSingleShotFix(boolean);
-  }
-
-  public final class GnssClock implements android.os.Parcelable {
-    method public int describeContents();
-    method public double getBiasNanos();
-    method @FloatRange(from=0.0f) public double getBiasUncertaintyNanos();
-    method public double getDriftNanosPerSecond();
-    method @FloatRange(from=0.0f) public double getDriftUncertaintyNanosPerSecond();
-    method public long getElapsedRealtimeNanos();
-    method @FloatRange(from=0.0f) public double getElapsedRealtimeUncertaintyNanos();
-    method public long getFullBiasNanos();
-    method public int getHardwareClockDiscontinuityCount();
-    method public int getLeapSecond();
-    method @FloatRange(from=0.0) public double getReferenceCarrierFrequencyHzForIsb();
-    method @NonNull public String getReferenceCodeTypeForIsb();
-    method public int getReferenceConstellationTypeForIsb();
-    method public long getTimeNanos();
-    method @FloatRange(from=0.0f) public double getTimeUncertaintyNanos();
-    method public boolean hasBiasNanos();
-    method public boolean hasBiasUncertaintyNanos();
-    method public boolean hasDriftNanosPerSecond();
-    method public boolean hasDriftUncertaintyNanosPerSecond();
-    method public boolean hasElapsedRealtimeNanos();
-    method public boolean hasElapsedRealtimeUncertaintyNanos();
-    method public boolean hasFullBiasNanos();
-    method public boolean hasLeapSecond();
-    method public boolean hasReferenceCarrierFrequencyHzForIsb();
-    method public boolean hasReferenceCodeTypeForIsb();
-    method public boolean hasReferenceConstellationTypeForIsb();
-    method public boolean hasTimeUncertaintyNanos();
-    method public void writeToParcel(android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssClock> CREATOR;
-  }
-
-  public final class GnssMeasurement implements android.os.Parcelable {
-    method public int describeContents();
-    method public double getAccumulatedDeltaRangeMeters();
-    method public int getAccumulatedDeltaRangeState();
-    method public double getAccumulatedDeltaRangeUncertaintyMeters();
-    method @Deprecated public double getAutomaticGainControlLevelDb();
-    method @FloatRange(from=0, to=63) public double getBasebandCn0DbHz();
-    method @Deprecated public long getCarrierCycles();
-    method public float getCarrierFrequencyHz();
-    method @Deprecated public double getCarrierPhase();
-    method @Deprecated public double getCarrierPhaseUncertainty();
-    method @FloatRange(from=0, to=63) public double getCn0DbHz();
-    method @NonNull public String getCodeType();
-    method public int getConstellationType();
-    method public double getFullInterSignalBiasNanos();
-    method @FloatRange(from=0.0) public double getFullInterSignalBiasUncertaintyNanos();
-    method public int getMultipathIndicator();
-    method public double getPseudorangeRateMetersPerSecond();
-    method public double getPseudorangeRateUncertaintyMetersPerSecond();
-    method public long getReceivedSvTimeNanos();
-    method public long getReceivedSvTimeUncertaintyNanos();
-    method public double getSatelliteInterSignalBiasNanos();
-    method @FloatRange(from=0.0) public double getSatelliteInterSignalBiasUncertaintyNanos();
-    method public double getSnrInDb();
-    method public int getState();
-    method public int getSvid();
-    method public double getTimeOffsetNanos();
-    method @Deprecated public boolean hasAutomaticGainControlLevelDb();
-    method public boolean hasBasebandCn0DbHz();
-    method @Deprecated public boolean hasCarrierCycles();
-    method public boolean hasCarrierFrequencyHz();
-    method @Deprecated public boolean hasCarrierPhase();
-    method @Deprecated public boolean hasCarrierPhaseUncertainty();
-    method public boolean hasCodeType();
-    method public boolean hasFullInterSignalBiasNanos();
-    method public boolean hasFullInterSignalBiasUncertaintyNanos();
-    method public boolean hasSatelliteInterSignalBiasNanos();
-    method public boolean hasSatelliteInterSignalBiasUncertaintyNanos();
-    method public boolean hasSnrInDb();
-    method public void writeToParcel(android.os.Parcel, int);
-    field public static final int ADR_STATE_CYCLE_SLIP = 4; // 0x4
-    field public static final int ADR_STATE_HALF_CYCLE_REPORTED = 16; // 0x10
-    field public static final int ADR_STATE_HALF_CYCLE_RESOLVED = 8; // 0x8
-    field public static final int ADR_STATE_RESET = 2; // 0x2
-    field public static final int ADR_STATE_UNKNOWN = 0; // 0x0
-    field public static final int ADR_STATE_VALID = 1; // 0x1
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssMeasurement> CREATOR;
-    field public static final int MULTIPATH_INDICATOR_DETECTED = 1; // 0x1
-    field public static final int MULTIPATH_INDICATOR_NOT_DETECTED = 2; // 0x2
-    field public static final int MULTIPATH_INDICATOR_UNKNOWN = 0; // 0x0
-    field public static final int STATE_2ND_CODE_LOCK = 65536; // 0x10000
-    field public static final int STATE_BDS_D2_BIT_SYNC = 256; // 0x100
-    field public static final int STATE_BDS_D2_SUBFRAME_SYNC = 512; // 0x200
-    field public static final int STATE_BIT_SYNC = 2; // 0x2
-    field public static final int STATE_CODE_LOCK = 1; // 0x1
-    field public static final int STATE_GAL_E1BC_CODE_LOCK = 1024; // 0x400
-    field public static final int STATE_GAL_E1B_PAGE_SYNC = 4096; // 0x1000
-    field public static final int STATE_GAL_E1C_2ND_CODE_LOCK = 2048; // 0x800
-    field public static final int STATE_GLO_STRING_SYNC = 64; // 0x40
-    field public static final int STATE_GLO_TOD_DECODED = 128; // 0x80
-    field public static final int STATE_GLO_TOD_KNOWN = 32768; // 0x8000
-    field public static final int STATE_MSEC_AMBIGUOUS = 16; // 0x10
-    field public static final int STATE_SBAS_SYNC = 8192; // 0x2000
-    field public static final int STATE_SUBFRAME_SYNC = 4; // 0x4
-    field public static final int STATE_SYMBOL_SYNC = 32; // 0x20
-    field public static final int STATE_TOW_DECODED = 8; // 0x8
-    field public static final int STATE_TOW_KNOWN = 16384; // 0x4000
-    field public static final int STATE_UNKNOWN = 0; // 0x0
-  }
-
-  public final class GnssMeasurementRequest implements android.os.Parcelable {
-    method public int describeContents();
-    method @IntRange(from=0) public int getIntervalMillis();
-    method public boolean isFullTracking();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssMeasurementRequest> CREATOR;
-    field public static final int PASSIVE_INTERVAL = 2147483647; // 0x7fffffff
-  }
-
-  public static final class GnssMeasurementRequest.Builder {
-    ctor public GnssMeasurementRequest.Builder();
-    ctor public GnssMeasurementRequest.Builder(@NonNull android.location.GnssMeasurementRequest);
-    method @NonNull public android.location.GnssMeasurementRequest build();
-    method @NonNull public android.location.GnssMeasurementRequest.Builder setFullTracking(boolean);
-    method @NonNull public android.location.GnssMeasurementRequest.Builder setIntervalMillis(@IntRange(from=0) int);
-  }
-
-  public final class GnssMeasurementsEvent implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public android.location.GnssClock getClock();
-    method @NonNull public java.util.Collection<android.location.GnssAutomaticGainControl> getGnssAutomaticGainControls();
-    method @NonNull public java.util.Collection<android.location.GnssMeasurement> getMeasurements();
-    method public boolean hasIsFullTracking();
-    method public boolean isFullTracking();
-    method public void writeToParcel(android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssMeasurementsEvent> CREATOR;
-  }
-
-  public static final class GnssMeasurementsEvent.Builder {
-    ctor public GnssMeasurementsEvent.Builder();
-    ctor public GnssMeasurementsEvent.Builder(@NonNull android.location.GnssMeasurementsEvent);
-    method @NonNull public android.location.GnssMeasurementsEvent build();
-    method @NonNull public android.location.GnssMeasurementsEvent.Builder clearIsFullTracking();
-    method @NonNull public android.location.GnssMeasurementsEvent.Builder setClock(@NonNull android.location.GnssClock);
-    method @NonNull public android.location.GnssMeasurementsEvent.Builder setGnssAutomaticGainControls(@NonNull java.util.Collection<android.location.GnssAutomaticGainControl>);
-    method @NonNull public android.location.GnssMeasurementsEvent.Builder setIsFullTracking(boolean);
-    method @NonNull public android.location.GnssMeasurementsEvent.Builder setMeasurements(@NonNull java.util.Collection<android.location.GnssMeasurement>);
-  }
-
-  public abstract static class GnssMeasurementsEvent.Callback {
-    ctor public GnssMeasurementsEvent.Callback();
-    method public void onGnssMeasurementsReceived(android.location.GnssMeasurementsEvent);
-    method @Deprecated public void onStatusChanged(int);
-    field @Deprecated public static final int STATUS_LOCATION_DISABLED = 2; // 0x2
-    field @Deprecated public static final int STATUS_NOT_ALLOWED = 3; // 0x3
-    field @Deprecated public static final int STATUS_NOT_SUPPORTED = 0; // 0x0
-    field @Deprecated public static final int STATUS_READY = 1; // 0x1
-  }
-
-  public final class GnssNavigationMessage implements android.os.Parcelable {
-    method public int describeContents();
-    method @NonNull public byte[] getData();
-    method @IntRange(from=0xffffffff, to=120) public int getMessageId();
-    method public int getStatus();
-    method @IntRange(from=1) public int getSubmessageId();
-    method @IntRange(from=1, to=200) public int getSvid();
-    method public int getType();
-    method public void writeToParcel(android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssNavigationMessage> CREATOR;
-    field public static final int STATUS_PARITY_PASSED = 1; // 0x1
-    field public static final int STATUS_PARITY_REBUILT = 2; // 0x2
-    field public static final int STATUS_UNKNOWN = 0; // 0x0
-    field public static final int TYPE_BDS_CNAV1 = 1283; // 0x503
-    field public static final int TYPE_BDS_CNAV2 = 1284; // 0x504
-    field public static final int TYPE_BDS_D1 = 1281; // 0x501
-    field public static final int TYPE_BDS_D2 = 1282; // 0x502
-    field public static final int TYPE_GAL_F = 1538; // 0x602
-    field public static final int TYPE_GAL_I = 1537; // 0x601
-    field public static final int TYPE_GLO_L1CA = 769; // 0x301
-    field public static final int TYPE_GPS_CNAV2 = 260; // 0x104
-    field public static final int TYPE_GPS_L1CA = 257; // 0x101
-    field public static final int TYPE_GPS_L2CNAV = 258; // 0x102
-    field public static final int TYPE_GPS_L5CNAV = 259; // 0x103
-    field public static final int TYPE_IRN_L5CA = 1793; // 0x701
-    field public static final int TYPE_QZS_L1CA = 1025; // 0x401
-    field public static final int TYPE_SBS = 513; // 0x201
-    field public static final int TYPE_UNKNOWN = 0; // 0x0
-  }
-
-  public abstract static class GnssNavigationMessage.Callback {
-    ctor public GnssNavigationMessage.Callback();
-    method public void onGnssNavigationMessageReceived(android.location.GnssNavigationMessage);
-    method @Deprecated public void onStatusChanged(int);
-    field @Deprecated public static final int STATUS_LOCATION_DISABLED = 2; // 0x2
-    field @Deprecated public static final int STATUS_NOT_SUPPORTED = 0; // 0x0
-    field @Deprecated public static final int STATUS_READY = 1; // 0x1
-  }
-
-  public final class GnssSignalType implements android.os.Parcelable {
-    method @NonNull public static android.location.GnssSignalType create(int, @FloatRange(from=0.0f, fromInclusive=false) double, @NonNull String);
-    method public int describeContents();
-    method @FloatRange(from=0.0f, fromInclusive=false) public double getCarrierFrequencyHz();
-    method @NonNull public String getCodeType();
-    method public int getConstellationType();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssSignalType> CREATOR;
-  }
-
-  public final class GnssStatus implements android.os.Parcelable {
-    method public int describeContents();
-    method @FloatRange(from=0, to=360) public float getAzimuthDegrees(@IntRange(from=0) int);
-    method @FloatRange(from=0, to=63) public float getBasebandCn0DbHz(@IntRange(from=0) int);
-    method @FloatRange(from=0) public float getCarrierFrequencyHz(@IntRange(from=0) int);
-    method @FloatRange(from=0, to=63) public float getCn0DbHz(@IntRange(from=0) int);
-    method public int getConstellationType(@IntRange(from=0) int);
-    method @FloatRange(from=0xffffffa6, to=90) public float getElevationDegrees(@IntRange(from=0) int);
-    method @IntRange(from=0) public int getSatelliteCount();
-    method @IntRange(from=1, to=206) public int getSvid(@IntRange(from=0) int);
-    method public boolean hasAlmanacData(@IntRange(from=0) int);
-    method public boolean hasBasebandCn0DbHz(@IntRange(from=0) int);
-    method public boolean hasCarrierFrequencyHz(@IntRange(from=0) int);
-    method public boolean hasEphemerisData(@IntRange(from=0) int);
-    method public boolean usedInFix(@IntRange(from=0) int);
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int CONSTELLATION_BEIDOU = 5; // 0x5
-    field public static final int CONSTELLATION_GALILEO = 6; // 0x6
-    field public static final int CONSTELLATION_GLONASS = 3; // 0x3
-    field public static final int CONSTELLATION_GPS = 1; // 0x1
-    field public static final int CONSTELLATION_IRNSS = 7; // 0x7
-    field public static final int CONSTELLATION_QZSS = 4; // 0x4
-    field public static final int CONSTELLATION_SBAS = 2; // 0x2
-    field public static final int CONSTELLATION_UNKNOWN = 0; // 0x0
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.GnssStatus> CREATOR;
-  }
-
-  public static final class GnssStatus.Builder {
-    ctor public GnssStatus.Builder();
-    method @NonNull public android.location.GnssStatus.Builder addSatellite(int, @IntRange(from=1, to=200) int, @FloatRange(from=0, to=63) float, @FloatRange(from=0xffffffa6, to=90) float, @FloatRange(from=0, to=360) float, boolean, boolean, boolean, boolean, @FloatRange(from=0) float, boolean, @FloatRange(from=0, to=63) float);
-    method @NonNull public android.location.GnssStatus build();
-    method @NonNull public android.location.GnssStatus.Builder clearSatellites();
-  }
-
-  public abstract static class GnssStatus.Callback {
-    ctor public GnssStatus.Callback();
-    method public void onFirstFix(int);
-    method public void onSatelliteStatusChanged(@NonNull android.location.GnssStatus);
-    method public void onStarted();
-    method public void onStopped();
-  }
-
-  @Deprecated public final class GpsSatellite {
-    method @Deprecated public float getAzimuth();
-    method @Deprecated public float getElevation();
-    method @Deprecated public int getPrn();
-    method @Deprecated public float getSnr();
-    method @Deprecated public boolean hasAlmanac();
-    method @Deprecated public boolean hasEphemeris();
-    method @Deprecated public boolean usedInFix();
-  }
-
-  @Deprecated public final class GpsStatus {
-    method @Deprecated @NonNull public static android.location.GpsStatus create(@NonNull android.location.GnssStatus, int);
-    method @Deprecated public int getMaxSatellites();
-    method @Deprecated public Iterable<android.location.GpsSatellite> getSatellites();
-    method @Deprecated public int getTimeToFirstFix();
-    field @Deprecated public static final int GPS_EVENT_FIRST_FIX = 3; // 0x3
-    field @Deprecated public static final int GPS_EVENT_SATELLITE_STATUS = 4; // 0x4
-    field @Deprecated public static final int GPS_EVENT_STARTED = 1; // 0x1
-    field @Deprecated public static final int GPS_EVENT_STOPPED = 2; // 0x2
-  }
-
-  @Deprecated public static interface GpsStatus.Listener {
-    method @Deprecated public void onGpsStatusChanged(int);
-  }
-
-  @Deprecated public static interface GpsStatus.NmeaListener {
-    method @Deprecated public void onNmeaReceived(long, String);
-  }
-
   public class Location implements android.os.Parcelable {
     ctor public Location(@Nullable String);
     ctor public Location(@NonNull android.location.Location);
@@ -21068,219 +20590,6 @@ package android.location {
     field public static final int FORMAT_DEGREES = 0; // 0x0
     field public static final int FORMAT_MINUTES = 1; // 0x1
     field public static final int FORMAT_SECONDS = 2; // 0x2
-  }
-
-  public interface LocationListener {
-    method public default void onFlushComplete(int);
-    method public void onLocationChanged(@NonNull android.location.Location);
-    method public default void onLocationChanged(@NonNull java.util.List<android.location.Location>);
-    method public default void onProviderDisabled(@NonNull String);
-    method public default void onProviderEnabled(@NonNull String);
-    method @Deprecated public default void onStatusChanged(String, int, android.os.Bundle);
-  }
-
-  public class LocationManager {
-    method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addGpsStatusListener(android.location.GpsStatus.Listener);
-    method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull android.location.GpsStatus.NmeaListener);
-    method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull android.location.OnNmeaMessageListener);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull android.location.OnNmeaMessageListener, @Nullable android.os.Handler);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean addNmeaListener(@NonNull java.util.concurrent.Executor, @NonNull android.location.OnNmeaMessageListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void addProximityAlert(double, double, float, long, @NonNull android.app.PendingIntent);
-    method public void addTestProvider(@NonNull String, boolean, boolean, boolean, boolean, boolean, boolean, boolean, int, int);
-    method public void addTestProvider(@NonNull String, @NonNull android.location.provider.ProviderProperties);
-    method public void addTestProvider(@NonNull String, @NonNull android.location.provider.ProviderProperties, @NonNull java.util.Set<java.lang.String>);
-    method @Deprecated public void clearTestProviderEnabled(@NonNull String);
-    method @Deprecated public void clearTestProviderLocation(@NonNull String);
-    method @Deprecated public void clearTestProviderStatus(@NonNull String);
-    method @NonNull public java.util.List<java.lang.String> getAllProviders();
-    method @Deprecated @Nullable public String getBestProvider(@NonNull android.location.Criteria, boolean);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void getCurrentLocation(@NonNull String, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.location.Location>);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void getCurrentLocation(@NonNull String, @NonNull android.location.LocationRequest, @Nullable android.os.CancellationSignal, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.location.Location>);
-    method @Nullable public java.util.List<android.location.GnssAntennaInfo> getGnssAntennaInfos();
-    method @NonNull public android.location.GnssCapabilities getGnssCapabilities();
-    method @Nullable public String getGnssHardwareModelName();
-    method public int getGnssYearOfHardware();
-    method @Deprecated @Nullable @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public android.location.GpsStatus getGpsStatus(@Nullable android.location.GpsStatus);
-    method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public android.location.Location getLastKnownLocation(@NonNull String);
-    method @Deprecated @Nullable public android.location.LocationProvider getProvider(@NonNull String);
-    method @Nullable public android.location.provider.ProviderProperties getProviderProperties(@NonNull String);
-    method @NonNull public java.util.List<java.lang.String> getProviders(boolean);
-    method @Deprecated @NonNull public java.util.List<java.lang.String> getProviders(@NonNull android.location.Criteria, boolean);
-    method public boolean hasProvider(@NonNull String);
-    method public boolean isLocationEnabled();
-    method public boolean isProviderEnabled(@NonNull String);
-    method public boolean registerAntennaInfoListener(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssAntennaInfo.Listener);
-    method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementsEvent.Callback);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementsEvent.Callback, @Nullable android.os.Handler);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssMeasurementsEvent.Callback);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.GnssMeasurementsEvent.Callback);
-    method @Deprecated public boolean registerGnssNavigationMessageCallback(@NonNull android.location.GnssNavigationMessage.Callback);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssNavigationMessageCallback(@NonNull android.location.GnssNavigationMessage.Callback, @Nullable android.os.Handler);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssNavigationMessageCallback(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssNavigationMessage.Callback);
-    method @Deprecated @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssStatusCallback(@NonNull android.location.GnssStatus.Callback);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssStatusCallback(@NonNull android.location.GnssStatus.Callback, @Nullable android.os.Handler);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) public boolean registerGnssStatusCallback(@NonNull java.util.concurrent.Executor, @NonNull android.location.GnssStatus.Callback);
-    method @Deprecated public void removeGpsStatusListener(android.location.GpsStatus.Listener);
-    method @Deprecated public void removeNmeaListener(@NonNull android.location.GpsStatus.NmeaListener);
-    method public void removeNmeaListener(@NonNull android.location.OnNmeaMessageListener);
-    method @RequiresPermission(anyOf={"android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"}, apis="..22") public void removeProximityAlert(@NonNull android.app.PendingIntent);
-    method public void removeTestProvider(@NonNull String);
-    method @RequiresPermission(anyOf={"android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"}, apis="..22") public void removeUpdates(@NonNull android.location.LocationListener);
-    method public void removeUpdates(@NonNull android.app.PendingIntent);
-    method public void requestFlush(@NonNull String, @NonNull android.location.LocationListener, int);
-    method public void requestFlush(@NonNull String, @NonNull android.app.PendingIntent, int);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.location.LocationListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, long, float, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(long, float, @NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull java.util.concurrent.Executor, @NonNull android.location.LocationListener);
-    method @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestLocationUpdates(@NonNull String, @NonNull android.location.LocationRequest, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull String, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull android.location.Criteria, @NonNull android.location.LocationListener, @Nullable android.os.Looper);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull String, @NonNull android.app.PendingIntent);
-    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION}) public void requestSingleUpdate(@NonNull android.location.Criteria, @NonNull android.app.PendingIntent);
-    method public boolean sendExtraCommand(@NonNull String, @NonNull String, @Nullable android.os.Bundle);
-    method public void setTestProviderEnabled(@NonNull String, boolean);
-    method public void setTestProviderLocation(@NonNull String, @NonNull android.location.Location);
-    method @Deprecated public void setTestProviderStatus(@NonNull String, int, @Nullable android.os.Bundle, long);
-    method public void unregisterAntennaInfoListener(@NonNull android.location.GnssAntennaInfo.Listener);
-    method public void unregisterGnssMeasurementsCallback(@NonNull android.location.GnssMeasurementsEvent.Callback);
-    method public void unregisterGnssNavigationMessageCallback(@NonNull android.location.GnssNavigationMessage.Callback);
-    method public void unregisterGnssStatusCallback(@NonNull android.location.GnssStatus.Callback);
-    field public static final String ACTION_GNSS_CAPABILITIES_CHANGED = "android.location.action.GNSS_CAPABILITIES_CHANGED";
-    field public static final String EXTRA_GNSS_CAPABILITIES = "android.location.extra.GNSS_CAPABILITIES";
-    field public static final String EXTRA_LOCATION_ENABLED = "android.location.extra.LOCATION_ENABLED";
-    field public static final String EXTRA_PROVIDER_ENABLED = "android.location.extra.PROVIDER_ENABLED";
-    field public static final String EXTRA_PROVIDER_NAME = "android.location.extra.PROVIDER_NAME";
-    field public static final String FUSED_PROVIDER = "fused";
-    field public static final String GPS_PROVIDER = "gps";
-    field public static final String KEY_FLUSH_COMPLETE = "flushComplete";
-    field public static final String KEY_LOCATIONS = "locations";
-    field public static final String KEY_LOCATION_CHANGED = "location";
-    field public static final String KEY_PROVIDER_ENABLED = "providerEnabled";
-    field public static final String KEY_PROXIMITY_ENTERING = "entering";
-    field @Deprecated public static final String KEY_STATUS_CHANGED = "status";
-    field public static final String MODE_CHANGED_ACTION = "android.location.MODE_CHANGED";
-    field public static final String NETWORK_PROVIDER = "network";
-    field public static final String PASSIVE_PROVIDER = "passive";
-    field public static final String PROVIDERS_CHANGED_ACTION = "android.location.PROVIDERS_CHANGED";
-  }
-
-  @Deprecated public class LocationProvider {
-    method @Deprecated public int getAccuracy();
-    method @Deprecated public String getName();
-    method @Deprecated public int getPowerRequirement();
-    method @Deprecated public boolean hasMonetaryCost();
-    method @Deprecated public boolean meetsCriteria(android.location.Criteria);
-    method @Deprecated public boolean requiresCell();
-    method @Deprecated public boolean requiresNetwork();
-    method @Deprecated public boolean requiresSatellite();
-    method @Deprecated public boolean supportsAltitude();
-    method @Deprecated public boolean supportsBearing();
-    method @Deprecated public boolean supportsSpeed();
-    field @Deprecated public static final int AVAILABLE = 2; // 0x2
-    field @Deprecated public static final int OUT_OF_SERVICE = 0; // 0x0
-    field @Deprecated public static final int TEMPORARILY_UNAVAILABLE = 1; // 0x1
-  }
-
-  public final class LocationRequest implements android.os.Parcelable {
-    method public int describeContents();
-    method @IntRange(from=1) public long getDurationMillis();
-    method @IntRange(from=0) public long getIntervalMillis();
-    method @IntRange(from=0) public long getMaxUpdateDelayMillis();
-    method @IntRange(from=1, to=java.lang.Integer.MAX_VALUE) public int getMaxUpdates();
-    method @FloatRange(from=0, to=java.lang.Float.MAX_VALUE) public float getMinUpdateDistanceMeters();
-    method @IntRange(from=0) public long getMinUpdateIntervalMillis();
-    method public int getQuality();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.LocationRequest> CREATOR;
-    field public static final long PASSIVE_INTERVAL = 9223372036854775807L; // 0x7fffffffffffffffL
-    field public static final int QUALITY_BALANCED_POWER_ACCURACY = 102; // 0x66
-    field public static final int QUALITY_HIGH_ACCURACY = 100; // 0x64
-    field public static final int QUALITY_LOW_POWER = 104; // 0x68
-  }
-
-  public static final class LocationRequest.Builder {
-    ctor public LocationRequest.Builder(long);
-    ctor public LocationRequest.Builder(@NonNull android.location.LocationRequest);
-    method @NonNull public android.location.LocationRequest build();
-    method @NonNull public android.location.LocationRequest.Builder clearMinUpdateIntervalMillis();
-    method @NonNull public android.location.LocationRequest.Builder setDurationMillis(@IntRange(from=1) long);
-    method @NonNull public android.location.LocationRequest.Builder setIntervalMillis(@IntRange(from=0) long);
-    method @NonNull public android.location.LocationRequest.Builder setMaxUpdateDelayMillis(@IntRange(from=0) long);
-    method @NonNull public android.location.LocationRequest.Builder setMaxUpdates(@IntRange(from=1, to=java.lang.Integer.MAX_VALUE) int);
-    method @NonNull public android.location.LocationRequest.Builder setMinUpdateDistanceMeters(@FloatRange(from=0, to=java.lang.Float.MAX_VALUE) float);
-    method @NonNull public android.location.LocationRequest.Builder setMinUpdateIntervalMillis(@IntRange(from=0) long);
-    method @NonNull public android.location.LocationRequest.Builder setQuality(int);
-  }
-
-  public interface OnNmeaMessageListener {
-    method public void onNmeaMessage(String, long);
-  }
-
-  public abstract class SettingInjectorService extends android.app.Service {
-    ctor public SettingInjectorService(String);
-    method public final android.os.IBinder onBind(android.content.Intent);
-    method protected abstract boolean onGetEnabled();
-    method protected abstract String onGetSummary();
-    method public final void onStart(android.content.Intent, int);
-    method public final int onStartCommand(android.content.Intent, int, int);
-    method public static final void refreshSettings(@NonNull android.content.Context);
-    field public static final String ACTION_INJECTED_SETTING_CHANGED = "android.location.InjectedSettingChanged";
-    field public static final String ACTION_SERVICE_INTENT = "android.location.SettingInjectorService";
-    field public static final String ATTRIBUTES_NAME = "injected-location-setting";
-    field public static final String META_DATA_NAME = "android.location.SettingInjectorService";
-  }
-
-}
-
-package android.location.altitude {
-
-  public final class AltitudeConverter {
-    ctor public AltitudeConverter();
-    method @WorkerThread public void addMslAltitudeToLocation(@NonNull android.content.Context, @NonNull android.location.Location) throws java.io.IOException;
-  }
-
-}
-
-package android.location.provider {
-
-  public final class ProviderProperties implements android.os.Parcelable {
-    method public int describeContents();
-    method public int getAccuracy();
-    method public int getPowerUsage();
-    method public boolean hasAltitudeSupport();
-    method public boolean hasBearingSupport();
-    method public boolean hasCellRequirement();
-    method public boolean hasMonetaryCost();
-    method public boolean hasNetworkRequirement();
-    method public boolean hasSatelliteRequirement();
-    method public boolean hasSpeedSupport();
-    method public void writeToParcel(@NonNull android.os.Parcel, int);
-    field public static final int ACCURACY_COARSE = 2; // 0x2
-    field public static final int ACCURACY_FINE = 1; // 0x1
-    field @NonNull public static final android.os.Parcelable.Creator<android.location.provider.ProviderProperties> CREATOR;
-    field public static final int POWER_USAGE_HIGH = 3; // 0x3
-    field public static final int POWER_USAGE_LOW = 1; // 0x1
-    field public static final int POWER_USAGE_MEDIUM = 2; // 0x2
-  }
-
-  public static final class ProviderProperties.Builder {
-    ctor public ProviderProperties.Builder();
-    ctor public ProviderProperties.Builder(@NonNull android.location.provider.ProviderProperties);
-    method @NonNull public android.location.provider.ProviderProperties build();
-    method @NonNull public android.location.provider.ProviderProperties.Builder setAccuracy(int);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasAltitudeSupport(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasBearingSupport(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasCellRequirement(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasMonetaryCost(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasNetworkRequirement(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasSatelliteRequirement(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setHasSpeedSupport(boolean);
-    method @NonNull public android.location.provider.ProviderProperties.Builder setPowerUsage(int);
   }
 
 }
@@ -24735,10 +24044,12 @@ package android.media {
     method @Nullable public android.media.MediaRouter2.RoutingController getController(@NonNull String);
     method @NonNull public java.util.List<android.media.MediaRouter2.RoutingController> getControllers();
     method @NonNull public static android.media.MediaRouter2 getInstance(@NonNull android.content.Context);
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") @Nullable public android.media.RouteListingPreference getRouteListingPreference();
     method @NonNull public java.util.List<android.media.MediaRoute2Info> getRoutes();
     method @NonNull public android.media.MediaRouter2.RoutingController getSystemController();
     method public void registerControllerCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.ControllerCallback);
     method public void registerRouteCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.RouteCallback, @NonNull android.media.RouteDiscoveryPreference);
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void registerRouteListingPreferenceCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.RouteListingPreferenceCallback);
     method public void registerTransferCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.TransferCallback);
     method public void setOnGetControllerHintsListener(@Nullable android.media.MediaRouter2.OnGetControllerHintsListener);
     method public void setRouteListingPreference(@Nullable android.media.RouteListingPreference);
@@ -24747,6 +24058,7 @@ package android.media {
     method public void transferTo(@NonNull android.media.MediaRoute2Info);
     method public void unregisterControllerCallback(@NonNull android.media.MediaRouter2.ControllerCallback);
     method public void unregisterRouteCallback(@NonNull android.media.MediaRouter2.RouteCallback);
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void unregisterRouteListingPreferenceCallback(@NonNull android.media.MediaRouter2.RouteListingPreferenceCallback);
     method public void unregisterTransferCallback(@NonNull android.media.MediaRouter2.TransferCallback);
   }
 
@@ -24765,6 +24077,11 @@ package android.media {
     method @Deprecated public void onRoutesChanged(@NonNull java.util.List<android.media.MediaRoute2Info>);
     method @Deprecated public void onRoutesRemoved(@NonNull java.util.List<android.media.MediaRoute2Info>);
     method public void onRoutesUpdated(@NonNull java.util.List<android.media.MediaRoute2Info>);
+  }
+
+  @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public abstract static class MediaRouter2.RouteListingPreferenceCallback {
+    ctor @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public MediaRouter2.RouteListingPreferenceCallback();
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void onRouteListingPreferenceChanged(@Nullable android.media.RouteListingPreference);
   }
 
   public class MediaRouter2.RoutingController {
@@ -33061,6 +32378,7 @@ package android.os {
     method public static long getNativeHeapFreeSize();
     method public static long getNativeHeapSize();
     method public static long getPss();
+    method @FlaggedApi("android.os.remove_app_profiler_pss_collection") public static long getRss();
     method public static String getRuntimeStat(String);
     method public static java.util.Map<java.lang.String,java.lang.String> getRuntimeStats();
     method @Deprecated public static int getThreadAllocCount();
@@ -34201,6 +33519,7 @@ package android.os {
     field public static final String DISALLOW_MICROPHONE_TOGGLE = "disallow_microphone_toggle";
     field public static final String DISALLOW_MODIFY_ACCOUNTS = "no_modify_accounts";
     field public static final String DISALLOW_MOUNT_PHYSICAL_MEDIA = "no_physical_media";
+    field public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
     field public static final String DISALLOW_NETWORK_RESET = "no_network_reset";
     field public static final String DISALLOW_OUTGOING_BEAM = "no_outgoing_beam";
     field public static final String DISALLOW_OUTGOING_CALLS = "no_outgoing_calls";
@@ -39431,8 +38750,10 @@ package android.security {
   }
 
   public final class FileIntegrityManager {
+    method @FlaggedApi("android.security.fsverity_api") @Nullable public byte[] getFsVerityDigest(@NonNull java.io.File) throws java.io.IOException;
     method public boolean isApkVeritySupported();
-    method @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public boolean isAppSourceCertificateTrusted(@NonNull java.security.cert.X509Certificate) throws java.security.cert.CertificateEncodingException;
+    method @FlaggedApi("android.security.fsverity_api") public void setupFsVerity(@NonNull java.io.File) throws java.io.IOException;
   }
 
   public final class KeyChain {
@@ -39774,6 +39095,7 @@ package android.security.keystore {
     method @Nullable public java.util.Date getKeyValidityStart();
     method @NonNull public String getKeystoreAlias();
     method public int getMaxUsageCount();
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
     method public int getPurposes();
     method @NonNull public String[] getSignaturePaddings();
     method public int getUserAuthenticationType();
@@ -39781,6 +39103,7 @@ package android.security.keystore {
     method public boolean isDevicePropertiesAttestationIncluded();
     method @NonNull public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public boolean isMgf1DigestsSpecified();
     method public boolean isRandomizedEncryptionRequired();
     method public boolean isStrongBoxBacked();
     method public boolean isUnlockedDeviceRequired();
@@ -39812,6 +39135,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityForOriginationEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityStart(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMaxUsageCount(int);
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMgf1Digests(@Nullable java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUnlockedDeviceRequired(boolean);
@@ -39916,12 +39240,14 @@ package android.security.keystore {
     method @Nullable public java.util.Date getKeyValidityForOriginationEnd();
     method @Nullable public java.util.Date getKeyValidityStart();
     method public int getMaxUsageCount();
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
     method public int getPurposes();
     method @NonNull public String[] getSignaturePaddings();
     method public int getUserAuthenticationType();
     method public int getUserAuthenticationValidityDurationSeconds();
     method public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public boolean isMgf1DigestsSpecified();
     method public boolean isRandomizedEncryptionRequired();
     method public boolean isUnlockedDeviceRequired();
     method public boolean isUserAuthenticationRequired();
@@ -39943,6 +39269,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityForOriginationEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityStart(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setMaxUsageCount(int);
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyProtection.Builder setMgf1Digests(@Nullable java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUnlockedDeviceRequired(boolean);
@@ -42351,7 +41678,7 @@ package android.telecom {
     field public static final int PROPERTY_HIGH_DEF_AUDIO = 16; // 0x10
     field public static final int PROPERTY_IS_ADHOC_CONFERENCE = 8192; // 0x2000
     field public static final int PROPERTY_IS_EXTERNAL_CALL = 64; // 0x40
-    field public static final int PROPERTY_IS_TRANSACTIONAL = 32768; // 0x8000
+    field @FlaggedApi("com.android.server.telecom.flags.voip_app_actions_support") public static final int PROPERTY_IS_TRANSACTIONAL = 32768; // 0x8000
     field public static final int PROPERTY_NETWORK_IDENTIFIED_EMERGENCY_CALL = 2048; // 0x800
     field public static final int PROPERTY_RTT = 1024; // 0x400
     field public static final int PROPERTY_SELF_MANAGED = 256; // 0x100
@@ -43664,7 +42991,7 @@ package android.telephony {
     field public static final String KEY_CARRIER_SERVICE_NUMBER_STRING_ARRAY = "carrier_service_number_array";
     field public static final String KEY_CARRIER_SETTINGS_ACTIVITY_COMPONENT_NAME_STRING = "carrier_settings_activity_component_name_string";
     field public static final String KEY_CARRIER_SETTINGS_ENABLE_BOOL = "carrier_settings_enable_bool";
-    field public static final String KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE = "carrier_supported_satellite_services_per_provider_bundle";
+    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String KEY_CARRIER_SUPPORTED_SATELLITE_SERVICES_PER_PROVIDER_BUNDLE = "carrier_supported_satellite_services_per_provider_bundle";
     field public static final String KEY_CARRIER_SUPPORTS_OPP_DATA_AUTO_PROVISIONING_BOOL = "carrier_supports_opp_data_auto_provisioning_bool";
     field public static final String KEY_CARRIER_SUPPORTS_SS_OVER_UT_BOOL = "carrier_supports_ss_over_ut_bool";
     field public static final String KEY_CARRIER_SUPPORTS_TETHERING_BOOL = "carrier_supports_tethering_bool";
@@ -43739,7 +43066,6 @@ package android.telephony {
     field public static final String KEY_GSM_ROAMING_NETWORKS_STRING_ARRAY = "gsm_roaming_networks_string_array";
     field public static final String KEY_HAS_IN_CALL_NOISE_SUPPRESSION_BOOL = "has_in_call_noise_suppression_bool";
     field public static final String KEY_HIDE_CARRIER_NETWORK_SETTINGS_BOOL = "hide_carrier_network_settings_bool";
-    field @Deprecated public static final String KEY_HIDE_ENABLE_2G = "hide_enable_2g_bool";
     field public static final String KEY_HIDE_ENHANCED_4G_LTE_BOOL = "hide_enhanced_4g_lte_bool";
     field public static final String KEY_HIDE_IMS_APN_BOOL = "hide_ims_apn_bool";
     field public static final String KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL = "hide_lte_plus_data_icon_bool";
@@ -43832,6 +43158,7 @@ package android.telephony {
     field public static final String KEY_RTT_SUPPORTED_WHILE_ROAMING_BOOL = "rtt_supported_while_roaming_bool";
     field public static final String KEY_RTT_UPGRADE_SUPPORTED_BOOL = "rtt_upgrade_supported_bool";
     field public static final String KEY_RTT_UPGRADE_SUPPORTED_FOR_DOWNGRADED_VT_CALL_BOOL = "rtt_upgrade_supported_for_downgraded_vt_call";
+    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String KEY_SATELLITE_ATTACH_SUPPORTED_BOOL = "satellite_attach_supported_bool";
     field public static final String KEY_SHOW_4G_FOR_3G_DATA_ICON_BOOL = "show_4g_for_3g_data_icon_bool";
     field public static final String KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL = "show_4g_for_lte_data_icon_bool";
     field public static final String KEY_SHOW_APN_SETTING_CDMA_BOOL = "show_apn_setting_cdma_bool";
@@ -45660,6 +44987,7 @@ package android.telephony {
     method public int getSubscriptionType();
     method public int getUsageSetting();
     method public boolean isEmbedded();
+    method @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public boolean isOnlyNonTerrestrialNetwork();
     method public boolean isOpportunistic();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.SubscriptionInfo> CREATOR;
@@ -47359,9 +46687,9 @@ package android.text {
   }
 
   public class BoringLayout extends android.text.Layout implements android.text.TextUtils.EllipsizeCallback {
-    ctor @Deprecated public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
-    ctor @Deprecated public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
-    ctor @Deprecated public BoringLayout(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, float, float, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
+    ctor public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
+    ctor public BoringLayout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
+    ctor public BoringLayout(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, float, float, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public void ellipsized(int, int);
     method public int getBottomPadding();
     method public int getEllipsisCount(int);
@@ -47374,12 +46702,12 @@ package android.text {
     method public int getLineTop(int);
     method public int getParagraphDirection(int);
     method public int getTopPadding();
-    method @Deprecated public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint);
-    method @Deprecated public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint, android.text.BoringLayout.Metrics);
-    method @Deprecated @Nullable public static android.text.BoringLayout.Metrics isBoring(@NonNull CharSequence, @NonNull android.text.TextPaint, @NonNull android.text.TextDirectionHeuristic, boolean, @Nullable android.text.BoringLayout.Metrics);
-    method @Deprecated public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
-    method @Deprecated public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
-    method @Deprecated @NonNull public static android.text.BoringLayout make(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
+    method public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint);
+    method public static android.text.BoringLayout.Metrics isBoring(CharSequence, android.text.TextPaint, android.text.BoringLayout.Metrics);
+    method @Nullable public static android.text.BoringLayout.Metrics isBoring(@NonNull CharSequence, @NonNull android.text.TextPaint, @NonNull android.text.TextDirectionHeuristic, boolean, @Nullable android.text.BoringLayout.Metrics);
+    method public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
+    method public static android.text.BoringLayout make(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
+    method @NonNull public static android.text.BoringLayout make(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public android.text.BoringLayout replaceOrMake(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean);
     method @NonNull public android.text.BoringLayout replaceOrMake(@NonNull CharSequence, @NonNull android.text.TextPaint, @IntRange(from=0) int, @NonNull android.text.Layout.Alignment, @NonNull android.text.BoringLayout.Metrics, boolean, @Nullable android.text.TextUtils.TruncateAt, @IntRange(from=0) int, boolean);
     method public android.text.BoringLayout replaceOrMake(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float, android.text.BoringLayout.Metrics, boolean, android.text.TextUtils.TruncateAt, int);
@@ -47387,6 +46715,7 @@ package android.text {
 
   public static class BoringLayout.Metrics extends android.graphics.Paint.FontMetricsInt {
     ctor public BoringLayout.Metrics();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.graphics.RectF getDrawingBoundingBox();
     field public int width;
   }
 
@@ -47428,6 +46757,7 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
+    method @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -47570,6 +46900,7 @@ package android.text {
 
   public abstract class Layout {
     ctor protected Layout(CharSequence, android.text.TextPaint, int, android.text.Layout.Alignment, float, float);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.graphics.RectF computeDrawingBoundingBox();
     method public void draw(android.graphics.Canvas);
     method public void draw(android.graphics.Canvas, android.graphics.Path, android.graphics.Paint, int);
     method public void draw(@NonNull android.graphics.Canvas, @Nullable java.util.List<android.graphics.Path>, @Nullable java.util.List<android.graphics.Paint>, @Nullable android.graphics.Path, @Nullable android.graphics.Paint, int);
@@ -47578,24 +46909,24 @@ package android.text {
     method public void fillCharacterBounds(@IntRange(from=0) int, @IntRange(from=0) int, @NonNull float[], @IntRange(from=0) int);
     method @NonNull public final android.text.Layout.Alignment getAlignment();
     method public abstract int getBottomPadding();
-    method public final int getBreakStrategy();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final int getBreakStrategy();
     method public void getCursorPath(int, android.graphics.Path, CharSequence);
     method public static float getDesiredWidth(CharSequence, android.text.TextPaint);
     method public static float getDesiredWidth(CharSequence, int, int, android.text.TextPaint);
     method public abstract int getEllipsisCount(int);
     method public abstract int getEllipsisStart(int);
-    method @Nullable public final android.text.TextUtils.TruncateAt getEllipsize();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @Nullable public final android.text.TextUtils.TruncateAt getEllipsize();
     method @IntRange(from=0) public int getEllipsizedWidth();
     method public int getHeight();
-    method public final int getHyphenationFrequency();
-    method public final int getJustificationMode();
-    method @Nullable public final int[] getLeftIndents();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final int getHyphenationFrequency();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final int getJustificationMode();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @Nullable public final int[] getLeftIndents();
     method public final int getLineAscent(int);
     method public final int getLineBaseline(int);
     method public final int getLineBottom(int);
     method public int getLineBottom(int, boolean);
     method public int getLineBounds(int, android.graphics.Rect);
-    method @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
     method public abstract boolean getLineContainsTab(int);
     method public abstract int getLineCount();
     method public abstract int getLineDescent(int);
@@ -47606,13 +46937,13 @@ package android.text {
     method public float getLineLeft(int);
     method public float getLineMax(int);
     method public float getLineRight(int);
-    method public final float getLineSpacingAmount();
-    method public final float getLineSpacingMultiplier();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final float getLineSpacingAmount();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final float getLineSpacingMultiplier();
     method public abstract int getLineStart(int);
     method public abstract int getLineTop(int);
     method public int getLineVisibleEnd(int);
     method public float getLineWidth(int);
-    method @IntRange(from=1) public final int getMaxLines();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @IntRange(from=1) public final int getMaxLines();
     method public int getOffsetForHorizontal(int, float);
     method public int getOffsetToLeftOf(int);
     method public int getOffsetToRightOf(int);
@@ -47623,18 +46954,19 @@ package android.text {
     method public final int getParagraphRight(int);
     method public float getPrimaryHorizontal(int);
     method @Nullable public int[] getRangeForRect(@NonNull android.graphics.RectF, @NonNull android.text.SegmentFinder, @NonNull android.text.Layout.TextInclusionStrategy);
-    method @Nullable public final int[] getRightIndents();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @Nullable public final int[] getRightIndents();
     method public float getSecondaryHorizontal(int);
     method public void getSelectionPath(int, int, android.graphics.Path);
     method public final float getSpacingAdd();
     method public final float getSpacingMultiplier();
-    method @NonNull public final CharSequence getText();
-    method @NonNull public final android.text.TextDirectionHeuristic getTextDirectionHeuristic();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public final CharSequence getText();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public final android.text.TextDirectionHeuristic getTextDirectionHeuristic();
     method public abstract int getTopPadding();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public boolean getUseBoundsForWidth();
     method @IntRange(from=0) public final int getWidth();
     method public final void increaseWidthTo(int);
     method public boolean isFallbackLineSpacingEnabled();
-    method public final boolean isFontPaddingIncluded();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public final boolean isFontPaddingIncluded();
     method public boolean isRtlCharAt(int);
     method protected final boolean isSpanned();
     field public static final int BREAK_STRATEGY_BALANCED = 2; // 0x2
@@ -47662,7 +46994,7 @@ package android.text {
     enum_constant public static final android.text.Layout.Alignment ALIGN_OPPOSITE;
   }
 
-  public static final class Layout.Builder {
+  @FlaggedApi("com.android.text.flags.use_bounds_for_width") public static final class Layout.Builder {
     ctor public Layout.Builder(@NonNull CharSequence, @IntRange(from=0) int, @IntRange(from=0) int, @NonNull android.text.TextPaint, @IntRange(from=0) int);
     method @NonNull public android.text.Layout build();
     method @NonNull public android.text.Layout.Builder setAlignment(@NonNull android.text.Layout.Alignment);
@@ -47680,6 +47012,7 @@ package android.text {
     method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
     method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.Layout.Builder setUseBoundsForWidth(boolean);
   }
 
   public static class Layout.Directions {
@@ -47948,6 +47281,7 @@ package android.text {
     method @NonNull public android.text.StaticLayout.Builder setMaxLines(@IntRange(from=0) int);
     method public android.text.StaticLayout.Builder setText(CharSequence);
     method @NonNull public android.text.StaticLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
+    method @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.StaticLayout.Builder setUseLineSpacingFromFallbacks(boolean);
   }
 
@@ -48655,9 +47989,13 @@ package android.text.style {
     method public void writeToParcel(@NonNull android.os.Parcel, int);
   }
 
-  public class LineBreakConfigSpan {
-    ctor public LineBreakConfigSpan(@NonNull android.graphics.text.LineBreakConfig);
-    method @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
+  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public class LineBreakConfigSpan {
+    ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
+  }
+
+  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final class LineBreakConfigSpan.NoHyphenationSpan extends android.text.style.LineBreakConfigSpan {
+    ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan.NoHyphenationSpan();
   }
 
   public interface LineHeightSpan extends android.text.style.ParagraphStyle android.text.style.WrapTogetherSpan {
@@ -50820,6 +50158,13 @@ package android.view {
     field public static final int VIRTUAL_KEY_RELEASE = 8; // 0x8
   }
 
+  @FlaggedApi("android.view.flags.scroll_feedback_api") public class HapticScrollFeedbackProvider implements android.view.ScrollFeedbackProvider {
+    ctor public HapticScrollFeedbackProvider(@NonNull android.view.View);
+    method public void onScrollLimit(int, int, int, boolean);
+    method public void onScrollProgress(int, int, int, int);
+    method public void onSnapToItem(int, int, int);
+  }
+
   public class InflateException extends java.lang.RuntimeException {
     ctor public InflateException();
     ctor public InflateException(String, Throwable);
@@ -51985,6 +51330,12 @@ package android.view {
     method @UiThread public void updatePositionInWindow();
   }
 
+  @FlaggedApi("android.view.flags.scroll_feedback_api") public interface ScrollFeedbackProvider {
+    method public void onScrollLimit(int, int, int, boolean);
+    method public void onScrollProgress(int, int, int, int);
+    method public void onSnapToItem(int, int, int);
+  }
+
   public class SearchEvent {
     ctor public SearchEvent(android.view.InputDevice);
     method public android.view.InputDevice getInputDevice();
@@ -52447,6 +51798,7 @@ package android.view {
     method @Nullable public android.graphics.BlendMode getForegroundTintBlendMode();
     method @Nullable public android.content.res.ColorStateList getForegroundTintList();
     method @Nullable public android.graphics.PorterDuff.Mode getForegroundTintMode();
+    method @FlaggedApi("android.view.flags.view_velocity_api") public float getFrameContentVelocity();
     method public boolean getGlobalVisibleRect(android.graphics.Rect, android.graphics.Point);
     method public final boolean getGlobalVisibleRect(android.graphics.Rect);
     method public android.os.Handler getHandler();
@@ -52824,6 +52176,7 @@ package android.view {
     method public void setForegroundTintBlendMode(@Nullable android.graphics.BlendMode);
     method public void setForegroundTintList(@Nullable android.content.res.ColorStateList);
     method public void setForegroundTintMode(@Nullable android.graphics.PorterDuff.Mode);
+    method @FlaggedApi("android.view.flags.view_velocity_api") public void setFrameContentVelocity(float);
     method public void setHandwritingBoundsOffsets(float, float, float, float);
     method public void setHandwritingDelegatorCallback(@Nullable Runnable);
     method public void setHapticFeedbackEnabled(boolean);
@@ -53262,6 +52615,7 @@ package android.view {
     method @Deprecated public static int getEdgeSlop();
     method @Deprecated public static int getFadingEdgeLength();
     method @Deprecated public static long getGlobalActionKeyTimeout();
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") public int getHapticScrollFeedbackTickInterval(int, int, int);
     method public static int getJumpTapTimeout();
     method public static int getKeyRepeatDelay();
     method public static int getKeyRepeatTimeout();
@@ -53301,6 +52655,7 @@ package android.view {
     method @Deprecated public static int getWindowTouchSlop();
     method public static long getZoomControlsTimeout();
     method public boolean hasPermanentMenuKey();
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") public boolean isHapticScrollFeedbackEnabled(int, int, int);
     method public boolean shouldShowMenuShortcutsWhenKeyboardPresent();
   }
 
@@ -55189,8 +54544,8 @@ package android.view.animation {
   public class AnimationUtils {
     ctor public AnimationUtils();
     method public static long currentAnimationTimeMillis();
-    method public static long getExpectedPresentationTimeMillis();
-    method public static long getExpectedPresentationTimeNanos();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeMillis();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeNanos();
     method public static android.view.animation.Animation loadAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.Interpolator loadInterpolator(android.content.Context, @AnimRes @InterpolatorRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.LayoutAnimationController loadLayoutAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
@@ -55762,10 +55117,12 @@ package android.view.inputmethod {
     method public int getInitialToolType();
     method @NonNull public java.util.Set<java.lang.Class<? extends android.view.inputmethod.PreviewableHandwritingGesture>> getSupportedHandwritingGesturePreviews();
     method @NonNull public java.util.List<java.lang.Class<? extends android.view.inputmethod.HandwritingGesture>> getSupportedHandwritingGestures();
+    method @FlaggedApi("android.view.inputmethod.editorinfo_handwriting_enabled") public boolean isStylusHandwritingEnabled();
     method public final void makeCompatible(int);
     method public void setInitialSurroundingSubText(@NonNull CharSequence, int);
     method public void setInitialSurroundingText(@NonNull CharSequence);
     method public void setInitialToolType(int);
+    method @FlaggedApi("android.view.inputmethod.editorinfo_handwriting_enabled") public void setStylusHandwritingEnabled(boolean);
     method public void setSupportedHandwritingGesturePreviews(@NonNull java.util.Set<java.lang.Class<? extends android.view.inputmethod.PreviewableHandwritingGesture>>);
     method public void setSupportedHandwritingGestures(@NonNull java.util.List<java.lang.Class<? extends android.view.inputmethod.HandwritingGesture>>);
     method public void writeToParcel(android.os.Parcel, int);
@@ -60633,6 +59990,7 @@ package android.widget {
     method public final android.text.method.TransformationMethod getTransformationMethod();
     method public android.graphics.Typeface getTypeface();
     method public android.text.style.URLSpan[] getUrls();
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public boolean getUseBoundsForWidth();
     method public boolean hasSelection();
     method public boolean isAllCaps();
     method public boolean isCursorVisible();
@@ -60775,6 +60133,7 @@ package android.widget {
     method public final void setTransformationMethod(android.text.method.TransformationMethod);
     method public void setTypeface(@Nullable android.graphics.Typeface, int);
     method public void setTypeface(@Nullable android.graphics.Typeface);
+    method @FlaggedApi("com.android.text.flags.use_bounds_for_width") public void setUseBoundsForWidth(boolean);
     method public void setWidth(int);
     field public static final int AUTO_SIZE_TEXT_TYPE_NONE = 0; // 0x0
     field public static final int AUTO_SIZE_TEXT_TYPE_UNIFORM = 1; // 0x1

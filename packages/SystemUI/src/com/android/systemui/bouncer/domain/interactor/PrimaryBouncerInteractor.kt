@@ -28,7 +28,7 @@ import com.android.keyguard.KeyguardSecurityModel
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.DejankUtils
-import com.android.systemui.R
+import com.android.systemui.res.R
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants.EXPANSION_HIDDEN
@@ -38,8 +38,6 @@ import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.data.repository.TrustRepository
 import com.android.systemui.plugins.ActivityStarter
@@ -74,19 +72,22 @@ constructor(
     private val context: Context,
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
     private val trustRepository: TrustRepository,
-    private val featureFlags: FeatureFlags,
     @Application private val applicationScope: CoroutineScope,
 ) {
     private val passiveAuthBouncerDelay =
         context.resources.getInteger(R.integer.primary_bouncer_passive_auth_delay).toLong()
+
     /** Runnable to show the primary bouncer. */
     val showRunnable = Runnable {
         repository.setPrimaryShow(true)
         repository.setPrimaryShowingSoon(false)
         primaryBouncerCallbackInteractor.dispatchVisibilityChanged(View.VISIBLE)
     }
-
-    val keyguardAuthenticated: Flow<Boolean> = repository.keyguardAuthenticated.filterNotNull()
+    val keyguardAuthenticatedPrimaryAuth: Flow<Int> = repository.keyguardAuthenticatedPrimaryAuth
+    val keyguardAuthenticatedBiometrics: Flow<Boolean> =
+        repository.keyguardAuthenticatedBiometrics.filterNotNull()
+    val userRequestedBouncerWhenAlreadyAuthenticated: Flow<Int> =
+        repository.userRequestedBouncerWhenAlreadyAuthenticated.filterNotNull()
     val isShowing: StateFlow<Boolean> = repository.primaryBouncerShow
     val startingToHide: Flow<Unit> = repository.primaryBouncerStartingToHide.filter { it }.map {}
     val isBackButtonEnabled: Flow<Boolean> = repository.isBackButtonEnabled.filterNotNull()
@@ -96,6 +97,7 @@ constructor(
     val resourceUpdateRequests: Flow<Boolean> = repository.resourceUpdateRequests.filter { it }
     val keyguardPosition: Flow<Float> = repository.keyguardPosition.filterNotNull()
     val panelExpansionAmount: Flow<Float> = repository.panelExpansionAmount
+
     /** 0f = bouncer fully hidden. 1f = bouncer fully visible. */
     val bouncerExpansion: Flow<Float> =
         combine(repository.panelExpansionAmount, repository.primaryBouncerShow) {
@@ -107,6 +109,7 @@ constructor(
                 0f
             }
         }
+
     /** Allow for interaction when just about fully visible */
     val isInteractable: Flow<Boolean> = bouncerExpansion.map { it > 0.9 }
     val sideFpsShowing: Flow<Boolean> = repository.sideFpsShowing
@@ -129,11 +132,9 @@ constructor(
 
     init {
         keyguardUpdateMonitor.registerCallback(keyguardUpdateMonitorCallback)
-        if (featureFlags.isEnabled(Flags.DELAY_BOUNCER)) {
-            applicationScope.launch {
-                trustRepository.isCurrentUserActiveUnlockRunning.collect {
-                    currentUserActiveUnlockRunning = it
-                }
+        applicationScope.launch {
+            trustRepository.isCurrentUserActiveUnlockRunning.collect {
+                currentUserActiveUnlockRunning = it
             }
         }
     }
@@ -144,7 +145,7 @@ constructor(
     @JvmOverloads
     fun show(isScrimmed: Boolean) {
         // Reset some states as we show the bouncer.
-        repository.setKeyguardAuthenticated(null)
+        repository.setKeyguardAuthenticatedBiometrics(null)
         repository.setPrimaryStartingToHide(false)
 
         val resumeBouncer =
@@ -268,9 +269,19 @@ constructor(
         repository.setResourceUpdateRequests(true)
     }
 
-    /** Tell the bouncer that keyguard is authenticated. */
-    fun notifyKeyguardAuthenticated(strongAuth: Boolean) {
-        repository.setKeyguardAuthenticated(strongAuth)
+    /** Tell the bouncer that keyguard is authenticated with primary authentication. */
+    fun notifyKeyguardAuthenticatedPrimaryAuth(userId: Int) {
+        applicationScope.launch { repository.setKeyguardAuthenticatedPrimaryAuth(userId) }
+    }
+
+    /** Tell the bouncer that bouncer is requested when device is already authenticated */
+    fun notifyUserRequestedBouncerWhenAlreadyAuthenticated(userId: Int) {
+        applicationScope.launch { repository.setKeyguardAuthenticatedPrimaryAuth(userId) }
+    }
+
+    /** Tell the bouncer that keyguard is authenticated with biometrics. */
+    fun notifyKeyguardAuthenticatedBiometrics(strongAuth: Boolean) {
+        repository.setKeyguardAuthenticatedBiometrics(strongAuth)
     }
 
     /** Update the position of the bouncer when showing. */
@@ -280,7 +291,7 @@ constructor(
 
     /** Notifies that the state change was handled. */
     fun notifyKeyguardAuthenticatedHandled() {
-        repository.setKeyguardAuthenticated(null)
+        repository.setKeyguardAuthenticatedBiometrics(null)
     }
 
     /** Notifies that the message was shown. */
@@ -399,9 +410,7 @@ constructor(
             currentUserActiveUnlockRunning &&
                 keyguardUpdateMonitor.canTriggerActiveUnlockBasedOnDeviceState()
 
-        return featureFlags.isEnabled(Flags.DELAY_BOUNCER) &&
-            !needsFullscreenBouncer() &&
-            (canRunFaceAuth || canRunActiveUnlock)
+        return !needsFullscreenBouncer() && (canRunFaceAuth || canRunActiveUnlock)
     }
 
     companion object {

@@ -37,7 +37,7 @@ import androidx.annotation.NonNull;
 import com.android.app.animation.Interpolators;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.SystemBarUtils;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.animation.ShadeInterpolation;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.flags.ViewRefactorFlag;
@@ -776,7 +776,7 @@ public class NotificationShelf extends ActivatableNotificationView implements St
             }
 
         } else if (viewEnd >= shelfClipStart
-                && (!mAmbientState.isUnlockHintRunning() || view.isInShelf())
+                && view.isInShelf()
                 && (mAmbientState.isShadeExpanded()
                 || (!view.isPinned() && !view.isHeadsUpAnimatingAway()))) {
 

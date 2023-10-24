@@ -1180,6 +1180,14 @@ public class SubscriptionManager {
     public static final String SATELLITE_ATTACH_ENABLED_FOR_CARRIER =
             SimInfo.COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER;
 
+    /**
+     * TelephonyProvider column name to identify eSIM profile of a non-terrestrial network.
+     * By default, it's disabled.
+     * <P>Type: INTEGER (int)</P>
+     * @hide
+     */
+    public static final String IS_NTN = SimInfo.COLUMN_IS_NTN;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"USAGE_SETTING_"},
@@ -4480,7 +4488,7 @@ public class SubscriptionManager {
      * {code true} if there are no subscriptions on device
      * else {@code false} if subscription is not associated with user.
      *
-     * @throws IllegalArgumentException if subscription is invalid.
+     * @throws IllegalArgumentException if subscription doesn't exist.
      * @throws SecurityException if the caller doesn't have permissions required.
      *
      * @hide

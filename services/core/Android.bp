@@ -183,6 +183,7 @@ java_library_static {
         "android.hardware.power.stats-V2-java",
         "android.hidl.manager-V1.2-java",
         "cbor-java",
+        "display_flags_lib",
         "icu4j_calendar_astronomer",
         "netd-client",
         "overlayable_policy_aidl-java",
@@ -196,7 +197,9 @@ java_library_static {
         "apache-commons-math",
         "power_optimization_flags_lib",
         "notification_flags_lib",
-        "pm_flags_lib",
+        "camera_platform_flags_core_java_lib",
+        "biometrics_flags_lib",
+        "am_flags_lib",
     ],
     javac_shard_size: 50,
     javacflags: [
@@ -209,8 +212,14 @@ java_library_static {
     visibility: [
       "//frameworks/base/services",
       "//frameworks/base/tests/Input",
-      "//packages/modules/AdServices/adservices/tests/unittest/system-service",
+      "//frameworks/base/tests/InputScreenshotTest",
+      "//packages/modules/AdServices/adservices/tests/unittest/adservices-test-utility",
       "//packages/modules/AdServices/adservices/tests/unittest/service-core",
+      "//packages/modules/AdServices/adservices/tests/unittest/system-service",
+      "//packages/modules/AdServices/adservices/tests/unittest/ui",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/appsearch",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/appsetid",
+      "//packages/modules/AdServices/adservices/tests/unittest/service-core/adid",
     ],
 }
 

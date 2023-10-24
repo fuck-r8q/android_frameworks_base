@@ -129,6 +129,7 @@ import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.common.split.SplitLayout;
+import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.common.split.SplitScreenConstants.SplitPosition;
 import com.android.wm.shell.common.split.SplitScreenUtils;
 import com.android.wm.shell.common.split.SplitWindowManager;
@@ -228,6 +229,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private DefaultMixedHandler mMixedHandler;
     private final Toast mSplitUnsupportedToast;
     private SplitRequest mSplitRequest;
+
+    /**
+     * Since StageCoordinator only coordinates MainStage and SideStage, it shouldn't support
+     * CompatUI layouts. CompatUI is handled separately by MainStage and SideStage.
+     */
+    @Override
+    public boolean supportCompatUI() {
+        return false;
+    }
 
     class SplitRequest {
         @SplitPosition
@@ -467,10 +477,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     }
 
     void requestEnterSplitSelect(ActivityManager.RunningTaskInfo taskInfo,
-            WindowContainerTransaction wct) {
+            WindowContainerTransaction wct, int splitPosition, Rect taskBounds) {
         boolean enteredSplitSelect = false;
         for (SplitScreen.SplitSelectListener listener : mSelectListeners) {
-            enteredSplitSelect |= listener.onRequestEnterSplitSelect(taskInfo);
+            enteredSplitSelect |= listener.onRequestEnterSplitSelect(taskInfo, splitPosition,
+                    taskBounds);
         }
         if (enteredSplitSelect) mTaskOrganizer.applyTransaction(wct);
     }
@@ -622,8 +633,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     }
 
     /** Starts 2 tasks in one transition. */
-    void startTasks(int taskId1, @Nullable Bundle options1, int taskId2,
-            @Nullable Bundle options2, @SplitPosition int splitPosition, float splitRatio,
+    void startTasks(int taskId1, @Nullable Bundle options1, int taskId2, @Nullable Bundle options2,
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
             @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (taskId2 == INVALID_TASK_ID) {
@@ -645,13 +656,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         addActivityOptions(options1, mSideStage);
         wct.startTask(taskId1, options1);
 
-        startWithTask(wct, taskId2, options2, splitRatio, remoteTransition, instanceId);
+        startWithTask(wct, taskId2, options2, snapPosition, remoteTransition, instanceId);
     }
 
     /** Start an intent and a task to a split pair in one transition. */
     void startIntentAndTask(PendingIntent pendingIntent, Intent fillInIntent,
             @Nullable Bundle options1, int taskId, @Nullable Bundle options2,
-            @SplitPosition int splitPosition, float splitRatio,
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
             @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (taskId == INVALID_TASK_ID) {
@@ -667,13 +678,14 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         addActivityOptions(options1, mSideStage);
         wct.sendPendingIntent(pendingIntent, fillInIntent, options1);
 
-        startWithTask(wct, taskId, options2, splitRatio, remoteTransition, instanceId);
+        startWithTask(wct, taskId, options2, snapPosition, remoteTransition, instanceId);
     }
 
     /** Starts a shortcut and a task to a split pair in one transition. */
     void startShortcutAndTask(ShortcutInfo shortcutInfo, @Nullable Bundle options1,
             int taskId, @Nullable Bundle options2, @SplitPosition int splitPosition,
-            float splitRatio, @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
+            @PersistentSnapPosition int snapPosition, @Nullable RemoteTransition remoteTransition,
+            InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (taskId == INVALID_TASK_ID) {
             options1 = options1 != null ? options1 : new Bundle();
@@ -688,7 +700,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         addActivityOptions(options1, mSideStage);
         wct.startShortcut(mContext.getPackageName(), shortcutInfo, options1);
 
-        startWithTask(wct, taskId, options2, splitRatio, remoteTransition, instanceId);
+        startWithTask(wct, taskId, options2, snapPosition, remoteTransition, instanceId);
     }
 
     /**
@@ -699,16 +711,18 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
      *                   {@link SplitscreenEventLogger#logEnter(float, int, int, int, int, boolean)}
      */
     private void startWithTask(WindowContainerTransaction wct, int mainTaskId,
-            @Nullable Bundle mainOptions, float splitRatio,
+            @Nullable Bundle mainOptions, @PersistentSnapPosition int snapPosition,
             @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
         if (!mMainStage.isActive()) {
             // Build a request WCT that will launch both apps such that task 0 is on the main stage
             // while task 1 is on the side stage.
             mMainStage.activate(wct, false /* reparent */);
         }
-        mSplitLayout.setDivideRatio(splitRatio);
+        mSplitLayout.setDivideRatio(snapPosition);
         updateWindowBounds(mSplitLayout, wct);
         wct.reorder(mRootTaskInfo.token, true);
+        wct.setReparentLeafTaskIfRelaunch(mRootTaskInfo.token,
+                false /* reparentLeafTaskIfRelaunch */);
         setRootForceTranslucent(false, wct);
 
         // Make sure the launch options will put tasks in the corresponding split roots
@@ -731,7 +745,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             @Nullable ShortcutInfo shortcutInfo1, @Nullable Bundle options1,
             PendingIntent pendingIntent2, Intent fillInIntent2,
             @Nullable ShortcutInfo shortcutInfo2, @Nullable Bundle options2,
-            @SplitPosition int splitPosition, float splitRatio,
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
             @Nullable RemoteTransition remoteTransition, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (pendingIntent2 == null) {
@@ -753,9 +767,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         }
 
         setSideStagePosition(splitPosition, wct);
-        mSplitLayout.setDivideRatio(splitRatio);
+        mSplitLayout.setDivideRatio(snapPosition);
         updateWindowBounds(mSplitLayout, wct);
         wct.reorder(mRootTaskInfo.token, true);
+        wct.setReparentLeafTaskIfRelaunch(mRootTaskInfo.token,
+                false /* reparentLeafTaskIfRelaunch */);
         setRootForceTranslucent(false, wct);
 
         options1 = options1 != null ? options1 : new Bundle();
@@ -781,7 +797,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     /** Starts a pair of tasks using legacy transition. */
     void startTasksWithLegacyTransition(int taskId1, @Nullable Bundle options1,
             int taskId2, @Nullable Bundle options2, @SplitPosition int splitPosition,
-            float splitRatio, RemoteAnimationAdapter adapter, InstanceId instanceId) {
+            @PersistentSnapPosition int snapPosition, RemoteAnimationAdapter adapter,
+            InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (options1 == null) options1 = new Bundle();
         if (taskId2 == INVALID_TASK_ID) {
@@ -802,7 +819,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         addActivityOptions(options1, mSideStage);
         wct.startTask(taskId1, options1);
         mSplitRequest = new SplitRequest(taskId1, taskId2, splitPosition);
-        startWithLegacyTransition(wct, taskId2, options2, splitPosition, splitRatio, adapter,
+        startWithLegacyTransition(wct, taskId2, options2, splitPosition, snapPosition, adapter,
                 instanceId);
     }
 
@@ -811,8 +828,8 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             @Nullable ShortcutInfo shortcutInfo1, @Nullable Bundle options1,
             @Nullable PendingIntent pendingIntent2, Intent fillInIntent2,
             @Nullable ShortcutInfo shortcutInfo2, @Nullable Bundle options2,
-            @SplitPosition int splitPosition, float splitRatio, RemoteAnimationAdapter adapter,
-            InstanceId instanceId) {
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
+            RemoteAnimationAdapter adapter, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (options1 == null) options1 = new Bundle();
         if (pendingIntent2 == null) {
@@ -831,13 +848,13 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                     pendingIntent2 != null ? pendingIntent2.getIntent() : null, splitPosition);
         }
         startWithLegacyTransition(wct, pendingIntent2, fillInIntent2, shortcutInfo2, options2,
-                splitPosition, splitRatio, adapter, instanceId);
+                splitPosition, snapPosition, adapter, instanceId);
     }
 
     void startIntentAndTaskWithLegacyTransition(PendingIntent pendingIntent, Intent fillInIntent,
             @Nullable Bundle options1, int taskId, @Nullable Bundle options2,
-            @SplitPosition int splitPosition, float splitRatio, RemoteAnimationAdapter adapter,
-            InstanceId instanceId) {
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
+            RemoteAnimationAdapter adapter, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (options1 == null) options1 = new Bundle();
         if (taskId == INVALID_TASK_ID) {
@@ -850,15 +867,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
         addActivityOptions(options1, mSideStage);
         wct.sendPendingIntent(pendingIntent, fillInIntent, options1);
         mSplitRequest = new SplitRequest(taskId, pendingIntent.getIntent(), splitPosition);
-        startWithLegacyTransition(wct, taskId, options2, splitPosition, splitRatio, adapter,
+        startWithLegacyTransition(wct, taskId, options2, splitPosition, snapPosition, adapter,
                 instanceId);
     }
 
     /** Starts a pair of shortcut and task using legacy transition. */
     void startShortcutAndTaskWithLegacyTransition(ShortcutInfo shortcutInfo,
             @Nullable Bundle options1, int taskId, @Nullable Bundle options2,
-            @SplitPosition int splitPosition, float splitRatio, RemoteAnimationAdapter adapter,
-            InstanceId instanceId) {
+            @SplitPosition int splitPosition, @PersistentSnapPosition int snapPosition,
+            RemoteAnimationAdapter adapter, InstanceId instanceId) {
         final WindowContainerTransaction wct = new WindowContainerTransaction();
         if (options1 == null) options1 = new Bundle();
         if (taskId == INVALID_TASK_ID) {
@@ -869,7 +886,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
 
         addActivityOptions(options1, mSideStage);
         wct.startShortcut(mContext.getPackageName(), shortcutInfo, options1);
-        startWithLegacyTransition(wct, taskId, options2, splitPosition, splitRatio, adapter,
+        startWithLegacyTransition(wct, taskId, options2, splitPosition, snapPosition, adapter,
                 instanceId);
     }
 
@@ -919,18 +936,19 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private void startWithLegacyTransition(WindowContainerTransaction wct,
             @Nullable PendingIntent mainPendingIntent, @Nullable Intent mainFillInIntent,
             @Nullable ShortcutInfo mainShortcutInfo, @Nullable Bundle mainOptions,
-            @SplitPosition int sidePosition, float splitRatio, RemoteAnimationAdapter adapter,
-            InstanceId instanceId) {
+            @SplitPosition int sidePosition, @PersistentSnapPosition int snapPosition,
+            RemoteAnimationAdapter adapter, InstanceId instanceId) {
         startWithLegacyTransition(wct, INVALID_TASK_ID, mainPendingIntent, mainFillInIntent,
-                mainShortcutInfo, mainOptions, sidePosition, splitRatio, adapter, instanceId);
+                mainShortcutInfo, mainOptions, sidePosition, snapPosition, adapter, instanceId);
     }
 
     private void startWithLegacyTransition(WindowContainerTransaction wct, int mainTaskId,
-            @Nullable Bundle mainOptions, @SplitPosition int sidePosition, float splitRatio,
-            RemoteAnimationAdapter adapter, InstanceId instanceId) {
+            @Nullable Bundle mainOptions, @SplitPosition int sidePosition,
+            @PersistentSnapPosition int snapPosition, RemoteAnimationAdapter adapter,
+            InstanceId instanceId) {
         startWithLegacyTransition(wct, mainTaskId, null /* mainPendingIntent */,
                 null /* mainFillInIntent */, null /* mainShortcutInfo */, mainOptions, sidePosition,
-                splitRatio, adapter, instanceId);
+                snapPosition, adapter, instanceId);
     }
 
     /**
@@ -941,15 +959,15 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
     private void startWithLegacyTransition(WindowContainerTransaction wct, int mainTaskId,
             @Nullable PendingIntent mainPendingIntent, @Nullable Intent mainFillInIntent,
             @Nullable ShortcutInfo mainShortcutInfo, @Nullable Bundle options,
-            @SplitPosition int sidePosition, float splitRatio, RemoteAnimationAdapter adapter,
-            InstanceId instanceId) {
+            @SplitPosition int sidePosition, @PersistentSnapPosition int snapPosition,
+            RemoteAnimationAdapter adapter, InstanceId instanceId) {
         if (!isSplitScreenVisible()) {
             exitSplitScreen(null /* childrenToTop */, EXIT_REASON_RECREATE_SPLIT);
         }
 
         // Init divider first to make divider leash for remote animation target.
         mSplitLayout.init();
-        mSplitLayout.setDivideRatio(splitRatio);
+        mSplitLayout.setDivideRatio(snapPosition);
 
         // Apply surface bounds before animation start.
         SurfaceControl.Transaction startT = mTransactionPool.acquire();
@@ -1542,6 +1560,11 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
             @Nullable ActivityManager.RunningTaskInfo taskInfo, @SplitPosition int startPosition,
             boolean resizeAnim) {
         onSplitScreenEnter();
+        // Preemptively reset the reparenting behavior if we know that we are entering, as starting
+        // split tasks with activity trampolines can inadvertently trigger the task to be
+        // reparented out of the split root mid-launch
+        wct.setReparentLeafTaskIfRelaunch(mRootTaskInfo.token,
+                false /* setReparentLeafTaskIfRelaunch */);
         if (isSplitActive()) {
             prepareBringSplit(wct, taskInfo, startPosition, resizeAnim);
         } else {
@@ -1752,7 +1775,7 @@ public class StageCoordinator implements SplitLayout.SplitLayoutHandler,
                 rightBottomTaskId = sideStageTopTaskId;
             }
             SplitBounds splitBounds = new SplitBounds(topLeftBounds, bottomRightBounds,
-                    leftTopTaskId, rightBottomTaskId);
+                    leftTopTaskId, rightBottomTaskId, mSplitLayout.calculateCurrentSnapPosition());
             if (mainStageTopTaskId != INVALID_TASK_ID && sideStageTopTaskId != INVALID_TASK_ID) {
                 // Update the pair for the top tasks
                 recentTasks.addSplitPair(mainStageTopTaskId, sideStageTopTaskId, splitBounds);

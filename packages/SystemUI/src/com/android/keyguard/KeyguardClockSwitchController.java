@@ -38,10 +38,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.systemui.Dumpable;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.log.LogBuffer;
@@ -208,7 +209,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
     public void setLockscreenClockY(int clockY) {
         if (mView.screenOffsetYPadding != clockY) {
             mView.screenOffsetYPadding = clockY;
-            mView.updateClockTargetRegions();
+            mView.post(() -> mView.updateClockTargetRegions());
         }
     }
 
@@ -234,13 +235,19 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         }
     }
 
+    public KeyguardClockSwitch getView() {
+        return mView;
+    }
+
     private void hideSliceViewAndNotificationIconContainer() {
         View ksv = mView.findViewById(R.id.keyguard_slice_view);
         ksv.setVisibility(View.GONE);
 
         View nic = mView.findViewById(
                 R.id.left_aligned_notification_icon_container);
-        nic.setVisibility(View.GONE);
+        if (nic != null) {
+            nic.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -307,7 +314,11 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
     }
 
     int getNotificationIconAreaHeight() {
-        return mNotificationIconAreaController.getHeight();
+        if (mFeatureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)) {
+            return 0;
+        } else {
+            return mNotificationIconAreaController.getHeight();
+        }
     }
 
     @Override
@@ -372,6 +383,7 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
         mSmartspaceView.setPaddingRelative(startPadding, 0, endPadding, 0);
 
         mKeyguardUnlockAnimationController.setLockscreenSmartspace(mSmartspaceView);
+        mView.setSmartspace(mSmartspaceView);
     }
 
     /**
@@ -517,10 +529,12 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
     }
 
     private void updateAodIcons() {
-        NotificationIconContainer nic = (NotificationIconContainer)
-                mView.findViewById(
-                        com.android.systemui.R.id.left_aligned_notification_icon_container);
-        mNotificationIconAreaController.setupAodIcons(nic);
+        if (!mFeatureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)) {
+            NotificationIconContainer nic = (NotificationIconContainer)
+                    mView.findViewById(
+                            com.android.systemui.res.R.id.left_aligned_notification_icon_container);
+            mNotificationIconAreaController.setupAodIcons(nic);
+        }
     }
 
     private void setClock(ClockController clock) {
@@ -544,7 +558,8 @@ public class KeyguardClockSwitchController extends ViewController<KeyguardClockS
 
     private void updateDoubleLineClock() {
         mCanShowDoubleLineClock = mSecureSettings.getIntForUser(
-            Settings.Secure.LOCKSCREEN_USE_DOUBLE_LINE_CLOCK, 1,
+            Settings.Secure.LOCKSCREEN_USE_DOUBLE_LINE_CLOCK, mView.getResources()
+                .getInteger(com.android.internal.R.integer.config_doublelineClockDefault),
                 UserHandle.USER_CURRENT) != 0;
 
         if (!mCanShowDoubleLineClock) {

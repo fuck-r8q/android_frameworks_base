@@ -16,11 +16,20 @@
 
 package com.android.systemui.bouncer.ui.viewmodel
 
+import android.annotation.StringRes
+import com.android.systemui.authentication.domain.interactor.AuthenticationResult
+import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
+import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 sealed class AuthMethodBouncerViewModel(
+    protected val viewModelScope: CoroutineScope,
+    protected val interactor: BouncerInteractor,
+
     /**
      * Whether user input is enabled.
      *
@@ -37,6 +46,43 @@ sealed class AuthMethodBouncerViewModel(
      */
     val animateFailure: StateFlow<Boolean> = _animateFailure.asStateFlow()
 
+    /** Whether the input method editor (for example, the software keyboard) is visible. */
+    private var isImeVisible: Boolean = false
+
+    /** The authentication method that corresponds to this view model. */
+    abstract val authenticationMethod: AuthenticationMethodModel
+
+    /**
+     * String resource ID of the failure message to be shown during throttling.
+     *
+     * The message must include 2 number parameters: the first one indicating how many unsuccessful
+     * attempts were made, and the second one indicating in how many seconds throttling will expire.
+     */
+    @get:StringRes abstract val throttlingMessageId: Int
+
+    /** Notifies that the UI has been shown to the user. */
+    fun onShown() {
+        clearInput()
+        interactor.resetMessage()
+    }
+
+    /** Notifies that the user has placed down a pointer. */
+    fun onDown() {
+        interactor.onDown()
+    }
+
+    /**
+     * Notifies that the input method editor (for example, the software keyboard) has been shown or
+     * hidden.
+     */
+    fun onImeVisibilityChanged(isVisible: Boolean) {
+        if (isImeVisible && !isVisible) {
+            interactor.onImeHidden()
+        }
+
+        isImeVisible = isVisible
+    }
+
     /**
      * Notifies that the failure animation has been shown. This should be called to consume a `true`
      * value in [animateFailure].
@@ -45,8 +91,31 @@ sealed class AuthMethodBouncerViewModel(
         _animateFailure.value = false
     }
 
-    /** Ask the UI to show the failure animation. */
-    protected fun showFailureAnimation() {
-        _animateFailure.value = true
+    /** Clears any previously-entered input. */
+    protected abstract fun clearInput()
+
+    /** Returns the input entered so far. */
+    protected abstract fun getInput(): List<Any>
+
+    /**
+     * Attempts to authenticate the user using the current input value.
+     *
+     * @see BouncerInteractor.authenticate
+     */
+    protected fun tryAuthenticate(
+        input: List<Any> = getInput(),
+        useAutoConfirm: Boolean = false,
+    ) {
+        viewModelScope.launch {
+            val authenticationResult = interactor.authenticate(input, useAutoConfirm)
+            if (authenticationResult == AuthenticationResult.SKIPPED && useAutoConfirm) {
+                return@launch
+            }
+            _animateFailure.value = authenticationResult != AuthenticationResult.SUCCEEDED
+
+            // TODO(b/291528545): On success, this should only be cleared after the view is animated
+            //  away).
+            clearInput()
+        }
     }
 }

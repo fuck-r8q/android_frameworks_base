@@ -1,0 +1,17 @@
+package: "android.view.inputmethod"
+
+flag {
+    name: "refactor_insets_controller"
+    namespace: "input_method"
+    description: "Feature flag for refactoring InsetsController and removing ImeInsetsSourceConsumer"
+    bug: "298172246"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "editorinfo_handwriting_enabled"
+    namespace: "input_method"
+    description: "Feature flag for adding EditorInfo#mStylusHandwritingEnabled"
+    bug: "293898187"
+    is_fixed_read_only: true
+}

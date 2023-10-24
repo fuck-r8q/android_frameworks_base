@@ -20,6 +20,8 @@ import static android.provider.Settings.Config.SYNC_DISABLED_MODE_NONE;
 import static android.provider.Settings.Config.SYNC_DISABLED_MODE_PERSISTENT;
 import static android.provider.Settings.Config.SYNC_DISABLED_MODE_UNTIL_REBOOT;
 
+import static com.android.providers.settings.Flags.supportOverrides;
+
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.AttributionSource;
@@ -42,10 +44,8 @@ import com.android.internal.util.FastPrintWriter;
 
 import java.io.File;
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
@@ -68,6 +68,11 @@ public final class DeviceConfigService extends Binder {
         "/system_ext/etc/aconfig_flags.textproto",
         "/system_ext/etc/aconfig_flags.textproto",
         "/vendor/etc/aconfig_flags.textproto");
+
+    private static final List<String> PRIVATE_NAMESPACES = List.of(
+            "device_config_overrides",
+            "staged",
+            "token_staged");
 
     final SettingsProvider mProvider;
 
@@ -171,9 +176,12 @@ public final class DeviceConfigService extends Binder {
         enum CommandVerb {
             GET,
             PUT,
+            OVERRIDE,
+            CLEAR_OVERRIDE,
             DELETE,
             LIST,
             LIST_NAMESPACES,
+            LIST_LOCAL_OVERRIDES,
             RESET,
             SET_SYNC_DISABLED_FOR_TESTS,
             GET_SYNC_DISABLED_FOR_TESTS,
@@ -244,6 +252,10 @@ public final class DeviceConfigService extends Binder {
                 verb = CommandVerb.GET;
             } else if ("put".equalsIgnoreCase(cmd)) {
                 verb = CommandVerb.PUT;
+            } else if (supportOverrides() && "override".equalsIgnoreCase(cmd)) {
+                verb = CommandVerb.OVERRIDE;
+            } else if (supportOverrides() && "clear_override".equalsIgnoreCase(cmd)) {
+                verb = CommandVerb.CLEAR_OVERRIDE;
             } else if ("delete".equalsIgnoreCase(cmd)) {
                 verb = CommandVerb.DELETE;
             } else if ("list".equalsIgnoreCase(cmd)) {
@@ -253,6 +265,11 @@ public final class DeviceConfigService extends Binder {
                 }
             } else if ("list_namespaces".equalsIgnoreCase(cmd)) {
                 verb = CommandVerb.LIST_NAMESPACES;
+                if (peekNextArg() == null) {
+                    isValid = true;
+                }
+            } else if (supportOverrides() && "list_local_overrides".equalsIgnoreCase(cmd)) {
+                verb = CommandVerb.LIST_LOCAL_OVERRIDES;
                 if (peekNextArg() == null) {
                     isValid = true;
                 }
@@ -330,7 +347,7 @@ public final class DeviceConfigService extends Binder {
                         publicOnly = true;
                     }
                 } else if (namespace == null) {
-                    // GET, PUT, DELETE, LIST 1st arg
+                    // GET, PUT, OVERRIDE, DELETE, LIST 1st arg
                     namespace = arg;
                     if (verb == CommandVerb.LIST) {
                         if (peekNextArg() == null) {
@@ -342,9 +359,12 @@ public final class DeviceConfigService extends Binder {
                         }
                     }
                 } else if (key == null) {
-                    // GET, PUT, DELETE 2nd arg
+                    // GET, PUT, OVERRIDE, DELETE 2nd arg
                     key = arg;
-                    if ((verb == CommandVerb.GET || verb == CommandVerb.DELETE)) {
+                    boolean validVerb = verb == CommandVerb.GET
+                            || verb == CommandVerb.DELETE
+                            || verb == CommandVerb.CLEAR_OVERRIDE;
+                    if (validVerb) {
                         // GET, DELETE only have 2 args
                         if (peekNextArg() == null) {
                             isValid = true;
@@ -355,9 +375,11 @@ public final class DeviceConfigService extends Binder {
                         }
                     }
                 } else if (value == null) {
-                    // PUT 3rd arg (required)
+                    // PUT, OVERRIDE 3rd arg (required)
                     value = arg;
-                    if (verb == CommandVerb.PUT && peekNextArg() == null) {
+                    boolean validVerb = verb == CommandVerb.PUT
+                            || verb == CommandVerb.OVERRIDE;
+                    if (validVerb && peekNextArg() == null) {
                         isValid = true;
                     }
                 } else if ("default".equalsIgnoreCase(arg)) {
@@ -387,6 +409,16 @@ public final class DeviceConfigService extends Binder {
                 case PUT:
                     DeviceConfig.setProperty(namespace, key, value, makeDefault);
                     break;
+                case OVERRIDE:
+                    if (supportOverrides()) {
+                        DeviceConfig.setLocalOverride(namespace, key, value);
+                    }
+                    break;
+                case CLEAR_OVERRIDE:
+                    if (supportOverrides()) {
+                        DeviceConfig.clearLocalOverride(namespace, key);
+                    }
+                    break;
                 case DELETE:
                     pout.println(delete(iprovider, namespace, key)
                             ? "Successfully deleted " + key + " from " + namespace
@@ -394,7 +426,8 @@ public final class DeviceConfigService extends Binder {
                     break;
                 case LIST:
                     if (namespace != null) {
-                        DeviceConfig.Properties properties = DeviceConfig.getProperties(namespace);
+                        DeviceConfig.Properties properties =
+                                DeviceConfig.getProperties(namespace);
                         List<String> keys = new ArrayList<>(properties.getKeyset());
                         Collections.sort(keys);
                         for (String name : keys) {
@@ -402,7 +435,21 @@ public final class DeviceConfigService extends Binder {
                         }
                     } else {
                         for (String line : listAll(iprovider)) {
-                            pout.println(line);
+                            if (supportOverrides()) {
+                                boolean isPrivate = false;
+                                for (String privateNamespace : PRIVATE_NAMESPACES) {
+                                    if (line.startsWith(privateNamespace)) {
+                                        isPrivate = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!isPrivate) {
+                                    pout.println(line);
+                                }
+                            } else {
+                                pout.println(line);
+                            }
                         }
                     }
                     break;
@@ -428,6 +475,22 @@ public final class DeviceConfigService extends Binder {
                     }
                     for (int i = 0; i < namespaces.size(); i++) {
                         pout.println(namespaces.get(i));
+                    }
+                    break;
+                case LIST_LOCAL_OVERRIDES:
+                    if (supportOverrides()) {
+                        Map<String, Map<String, String>> underlyingValues =
+                                DeviceConfig.getUnderlyingValuesForOverriddenFlags();
+                        for (String overrideNamespace : underlyingValues.keySet()) {
+                            Map<String, String> flagToValue =
+                                    underlyingValues.get(overrideNamespace);
+                            for (String flag : flagToValue.keySet()) {
+                                String flagText = overrideNamespace + "/" + flag;
+                                String valueText =
+                                        DeviceConfig.getProperty(overrideNamespace, flag);
+                                pout.println(flagText + "=" + valueText);
+                            }
+                        }
                     }
                     break;
                 case RESET:

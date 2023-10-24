@@ -78,7 +78,6 @@ class MobileIconsViewModelTest : SysuiTestCase() {
                 airplaneModeInteractor,
                 constants,
                 testScope.backgroundScope,
-                statusBarPipelineFlags,
             )
 
         interactor.filteredSubscriptions.value = listOf(SUB_1, SUB_2)
@@ -151,33 +150,6 @@ class MobileIconsViewModelTest : SysuiTestCase() {
 
             // ... and dropped from the cache
             assertThat(underTest.mobileIconSubIdCache).containsExactly(2, model2.commonImpl)
-        }
-
-    @Test
-    fun caching_mobileIconInteractorIsReusedForSameSubId() =
-        testScope.runTest {
-            val interactor1 = underTest.mobileIconInteractorForSub(1)
-            val interactor2 = underTest.mobileIconInteractorForSub(1)
-
-            assertThat(interactor1).isSameInstanceAs(interactor2)
-        }
-
-    @Test
-    fun caching_invalidInteractorssAreRemovedFromCacheWhenSubDisappears() =
-        testScope.runTest {
-            // Retrieve interactors to trigger caching
-            val interactor1 = underTest.mobileIconInteractorForSub(1)
-            val interactor2 = underTest.mobileIconInteractorForSub(2)
-
-            // Both impls are cached
-            assertThat(underTest.mobileIconInteractorSubIdCache)
-                .containsExactly(1, interactor1, 2, interactor2)
-
-            // SUB_1 is removed from the list...
-            interactor.filteredSubscriptions.value = listOf(SUB_2)
-
-            // ... and dropped from the cache
-            assertThat(underTest.mobileIconInteractorSubIdCache).containsExactly(2, interactor2)
         }
 
     @Test

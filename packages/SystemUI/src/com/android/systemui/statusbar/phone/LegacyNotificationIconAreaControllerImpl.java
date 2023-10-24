@@ -15,6 +15,8 @@
  */
 package com.android.systemui.statusbar.phone;
 
+import static com.android.systemui.flags.Flags.NEW_AOD_TRANSITION;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Color;
@@ -34,7 +36,7 @@ import com.android.app.animation.Interpolators;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.util.ContrastColorUtil;
 import com.android.settingslib.Utils;
-import com.android.systemui.R;
+import com.android.systemui.res.R;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.demomode.DemoMode;
 import com.android.systemui.demomode.DemoModeController;
@@ -109,12 +111,15 @@ public class LegacyNotificationIconAreaControllerImpl implements
 
     private final ViewRefactorFlag mShelfRefactor;
 
+    private final boolean mNewAodTransition;
+
     private int mAodIconAppearTranslation;
 
     private boolean mAnimationsEnabled;
     private int mAodIconTint;
     private boolean mAodIconsVisible;
     private boolean mShowLowPriority = true;
+    private boolean mIsStatusViewMigrated = false;
 
     @VisibleForTesting
     final NotificationListener.NotificationSettingsListener mSettingsListener =
@@ -146,6 +151,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
         mContext = context;
         mStatusBarStateController = statusBarStateController;
         mShelfRefactor = new ViewRefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
+        mNewAodTransition = featureFlags.isEnabled(NEW_AOD_TRANSITION);
         mStatusBarStateController.addCallback(this);
         mMediaManager = notificationMediaManager;
         mDozeParameters = dozeParameters;
@@ -158,7 +164,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
         mStatusBarWindowController = statusBarWindowController;
         mScreenOffAnimationController = screenOffAnimationController;
         notificationListener.addNotificationSettingsListener(mSettingsListener);
-
+        mIsStatusViewMigrated = featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW);
         initializeNotificationAreaViews(context);
         reloadAodColor();
         darkIconDispatcher.addDarkReceiver(this);
@@ -557,7 +563,9 @@ public class LegacyNotificationIconAreaControllerImpl implements
             return;
         }
         if (mScreenOffAnimationController.shouldAnimateAodIcons()) {
-            mAodIcons.setTranslationY(-mAodIconAppearTranslation);
+            if (!mIsStatusViewMigrated) {
+                mAodIcons.setTranslationY(-mAodIconAppearTranslation);
+            }
             mAodIcons.setAlpha(0);
             animateInAodIconTranslation();
             mAodIcons.animate()
@@ -567,16 +575,20 @@ public class LegacyNotificationIconAreaControllerImpl implements
                     .start();
         } else {
             mAodIcons.setAlpha(1.0f);
-            mAodIcons.setTranslationY(0);
+            if (!mIsStatusViewMigrated) {
+                mAodIcons.setTranslationY(0);
+            }
         }
     }
 
     private void animateInAodIconTranslation() {
-        mAodIcons.animate()
-                .setInterpolator(Interpolators.DECELERATE_QUINT)
-                .translationY(0)
-                .setDuration(AOD_ICONS_APPEAR_DURATION)
-                .start();
+        if (!mIsStatusViewMigrated) {
+            mAodIcons.animate()
+                    .setInterpolator(Interpolators.DECELERATE_QUINT)
+                    .translationY(0)
+                    .setDuration(AOD_ICONS_APPEAR_DURATION)
+                    .start();
+        }
     }
 
     private void reloadAodColor() {
@@ -602,9 +614,11 @@ public class LegacyNotificationIconAreaControllerImpl implements
         boolean animate = true;
         if (!mBypassController.getBypassEnabled()) {
             animate = mDozeParameters.getAlwaysOn() && !mDozeParameters.getDisplayNeedsBlanking();
-            // We only want the appear animations to happen when the notifications get fully hidden,
-            // since otherwise the unhide animation overlaps
-            animate &= fullyHidden;
+            if (!mNewAodTransition) {
+                // We only want the appear animations to happen when the notifications get fully
+                // hidden, since otherwise the unhide animation overlaps
+                animate &= fullyHidden;
+            }
         }
         updateAodIconsVisibility(animate, false /* force */);
         updateAodNotificationIcons();
@@ -640,27 +654,40 @@ public class LegacyNotificationIconAreaControllerImpl implements
             mAodIconsVisible = visible;
             mAodIcons.animate().cancel();
             if (animate) {
-                boolean wasFullyInvisible = mAodIcons.getVisibility() != View.VISIBLE;
-                if (mAodIconsVisible) {
-                    if (wasFullyInvisible) {
-                        // No fading here, let's just appear the icons instead!
-                        mAodIcons.setVisibility(View.VISIBLE);
-                        mAodIcons.setAlpha(1.0f);
-                        appearAodIcons();
+                if (mNewAodTransition) {
+                    // Let's make sure the icon are translated to 0, since we cancelled it above
+                    animateInAodIconTranslation();
+                    if (mAodIconsVisible) {
+                        CrossFadeHelper.fadeIn(mAodIcons);
+                    } else {
+                        CrossFadeHelper.fadeOut(mAodIcons);
+                    }
+                } else {
+                    boolean wasFullyInvisible = mAodIcons.getVisibility() != View.VISIBLE;
+                    if (mAodIconsVisible) {
+                        if (wasFullyInvisible) {
+                            // No fading here, let's just appear the icons instead!
+                            mAodIcons.setVisibility(View.VISIBLE);
+                            mAodIcons.setAlpha(1.0f);
+                            appearAodIcons();
+                        } else {
+                            // Let's make sure the icon are translated to 0, since we cancelled it
+                            // above
+                            animateInAodIconTranslation();
+                            // We were fading out, let's fade in instead
+                            CrossFadeHelper.fadeIn(mAodIcons);
+                        }
                     } else {
                         // Let's make sure the icon are translated to 0, since we cancelled it above
                         animateInAodIconTranslation();
-                        // We were fading out, let's fade in instead
-                        CrossFadeHelper.fadeIn(mAodIcons);
+                        CrossFadeHelper.fadeOut(mAodIcons);
                     }
-                } else {
-                    // Let's make sure the icon are translated to 0, since we cancelled it above
-                    animateInAodIconTranslation();
-                    CrossFadeHelper.fadeOut(mAodIcons);
                 }
             } else {
                 mAodIcons.setAlpha(1.0f);
-                mAodIcons.setTranslationY(0);
+                if (!mIsStatusViewMigrated) {
+                    mAodIcons.setTranslationY(0);
+                }
                 mAodIcons.setVisibility(visible ? View.VISIBLE : View.INVISIBLE);
             }
         }
