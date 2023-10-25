@@ -9644,13 +9644,13 @@ package android.companion {
     method @Deprecated @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull String);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
-    method @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
-    field public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
-    field public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
-    field public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
-    field public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
-    field public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
-    field public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
+    method @FlaggedApi("android.companion.device_presence") @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
     field public static final String SERVICE_INTERFACE = "android.companion.CompanionDeviceService";
   }
 
@@ -11101,7 +11101,7 @@ package android.content {
     field public static final String EXTRA_ALLOW_MULTIPLE = "android.intent.extra.ALLOW_MULTIPLE";
     field @Deprecated public static final String EXTRA_ALLOW_REPLACE = "android.intent.extra.ALLOW_REPLACE";
     field public static final String EXTRA_ALTERNATE_INTENTS = "android.intent.extra.ALTERNATE_INTENTS";
-    field public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
+    field @FlaggedApi("android.content.pm.archiving") public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
     field public static final String EXTRA_ASSIST_CONTEXT = "android.intent.extra.ASSIST_CONTEXT";
     field public static final String EXTRA_ASSIST_INPUT_DEVICE_ID = "android.intent.extra.ASSIST_INPUT_DEVICE_ID";
     field public static final String EXTRA_ASSIST_INPUT_HINT_KEYBOARD = "android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD";
@@ -11988,6 +11988,40 @@ package android.content.pm {
     method public final int compare(android.content.pm.ApplicationInfo, android.content.pm.ApplicationInfo);
   }
 
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedActivity {
+    ctor public ArchivedActivity(@NonNull CharSequence, @NonNull android.content.ComponentName);
+    method @NonNull public android.content.ComponentName getComponentName();
+    method @Nullable public android.graphics.drawable.Drawable getIcon();
+    method @NonNull public CharSequence getLabel();
+    method @Nullable public android.graphics.drawable.Drawable getMonochromeIcon();
+    method @NonNull public android.content.pm.ArchivedActivity setComponentName(@NonNull android.content.ComponentName);
+    method @NonNull public android.content.pm.ArchivedActivity setIcon(@NonNull android.graphics.drawable.Drawable);
+    method @NonNull public android.content.pm.ArchivedActivity setLabel(@NonNull CharSequence);
+    method @NonNull public android.content.pm.ArchivedActivity setMonochromeIcon(@NonNull android.graphics.drawable.Drawable);
+  }
+
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedPackage {
+    ctor public ArchivedPackage(@NonNull String, @NonNull android.content.pm.SigningInfo, @NonNull java.util.List<android.content.pm.ArchivedActivity>);
+    method @Nullable public String getDefaultToDeviceProtectedStorage();
+    method @NonNull public java.util.List<android.content.pm.ArchivedActivity> getLauncherActivities();
+    method @NonNull public String getPackageName();
+    method @Nullable public String getRequestLegacyExternalStorage();
+    method @NonNull public android.content.pm.SigningInfo getSigningInfo();
+    method public int getTargetSdkVersion();
+    method @Nullable public String getUserDataFragile();
+    method public int getVersionCode();
+    method public int getVersionCodeMajor();
+    method @NonNull public android.content.pm.ArchivedPackage setDefaultToDeviceProtectedStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setLauncherActivities(@NonNull java.util.List<android.content.pm.ArchivedActivity>);
+    method @NonNull public android.content.pm.ArchivedPackage setPackageName(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setRequestLegacyExternalStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setSigningInfo(@NonNull android.content.pm.SigningInfo);
+    method @NonNull public android.content.pm.ArchivedPackage setTargetSdkVersion(int);
+    method @NonNull public android.content.pm.ArchivedPackage setUserDataFragile(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setVersionCode(int);
+    method @NonNull public android.content.pm.ArchivedPackage setVersionCodeMajor(int);
+  }
+
   public final class Attribution implements android.os.Parcelable {
     method public int describeContents();
     method @IdRes public int getLabel();
@@ -12320,6 +12354,7 @@ package android.content.pm {
     method @Nullable public android.content.pm.PackageInstaller.SessionInfo getSessionInfo(int);
     method @NonNull public java.util.List<android.content.pm.PackageInstaller.SessionInfo> getStagedSessions();
     method @RequiresPermission(allOf={android.Manifest.permission.INSTALL_PACKAGES, "com.android.permission.INSTALL_EXISTING_PACKAGES"}) public void installExistingPackage(@NonNull String, int, @Nullable android.content.IntentSender);
+    method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void installPackageArchived(@NonNull android.content.pm.ArchivedPackage, @NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.content.IntentSender);
     method @NonNull public android.content.pm.PackageInstaller.Session openSession(int) throws java.io.IOException;
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback, @NonNull android.os.Handler);
@@ -12601,6 +12636,7 @@ package android.content.pm {
     method @NonNull public abstract CharSequence getApplicationLabel(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
+    method @FlaggedApi("android.content.pm.archiving") @Nullable public android.content.pm.ArchivedPackage getArchivedPackage(@NonNull String);
     method @NonNull public CharSequence getBackgroundPermissionOptionLabel();
     method @Nullable public abstract android.content.pm.ChangedPackages getChangedPackages(@IntRange(from=0) int);
     method public abstract int getComponentEnabledSetting(@NonNull android.content.ComponentName);
@@ -16259,6 +16295,8 @@ package android.graphics {
 
   public static class Paint.FontMetricsInt {
     ctor public Paint.FontMetricsInt();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void set(@NonNull android.graphics.Paint.FontMetricsInt);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void set(@NonNull android.graphics.Paint.FontMetrics);
     field public int ascent;
     field public int bottom;
     field public int descent;
@@ -33473,7 +33511,7 @@ package android.os {
     field public static final String DISALLOW_MICROPHONE_TOGGLE = "disallow_microphone_toggle";
     field public static final String DISALLOW_MODIFY_ACCOUNTS = "no_modify_accounts";
     field public static final String DISALLOW_MOUNT_PHYSICAL_MEDIA = "no_physical_media";
-    field public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
+    field @FlaggedApi("android.nfc.enable_nfc_user_restriction") public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
     field public static final String DISALLOW_NETWORK_RESET = "no_network_reset";
     field public static final String DISALLOW_OUTGOING_BEAM = "no_outgoing_beam";
     field public static final String DISALLOW_OUTGOING_CALLS = "no_outgoing_calls";
@@ -43125,6 +43163,7 @@ package android.telephony {
     field public static final String KEY_SHOW_ICCID_IN_SIM_STATUS_BOOL = "show_iccid_in_sim_status_bool";
     field public static final String KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL = "show_ims_registration_status_bool";
     field public static final String KEY_SHOW_ONSCREEN_DIAL_BUTTON_BOOL = "show_onscreen_dial_button_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.hide_roaming_icon") public static final String KEY_SHOW_ROAMING_INDICATOR_BOOL = "show_roaming_indicator_bool";
     field public static final String KEY_SHOW_SIGNAL_STRENGTH_IN_SIM_STATUS_BOOL = "show_signal_strength_in_sim_status_bool";
     field public static final String KEY_SHOW_VIDEO_CALL_CHARGES_ALERT_DIALOG_BOOL = "show_video_call_charges_alert_dialog_bool";
     field public static final String KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL = "show_wfc_location_privacy_policy_bool";
@@ -46719,6 +46758,7 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setJustificationMode(int);
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.DynamicLayout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
@@ -46907,6 +46947,7 @@ package android.text {
     method public int getLineVisibleEnd(int);
     method public float getLineWidth(int);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @IntRange(from=1) public final int getMaxLines();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @Nullable public android.graphics.Paint.FontMetrics getMinimumFontMetrics();
     method public int getOffsetForHorizontal(int, float);
     method public int getOffsetToLeftOf(int);
     method public int getOffsetToRightOf(int);
@@ -46973,6 +47014,7 @@ package android.text {
     method @NonNull public android.text.Layout.Builder setLineSpacingAmount(float);
     method @NonNull public android.text.Layout.Builder setLineSpacingMultiplier(@FloatRange(from=0) float);
     method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.Layout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.Layout.Builder setUseBoundsForWidth(boolean);
@@ -47244,6 +47286,7 @@ package android.text {
     method @NonNull public android.text.StaticLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.StaticLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.StaticLayout.Builder setMaxLines(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.StaticLayout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method public android.text.StaticLayout.Builder setText(CharSequence);
     method @NonNull public android.text.StaticLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
@@ -59922,6 +59965,7 @@ package android.widget {
     method public int getMinHeight();
     method public int getMinLines();
     method public int getMinWidth();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @Nullable public android.graphics.Paint.FontMetrics getMinimumFontMetrics();
     method public final android.text.method.MovementMethod getMovementMethod();
     method public int getOffsetForPosition(float, float);
     method public android.text.TextPaint getPaint();
@@ -60058,6 +60102,7 @@ package android.widget {
     method public void setMinHeight(int);
     method public void setMinLines(int);
     method public void setMinWidth(int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method public final void setMovementMethod(android.text.method.MovementMethod);
     method public void setOnEditorActionListener(android.widget.TextView.OnEditorActionListener);
     method public void setPaintFlags(int);
