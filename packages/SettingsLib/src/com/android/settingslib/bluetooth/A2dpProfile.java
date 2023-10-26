@@ -279,7 +279,7 @@ public class A2dpProfile implements LocalBluetoothProfile {
             if (V) Log.d(TAG,"mService is null.");
             return false;
         }
-        BluetoothDevice bluetoothDevice = (device != null) ? device : mService.getActiveDevice();
+        BluetoothDevice bluetoothDevice = (device != null) ? device : getActiveDevice();
         if (bluetoothDevice == null) {
             return false;
         }
