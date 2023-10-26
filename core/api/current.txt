@@ -232,6 +232,7 @@ package android {
     field public static final String READ_CALENDAR = "android.permission.READ_CALENDAR";
     field public static final String READ_CALL_LOG = "android.permission.READ_CALL_LOG";
     field public static final String READ_CONTACTS = "android.permission.READ_CONTACTS";
+    field @FlaggedApi("com.android.server.feature.flags.enable_read_dropbox_permission") public static final String READ_DROPBOX_DATA = "android.permission.READ_DROPBOX_DATA";
     field public static final String READ_EXTERNAL_STORAGE = "android.permission.READ_EXTERNAL_STORAGE";
     field public static final String READ_HOME_APP_SEARCH_DATA = "android.permission.READ_HOME_APP_SEARCH_DATA";
     field @Deprecated public static final String READ_INPUT_STATE = "android.permission.READ_INPUT_STATE";
@@ -12888,7 +12889,7 @@ package android.content.pm {
     field public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
     field public static final String FEATURE_TELEPHONY_SUBSCRIPTION = "android.hardware.telephony.subscription";
     field @Deprecated public static final String FEATURE_TELEVISION = "android.hardware.type.television";
-    field public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
+    field @FlaggedApi("com.android.net.thread.flags.thread_enabled") public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
     field public static final String FEATURE_TOUCHSCREEN = "android.hardware.touchscreen";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH = "android.hardware.touchscreen.multitouch";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT = "android.hardware.touchscreen.multitouch.distinct";
@@ -17712,12 +17713,14 @@ package android.graphics.text {
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_DISABLED = 0; // 0x0
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_ENABLED = 1; // 0x1
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.word_style_auto") public static final int LINE_BREAK_STYLE_AUTO = 5; // 0x5
     field public static final int LINE_BREAK_STYLE_LOOSE = 1; // 0x1
     field public static final int LINE_BREAK_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_STYLE_NORMAL = 2; // 0x2
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_NO_BREAK = 4; // 0x4
     field public static final int LINE_BREAK_STYLE_STRICT = 3; // 0x3
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.word_style_auto") public static final int LINE_BREAK_WORD_STYLE_AUTO = 2; // 0x2
     field public static final int LINE_BREAK_WORD_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_WORD_STYLE_PHRASE = 1; // 0x1
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_WORD_STYLE_UNSPECIFIED = -1; // 0xffffffff
@@ -32440,7 +32443,7 @@ package android.os {
     method public void addData(@NonNull String, @Nullable byte[], int);
     method public void addFile(@NonNull String, @NonNull java.io.File, int) throws java.io.IOException;
     method public void addText(@NonNull String, @NonNull String);
-    method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_LOGS, android.Manifest.permission.PACKAGE_USAGE_STATS}) public android.os.DropBoxManager.Entry getNextEntry(String, long);
+    method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_DROPBOX_DATA, android.Manifest.permission.PACKAGE_USAGE_STATS}) public android.os.DropBoxManager.Entry getNextEntry(String, long);
     method public boolean isTagEnabled(String);
     field public static final String ACTION_DROPBOX_ENTRY_ADDED = "android.intent.action.DROPBOX_ENTRY_ADDED";
     field public static final String EXTRA_DROPPED_COUNT = "android.os.extra.DROPPED_COUNT";
@@ -33047,7 +33050,7 @@ package android.os {
   public static class PerformanceHintManager.Session implements java.io.Closeable {
     method public void close();
     method public void reportActualWorkDuration(long);
-    method public void setPreferPowerEfficiency(boolean);
+    method @FlaggedApi("android.os.adpf_prefer_power_efficiency") public void setPreferPowerEfficiency(boolean);
     method public void setThreads(@NonNull int[]);
     method public void updateTargetWorkDuration(long);
   }
