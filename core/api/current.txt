@@ -13322,9 +13322,12 @@ package android.content.pm {
 
   public final class SigningInfo implements android.os.Parcelable {
     ctor public SigningInfo();
+    ctor @FlaggedApi("android.content.pm.archiving") public SigningInfo(@IntRange(from=0) int, @Nullable java.util.Collection<android.content.pm.Signature>, @Nullable java.util.Collection<java.security.PublicKey>, @Nullable java.util.Collection<android.content.pm.Signature>);
     ctor public SigningInfo(android.content.pm.SigningInfo);
     method public int describeContents();
     method public android.content.pm.Signature[] getApkContentsSigners();
+    method @FlaggedApi("android.content.pm.archiving") @NonNull public java.util.Collection<java.security.PublicKey> getPublicKeys();
+    method @FlaggedApi("android.content.pm.archiving") @IntRange(from=0) public int getSchemeVersion();
     method public android.content.pm.Signature[] getSigningCertificateHistory();
     method public boolean hasMultipleSigners();
     method public boolean hasPastSigningCertificates();
@@ -44504,7 +44507,7 @@ package android.telephony {
     method public static final boolean isStartsPostDial(char);
     method public static boolean isVoiceMailNumber(String);
     method public static boolean isWellFormedSmsAddress(String);
-    method public static boolean isWpsCallNumber(@Nullable String);
+    method @FlaggedApi("com.android.internal.telephony.flags.enable_wps_check_api_flag") public static boolean isWpsCallNumber(@NonNull String);
     method public static byte[] networkPortionToCalledPartyBCD(String);
     method public static byte[] networkPortionToCalledPartyBCDWithLength(String);
     method public static String normalizeNumber(String);
