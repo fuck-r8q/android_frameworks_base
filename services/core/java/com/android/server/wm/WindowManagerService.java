@@ -251,6 +251,7 @@ import android.view.DisplayInfo;
 import android.view.Gravity;
 import android.view.IAppTransitionAnimationSpecsFuture;
 import android.view.ICrossWindowBlurEnabledListener;
+import android.view.IDecorViewGestureListener;
 import android.view.IDisplayChangeWindowController;
 import android.view.IDisplayFoldListener;
 import android.view.IDisplayWindowInsetsController;
@@ -305,6 +306,7 @@ import android.window.ClientWindowFrames;
 import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
 import android.window.ScreenCapture;
+import android.window.SystemPerformanceHinter;
 import android.window.TaskSnapshot;
 import android.window.WindowContainerToken;
 import android.window.WindowContextInfo;
@@ -551,6 +553,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @VisibleForTesting
     WindowManagerPolicy mPolicy;
+
+    final WindowManagerFlags mFlags;
 
     final IActivityManager mActivityManager;
     final ActivityManagerInternal mAmInternal;
@@ -1041,6 +1045,8 @@ public class WindowManagerService extends IWindowManager.Stub
         sThreadPriorityBooster.reset();
     }
 
+    SystemPerformanceHinter mSystemPerformanceHinter;
+
     void openSurfaceTransaction() {
         try {
             Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "openSurfaceTransaction");
@@ -1158,6 +1164,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mGlobalLock = atm.getGlobalLock();
         mAtmService = atm;
         mContext = context;
+        mFlags = new WindowManagerFlags();
         mIsPc = mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
         mAllowBootMessages = showBootMsgs;
         mLimitedAlphaCompositing = context.getResources().getBoolean(
@@ -1334,6 +1341,13 @@ public class WindowManagerService extends IWindowManager.Stub
         mBlurController = new BlurController(mContext, mPowerManager);
         mTaskFpsCallbackController = new TaskFpsCallbackController(mContext);
         mAccessibilityController = new AccessibilityController(this);
+        mSystemPerformanceHinter = new SystemPerformanceHinter(mContext, displayId -> {
+            synchronized (mGlobalLock) {
+                DisplayContent dc = mRoot.getDisplayContent(displayId);
+                return (dc == null) ? null : dc.getSurfaceControl();
+            }
+
+        }, mTransactionFactory);
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {
@@ -2510,14 +2524,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 outInsetsState.set(win.getCompatInsetsState(), true /* copySources */);
             }
 
-            // TODO (b/298562855): Remove this after identifying the reason why the frame is empty.
-            if (win.mAttrs.providedInsets != null && win.getFrame().isEmpty()) {
-                Slog.w(TAG, "Empty frame of " + win
-                        + " configChanged=" + configChanged
-                        + " frame=" + win.getFrame().toShortString()
-                        + " attrs=" + attrs);
-            }
-
             ProtoLog.v(WM_DEBUG_FOCUS, "Relayout of %s: focusMayChange=%b",
                     win, focusMayChange);
 
@@ -3125,10 +3131,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @Override
     public void notifyKeyguardTrustedChanged() {
-        synchronized (mGlobalLock) {
-            if (mAtmService.mKeyguardController.isKeyguardShowing(DEFAULT_DISPLAY)) {
-                mRoot.ensureActivitiesVisible(null, 0, false /* preserveWindows */);
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                if (mAtmService.mKeyguardController.isKeyguardShowing(DEFAULT_DISPLAY)) {
+                    mRoot.ensureActivitiesVisible(null, 0, false /* preserveWindows */);
+                }
             }
+        } finally {
+            Binder.restoreCallingIdentity(origId);
         }
     }
 
@@ -4670,8 +4681,9 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
             if (displayContent == null) {
-                throw new IllegalArgumentException("Trying to register visibility event "
-                        + "for invalid display: " + displayId);
+                throw new IllegalArgumentException(
+                        "Trying to register system gesture exclusion event for invalid display: "
+                                + displayId);
             }
             displayContent.registerSystemGestureExclusionListener(listener);
         }
@@ -4683,10 +4695,61 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
             if (displayContent == null) {
-                throw new IllegalArgumentException("Trying to register visibility event "
-                        + "for invalid display: " + displayId);
+                throw new IllegalArgumentException(
+                        "Trying to unregister system gesture exclusion event for invalid display: "
+                                + displayId);
             }
             displayContent.unregisterSystemGestureExclusionListener(listener);
+        }
+    }
+
+    @Override
+    public void registerDecorViewGestureListener(
+            IDecorViewGestureListener listener, int displayId) {
+        if (!checkCallingPermission(android.Manifest.permission.MONITOR_INPUT,
+                "registerDecorViewGestureListener()")) {
+            throw new SecurityException("Requires MONITOR_INPUT permission");
+        }
+        synchronized (mGlobalLock) {
+            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+            if (displayContent == null) {
+                throw new IllegalArgumentException(
+                        "Trying to register DecorView gesture event listener"
+                                + "for invalid display: "
+                                + displayId);
+            }
+            displayContent.registerDecorViewGestureListener(listener);
+        }
+    }
+
+    @Override
+    public void unregisterDecorViewGestureListener(
+            IDecorViewGestureListener listener, int displayId) {
+        if (!checkCallingPermission(android.Manifest.permission.MONITOR_INPUT,
+                "unregisterSystemGestureExclusionListener()")) {
+            throw new SecurityException("Requires MONITOR_INPUT permission");
+        }
+        synchronized (mGlobalLock) {
+            final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+            if (displayContent == null) {
+                throw new IllegalArgumentException(
+                        "Trying to unregister DecorView gesture event listener"
+                                + "for invalid display: "
+                                + displayId);
+            }
+            displayContent.unregisterDecorViewGestureListener(listener);
+        }
+    }
+
+    void reportDecorViewGestureChanged(Session session, IWindow window, boolean intercepted) {
+        synchronized (mGlobalLock) {
+            final WindowState win =
+                    windowForClientLocked(session, window, false /* throwOnError */);
+            if (win == null) {
+                return;
+            }
+            win.getDisplayContent()
+                    .updateDecorViewGestureIntercepted(win.mToken.token, intercepted);
         }
     }
 
@@ -8845,7 +8908,7 @@ public class WindowManagerService extends IWindowManager.Stub
     void grantInputChannel(Session session, int callingUid, int callingPid, int displayId,
             SurfaceControl surface, IWindow window, IBinder hostInputToken,
             int flags, int privateFlags, int inputFeatures, int type, IBinder windowToken,
-            IBinder focusGrantToken, String inputHandleName, InputChannel outInputChannel) {
+            IBinder inputTransferToken, String inputHandleName, InputChannel outInputChannel) {
         final int sanitizedType = sanitizeWindowType(session, displayId, windowToken, type);
         final InputApplicationHandle applicationHandle;
         final String name;
@@ -8854,7 +8917,7 @@ public class WindowManagerService extends IWindowManager.Stub
             EmbeddedWindowController.EmbeddedWindow win =
                     new EmbeddedWindowController.EmbeddedWindow(session, this, window,
                             mInputToWindowMap.get(hostInputToken), callingUid, callingPid,
-                            sanitizedType, displayId, focusGrantToken, inputHandleName,
+                            sanitizedType, displayId, inputTransferToken, inputHandleName,
                             (flags & FLAG_NOT_FOCUSABLE) == 0);
             win.openInputChannel(outInputChannel);
             mEmbeddedWindowController.add(outInputChannel.getToken(), win);
@@ -8926,11 +8989,6 @@ public class WindowManagerService extends IWindowManager.Stub
             h.inputConfig |= InputConfig.NOT_FOCUSABLE;
         }
 
-        //  Check private trusted overlay flag to set trustedOverlay field of input window handle.
-        if ((privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0) {
-            h.inputConfig |= InputConfig.TRUSTED_OVERLAY;
-        }
-
         h.dispatchingTimeoutMillis = DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
         h.ownerUid = callingUid;
         h.ownerPid = callingPid;
@@ -8950,6 +9008,8 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         final SurfaceControl.Transaction t = mTransactionFactory.get();
+        //  Check private trusted overlay flag to set trustedOverlay field of input window handle.
+        h.setTrustedOverlay(t, surface, (privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0);
         t.setInputWindowInfo(surface, h);
         t.apply();
         t.close();
@@ -9181,10 +9241,10 @@ public class WindowManagerService extends IWindowManager.Stub
         return mPossibleDisplayInfoMapper.getPossibleDisplayInfos(displayId);
     }
 
-    void grantEmbeddedWindowFocus(Session session, IBinder focusToken, boolean grantFocus) {
+    void grantEmbeddedWindowFocus(Session session, IBinder inputTransferToken, boolean grantFocus) {
         synchronized (mGlobalLock) {
             final EmbeddedWindowController.EmbeddedWindow embeddedWindow =
-                    mEmbeddedWindowController.getByFocusToken(focusToken);
+                    mEmbeddedWindowController.getByInputTransferToken(inputTransferToken);
             if (embeddedWindow == null) {
                 Slog.e(TAG, "Embedded window not found");
                 return;
@@ -9229,8 +9289,8 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    void grantEmbeddedWindowFocus(Session session, IWindow callingWindow, IBinder targetFocusToken,
-                                  boolean grantFocus) {
+    void grantEmbeddedWindowFocus(Session session, IWindow callingWindow,
+            IBinder inputTransferToken, boolean grantFocus) {
         synchronized (mGlobalLock) {
             final WindowState hostWindow =
                     windowForClientLocked(session, callingWindow, false /* throwOnError*/);
@@ -9243,7 +9303,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             }
             final EmbeddedWindowController.EmbeddedWindow embeddedWindow =
-                    mEmbeddedWindowController.getByFocusToken(targetFocusToken);
+                    mEmbeddedWindowController.getByInputTransferToken(inputTransferToken);
             if (embeddedWindow == null) {
                 Slog.e(TAG, "Embedded window not found");
                 return;
@@ -9472,7 +9532,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     throw new IllegalArgumentException(
                             "Failed to find matching task for taskId=" + taskId);
                 }
-                taskSnapshot = mTaskSnapshotController.captureSnapshot(task, false);
+                taskSnapshot = mTaskSnapshotController.captureSnapshot(task);
             }
         } finally {
             Binder.restoreCallingIdentity(token);

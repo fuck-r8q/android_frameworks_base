@@ -22,9 +22,8 @@ import android.content.res.Resources
 import android.provider.Settings
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.res.R
-import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.res.R
 import com.android.systemui.settings.FakeUserTracker
 import com.android.systemui.shared.keyguard.shared.model.KeyguardQuickAffordanceSlots
 import com.android.systemui.util.FakeSharedPreferences
@@ -49,7 +48,6 @@ import org.mockito.MockitoAnnotations
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
-@RoboPilotTest
 @RunWith(AndroidJUnit4::class)
 class KeyguardQuickAffordanceLegacySettingSyncerTest : SysuiTestCase() {
 
@@ -72,8 +70,7 @@ class KeyguardQuickAffordanceLegacySettingSyncerTest : SysuiTestCase() {
         val resources: Resources = mock()
         whenever(resources.getStringArray(R.array.config_keyguardQuickAffordanceDefaults))
             .thenReturn(emptyArray())
-        whenever(resources.getBoolean(R.bool.custom_lockscreen_shortcuts_enabled))
-            .thenReturn(true)
+        whenever(resources.getBoolean(R.bool.custom_lockscreen_shortcuts_enabled)).thenReturn(true)
         whenever(context.resources).thenReturn(resources)
 
         testDispatcher = UnconfinedTestDispatcher()

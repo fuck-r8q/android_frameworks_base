@@ -50,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -92,6 +93,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.TestShellExecutor;
 import com.android.wm.shell.common.DisplayController;
@@ -145,7 +147,9 @@ public class ShellTransitionTests extends ShellTestCase {
         final Transitions t = new Transitions(mContext, shellInit, mock(ShellController.class),
                 mOrganizer, mTransactionPool, createTestDisplayController(), mMainExecutor,
                 mMainHandler, mAnimExecutor);
-        verify(shellInit, times(1)).addInitCallback(any(), eq(t));
+        // One from Transitions, one from RootTaskDisplayAreaOrganizer
+        verify(shellInit).addInitCallback(any(), eq(t));
+        verify(shellInit).addInitCallback(any(), isA(RootTaskDisplayAreaOrganizer.class));
     }
 
     @Test
@@ -284,6 +288,10 @@ public class ShellTransitionTests extends ShellTestCase {
             public void mergeAnimation(IBinder token, TransitionInfo info,
                     SurfaceControl.Transaction t, IBinder mergeTarget,
                     IRemoteTransitionFinishedCallback finishCallback) throws RemoteException {
+            }
+
+            @Override
+            public void onTransitionConsumed(IBinder iBinder, boolean b) throws RemoteException {
             }
         };
         IBinder transitToken = new Binder();
@@ -427,6 +435,10 @@ public class ShellTransitionTests extends ShellTestCase {
                     SurfaceControl.Transaction t, IBinder mergeTarget,
                     IRemoteTransitionFinishedCallback finishCallback) throws RemoteException {
             }
+
+            @Override
+            public void onTransitionConsumed(IBinder iBinder, boolean b) throws RemoteException {
+            }
         };
 
         TransitionFilter filter = new TransitionFilter();
@@ -472,6 +484,10 @@ public class ShellTransitionTests extends ShellTestCase {
             public void mergeAnimation(IBinder token, TransitionInfo info,
                     SurfaceControl.Transaction t, IBinder mergeTarget,
                     IRemoteTransitionFinishedCallback finishCallback) throws RemoteException {
+            }
+
+            @Override
+            public void onTransitionConsumed(IBinder iBinder, boolean b) throws RemoteException {
             }
         };
 
@@ -1153,7 +1169,7 @@ public class ShellTransitionTests extends ShellTestCase {
     }
 
     @Test
-    public void testEmptyTransitionStillReportsKeyguardGoingAway() {
+    public void testEmptyTransition_withKeyguardGoingAway_plays() {
         Transitions transitions = createTestTransitions();
         transitions.replaceDefaultHandlerForTest(mDefaultHandler);
 
@@ -1169,6 +1185,65 @@ public class ShellTransitionTests extends ShellTestCase {
 
         // If keyguard-going-away flag set, then it shouldn't be aborted.
         assertEquals(1, mDefaultHandler.activeCount());
+    }
+
+    @Test
+    public void testSleepTransition_withKeyguardGoingAway_plays(){
+        Transitions transitions = createTestTransitions();
+        transitions.replaceDefaultHandlerForTest(mDefaultHandler);
+
+        IBinder transitToken = new Binder();
+        transitions.requestStartTransition(transitToken,
+                new TransitionRequestInfo(TRANSIT_SLEEP, null /* trigger */, null /* remote */));
+
+        // Make a no-op transition
+        TransitionInfo info = new TransitionInfoBuilder(
+                TRANSIT_SLEEP, TRANSIT_FLAG_KEYGUARD_GOING_AWAY, true /* noOp */).build();
+        transitions.onTransitionReady(transitToken, info, new StubTransaction(),
+                new StubTransaction());
+
+        // If keyguard-going-away flag set, then it shouldn't be aborted.
+        assertEquals(1, mDefaultHandler.activeCount());
+    }
+
+    @Test
+    public void testSleepTransition_withChanges_plays(){
+        Transitions transitions = createTestTransitions();
+        transitions.replaceDefaultHandlerForTest(mDefaultHandler);
+
+        IBinder transitToken = new Binder();
+        transitions.requestStartTransition(transitToken,
+                new TransitionRequestInfo(TRANSIT_SLEEP, null /* trigger */, null /* remote */));
+
+        // Make a transition with some changes
+        TransitionInfo info = new TransitionInfoBuilder(TRANSIT_SLEEP)
+                .addChange(TRANSIT_OPEN).build();
+        info.setTrack(0);
+        transitions.onTransitionReady(transitToken, info, new StubTransaction(),
+                new StubTransaction());
+
+        // If there is an actual change, then it shouldn't be aborted.
+        assertEquals(1, mDefaultHandler.activeCount());
+    }
+
+
+    @Test
+    public void testSleepTransition_empty_SyncBySleepHandler() {
+        Transitions transitions = createTestTransitions();
+        transitions.replaceDefaultHandlerForTest(mDefaultHandler);
+
+        IBinder transitToken = new Binder();
+        transitions.requestStartTransition(transitToken,
+                new TransitionRequestInfo(TRANSIT_SLEEP, null /* trigger */, null /* remote */));
+
+        // Make a no-op transition
+        TransitionInfo info = new TransitionInfoBuilder(
+                TRANSIT_SLEEP, 0x0, true /* noOp */).build();
+        transitions.onTransitionReady(transitToken, info, new StubTransaction(),
+                new StubTransaction());
+
+        // If there is nothing to actually play, it should not be offered to handlers.
+        assertEquals(0, mDefaultHandler.activeCount());
     }
 
     @Test

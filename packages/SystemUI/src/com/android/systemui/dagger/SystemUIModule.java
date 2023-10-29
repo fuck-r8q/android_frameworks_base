@@ -33,7 +33,6 @@ import com.android.systemui.aconfig.AConfigModule;
 import com.android.systemui.appops.dagger.AppOpsModule;
 import com.android.systemui.assist.AssistModule;
 import com.android.systemui.authentication.AuthenticationModule;
-import com.android.systemui.biometrics.AlternateUdfpsTouchProvider;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
 import com.android.systemui.biometrics.FingerprintReEnrollNotification;
 import com.android.systemui.biometrics.UdfpsDisplayModeProvider;
@@ -56,6 +55,7 @@ import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.FlagsModule;
 import com.android.systemui.keyboard.KeyboardModule;
+import com.android.systemui.keyevent.data.repository.KeyEventRepositoryModule;
 import com.android.systemui.keyguard.ui.view.layout.blueprints.KeyguardBlueprintModule;
 import com.android.systemui.log.dagger.LogModule;
 import com.android.systemui.log.dagger.MonitorLog;
@@ -181,6 +181,7 @@ import javax.inject.Named;
         FalsingModule.class,
         FlagsModule.class,
         FooterActionsModule.class,
+        KeyEventRepositoryModule.class,
         KeyboardModule.class,
         KeyguardBlueprintModule.class,
         LetterboxModule.class,
@@ -296,9 +297,6 @@ public abstract class SystemUIModule {
 
     @BindsOptionalOf
     abstract UdfpsDisplayModeProvider optionalUdfpsDisplayModeProvider();
-
-    @BindsOptionalOf
-    abstract AlternateUdfpsTouchProvider optionalUdfpsTouchProvider();
 
     @BindsOptionalOf
     abstract FingerprintInteractiveToAuthProvider optionalFingerprintInteractiveToAuthProvider();

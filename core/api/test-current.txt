@@ -1,4 +1,6 @@
 // Signature format: 2.0
+// - add-additional-overrides=no
+// - migrating=Migration in progress see b/299366704
 package android {
 
   public static final class Manifest.permission {
@@ -28,7 +30,6 @@ package android {
     field public static final String MANAGE_APP_OPS_MODES = "android.permission.MANAGE_APP_OPS_MODES";
     field public static final String MANAGE_CRATES = "android.permission.MANAGE_CRATES";
     field public static final String MANAGE_NOTIFICATION_LISTENERS = "android.permission.MANAGE_NOTIFICATION_LISTENERS";
-    field public static final String MANAGE_REMOTE_AUTH = "android.permission.MANAGE_REMOTE_AUTH";
     field public static final String MANAGE_ROLLBACKS = "android.permission.MANAGE_ROLLBACKS";
     field public static final String MANAGE_TOAST_RATE_LIMITING = "android.permission.MANAGE_TOAST_RATE_LIMITING";
     field public static final String MODIFY_HDR_CONVERSION_MODE = "android.permission.MODIFY_HDR_CONVERSION_MODE";
@@ -56,7 +57,6 @@ package android {
     field public static final String TEST_INPUT_METHOD = "android.permission.TEST_INPUT_METHOD";
     field public static final String TEST_MANAGE_ROLLBACKS = "android.permission.TEST_MANAGE_ROLLBACKS";
     field public static final String UPGRADE_RUNTIME_PERMISSIONS = "android.permission.UPGRADE_RUNTIME_PERMISSIONS";
-    field public static final String USE_REMOTE_AUTH = "android.permission.USE_REMOTE_AUTH";
     field public static final String WRITE_ALLOWLISTED_DEVICE_CONFIG = "android.permission.WRITE_ALLOWLISTED_DEVICE_CONFIG";
     field public static final String WRITE_DEVICE_CONFIG = "android.permission.WRITE_DEVICE_CONFIG";
     field @Deprecated public static final String WRITE_MEDIA_STORAGE = "android.permission.WRITE_MEDIA_STORAGE";
@@ -840,7 +840,7 @@ package android.appwidget {
 
 package android.companion {
 
-  public static final class AssociationInfo.Builder {
+  @FlaggedApi("android.companion.new_association_builder") public static final class AssociationInfo.Builder {
     ctor public AssociationInfo.Builder(int, int, @NonNull String);
     ctor public AssociationInfo.Builder(@NonNull android.companion.AssociationInfo);
     method @NonNull public android.companion.AssociationInfo build();
@@ -1181,6 +1181,7 @@ package android.credentials {
     method @Nullable public CharSequence getLabel(@NonNull android.content.Context);
     method @Nullable public android.graphics.drawable.Drawable getServiceIcon(@NonNull android.content.Context);
     method @NonNull public android.content.pm.ServiceInfo getServiceInfo();
+    method @FlaggedApi("android.credentials.flags.settings_activity_enabled") @Nullable public CharSequence getSettingsActivity();
     method @Nullable public CharSequence getSettingsSubtitle();
     method @NonNull public boolean hasCapability(@NonNull String);
     method public boolean isEnabled();
@@ -1903,7 +1904,7 @@ package android.media {
     method public android.media.PlaybackParams setAudioStretchMode(int);
   }
 
-  public final class RingtoneSelection {
+  @FlaggedApi("android.os.vibrator.haptics_customization_enabled") public final class RingtoneSelection {
     method @NonNull public static android.media.RingtoneSelection fromUri(@Nullable android.net.Uri, int);
     method public int getSoundSource();
     method @Nullable public android.net.Uri getSoundUri();
@@ -1915,14 +1916,16 @@ package android.media {
     field public static final int FROM_URI_RINGTONE_SELECTION_ONLY = 3; // 0x3
     field public static final int FROM_URI_RINGTONE_SELECTION_OR_SOUND = 1; // 0x1
     field public static final int FROM_URI_RINGTONE_SELECTION_OR_VIBRATION = 2; // 0x2
-    field public static final int SOUND_SOURCE_DEFAULT = 0; // 0x0
     field public static final int SOUND_SOURCE_OFF = 1; // 0x1
+    field public static final int SOUND_SOURCE_SYSTEM_DEFAULT = 3; // 0x3
+    field public static final int SOUND_SOURCE_UNSPECIFIED = 0; // 0x0
     field public static final int SOUND_SOURCE_URI = 2; // 0x2
-    field public static final int VIBRATION_SOURCE_APPLICATION_PROVIDED = 3; // 0x3
+    field public static final int VIBRATION_SOURCE_APPLICATION_DEFAULT = 4; // 0x4
     field public static final int VIBRATION_SOURCE_AUDIO_CHANNEL = 10; // 0xa
-    field public static final int VIBRATION_SOURCE_DEFAULT = 0; // 0x0
     field public static final int VIBRATION_SOURCE_HAPTIC_GENERATOR = 11; // 0xb
     field public static final int VIBRATION_SOURCE_OFF = 1; // 0x1
+    field public static final int VIBRATION_SOURCE_SYSTEM_DEFAULT = 3; // 0x3
+    field public static final int VIBRATION_SOURCE_UNSPECIFIED = 0; // 0x0
     field public static final int VIBRATION_SOURCE_URI = 2; // 0x2
   }
 
@@ -2610,17 +2613,17 @@ package android.os.vibrator {
 
 package android.os.vibrator.persistence {
 
-  public class ParsedVibration {
+  @FlaggedApi("android.os.vibrator.enable_vibration_serialization_apis") public class ParsedVibration {
     method @NonNull public java.util.List<android.os.VibrationEffect> getVibrationEffects();
     method @Nullable public android.os.VibrationEffect resolve(@NonNull android.os.Vibrator);
   }
 
-  public final class VibrationXmlParser {
+  @FlaggedApi("android.os.vibrator.enable_vibration_serialization_apis") public final class VibrationXmlParser {
     method @Nullable public static android.os.vibrator.persistence.ParsedVibration parseDocument(@NonNull java.io.Reader) throws java.io.IOException;
     method @Nullable public static android.os.VibrationEffect parseVibrationEffect(@NonNull java.io.Reader) throws java.io.IOException;
   }
 
-  public final class VibrationXmlSerializer {
+  @FlaggedApi("android.os.vibrator.enable_vibration_serialization_apis") public final class VibrationXmlSerializer {
     method public static void serialize(@NonNull android.os.VibrationEffect, @NonNull java.io.Writer) throws java.io.IOException, android.os.vibrator.persistence.VibrationXmlSerializer.SerializationFailedException;
   }
 
@@ -2955,10 +2958,6 @@ package android.service.notification {
     method @Deprecated public boolean isBound();
   }
 
-  public class NotificationRankingUpdate implements android.os.Parcelable {
-    method public final boolean isFdNotNullAndClosed();
-  }
-
 }
 
 package android.service.quickaccesswallet {
@@ -3188,7 +3187,7 @@ package android.telephony {
     field public static final int HAL_SERVICE_MESSAGING = 2; // 0x2
     field public static final int HAL_SERVICE_MODEM = 3; // 0x3
     field public static final int HAL_SERVICE_NETWORK = 4; // 0x4
-    field public static final int HAL_SERVICE_SATELLITE = 8; // 0x8
+    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int HAL_SERVICE_SATELLITE = 8; // 0x8
     field public static final int HAL_SERVICE_SIM = 5; // 0x5
     field public static final int HAL_SERVICE_VOICE = 6; // 0x6
     field public static final android.util.Pair HAL_VERSION_UNKNOWN;
@@ -3281,12 +3280,12 @@ package android.text {
   }
 
   public class MeasuredParagraph {
-    method @NonNull public static android.text.MeasuredParagraph buildForStaticLayoutTest(@NonNull android.text.TextPaint, @Nullable android.graphics.text.LineBreakConfig, @NonNull CharSequence, @IntRange(from=0) int, @IntRange(from=0) int, @NonNull android.text.TextDirectionHeuristic, int, boolean, @Nullable android.text.MeasuredParagraph.StyleRunCallback);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public static android.text.MeasuredParagraph buildForStaticLayoutTest(@NonNull android.text.TextPaint, @Nullable android.graphics.text.LineBreakConfig, @NonNull CharSequence, @IntRange(from=0) int, @IntRange(from=0) int, @NonNull android.text.TextDirectionHeuristic, int, boolean, @Nullable android.text.MeasuredParagraph.StyleRunCallback);
   }
 
-  public static interface MeasuredParagraph.StyleRunCallback {
-    method public void onAppendReplacementRun(@NonNull android.graphics.Paint, @IntRange(from=0) int, @FloatRange(from=0) @Px float);
-    method public void onAppendStyleRun(@NonNull android.graphics.Paint, @Nullable android.graphics.text.LineBreakConfig, @IntRange(from=0) int, boolean);
+  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static interface MeasuredParagraph.StyleRunCallback {
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public void onAppendReplacementRun(@NonNull android.graphics.Paint, @IntRange(from=0) int, @FloatRange(from=0) @Px float);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public void onAppendStyleRun(@NonNull android.graphics.Paint, @Nullable android.graphics.text.LineBreakConfig, @IntRange(from=0) int, boolean);
   }
 
   public static final class Selection.MemoryTextWatcher implements android.text.TextWatcher {
@@ -3408,7 +3407,7 @@ package android.view {
 
   public final class Choreographer {
     method public static long getFrameDelay();
-    method public long getFrameTimeNanos();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public long getFrameTimeNanos();
     method public void postCallback(int, Runnable, Object);
     method public void postCallbackDelayed(int, Runnable, Object, long);
     method public void removeCallbacks(int, Runnable, Object);
@@ -3569,8 +3568,8 @@ package android.view {
     method public default void holdLock(android.os.IBinder, int);
     method public default boolean isGlobalKey(int);
     method public default boolean isTaskSnapshotSupported();
-    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithMirror(int, @NonNull android.view.Window);
-    method @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithSc(int, @NonNull android.view.SurfaceControl);
+    method @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR") @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithMirror(int, @NonNull android.view.Window);
+    method @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR") @RequiresPermission(android.Manifest.permission.ACCESS_SURFACE_FLINGER) public default boolean replaceContentOnDisplayWithSc(int, @NonNull android.view.SurfaceControl);
     method public default void setDisplayImePolicy(int, int);
     method public default void setShouldShowSystemDecors(int, boolean);
     method public default void setShouldShowWithInsecureKeyguard(int, boolean);
@@ -3627,7 +3626,7 @@ package android.view.accessibility {
 package android.view.animation {
 
   public class AnimationUtils {
-    method public static void lockAnimationClock(long, long);
+    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static void lockAnimationClock(long, long);
     method public static void unlockAnimationClock();
   }
 

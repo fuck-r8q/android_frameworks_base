@@ -241,6 +241,7 @@ import static android.provider.Telephony.Carriers.ENFORCE_KEY;
 import static android.provider.Telephony.Carriers.ENFORCE_MANAGED_URI;
 import static android.provider.Telephony.Carriers.INVALID_APN_ID;
 import static android.security.keystore.AttestationUtils.USE_INDIVIDUAL_ATTESTATION;
+
 import static com.android.internal.logging.nano.MetricsProto.MetricsEvent.PROVISIONING_ENTRY_POINT_ADB;
 import static com.android.internal.widget.LockPatternUtils.CREDENTIAL_TYPE_NONE;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_DPM_LOCK_NOW;
@@ -485,7 +486,6 @@ import com.android.server.AlarmManagerInternal;
 import com.android.server.LocalManagerRegistry;
 import com.android.server.LocalServices;
 import com.android.server.LockGuard;
-import com.android.server.PersistentDataBlockManagerInternal;
 import com.android.server.SystemServerInitThreadPool;
 import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
@@ -493,6 +493,7 @@ import com.android.server.devicepolicy.ActiveAdmin.TrustAgentInfo;
 import com.android.server.devicepolicy.flags.FlagUtils;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.net.NetworkPolicyManagerInternal;
+import com.android.server.pdb.PersistentDataBlockManagerInternal;
 import com.android.server.pm.DefaultCrossProfileIntentFilter;
 import com.android.server.pm.DefaultCrossProfileIntentFiltersUtils;
 import com.android.server.pm.PackageManagerLocal;
@@ -871,16 +872,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             "enable_permission_based_access";
     private static final boolean DEFAULT_VALUE_PERMISSION_BASED_ACCESS_FLAG = false;
 
-    private static final String ENABLE_DEVICE_POLICY_ENGINE_FOR_FINANCE_FLAG =
-            "enable_device_policy_engine";
-    private static final boolean DEFAULT_ENABLE_DEVICE_POLICY_ENGINE_FOR_FINANCE_FLAG = true;
-
     // TODO(b/265683382) remove the flag after rollout.
     public static final boolean DEFAULT_KEEP_PROFILES_RUNNING_FLAG = false;
-
-    // TODO(b/261999445) remove the flag after rollout.
-    private static final String HEADLESS_FLAG = "headless";
-    private static final boolean DEFAULT_HEADLESS_FLAG = true;
 
     // TODO(b/266831522) remove the flag after rollout.
     private static final String APPLICATION_EXEMPTIONS_FLAG = "application_exemptions";
@@ -4024,75 +4017,41 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     private void clearDeviceOwnerUserRestriction(UserHandle userHandle) {
-        if (isHeadlessFlagEnabled()) {
-            for (int userId : mUserManagerInternal.getUserIds()) {
-                UserHandle user = UserHandle.of(userId);
-                // ManagedProvisioning/DPC sets DISALLOW_ADD_USER. Clear to recover to the
-                // original state
-                if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_USER, user)) {
-                    mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_USER,
-                            false, user);
-                }
-                // When a device owner is set, the system automatically restricts adding a
-                // managed profile.
-                // Remove this restriction when the device owner is cleared.
-                if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_MANAGED_PROFILE,
-                        user)) {
-                    mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_MANAGED_PROFILE,
-                            false,
-                            user);
-                }
-                // When a device owner is set, the system automatically restricts adding a
-                // clone profile.
-                // Remove this restriction when the device owner is cleared.
-                if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE, user)) {
-                    mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE,
-                            false, user);
-                }
-
-                // When a device owner is set, the system automatically restricts adding a
-                // private profile.
-                // Remove this restriction when the device owner is cleared.
-                if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
-                        user)) {
-                    mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
-                            false, user);
-                }
-            }
-        } else {
-            // ManagedProvisioning/DPC sets DISALLOW_ADD_USER. Clear to recover to the original state
-            if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_USER, userHandle)) {
-                mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_USER, false,
-                        userHandle);
+        for (int userId : mUserManagerInternal.getUserIds()) {
+            UserHandle user = UserHandle.of(userId);
+            // ManagedProvisioning/DPC sets DISALLOW_ADD_USER. Clear to recover to the
+            // original state
+            if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_USER, user)) {
+                mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_USER,
+                        false, user);
             }
             // When a device owner is set, the system automatically restricts adding a
             // managed profile.
             // Remove this restriction when the device owner is cleared.
             if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_MANAGED_PROFILE,
-                    userHandle)) {
+                    user)) {
                 mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_MANAGED_PROFILE,
                         false,
-                        userHandle);
+                        user);
             }
-            // When a device owner is set, the system automatically restricts adding a clone
-            // profile.
+            // When a device owner is set, the system automatically restricts adding a
+            // clone profile.
             // Remove this restriction when the device owner is cleared.
-            if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE,
-                    userHandle)) {
+            if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE, user)) {
                 mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE,
-                        false,
-                        userHandle);
+                        false, user);
             }
 
             // When a device owner is set, the system automatically restricts adding a
             // private profile.
             // Remove this restriction when the device owner is cleared.
             if (mUserManager.hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
-                    userHandle)) {
+                    user)) {
                 mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
-                        false, userHandle);
+                        false, user);
             }
         }
+
     }
 
     /**
@@ -6475,7 +6434,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                          KeyChain.bindAsUser(mContext, userHandle)) {
                 IKeyChainService keyChain = keyChainConnection.getService();
                 return keyChain.setGrant(granteeUid, alias, hasGrant);
-            } catch (RemoteException e) {
+            } catch (RemoteException | AssertionError e) {
                 Slogf.e(LOG_TAG, "Setting grant for package.", e);
                 return false;
             }
@@ -7955,14 +7914,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 hasCallingOrSelfPermission(permission.TRIGGER_LOST_MODE));
 
         synchronized (getLockObject()) {
-            // TODO(b/261999445): Remove
-            ActiveAdmin admin;
-            if (isHeadlessFlagEnabled()) {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-            } else {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                        UserHandle.USER_SYSTEM);
-            }
+            ActiveAdmin admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
+
             Preconditions.checkState(admin != null,
                     "Lost mode location updates can only be sent on an organization-owned device.");
             mInjector.binderWithCleanCallingIdentity(() -> {
@@ -9448,39 +9401,24 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                 // profile, such that the admin on that managed profile has extended management
                 // capabilities that can affect the entire device (but not access private data
                 // on the primary profile).
-                if (isHeadlessFlagEnabled()) {
-                    for (int u : mUserManagerInternal.getUserIds()) {
-                        mUserManager.setUserRestriction(
-                                UserManager.DISALLOW_ADD_MANAGED_PROFILE, true,
-                                UserHandle.of(u));
-                        // Restrict adding a clone profile when a device owner is set on the device.
-                        // That is to prevent the co-existence of a clone profile and a device owner
-                        // on the same device.
-                        // CDD for reference : https://source.android.com/compatibility/12/android-12-cdd#95_multi-user_support
-                        mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE,
-                                true,
-                                UserHandle.of(u));
-
-                        // Restrict adding a private profile when a device owner is set.
-                        mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
-                                true,
-                                UserHandle.of(u));
-                    }
-                } else {
-                    mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_MANAGED_PROFILE,
-                            true,
-                            UserHandle.of(userId));
+                for (int u : mUserManagerInternal.getUserIds()) {
+                    mUserManager.setUserRestriction(
+                            UserManager.DISALLOW_ADD_MANAGED_PROFILE, true,
+                            UserHandle.of(u));
                     // Restrict adding a clone profile when a device owner is set on the device.
                     // That is to prevent the co-existence of a clone profile and a device owner
                     // on the same device.
                     // CDD for reference : https://source.android.com/compatibility/12/android-12-cdd#95_multi-user_support
                     mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE,
                             true,
-                            UserHandle.of(userId));
+                            UserHandle.of(u));
+
+                    // Restrict adding a private profile when a device owner is set.
                     mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE,
                             true,
-                            UserHandle.of(userId));
+                            UserHandle.of(u));
                 }
+
                 // TODO Send to system too?
                 sendOwnerChangedBroadcast(DevicePolicyManager.ACTION_DEVICE_OWNER_CHANGED, userId);
             });
@@ -15781,57 +15719,19 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         } else {
             long ident = mInjector.binderClearCallingIdentity();
             try {
-                // TODO(b/277908283): check in the policy engine instead of calling user manager.
-                List<UserManager.EnforcingUser> sources = mUserManager
-                        .getUserRestrictionSources(restriction, UserHandle.of(userId));
-                if (sources == null) {
-                    // The restriction is not enforced.
-                    return null;
-                }
-                int sizeBefore = sources.size();
-                if (sizeBefore > 1) {
-                    Slogf.d(LOG_TAG, "getEnforcingAdminAndUserDetailsInternal(%d, %s): "
-                            + "%d sources found, excluding those set by UserManager",
-                            userId, restriction, sizeBefore);
-                    sources = getDevicePolicySources(sources);
-                }
-                if (sources.isEmpty()) {
-                    // The restriction is not enforced (or is just enforced by the system)
+                if (getEnforcingAdminsForRestrictionInternal(userId, restriction).size() == 0) {
                     return null;
                 }
 
-                if (sources.size() > 1) {
-                    // In this case, we'll show an admin support dialog that does not
-                    // specify the admin.
-                    // TODO(b/128928355): if this restriction is enforced by multiple DPCs, return
-                    // the admin for the calling user.
-                    Slogf.w(LOG_TAG, "getEnforcingAdminAndUserDetailsInternal(%d, %s): multiple "
-                            + "sources for restriction %s on user %d",
-                            userId, restriction, restriction, userId);
+                ActiveAdmin admin = getMostProbableDPCAdminForLocalPolicy(userId);
+                if (admin != null) {
                     result = new Bundle();
-                    result.putInt(Intent.EXTRA_USER_ID, userId);
+                    result.putInt(Intent.EXTRA_USER_ID, admin.getUserHandle().getIdentifier());
+                    result.putParcelable(DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                            admin.info.getComponent());
                     return result;
                 }
-                final UserManager.EnforcingUser enforcingUser = sources.get(0);
-                final int sourceType = enforcingUser.getUserRestrictionSource();
-                if (sourceType == UserManager.RESTRICTION_SOURCE_PROFILE_OWNER
-                        || sourceType == UserManager.RESTRICTION_SOURCE_DEVICE_OWNER) {
-                    ActiveAdmin admin = getMostProbableDPCAdminForLocalPolicy(userId);
-                    if (admin != null) {
-                        result = new Bundle();
-                        result.putInt(Intent.EXTRA_USER_ID, admin.getUserHandle().getIdentifier());
-                        result.putParcelable(DevicePolicyManager.EXTRA_DEVICE_ADMIN,
-                                admin.info.getComponent());
-                        return result;
-                    }
-                } else if (sourceType == UserManager.RESTRICTION_SOURCE_SYSTEM) {
-                    /*
-                     * In this case, the user restriction is enforced by the system.
-                     * So we won't show an admin support intent, even if it is also
-                     * enforced by a profile/device owner.
-                     */
-                    return null;
-                }
+                return null;
             } finally {
                 mInjector.binderRestoreCallingIdentity(ident);
             }
@@ -20156,14 +20056,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         synchronized (getLockObject()) {
             // Only DO or COPE PO can turn on CC mode, so take a shortcut here and only look at
             // their ActiveAdmin, instead of iterating through all admins.
-            ActiveAdmin admin;
-            // TODO(b/261999445): remove
-            if (isHeadlessFlagEnabled()) {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-            } else {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                        UserHandle.USER_SYSTEM);
-            }
+            ActiveAdmin admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
+
             return admin != null ? admin.mCommonCriteriaMode : false;
         }
     }
@@ -21430,7 +21324,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     private void disallowAddUser() {
-        if (!isHeadlessFlagEnabled() || mIsAutomotive) {
+        if (mIsAutomotive) {
             // Auto still enables adding users due to the communal nature of those devices
             if (mInjector.userManagerIsHeadlessSystemUserMode()) {
                 Slogf.i(LOG_TAG, "Not setting DISALLOW_ADD_USER on headless system user mode.");
@@ -21748,14 +21642,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     }
 
     private boolean isUsbDataSignalingEnabledInternalLocked() {
-        // TODO(b/261999445): remove
-        ActiveAdmin admin;
-        if (isHeadlessFlagEnabled()) {
-            admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-        } else {
-            admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                    UserHandle.USER_SYSTEM);
-        }
+        ActiveAdmin admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
         return admin == null || admin.mUsbDataSignalingEnabled;
     }
 
@@ -21822,14 +21709,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @Override
     public int getMinimumRequiredWifiSecurityLevel() {
         synchronized (getLockObject()) {
-            ActiveAdmin admin;
-            // TODO(b/261999445): remove
-            if (isHeadlessFlagEnabled()) {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-            } else {
-                admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                        UserHandle.USER_SYSTEM);
-            }
+            ActiveAdmin admin = getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
             return (admin == null) ? DevicePolicyManager.WIFI_SECURITY_OPEN
                     : admin.mWifiMinimumSecurityLevel;
         }
@@ -23206,16 +23086,8 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             || isProfileOwnerOfOrganizationOwnedDevice(caller));
         }
         synchronized (getLockObject()) {
-            // TODO(b/261999445): Remove
-            ActiveAdmin admin;
-            if (isHeadlessFlagEnabled()) {
-                admin =
+            ActiveAdmin admin =
                         getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-            } else {
-                admin =
-                        getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                                UserHandle.USER_SYSTEM);
-            }
 
             if (admin != null) {
                 final String memtagProperty = "arm64.memtag.bootctl";
@@ -23248,27 +23120,12 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
                             || isSystemUid(caller));
         }
         synchronized (getLockObject()) {
-            // TODO(b/261999445): Remove
-            ActiveAdmin admin;
-            if (isHeadlessFlagEnabled()) {
-                admin =
+            ActiveAdmin admin =
                         getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked();
-            } else {
-                admin =
-                        getDeviceOwnerOrProfileOwnerOfOrganizationOwnedDeviceLocked(
-                                UserHandle.USER_SYSTEM);
-            }
             return admin != null
                     ? admin.mtePolicy
                     : DevicePolicyManager.MTE_NOT_CONTROLLED_BY_POLICY;
         }
-    }
-
-    private boolean isHeadlessFlagEnabled() {
-        return DeviceConfig.getBoolean(
-                NAMESPACE_DEVICE_POLICY_MANAGER,
-                HEADLESS_FLAG,
-                DEFAULT_HEADLESS_FLAG);
     }
 
     @Override

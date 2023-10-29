@@ -15,8 +15,22 @@ flag {
 }
 
 flag {
-     namespace: "media_solutions"
-     name: "enable_audio_policies_device_and_bluetooth_controller"
-     description: "Use Audio Policies implementation for device and Bluetooth route controllers."
-     bug: "280576228"
+    namespace: "media_solutions"
+    name: "enable_audio_policies_device_and_bluetooth_controller"
+    description: "Use Audio Policies implementation for device and Bluetooth route controllers."
+    bug: "280576228"
+}
+
+flag {
+    namespace: "media_solutions"
+    name: "disable_screen_off_broadcast_receiver"
+    description: "Disables the broadcast receiver that prevents scanning when the screen is off."
+    bug: "304234628"
+}
+
+flag {
+    namespace: "media_solutions"
+    name: "fallback_to_default_handling_when_media_session_has_fixed_volume_handling"
+    description: "Fallbacks to the default handling for volume adjustment when media session has fixed volume handling and its app is in the foreground and setting a media controller."
+    bug: "293743975"
 }

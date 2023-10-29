@@ -147,7 +147,6 @@ int JTvInputHal::removeStream(int deviceId, int streamId) {
 }
 
 int JTvInputHal::setTvMessageEnabled(int deviceId, int streamId, int type, bool enabled) {
-    Mutex::Autolock autoLock(&mLock);
     if (!mTvInput->setTvMessageEnabled(deviceId, streamId,
                                        static_cast<AidlTvMessageEventType>(type), enabled)
                  .isOk()) {
@@ -168,9 +167,27 @@ const std::vector<AidlTvStreamConfig> JTvInputHal::getStreamConfigs(int deviceId
     return list;
 }
 
+static const std::map<std::pair<AidlAudioDeviceType, std::string>, audio_devices_t>
+        aidlToNativeAudioType = {
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_ANALOG},
+        AUDIO_DEVICE_IN_LINE},
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_HDMI},
+        AUDIO_DEVICE_IN_HDMI},
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_HDMI_ARC},
+        AUDIO_DEVICE_IN_HDMI_ARC},
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_HDMI_EARC},
+        AUDIO_DEVICE_IN_HDMI_EARC},
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_IP_V4},
+        AUDIO_DEVICE_IN_IP},
+    {{AidlAudioDeviceType::IN_DEVICE, AidlAudioDeviceDescription::CONNECTION_SPDIF},
+        AUDIO_DEVICE_IN_SPDIF},
+    {{AidlAudioDeviceType::IN_LOOPBACK, ""}, AUDIO_DEVICE_IN_LOOPBACK},
+    {{AidlAudioDeviceType::IN_TV_TUNER, ""}, AUDIO_DEVICE_IN_TV_TUNER},
+};
+
 void JTvInputHal::onDeviceAvailable(const TvInputDeviceInfoWrapper& info) {
     {
-        Mutex::Autolock autoLock(&mLock);
+        Mutex::Autolock autoLock(&mStreamLock);
         mConnections.add(info.deviceId, KeyedVector<int, Connection>());
     }
     JNIEnv* env = AndroidRuntime::getJNIEnv();
@@ -187,9 +204,15 @@ void JTvInputHal::onDeviceAvailable(const TvInputDeviceInfoWrapper& info) {
     if (info.isHidl) {
         hidlSetUpAudioInfo(env, builder, info);
     } else {
-        AidlAudioDeviceType audioType = info.aidlAudioDevice.type.type;
-        env->CallObjectMethod(builder, gTvInputHardwareInfoBuilderClassInfo.audioType, audioType);
-        if (audioType != AidlAudioDeviceType::NONE) {
+        auto it = aidlToNativeAudioType.find({info.aidlAudioDevice.type.type,
+                                    info.aidlAudioDevice.type.connection});
+        audio_devices_t nativeAudioType = AUDIO_DEVICE_NONE;
+        if (it != aidlToNativeAudioType.end()) {
+            nativeAudioType = it->second;
+        }
+        env->CallObjectMethod(builder, gTvInputHardwareInfoBuilderClassInfo.audioType,
+            nativeAudioType);
+        if (info.aidlAudioDevice.type.type != AidlAudioDeviceType::NONE) {
             std::stringstream ss;
             switch (info.aidlAudioDevice.address.getTag()) {
                 case AidlAudioDeviceAddress::id:
@@ -251,7 +274,7 @@ void JTvInputHal::onDeviceAvailable(const TvInputDeviceInfoWrapper& info) {
 
 void JTvInputHal::onDeviceUnavailable(int deviceId) {
     {
-        Mutex::Autolock autoLock(&mLock);
+        Mutex::Autolock autoLock(&mStreamLock);
         KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
         for (size_t i = 0; i < connections.size(); ++i) {
             removeStream(deviceId, connections.keyAt(i));
@@ -265,7 +288,7 @@ void JTvInputHal::onDeviceUnavailable(int deviceId) {
 
 void JTvInputHal::onStreamConfigurationsChanged(int deviceId, int cableConnectionStatus) {
     {
-        Mutex::Autolock autoLock(&mLock);
+        Mutex::Autolock autoLock(&mStreamLock);
         KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
         for (size_t i = 0; i < connections.size(); ++i) {
             removeStream(deviceId, connections.keyAt(i));
@@ -306,7 +329,7 @@ void JTvInputHal::onTvMessage(int deviceId, int streamId, AidlTvMessageEventType
 void JTvInputHal::onCaptured(int deviceId, int streamId, uint32_t seq, bool succeeded) {
     sp<BufferProducerThread> thread;
     {
-        Mutex::Autolock autoLock(&mLock);
+        Mutex::Autolock autoLock(&mStreamLock);
         KeyedVector<int, Connection>& connections = mConnections.editValueFor(deviceId);
         Connection& connection = connections.editValueFor(streamId);
         if (connection.mThread == NULL) {

@@ -4605,6 +4605,16 @@ public abstract class PackageManager {
     public static final String FEATURE_WALLET_LOCATION_BASED_SUGGESTIONS =
             "android.software.wallet_location_based_suggestions";
 
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device has
+     * the rotary encoder hardware to support rotating bezel on watch.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_ROTARY_ENCODER_LOW_RES =
+            "android.hardware.rotaryencoder.lowres";
+
     /** @hide */
     public static final boolean APP_ENUMERATION_ENABLED_BY_DEFAULT = true;
 
@@ -4802,6 +4812,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
+    @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
     public static final String EXTRA_REQUEST_PERMISSIONS_DEVICE_ID =
             "android.content.pm.extra.REQUEST_PERMISSIONS_DEVICE_ID";
 
@@ -9877,6 +9888,18 @@ public abstract class PackageManager {
     }
 
     /**
+     * Query if an app is currently stopped.
+     *
+     * @return {@code true} if the given package is stopped, {@code false} otherwise
+     * @throws NameNotFoundException if the package could not be found.
+     * @see ApplicationInfo#FLAG_STOPPED
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_STAY_STOPPED)
+    public boolean isPackageStopped(@NonNull String packageName) throws NameNotFoundException {
+        throw new UnsupportedOperationException("isPackageStopped not implemented");
+    }
+
+    /**
      * Query if an app is currently quarantined.
      *
      * @return {@code true} if the given package is quarantined, {@code false} otherwise
@@ -9887,7 +9910,6 @@ public abstract class PackageManager {
     public boolean isPackageQuarantined(@NonNull String packageName) throws NameNotFoundException {
         throw new UnsupportedOperationException("isPackageQuarantined not implemented");
     }
-
     /**
      * Provide a hint of what the {@link ApplicationInfo#category} value should
      * be for the given package.

@@ -396,7 +396,7 @@ public class NotificationManagerService extends SystemService {
     static final int MESSAGE_FINISH_TOKEN_TIMEOUT = 7;
     static final int MESSAGE_ON_PACKAGE_CHANGED = 8;
 
-    static final long BITMAP_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(24);
+    static final Duration BITMAP_DURATION = Duration.ofHours(24);
 
     // ranking thread messages
     private static final int MESSAGE_RECONSIDER_RANKING = 1000;
@@ -2532,7 +2532,7 @@ public class NotificationManagerService extends SystemService {
 
         if (mFlagResolver.isEnabled(NotificationFlags.ENABLE_ATTENTION_HELPER_REFACTOR)) {
             mAttentionHelper = new NotificationAttentionHelper(getContext(), lightsManager,
-                mAccessibilityManager, mPackageManagerClient, usageStats,
+                mAccessibilityManager, mPackageManagerClient, userManager, usageStats,
                 mNotificationManagerPrivate, mZenModeHelper, flagResolver);
         }
 
@@ -3369,6 +3369,10 @@ public class NotificationManagerService extends SystemService {
         mAppUsageStats.reportEvent(r.getSbn().getPackageName(),
                 getRealUserId(r.getSbn().getUserId()),
                 UsageEvents.Event.USER_INTERACTION);
+
+        if (Flags.politeNotifications()) {
+            mAttentionHelper.onUserInteraction(r);
+        }
     }
 
     private int getRealUserId(int userId) {
@@ -5730,13 +5734,18 @@ public class NotificationManagerService extends SystemService {
         public void setNotificationListenerAccessGrantedForUser(ComponentName listener, int userId,
                 boolean granted, boolean userSet) {
             Objects.requireNonNull(listener);
+            if (UserHandle.getCallingUserId() != userId) {
+                getContext().enforceCallingOrSelfPermission(
+                        android.Manifest.permission.INTERACT_ACROSS_USERS,
+                        "setNotificationListenerAccessGrantedForUser for user " + userId);
+            }
             checkNotificationListenerAccess();
             if (granted && listener.flattenToString().length()
                     > NotificationManager.MAX_SERVICE_COMPONENT_NAME_LENGTH) {
                 throw new IllegalArgumentException(
                         "Component name too long: " + listener.flattenToString());
             }
-            if (!userSet && isNotificationListenerAccessUserSet(listener)) {
+            if (!userSet && isNotificationListenerAccessUserSet(listener, userId)) {
                 // Don't override user's choice
                 return;
             }
@@ -5762,9 +5771,8 @@ public class NotificationManagerService extends SystemService {
             }
         }
 
-        private boolean isNotificationListenerAccessUserSet(ComponentName listener) {
-            return mListeners.isPackageOrComponentUserSet(listener.flattenToString(),
-                    getCallingUserHandle().getIdentifier());
+        private boolean isNotificationListenerAccessUserSet(ComponentName listener, int userId) {
+            return mListeners.isPackageOrComponentUserSet(listener.flattenToString(), userId);
         }
 
         @Override
@@ -6705,7 +6713,7 @@ public class NotificationManagerService extends SystemService {
                     final long timePostedMs = r.getSbn().getPostTime();
                     final long timeNowMs = System.currentTimeMillis();
 
-                    if (isBitmapExpired(timePostedMs, timeNowMs, BITMAP_EXPIRATION_TIME_MS)) {
+                    if (isBitmapExpired(timePostedMs, timeNowMs, BITMAP_DURATION.toMillis())) {
                         removeBitmapAndRepost(r);
                     }
                 }
@@ -8612,7 +8620,7 @@ public class NotificationManagerService extends SystemService {
                     .setCategory(MetricsEvent.NOTIFICATION_ALERT)
                     .setType(MetricsEvent.TYPE_OPEN)
                     .setSubtype(buzzBeepBlink));
-            EventLogTags.writeNotificationAlert(key, buzz ? 1 : 0, beep ? 1 : 0, blink ? 1 : 0);
+            EventLogTags.writeNotificationAlert(key, buzz ? 1 : 0, beep ? 1 : 0, blink ? 1 : 0, 0);
         }
         record.setAudiblyAlerted(buzz || beep);
         return buzzBeepBlink;
@@ -8757,7 +8765,7 @@ public class NotificationManagerService extends SystemService {
                     if (DBG) Slog.v(TAG, "Playing sound " + soundUri
                             + " with attributes " + record.getAudioAttributes());
                     player.playAsync(soundUri, record.getSbn().getUser(), looping,
-                            record.getAudioAttributes());
+                            record.getAudioAttributes(), 1.0f);
                     return true;
                 }
             } catch (RemoteException e) {

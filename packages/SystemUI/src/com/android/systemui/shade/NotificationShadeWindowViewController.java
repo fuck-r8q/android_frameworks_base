@@ -21,7 +21,6 @@ import static com.android.systemui.flags.Flags.TRACKPAD_GESTURE_COMMON;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.app.StatusBarManager;
-import android.os.PowerManager;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.InputDevice;
@@ -36,10 +35,11 @@ import com.android.keyguard.KeyguardMessageAreaController;
 import com.android.keyguard.LockIconViewController;
 import com.android.keyguard.dagger.KeyguardBouncerComponent;
 import com.android.systemui.Dumpable;
-import com.android.systemui.res.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.back.domain.interactor.BackActionInteractor;
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
+import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.bouncer.ui.binder.KeyguardBouncerViewBinder;
 import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel;
 import com.android.systemui.classifier.FalsingCollector;
@@ -48,7 +48,7 @@ import com.android.systemui.dock.DockManager;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
-import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor;
+import com.android.systemui.keyevent.domain.interactor.SysUIKeyEventHandler;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.keyguard.shared.model.TransitionState;
@@ -56,6 +56,7 @@ import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.log.BouncerLogger;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
+import com.android.systemui.res.R;
 import com.android.systemui.shared.animation.DisableSubpixelTextTransitionListener;
 import com.android.systemui.statusbar.DragDownHelper;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -105,7 +106,9 @@ public class NotificationShadeWindowViewController implements Dumpable {
     private final NotificationInsetsController mNotificationInsetsController;
     private final boolean mIsTrackpadCommonEnabled;
     private final FeatureFlags mFeatureFlags;
-    private final KeyEventInteractor mKeyEventInteractor;
+    private final SysUIKeyEventHandler mSysUIKeyEventHandler;
+    private final PrimaryBouncerInteractor mPrimaryBouncerInteractor;
+    private final AlternateBouncerInteractor mAlternateBouncerInteractor;
     private GestureDetector mPulsingWakeupGestureHandler;
     private GestureDetector mDreamingWakeupGestureHandler;
     private View mBrightnessMirror;
@@ -182,7 +185,9 @@ public class NotificationShadeWindowViewController implements Dumpable {
             SystemClock clock,
             BouncerMessageInteractor bouncerMessageInteractor,
             BouncerLogger bouncerLogger,
-            KeyEventInteractor keyEventInteractor) {
+            SysUIKeyEventHandler sysUIKeyEventHandler,
+            PrimaryBouncerInteractor primaryBouncerInteractor,
+            AlternateBouncerInteractor alternateBouncerInteractor) {
         mLockscreenShadeTransitionController = transitionController;
         mFalsingCollector = falsingCollector;
         mStatusBarStateController = statusBarStateController;
@@ -209,7 +214,9 @@ public class NotificationShadeWindowViewController implements Dumpable {
         mNotificationInsetsController = notificationInsetsController;
         mIsTrackpadCommonEnabled = featureFlags.isEnabled(TRACKPAD_GESTURE_COMMON);
         mFeatureFlags = featureFlags;
-        mKeyEventInteractor = keyEventInteractor;
+        mSysUIKeyEventHandler = sysUIKeyEventHandler;
+        mPrimaryBouncerInteractor = primaryBouncerInteractor;
+        mAlternateBouncerInteractor = alternateBouncerInteractor;
 
         // This view is not part of the newly inflated expanded status bar.
         mBrightnessMirror = mView.findViewById(R.id.brightness_mirror_container);
@@ -351,16 +358,6 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 if (mStatusBarStateController.isDozing()) {
                     mDozeScrimController.extendPulse();
                 }
-                mLockIconViewController.onTouchEvent(
-                        ev,
-                        /* onGestureDetectedRunnable */
-                        () -> {
-                            mService.userActivity();
-                            mPowerInteractor.wakeUpIfDozing(
-                                    "LOCK_ICON_TOUCH",
-                                    PowerManager.WAKE_REASON_GESTURE);
-                        }
-                );
 
                 // In case we start outside of the view bounds (below the status bar), we need to
                 // dispatch the touch manually as the view system can't accommodate for touches
@@ -415,8 +412,18 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
             private boolean shouldInterceptTouchEventInternal(MotionEvent ev) {
                 mLastInterceptWasDragDownHelper = false;
-                if (mStatusBarStateController.isDozing() && !mDozeServiceHost.isPulsing()
-                        && !mDockManager.isDocked()) {
+                // When the device starts dozing, there's a delay before the device's display state
+                // changes from ON => DOZE to allow for the light reveal animation to run at
+                // a higher refresh rate and to delay visual changes (ie: display blink) when
+                // changing the display state. We'll call this specific state the
+                // "aodDefermentState". In this state we:
+                //     - don't want touches to get sent to underlying views, except the lock icon
+                //     - handle the tap to wake gesture via the PulsingGestureListener
+                if (mStatusBarStateController.isDozing()
+                        && !mDozeServiceHost.isPulsing()
+                        && !mDockManager.isDocked()
+                        && !mLockIconViewController.willHandleTouchWhileDozing(ev)
+                ) {
                     if (ev.getAction() == MotionEvent.ACTION_DOWN) {
                         mShadeLogger.d("NSWVC: capture all touch events in always-on");
                     }
@@ -432,16 +439,15 @@ public class NotificationShadeWindowViewController implements Dumpable {
                     return true;
                 }
 
-                if (mLockIconViewController.onInterceptTouchEvent(ev)) {
-                    // immediately return true; don't send the touch to the drag down helper
-                    if (ev.getAction() == MotionEvent.ACTION_DOWN) {
-                        mShadeLogger.d("NSWVC: don't send touch to drag down helper");
-                    }
-                    return true;
+                boolean bouncerShowing;
+                if (mFeatureFlags.isEnabled(Flags.ALTERNATE_BOUNCER_VIEW)) {
+                    bouncerShowing = mPrimaryBouncerInteractor.isBouncerShowing()
+                            || mAlternateBouncerInteractor.isVisibleState();
+                } else {
+                    bouncerShowing = mService.isBouncerShowing();
                 }
-
                 if (mNotificationPanelViewController.isFullyExpanded()
-                        && !mService.isBouncerShowing()
+                        && !bouncerShowing
                         && !mStatusBarStateController.isDozing()) {
                     if (mDragDownHelper.isDragDownEnabled()) {
                         // This handles drag down over lockscreen
@@ -523,17 +529,17 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
             @Override
             public boolean interceptMediaKey(KeyEvent event) {
-                return mKeyEventInteractor.interceptMediaKey(event);
+                return mSysUIKeyEventHandler.interceptMediaKey(event);
             }
 
             @Override
             public boolean dispatchKeyEventPreIme(KeyEvent event) {
-                return mKeyEventInteractor.dispatchKeyEventPreIme(event);
+                return mSysUIKeyEventHandler.dispatchKeyEventPreIme(event);
             }
 
             @Override
             public boolean dispatchKeyEvent(KeyEvent event) {
-                return mKeyEventInteractor.dispatchKeyEvent(event);
+                return mSysUIKeyEventHandler.dispatchKeyEvent(event);
             }
         });
 

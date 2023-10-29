@@ -219,6 +219,7 @@ import android.view.DisplayCutout;
 import android.view.DisplayInfo;
 import android.view.DisplayShape;
 import android.view.Gravity;
+import android.view.IDecorViewGestureListener;
 import android.view.IDisplayWindowInsetsController;
 import android.view.ISystemGestureExclusionListener;
 import android.view.IWindow;
@@ -472,6 +473,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     private final RemoteCallbackList<ISystemGestureExclusionListener>
             mSystemGestureExclusionListeners = new RemoteCallbackList<>();
+    private final RemoteCallbackList<IDecorViewGestureListener> mDecorViewGestureListener =
+            new RemoteCallbackList<>();
     private final Region mSystemGestureExclusion = new Region();
     private boolean mSystemGestureExclusionWasRestricted = false;
     private final Region mSystemGestureExclusionUnrestricted = new Region();
@@ -5964,6 +5967,27 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     void unregisterSystemGestureExclusionListener(ISystemGestureExclusionListener listener) {
         mSystemGestureExclusionListeners.unregister(listener);
+    }
+
+    void registerDecorViewGestureListener(IDecorViewGestureListener listener) {
+        mDecorViewGestureListener.register(listener);
+    }
+
+    void unregisterDecorViewGestureListener(IDecorViewGestureListener listener) {
+        mDecorViewGestureListener.unregister(listener);
+    }
+
+    void updateDecorViewGestureIntercepted(IBinder token, boolean intercepted) {
+        for (int i = mDecorViewGestureListener.beginBroadcast() - 1; i >= 0; --i) {
+            try {
+                mDecorViewGestureListener
+                        .getBroadcastItem(i)
+                        .onInterceptionChanged(token, intercepted);
+            } catch (RemoteException e) {
+                Slog.e(TAG, "Failed to notify DecorViewGestureListener", e);
+            }
+        }
+        mDecorViewGestureListener.finishBroadcast();
     }
 
     void updateKeepClearAreas() {

@@ -20,6 +20,7 @@ import static android.os.Trace.TRACE_TAG_APP;
 
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_NOTIFICATION_SHADE_SCROLL_FLING;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_SHADE_CLEAR_ALL;
+import static com.android.systemui.flags.Flags.UNCLEARED_TRANSIENT_HUN_FIX;
 import static com.android.systemui.statusbar.notification.stack.NotificationPriorityBucketKt.BUCKET_SILENT;
 import static com.android.systemui.statusbar.notification.stack.StackStateAnimator.ANIMATION_DURATION_SWIPE;
 import static com.android.systemui.util.DumpUtilsKt.println;
@@ -86,12 +87,12 @@ import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
 import com.android.systemui.ExpandHelper;
-import com.android.systemui.res.R;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
-import com.android.systemui.flags.ViewRefactorFlag;
+import com.android.systemui.flags.RefactorFlag;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.statusbar.NotificationSwipeActionHelper;
+import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.statusbar.CommandQueue;
@@ -106,12 +107,12 @@ import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.render.GroupExpansionManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
+import com.android.systemui.statusbar.notification.footer.ui.view.FooterView;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
-import com.android.systemui.statusbar.notification.row.FooterView;
 import com.android.systemui.statusbar.notification.row.StackScrollerDecorView;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
 import com.android.systemui.statusbar.phone.HeadsUpTouchHelper;
@@ -200,8 +201,8 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private Set<Integer> mDebugTextUsedYPositions;
     private final boolean mDebugRemoveAnimation;
     private final boolean mSensitiveRevealAnimEndabled;
-    private final ViewRefactorFlag mAnimatedInsets;
-    private final ViewRefactorFlag mShelfRefactor;
+    private final RefactorFlag mAnimatedInsets;
+    private final RefactorFlag mShelfRefactor;
 
     private final boolean mNewAodTransition;
 
@@ -487,8 +488,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private ShadeController mShadeController;
     private Consumer<Boolean> mOnStackYChanged;
 
-    protected boolean mClearAllEnabled;
-
     private Interpolator mHideXInterpolator = Interpolators.FAST_OUT_SLOW_IN;
 
     private final NotificationSectionsManager mSectionsManager;
@@ -578,6 +577,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mSplitShadeStateController = splitShadeStateController;
         updateSplitNotificationShade();
     }
+    private FeatureFlags mFeatureFlags;
 
     private final ExpandableView.OnHeightChangedListener mOnChildHeightChangedListener =
             new ExpandableView.OnHeightChangedListener() {
@@ -630,16 +630,16 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     public NotificationStackScrollLayout(Context context, AttributeSet attrs) {
         super(context, attrs, 0, 0);
         Resources res = getResources();
-        FeatureFlags featureFlags = Dependency.get(FeatureFlags.class);
-        mIsSmallLandscapeLockscreenEnabled = featureFlags.isEnabled(
+        mFeatureFlags = Dependency.get(FeatureFlags.class);
+        mIsSmallLandscapeLockscreenEnabled = mFeatureFlags.isEnabled(
                 Flags.LOCKSCREEN_ENABLE_LANDSCAPE);
-        mDebugLines = featureFlags.isEnabled(Flags.NSSL_DEBUG_LINES);
-        mNewAodTransition = featureFlags.isEnabled(Flags.NEW_AOD_TRANSITION);
-        mDebugRemoveAnimation = featureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
-        mSensitiveRevealAnimEndabled = featureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
+        mDebugLines = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_LINES);
+        mNewAodTransition = mFeatureFlags.isEnabled(Flags.NEW_AOD_TRANSITION);
+        mDebugRemoveAnimation = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
+        mSensitiveRevealAnimEndabled = mFeatureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
         mAnimatedInsets =
-                new ViewRefactorFlag(featureFlags, Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
-        mShelfRefactor = new ViewRefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
+                new RefactorFlag(mFeatureFlags, Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
+        mShelfRefactor = new RefactorFlag(mFeatureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
         mSectionsManager = Dependency.get(NotificationSectionsManager.class);
         mScreenOffAnimationController =
                 Dependency.get(ScreenOffAnimationController.class);
@@ -673,7 +673,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             mDebugPaint.setStyle(Paint.Style.STROKE);
             mDebugPaint.setTextSize(25f);
         }
-        mClearAllEnabled = res.getBoolean(R.bool.config_enableNotificationsClearAll);
         mGroupMembershipManager = Dependency.get(GroupMembershipManager.class);
         mGroupExpansionManager = Dependency.get(GroupExpansionManager.class);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
@@ -761,8 +760,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     }
 
     private boolean shouldShowDismissView() {
-        return mClearAllEnabled
-                && mController.hasActiveClearableNotifications(ROWS_ALL);
+        return mController.hasActiveClearableNotifications(ROWS_ALL);
     }
 
     private boolean shouldShowFooterView(boolean showDismissView) {
@@ -2783,8 +2781,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         if (animationGenerated) {
             if (!mSwipedOutViews.contains(child) || !isFullySwipedOut(child)) {
                 logAddTransientChild(child, container);
-                container.addTransientView(child, 0);
-                child.setTransientContainer(container);
+                child.addToTransientContainer(container, 0);
             }
         } else {
             mSwipedOutViews.remove(child);
@@ -2874,7 +2871,8 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
      * Generate a remove animation for a child view.
      *
      * @param child The view to generate the remove animation for.
-     * @return Whether an animation was generated.
+     * @return Whether a new animation was generated or an existing animation was detected by this
+     * method. We need this to determine if a transient view is needed.
      */
     boolean generateRemoveAnimation(ExpandableView child) {
         String key = "";
@@ -2891,10 +2889,23 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             mAddedHeadsUpChildren.remove(child);
             return false;
         }
-        if (isClickedHeadsUp(child)) {
-            // An animation is already running, add it transiently
-            mClearTransientViewsWhenFinished.add(child);
-            return true;
+        if (mFeatureFlags.isEnabled(UNCLEARED_TRANSIENT_HUN_FIX)) {
+            // Skip adding animation for clicked heads up notifications when the
+            // Shade is closed, because the animation event is generated in
+            // generateHeadsUpAnimationEvents. Only report that an animation was
+            // actually generated (thus requesting the transient view be added)
+            // if a removal animation is in progress.
+            if (!isExpanded() && isClickedHeadsUp(child)) {
+                // An animation is already running, add it transiently
+                mClearTransientViewsWhenFinished.add(child);
+                return child.inRemovalAnimation();
+            }
+        } else {
+            if (isClickedHeadsUp(child)) {
+                // An animation is already running, add it transiently
+                mClearTransientViewsWhenFinished.add(child);
+                return true;
+            }
         }
         if (mDebugRemoveAnimation) {
             Log.d(TAG, "generateRemove " + key
@@ -5178,7 +5189,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
                     DumpUtilsKt.withIncreasedIndent(
                             pw,
                             () -> {
-                                pw.println("mClearAllEnabled: " + mClearAllEnabled);
                                 pw.println(
                                         "hasActiveClearableNotifications: "
                                                 + mController.hasActiveClearableNotifications(

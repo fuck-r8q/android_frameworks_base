@@ -123,7 +123,8 @@ public final class SurfaceControl implements Parcelable {
     private static native long nativeMirrorSurface(long mirrorOfObject);
     private static native long nativeCreateTransaction();
     private static native long nativeGetNativeTransactionFinalizer();
-    private static native void nativeApplyTransaction(long transactionObj, boolean sync);
+    private static native void nativeApplyTransaction(long transactionObj, boolean sync,
+            boolean oneWay);
     private static native void nativeMergeTransaction(long transactionObj,
             long otherTransactionObj);
     private static native void nativeClearTransaction(long transactionObj);
@@ -262,7 +263,7 @@ public final class SurfaceControl implements Parcelable {
     private static native void nativeSetDefaultFrameRateCompatibility(long transactionObj,
             long nativeObject, int compatibility);
     private static native void nativeSetFrameRateCategory(
-            long transactionObj, long nativeObject, int category);
+            long transactionObj, long nativeObject, int category, boolean smoothSwitchOnly);
     private static native void nativeSetFrameRateSelectionStrategy(
             long transactionObj, long nativeObject, int strategy);
     private static native long nativeGetHandle(long nativeObject);
@@ -1792,7 +1793,12 @@ public final class SurfaceControl implements Parcelable {
         public float xDpi;
         public float yDpi;
 
+        // Some modes have peak refresh rate lower than the panel vsync rate.
         public float refreshRate;
+        // Fixed rate of vsync deadlines for the panel.
+        // This can be higher then the peak refresh rate for some panel technologies
+        // See: VrrConfig.aidl
+        public float vsyncRate;
         public long appVsyncOffsetNanos;
         public long presentationDeadlineNanos;
         public int[] supportedHdrTypes;
@@ -1813,6 +1819,7 @@ public final class SurfaceControl implements Parcelable {
                     + ", xDpi=" + xDpi
                     + ", yDpi=" + yDpi
                     + ", refreshRate=" + refreshRate
+                    + ", vsyncRate=" + vsyncRate
                     + ", appVsyncOffsetNanos=" + appVsyncOffsetNanos
                     + ", presentationDeadlineNanos=" + presentationDeadlineNanos
                     + ", supportedHdrTypes=" + Arrays.toString(supportedHdrTypes)
@@ -1830,6 +1837,7 @@ public final class SurfaceControl implements Parcelable {
                     && Float.compare(that.xDpi, xDpi) == 0
                     && Float.compare(that.yDpi, yDpi) == 0
                     && Float.compare(that.refreshRate, refreshRate) == 0
+                    && Float.compare(that.vsyncRate, vsyncRate) == 0
                     && appVsyncOffsetNanos == that.appVsyncOffsetNanos
                     && presentationDeadlineNanos == that.presentationDeadlineNanos
                     && Arrays.equals(supportedHdrTypes, that.supportedHdrTypes)
@@ -1838,8 +1846,9 @@ public final class SurfaceControl implements Parcelable {
 
         @Override
         public int hashCode() {
-            return Objects.hash(id, width, height, xDpi, yDpi, refreshRate, appVsyncOffsetNanos,
-                    presentationDeadlineNanos, group, Arrays.hashCode(supportedHdrTypes));
+            return Objects.hash(id, width, height, xDpi, yDpi, refreshRate, vsyncRate,
+                    appVsyncOffsetNanos, presentationDeadlineNanos, group,
+                    Arrays.hashCode(supportedHdrTypes));
         }
     }
 
@@ -2788,8 +2797,20 @@ public final class SurfaceControl implements Parcelable {
          * as a new transaction.
          */
         public void apply() {
-            apply(false);
+            apply(/*sync*/ false);
         }
+
+        /**
+         * Applies the transaction as a one way binder call. This transaction will be applied out
+         * of order with other transactions that are applied synchronously. This method is not
+         * safe. It should only be used when the order does not matter.
+         *
+         * @hide
+         */
+        public void applyAsyncUnsafe() {
+            apply(/*sync*/ false, /*oneWay*/ true);
+        }
+
 
         /**
          * Clear the transaction object, without applying it.
@@ -2820,9 +2841,13 @@ public final class SurfaceControl implements Parcelable {
          * @hide
          */
         public void apply(boolean sync) {
+            apply(sync, /*oneWay*/ false);
+        }
+
+        private void apply(boolean sync, boolean oneWay) {
             applyResizedSurfaces();
             notifyReparentedSurfaces();
-            nativeApplyTransaction(mNativeObject, sync);
+            nativeApplyTransaction(mNativeObject, sync, oneWay);
         }
 
         /**
@@ -3687,6 +3712,10 @@ public final class SurfaceControl implements Parcelable {
          * @param sc The SurfaceControl to specify the frame rate category of.
          * @param category The frame rate category of this surface. The category value may influence
          * the system's choice of display frame rate.
+         * @param smoothSwitchOnly Set to {@code true} to indicate the display frame rate should not
+         * change if changing it would cause jank. Else {@code false}.
+         * This parameter is ignored when {@code category} is
+         * {@link Surface#FRAME_RATE_CATEGORY_DEFAULT}.
          *
          * @return This transaction object.
          *
@@ -3695,10 +3724,10 @@ public final class SurfaceControl implements Parcelable {
          * @hide
          */
         @NonNull
-        public Transaction setFrameRateCategory(
-                @NonNull SurfaceControl sc, @Surface.FrameRateCategory int category) {
+        public Transaction setFrameRateCategory(@NonNull SurfaceControl sc,
+                @Surface.FrameRateCategory int category, boolean smoothSwitchOnly) {
             checkPreconditions(sc);
-            nativeSetFrameRateCategory(mNativeObject, sc.mNativeObject, category);
+            nativeSetFrameRateCategory(mNativeObject, sc.mNativeObject, category, smoothSwitchOnly);
             return this;
         }
 
@@ -4244,8 +4273,7 @@ public final class SurfaceControl implements Parcelable {
          * be somewhat arbitrary, and so there are some somewhat arbitrary decisions in
          * this API as well.
          * <p>
-         * @param sc         The {@link SurfaceControl} to set the
-         *                   {@link TrustedPresentationCallback} on
+         * @param sc         The {@link SurfaceControl} to set the callback on
          * @param thresholds The {@link TrustedPresentationThresholds} that will specify when the to
          *                   invoke the callback.
          * @param executor   The {@link Executor} where the callback will be invoked on.
@@ -4278,10 +4306,9 @@ public final class SurfaceControl implements Parcelable {
         }
 
         /**
-         * Clears the {@link TrustedPresentationCallback} for a specific {@link SurfaceControl}
+         * Clears the callback for a specific {@link SurfaceControl}
          *
-         * @param sc The SurfaceControl that the {@link TrustedPresentationCallback} should be
-         *           cleared from
+         * @param sc The SurfaceControl that the callback should be cleared from
          * @return This transaction
          */
         @NonNull
@@ -4376,7 +4403,7 @@ public final class SurfaceControl implements Parcelable {
         void applyGlobalTransaction(boolean sync) {
             applyResizedSurfaces();
             notifyReparentedSurfaces();
-            nativeApplyTransaction(mNativeObject, sync);
+            nativeApplyTransaction(mNativeObject, sync, /*oneWay*/ false);
         }
 
         @Override

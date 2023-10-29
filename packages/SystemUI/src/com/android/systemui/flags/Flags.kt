@@ -36,7 +36,10 @@ import com.android.systemui.flags.FlagsFactory.unreleasedFlag
  * See [FeatureFlagsClassicDebug] for instructions on flipping the flags via adb.
  */
 object Flags {
-    @JvmField val TEAMFOOD = unreleasedFlag("teamfood")
+    // IGNORE ME!
+    // Because flags are static, we need an ever-present flag to reference in some of the internal
+    // code that ensure that other flags are referenced and available.
+    @JvmField val NULL_FLAG = unreleasedFlag("null_flag")
 
     // 100 - notification
     // TODO(b/297792660): Tracking Bug
@@ -144,11 +147,6 @@ object Flags {
             "lockscreen_custom_clocks"
         )
 
-    // TODO(b/275694445): Tracking Bug
-    @JvmField
-    val LOCKSCREEN_WITHOUT_SECURE_LOCK_WHEN_DREAMING =
-        releasedFlag("lockscreen_without_secure_lock_when_dreaming")
-
     // TODO(b/286092087): Tracking Bug
     @JvmField
     val ENABLE_SYSTEM_UI_DREAM_CONTROLLER = unreleasedFlag("enable_system_ui_dream_controller")
@@ -234,8 +232,7 @@ object Flags {
     /** Whether page transition animations in the wallpaper picker are enabled */
     // TODO(b/291710220): Tracking bug.
     @JvmField
-    val WALLPAPER_PICKER_PAGE_TRANSITIONS =
-        unreleasedFlag("wallpaper_picker_page_transitions", teamfood = true)
+    val WALLPAPER_PICKER_PAGE_TRANSITIONS = releasedFlag("wallpaper_picker_page_transitions")
 
     /** Add "Apply" button to wall paper picker's grid preview page. */
     // TODO(b/294866904): Tracking bug.
@@ -310,6 +307,11 @@ object Flags {
     @JvmField
     val WALLPAPER_PICKER_PREVIEW_ANIMATION = releasedFlag("wallpaper_picker_preview_animation")
 
+    /** Flag to enable rest to unlock feature. */
+    // TODO(b/303672286): Tracking bug
+    @JvmField
+    val REST_TO_UNLOCK: UnreleasedFlag = unreleasedFlag("rest_to_unlock")
+
     /**
      * TODO(b/278086361): Tracking bug
      * Complete rewrite of the interactions between System UI and Window Manager involving keyguard
@@ -332,7 +334,7 @@ object Flags {
     /** Flag to use a separate view for the alternate bouncer. */
     // TODO(b/300440924): Tracking bug
     @JvmField
-    val ALTERNATE_BOUNCER_REFACTOR: UnreleasedFlag = unreleasedFlag("alternate_bouncer_view")
+    val ALTERNATE_BOUNCER_VIEW: UnreleasedFlag = unreleasedFlag("alternate_bouncer_view")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -401,6 +403,9 @@ object Flags {
     // TODO(b/291315866): Tracking Bug
     @JvmField val SIGNAL_CALLBACK_DEPRECATION =
         unreleasedFlag("signal_callback_deprecation", teamfood = true)
+
+    // TODO(b/301610137): Tracking bug
+    @JvmField val NEW_NETWORK_SLICE_UI = unreleasedFlag("new_network_slice_ui", teamfood = true)
 
     // TODO(b/265892345): Tracking Bug
     val PLUG_IN_STATUS_BAR_CHIP = releasedFlag("plug_in_status_bar_chip")
@@ -473,6 +478,9 @@ object Flags {
 
     // TODO(b/270437894): Tracking Bug
     val MEDIA_REMOTE_RESUME = unreleasedFlag("media_remote_resume")
+
+    // TODO(b/304506662): Tracking Bug
+    val MEDIA_DEVICE_NAME_FIX = unreleasedFlag("media_device_name_fix", teamfood = true)
 
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag("simulate_dock_through_charging")
@@ -668,8 +676,6 @@ object Flags {
     @JvmField val NOTE_TASKS = releasedFlag("keycode_flag")
 
     // 2200 - biometrics (udfps, sfps, BiometricPrompt, etc.)
-    // TODO(b/259264861): Tracking Bug
-    @JvmField val UDFPS_NEW_TOUCH_DETECTION = releasedFlag("udfps_new_touch_detection")
 
     // 2300 - stylus
     @JvmField val TRACK_STYLUS_EVER_USED = releasedFlag("track_stylus_ever_used")
@@ -787,8 +793,7 @@ object Flags {
 
     // TODO(b/290213663): Tracking Bug
     @JvmField
-    val ONE_WAY_HAPTICS_API_MIGRATION =
-            unreleasedFlag("oneway_haptics_api_migration", teamfood = true)
+    val ONE_WAY_HAPTICS_API_MIGRATION = releasedFlag("oneway_haptics_api_migration")
 
     /** TODO(b/296223317): Enables the new keyguard presentation containing a clock. */
     @JvmField

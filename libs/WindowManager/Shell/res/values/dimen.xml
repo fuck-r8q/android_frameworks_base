@@ -143,7 +143,9 @@
     <dimen name="bubble_expanded_view_padding">16dp</dimen>
     <!-- Padding for the edge of the expanded view that is closest to the edge of the screen used
          when displaying in landscape on a large screen. -->
-    <dimen name="bubble_expanded_view_largescreen_landscape_padding">128dp</dimen>
+    <dimen name="bubble_expanded_view_largescreen_landscape_padding">102dp</dimen>
+    <!-- The width of the expanded view on large screens. -->
+    <dimen name="bubble_expanded_view_largescreen_width">540dp</dimen>
     <!-- This should be at least the size of bubble_expanded_view_padding; it is used to include
          a slight touch slop around the expanded view. -->
     <dimen name="bubble_expanded_view_slop">8dp</dimen>
@@ -434,11 +436,11 @@
     <!-- The height of the handle menu's "Windowing" pill in desktop mode. -->
     <dimen name="desktop_mode_handle_menu_windowing_pill_height">52dp</dimen>
 
-    <!-- The height of the handle menu's "More Actions" pill in desktop mode, but not freeform. -->
-    <dimen name="desktop_mode_handle_menu_more_actions_pill_height">104dp</dimen>
+    <!-- The height of the handle menu's "More Actions" pill in desktop mode. -->
+    <dimen name="desktop_mode_handle_menu_more_actions_pill_height">52dp</dimen>
 
-    <!-- The height of the handle menu's "More Actions" pill in freeform desktop windowing mode. -->
-    <dimen name="desktop_mode_handle_menu_more_actions_pill_freeform_height">52dp</dimen>
+    <!-- The height of the handle menu in desktop mode. -->
+    <dimen name="desktop_mode_handle_menu_height">328dp</dimen>
 
     <!-- The top margin of the handle menu in desktop mode. -->
     <dimen name="desktop_mode_handle_menu_margin_top">4dp</dimen>

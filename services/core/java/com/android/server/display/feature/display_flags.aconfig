@@ -35,6 +35,14 @@ flag {
 }
 
 flag {
+    name: "enable_adaptive_tone_improvements_2"
+    namespace: "display_manager"
+    description: "Feature flag for Further Adaptive Tone Improvements"
+    bug: "294762632"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "enable_display_resolution_range_voting"
     namespace: "display_manager"
     description: "Feature flag to enable voting for ranges of resolutions"
@@ -70,5 +78,21 @@ flag {
     namespace: "display_manager"
     description: "Feature flag for DisplayOffload"
     bug: "299521647"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "enable_connected_display_error_handling"
+    namespace: "display_manager"
+    description: "Feature flag for connected display error handling"
+    bug: "283461472"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "back_up_smooth_display_and_force_peak_refresh_rate"
+    namespace: "display_manager"
+    description: "Feature flag for backing up Smooth Display and Force Peak Refresh Rate"
+    bug: "211737588"
     is_fixed_read_only: true
 }

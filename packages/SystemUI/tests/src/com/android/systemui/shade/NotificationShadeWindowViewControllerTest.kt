@@ -34,6 +34,7 @@ import com.android.systemui.back.domain.interactor.BackActionInteractor
 import com.android.systemui.biometrics.data.repository.FakeFacePropertyRepository
 import com.android.systemui.bouncer.data.repository.BouncerMessageRepositoryImpl
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
 import com.android.systemui.bouncer.domain.interactor.CountDownTimerUtil
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerCallbackInteractor
@@ -48,7 +49,7 @@ import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.flags.SystemPropertiesHelper
-import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor
+import com.android.systemui.keyevent.domain.interactor.SysUIKeyEventHandler
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
@@ -83,7 +84,6 @@ import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
-import java.util.Optional
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
@@ -97,8 +97,9 @@ import org.mockito.Mockito.anyFloat
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
+import java.util.Optional
+import org.mockito.Mockito.`when` as whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -143,7 +144,9 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
     @Mock lateinit var dragDownHelper: DragDownHelper
     @Mock
     lateinit var primaryBouncerToGoneTransitionViewModel: PrimaryBouncerToGoneTransitionViewModel
-    @Mock lateinit var keyEventInteractor: KeyEventInteractor
+    @Mock lateinit var sysUIKeyEventHandler: SysUIKeyEventHandler
+    @Mock lateinit var primaryBouncerInteractor: PrimaryBouncerInteractor
+    @Mock lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
     private val notificationExpansionRepository = NotificationExpansionRepository()
 
     private lateinit var fakeClock: FakeSystemClock
@@ -176,6 +179,7 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
         featureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
         featureFlags.set(Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false)
         featureFlags.set(Flags.MIGRATE_NSSL, false)
+        featureFlags.set(Flags.ALTERNATE_BOUNCER_VIEW, false)
 
         testScope = TestScope()
         fakeClock = FakeSystemClock()
@@ -247,7 +251,9 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
                     securityModel = mock(KeyguardSecurityModel::class.java),
                 ),
                 BouncerLogger(logcatLogBuffer("BouncerLog")),
-                keyEventInteractor,
+                sysUIKeyEventHandler,
+                primaryBouncerInteractor,
+                alternateBouncerInteractor,
             )
         underTest.setupExpandedStatusBar()
         underTest.setDragDownHelper(dragDownHelper)
@@ -425,29 +431,37 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
     }
 
     @Test
-    fun shouldInterceptTouchEvent_notificationPanelViewControllerShouldIntercept() {
-        // GIVEN not dozing
-        whenever(sysuiStatusBarStateController.isDozing()).thenReturn(false)
+    fun shouldInterceptTouchEvent_dozing_touchInLockIconArea_touchNotIntercepted() {
+        // GIVEN dozing
+        whenever(sysuiStatusBarStateController.isDozing).thenReturn(true)
         // AND alternate bouncer doesn't want the touch
         whenever(statusBarKeyguardViewManager.shouldInterceptTouchEvent(DOWN_EVENT))
             .thenReturn(false)
-        // AND the lock icon doesn't want the touch
-        whenever(lockIconViewController.onInterceptTouchEvent(DOWN_EVENT)).thenReturn(false)
-        // AND the notification panel can accept touches
-        whenever(notificationPanelViewController.isFullyExpanded()).thenReturn(true)
-        whenever(dragDownHelper.isDragDownEnabled).thenReturn(true)
-        whenever(centralSurfaces.isBouncerShowing()).thenReturn(false)
-
-        // AND the drag down helper doesn't want the touch (to pull the shade down)
-        whenever(dragDownHelper.onInterceptTouchEvent(DOWN_EVENT)).thenReturn(false)
+        // AND the lock icon wants the touch
+        whenever(lockIconViewController.willHandleTouchWhileDozing(DOWN_EVENT))
+                .thenReturn(true)
 
         featureFlags.set(Flags.MIGRATE_NSSL, true)
 
-        // WHEN asked if should intercept touch
-        interactionEventHandler.shouldInterceptTouchEvent(DOWN_EVENT)
+        // THEN touch should NOT be intercepted by NotificationShade
+        assertThat(interactionEventHandler.shouldInterceptTouchEvent(DOWN_EVENT)).isFalse()
+    }
 
-        // Verify that NPVC gets a chance to use the touch
-        verify(notificationPanelViewController).handleExternalInterceptTouch(DOWN_EVENT)
+    @Test
+    fun shouldInterceptTouchEvent_dozing_touchNotInLockIconArea_touchIntercepted() {
+        // GIVEN dozing
+        whenever(sysuiStatusBarStateController.isDozing).thenReturn(true)
+        // AND alternate bouncer doesn't want the touch
+        whenever(statusBarKeyguardViewManager.shouldInterceptTouchEvent(DOWN_EVENT))
+                .thenReturn(false)
+        // AND the lock icon does NOT want the touch
+        whenever(lockIconViewController.willHandleTouchWhileDozing(DOWN_EVENT))
+                .thenReturn(false)
+
+        featureFlags.set(Flags.MIGRATE_NSSL, true)
+
+        // THEN touch should NOT be intercepted by NotificationShade
+        assertThat(interactionEventHandler.shouldInterceptTouchEvent(DOWN_EVENT)).isTrue()
     }
 
     @Test
@@ -461,21 +475,21 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
     fun forwardsDispatchKeyEvent() {
         val keyEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_B)
         interactionEventHandler.dispatchKeyEvent(keyEvent)
-        verify(keyEventInteractor).dispatchKeyEvent(keyEvent)
+        verify(sysUIKeyEventHandler).dispatchKeyEvent(keyEvent)
     }
 
     @Test
     fun forwardsDispatchKeyEventPreIme() {
         val keyEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_B)
         interactionEventHandler.dispatchKeyEventPreIme(keyEvent)
-        verify(keyEventInteractor).dispatchKeyEventPreIme(keyEvent)
+        verify(sysUIKeyEventHandler).dispatchKeyEventPreIme(keyEvent)
     }
 
     @Test
     fun forwardsInterceptMediaKey() {
         val keyEvent = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_UP)
         interactionEventHandler.interceptMediaKey(keyEvent)
-        verify(keyEventInteractor).interceptMediaKey(keyEvent)
+        verify(sysUIKeyEventHandler).interceptMediaKey(keyEvent)
     }
 
     companion object {

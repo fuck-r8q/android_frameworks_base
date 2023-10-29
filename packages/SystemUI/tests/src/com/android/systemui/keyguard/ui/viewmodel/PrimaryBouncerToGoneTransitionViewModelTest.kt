@@ -18,7 +18,6 @@ package com.android.systemui.keyguard.ui.viewmodel
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.coroutines.collectValues
@@ -46,7 +45,6 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 
 @SmallTest
-@RoboPilotTest
 @RunWith(AndroidJUnit4::class)
 class PrimaryBouncerToGoneTransitionViewModelTest : SysuiTestCase() {
     private lateinit var underTest: PrimaryBouncerToGoneTransitionViewModel
@@ -62,10 +60,7 @@ class PrimaryBouncerToGoneTransitionViewModelTest : SysuiTestCase() {
         MockitoAnnotations.initMocks(this)
         repository = FakeKeyguardTransitionRepository()
         val featureFlags =
-            FakeFeatureFlags().apply {
-                set(Flags.REFACTOR_KEYGUARD_DISMISS_INTENT, false)
-                set(Flags.UDFPS_NEW_TOUCH_DETECTION, true)
-            }
+            FakeFeatureFlags().apply { set(Flags.REFACTOR_KEYGUARD_DISMISS_INTENT, false) }
         val interactor =
             KeyguardTransitionInteractorFactory.create(
                     scope = TestScope().backgroundScope,

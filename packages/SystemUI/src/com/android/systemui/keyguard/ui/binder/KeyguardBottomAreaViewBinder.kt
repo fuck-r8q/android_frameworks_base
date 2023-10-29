@@ -48,6 +48,7 @@ import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.statusbar.VibratorHelper
+import com.android.systemui.util.doOnEnd
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -416,6 +417,9 @@ object KeyguardBottomAreaViewBinder {
                         KeyguardBottomAreaVibrations.ShakeAnimationDuration.inWholeMilliseconds
                     shakeAnimator.interpolator =
                         CycleInterpolator(KeyguardBottomAreaVibrations.ShakeAnimationCycles)
+                    shakeAnimator.doOnEnd {
+                        view.translationX = 0f
+                    }
                     shakeAnimator.start()
 
                     vibratorHelper?.vibrate(KeyguardBottomAreaVibrations.Shake)

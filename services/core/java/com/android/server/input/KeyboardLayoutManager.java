@@ -71,6 +71,7 @@ import android.widget.Toast;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.inputmethod.InputMethodSubtypeHandle;
 import com.android.internal.messages.nano.SystemMessageProto;
 import com.android.internal.notification.SystemNotificationChannels;
@@ -99,7 +100,7 @@ import java.util.stream.Stream;
  *
  * @hide
  */
-final class KeyboardLayoutManager implements InputManager.InputDeviceListener {
+class KeyboardLayoutManager implements InputManager.InputDeviceListener {
 
     private static final String TAG = "KeyboardLayoutManager";
 
@@ -1247,11 +1248,17 @@ final class KeyboardLayoutManager implements InputManager.InputDeviceListener {
                         isFirstConfiguration);
         for (int i = 0; i < imeInfoList.size(); i++) {
             KeyboardLayoutInfo layoutInfo = layoutInfoList.get(i);
-            boolean noLayoutFound = layoutInfo == null || layoutInfo.mDescriptor == null;
-            configurationEventBuilder.addLayoutSelection(imeInfoList.get(i).mImeSubtype,
-                    noLayoutFound ? null : getKeyboardLayout(layoutInfo.mDescriptor),
-                    noLayoutFound ? LAYOUT_SELECTION_CRITERIA_DEFAULT
-                            : layoutInfo.mSelectionCriteria);
+            String layoutName = null;
+            int layoutSelectionCriteria = LAYOUT_SELECTION_CRITERIA_DEFAULT;
+            if (layoutInfo != null && layoutInfo.mDescriptor != null) {
+                layoutSelectionCriteria = layoutInfo.mSelectionCriteria;
+                KeyboardLayoutDescriptor d = KeyboardLayoutDescriptor.parse(layoutInfo.mDescriptor);
+                if (d != null) {
+                    layoutName = d.keyboardLayoutName;
+                }
+            }
+            configurationEventBuilder.addLayoutSelection(imeInfoList.get(i).mImeSubtype, layoutName,
+                    layoutSelectionCriteria);
         }
         KeyboardMetricsCollector.logKeyboardConfiguredAtom(configurationEventBuilder.build());
     }
@@ -1297,7 +1304,8 @@ final class KeyboardLayoutManager implements InputManager.InputDeviceListener {
     }
 
     @SuppressLint("MissingPermission")
-    private List<ImeInfo> getImeInfoListForLayoutMapping() {
+    @VisibleForTesting
+    public List<ImeInfo> getImeInfoListForLayoutMapping() {
         List<ImeInfo> imeInfoList = new ArrayList<>();
         UserManager userManager = Objects.requireNonNull(
                 mContext.getSystemService(UserManager.class));
@@ -1404,7 +1412,8 @@ final class KeyboardLayoutManager implements InputManager.InputDeviceListener {
         }
     }
 
-    private static class ImeInfo {
+    @VisibleForTesting
+    public static class ImeInfo {
         @UserIdInt int mUserId;
         @NonNull InputMethodSubtypeHandle mImeSubtypeHandle;
         @Nullable InputMethodSubtype mImeSubtype;

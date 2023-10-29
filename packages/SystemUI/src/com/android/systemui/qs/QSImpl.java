@@ -72,6 +72,8 @@ import com.android.systemui.statusbar.policy.BrightnessMirrorController;
 import com.android.systemui.statusbar.policy.RemoteInputQuickSettingsDisabler;
 import com.android.systemui.util.Utils;
 
+import dalvik.annotation.optimization.NeverCompile;
+
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -199,10 +201,12 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         mListeningAndVisibilityLifecycleOwner = new ListeningAndVisibilityLifecycleOwner();
     }
 
+    /**
+     * This method will set up all the necessary fields. Methods from the implemented interfaces
+     * should not be called before this method returns.
+     */
     public void onComponentCreated(QSComponent qsComponent, @Nullable Bundle savedInstanceState) {
         mRootView = qsComponent.getRootView();
-
-        mCommandQueue.addCallback(this);
 
         mQSPanelController = qsComponent.getQSPanelController();
         mQuickQSPanelController = qsComponent.getQuickQSPanelController();
@@ -270,6 +274,9 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
                     mQSPanelController.getMediaHost().getHostView().setAlpha(1.0f);
                     mQSAnimator.requestAnimatorUpdate();
                 });
+
+        // This will immediately call disable, so it needs to be added after setting up the fields.
+        mCommandQueue.addCallback(this);
     }
 
     private void bindFooterActionsView(View root) {
@@ -323,6 +330,8 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
     public void onDestroy() {
         mCommandQueue.removeCallback(this);
         mStatusBarStateController.removeCallback(this);
+        mQSPanelController.destroy();
+        mQuickQSPanelController.destroy();
         if (mListening) {
             setListening(false);
         }
@@ -927,6 +936,7 @@ public class QSImpl implements QS, CommandQueue.Callbacks, StatusBarStateControl
         return mListeningAndVisibilityLifecycleOwner;
     }
 
+    @NeverCompile
     @Override
     public void dump(PrintWriter pw, String[] args) {
         IndentingPrintWriter indentingPw = new IndentingPrintWriter(pw, /* singleIndent= */ "  ");

@@ -20,11 +20,15 @@ import static android.Manifest.permission.MANAGE_CONTENT_CAPTURE;
 import static android.content.Context.CONTENT_CAPTURE_MANAGER_SERVICE;
 import static android.service.contentcapture.ContentCaptureService.setClientState;
 import static android.view.contentcapture.ContentCaptureHelper.toList;
+import static android.view.contentcapture.ContentCaptureManager.DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_CONFIG;
+import static android.view.contentcapture.ContentCaptureManager.DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD;
+import static android.view.contentcapture.ContentCaptureManager.DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_REQUIRED_GROUPS_CONFIG;
 import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_FALSE;
 import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_OK;
 import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_SECURITY_EXCEPTION;
 import static android.view.contentcapture.ContentCaptureManager.RESULT_CODE_TRUE;
 import static android.view.contentcapture.ContentCaptureSession.STATE_DISABLED;
+import static android.view.contentprotection.flags.Flags.parseGroupsConfigEnabled;
 
 import static com.android.internal.util.FrameworkStatsLog.CONTENT_CAPTURE_SERVICE_EVENTS__EVENT__ACCEPT_DATA_SHARE_REQUEST;
 import static com.android.internal.util.FrameworkStatsLog.CONTENT_CAPTURE_SERVICE_EVENTS__EVENT__DATA_SHARE_ERROR_CLIENT_PIPE_FAIL;
@@ -112,6 +116,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -137,6 +143,9 @@ public class ContentCaptureManagerService extends
     private static final int MAX_DATA_SHARE_FILE_DESCRIPTORS_TTL_MS =  1_000 * 60 * 5; // 5 minutes
     private static final int MAX_CONCURRENT_FILE_SHARING_REQUESTS = 10;
     private static final int DATA_SHARE_BYTE_BUFFER_LENGTH = 1_024;
+
+    private static final String CONTENT_PROTECTION_GROUP_CONFIG_SEPARATOR_GROUP = ";";
+    private static final String CONTENT_PROTECTION_GROUP_CONFIG_SEPARATOR_VALUE = ",";
 
     // Needed to pass checkstyle_hook as names are too long for one line.
     private static final int EVENT__DATA_SHARE_ERROR_CONCURRENT_REQUEST =
@@ -203,6 +212,17 @@ public class ContentCaptureManagerService extends
     @GuardedBy("mLock")
     int mDevCfgContentProtectionBufferSize;
 
+    @GuardedBy("mLock")
+    @NonNull
+    List<List<String>> mDevCfgContentProtectionRequiredGroups;
+
+    @GuardedBy("mLock")
+    @NonNull
+    List<List<String>> mDevCfgContentProtectionOptionalGroups;
+
+    @GuardedBy("mLock")
+    int mDevCfgContentProtectionOptionalGroupsThreshold;
+
     private final Executor mDataShareExecutor = Executors.newCachedThreadPool();
     private final Handler mHandler = new Handler(Looper.getMainLooper());
 
@@ -226,6 +246,11 @@ public class ContentCaptureManagerService extends
                 com.android.internal.R.string.config_defaultContentCaptureService),
                 UserManager.DISALLOW_CONTENT_CAPTURE,
                 /*packageUpdatePolicy=*/ PACKAGE_UPDATE_POLICY_NO_REFRESH);
+
+        mDevCfgContentProtectionRequiredGroups =
+                ContentCaptureManager.DEFAULT_CONTENT_PROTECTION_REQUIRED_GROUPS;
+        mDevCfgContentProtectionOptionalGroups =
+                ContentCaptureManager.DEFAULT_CONTENT_PROTECTION_OPTIONAL_GROUPS;
         DeviceConfig.addOnPropertiesChangedListener(DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
                 ActivityThread.currentApplication().getMainExecutor(),
                 (properties) -> onDeviceConfigChange(properties));
@@ -422,6 +447,9 @@ public class ContentCaptureManagerService extends
                 case ContentCaptureManager.DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_BUFFER_SIZE:
                 case ContentCaptureManager
                         .DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_APPS_BLOCKLIST_SIZE:
+                case DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_REQUIRED_GROUPS_CONFIG:
+                case DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_CONFIG:
+                case DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD:
                     setFineTuneParamsFromDeviceConfig();
                     return;
                 default:
@@ -433,6 +461,8 @@ public class ContentCaptureManagerService extends
     /** @hide */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     protected void setFineTuneParamsFromDeviceConfig() {
+        String contentProtectionRequiredGroupsConfig;
+        String contentProtectionOptionalGroupsConfig;
         synchronized (mLock) {
             mDevCfgMaxBufferSize =
                     DeviceConfig.getInt(
@@ -486,6 +516,24 @@ public class ContentCaptureManagerService extends
                             ContentCaptureManager
                                     .DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_BUFFER_SIZE,
                             ContentCaptureManager.DEFAULT_CONTENT_PROTECTION_BUFFER_SIZE);
+            contentProtectionRequiredGroupsConfig =
+                    DeviceConfig.getString(
+                            DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                            DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_REQUIRED_GROUPS_CONFIG,
+                            ContentCaptureManager
+                                    .DEFAULT_CONTENT_PROTECTION_REQUIRED_GROUPS_CONFIG);
+            contentProtectionOptionalGroupsConfig =
+                    DeviceConfig.getString(
+                            DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                            DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_CONFIG,
+                            ContentCaptureManager
+                                    .DEFAULT_CONTENT_PROTECTION_OPTIONAL_GROUPS_CONFIG);
+            mDevCfgContentProtectionOptionalGroupsThreshold =
+                    DeviceConfig.getInt(
+                            DeviceConfig.NAMESPACE_CONTENT_CAPTURE,
+                            DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD,
+                            ContentCaptureManager
+                                    .DEFAULT_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD);
             if (verbose) {
                 Slog.v(
                         TAG,
@@ -507,8 +555,23 @@ public class ContentCaptureManagerService extends
                                 + ", contentProtectionAppsBlocklistSize="
                                 + mDevCfgContentProtectionAppsBlocklistSize
                                 + ", contentProtectionBufferSize="
-                                + mDevCfgContentProtectionBufferSize);
+                                + mDevCfgContentProtectionBufferSize
+                                + ", contentProtectionRequiredGroupsConfig="
+                                + contentProtectionRequiredGroupsConfig
+                                + ", contentProtectionOptionalGroupsConfig="
+                                + contentProtectionOptionalGroupsConfig
+                                + ", contentProtectionOptionalGroupsThreshold="
+                                + mDevCfgContentProtectionOptionalGroupsThreshold);
             }
+        }
+
+        List<List<String>> contentProtectionRequiredGroups =
+                parseContentProtectionGroupsConfig(contentProtectionRequiredGroupsConfig);
+        List<List<String>> contentProtectionOptionalGroups =
+                parseContentProtectionGroupsConfig(contentProtectionOptionalGroupsConfig);
+        synchronized (mLock) {
+            mDevCfgContentProtectionRequiredGroups = contentProtectionRequiredGroups;
+            mDevCfgContentProtectionOptionalGroups = contentProtectionOptionalGroups;
         }
     }
 
@@ -786,6 +849,15 @@ public class ContentCaptureManagerService extends
         pw.print(prefix2);
         pw.print("contentProtectionBufferSize: ");
         pw.println(mDevCfgContentProtectionBufferSize);
+        pw.print(prefix2);
+        pw.print("contentProtectionRequiredGroupsSize: ");
+        pw.println(mDevCfgContentProtectionRequiredGroups.size());
+        pw.print(prefix2);
+        pw.print("contentProtectionOptionalGroupsSize: ");
+        pw.println(mDevCfgContentProtectionOptionalGroups.size());
+        pw.print(prefix2);
+        pw.print("contentProtectionOptionalGroupsThreshold: ");
+        pw.println(mDevCfgContentProtectionOptionalGroupsThreshold);
         pw.print(prefix);
         pw.println("Global Options:");
         mGlobalContentCaptureOptions.dump(prefix2, pw);
@@ -888,6 +960,42 @@ public class ContentCaptureManagerService extends
     @NonNull
     protected ContentCaptureManagerServiceStub getContentCaptureManagerServiceStub() {
         return mContentCaptureManagerServiceStub;
+    }
+
+    /**
+     * Parses a simple config in format "group;group" where each "group" is itself in the format of
+     * "string1,string2", eg:
+     *
+     * <p>"a" -> [["a"]]
+     *
+     * <p>"a,b" -> [["a", "b"]]
+     *
+     * <p>"a,b;c;d,e" -> [["a", "b"], ["c"], ["d", "e"]]
+     *
+     * @hide
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    @NonNull
+    protected List<List<String>> parseContentProtectionGroupsConfig(@Nullable String config) {
+        if (verbose) {
+            Slog.v(TAG, "parseContentProtectionGroupsConfig: " + config);
+        }
+        if (!parseGroupsConfigEnabled()) {
+            return Collections.emptyList();
+        }
+        if (config == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(config.split(CONTENT_PROTECTION_GROUP_CONFIG_SEPARATOR_GROUP))
+                .map(this::parseContentProtectionGroupConfigValues)
+                .filter(group -> !group.isEmpty())
+                .toList();
+    }
+
+    private List<String> parseContentProtectionGroupConfigValues(@NonNull String group) {
+        return Arrays.stream(group.split(CONTENT_PROTECTION_GROUP_CONFIG_SEPARATOR_VALUE))
+                .filter(value -> !value.isEmpty())
+                .toList();
     }
 
     final class ContentCaptureManagerServiceStub extends IContentCaptureManager.Stub {
@@ -1277,7 +1385,10 @@ public class ContentCaptureManagerService extends
                                 isContentCaptureReceiverEnabled || whitelistedComponents != null,
                                 new ContentCaptureOptions.ContentProtectionOptions(
                                         isContentProtectionReceiverEnabled,
-                                        mDevCfgContentProtectionBufferSize),
+                                        mDevCfgContentProtectionBufferSize,
+                                        mDevCfgContentProtectionRequiredGroups,
+                                        mDevCfgContentProtectionOptionalGroups,
+                                        mDevCfgContentProtectionOptionalGroupsThreshold),
                                 whitelistedComponents);
                 if (verbose) Slog.v(TAG, "getOptionsForPackage(" + packageName + "): " + options);
                 return options;

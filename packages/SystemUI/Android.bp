@@ -60,7 +60,9 @@ systemui_compose_java_defaults {
             // except for SystemUI-core.
             // Copied from compose/features/Android.bp.
             static_libs: [
+                "CommunalLayoutLib",
                 "PlatformComposeCore",
+                "PlatformComposeSceneTransitionLayout",
 
                 "androidx.compose.runtime_runtime",
                 "androidx.compose.material3_material3",
@@ -323,6 +325,8 @@ filegroup {
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/data/repository/prod/WifiRepositoryImplTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/domain/interactor/WifiInteractorImplTest.kt",
         "tests/src/com/android/systemui/statusbar/pipeline/wifi/ui/viewmodel/WifiViewModelTest.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/mobile/domain/interactor/FakeMobileIconsInteractor.kt",
+        "tests/src/com/android/systemui/statusbar/pipeline/mobile/domain/interactor/FakeMobileIconInteractor.kt",
 
         /* Bouncer UI tests */
         "tests/src/com/android/keyguard/KeyguardPasswordViewControllerTest.kt",
@@ -369,6 +373,42 @@ filegroup {
         "tests/src/com/android/systemui/qs/pipeline/shared/TileSpecTest.kt",
         "tests/src/com/android/systemui/qs/tiles/base/**/*.kt",
         "tests/src/com/android/systemui/qs/tiles/viewmodel/**/*.kt",
+
+        /* Authentication */
+        "tests/src/com/android/systemui/authentication/data/repository/AuthenticationRepositoryTest.kt",
+        "tests/src/com/android/systemui/authentication/domain/interactor/AuthenticationInteractorTest.kt",
+
+        /* Device entry */
+        "tests/src/com/android/systemui/deviceentry/data/repository/DeviceEntryRepositoryTest.kt",
+        "tests/src/com/android/systemui/deviceentry/domain/interactor/DeviceEntryInteractorTest.kt",
+
+        /* Bouncer scene */
+        "tests/src/com/android/systemui/bouncer/domain/interactor/BouncerInteractorTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/AuthMethodBouncerViewModelTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/BouncerViewModelTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/PasswordBouncerViewModelTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/PatternBouncerViewModelTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/PinBouncerViewModelTest.kt",
+        "tests/src/com/android/systemui/bouncer/ui/viewmodel/PinInputViewModelTest.kt",
+
+        /* Lockscreen scene */
+        "tests/src/com/android/systemui/keyguard/ui/viewmodel/LockscreenSceneViewModelTest.kt",
+
+        /* Shade scene */
+        "tests/src/com/android/systemui/shade/ui/viewmodel/ShadeSceneViewModelTest.kt",
+        "tests/src/com/android/systemui/shade/ui/viewmodel/ShadeHeaderViewModelTest.kt",
+
+        /* Quick Settings scene */
+        "tests/src/com/android/systemui/qs/ui/viewmodel/QuickSettingsSceneViewModelTest.kt",
+
+        /* Flexiglass / Scene framework tests */
+        "tests/src/com/android/systemui/scene/SceneFrameworkIntegrationTest.kt",
+        "tests/src/com/android/systemui/scene/data/repository/SceneContainerRepositoryTest.kt",
+        "tests/src/com/android/systemui/scene/data/repository/WindowRootViewVisibilityRepositoryTest.kt",
+        "tests/src/com/android/systemui/scene/domain/interactor/SceneInteractorTest.kt",
+        "tests/src/com/android/systemui/scene/domain/interactor/WindowRootViewVisibilityInteractorTest.kt",
+        "tests/src/com/android/systemui/scene/domain/startable/SceneContainerStartableTest.kt",
+        "tests/src/com/android/systemui/scene/ui/viewmodel/SceneContainerViewModelTest.kt",
     ],
     path: "tests/src",
 }
@@ -435,7 +475,7 @@ android_library {
         "hamcrest-library",
         "androidx.test.rules",
         "testables",
-        "truth-prebuilt",
+        "truth",
         "monet",
         "libmonet",
         "dagger2",
@@ -554,7 +594,7 @@ android_robolectric_test {
         "android.test.runner",
         "android.test.base",
         "android.test.mock",
-        "truth-prebuilt",
+        "truth",
     ],
 
     upstream: true,
