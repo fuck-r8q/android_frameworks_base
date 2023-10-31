@@ -18192,12 +18192,16 @@ package android.hardware {
     field public static final int D_16 = 48; // 0x30
     field public static final int D_24 = 49; // 0x31
     field public static final int D_FP32 = 51; // 0x33
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RGBA_10101010 = 59; // 0x3b
     field public static final int RGBA_1010102 = 43; // 0x2b
     field public static final int RGBA_8888 = 1; // 0x1
     field public static final int RGBA_FP16 = 22; // 0x16
     field public static final int RGBX_8888 = 2; // 0x2
     field public static final int RGB_565 = 4; // 0x4
     field public static final int RGB_888 = 3; // 0x3
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RG_1616_UINT = 58; // 0x3a
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_16_UINT = 57; // 0x39
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_8 = 56; // 0x38
     field public static final int S_UI8 = 53; // 0x35
     field public static final long USAGE_COMPOSER_OVERLAY = 2048L; // 0x800L
     field public static final long USAGE_CPU_READ_OFTEN = 3L; // 0x3L
@@ -28487,6 +28491,7 @@ package android.net.vcn {
     method @NonNull public long[] getRetryIntervalsMillis();
     method @NonNull public java.util.List<android.net.vcn.VcnUnderlyingNetworkTemplate> getVcnUnderlyingNetworkPriorities();
     method public boolean hasGatewayOption(int);
+    method @FlaggedApi("android.net.vcn.safe_mode_config") public boolean isSafeModeEnabled();
     field public static final int VCN_GATEWAY_OPTION_ENABLE_DATA_STALL_RECOVERY_WITH_MOBILITY = 0; // 0x0
   }
 
@@ -28495,6 +28500,7 @@ package android.net.vcn {
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig build();
+    method @FlaggedApi("android.net.vcn.safe_mode_config") @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder enableSafeMode(boolean);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setMaxMtu(@IntRange(from=0x500) int);
@@ -51147,6 +51153,7 @@ package android.view {
     method public void clear();
     method public void copyFrom(android.view.MotionEvent.PointerCoords);
     method public float getAxisValue(int);
+    method @FlaggedApi("com.android.hardware.input.pointer_coords_is_resampled_api") public boolean isResampled();
     method public void setAxisValue(int, float);
     field public float orientation;
     field public float pressure;
