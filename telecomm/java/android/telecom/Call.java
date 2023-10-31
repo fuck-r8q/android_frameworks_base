@@ -942,6 +942,7 @@ public final class Call {
          * @return the Telecom identifier associated with this {@link Call} . This is not a stable
          * identifier and is not guaranteed to be unique across device reboots.
          */
+        @FlaggedApi(Flags.FLAG_CALL_DETAILS_ID_CHANGES)
         public @NonNull String getId() { return mTelecomCallId; }
 
         /** {@hide} */
@@ -1894,7 +1895,7 @@ public final class Call {
      * Tones are both played locally for the user to hear and sent to the network to be relayed
      * to the remote device.
      * <p>
-     * You must ensure that any call to {@link #playDtmfTone(char}) is followed by a matching
+     * You must ensure that any call to {@link #playDtmfTone(char)} is followed by a matching
      * call to {@link #stopDtmfTone()} and that each tone is stopped before a new one is started.
      * The play and stop commands are relayed to the underlying
      * {@link android.telecom.ConnectionService} as executed; implementations may not correctly

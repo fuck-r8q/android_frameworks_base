@@ -91,7 +91,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.server.am.PendingIntentRecord.FLAG_ACTIVITY_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_BROADCAST_SENDER;
 import static com.android.server.am.PendingIntentRecord.FLAG_SERVICE_SENDER;
-import static com.android.server.notification.NotificationManagerService.BITMAP_EXPIRATION_TIME_MS;
+import static com.android.server.notification.NotificationManagerService.BITMAP_DURATION;
 import static com.android.server.notification.NotificationManagerService.DEFAULT_MAX_NOTIFICATION_ENQUEUE_RATE;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_ADJUSTED;
 import static com.android.server.notification.NotificationRecordLogger.NotificationReportedEvent.NOTIFICATION_POSTED;
@@ -687,7 +687,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 mPackageIntentReceiver = broadcastReceivers.get(i);
             }
             if (filter.hasAction(Intent.ACTION_USER_SWITCHED)) {
-                mUserSwitchIntentReceiver = broadcastReceivers.get(i);
+                // There may be multiple receivers, get the NMS one
+                if (broadcastReceivers.get(i).toString().contains(
+                        NotificationManagerService.class.getName())) {
+                    mUserSwitchIntentReceiver = broadcastReceivers.get(i);
+                }
             }
         }
         assertNotNull("package intent receiver should exist", mPackageIntentReceiver);
@@ -11381,7 +11385,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         long timePostedMs = System.currentTimeMillis();
         if (isExpired) {
-            timePostedMs -= BITMAP_EXPIRATION_TIME_MS;
+            timePostedMs -= BITMAP_DURATION.toMillis();
         }
         StatusBarNotification sbn = new StatusBarNotification(PKG, PKG, 8, "tag", mUid, 0,
                 notification, UserHandle.getUserHandleForUid(mUid), null, timePostedMs);

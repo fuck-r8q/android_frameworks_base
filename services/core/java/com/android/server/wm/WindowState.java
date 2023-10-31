@@ -179,6 +179,7 @@ import static com.android.server.wm.WindowStateProto.UNRESTRICTED_KEEP_CLEAR_ARE
 import static com.android.server.wm.WindowStateProto.VIEW_VISIBILITY;
 import static com.android.server.wm.WindowStateProto.WINDOW_CONTAINER;
 import static com.android.server.wm.WindowStateProto.WINDOW_FRAMES;
+import static com.android.window.flags.Flags.surfaceTrustedOverlay;
 
 import android.annotation.CallSuper;
 import android.annotation.NonNull;
@@ -186,6 +187,7 @@ import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
 import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyCache;
+import android.app.servertransaction.WindowStateResizeItem;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Matrix;
@@ -1117,7 +1119,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mInputWindowHandle.setName(getName());
         mInputWindowHandle.setPackageName(mAttrs.packageName);
         mInputWindowHandle.setLayoutParamsType(mAttrs.type);
-        mInputWindowHandle.setTrustedOverlay(shouldWindowHandleBeTrusted(s));
+        if (!surfaceTrustedOverlay()) {
+            mInputWindowHandle.setTrustedOverlay(isWindowTrustedOverlay());
+        }
         if (DEBUG) {
             Slog.v(TAG, "Window " + this + " client=" + c.asBinder()
                             + " token=" + token + " (" + mAttrs.token + ")" + " params=" + a);
@@ -1192,12 +1196,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
-    boolean shouldWindowHandleBeTrusted(Session s) {
+    public boolean isWindowTrustedOverlay() {
         return InputMonitor.isTrustedOverlay(mAttrs.type)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
-                        && s.mCanAddInternalSystemWindow)
+                        && mSession.mCanAddInternalSystemWindow)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                        && s.mCanCreateSystemApplicationOverlay);
+                        && mSession.mCanCreateSystemApplicationOverlay);
     }
 
     int getTouchOcclusionMode() {
@@ -3736,28 +3740,42 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
         markRedrawForSyncReported();
 
-        try {
-            mClient.resized(mClientWindowFrames, reportDraw, mLastReportedConfiguration,
-                    getCompatInsetsState(), forceRelayout, alwaysConsumeSystemBars, displayId,
-                    syncWithBuffers ? mSyncSeqId : -1, isDragResizing);
-            if (drawPending && prevRotation >= 0 && prevRotation != mLastReportedConfiguration
-                    .getMergedConfiguration().windowConfiguration.getRotation()) {
-                mOrientationChangeRedrawRequestTime = SystemClock.elapsedRealtime();
-                ProtoLog.v(WM_DEBUG_ORIENTATION,
-                        "Requested redraw for orientation change: %s", this);
+        if (mWmService.mFlags.mWindowStateResizeItemFlag) {
+            getProcess().scheduleClientTransactionItem(
+                    WindowStateResizeItem.obtain(mClient, mClientWindowFrames, reportDraw,
+                            mLastReportedConfiguration, getCompatInsetsState(), forceRelayout,
+                            alwaysConsumeSystemBars, displayId,
+                            syncWithBuffers ? mSyncSeqId : -1, isDragResizing));
+            onResizePostDispatched(drawPending, prevRotation, displayId);
+        } else {
+            // TODO(b/301870955): cleanup after launch
+            try {
+                mClient.resized(mClientWindowFrames, reportDraw, mLastReportedConfiguration,
+                        getCompatInsetsState(), forceRelayout, alwaysConsumeSystemBars, displayId,
+                        syncWithBuffers ? mSyncSeqId : -1, isDragResizing);
+                onResizePostDispatched(drawPending, prevRotation, displayId);
+            } catch (RemoteException e) {
+                // Cancel orientation change of this window to avoid blocking unfreeze display.
+                setOrientationChanging(false);
+                mLastFreezeDuration = (int) (SystemClock.elapsedRealtime()
+                        - mWmService.mDisplayFreezeTime);
+                Slog.w(TAG, "Failed to report 'resized' to " + this + " due to " + e);
             }
-
-            if (mWmService.mAccessibilityController.hasCallbacks()) {
-                mWmService.mAccessibilityController.onSomeWindowResizedOrMoved(displayId);
-            }
-        } catch (RemoteException e) {
-            // Cancel orientation change of this window to avoid blocking unfreeze display.
-            setOrientationChanging(false);
-            mLastFreezeDuration = (int)(SystemClock.elapsedRealtime()
-                    - mWmService.mDisplayFreezeTime);
-            Slog.w(TAG, "Failed to report 'resized' to " + this + " due to " + e);
         }
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+    }
+
+    private void onResizePostDispatched(boolean drawPending, int prevRotation, int displayId) {
+        if (drawPending && prevRotation >= 0 && prevRotation != mLastReportedConfiguration
+                .getMergedConfiguration().windowConfiguration.getRotation()) {
+            mOrientationChangeRedrawRequestTime = SystemClock.elapsedRealtime();
+            ProtoLog.v(WM_DEBUG_ORIENTATION,
+                    "Requested redraw for orientation change: %s", this);
+        }
+
+        if (mWmService.mAccessibilityController.hasCallbacks()) {
+            mWmService.mAccessibilityController.onSomeWindowResizedOrMoved(displayId);
+        }
     }
 
     boolean inRelaunchingActivity() {
@@ -5194,6 +5212,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             updateFrameRateSelectionPriorityIfNeeded();
             updateScaleIfNeeded();
             mWinAnimator.prepareSurfaceLocked(getSyncTransaction());
+            if (surfaceTrustedOverlay()) {
+                getSyncTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
+            }
         }
         super.prepareSurfaces();
     }
@@ -5946,7 +5967,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     boolean isTrustedOverlay() {
-        return mInputWindowHandle.isTrustedOverlay();
+        if (surfaceTrustedOverlay()) {
+            WindowState parentWindow = getParentWindow();
+            return isWindowTrustedOverlay() || (parentWindow != null
+                    && parentWindow.isWindowTrustedOverlay());
+        } else {
+            return mInputWindowHandle.isTrustedOverlay();
+        }
     }
 
     public boolean receiveFocusFromTapOutside() {

@@ -185,7 +185,8 @@ public abstract class ContentCaptureSession implements AutoCloseable {
     public static final int FLUSH_REASON_LOGIN_DETECTED = 11;
 
     /**
-     * After {@link UPSIDE_DOWN_CAKE}, {@link #notifyViewsDisappeared(AutofillId, long[])} wraps
+     * After {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE},
+     * {@link #notifyViewsDisappeared(AutofillId, long[])} wraps
      * the virtual children with a pair of view tree appearing and view tree appeared events.
      */
     @ChangeId

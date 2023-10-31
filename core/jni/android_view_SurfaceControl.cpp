@@ -127,6 +127,7 @@ static struct {
     jfieldID xDpi;
     jfieldID yDpi;
     jfieldID refreshRate;
+    jfieldID vsyncRate;
     jfieldID appVsyncOffsetNanos;
     jfieldID presentationDeadlineNanos;
     jfieldID group;
@@ -469,9 +470,10 @@ static void nativeSetDefaultBufferSize(JNIEnv* env, jclass clazz, jlong nativeOb
     }
 }
 
-static void nativeApplyTransaction(JNIEnv* env, jclass clazz, jlong transactionObj, jboolean sync) {
+static void nativeApplyTransaction(JNIEnv* env, jclass clazz, jlong transactionObj, jboolean sync,
+                                   jboolean oneWay) {
     auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
-    transaction->apply(sync);
+    transaction->apply(sync, oneWay);
 }
 
 static void nativeMergeTransaction(JNIEnv* env, jclass clazz,
@@ -961,10 +963,11 @@ static void nativeSetDefaultFrameRateCompatibility(JNIEnv* env, jclass clazz, jl
 }
 
 static void nativeSetFrameRateCategory(JNIEnv* env, jclass clazz, jlong transactionObj,
-                                       jlong nativeObject, jint category) {
+                                       jlong nativeObject, jint category,
+                                       jboolean smoothSwitchOnly) {
     auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
     const auto ctrl = reinterpret_cast<SurfaceControl*>(nativeObject);
-    transaction->setFrameRateCategory(ctrl, static_cast<int8_t>(category));
+    transaction->setFrameRateCategory(ctrl, static_cast<int8_t>(category), smoothSwitchOnly);
 }
 
 static void nativeSetFrameRateSelectionStrategy(JNIEnv* env, jclass clazz, jlong transactionObj,
@@ -1230,6 +1233,7 @@ static jobject convertDisplayModeToJavaObject(JNIEnv* env, const ui::DisplayMode
     env->SetFloatField(object, gDisplayModeClassInfo.yDpi, config.yDpi);
 
     env->SetFloatField(object, gDisplayModeClassInfo.refreshRate, config.refreshRate);
+    env->SetFloatField(object, gDisplayModeClassInfo.vsyncRate, config.vsyncRate);
     env->SetLongField(object, gDisplayModeClassInfo.appVsyncOffsetNanos, config.appVsyncOffset);
     env->SetLongField(object, gDisplayModeClassInfo.presentationDeadlineNanos,
                       config.presentationDeadline);
@@ -2119,7 +2123,7 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*)nativeSetDefaultBufferSize},
     {"nativeCreateTransaction", "()J",
             (void*)nativeCreateTransaction },
-    {"nativeApplyTransaction", "(JZ)V",
+    {"nativeApplyTransaction", "(JZZ)V",
             (void*)nativeApplyTransaction },
     {"nativeGetNativeTransactionFinalizer", "()J",
             (void*)nativeGetNativeTransactionFinalizer },
@@ -2178,7 +2182,7 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*)nativeSetFrameRate },
     {"nativeSetDefaultFrameRateCompatibility", "(JJI)V",
             (void*)nativeSetDefaultFrameRateCompatibility},
-    {"nativeSetFrameRateCategory", "(JJI)V",
+    {"nativeSetFrameRateCategory", "(JJIZ)V",
             (void*)nativeSetFrameRateCategory},
     {"nativeSetFrameRateSelectionStrategy", "(JJI)V",
             (void*)nativeSetFrameRateSelectionStrategy},
@@ -2393,6 +2397,7 @@ int register_android_view_SurfaceControl(JNIEnv* env)
     gDisplayModeClassInfo.xDpi = GetFieldIDOrDie(env, modeClazz, "xDpi", "F");
     gDisplayModeClassInfo.yDpi = GetFieldIDOrDie(env, modeClazz, "yDpi", "F");
     gDisplayModeClassInfo.refreshRate = GetFieldIDOrDie(env, modeClazz, "refreshRate", "F");
+    gDisplayModeClassInfo.vsyncRate = GetFieldIDOrDie(env, modeClazz, "vsyncRate", "F");
     gDisplayModeClassInfo.appVsyncOffsetNanos =
             GetFieldIDOrDie(env, modeClazz, "appVsyncOffsetNanos", "J");
     gDisplayModeClassInfo.presentationDeadlineNanos =

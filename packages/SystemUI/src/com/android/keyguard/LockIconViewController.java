@@ -29,6 +29,7 @@ import static com.android.systemui.flags.Flags.NEW_AOD_TRANSITION;
 import static com.android.systemui.flags.Flags.ONE_WAY_HAPTICS_API_MIGRATION;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -57,11 +58,11 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
 import com.android.systemui.Dumpable;
-import com.android.systemui.res.R;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.AuthRippleController;
 import com.android.systemui.biometrics.UdfpsController;
 import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
+import com.android.systemui.bouncer.domain.interactor.BouncerInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -73,11 +74,15 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInterac
 import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
+import com.android.systemui.res.R;
+import com.android.systemui.scene.shared.flag.SceneContainerFlags;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
+
+import dagger.Lazy;
 
 import java.io.PrintWriter;
 import java.util.Objects;
@@ -127,6 +132,8 @@ public class LockIconViewController implements Dumpable {
     @NonNull private final KeyguardTransitionInteractor mTransitionInteractor;
     @NonNull private final KeyguardInteractor mKeyguardInteractor;
     @NonNull private final View.AccessibilityDelegate mAccessibilityDelegate;
+    @NonNull private final Lazy<BouncerInteractor> mBouncerInteractor;
+    @NonNull private final SceneContainerFlags mSceneContainerFlags;
 
     // Tracks the velocity of a touch to help filter out the touches that move too fast.
     private VelocityTracker mVelocityTracker;
@@ -203,7 +210,9 @@ public class LockIconViewController implements Dumpable {
             @NonNull KeyguardInteractor keyguardInteractor,
             @NonNull FeatureFlags featureFlags,
             PrimaryBouncerInteractor primaryBouncerInteractor,
-            Context context
+            Context context,
+            Lazy<BouncerInteractor> bouncerInteractor,
+            SceneContainerFlags sceneContainerFlags
     ) {
         mStatusBarStateController = statusBarStateController;
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
@@ -232,6 +241,8 @@ public class LockIconViewController implements Dumpable {
         dumpManager.registerDumpable(TAG, this);
         mResources = resources;
         mContext = context;
+        mBouncerInteractor = bouncerInteractor;
+        mSceneContainerFlags = sceneContainerFlags;
 
         mAccessibilityDelegate = new View.AccessibilityDelegate() {
             private final AccessibilityNodeInfo.AccessibilityAction mAccessibilityAuthenticateHint =
@@ -256,6 +267,7 @@ public class LockIconViewController implements Dumpable {
     }
 
     /** Sets the LockIconView to the controller and rebinds any that depend on it. */
+    @SuppressLint("ClickableViewAccessibility")
     public void setLockIconView(LockIconView lockIconView) {
         mView = lockIconView;
         mView.setImageDrawable(mIcon);
@@ -305,6 +317,8 @@ public class LockIconViewController implements Dumpable {
         if (lockIconView.isAttachedToWindow()) {
             registerCallbacks();
         }
+
+        lockIconView.setOnTouchListener((view, motionEvent) -> onTouchEvent(motionEvent));
     }
 
     private void registerCallbacks() {
@@ -635,19 +649,18 @@ public class LockIconViewController implements Dumpable {
     };
 
     /**
-     * Handles the touch if it is within the lock icon view and {@link #isActionable()} is true.
+     * Handles the touch if {@link #isActionable()} is true.
      * Subsequently, will trigger {@link #onLongPress()} if a touch is continuously in the lock icon
      * area for {@link #mLongPressTimeout} ms.
      *
      * Touch speed debouncing mimics logic from the velocity tracker in {@link UdfpsController}.
      */
-    public boolean onTouchEvent(MotionEvent event, Runnable onGestureDetectedRunnable) {
-        if (!onInterceptTouchEvent(event)) {
+    private boolean onTouchEvent(MotionEvent event) {
+        if (!actionableDownEventStartedOnView(event)) {
             cancelTouches();
             return false;
         }
 
-        mOnGestureDetectedRunnable = onGestureDetectedRunnable;
         switch(event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_HOVER_ENTER:
@@ -679,10 +692,10 @@ public class LockIconViewController implements Dumpable {
                 mVelocityTracker.addMovement(event);
                 // Compute pointer velocity in pixels per second.
                 mVelocityTracker.computeCurrentVelocity(1000);
-                float velocity = UdfpsController.computePointerSpeed(mVelocityTracker,
+                float velocity = computePointerSpeed(mVelocityTracker,
                         mActivePointerId);
                 if (event.getClassification() != MotionEvent.CLASSIFICATION_DEEP_PRESS
-                        && UdfpsController.exceedsVelocityThreshold(velocity)) {
+                        && exceedsVelocityThreshold(velocity)) {
                     Log.v(TAG, "lock icon long-press rescheduled due to "
                             + "high pointer velocity=" + velocity);
                     mLongPressCancelRunnable.run();
@@ -701,11 +714,24 @@ public class LockIconViewController implements Dumpable {
     }
 
     /**
-     * Intercepts the touch if the onDown event and current event are within this lock icon view's
-     * bounds.
+     * Calculate the pointer speed given a velocity tracker and the pointer id.
+     * This assumes that the velocity tracker has already been passed all relevant motion events.
      */
-    public boolean onInterceptTouchEvent(MotionEvent event) {
-        if (!inLockIconArea(event) || !isActionable()) {
+    private static float computePointerSpeed(@NonNull VelocityTracker tracker, int pointerId) {
+        final float vx = tracker.getXVelocity(pointerId);
+        final float vy = tracker.getYVelocity(pointerId);
+        return (float) Math.sqrt(Math.pow(vx, 2.0) + Math.pow(vy, 2.0));
+    }
+
+    /**
+     * Whether the velocity exceeds the acceptable UDFPS debouncing threshold.
+     */
+    private static boolean exceedsVelocityThreshold(float velocity) {
+        return velocity > 750f;
+    }
+
+    private boolean actionableDownEventStartedOnView(MotionEvent event) {
+        if (!isActionable()) {
             return false;
         }
 
@@ -716,7 +742,8 @@ public class LockIconViewController implements Dumpable {
         return mDownDetected;
     }
 
-    private void onLongPress() {
+    @VisibleForTesting
+    protected void onLongPress() {
         cancelTouches();
         if (mFalsingManager.isFalseLongTap(FalsingManager.LOW_PENALTY)) {
             Log.v(TAG, "lock icon long-press rejected by the falsing manager.");
@@ -729,14 +756,15 @@ public class LockIconViewController implements Dumpable {
             mAuthRippleController.showUnlockRipple(FINGERPRINT);
         }
         updateVisibility();
-        if (mOnGestureDetectedRunnable != null) {
-            mOnGestureDetectedRunnable.run();
-        }
 
         // play device entry haptic (consistent with UDFPS controller longpress)
         vibrateOnLongPress();
 
-        mKeyguardViewController.showPrimaryBouncer(/* scrim */ true);
+        if (mSceneContainerFlags.isEnabled()) {
+            mBouncerInteractor.get().showOrUnlockDevice(null);
+        } else {
+            mKeyguardViewController.showPrimaryBouncer(/* scrim */ true);
+        }
     }
 
 
@@ -749,12 +777,6 @@ public class LockIconViewController implements Dumpable {
             mVelocityTracker.recycle();
             mVelocityTracker = null;
         }
-    }
-
-    private boolean inLockIconArea(MotionEvent event) {
-        mView.getHitRect(mSensorTouchLocation);
-        return mSensorTouchLocation.contains((int) event.getX(), (int) event.getY())
-                && mView.getVisibility() == View.VISIBLE;
     }
 
     private boolean isActionable() {
@@ -833,6 +855,19 @@ public class LockIconViewController implements Dumpable {
             updateUdfpsConfig();
         }
     };
+
+    /**
+     * Whether the lock icon will handle a touch while dozing.
+     */
+    public boolean willHandleTouchWhileDozing(MotionEvent event) {
+        // is in lock icon area
+        mView.getHitRect(mSensorTouchLocation);
+        final boolean inLockIconArea =
+                mSensorTouchLocation.contains((int) event.getX(), (int) event.getY())
+                        && mView.getVisibility() == View.VISIBLE;
+
+        return inLockIconArea && actionableDownEventStartedOnView(event);
+    }
 
     private final View.OnClickListener mA11yClickListener = v -> onLongPress();
 

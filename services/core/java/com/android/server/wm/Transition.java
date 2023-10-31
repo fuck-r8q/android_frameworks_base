@@ -381,8 +381,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             parent.forAllTasks(t -> {
                 // Skip transient-launch task
                 if (t == transientRootTask) return false;
-                if (t.isVisibleRequested() && !t.isAlwaysOnTop()
-                        && !t.getWindowConfiguration().tasksAreFloating()) {
+                if (t.isVisibleRequested() && !t.isAlwaysOnTop()) {
                     if (t.isRootTask()) {
                         mTransientHideTasks.add(t);
                     }
@@ -719,6 +718,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (dc == null || mTargetDisplays.contains(dc)) return;
         mTargetDisplays.add(dc);
         addOnTopTasks(dc, mOnTopTasksStart);
+        mController.startPerfHintForDisplay(dc.mDisplayId);
     }
 
     /**
@@ -1212,7 +1212,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS,
                                 "  Commit activity becoming invisible: %s", ar);
                         final SnapshotController snapController = mController.mSnapshotController;
-                        if (mTransientLaunches != null && !task.isVisibleRequested()) {
+                        if (mTransientLaunches != null && !task.isVisibleRequested()
+                                && !task.isActivityTypeHome()) {
                             final long startTimeNs = mLogger.mSendTimeNs;
                             final long lastSnapshotTimeNs = snapController.mTaskSnapshotController
                                     .getSnapshotCaptureTime(task.mTaskId);
@@ -1220,8 +1221,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                             // transition only if a snapshot was not already captured by request
                             // during the transition
                             if (lastSnapshotTimeNs < startTimeNs) {
-                                snapController.mTaskSnapshotController
-                                        .recordSnapshot(task, false /* allowSnapshotHome */);
+                                snapController.mTaskSnapshotController.recordSnapshot(task);
                             } else {
                                 ProtoLog.v(ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS,
                                         "  Skipping post-transition snapshot for task %d",
@@ -1407,7 +1407,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             dc.handleCompleteDeferredRemoval();
         }
         validateKeyguardOcclusion();
-        validateVisibility();
 
         mState = STATE_FINISHED;
         if (mPerf != null && mIsAnimationPerfLockAcquired) {
@@ -2784,29 +2783,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mController.mStateValidators.add(
                 mController.mAtm.mWindowManager.mPolicy::applyKeyguardOcclusionChange);
         }
-    }
-
-    private void validateVisibility() {
-        for (int i = mTargets.size() - 1; i >= 0; --i) {
-            if (reduceMode(mTargets.get(i).mReadyMode) != TRANSIT_CLOSE) {
-                return;
-            }
-        }
-        // All modes are CLOSE. The surfaces may be hidden by the animation unexpectedly.
-        // If the window container should be visible, then recover it.
-        mController.mStateValidators.add(() -> {
-            for (int i = mTargets.size() - 1; i >= 0; --i) {
-                final ChangeInfo change = mTargets.get(i);
-                if (!change.mContainer.isVisibleRequested()
-                        || change.mContainer.mSurfaceControl == null) {
-                    continue;
-                }
-                Slog.e(TAG, "Force show for visible " + change.mContainer
-                        + " which may be hidden by transition unexpectedly");
-                change.mContainer.getSyncTransaction().show(change.mContainer.mSurfaceControl);
-                change.mContainer.scheduleAnimation();
-            }
-        });
     }
 
     /**

@@ -62,6 +62,7 @@ import android.window.PictureInPictureSurfaceTransaction;
 import android.window.TaskSnapshot;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.os.IResultReceiver;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.server.LocalServices;
 import com.android.server.inputmethod.InputMethodManagerInternal;
@@ -244,7 +245,8 @@ public class RecentsAnimationController implements DeathRecipient {
         }
 
         @Override
-        public void finish(boolean moveHomeToTop, boolean sendUserLeaveHint) {
+        public void finish(boolean moveHomeToTop, boolean sendUserLeaveHint,
+                IResultReceiver finishCb) {
             ProtoLog.d(WM_DEBUG_RECENTS_ANIMATIONS,
                     "finish(%b): mCanceled=%b", moveHomeToTop, mCanceled);
             final long token = Binder.clearCallingIdentity();
@@ -256,6 +258,13 @@ public class RecentsAnimationController implements DeathRecipient {
                         : REORDER_MOVE_TO_ORIGINAL_POSITION, sendUserLeaveHint);
             } finally {
                 Binder.restoreCallingIdentity(token);
+            }
+            if (finishCb != null) {
+                try {
+                    finishCb.send(0, new Bundle());
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to report animation finished", e);
+                }
             }
         }
 
@@ -901,7 +910,8 @@ public class RecentsAnimationController implements DeathRecipient {
         for (int i = mPendingAnimations.size() - 1; i >= 0; i--) {
             final TaskAnimationAdapter adapter = mPendingAnimations.get(i);
             final Task task = adapter.mTask;
-            snapshotController.recordSnapshot(task, false /* allowSnapshotHome */);
+            if (task.isActivityTypeHome()) continue;
+            snapshotController.recordSnapshot(task);
             final TaskSnapshot snapshot = snapshotController.getSnapshot(task.mTaskId, task.mUserId,
                     false /* restoreFromDisk */, false /* isLowResolution */);
             if (snapshot != null) {

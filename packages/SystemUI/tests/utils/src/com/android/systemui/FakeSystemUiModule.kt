@@ -15,21 +15,29 @@
  */
 package com.android.systemui
 
+import com.android.systemui.classifier.FakeClassifierModule
 import com.android.systemui.data.FakeSystemUiDataLayerModule
 import com.android.systemui.flags.FakeFeatureFlagsClassicModule
 import com.android.systemui.log.FakeUiEventLoggerModule
 import com.android.systemui.scene.FakeSceneModule
 import com.android.systemui.settings.FakeSettingsModule
+import com.android.systemui.statusbar.policy.FakeConfigurationControllerModule
+import com.android.systemui.statusbar.policy.FakeSplitShadeStateControllerModule
 import com.android.systemui.util.concurrency.FakeExecutorModule
+import com.android.systemui.util.time.FakeSystemClockModule
 import dagger.Module
 
 @Module(
     includes =
         [
+            FakeClassifierModule::class,
+            FakeConfigurationControllerModule::class,
             FakeExecutorModule::class,
             FakeFeatureFlagsClassicModule::class,
-            FakeSettingsModule::class,
             FakeSceneModule::class,
+            FakeSettingsModule::class,
+            FakeSplitShadeStateControllerModule::class,
+            FakeSystemClockModule::class,
             FakeSystemUiDataLayerModule::class,
             FakeUiEventLoggerModule::class,
         ]

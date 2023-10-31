@@ -98,6 +98,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.OomKillRecord;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteCallbackList;
@@ -413,6 +414,8 @@ public final class ProcessList {
     private boolean mHaveDisplaySize;
 
     private static LmkdConnection sLmkdConnection = null;
+
+    private static OomConnection sOomConnection = null;
 
     private boolean mOomLevelsSet = false;
 
@@ -862,6 +865,21 @@ public final class ProcessList {
                     THREAD_PRIORITY_BACKGROUND, true /* allowIo */);
             sKillThread.start();
             sKillHandler = new KillHandler(sKillThread.getLooper());
+            sOomConnection = new OomConnection(new OomConnection.OomConnectionListener() {
+                @Override
+                public void handleOomEvent(OomKillRecord[] oomKills) {
+                    for (OomKillRecord oomKill: oomKills) {
+                        synchronized (mProcLock) {
+                            noteAppKill(
+                                oomKill.getPid(),
+                                oomKill.getUid(),
+                                ApplicationExitInfo.REASON_LOW_MEMORY,
+                                ApplicationExitInfo.SUBREASON_OOM_KILL,
+                                "oom");
+                        }
+                    }
+                }
+            });
             sLmkdConnection = new LmkdConnection(sKillThread.getLooper().getQueue(),
                     new LmkdConnection.LmkdConnectionListener() {
                         @Override
@@ -1428,7 +1446,7 @@ public final class ProcessList {
     }
 
     public static long computeNextPssTime(int procState, ProcStateMemTracker tracker, boolean test,
-            boolean sleeping, long now) {
+            boolean sleeping, long now, long earliest) {
         boolean first;
         float scalingFactor;
         final int memState = sProcStateToProcMem[procState];
@@ -1459,7 +1477,7 @@ public final class ProcessList {
         if (delay > PSS_MAX_INTERVAL) {
             delay = PSS_MAX_INTERVAL;
         }
-        return now + delay;
+        return Math.max(now + delay, earliest);
     }
 
     long getMemLevel(int adjustment) {

@@ -2,8 +2,7 @@ aconfig_declarations {
     name: "com_android_systemui_flags",
     package: "com.android.systemui",
     srcs: [
-        "systemui.aconfig",
-        "accessibility.aconfig",
+        "*.aconfig",
     ],
 }
 

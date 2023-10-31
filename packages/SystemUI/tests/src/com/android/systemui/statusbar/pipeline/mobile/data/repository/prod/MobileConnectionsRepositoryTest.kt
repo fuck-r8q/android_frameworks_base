@@ -183,6 +183,7 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
             MobileConnectionRepositoryImpl.Factory(
                 context,
                 fakeBroadcastDispatcher,
+                connectivityManager,
                 telephonyManager = telephonyManager,
                 bgDispatcher = dispatcher,
                 logger = logger,
@@ -190,7 +191,6 @@ class MobileConnectionsRepositoryTest : SysuiTestCase() {
                 scope = testScope.backgroundScope,
                 carrierConfigRepository = carrierConfigRepository,
                 fiveGServiceClient = fiveGServiceClient,
-                connectivityManager = connectivityManager,
             )
         carrierMergedFactory =
             CarrierMergedConnectionRepository.Factory(

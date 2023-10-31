@@ -3887,11 +3887,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     return null;
                 }
                 if (updateCache) {
-                    return mWindowManager.mTaskSnapshotController.recordSnapshot(task,
-                            true /* snapshotHome */);
+                    return mWindowManager.mTaskSnapshotController.recordSnapshot(task);
                 } else {
-                    return mWindowManager.mTaskSnapshotController.captureSnapshot(task,
-                            true /* snapshotHome */);
+                    return mWindowManager.mTaskSnapshotController.captureSnapshot(task);
                 }
             }
         } finally {
@@ -6491,19 +6489,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (!restarting && hasVisibleActivities) {
                     deferWindowLayout();
                     try {
-                        final Task topTask = mRootWindowContainer.getTopDisplayFocusedRootTask();
-                        if (topTask != null
-                                && topTask.topRunningActivity(true /* focusableOnly */) == null) {
-                            topTask.adjustFocusToNextFocusableTask("handleAppDied");
-                        }
-                        if (!mRootWindowContainer.resumeFocusedTasksTopActivities()) {
-                            // If there was nothing to resume, and we are not already restarting
-                            // this process, but there is a visible activity that is hosted by the
-                            // process...then make sure all visible activities are running, taking
-                            // care of restarting this process.
-                            mRootWindowContainer.ensureActivitiesVisible(null, 0,
-                                    !PRESERVE_WINDOWS);
-                        }
+                        mRootWindowContainer.ensureVisibilityOnVisibleActivityDiedOrCrashed(
+                                "handleAppDied");
                     } finally {
                         continueWindowLayout();
                     }
@@ -6944,7 +6931,18 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public int finishTopCrashedActivities(WindowProcessController crashedApp, String reason) {
             synchronized (mGlobalLock) {
-                return mRootWindowContainer.finishTopCrashedActivities(crashedApp, reason);
+                deferWindowLayout();
+                try {
+                    final Task finishedTask = mRootWindowContainer.finishTopCrashedActivities(
+                            crashedApp, reason);
+                    if (finishedTask != null) {
+                        mRootWindowContainer.ensureVisibilityOnVisibleActivityDiedOrCrashed(reason);
+                        return finishedTask.mTaskId;
+                    }
+                    return INVALID_TASK_ID;
+                } finally {
+                    continueWindowLayout();
+                }
             }
         }
 

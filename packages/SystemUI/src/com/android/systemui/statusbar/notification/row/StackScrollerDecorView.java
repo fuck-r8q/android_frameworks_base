@@ -167,7 +167,7 @@ public abstract class StackScrollerDecorView extends ExpandableView {
     }
 
     @VisibleForTesting
-    boolean isSecondaryVisible() {
+    public boolean isSecondaryVisible() {
         return mIsSecondaryVisible;
     }
 
@@ -179,7 +179,8 @@ public abstract class StackScrollerDecorView extends ExpandableView {
         return mIsVisible;
     }
 
-    void setDuration(int duration) {
+    @VisibleForTesting
+    public void setDuration(int duration) {
         mDuration = duration;
     }
 
@@ -236,9 +237,13 @@ public abstract class StackScrollerDecorView extends ExpandableView {
     @Override
     public long performRemoveAnimation(long duration, long delay,
             float translationDirection, boolean isHeadsUpAnimation,
+            Runnable onStartedRunnable,
             Runnable onFinishedRunnable,
             AnimatorListenerAdapter animationListener) {
         // TODO: Use duration
+        if (onStartedRunnable != null) {
+            onStartedRunnable.run();
+        }
         setContentVisible(false, true /* animate */, (cancelled) -> onFinishedRunnable.run());
         return 0;
     }

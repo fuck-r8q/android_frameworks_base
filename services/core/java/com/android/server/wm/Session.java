@@ -560,6 +560,16 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     }
 
     @Override
+    public void reportDecorViewGestureInterceptionChanged(IWindow window, boolean intercepted) {
+        final long ident = Binder.clearCallingIdentity();
+        try {
+            mService.reportDecorViewGestureChanged(this, window, intercepted);
+        } finally {
+            Binder.restoreCallingIdentity(ident);
+        }
+    }
+
+    @Override
     public void reportKeepClearAreasChanged(IWindow window, List<Rect> restricted,
             List<Rect> unrestricted) {
         if (!mSetsUnrestrictedKeepClearAreas && !unrestricted.isEmpty()) {
@@ -884,8 +894,8 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     @Override
     public void grantInputChannel(int displayId, SurfaceControl surface,
             IWindow window, IBinder hostInputToken, int flags, int privateFlags, int type,
-            int inputFeatures, IBinder windowToken, IBinder focusGrantToken, String inputHandleName,
-            InputChannel outInputChannel) {
+            int inputFeatures, IBinder windowToken, IBinder inputTransferToken,
+            String inputHandleName, InputChannel outInputChannel) {
         if (hostInputToken == null && !mCanAddInternalSystemWindow) {
             // Callers without INTERNAL_SYSTEM_WINDOW permission cannot grant input channel to
             // embedded windows without providing a host window input token
@@ -896,7 +906,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         try {
             mService.grantInputChannel(this, mUid, mPid, displayId, surface, window, hostInputToken,
                     flags, mCanAddInternalSystemWindow ? privateFlags : 0,
-                    type, inputFeatures, windowToken, focusGrantToken, inputHandleName,
+                    type, inputFeatures, windowToken, inputTransferToken, inputHandleName,
                     outInputChannel);
         } finally {
             Binder.restoreCallingIdentity(identity);

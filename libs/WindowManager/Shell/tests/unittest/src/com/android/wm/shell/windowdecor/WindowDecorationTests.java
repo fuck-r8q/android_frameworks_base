@@ -17,11 +17,18 @@
 package com.android.wm.shell.windowdecor;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.view.WindowInsets.Type.captionBar;
+import static android.view.WindowInsets.Type.mandatorySystemGestures;
+import static android.view.WindowInsets.Type.statusBars;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.wm.shell.MockSurfaceControlHelper.createMockSurfaceControlBuilder;
 import static com.android.wm.shell.MockSurfaceControlHelper.createMockSurfaceControlTransaction;
 
 import static com.google.common.truth.Truth.assertThat;
+
+import static junit.framework.Assert.assertTrue;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -36,6 +43,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.quality.Strictness.LENIENT;
 
 import android.app.ActivityManager;
 import android.content.Context;
@@ -48,6 +56,7 @@ import android.testing.AndroidTestingRunner;
 import android.util.DisplayMetrics;
 import android.view.AttachedSurfaceControl;
 import android.view.Display;
+import android.view.InsetsState;
 import android.view.SurfaceControl;
 import android.view.SurfaceControlViewHost;
 import android.view.View;
@@ -59,10 +68,12 @@ import android.window.WindowContainerTransaction;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.TestRunningTaskInfoBuilder;
 import com.android.wm.shell.common.DisplayController;
+import com.android.wm.shell.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.tests.R;
 
 import org.junit.Before;
@@ -89,6 +100,7 @@ public class WindowDecorationTests extends ShellTestCase {
     private static final Rect TASK_BOUNDS = new Rect(100, 300, 400, 400);
     private static final Point TASK_POSITION_IN_PARENT = new Point(40, 60);
     private static final int CORNER_RADIUS = 20;
+    private static final int STATUS_BAR_INSET_SOURCE_ID = 0;
 
     private final WindowDecoration.RelayoutResult<TestView> mRelayoutResult =
             new WindowDecoration.RelayoutResult<>();
@@ -113,14 +125,13 @@ public class WindowDecorationTests extends ShellTestCase {
     private final List<SurfaceControl.Transaction> mMockSurfaceControlTransactions =
             new ArrayList<>();
     private final List<SurfaceControl.Builder> mMockSurfaceControlBuilders = new ArrayList<>();
+    private final InsetsState mInsetsState = new InsetsState();
     private SurfaceControl.Transaction mMockSurfaceControlStartT;
     private SurfaceControl.Transaction mMockSurfaceControlFinishT;
     private SurfaceControl.Transaction mMockSurfaceControlAddWindowT;
     private WindowDecoration.RelayoutParams mRelayoutParams = new WindowDecoration.RelayoutParams();
     private Configuration mWindowConfiguration = new Configuration();
     private int mCaptionMenuWidthId;
-    private int mCaptionMenuShadowRadiusId;
-    private int mCaptionMenuCornerRadiusId;
 
     @Before
     public void setUp() {
@@ -131,8 +142,6 @@ public class WindowDecorationTests extends ShellTestCase {
         mRelayoutParams.mLayoutResId = 0;
         mRelayoutParams.mCaptionHeightId = R.dimen.test_freeform_decor_caption_height;
         mCaptionMenuWidthId = R.dimen.test_freeform_decor_caption_menu_width;
-        mCaptionMenuShadowRadiusId = R.dimen.test_caption_menu_shadow_radius;
-        mCaptionMenuCornerRadiusId = R.dimen.test_caption_menu_corner_radius;
         mRelayoutParams.mShadowRadiusId = R.dimen.test_window_decor_shadow_radius;
         mRelayoutParams.mCornerRadius = CORNER_RADIUS;
 
@@ -140,6 +149,11 @@ public class WindowDecorationTests extends ShellTestCase {
                 .create(any(), any(), any());
         when(mMockSurfaceControlViewHost.getRootSurfaceControl())
                 .thenReturn(mMockRootSurfaceControl);
+        when(mMockView.findViewById(anyInt())).thenReturn(mMockView);
+
+        // Add status bar inset so that WindowDecoration does not think task is in immersive mode
+        mInsetsState.getOrCreateSource(STATUS_BAR_INSET_SOURCE_ID, statusBars()).setVisible(true);
+        doReturn(mInsetsState).when(mMockDisplayController).getInsetsState(anyInt());
     }
 
     @Test
@@ -205,12 +219,8 @@ public class WindowDecorationTests extends ShellTestCase {
                 createMockSurfaceControlBuilder(captionContainerSurface);
         mMockSurfaceControlBuilders.add(captionContainerSurfaceBuilder);
 
-        final ActivityManager.TaskDescription.Builder taskDescriptionBuilder =
-                new ActivityManager.TaskDescription.Builder()
-                        .setBackgroundColor(Color.YELLOW);
         final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
                 .setDisplayId(Display.DEFAULT_DISPLAY)
-                .setTaskDescriptionBuilder(taskDescriptionBuilder)
                 .setBounds(TASK_BOUNDS)
                 .setPositionInParent(TASK_POSITION_IN_PARENT.x, TASK_POSITION_IN_PARENT.y)
                 .setVisible(true)
@@ -259,8 +269,6 @@ public class WindowDecorationTests extends ShellTestCase {
         verify(mMockSurfaceControlFinishT).setCornerRadius(taskSurface, CORNER_RADIUS);
         verify(mMockSurfaceControlStartT)
                 .show(taskSurface);
-        verify(mMockSurfaceControlStartT)
-                .setColor(taskSurface, new float[] {1.f, 1.f, 0.f});
         verify(mMockSurfaceControlStartT).setShadowRadius(taskSurface, 10);
 
         assertEquals(300, mRelayoutResult.mWidth);
@@ -417,16 +425,6 @@ public class WindowDecorationTests extends ShellTestCase {
         final int height = WindowDecoration.loadDimensionPixelSize(
                 windowDecor.mDecorWindowContext.getResources(), mRelayoutParams.mCaptionHeightId);
         verify(mMockSurfaceControlAddWindowT).setWindowCrop(additionalWindowSurface, width, height);
-        final int shadowRadius = WindowDecoration.loadDimensionPixelSize(
-                windowDecor.mDecorWindowContext.getResources(),
-                mCaptionMenuShadowRadiusId);
-        verify(mMockSurfaceControlAddWindowT)
-                .setShadowRadius(additionalWindowSurface, shadowRadius);
-        final int cornerRadius = WindowDecoration.loadDimensionPixelSize(
-                windowDecor.mDecorWindowContext.getResources(),
-                mCaptionMenuCornerRadiusId);
-        verify(mMockSurfaceControlAddWindowT)
-                .setCornerRadius(additionalWindowSurface, cornerRadius);
         verify(mMockSurfaceControlAddWindowT).show(additionalWindowSurface);
         verify(mMockSurfaceControlViewHostFactory, Mockito.times(2))
                 .create(any(), eq(defaultDisplay), any());
@@ -516,6 +514,142 @@ public class WindowDecorationTests extends ShellTestCase {
         verify(mMockRootSurfaceControl).applyTransactionOnDraw(mMockSurfaceControlStartT);
     }
 
+    @Test
+    public void testRelayout_fluidResizeEnabled_freeformTask_setTaskSurfaceColor() {
+        StaticMockitoSession mockitoSession = mockitoSession().mockStatic(
+                DesktopModeStatus.class).strictness(
+                LENIENT).startMocking();
+        when(DesktopModeStatus.isVeiledResizeEnabled()).thenReturn(false);
+
+        final Display defaultDisplay = mock(Display.class);
+        doReturn(defaultDisplay).when(mMockDisplayController)
+                .getDisplay(Display.DEFAULT_DISPLAY);
+
+        final SurfaceControl decorContainerSurface = mock(SurfaceControl.class);
+        final SurfaceControl.Builder decorContainerSurfaceBuilder =
+                createMockSurfaceControlBuilder(decorContainerSurface);
+        mMockSurfaceControlBuilders.add(decorContainerSurfaceBuilder);
+        final SurfaceControl captionContainerSurface = mock(SurfaceControl.class);
+        final SurfaceControl.Builder captionContainerSurfaceBuilder =
+                createMockSurfaceControlBuilder(captionContainerSurface);
+        mMockSurfaceControlBuilders.add(captionContainerSurfaceBuilder);
+
+        final ActivityManager.TaskDescription.Builder taskDescriptionBuilder =
+                new ActivityManager.TaskDescription.Builder()
+                        .setBackgroundColor(Color.YELLOW);
+
+        final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(Display.DEFAULT_DISPLAY)
+                .setTaskDescriptionBuilder(taskDescriptionBuilder)
+                .setVisible(true)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                .build();
+        taskInfo.isFocused = true;
+        final SurfaceControl taskSurface = mock(SurfaceControl.class);
+        final TestWindowDecoration windowDecor = createWindowDecoration(taskInfo, taskSurface);
+
+        windowDecor.relayout(taskInfo);
+
+        verify(mMockSurfaceControlStartT).setColor(taskSurface, new float[]{1.f, 1.f, 0.f});
+
+        mockitoSession.finishMocking();
+    }
+
+    @Test
+    public void testInsetsAddedWhenCaptionIsVisible() {
+        final Display defaultDisplay = mock(Display.class);
+        doReturn(defaultDisplay).when(mMockDisplayController)
+                .getDisplay(Display.DEFAULT_DISPLAY);
+
+        final ActivityManager.TaskDescription.Builder taskDescriptionBuilder =
+                new ActivityManager.TaskDescription.Builder();
+        final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(Display.DEFAULT_DISPLAY)
+                .setTaskDescriptionBuilder(taskDescriptionBuilder)
+                .setVisible(true)
+                .build();
+        final SurfaceControl taskSurface = mock(SurfaceControl.class);
+        final TestWindowDecoration windowDecor = createWindowDecoration(taskInfo, taskSurface);
+
+        assertTrue(mInsetsState.getOrCreateSource(STATUS_BAR_INSET_SOURCE_ID, statusBars())
+                .isVisible());
+        assertTrue(mInsetsState.sourceSize() == 1);
+        assertTrue(mInsetsState.sourceAt(0).getType() == statusBars());
+
+        windowDecor.relayout(taskInfo);
+
+        verify(mMockWindowContainerTransaction).addInsetsSource(eq(taskInfo.token), any(),
+                eq(0) /* index */, eq(captionBar()), any());
+        verify(mMockWindowContainerTransaction).addInsetsSource(eq(taskInfo.token), any(),
+                eq(0) /* index */, eq(mandatorySystemGestures()), any());
+    }
+
+    @Test
+    public void testRelayout_fluidResizeEnabled_fullscreenTask_clearTaskSurfaceColor() {
+        StaticMockitoSession mockitoSession = mockitoSession().mockStatic(
+                DesktopModeStatus.class).strictness(LENIENT).startMocking();
+        when(DesktopModeStatus.isVeiledResizeEnabled()).thenReturn(false);
+
+        final Display defaultDisplay = mock(Display.class);
+        doReturn(defaultDisplay).when(mMockDisplayController)
+                .getDisplay(Display.DEFAULT_DISPLAY);
+
+        final SurfaceControl decorContainerSurface = mock(SurfaceControl.class);
+        final SurfaceControl.Builder decorContainerSurfaceBuilder =
+                createMockSurfaceControlBuilder(decorContainerSurface);
+        mMockSurfaceControlBuilders.add(decorContainerSurfaceBuilder);
+        final SurfaceControl captionContainerSurface = mock(SurfaceControl.class);
+        final SurfaceControl.Builder captionContainerSurfaceBuilder =
+                createMockSurfaceControlBuilder(captionContainerSurface);
+        mMockSurfaceControlBuilders.add(captionContainerSurfaceBuilder);
+
+        final ActivityManager.TaskDescription.Builder taskDescriptionBuilder =
+                new ActivityManager.TaskDescription.Builder()
+                        .setBackgroundColor(Color.YELLOW);
+        final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(Display.DEFAULT_DISPLAY)
+                .setTaskDescriptionBuilder(taskDescriptionBuilder)
+                .setVisible(true)
+                .setWindowingMode(WINDOWING_MODE_FULLSCREEN)
+                .build();
+        taskInfo.isFocused = true;
+        final SurfaceControl taskSurface = mock(SurfaceControl.class);
+        final TestWindowDecoration windowDecor = createWindowDecoration(taskInfo, taskSurface);
+
+        windowDecor.relayout(taskInfo);
+
+        verify(mMockSurfaceControlStartT).unsetColor(taskSurface);
+
+        mockitoSession.finishMocking();
+    }
+
+
+    @Test
+    public void testInsetsRemovedWhenCaptionIsHidden() {
+        final Display defaultDisplay = mock(Display.class);
+        doReturn(defaultDisplay).when(mMockDisplayController)
+                .getDisplay(Display.DEFAULT_DISPLAY);
+
+        mInsetsState.getOrCreateSource(STATUS_BAR_INSET_SOURCE_ID, captionBar()).setVisible(false);
+
+        final ActivityManager.TaskDescription.Builder taskDescriptionBuilder =
+                new ActivityManager.TaskDescription.Builder();
+        final ActivityManager.RunningTaskInfo taskInfo = new TestRunningTaskInfoBuilder()
+                .setDisplayId(Display.DEFAULT_DISPLAY)
+                .setTaskDescriptionBuilder(taskDescriptionBuilder)
+                .setVisible(true)
+                .build();
+        final SurfaceControl taskSurface = mock(SurfaceControl.class);
+        final TestWindowDecoration windowDecor = createWindowDecoration(taskInfo, taskSurface);
+
+        windowDecor.relayout(taskInfo);
+
+        verify(mMockWindowContainerTransaction).removeInsetsSource(eq(taskInfo.token), any(),
+                eq(0) /* index */, eq(captionBar()));
+        verify(mMockWindowContainerTransaction).removeInsetsSource(eq(taskInfo.token), any(),
+                eq(0) /* index */, eq(mandatorySystemGestures()));
+    }
+
     private TestWindowDecoration createWindowDecoration(
             ActivityManager.RunningTaskInfo taskInfo, SurfaceControl testSurface) {
         return new TestWindowDecoration(mContext, mMockDisplayController, mMockShellTaskOrganizer,
@@ -588,13 +722,11 @@ public class WindowDecorationTests extends ShellTestCase {
             int y = mRelayoutParams.mCaptionY;
             int width = loadDimensionPixelSize(resources, mCaptionMenuWidthId);
             int height = loadDimensionPixelSize(resources, mRelayoutParams.mCaptionHeightId);
-            int shadowRadius = loadDimensionPixelSize(resources, mCaptionMenuShadowRadiusId);
-            int cornerRadius = loadDimensionPixelSize(resources, mCaptionMenuCornerRadiusId);
             String name = "Test Window";
             WindowDecoration.AdditionalWindow additionalWindow =
-                    addWindow(R.layout.desktop_mode_window_decor_handle_menu_app_info_pill, name,
+                    addWindow(R.layout.desktop_mode_window_decor_handle_menu, name,
                             mMockSurfaceControlAddWindowT, mMockSurfaceSyncGroup, x, y,
-                            width, height, shadowRadius, cornerRadius);
+                            width, height);
             return additionalWindow;
         }
     }

@@ -431,6 +431,13 @@ public final class ActiveServices {
 
     AppWidgetManagerInternal mAppWidgetManagerInternal;
 
+    /**
+     * The available ANR timers.
+     */
+    private final ProcessAnrTimer mActiveServiceAnrTimer;
+    private final ServiceAnrTimer mShortFGSAnrTimer;
+    private final ServiceAnrTimer mServiceFGAnrTimer;
+
     // allowlisted packageName.
     ArraySet<String> mAllowListWhileInUsePermissionInFgs = new ArraySet<>();
 
@@ -689,6 +696,15 @@ public final class ActiveServices {
             SERVICE_RESCHEDULE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.am.reschedule_service", "false"));
 
         this.mFGSLogger = new ForegroundServiceTypeLoggerModule();
+        this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
+                ActivityManagerService.SERVICE_TIMEOUT_MSG,
+                "SERVICE_TIMEOUT");
+        this.mShortFGSAnrTimer = new ServiceAnrTimer(service,
+                ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG,
+                "FGS_TIMEOUT");
+        this.mServiceFGAnrTimer = new ServiceAnrTimer(service,
+                ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
+                "SERVICE_FOREGROUND_TIMEOUT");
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
                 if (DEBUG_SERVICE) Slog.w(TAG, "AIDL is supported");
@@ -2159,8 +2175,7 @@ public final class ActiveServices {
                 r.fgRequired = false;
                 r.fgWaiting = false;
                 alreadyStartedOp = stopProcStatsOp = true;
-                mAm.mHandler.removeMessages(
-                        ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG, r);
+                mServiceFGAnrTimer.cancel(r);
             }
 
             final ProcessServiceRecord psr = r.app.mServices;
@@ -3389,7 +3404,7 @@ public final class ActiveServices {
     }
 
     void unscheduleShortFgsTimeoutLocked(ServiceRecord sr) {
-        mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG, sr);
+        mShortFGSAnrTimer.cancel(sr);
         mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_SHORT_FGS_PROCSTATE_TIMEOUT_MSG,
                 sr);
         mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_SHORT_FGS_TIMEOUT_MSG, sr);
@@ -3463,9 +3478,11 @@ public final class ActiveServices {
                     Slog.d(TAG_SERVICE, "[STALE] Short FGS timed out: " + sr
                             + " " + sr.getShortFgsTimedEventDescription(nowUptime));
                 }
+                mShortFGSAnrTimer.discard(sr);
                 return;
             }
             Slog.e(TAG_SERVICE, "Short FGS timed out: " + sr);
+            mShortFGSAnrTimer.accept(sr);
             traceInstant("short FGS timeout: ", sr);
 
             logFGSStateChangeLocked(sr,
@@ -3489,11 +3506,10 @@ public final class ActiveServices {
                         msg, sr.getShortFgsInfo().getProcStateDemoteTime());
             }
 
-            {
-                final Message msg = mAm.mHandler.obtainMessage(
-                        ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG, sr);
-                mAm.mHandler.sendMessageAtTime(msg, sr.getShortFgsInfo().getAnrTime());
-            }
+            // ServiceRecord.getAnrTime() is an absolute time with a reference that is not "now".
+            // Compute the time from "now" when starting the anr timer.
+            mShortFGSAnrTimer.start(sr,
+                    sr.getShortFgsInfo().getAnrTime() - SystemClock.uptimeMillis());
         }
     }
 
@@ -5067,8 +5083,7 @@ public final class ActiveServices {
         // a new SERVICE_FOREGROUND_TIMEOUT_MSG is scheduled in SERVICE_START_FOREGROUND_TIMEOUT
         // again.
         if (r.fgRequired && r.fgWaiting) {
-            mAm.mHandler.removeMessages(
-                    ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG, r);
+            mServiceFGAnrTimer.cancel(r);
             r.fgWaiting = false;
         }
 
@@ -5990,8 +6005,7 @@ public final class ActiveServices {
             }
             mAm.mAppOpsService.finishOperation(AppOpsManager.getToken(mAm.mAppOpsService),
                     AppOpsManager.OP_START_FOREGROUND, r.appInfo.uid, r.packageName, null);
-            mAm.mHandler.removeMessages(
-                    ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG, r);
+            mServiceFGAnrTimer.cancel(r);
             if (r.app != null) {
                 Message msg = mAm.mHandler.obtainMessage(
                         ActivityManagerService.SERVICE_FOREGROUND_CRASH_MSG);
@@ -6427,7 +6441,7 @@ public final class ActiveServices {
                 if (psr.numberOfExecutingServices() == 0) {
                     if (DEBUG_SERVICE || DEBUG_SERVICE_EXECUTING) Slog.v(TAG_SERVICE_EXECUTING,
                             "No more executingServices of " + r.shortInstanceName);
-                    mAm.mHandler.removeMessages(ActivityManagerService.SERVICE_TIMEOUT_MSG, r.app);
+                    if (r.app.mPid != 0) mActiveServiceAnrTimer.cancel(r.app);
                 } else if (r.executeFg) {
                     // Need to re-evaluate whether the app still needs to be in the foreground.
                     for (int i = psr.numberOfExecutingServices() - 1; i >= 0; i--) {
@@ -7127,13 +7141,16 @@ public final class ActiveServices {
             synchronized (mAm) {
                 if (proc.isDebugging()) {
                     // The app's being debugged, ignore timeout.
+                    mActiveServiceAnrTimer.discard(proc);
                     return;
                 }
                 final ProcessServiceRecord psr = proc.mServices;
                 if (psr.numberOfExecutingServices() == 0 || proc.getThread() == null
                         || proc.isKilled()) {
+                    mActiveServiceAnrTimer.discard(proc);
                     return;
                 }
+                mActiveServiceAnrTimer.accept(proc);
                 final long now = SystemClock.uptimeMillis();
                 final long maxTime =  now
                         - (psr.shouldExecServicesFg()
@@ -7166,12 +7183,11 @@ public final class ActiveServices {
                     timeoutRecord = TimeoutRecord.forServiceExec(timeout.shortInstanceName,
                             waitedMillis);
                 } else {
-                    Message msg = mAm.mHandler.obtainMessage(
-                            ActivityManagerService.SERVICE_TIMEOUT_MSG);
-                    msg.obj = proc;
-                    mAm.mHandler.sendMessageAtTime(msg, psr.shouldExecServicesFg()
-                            ? (nextTime + mAm.mConstants.SERVICE_TIMEOUT) :
-                            (nextTime + mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT));
+                    final long delay = psr.shouldExecServicesFg()
+                                       ? (nextTime + mAm.mConstants.SERVICE_TIMEOUT) :
+                                       (nextTime + mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT)
+                                       - SystemClock.uptimeMillis();
+                    mActiveServiceAnrTimer.start(proc, delay);
                 }
             }
 
@@ -7197,12 +7213,15 @@ public final class ActiveServices {
             synchronized (mAm) {
                 timeoutRecord.mLatencyTracker.waitingOnAMSLockEnded();
                 if (!r.fgRequired || !r.fgWaiting || r.destroying) {
+                    mServiceFGAnrTimer.discard(r);
                     return;
                 }
 
+                mServiceFGAnrTimer.accept(r);
                 app = r.app;
                 if (app != null && app.isDebugging()) {
                     // The app's being debugged; let it ride
+                    mServiceFGAnrTimer.discard(r);
                     return;
                 }
 
@@ -7259,26 +7278,46 @@ public final class ActiveServices {
                 ForegroundServiceDidNotStartInTimeException.createExtrasForService(service));
     }
 
+    private static class ProcessAnrTimer extends AnrTimer<ProcessRecord> {
+
+        ProcessAnrTimer(ActivityManagerService am, int msg, String label) {
+            super(Objects.requireNonNull(am).mHandler, msg, label);
+        }
+
+        void start(@NonNull ProcessRecord proc, long millis) {
+            start(proc, proc.getPid(), proc.uid, millis);
+        }
+    }
+
+    private static class ServiceAnrTimer extends AnrTimer<ServiceRecord> {
+
+        ServiceAnrTimer(ActivityManagerService am, int msg, String label) {
+            super(Objects.requireNonNull(am).mHandler, msg, label);
+        }
+
+        void start(@NonNull ServiceRecord service, long millis) {
+            start(service,
+                    (service.app != null) ? service.app.getPid() : 0,
+                    service.appInfo.uid,
+                    millis);
+        }
+    }
+
     void scheduleServiceTimeoutLocked(ProcessRecord proc) {
         if (proc.mServices.numberOfExecutingServices() == 0 || proc.getThread() == null) {
             return;
         }
-        Message msg = mAm.mHandler.obtainMessage(
-                ActivityManagerService.SERVICE_TIMEOUT_MSG);
-        msg.obj = proc;
-        mAm.mHandler.sendMessageDelayed(msg, proc.mServices.shouldExecServicesFg()
-                ? mAm.mConstants.SERVICE_TIMEOUT : mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT);
+        final long delay = proc.mServices.shouldExecServicesFg()
+                ? mAm.mConstants.SERVICE_TIMEOUT : mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT;
+        mActiveServiceAnrTimer.start(proc, delay);
     }
 
     void scheduleServiceForegroundTransitionTimeoutLocked(ServiceRecord r) {
         if (r.app.mServices.numberOfExecutingServices() == 0 || r.app.getThread() == null) {
             return;
         }
-        Message msg = mAm.mHandler.obtainMessage(
-                ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG);
-        msg.obj = r;
         r.fgWaiting = true;
-        mAm.mHandler.sendMessageDelayed(msg, mAm.mConstants.mServiceStartForegroundTimeoutMs);
+        mServiceFGAnrTimer.start(r, mAm.mConstants.mServiceStartForegroundTimeoutMs);
     }
 
     final class ServiceDumper {

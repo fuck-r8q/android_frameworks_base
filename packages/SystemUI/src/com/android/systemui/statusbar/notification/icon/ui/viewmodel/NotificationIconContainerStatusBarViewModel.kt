@@ -15,8 +15,31 @@
  */
 package com.android.systemui.statusbar.notification.icon.ui.viewmodel
 
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.shade.domain.interactor.ShadeInteractor
+import com.android.systemui.util.ui.AnimatedValue
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
 
 /** View-model for the row of notification icons displayed in the status bar, */
-class NotificationIconContainerStatusBarViewModel @Inject constructor() :
-    NotificationIconContainerViewModel
+class NotificationIconContainerStatusBarViewModel
+@Inject
+constructor(
+    keyguardInteractor: KeyguardInteractor,
+    shadeInteractor: ShadeInteractor,
+) : NotificationIconContainerViewModel {
+    override val animationsEnabled: Flow<Boolean> =
+        combine(
+            shadeInteractor.isShadeTouchable,
+            keyguardInteractor.isKeyguardShowing,
+        ) { panelTouchesEnabled, isKeyguardShowing ->
+            panelTouchesEnabled && !isKeyguardShowing
+        }
+
+    override val isDozing: Flow<AnimatedValue<Boolean>> = emptyFlow()
+    override val isVisible: Flow<AnimatedValue<Boolean>> = emptyFlow()
+    override fun completeDozeAnimation() {}
+    override fun completeVisibilityAnimation() {}
+}

@@ -29,7 +29,6 @@ import android.testing.TestableLooper.RunWithLooper
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.Surface
-import android.view.Surface.ROTATION_0
 import android.view.Surface.Rotation
 import android.view.View
 import android.view.WindowManager
@@ -38,7 +37,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.res.R
-import com.android.systemui.RoboPilotTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.animation.ActivityLaunchAnimator
 import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams
@@ -46,7 +44,6 @@ import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.ui.viewmodel.UdfpsKeyguardViewModels
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
@@ -83,7 +80,6 @@ private const val SENSOR_HEIGHT = 60
 
 @ExperimentalCoroutinesApi
 @SmallTest
-@RoboPilotTest
 @RunWith(AndroidJUnit4::class)
 @RunWithLooper(setAsMainLooper = true)
 class UdfpsControllerOverlayTest : SysuiTestCase() {
@@ -143,7 +139,6 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
     ) {
         controllerOverlay = UdfpsControllerOverlay(
             context,
-            fingerprintManager,
             inflater,
             windowManager,
             accessibilityManager,
@@ -157,7 +152,6 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             keyguardStateController,
             unlockedScreenOffAnimationController,
             udfpsDisplayMode,
-            secureSettings,
             REQUEST_ID,
             reason,
             controllerCallback,
@@ -167,7 +161,6 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             primaryBouncerInteractor,
             alternateBouncerInteractor,
             isDebuggable,
-            udfpsUtils,
             udfpsKeyguardAccessibilityDelegate,
             udfpsKeyguardViewModels,
         )
@@ -214,8 +207,8 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             val lp = layoutParamsCaptor.value
             assertThat(lp.x).isEqualTo(0)
             assertThat(lp.y).isEqualTo(0)
-            assertThat(lp.width).isEqualTo(SENSOR_WIDTH)
-            assertThat(lp.height).isEqualTo(SENSOR_HEIGHT)
+            assertThat(lp.width).isEqualTo(DISPLAY_WIDTH)
+            assertThat(lp.height).isEqualTo(DISPLAY_HEIGHT)
         }
     }
 
@@ -232,8 +225,8 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             val lp = layoutParamsCaptor.value
             assertThat(lp.x).isEqualTo(0)
             assertThat(lp.y).isEqualTo(0)
-            assertThat(lp.width).isEqualTo(SENSOR_WIDTH)
-            assertThat(lp.height).isEqualTo(SENSOR_HEIGHT)
+            assertThat(lp.width).isEqualTo(DISPLAY_WIDTH)
+            assertThat(lp.height).isEqualTo(DISPLAY_HEIGHT)
         }
     }
 
@@ -249,9 +242,9 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             // Sensor should be in the bottom left corner in ROTATION_90.
             val lp = layoutParamsCaptor.value
             assertThat(lp.x).isEqualTo(0)
-            assertThat(lp.y).isEqualTo(DISPLAY_WIDTH - SENSOR_WIDTH)
-            assertThat(lp.width).isEqualTo(SENSOR_HEIGHT)
-            assertThat(lp.height).isEqualTo(SENSOR_WIDTH)
+            assertThat(lp.y).isEqualTo(0)
+            assertThat(lp.width).isEqualTo(DISPLAY_HEIGHT)
+            assertThat(lp.height).isEqualTo(DISPLAY_WIDTH)
         }
     }
 
@@ -266,10 +259,10 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
 
             // Sensor should be in the top right corner in ROTATION_270.
             val lp = layoutParamsCaptor.value
-            assertThat(lp.x).isEqualTo(DISPLAY_HEIGHT - SENSOR_HEIGHT)
+            assertThat(lp.x).isEqualTo(0)
             assertThat(lp.y).isEqualTo(0)
-            assertThat(lp.width).isEqualTo(SENSOR_HEIGHT)
-            assertThat(lp.height).isEqualTo(SENSOR_WIDTH)
+            assertThat(lp.width).isEqualTo(DISPLAY_HEIGHT)
+            assertThat(lp.height).isEqualTo(DISPLAY_WIDTH)
         }
     }
 
@@ -347,11 +340,10 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
     }
 
     @Test
-    fun smallOverlayOnEnrollmentWithA11y() = withRotation(ROTATION_0) {
+    fun smallOverlayOnEnrollmentWithA11y() = withRotation(Surface.ROTATION_0) {
         withReason(REASON_ENROLL_ENROLLING) {
             // When a11y enabled during enrollment
             whenever(accessibilityManager.isTouchExplorationEnabled).thenReturn(true)
-            whenever(featureFlags.isEnabled(Flags.UDFPS_NEW_TOUCH_DETECTION)).thenReturn(true)
 
             controllerOverlay.show(udfpsController, overlayParams)
             verify(windowManager).addView(
@@ -363,24 +355,6 @@ class UdfpsControllerOverlayTest : SysuiTestCase() {
             val lp = layoutParamsCaptor.value
             assertThat(lp.width).isEqualTo(overlayParams.sensorBounds.width())
             assertThat(lp.height).isEqualTo(overlayParams.sensorBounds.height())
-        }
-    }
-
-    @Test
-    fun fullScreenOverlayWithNewTouchDetectionEnabled() = withRotation(ROTATION_0) {
-        withReason(REASON_AUTH_KEYGUARD) {
-            whenever(featureFlags.isEnabled(Flags.UDFPS_NEW_TOUCH_DETECTION)).thenReturn(true)
-
-            controllerOverlay.show(udfpsController, overlayParams)
-            verify(windowManager).addView(
-                    eq(controllerOverlay.overlayView),
-                    layoutParamsCaptor.capture()
-            )
-
-            // Layout params should use natural display width and height
-            val lp = layoutParamsCaptor.value
-            assertThat(lp.width).isEqualTo(overlayParams.naturalDisplayWidth)
-            assertThat(lp.height).isEqualTo(overlayParams.naturalDisplayHeight)
         }
     }
 }

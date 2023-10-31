@@ -38,6 +38,7 @@ import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.os.VibrationEffect;
+import android.os.vibrator.Flags;
 import android.provider.MediaStore;
 import android.util.Log;
 
@@ -111,7 +112,7 @@ public class RingtonePlayer implements CoreStartable {
         @Override
         public void play(IBinder token, Uri uri, AudioAttributes aa, float volume, boolean looping)
                 throws RemoteException {
-            if (Ringtone.useRingtoneV2()) {
+            if (Flags.hapticsCustomizationRingtoneV2Enabled()) {
                 playRemoteRingtone(token, uri, aa, true, Ringtone.MEDIA_SOUND,
                         null, volume, looping, /* hapticGenerator= */ false,
                         null);
@@ -284,7 +285,8 @@ public class RingtonePlayer implements CoreStartable {
         }
 
         @Override
-        public void playAsync(Uri uri, UserHandle user, boolean looping, AudioAttributes aa) {
+        public void playAsync(Uri uri, UserHandle user, boolean looping, AudioAttributes aa,
+                float volume) {
             if (LOGD) Log.d(TAG, "playAsync(uri=" + uri + ", user=" + user + ")");
             if (Binder.getCallingUid() != Process.SYSTEM_UID) {
                 throw new SecurityException("Async playback only available from system UID.");
@@ -292,7 +294,7 @@ public class RingtonePlayer implements CoreStartable {
             if (UserHandle.ALL.equals(user)) {
                 user = UserHandle.SYSTEM;
             }
-            mAsyncPlayer.play(getContextForUser(user), uri, looping, aa);
+            mAsyncPlayer.play(getContextForUser(user), uri, looping, aa, volume);
         }
 
         @Override

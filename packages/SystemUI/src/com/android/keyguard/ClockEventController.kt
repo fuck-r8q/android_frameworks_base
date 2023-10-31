@@ -34,6 +34,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.android.systemui.customization.R
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.dagger.qualifiers.DisplaySpecific
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags.DOZING_MIGRATION_1
@@ -79,7 +80,7 @@ constructor(
     private val batteryController: BatteryController,
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
     private val configurationController: ConfigurationController,
-    @Main private val resources: Resources,
+    @DisplaySpecific private val resources: Resources,
     private val context: Context,
     @Main private val mainExecutor: DelayableExecutor,
     @Background private val bgExecutor: Executor,
@@ -205,19 +206,19 @@ constructor(
     private var isRegistered = false
     private var disposableHandle: DisposableHandle? = null
     private val regionSamplingEnabled = featureFlags.isEnabled(REGION_SAMPLING)
-
+    private var largeClockOnSecondaryDisplay = false
 
     private fun updateColors() {
         if (regionSamplingEnabled) {
             clock?.let { clock ->
                 smallRegionSampler?.let {
-                    smallClockIsDark = it.currentRegionDarkness().isDark
-                    clock.smallClock.events.onRegionDarknessChanged(smallClockIsDark)
+                    val isRegionDark = it.currentRegionDarkness().isDark
+                    clock.smallClock.events.onRegionDarknessChanged(isRegionDark)
                 }
 
                 largeRegionSampler?.let {
-                    largeClockIsDark = it.currentRegionDarkness().isDark
-                    clock.largeClock.events.onRegionDarknessChanged(largeClockIsDark)
+                    val isRegionDark = it.currentRegionDarkness().isDark
+                    clock.largeClock.events.onRegionDarknessChanged(isRegionDark)
                 }
             }
             return
@@ -225,12 +226,12 @@ constructor(
 
         val isLightTheme = TypedValue()
         context.theme.resolveAttribute(android.R.attr.isLightTheme, isLightTheme, true)
-        smallClockIsDark = isLightTheme.data == 0
-        largeClockIsDark = isLightTheme.data == 0
+        val isRegionDark = isLightTheme.data == 0
 
         clock?.run {
-            smallClock.events.onRegionDarknessChanged(smallClockIsDark)
-            largeClock.events.onRegionDarknessChanged(largeClockIsDark)
+            Log.i(TAG, "Region isDark: $isRegionDark")
+            smallClock.events.onRegionDarknessChanged(isRegionDark)
+            largeClock.events.onRegionDarknessChanged(isRegionDark)
         }
     }
     protected open fun createRegionSampler(
@@ -259,9 +260,6 @@ constructor(
     val shouldTimeListenerRun: Boolean
         get() = isKeyguardVisible && dozeAmount < DOZE_TICKRATE_THRESHOLD
     private var cachedWeatherData: WeatherData? = null
-
-    private var smallClockIsDark = true
-    private var largeClockIsDark = true
 
     private val configListener =
         object : ConfigurationController.ConfigurationListener {
@@ -381,6 +379,19 @@ constructor(
                 ?.removeOnAttachStateChangeListener(largeClockOnAttachStateChangeListener)
     }
 
+    /**
+     * Sets this clock as showing in a secondary display.
+     *
+     * Not that this is not necessarily needed, as we could get the displayId from [Context]
+     * directly and infere [largeClockOnSecondaryDisplay] from the id being different than the
+     * default display one. However, if we do so, current screenshot tests would not work, as they
+     * pass an activity context always from the default display.
+     */
+    fun setLargeClockOnSecondaryDisplay(onSecondaryDisplay: Boolean) {
+        largeClockOnSecondaryDisplay = onSecondaryDisplay
+        updateFontSizes()
+    }
+
     private fun updateTimeListeners() {
         smallTimeListener?.stop()
         largeTimeListener?.stop()
@@ -403,9 +414,15 @@ constructor(
             smallClock.events.onFontSettingChanged(
                 resources.getDimensionPixelSize(R.dimen.small_clock_text_size).toFloat()
             )
-            largeClock.events.onFontSettingChanged(
-                resources.getDimensionPixelSize(R.dimen.large_clock_text_size).toFloat()
-            )
+            largeClock.events.onFontSettingChanged(getLargeClockSizePx())
+        }
+    }
+
+    private fun getLargeClockSizePx(): Float {
+        return if (largeClockOnSecondaryDisplay) {
+            resources.getDimensionPixelSize(R.dimen.presentation_clock_text_size).toFloat()
+        } else {
+            resources.getDimensionPixelSize(R.dimen.large_clock_text_size).toFloat()
         }
     }
 
