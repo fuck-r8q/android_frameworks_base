@@ -73,7 +73,7 @@
          CarrierConfigManager#KEY_AUTO_DATA_SWITCH_RAT_SIGNAL_SCORE_STRING_ARRAY.
          If 0, the device always switch to the higher score SIM.
          If < 0, the network type and signal strength based auto switch is disabled. -->
-    <integer name="auto_data_switch_score_tolerance">-1</integer>
+    <integer name="auto_data_switch_score_tolerance">4000</integer>
     <java-symbol type="integer" name="auto_data_switch_score_tolerance" />
 
     <!-- Boolean indicating whether the Iwlan data service supports persistence of iwlan ipsec
@@ -226,5 +226,9 @@
     <!-- Boolean indicating whether TelephonyAnalytics module is active or not. -->
     <bool name="telephony_analytics_switch">true</bool>
     <java-symbol type="bool" name="telephony_analytics_switch" />
+
+    <!-- Whether to enable modem on boot if behavior is not defined -->
+    <bool name="config_enable_cellular_on_boot_default">true</bool>
+    <java-symbol type="bool" name="config_enable_cellular_on_boot_default" />
 
 </resources>

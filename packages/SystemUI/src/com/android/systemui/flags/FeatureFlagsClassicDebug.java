@@ -31,12 +31,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.os.UserHandle;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.systemui.FeatureFlags;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.util.settings.GlobalSettings;
@@ -56,15 +56,15 @@ import javax.inject.Named;
 
 /**
  * Concrete implementation of the a Flag manager that returns default values for debug builds
- *
+ * <p>
  * Flags can be set (or unset) via the following adb command:
- *
+ * <p>
  * adb shell cmd statusbar flag <id> <on|off|toggle|erase>
- *
+ * <p>
  * Alternatively, you can change flags via a broadcast intent:
- *
+ * <p>
  * adb shell am broadcast -a com.android.systemui.action.SET_FLAG --ei id <id> [--ez value <0|1>]
- *
+ * <p>
  * To restore a flag back to its default, leave the `--ez value <0|1>` off of the command.
  */
 @SysUISingleton
@@ -81,6 +81,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
     private final Map<String, Boolean> mBooleanFlagCache = new ConcurrentHashMap<>();
     private final Map<String, String> mStringFlagCache = new ConcurrentHashMap<>();
     private final Map<String, Integer> mIntFlagCache = new ConcurrentHashMap<>();
+    private final FeatureFlags mGantryFlags;
     private final Restarter mRestarter;
 
     private final ServerFlagReader.ChangeListener mOnPropertiesChanged =
@@ -125,6 +126,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
             @Main Resources resources,
             ServerFlagReader serverFlagReader,
             @Named(ALL_FLAGS) Map<String, Flag<?>> allFlags,
+            FeatureFlags gantryFlags,
             Restarter restarter) {
         mFlagManager = flagManager;
         mContext = context;
@@ -133,6 +135,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
         mSystemProperties = systemProperties;
         mServerFlagReader = serverFlagReader;
         mAllFlags = allFlags;
+        mGantryFlags = gantryFlags;
         mRestarter = restarter;
     }
 
@@ -260,9 +263,8 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
         if (!hasServerOverride
                 && !defaultValue
                 && result == null
-                && !flag.getName().equals(Flags.TEAMFOOD.getName())
                 && flag.getTeamfood()) {
-            return isEnabled(Flags.TEAMFOOD);
+            return mGantryFlags.sysuiTeamfood();
         }
 
         return result == null ? mServerFlagReader.readServerOverride(
@@ -319,8 +321,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
             Log.w(TAG, "Failed to set flag " + name + " to " + value);
             return;
         }
-        mGlobalSettings.putStringForUser(mFlagManager.nameToSettingsKey(name), data,
-                UserHandle.USER_CURRENT);
+        mGlobalSettings.putString(mFlagManager.nameToSettingsKey(name), data);
     }
 
     <T> void eraseFlag(Flag<T> flag) {
@@ -354,8 +355,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
     /** Works just like {@link #eraseFlag(String)} except that it doesn't restart SystemUI. */
     private void eraseInternal(String name) {
         // We can't actually "erase" things from settings, but we can set them to empty!
-        mGlobalSettings.putStringForUser(mFlagManager.nameToSettingsKey(name), "",
-                UserHandle.USER_CURRENT);
+        mGlobalSettings.putString(mFlagManager.nameToSettingsKey(name), "");
         Log.i(TAG, "Erase name " + name);
     }
 
@@ -537,7 +537,7 @@ public class FeatureFlagsClassicDebug implements FeatureFlagsClassic {
     @Override
     public void dump(@NonNull PrintWriter pw, @NonNull String[] args) {
         pw.println("can override: true");
-
+        pw.println("teamfood: " + mGantryFlags.sysuiTeamfood());
         pw.println("booleans: " + mBooleanFlagCache.size());
         // Sort our flags for dumping
         TreeMap<String, Boolean> dumpBooleanMap = new TreeMap<>(mBooleanFlagCache);

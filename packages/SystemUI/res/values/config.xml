@@ -354,9 +354,6 @@
     <!-- Whether to show activity indicators in the status bar -->
     <bool name="config_showActivity">true</bool>
 
-    <!-- Whether or not the button to clear all notifications will be shown. -->
-    <bool name="config_enableNotificationsClearAll">true</bool>
-
     <!-- Whether or not to show the notification shelf that houses the icons of notifications that
      have been scrolled off-screen. -->
     <bool name="config_showNotificationShelf">true</bool>
@@ -953,6 +950,9 @@
     <!-- Flag controlling whether visual query attention detection has been enabled. -->
     <bool name="config_enableVisualQueryAttentionDetection">false</bool>
 
+    <!-- Whether to show bottom sheets edge to edge -->
+    <bool name="config_edgeToEdgeBottomSheetDialog">true</bool>
+
     <!--
     Whether the scene container framework is enabled.
 
@@ -960,4 +960,15 @@
     bouncer, lockscreen, shade, and quick settings.
     -->
     <bool name="config_sceneContainerFrameworkEnabled">true</bool>
+
+    <!--
+    Time in milliseconds the user has to touch the side FPS sensor to successfully authenticate
+    TODO(b/302332976) Get this value from the HAL if they can provide an API for it.
+    -->
+    <integer name="config_restToUnlockDuration">300</integer>
+
+    <!--
+    Width in pixels of the Side FPS sensor.
+    -->
+    <integer name="config_sfpsSensorWidth">200</integer>
 </resources>

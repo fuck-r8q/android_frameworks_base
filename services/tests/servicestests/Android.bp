@@ -2,6 +2,13 @@
 // Build FrameworksServicesTests package
 //########################################################################
 
+java_defaults {
+    name: "FrameworksServicesTests-jni-defaults",
+    jni_libs: [
+        "libservicestestjni",
+    ],
+}
+
 package {
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
@@ -13,6 +20,9 @@ package {
 
 android_test {
     name: "FrameworksServicesTests",
+    defaults: [
+        "FrameworksServicesTests-jni-defaults",
+    ],
 
     // Include all test java files.
     srcs: [
@@ -51,7 +61,7 @@ android_test {
         "mockito-target-minus-junit4",
         "platform-test-annotations",
         "ShortcutManagerTestUtils",
-        "truth-prebuilt",
+        "truth",
         "testables",
         "androidx.test.uiautomator_uiautomator",
         "platformprotosnano",
@@ -62,7 +72,7 @@ android_test {
         // TODO: remove once Android migrates to JUnit 4.12,
         // which provides assertThrows
         "testng",
-        "truth-prebuilt",
+        "truth",
         "junit",
         "junit-params",
         "ActivityContext",

@@ -204,7 +204,7 @@ public class SystemWindows {
                     + "SystemWindow:" + view);
             return null;
         }
-        return root.getFocusGrantToken();
+        return root.getInputTransferToken();
     }
 
     private class PerDisplay {

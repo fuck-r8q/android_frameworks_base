@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 
+import android.net.ConnectivityManager
 import android.telephony.ServiceState
 import android.telephony.SignalStrength
 import android.telephony.TelephonyCallback
@@ -81,6 +82,7 @@ class FullMobileConnectionRepositoryTest : SysuiTestCase() {
         )
     private val mobileFactory = mock<MobileConnectionRepositoryImpl.Factory>()
     private val carrierMergedFactory = mock<CarrierMergedConnectionRepository.Factory>()
+    private val connectivityManager = mock<ConnectivityManager>()
 
     private val subscriptionModel =
         MutableStateFlow(
@@ -679,6 +681,7 @@ class FullMobileConnectionRepositoryTest : SysuiTestCase() {
                 subscriptionModel,
                 DEFAULT_NAME_MODEL,
                 SEP,
+                connectivityManager,
                 telephonyManager,
                 systemUiCarrierConfig = mock(),
                 fakeBroadcastDispatcher,
@@ -688,7 +691,6 @@ class FullMobileConnectionRepositoryTest : SysuiTestCase() {
                 tableLogBuffer,
                 testScope.backgroundScope,
                 FiveGServiceClient(mContext),
-                connectivityManager = mock(),
             )
         whenever(
                 mobileFactory.build(

@@ -44,8 +44,6 @@ import android.util.AttributeSet;
 import android.view.WindowInsets;
 import android.view.WindowInsetsAnimationControlListener;
 import android.view.WindowInsetsAnimationController;
-import android.view.animation.AnimationUtils;
-import android.view.animation.Interpolator;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -66,18 +64,8 @@ import com.android.systemui.statusbar.policy.DevicePostureController;
  */
 public class KeyguardPasswordView extends KeyguardAbsKeyInputView {
 
-    private final int mDisappearYTranslation;
-
-    private static final long IME_DISAPPEAR_DURATION_MS = 125;
-
-    // A delay constant to be used in a workaround for the situation where InputMethodManagerService
-    // is not switched to the new user yet.
-    // TODO: Remove this by ensuring such a race condition never happens.
-
     private TextView mPasswordEntry;
     private TextViewInputDisabler mPasswordEntryDisabler;
-    private Interpolator mLinearOutSlowInInterpolator;
-    private Interpolator mFastOutLinearInInterpolator;
     private DisappearAnimationListener mDisappearAnimationListener;
     @Nullable private MotionLayout mContainerMotionLayout;
     private boolean mAlreadyUsingSplitBouncer = false;
@@ -93,12 +81,6 @@ public class KeyguardPasswordView extends KeyguardAbsKeyInputView {
 
     public KeyguardPasswordView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mDisappearYTranslation = getResources().getDimensionPixelSize(
-                R.dimen.disappear_y_translation);
-        mLinearOutSlowInInterpolator = AnimationUtils.loadInterpolator(
-                context, android.R.interpolator.linear_out_slow_in);
-        mFastOutLinearInInterpolator = AnimationUtils.loadInterpolator(
-                context, android.R.interpolator.fast_out_linear_in);
     }
 
     /**
@@ -139,7 +121,7 @@ public class KeyguardPasswordView extends KeyguardAbsKeyInputView {
             case PROMPT_REASON_USER_REQUEST:
                 return R.string.kg_prompt_after_user_lockdown_password;
             case PROMPT_REASON_PREPARE_FOR_UPDATE:
-                return R.string.kg_prompt_unattended_update_password;
+                return R.string.kg_prompt_reason_timeout_password;
             case PROMPT_REASON_NON_STRONG_BIOMETRIC_TIMEOUT:
                 return R.string.kg_prompt_reason_timeout_password;
             case PROMPT_REASON_TRUSTAGENT_EXPIRED:

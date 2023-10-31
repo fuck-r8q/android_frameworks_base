@@ -5145,7 +5145,6 @@ public class CarrierConfigManager {
          * MMTEL and RCS.
          * <p>
          * The default value for this configuration is {@code false}.
-         * @see android.telephony.ims.SipDelegateManager
          */
         public static final String KEY_IMS_SINGLE_REGISTRATION_REQUIRED_BOOL =
                 KEY_PREFIX + "ims_single_registration_required_bool";
@@ -5720,8 +5719,8 @@ public class CarrierConfigManager {
          *     <li>{@link #KEY_CAPABILITY_TYPE_SMS_INT_ARRAY}</li>
          *     <li>{@link #KEY_CAPABILITY_TYPE_CALL_COMPOSER_INT_ARRAY}</li>
          * </ul>
-         * <p> The values are defined in
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech}
+         * <p> The values are defined as {@code REGISTRATION_TECH_*} constants in
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase}.
          *
          * changing mmtel_requires_provisioning_bundle requires changes to
          * carrier_volte_provisioning_required_bool and vice versa
@@ -5733,12 +5732,12 @@ public class CarrierConfigManager {
         /**
          * List of different RAT technologies on which Provisioning for Voice calling (IR.92)
          * is supported.
-         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_VOICE
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
+         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_VOICE
          */
         public static final String KEY_CAPABILITY_TYPE_VOICE_INT_ARRAY =
                 KEY_PREFIX + "capability_type_voice_int_array";
@@ -5746,12 +5745,12 @@ public class CarrierConfigManager {
         /**
          * List of different RAT technologies on which Provisioning for Video Telephony (IR.94)
          * is supported.
-         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_VIDEO
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
+         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_VIDEO
          */
         public static final String KEY_CAPABILITY_TYPE_VIDEO_INT_ARRAY =
                 KEY_PREFIX + "capability_type_video_int_array";
@@ -5759,24 +5758,24 @@ public class CarrierConfigManager {
         /**
          * List of different RAT technologies on which Provisioning for XCAP over Ut for
          * supplementary services. (IR.92) is supported.
-         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_UT
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
+         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_UT
          */
         public static final String KEY_CAPABILITY_TYPE_UT_INT_ARRAY =
                 KEY_PREFIX + "capability_type_ut_int_array";
 
         /**
          * List of different RAT technologies on which Provisioning for SMS (IR.92) is supported.
-         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_SMS
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
+         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_SMS
          */
         public static final String KEY_CAPABILITY_TYPE_SMS_INT_ARRAY =
                 KEY_PREFIX + "capability_type_sms_int_array";
@@ -5784,12 +5783,12 @@ public class CarrierConfigManager {
         /**
          * List of different RAT technologies on which Provisioning for Call Composer
          * (section 2.4 of RCC.20) is supported.
-         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_CALL_COMPOSER
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
+         * @see MmTelFeature.MmTelCapabilities#CAPABILITY_TYPE_CALL_COMPOSER
          */
         public static final String KEY_CAPABILITY_TYPE_CALL_COMPOSER_INT_ARRAY =
                 KEY_PREFIX + "capability_type_call_composer_int_array";
@@ -5804,8 +5803,8 @@ public class CarrierConfigManager {
          *     <li>{@link #KEY_CAPABILITY_TYPE_OPTIONS_UCE_INT_ARRAY}</li>
          *     <li>{@link #KEY_CAPABILITY_TYPE_PRESENCE_UCE_INT_ARRAY}</li>
          * </ul>
-         * <p> The values are defined in
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech}
+         * <p> The values are defined as {@code REGISTRATION_TECH_*} constants in
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase}.
          */
         public static final String KEY_RCS_REQUIRES_PROVISIONING_BUNDLE =
                 KEY_PREFIX + "rcs_requires_provisioning_bundle";
@@ -5814,12 +5813,11 @@ public class CarrierConfigManager {
          * This carrier supports User Capability Exchange using SIP OPTIONS as defined by the
          * framework. If set, the RcsFeature should support capability exchange using SIP OPTIONS.
          * If not set, this RcsFeature should not service capability requests.
-         * @see RcsFeature.RcsImsCapabilities#CAPABILITY_TYPE_OPTIONS_UCE
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
          */
         public static final String KEY_CAPABILITY_TYPE_OPTIONS_UCE_INT_ARRAY =
                 KEY_PREFIX + "capability_type_options_uce_int_array";
@@ -5829,12 +5827,11 @@ public class CarrierConfigManager {
          * framework. If set, the RcsFeature should support capability exchange using a presence
          * server. If not set, this RcsFeature should not publish capabilities or service capability
          * requests using presence.
-         * @see RcsFeature.RcsImsCapabilities#CAPABILITY_TYPE_PRESENCE_UCE
          * <p>Possible values are,
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_LTE}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_IWLAN}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_CROSS_SIM}
-         * {@link ImsRegistrationImplBase.ImsRegistrationTech#REGISTRATION_TECH_NR}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_LTE}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_IWLAN}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_CROSS_SIM}
+         * {@link android.telephony.ims.stub.ImsRegistrationImplBase#REGISTRATION_TECH_NR}
          */
         public static final String KEY_CAPABILITY_TYPE_PRESENCE_UCE_INT_ARRAY =
                 KEY_PREFIX + "capability_type_presence_uce_int_array";
@@ -9712,7 +9709,7 @@ public class CarrierConfigManager {
     /**
      * A list of premium capabilities the carrier supports. Applications can prompt users to
      * purchase these premium capabilities from their carrier for a performance boost.
-     * Valid values are any of {@link TelephonyManager.PremiumCapability}.
+     * Valid values are any of {@link TelephonyManager}'s {@code PREMIUM_CAPABILITY_*} constants.
      *
      * This is empty by default, indicating that no premium capabilities are supported.
      *
@@ -10756,6 +10753,8 @@ public class CarrierConfigManager {
                 "NR_NSA_MMWAVE", new int[]{8000, 10227, 12488, 15017, 15278});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
                 "LTE", new int[]{3731, 5965, 8618, 11179, 13384});
+        auto_data_switch_rat_signal_score_string_bundle.putIntArray(
+                "LTE_CA", new int[]{3831, 6065, 8718, 11379, 13484});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(
                 "NR_SA", new int[]{5288, 6795, 6955, 7562, 9713});
         auto_data_switch_rat_signal_score_string_bundle.putIntArray(

@@ -99,11 +99,11 @@ class MobileConnectionTelephonySmokeTests : SysuiTestCase() {
     private lateinit var underTest: MobileConnectionRepositoryImpl
     private lateinit var connectionsRepo: FakeMobileConnectionsRepository
 
+    @Mock private lateinit var connectivityManager: ConnectivityManager
     @Mock private lateinit var telephonyManager: TelephonyManager
     @Mock private lateinit var logger: MobileInputLogger
     @Mock private lateinit var tableLogger: TableLogBuffer
     @Mock private lateinit var subscriptionModel: StateFlow<SubscriptionModel?>
-    @Mock private lateinit var connectivityManager: ConnectivityManager
 
     private val mobileMappings = FakeMobileMappingsProxy()
     private val systemUiCarrierConfig =
@@ -134,6 +134,7 @@ class MobileConnectionTelephonySmokeTests : SysuiTestCase() {
                 subscriptionModel,
                 DEFAULT_NAME,
                 SEP,
+                connectivityManager,
                 telephonyManager,
                 systemUiCarrierConfig,
                 fakeBroadcastDispatcher,
@@ -143,7 +144,6 @@ class MobileConnectionTelephonySmokeTests : SysuiTestCase() {
                 tableLogger,
                 testScope.backgroundScope,
                 fiveGServiceClient,
-                connectivityManager,
             )
     }
 

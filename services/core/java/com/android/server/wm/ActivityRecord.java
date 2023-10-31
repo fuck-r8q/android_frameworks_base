@@ -5400,18 +5400,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 // rather than just direct membership.
                 inFinishingTransition = mTransitionController.inFinishingTransition(this);
                 if (!inFinishingTransition && (visible || !mDisplayContent.isSleeping())) {
-                    Slog.e(TAG, "setVisibility=" + visible
-                            + " while transition is not collecting or finishing "
-                            + this + " caller=" + Debug.getCallers(8));
-                    // Force showing the parents because they may be hidden by previous transition.
                     if (visible) {
-                        final Transaction t = getSyncTransaction();
-                        for (WindowContainer<?> p = getParent(); p != null && p != mDisplayContent;
-                                p = p.getParent()) {
-                            if (p.mSurfaceControl != null) {
-                                t.show(p.mSurfaceControl);
-                            }
-                        }
+                        mTransitionController.onVisibleWithoutCollectingTransition(this,
+                                Debug.getCallers(1, 1));
+                    } else {
+                        Slog.w(TAG, "Set invisible without transition " + this);
                     }
                 }
             }
@@ -8448,7 +8441,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     private void clearSizeCompatModeAttributes() {
         mInSizeCompatModeForBounds = false;
+        final float lastSizeCompatScale = mSizeCompatScale;
         mSizeCompatScale = 1f;
+        if (mSizeCompatScale != lastSizeCompatScale) {
+            forAllWindows(WindowState::updateGlobalScale, false /* traverseTopToBottom */);
+        }
         mSizeCompatBounds = null;
         mCompatDisplayInsets = null;
         mLetterboxUiController.clearInheritedCompatDisplayInsets();
@@ -8456,11 +8453,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     @VisibleForTesting
     void clearSizeCompatMode() {
-        final float lastSizeCompatScale = mSizeCompatScale;
         clearSizeCompatModeAttributes();
-        if (mSizeCompatScale != lastSizeCompatScale) {
-            forAllWindows(WindowState::updateGlobalScale, false /* traverseTopToBottom */);
-        }
         // Clear config override in #updateCompatDisplayInsets().
         final int activityType = getActivityType();
         final Configuration overrideConfig = getRequestedOverrideConfiguration();
@@ -9444,13 +9437,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 throw new IllegalStateException(errorMessage);
             }
             Slog.w(TAG, errorMessage);
-        }
-
-        // Configuration's equality doesn't consider seq so if only seq number changes in resolved
-        // override configuration. Therefore ConfigurationContainer doesn't change merged override
-        // configuration, but it's used to push configuration changes so explicitly update that.
-        if (getMergedOverrideConfiguration().seq != getResolvedOverrideConfiguration().seq) {
-            onMergedOverrideConfigurationChanged();
         }
 
         // Before PiP animation is done, th windowing mode of the activity is still the previous

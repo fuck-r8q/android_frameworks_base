@@ -55,6 +55,8 @@ class FakeMobileIconInteractor(
             NetworkTypeIconModel.DefaultIcon(TelephonyIcons.THREE_G)
         )
 
+    override val showSliceAttribution = MutableStateFlow(false)
+
     override val networkName = MutableStateFlow(NetworkNameModel.IntentDerived("demo mode"))
 
     override val carrierName = MutableStateFlow("demo mode")

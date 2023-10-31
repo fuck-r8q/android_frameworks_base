@@ -220,6 +220,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController.Configurati
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.ExtensionController;
+import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
@@ -236,6 +237,10 @@ import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.SplashscreenContentDrawer;
 import com.android.wm.shell.startingsurface.StartingSurface;
 
+import dagger.Lazy;
+
+import dalvik.annotation.optimization.NeverCompile;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;
@@ -246,8 +251,6 @@ import java.util.concurrent.Executor;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
-
-import dagger.Lazy;
 
 /**
  * A class handling initialization and coordination between some of the key central surfaces in
@@ -309,8 +312,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             };
 
     void onStatusBarWindowStateChanged(@WindowVisibleState int state) {
-        updateBubblesVisibility();
         mStatusBarWindowState = state;
+        updateBubblesVisibility();
     }
 
     @Override
@@ -417,7 +420,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationWakeUpCoordinator mWakeUpCoordinator;
     private final KeyguardBypassController mKeyguardBypassController;
     private final KeyguardStateController mKeyguardStateController;
-    private final HeadsUpManagerPhone mHeadsUpManager;
+    private final HeadsUpManager mHeadsUpManager;
     private final StatusBarTouchableRegionManager mStatusBarTouchableRegionManager;
     private final FalsingCollector mFalsingCollector;
     private final FalsingManager mFalsingManager;
@@ -611,7 +614,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             NotificationWakeUpCoordinator notificationWakeUpCoordinator,
             KeyguardBypassController keyguardBypassController,
             KeyguardStateController keyguardStateController,
-            HeadsUpManagerPhone headsUpManagerPhone,
+            HeadsUpManager headsUpManager,
             DynamicPrivacyController dynamicPrivacyController,
             FalsingManager falsingManager,
             FalsingCollector falsingCollector,
@@ -718,7 +721,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mWakeUpCoordinator = notificationWakeUpCoordinator;
         mKeyguardBypassController = keyguardBypassController;
         mKeyguardStateController = keyguardStateController;
-        mHeadsUpManager = headsUpManagerPhone;
+        mHeadsUpManager = headsUpManager;
         mBackActionInteractor = backActionInteractor;
         mKeyguardIndicationController = keyguardIndicationController;
         mStatusBarTouchableRegionManager = statusBarTouchableRegionManager;
@@ -1085,13 +1088,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      * @deprecated use {@link
      * WindowRootViewVisibilityInteractor.isLockscreenOrShadeVisible} instead.
      */    @VisibleForTesting
+    @Deprecated
     void initShadeVisibilityListener() {
         mShadeController.setVisibilityListener(new ShadeController.ShadeVisibilityListener() {
-            @Override
-            public void visibilityChanged(boolean visible) {
-                onShadeVisibilityChanged(visible);
-            }
-
             @Override
             public void expandedVisibleChanged(boolean expandedVisible) {
                 if (expandedVisible) {
@@ -1195,7 +1194,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 });
         mStatusBarInitializer.initializeStatusBar();
 
-        mStatusBarTouchableRegionManager.setup(this, getNotificationShadeWindowView());
+        mStatusBarTouchableRegionManager.setup(getNotificationShadeWindowView());
 
         createNavigationBar(result);
 
@@ -1727,7 +1726,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         StatusBarMode mode = mStatusBarModeRepository.getStatusBarMode().getValue();
         mBubblesOptional.ifPresent(bubbles -> bubbles.onStatusBarVisibilityChanged(
                 mode != StatusBarMode.LIGHTS_OUT
-                        && mode != StatusBarMode.LIGHTS_OUT_TRANSPARENT));
+                        && mode != StatusBarMode.LIGHTS_OUT_TRANSPARENT
+                        && mStatusBarWindowState != WINDOW_STATE_HIDDEN));
     }
 
     void checkBarMode(
@@ -1767,6 +1767,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         }
     }
 
+    @NeverCompile
     @Override
     public void dump(PrintWriter pwOriginal, String[] args) {
         IndentingPrintWriter pw = DumpUtilsKt.asIndenting(pwOriginal);
@@ -2603,7 +2604,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                         mShouldDelayWakeUpAnimation);
 
                 updateIsKeyguard();
+                // TODO(b/301913237): can't delay transition if config_displayBlanksAfterDoze=true,
+                // otherwise, the clock will flicker during LOCKSCREEN_TRANSITION_FROM_AOD
                 mShouldDelayLockscreenTransitionFromAod = mDozeParameters.getAlwaysOn()
+                        && !mDozeParameters.getDisplayNeedsBlanking()
                         && mFeatureFlags.isEnabled(
                                 Flags.ZJ_285570694_LOCKSCREEN_TRANSITION_FROM_AOD);
                 if (!mShouldDelayLockscreenTransitionFromAod) {
@@ -2703,7 +2707,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 !mDozeServiceHost.isPulsing(), mDeviceProvisionedController.isFrpActive());
 
         mShadeSurface.setTouchAndAnimationDisabled(disabled);
-        mNotificationIconAreaController.setAnimationsEnabled(!disabled);
+        if (!mFeatureFlags.isEnabled(Flags.NOTIFICATION_ICON_CONTAINER_REFACTOR)) {
+            mNotificationIconAreaController.setAnimationsEnabled(!disabled);
+        }
     }
 
     final ScreenLifecycle.Observer mScreenObserver = new ScreenLifecycle.Observer() {
@@ -2860,13 +2866,16 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mScrimController.setExpansionAffectsAlpha(!unlocking);
 
         if (mAlternateBouncerInteractor.isVisibleState()) {
-            if ((!mKeyguardStateController.isOccluded() || mShadeSurface.isPanelExpanded())
-                    && (mState == StatusBarState.SHADE || mState == StatusBarState.SHADE_LOCKED
-                    || mTransitionToFullShadeProgress > 0f)) {
-                mScrimController.transitionTo(ScrimState.AUTH_SCRIMMED_SHADE);
-            } else {
-                mScrimController.transitionTo(ScrimState.AUTH_SCRIMMED);
+            if (!mFeatureFlags.isEnabled(Flags.ALTERNATE_BOUNCER_VIEW)) {
+                if ((!mKeyguardStateController.isOccluded() || mShadeSurface.isPanelExpanded())
+                        && (mState == StatusBarState.SHADE || mState == StatusBarState.SHADE_LOCKED
+                        || mTransitionToFullShadeProgress > 0f)) {
+                    mScrimController.transitionTo(ScrimState.AUTH_SCRIMMED_SHADE);
+                } else {
+                    mScrimController.transitionTo(ScrimState.AUTH_SCRIMMED);
+                }
             }
+
             // This will cancel the keyguardFadingAway animation if it is running. We need to do
             // this as otherwise it can remain pending and leave keyguard in a weird state.
             mUnlockScrimCallback.onCancelled();
@@ -2928,8 +2937,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     protected AccessibilityManager mAccessibilityManager;
 
     protected boolean mDeviceInteractive;
-
-    protected boolean mVisible;
 
     protected DevicePolicyManager mDevicePolicyManager;
     private final PowerManager mPowerManager;
@@ -3046,16 +3053,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         };
         mActivityStarter.dismissKeyguardThenExecute(onDismissAction, /* cancel= */ null,
                 afterKeyguardGone);
-    }
-
-    private void onShadeVisibilityChanged(boolean visible) {
-        if (mVisible != visible) {
-            mVisible = visible;
-            if (visible) {
-                DejankUtils.notifyRendererOfExpensiveFrame(
-                        getNotificationShadeWindowView(), "onShadeVisibilityChanged");
-            }
-        }
     }
 
     private void clearNotificationEffects() {
@@ -3179,7 +3176,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             // TODO: Bring these out of CentralSurfaces.
             mUserInfoControllerImpl.onDensityOrFontScaleChanged();
             mNotificationIconAreaController.onDensityOrFontScaleChanged(mContext);
-            mHeadsUpManager.onDensityOrFontScaleChanged();
         }
 
         @Override
@@ -3216,7 +3212,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     // down on the lockscreen), clear notification LED, vibration,
                     // ringing.
                     // Other transitions are covered in WindowRootViewVisibilityInteractor.
-                    if (mVisible && (newState == StatusBarState.SHADE_LOCKED
+                    if (mWindowRootViewVisibilityInteractor.isLockscreenOrShadeVisible().getValue()
+                            && (newState == StatusBarState.SHADE_LOCKED
                             || mStatusBarStateController.goingToFullShade())) {
                         clearNotificationEffects();
                     }

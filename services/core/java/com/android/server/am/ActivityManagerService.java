@@ -377,6 +377,7 @@ import android.util.FeatureFlagUtils;
 import android.util.IndentingPrintWriter;
 import android.util.IntArray;
 import android.util.Log;
+import android.util.MathUtils;
 import android.util.Pair;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
@@ -567,7 +568,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     static final int PROC_START_TIMEOUT = 10 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
 
     // How long we wait for a launched process to complete its app startup before we ANR.
-    static final int BIND_APPLICATION_TIMEOUT = 10 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
+    static final int BIND_APPLICATION_TIMEOUT = 15 * 1000 * Build.HW_TIMEOUT_MULTIPLIER;
 
     // How long we wait to kill an application zygote, after the last process using
     // it has gone away.
@@ -1553,6 +1554,11 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     int mBootPhase;
 
+    /**
+     * The time stamp that all apps have received BOOT_COMPLETED.
+     */
+    volatile long mBootCompletedTimestamp;
+
     @GuardedBy("this")
     boolean mDeterministicUidIdle = false;
 
@@ -1652,7 +1658,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     static final int UPDATE_CACHED_APP_HIGH_WATERMARK = 79;
     static final int ADD_UID_TO_OBSERVER_MSG = 80;
     static final int REMOVE_UID_FROM_OBSERVER_MSG = 81;
-    static final int BIND_APPLICATION_TIMEOUT_MSG = 82;
+    static final int BIND_APPLICATION_TIMEOUT_SOFT_MSG = 82;
+    static final int BIND_APPLICATION_TIMEOUT_HARD_MSG = 83;
 
     static final int FIRST_BROADCAST_QUEUE_MSG = 200;
 
@@ -2005,15 +2012,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 case UPDATE_CACHED_APP_HIGH_WATERMARK: {
                     mAppProfiler.mCachedAppsWatermarkData.updateCachedAppsSnapshot((long) msg.obj);
                 } break;
-                case BIND_APPLICATION_TIMEOUT_MSG: {
-                    ProcessRecord app = (ProcessRecord) msg.obj;
-
-                    final String anrMessage;
-                    synchronized (app) {
-                        anrMessage = "Process " + app + " failed to complete startup";
-                    }
-
-                    mAnrHelper.appNotResponding(app, TimeoutRecord.forAppStart(anrMessage));
+                case BIND_APPLICATION_TIMEOUT_SOFT_MSG: {
+                    handleBindApplicationTimeoutSoft((ProcessRecord) msg.obj, msg.arg1);
+                } break;
+                case BIND_APPLICATION_TIMEOUT_HARD_MSG: {
+                    handleBindApplicationTimeoutHard((ProcessRecord) msg.obj);
                 } break;
             }
         }
@@ -4232,26 +4235,34 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     @GuardedBy("this")
     private void finishForceStopPackageLocked(final String packageName, int uid) {
-        Intent intent = new Intent(Intent.ACTION_PACKAGE_RESTARTED,
-                Uri.fromParts("package", packageName, null));
+        int flags = 0;
         if (!mProcessesReady) {
-            intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY
-                    | Intent.FLAG_RECEIVER_FOREGROUND);
+            flags = Intent.FLAG_RECEIVER_REGISTERED_ONLY
+                    | Intent.FLAG_RECEIVER_FOREGROUND;
         }
-        final int userId = UserHandle.getUserId(uid);
-        final int[] broadcastAllowList =
-                getPackageManagerInternal().getVisibilityAllowList(packageName, userId);
-        intent.putExtra(Intent.EXTRA_UID, uid);
-        intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
-        broadcastIntentLocked(null /* callerApp */, null /* callerPackage */,
-                null /* callerFeatureId */, intent, null /* resolvedType */,
-                null /* resultToApp */, null /* resultTo */,
-                0 /* resultCode */, null /* resultData */, null /* resultExtras */,
-                null /* requiredPermissions */, null /* excludedPermissions */,
-                null /* excludedPackages */, OP_NONE, null /* bOptions */, false /* ordered */,
-                false /* sticky */, MY_PID, SYSTEM_UID, Binder.getCallingUid(),
-                Binder.getCallingPid(), userId, BackgroundStartPrivileges.NONE,
-                broadcastAllowList, null /* filterExtrasForReceiver */);
+        if (android.content.pm.Flags.stayStopped()) {
+            // Sent async using the PM handler, to maintain ordering with PACKAGE_UNSTOPPED
+            mPackageManagerInt.sendPackageRestartedBroadcast(packageName,
+                    uid, flags);
+        } else {
+            Intent intent = new Intent(Intent.ACTION_PACKAGE_RESTARTED,
+                    Uri.fromParts("package", packageName, null));
+            intent.addFlags(flags);
+            final int userId = UserHandle.getUserId(uid);
+            final int[] broadcastAllowList =
+                    getPackageManagerInternal().getVisibilityAllowList(packageName, userId);
+            intent.putExtra(Intent.EXTRA_UID, uid);
+            intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
+            broadcastIntentLocked(null /* callerApp */, null /* callerPackage */,
+                    null /* callerFeatureId */, intent, null /* resolvedType */,
+                    null /* resultToApp */, null /* resultTo */,
+                    0 /* resultCode */, null /* resultData */, null /* resultExtras */,
+                    null /* requiredPermissions */, null /* excludedPermissions */,
+                    null /* excludedPackages */, OP_NONE, null /* bOptions */, false /* ordered */,
+                    false /* sticky */, MY_PID, SYSTEM_UID, Binder.getCallingUid(),
+                    Binder.getCallingPid(), userId, BackgroundStartPrivileges.NONE,
+                    broadcastAllowList, null /* filterExtrasForReceiver */);
+        }
     }
 
     private void cleanupDisabledPackageComponentsLocked(
@@ -4836,6 +4847,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mPlatformCompat.resetReporting(app.info);
             }
             final ProviderInfoList providerList = ProviderInfoList.fromList(providers);
+            app.mProfile.mLastCpuDelayTime.set(app.getCpuDelayTime());
             if (app.getIsolatedEntryPoint() != null) {
                 // This is an isolated process which should just call an entry point instead of
                 // being bound to an application.
@@ -4873,9 +4885,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                         app.getStartElapsedTime(), app.getStartUptime());
             }
 
-            Message msg = mHandler.obtainMessage(BIND_APPLICATION_TIMEOUT_MSG);
+            Message msg = mHandler.obtainMessage(BIND_APPLICATION_TIMEOUT_SOFT_MSG);
             msg.obj = app;
-            mHandler.sendMessageDelayed(msg, BIND_APPLICATION_TIMEOUT);
+            msg.arg1 = BIND_APPLICATION_TIMEOUT;
+            mHandler.sendMessageDelayed(msg, msg.arg1 /* BIND_APPLICATION_TIMEOUT */);
             mHandler.removeMessages(PROC_START_TIMEOUT_MSG, app);
 
             if (profilerInfo != null) {
@@ -4952,7 +4965,8 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         if (app != null && app.getStartUid() == uid && app.getStartSeq() == startSeq) {
-            mHandler.removeMessages(BIND_APPLICATION_TIMEOUT_MSG, app);
+            mHandler.removeMessages(BIND_APPLICATION_TIMEOUT_SOFT_MSG, app);
+            mHandler.removeMessages(BIND_APPLICATION_TIMEOUT_HARD_MSG, app);
         } else {
             Slog.wtf(TAG, "Mismatched or missing ProcessRecord: " + app + ". Pid: " + pid
                     + ". Uid: " + uid);
@@ -5089,6 +5103,35 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
+    private void handleBindApplicationTimeoutSoft(ProcessRecord app, int softTimeoutMillis) {
+        // Similar logic as the broadcast delivery timeout:
+        // instead of immediately triggering an ANR, extend the timeout by
+        // the amount of time the process was runnable-but-waiting; we're
+        // only willing to do this once before triggering an hard ANR.
+        final long cpuDelayTime = app.getCpuDelayTime() - app.mProfile.mLastCpuDelayTime.get();
+        final long hardTimeoutMillis = MathUtils.constrain(cpuDelayTime, 0, softTimeoutMillis);
+
+        if (hardTimeoutMillis == 0) {
+            handleBindApplicationTimeoutHard(app);
+            return;
+        }
+
+        Slog.i(TAG, "Extending process start timeout by " + hardTimeoutMillis + "ms for " + app);
+        Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "bindApplicationTimeSoft "
+                + app.processName + "(" + app.getPid() + ")");
+        final Message msg = mHandler.obtainMessage(BIND_APPLICATION_TIMEOUT_HARD_MSG, app);
+        mHandler.sendMessageDelayed(msg, hardTimeoutMillis);
+    }
+
+    private void handleBindApplicationTimeoutHard(ProcessRecord app) {
+        final String anrMessage;
+        synchronized (app) {
+            anrMessage = "Process " + app + " failed to complete startup";
+        }
+
+        mAnrHelper.appNotResponding(app, TimeoutRecord.forAppStart(anrMessage));
+    }
+
     /**
      * @return The last part of the string of an intent's action.
      */
@@ -5213,11 +5256,15 @@ public class ActivityManagerService extends IActivityManager.Stub
                         public void performReceive(Intent intent, int resultCode,
                                 String data, Bundle extras, boolean ordered,
                                 boolean sticky, int sendingUser) {
-                            synchronized (mProcLock) {
-                                mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
-                                mAppProfiler.requestPssAllProcsLPr(
-                                        SystemClock.uptimeMillis(), true, false);
-                            }
+                            mBootCompletedTimestamp = SystemClock.uptimeMillis();
+                            // Defer the full Pss collection as the system is really busy now.
+                            mHandler.postDelayed(() -> {
+                                synchronized (mProcLock) {
+                                    mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
+                                    mAppProfiler.requestPssAllProcsLPr(
+                                            SystemClock.uptimeMillis(), true, false);
+                                }
+                            }, mConstants.FULL_PSS_MIN_INTERVAL);
                         }
                     });
             maybeLogUserspaceRebootEvent();

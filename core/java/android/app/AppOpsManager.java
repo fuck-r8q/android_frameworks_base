@@ -1478,7 +1478,8 @@ public class AppOpsManager {
             AppProtoEnums.APP_OP_RECORD_AUDIO_SANDBOXED;
 
     /**
-     * Allows the assistant app to receive the PCC-validated hotword and be voice-triggered.
+     * Allows the assistant app to be voice-triggered by detected hotwords from a trusted detection
+     * service.
      *
      * @hide
      */
@@ -1486,13 +1487,13 @@ public class AppOpsManager {
             AppProtoEnums.APP_OP_RECEIVE_SANDBOX_TRIGGER_AUDIO;
 
     /**
-     * Allows the assistant app to get the training data from the PCC sandbox to improve the
-     * hotword training model.
+     * Allows the privileged assistant app to receive the training data from the sandboxed hotword
+     * detection service.
      *
      * @hide
      */
-    public static final int OP_RECEIVE_SANDBOX_TRAINING_DATA =
-            AppProtoEnums.APP_OP_RECEIVE_SANDBOX_TRAINING_DATA;
+    public static final int OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA =
+            AppProtoEnums.APP_OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA;
 
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
@@ -1640,7 +1641,7 @@ public class AppOpsManager {
             OPSTR_CAMERA_SANDBOXED,
             OPSTR_RECORD_AUDIO_SANDBOXED,
             OPSTR_RECEIVE_SANDBOX_TRIGGER_AUDIO,
-            OPSTR_RECEIVE_SANDBOX_TRAINING_DATA
+            OPSTR_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA
     })
     public @interface AppOpString {}
 
@@ -2252,22 +2253,22 @@ public class AppOpsManager {
     public static final String OPSTR_USE_FULL_SCREEN_INTENT = "android:use_full_screen_intent";
 
     /**
-     * Allows the assistant app to receive the PCC-validated hotword and be voice-triggered.
+     * Allows the assistant app to be voice-triggered by detected hotwords from a trusted detection
+     * service.
      *
      * @hide
      */
-    @SystemApi
     public static final String OPSTR_RECEIVE_SANDBOX_TRIGGER_AUDIO =
             "android:receive_sandbox_trigger_audio";
 
     /**
-     * Allows the assistant app to get the training data from the PCC sandbox to improve
-     * the hotword training model.
+     * Allows the privileged assistant app to receive training data from the sandboxed hotword
+     * detection service.
      *
      * @hide
      */
-    public static final String OPSTR_RECEIVE_SANDBOX_TRAINING_DATA =
-            "android:receive_sandbox_training_data";
+    public static final String OPSTR_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA =
+            "android:RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA";
 
     /** {@link #sAppOpsToNote} not initialized yet for this op */
     private static final byte SHOULD_COLLECT_NOTE_OP_NOT_INITIALIZED = 0;
@@ -2379,7 +2380,9 @@ public class AppOpsManager {
             OP_RUN_USER_INITIATED_JOBS,
             OP_FOREGROUND_SERVICE_SPECIAL_USE,
             OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD,
-            OP_USE_FULL_SCREEN_INTENT
+            OP_USE_FULL_SCREEN_INTENT,
+            OP_RECEIVE_SANDBOX_TRIGGER_AUDIO,
+            OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA
     };
 
     static final AppOpInfo[] sAppOpInfos = new AppOpInfo[]{
@@ -2810,10 +2813,13 @@ public class AppOpsManager {
         new AppOpInfo.Builder(OP_RECEIVE_SANDBOX_TRIGGER_AUDIO,
                 OPSTR_RECEIVE_SANDBOX_TRIGGER_AUDIO,
                 "RECEIVE_SANDBOX_TRIGGER_AUDIO")
-                .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
-        new AppOpInfo.Builder(OP_RECEIVE_SANDBOX_TRAINING_DATA,
-                OPSTR_RECEIVE_SANDBOX_TRAINING_DATA,
-                "RECEIVE_SANDBOX_TRAINING_DATA").build()
+                .setPermission(Manifest.permission.RECEIVE_SANDBOX_TRIGGER_AUDIO)
+                .setDefaultMode(AppOpsManager.MODE_DEFAULT).build(),
+        new AppOpInfo.Builder(OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA,
+                OPSTR_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA,
+                "RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA")
+                .setPermission(Manifest.permission.RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA)
+                .setDefaultMode(AppOpsManager.MODE_DEFAULT).build()
     };
 
     // The number of longs needed to form a full bitmask of app ops

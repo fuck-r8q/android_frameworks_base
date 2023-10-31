@@ -51,6 +51,7 @@ import android.credentials.CredentialManager;
 import android.database.sqlite.SQLiteCompatibilityWalFlags;
 import android.database.sqlite.SQLiteGlobal;
 import android.graphics.GraphicsStatsService;
+import android.graphics.Typeface;
 import android.hardware.display.DisplayManagerInternal;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityModuleConnector;
@@ -162,6 +163,7 @@ import com.android.server.os.BugreportManagerService;
 import com.android.server.os.DeviceIdentifiersPolicyService;
 import com.android.server.os.NativeTombstoneManagerService;
 import com.android.server.os.SchedulingPolicyService;
+import com.android.server.pdb.PersistentDataBlockService;
 import com.android.server.people.PeopleService;
 import com.android.server.permission.access.AccessCheckingService;
 import com.android.server.pm.ApexManager;
@@ -270,6 +272,8 @@ public final class SystemServer implements Dumpable {
             "com.android.server.backup.BackupManagerService$Lifecycle";
     private static final String APPWIDGET_SERVICE_CLASS =
             "com.android.server.appwidget.AppWidgetService";
+    private static final String ARC_SYSTEM_HEALTH_SERVICE =
+            "com.android.server.arc.health.ArcSystemHealthService";
     private static final String VOICE_RECOGNITION_MANAGER_SERVICE_CLASS =
             "com.android.server.voiceinteraction.VoiceInteractionManagerService";
     private static final String APP_HIBERNATION_SERVICE_CLASS =
@@ -920,6 +924,14 @@ public final class SystemServer implements Dumpable {
             SystemServerInitThreadPool tp = SystemServerInitThreadPool.start();
             mDumper.addDumpable(tp);
 
+            // Lazily load the pre-installed system font map in SystemServer only if we're not doing
+            // the optimized font loading in the FontManagerService.
+            if (!com.android.text.flags.Flags.useOptimizedBoottimeFontLoading()
+                    && Typeface.ENABLE_LAZY_TYPEFACE_INITIALIZATION) {
+                Slog.i(TAG, "Loading pre-installed system font map.");
+                Typeface.loadPreinstalledSystemFontMap();
+            }
+
             // Attach JVMTI agent if this is a debuggable build and the system property is set.
             if (Build.IS_DEBUGGABLE) {
                 // Property is of the form "library_path=parameters".
@@ -1291,6 +1303,12 @@ public final class SystemServer implements Dumpable {
                 Watchdog.getInstance().resumeWatchingCurrentThread("moveab");
                 t.traceEnd();
             }
+        }
+
+        if (Build.IS_ARC) {
+            t.traceBegin("StartArcSystemHealthService");
+            mSystemServiceManager.startService(ARC_SYSTEM_HEALTH_SERVICE);
+            t.traceEnd();
         }
 
         t.traceBegin("StartUserManagerService");

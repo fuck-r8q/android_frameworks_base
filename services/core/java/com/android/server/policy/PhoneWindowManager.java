@@ -338,6 +338,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int SHORT_PRESS_SLEEP_GO_TO_SLEEP = 0;
     static final int SHORT_PRESS_SLEEP_GO_TO_SLEEP_AND_GO_HOME = 1;
 
+    // must match: config_shortPressOnSettingsBehavior in config.xml
+    static final int SHORT_PRESS_SETTINGS_NOTHING = 0;
+    static final int SHORT_PRESS_SETTINGS_NOTIFICATION_PANEL = 1;
+    static final int LAST_SHORT_PRESS_SETTINGS_BEHAVIOR = SHORT_PRESS_SETTINGS_NOTIFICATION_PANEL;
+
     static final int PENDING_KEY_NULL = -1;
 
     // Must match: config_shortPressOnStemPrimaryBehavior in config.xml
@@ -615,6 +620,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     // What we do when the user double-taps on home
     int mDoubleTapOnHomeBehavior;
+
+    // What we do when the user presses on settings
+    int mShortPressOnSettingsBehavior;
 
     // Must match config_primaryShortPressTargetActivity in config.xml
     ComponentName mPrimaryShortPressTargetActivity;
@@ -2800,6 +2808,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mPackageManager.hasSystemFeature(FEATURE_PICTURE_IN_PICTURE)) {
             mShortPressOnWindowBehavior = SHORT_PRESS_WINDOW_PICTURE_IN_PICTURE;
         }
+
+        mShortPressOnSettingsBehavior = res.getInteger(
+                com.android.internal.R.integer.config_shortPressOnSettingsBehavior);
+        if (mShortPressOnSettingsBehavior < SHORT_PRESS_SETTINGS_NOTHING
+                || mShortPressOnSettingsBehavior > LAST_SHORT_PRESS_SETTINGS_BEHAVIOR) {
+            mShortPressOnSettingsBehavior = SHORT_PRESS_SETTINGS_NOTHING;
+        }
     }
 
     private void updateSettings() {
@@ -3672,6 +3687,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 Slog.wtf(TAG, "KEYCODE_STYLUS_BUTTON_* should be handled in"
                         + " interceptKeyBeforeQueueing");
                 return true;
+            case KeyEvent.KEYCODE_SETTINGS:
+                if (mShortPressOnSettingsBehavior == SHORT_PRESS_SETTINGS_NOTIFICATION_PANEL) {
+                    if (!down) {
+                        toggleNotificationPanel();
+                        logKeyboardSystemsEvent(event, KeyboardLogEvent.TOGGLE_NOTIFICATION_PANEL);
+                    }
+                    return true;
+                }
+                break;
         }
         if (isValidGlobalKey(keyCode)
                 && mGlobalKeyManager.handleGlobalKey(mContext, keyCode, event)) {
@@ -6314,6 +6338,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.print("mLongPressOnPowerBehavior=");
                 pw.println(longPressOnPowerBehaviorToString(mLongPressOnPowerBehavior));
         pw.print(prefix);
+        pw.print("mShortPressOnSettingsBehavior=");
+        pw.println(shortPressOnSettingsBehaviorToString(mShortPressOnSettingsBehavior));
+        pw.print(prefix);
         pw.print("mLongPressOnPowerAssistantTimeoutMs=");
         pw.println(mLongPressOnPowerAssistantTimeoutMs);
         pw.print(prefix);
@@ -6507,6 +6534,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 return "LONG_PRESS_POWER_GO_TO_VOICE_ASSIST";
             case LONG_PRESS_POWER_ASSISTANT:
                 return "LONG_PRESS_POWER_ASSISTANT";
+            default:
+                return Integer.toString(behavior);
+        }
+    }
+
+    private static String shortPressOnSettingsBehaviorToString(int behavior) {
+        switch (behavior) {
+            case SHORT_PRESS_SETTINGS_NOTHING:
+                return "SHORT_PRESS_SETTINGS_NOTHING";
+            case SHORT_PRESS_SETTINGS_NOTIFICATION_PANEL:
+                return "SHORT_PRESS_SETTINGS_NOTIFICATION_PANEL";
             default:
                 return Integer.toString(behavior);
         }

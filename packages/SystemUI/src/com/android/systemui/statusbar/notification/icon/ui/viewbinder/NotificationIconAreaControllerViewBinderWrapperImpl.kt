@@ -26,26 +26,21 @@ import android.widget.FrameLayout
 import androidx.annotation.ColorInt
 import androidx.annotation.VisibleForTesting
 import androidx.collection.ArrayMap
-import com.android.app.animation.Interpolators
 import com.android.internal.statusbar.StatusBarIcon
 import com.android.internal.util.ContrastColorUtil
 import com.android.settingslib.Utils
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.demomode.DemoMode
 import com.android.systemui.demomode.DemoModeController
-import com.android.systemui.flags.FeatureFlags
+import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags
-import com.android.systemui.flags.Flags.NEW_AOD_TRANSITION
-import com.android.systemui.flags.ViewRefactorFlag
+import com.android.systemui.flags.RefactorFlag
 import com.android.systemui.plugins.DarkIconDispatcher
-import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.CrossFadeHelper
 import com.android.systemui.statusbar.NotificationListener
 import com.android.systemui.statusbar.NotificationMediaManager
 import com.android.systemui.statusbar.NotificationShelfController
 import com.android.systemui.statusbar.StatusBarIconView
-import com.android.systemui.statusbar.StatusBarState
 import com.android.systemui.statusbar.notification.NotificationUtils
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator
 import com.android.systemui.statusbar.notification.collection.ListEntry
@@ -60,6 +55,7 @@ import com.android.systemui.statusbar.phone.KeyguardBypassController
 import com.android.systemui.statusbar.phone.NotificationIconAreaController
 import com.android.systemui.statusbar.phone.NotificationIconContainer
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController
+import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.window.StatusBarWindowController
 import com.android.wm.shell.bubbles.Bubbles
 import java.util.Optional
@@ -79,9 +75,9 @@ class NotificationIconAreaControllerViewBinderWrapperImpl
 @Inject
 constructor(
     private val context: Context,
-    private val statusBarStateController: StatusBarStateController,
     private val wakeUpCoordinator: NotificationWakeUpCoordinator,
     private val bypassController: KeyguardBypassController,
+    private val configurationController: ConfigurationController,
     private val mediaManager: NotificationMediaManager,
     notificationListener: NotificationListener,
     private val dozeParameters: DozeParameters,
@@ -89,7 +85,7 @@ constructor(
     private val bubblesOptional: Optional<Bubbles>,
     demoModeController: DemoModeController,
     darkIconDispatcher: DarkIconDispatcher,
-    private val featureFlags: FeatureFlags,
+    private val featureFlags: FeatureFlagsClassic,
     private val statusBarWindowController: StatusBarWindowController,
     private val screenOffAnimationController: ScreenOffAnimationController,
     private val shelfIconsViewModel: NotificationIconContainerShelfViewModel,
@@ -98,14 +94,12 @@ constructor(
 ) :
     NotificationIconAreaController,
     DarkIconDispatcher.DarkReceiver,
-    StatusBarStateController.StateListener,
     NotificationWakeUpCoordinator.WakeUpListener,
     DemoMode {
 
     private val contrastColorUtil: ContrastColorUtil = ContrastColorUtil.getInstance(context)
     private val updateStatusBarIcons = Runnable { updateStatusBarIcons() }
-    private val shelfRefactor = ViewRefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR)
-    private val statusViewMigrated = featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)
+    private val shelfRefactor = RefactorFlag(featureFlags, Flags.NOTIFICATION_SHELF_REFACTOR)
     private val tintAreas = ArrayList<Rect>()
 
     private var iconSize = 0
@@ -118,9 +112,7 @@ constructor(
     private var aodIcons: NotificationIconContainer? = null
     private var aodBindJob: DisposableHandle? = null
     private var aodIconAppearTranslation = 0
-    private var animationsEnabled = false
     private var aodIconTint = 0
-    private var aodIconsVisible = false
     private var showLowPriority = true
 
     @VisibleForTesting
@@ -133,7 +125,6 @@ constructor(
         }
 
     init {
-        statusBarStateController.addCallback(this)
         wakeUpCoordinator.addListener(this)
         demoModeController.addCallback(this)
         notificationListener.addNotificationSettingsListener(settingsListener)
@@ -157,9 +148,15 @@ constructor(
         }
         this.aodIcons = aodIcons
         this.aodIcons!!.setOnLockScreen(true)
-        aodBindJob = NotificationIconContainerViewBinder.bind(aodIcons, aodIconsViewModel)
-        updateAodIconsVisibility(animate = false, forceUpdate = changed)
-        updateAnimations()
+        aodBindJob =
+            NotificationIconContainerViewBinder.bind(
+                aodIcons,
+                aodIconsViewModel,
+                configurationController,
+                dozeParameters,
+                featureFlags,
+                screenOffAnimationController,
+            )
         if (changed) {
             updateAodNotificationIcons()
         }
@@ -171,7 +168,14 @@ constructor(
 
     override fun setShelfIcons(icons: NotificationIconContainer) {
         if (shelfRefactor.expectEnabled()) {
-            NotificationIconContainerViewBinder.bind(icons, shelfIconsViewModel)
+            NotificationIconContainerViewBinder.bind(
+                icons,
+                shelfIconsViewModel,
+                configurationController,
+                dozeParameters,
+                featureFlags,
+                screenOffAnimationController,
+            )
             shelfIcons = icons
         }
     }
@@ -244,23 +248,7 @@ constructor(
         notificationIcons!!.setIsolatedIconLocation(iconDrawingRect, requireStateUpdate)
     }
 
-    override fun onDozingChanged(isDozing: Boolean) {
-        if (aodIcons == null) {
-            return
-        }
-        val animate = (dozeParameters.alwaysOn && !dozeParameters.displayNeedsBlanking)
-        aodIcons!!.setDozing(isDozing, animate, 0)
-    }
-
-    override fun setAnimationsEnabled(enabled: Boolean) {
-        animationsEnabled = enabled
-        updateAnimations()
-    }
-
-    override fun onStateChanged(newState: Int) {
-        updateAodIconsVisibility(animate = false, forceUpdate = false)
-        updateAnimations()
-    }
+    override fun setAnimationsEnabled(enabled: Boolean) = unsupported
 
     override fun onThemeChanged() {
         reloadAodColor()
@@ -271,51 +259,9 @@ constructor(
         return if (aodIcons == null) 0 else aodIcons!!.height
     }
 
-    @VisibleForTesting
-    fun appearAodIcons() {
-        if (aodIcons == null) {
-            return
-        }
-        if (screenOffAnimationController.shouldAnimateAodIcons()) {
-            if (!statusViewMigrated) {
-                aodIcons!!.translationY = -aodIconAppearTranslation.toFloat()
-            }
-            aodIcons!!.alpha = 0f
-            animateInAodIconTranslation()
-            aodIcons!!
-                .animate()
-                .alpha(1f)
-                .setInterpolator(Interpolators.LINEAR)
-                .setDuration(AOD_ICONS_APPEAR_DURATION)
-                .start()
-        } else {
-            aodIcons!!.alpha = 1.0f
-            if (!statusViewMigrated) {
-                aodIcons!!.translationY = 0f
-            }
-        }
-    }
-
     override fun onFullyHiddenChanged(isFullyHidden: Boolean) {
-        var animate = true
-        if (!bypassController.bypassEnabled) {
-            animate = dozeParameters.alwaysOn && !dozeParameters.displayNeedsBlanking
-            if (!featureFlags.isEnabled(NEW_AOD_TRANSITION)) {
-                // We only want the appear animations to happen when the notifications get fully
-                // hidden,
-                // since otherwise the unhide animation overlaps
-                animate = animate and isFullyHidden
-            }
-        }
-        updateAodIconsVisibility(animate, false /* force */)
         updateAodNotificationIcons()
         updateAodIconColors()
-    }
-
-    override fun onPulseExpansionChanged(expandingChanged: Boolean) {
-        if (expandingChanged) {
-            updateAodIconsVisibility(animate = true, forceUpdate = false)
-        }
     }
 
     override fun demoCommands(): List<String> {
@@ -348,7 +294,14 @@ constructor(
         val layoutInflater = LayoutInflater.from(context)
         notificationIconArea = inflateIconArea(layoutInflater)
         notificationIcons = notificationIconArea?.findViewById(R.id.notificationIcons)
-        NotificationIconContainerViewBinder.bind(notificationIcons!!, statusBarIconsViewModel)
+        NotificationIconContainerViewBinder.bind(
+            notificationIcons!!,
+            statusBarIconsViewModel,
+            configurationController,
+            dozeParameters,
+            featureFlags,
+            screenOffAnimationController,
+        )
     }
 
     private fun updateIconLayoutParams(context: Context) {
@@ -598,25 +551,6 @@ constructor(
         v.setDecorColor(tint)
     }
 
-    private fun updateAnimations() {
-        val inShade = statusBarStateController.state == StatusBarState.SHADE
-        if (aodIcons != null) {
-            aodIcons!!.setAnimationsEnabled(animationsEnabled && !inShade)
-        }
-        notificationIcons!!.setAnimationsEnabled(animationsEnabled && inShade)
-    }
-
-    private fun animateInAodIconTranslation() {
-        if (!statusViewMigrated) {
-            aodIcons!!
-                .animate()
-                .setInterpolator(Interpolators.DECELERATE_QUINT)
-                .translationY(0f)
-                .setDuration(AOD_ICONS_APPEAR_DURATION)
-                .start()
-        }
-    }
-
     private fun reloadAodColor() {
         aodIconTint =
             Utils.getColorAttrDefaultColor(
@@ -639,70 +573,13 @@ constructor(
         }
     }
 
-    private fun updateAodIconsVisibility(animate: Boolean, forceUpdate: Boolean) {
-        if (aodIcons == null) {
-            return
-        }
-        var visible = (bypassController.bypassEnabled || wakeUpCoordinator.notificationsFullyHidden)
-
-        // Hide the AOD icons if we're not in the KEYGUARD state unless the screen off animation is
-        // playing, in which case we want them to be visible since we're animating in the AOD UI and
-        // will be switching to KEYGUARD shortly.
-        if (
-            statusBarStateController.state != StatusBarState.KEYGUARD &&
-                !screenOffAnimationController.shouldShowAodIconsWhenShade()
-        ) {
-            visible = false
-        }
-        if (visible && wakeUpCoordinator.isPulseExpanding() && !bypassController.bypassEnabled) {
-            visible = false
-        }
-        if (aodIconsVisible != visible || forceUpdate) {
-            aodIconsVisible = visible
-            aodIcons!!.animate().cancel()
-            if (animate) {
-                if (featureFlags.isEnabled(NEW_AOD_TRANSITION)) {
-                    // Let's make sure the icon are translated to 0, since we cancelled it above
-                    animateInAodIconTranslation()
-                    if (aodIconsVisible) {
-                        CrossFadeHelper.fadeIn(aodIcons)
-                    } else {
-                        CrossFadeHelper.fadeOut(aodIcons)
-                    }
-                } else {
-                    val wasFullyInvisible = aodIcons!!.visibility != View.VISIBLE
-                    if (aodIconsVisible) {
-                        if (wasFullyInvisible) {
-                            // No fading here, let's just appear the icons instead!
-                            aodIcons!!.visibility = View.VISIBLE
-                            aodIcons!!.alpha = 1.0f
-                            appearAodIcons()
-                        } else {
-                            // Let's make sure the icon are translated to 0, since we cancelled it
-                            // above
-                            animateInAodIconTranslation()
-                            // We were fading out, let's fade in instead
-                            CrossFadeHelper.fadeIn(aodIcons)
-                        }
-                    } else {
-                        // Let's make sure the icon are translated to 0, since we cancelled it above
-                        animateInAodIconTranslation()
-                        CrossFadeHelper.fadeOut(aodIcons)
-                    }
-                }
-            } else {
-                aodIcons!!.alpha = 1.0f
-                if (!statusViewMigrated) {
-                    aodIcons!!.translationY = 0f
-                }
-                aodIcons!!.visibility = if (visible) View.VISIBLE else View.INVISIBLE
-            }
-        }
-    }
-
     companion object {
-        private const val AOD_ICONS_APPEAR_DURATION: Long = 200
-
         @ColorInt private val DEFAULT_AOD_ICON_COLOR = -0x1
+
+        val unsupported: Nothing
+            get() =
+                error(
+                    "Code path not supported when NOTIFICATION_ICON_CONTAINER_REFACTOR is disabled"
+                )
     }
 }

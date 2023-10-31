@@ -177,6 +177,12 @@
     <!-- Size of the view displaying the mobile signal icon in the status bar. This value should
         match the viewport height of mobile signal drawables such as ic_lte_mobiledata -->
     <dimen name="status_bar_mobile_type_size">16sp</dimen>
+    <!-- Size of the view that contains the network type. Should be equal to
+    status_bar_mobile_type_size + 2, to account for 1sp top and bottom padding -->
+    <dimen name="status_bar_mobile_container_height">18sp</dimen>
+    <!-- Corner radius for the background of the network type indicator. Should be equal to
+        status_bar_mobile_container_height / 2 -->
+    <dimen name="status_bar_mobile_container_corner_radius">9sp</dimen>
     <!-- Size of the view displaying the mobile roam icon in the status bar. This value should
         match the viewport size of drawable stat_sys_roaming -->
     <dimen name="status_bar_mobile_roam_size">8sp</dimen>
@@ -846,11 +852,16 @@
     <!-- Amount the button should shake when it's not long-pressed for long enough. -->
     <dimen name="keyguard_affordance_shake_amplitude">8dp</dimen>
 
-    <dimen name="keyguard_affordance_horizontal_offset">32dp</dimen>
+    <dimen name="keyguard_affordance_horizontal_offset">16dp</dimen>
     <dimen name="keyguard_affordance_vertical_offset">32dp</dimen>
     <!-- Value should be at least sum of 'keyguard_affordance_width' +
          'keyguard_affordance_horizontal_offset' -->
     <dimen name="keyguard_indication_area_padding">82dp</dimen>
+
+    <!-- The width/padding of the communal tutorial indicator on keyguard. -->
+    <dimen name="communal_tutorial_indicator_fixed_width">168dp</dimen>
+    <dimen name="communal_tutorial_indicator_padding">24dp</dimen>
+    <dimen name="communal_tutorial_indicator_horizontal_offset">32dp</dimen>
 
     <!-- The width/height of the unlock icon view on keyguard. -->
     <dimen name="keyguard_lock_height">42dp</dimen>
@@ -1349,6 +1360,9 @@
     <dimen name="screenrecord_warning_line_height">20dp</dimen>
     <dimen name="screenrecord_options_padding_bottom">16dp</dimen>
     <dimen name="screenrecord_buttons_margin_top">20dp</dimen>
+
+    <!-- Connected display dialog -->
+    <dimen name="connected_display_dialog_logo_size">48dp</dimen>
 
     <!-- Keyguard user switcher -->
     <dimen name="kg_user_switcher_text_size">16sp</dimen>

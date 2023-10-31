@@ -18,6 +18,7 @@
 package com.android.packageinstaller;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
@@ -135,15 +136,20 @@ public class PackageUtil {
     static final class AppSnippet implements Parcelable {
         @NonNull public CharSequence label;
         @Nullable public Drawable icon;
-        public AppSnippet(@NonNull CharSequence label, @Nullable Drawable icon) {
+        public int iconSize;
+
+        AppSnippet(@NonNull CharSequence label, @Nullable Drawable icon, Context context) {
             this.label = label;
             this.icon = icon;
+            final ActivityManager am = context.getSystemService(ActivityManager.class);
+            this.iconSize = am.getLauncherLargeIconSize();
         }
 
         private AppSnippet(Parcel in) {
             label = in.readString();
             Bitmap bmp = in.readParcelable(getClass().getClassLoader(), Bitmap.class);
             icon = new BitmapDrawable(Resources.getSystem(), bmp);
+            iconSize = in.readInt();
         }
 
         @Override
@@ -161,6 +167,7 @@ public class PackageUtil {
             dest.writeString(label.toString());
             Bitmap bmp = getBitmapFromDrawable(icon);
             dest.writeParcelable(bmp, 0);
+            dest.writeInt(iconSize);
         }
 
         private Bitmap getBitmapFromDrawable(Drawable drawable) {
@@ -174,6 +181,14 @@ public class PackageUtil {
             // bitmap held within
             drawable.draw(canvas);
 
+            // Scale it down if the icon is too large
+            if ((bmp.getWidth() > iconSize * 2) || (bmp.getHeight() > iconSize * 2)) {
+                Bitmap scaledBitmap = Bitmap.createScaledBitmap(bmp, iconSize, iconSize, true);
+                if (scaledBitmap != bmp) {
+                    bmp.recycle();
+                }
+                return scaledBitmap;
+            }
             return bmp;
         }
 
@@ -241,7 +256,7 @@ public class PackageUtil {
         } catch (OutOfMemoryError e) {
             Log.i(LOG_TAG, "Could not load app icon", e);
         }
-        return new PackageUtil.AppSnippet(label, icon);
+        return new PackageUtil.AppSnippet(label, icon, pContext);
     }
 
     private static String findFilePath(File[] files, String postfix) {

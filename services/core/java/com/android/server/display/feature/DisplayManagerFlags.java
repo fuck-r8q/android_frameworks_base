@@ -47,25 +47,25 @@ public class DisplayManagerFlags {
             Flags.FLAG_ENABLE_ADAPTIVE_TONE_IMPROVEMENTS_1,
             Flags::enableAdaptiveToneImprovements1);
 
+    private final FlagState mAdaptiveToneImprovements2 = new FlagState(
+            Flags.FLAG_ENABLE_ADAPTIVE_TONE_IMPROVEMENTS_2,
+            Flags::enableAdaptiveToneImprovements2);
+
     private final FlagState mDisplayOffloadFlagState = new FlagState(
             Flags.FLAG_ENABLE_DISPLAY_OFFLOAD,
             Flags::enableDisplayOffload);
-
-    private final FlagState mDisplayResolutionRangeVotingState = new FlagState(
-            Flags.FLAG_ENABLE_DISPLAY_RESOLUTION_RANGE_VOTING,
-            Flags::enableDisplayResolutionRangeVoting);
-
-    private final FlagState mUserPreferredModeVoteState = new FlagState(
-            Flags.FLAG_ENABLE_USER_PREFERRED_MODE_VOTE,
-            Flags::enableUserPreferredModeVote);
 
     private final FlagState mExternalDisplayLimitModeState = new FlagState(
             Flags.FLAG_ENABLE_MODE_LIMIT_FOR_EXTERNAL_DISPLAY,
             Flags::enableModeLimitForExternalDisplay);
 
-    private final FlagState mDisplaysRefreshRatesSynchronizationState = new FlagState(
-            Flags.FLAG_ENABLE_DISPLAYS_REFRESH_RATES_SYNCHRONIZATION,
-            Flags::enableDisplaysRefreshRatesSynchronization);
+    private final FlagState mConnectedDisplayErrorHandlingFlagState = new FlagState(
+            Flags.FLAG_ENABLE_CONNECTED_DISPLAY_ERROR_HANDLING,
+            Flags::enableConnectedDisplayErrorHandling);
+
+    private final FlagState mBackUpSmoothDisplayAndForcePeakRefreshRateFlagState = new FlagState(
+            Flags.FLAG_BACK_UP_SMOOTH_DISPLAY_AND_FORCE_PEAK_REFRESH_RATE,
+            Flags::backUpSmoothDisplayAndForcePeakRefreshRate);
 
     /** Returns whether connected display management is enabled or not. */
     public boolean isConnectedDisplayManagementEnabled() {
@@ -88,9 +88,16 @@ public class DisplayManagerFlags {
         return mAdaptiveToneImprovements1.isEnabled();
     }
 
+    /**
+     * Returns whether adaptive tone improvements are enabled
+     */
+    public boolean isAdaptiveTone2Enabled() {
+        return mAdaptiveToneImprovements2.isEnabled();
+    }
+
     /** Returns whether resolution range voting feature is enabled or not. */
     public boolean isDisplayResolutionRangeVotingEnabled() {
-        return mDisplayResolutionRangeVotingState.isEnabled();
+        return isExternalDisplayLimitModeEnabled();
     }
 
     /**
@@ -98,7 +105,7 @@ public class DisplayManagerFlags {
      *      {@link com.android.server.display.mode.DisplayModeDirector}
      */
     public boolean isUserPreferredModeVoteEnabled() {
-        return mUserPreferredModeVoteState.isEnabled();
+        return isExternalDisplayLimitModeEnabled();
     }
 
     /**
@@ -112,12 +119,21 @@ public class DisplayManagerFlags {
      * @return Whether displays refresh rate synchronization is enabled.
      */
     public boolean isDisplaysRefreshRatesSynchronizationEnabled() {
-        return mDisplaysRefreshRatesSynchronizationState.isEnabled();
+        return isExternalDisplayLimitModeEnabled();
     }
 
     /** Returns whether displayoffload is enabled on not */
     public boolean isDisplayOffloadEnabled() {
         return mDisplayOffloadFlagState.isEnabled();
+    }
+
+    /** Returns whether error notifications for connected displays are enabled on not */
+    public boolean isConnectedDisplayErrorHandlingEnabled() {
+        return mConnectedDisplayErrorHandlingFlagState.isEnabled();
+    }
+
+    public boolean isBackUpSmoothDisplayAndForcePeakRefreshRateEnabled() {
+        return mBackUpSmoothDisplayAndForcePeakRefreshRateFlagState.isEnabled();
     }
 
     private static class FlagState {
@@ -133,7 +149,6 @@ public class DisplayManagerFlags {
             mFlagFunction = flagFunction;
         }
 
-        // TODO(b/297159910): Simplify using READ-ONLY flags when available.
         private boolean isEnabled() {
             if (mEnabledSet) {
                 if (DEBUG) {
@@ -150,19 +165,13 @@ public class DisplayManagerFlags {
         }
 
         private boolean flagOrSystemProperty(Supplier<Boolean> flagFunction, String flagName) {
+            boolean flagValue = flagFunction.get();
             // TODO(b/299462337) Remove when the infrastructure is ready.
-            if ((Build.IS_ENG || Build.IS_USERDEBUG)
-                    && SystemProperties.getBoolean("persist.sys." + flagName, false)) {
-                return true;
+            if (Build.IS_ENG || Build.IS_USERDEBUG) {
+                return SystemProperties.getBoolean("persist.sys." + flagName + "-override",
+                        flagValue);
             }
-            try {
-                return flagFunction.get();
-            } catch (Throwable ex) {
-                if (DEBUG) {
-                    Slog.i(TAG, "Flags not ready yet. Return false for " + flagName, ex);
-                }
-                return false;
-            }
+            return flagValue;
         }
     }
 }

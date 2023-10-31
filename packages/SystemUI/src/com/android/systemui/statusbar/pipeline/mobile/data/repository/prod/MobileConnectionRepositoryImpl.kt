@@ -128,6 +128,7 @@ class MobileConnectionRepositoryImpl(
     subscriptionModel: StateFlow<SubscriptionModel?>,
     defaultNetworkName: NetworkNameModel,
     networkNameSeparator: String,
+    connectivityManager: ConnectivityManager,
     private val telephonyManager: TelephonyManager,
     systemUiCarrierConfig: SystemUiCarrierConfig,
     broadcastDispatcher: BroadcastDispatcher,
@@ -137,7 +138,6 @@ class MobileConnectionRepositoryImpl(
     override val tableLogBuffer: TableLogBuffer,
     scope: CoroutineScope,
     private val fiveGServiceClient: FiveGServiceClient,
-    private val connectivityManager: ConnectivityManager
 ) : MobileConnectionRepository {
     init {
         if (telephonyManager.subscriptionId != subId) {
@@ -648,11 +648,50 @@ class MobileConnectionRepositoryImpl(
     /** Typical mobile connections aren't available during airplane mode. */
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false).asStateFlow()
 
+    /**
+     * Currently, a network with NET_CAPABILITY_PRIORITIZE_LATENCY is the only type of network that
+     * we consider to be a "network slice". _PRIORITIZE_BANDWIDTH may be added in the future. Any of
+     * these capabilities that are used here must also be represented in the
+     * self_certified_network_capabilities.xml config file
+     */
+    @SuppressLint("WrongConstant")
+    private val networkSliceRequest =
+        NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_PRIORITIZE_LATENCY)
+            .setSubscriptionIds(setOf(subId))
+            .build()
+
+    @SuppressLint("MissingPermission")
+    override val hasPrioritizedNetworkCapabilities: StateFlow<Boolean> =
+        conflatedCallbackFlow {
+                // Our network callback listens only for this.subId && net_cap_prioritize_latency
+                // therefore our state is a simple mapping of whether or not that network exists
+                val callback =
+                    object : NetworkCallback() {
+                        override fun onAvailable(network: Network) {
+                            logger.logPrioritizedNetworkAvailable(network.netId)
+                            trySend(true)
+                        }
+
+                        override fun onLost(network: Network) {
+                            logger.logPrioritizedNetworkLost(network.netId)
+                            trySend(false)
+                        }
+                    }
+
+                connectivityManager.registerNetworkCallback(networkSliceRequest, callback)
+
+                awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+            }
+            .flowOn(bgDispatcher)
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
     class Factory
     @Inject
     constructor(
         private val context: Context,
         private val broadcastDispatcher: BroadcastDispatcher,
+        private val connectivityManager: ConnectivityManager,
         private val telephonyManager: TelephonyManager,
         private val logger: MobileInputLogger,
         private val carrierConfigRepository: CarrierConfigRepository,
@@ -660,7 +699,6 @@ class MobileConnectionRepositoryImpl(
         @Background private val bgDispatcher: CoroutineDispatcher,
         @Application private val scope: CoroutineScope,
         private val fiveGServiceClient: FiveGServiceClient,
-        private val connectivityManager: ConnectivityManager
     ) {
         fun build(
             subId: Int,
@@ -675,6 +713,7 @@ class MobileConnectionRepositoryImpl(
                 subscriptionModel,
                 defaultNetworkName,
                 networkNameSeparator,
+                connectivityManager,
                 telephonyManager.createForSubscriptionId(subId),
                 carrierConfigRepository.getOrCreateConfigForSubId(subId),
                 broadcastDispatcher,
@@ -684,7 +723,6 @@ class MobileConnectionRepositoryImpl(
                 mobileLogger,
                 scope,
                 fiveGServiceClient,
-                connectivityManager
             )
         }
     }
@@ -699,11 +737,17 @@ private fun Intent.carrierId(): Int =
  */
 sealed interface CallbackEvent {
     data class OnCarrierNetworkChange(val active: Boolean) : CallbackEvent
+
     data class OnDataActivity(val direction: Int) : CallbackEvent
+
     data class OnDataConnectionStateChanged(val dataState: Int) : CallbackEvent
+
     data class OnDataEnabledChanged(val enabled: Boolean) : CallbackEvent
+
     data class OnDisplayInfoChanged(val telephonyDisplayInfo: TelephonyDisplayInfo) : CallbackEvent
+
     data class OnServiceStateChanged(val serviceState: ServiceState) : CallbackEvent
+
     data class OnSignalStrengthChanged(val signalStrength: SignalStrength) : CallbackEvent
     data class OnNrIconTypeChanged(val nrIconType: Int) : CallbackEvent
 }

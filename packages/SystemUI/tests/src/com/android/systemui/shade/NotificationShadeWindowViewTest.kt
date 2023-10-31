@@ -33,6 +33,7 @@ import com.android.systemui.back.domain.interactor.BackActionInteractor
 import com.android.systemui.biometrics.data.repository.FakeFacePropertyRepository
 import com.android.systemui.bouncer.data.repository.BouncerMessageRepositoryImpl
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
+import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor
 import com.android.systemui.bouncer.domain.interactor.CountDownTimerUtil
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerCallbackInteractor
@@ -47,7 +48,7 @@ import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.flags.SystemPropertiesHelper
-import com.android.systemui.keyevent.domain.interactor.KeyEventInteractor
+import com.android.systemui.keyevent.domain.interactor.SysUIKeyEventHandler
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
@@ -141,6 +142,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         Optional<UnfoldTransitionProgressProvider>
     @Mock private lateinit var notificationInsetsController: NotificationInsetsController
     @Mock private lateinit var keyguardTransitionInteractor: KeyguardTransitionInteractor
+    @Mock lateinit var primaryBouncerInteractor: PrimaryBouncerInteractor
+    @Mock lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
     @Mock
     private lateinit var primaryBouncerToGoneTransitionViewModel:
         PrimaryBouncerToGoneTransitionViewModel
@@ -180,6 +183,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         featureFlags.set(Flags.REVAMPED_BOUNCER_MESSAGES, true)
         featureFlags.set(Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false)
         featureFlags.set(Flags.MIGRATE_NSSL, false)
+        featureFlags.set(Flags.ALTERNATE_BOUNCER_VIEW, false)
         testScope = TestScope()
         controller =
             NotificationShadeWindowViewController(
@@ -249,7 +253,9 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                     securityModel = Mockito.mock(KeyguardSecurityModel::class.java),
                 ),
                 BouncerLogger(logcatLogBuffer("BouncerLog")),
-                Mockito.mock(KeyEventInteractor::class.java),
+                Mockito.mock(SysUIKeyEventHandler::class.java),
+                primaryBouncerInteractor,
+                alternateBouncerInteractor,
             )
 
         controller.setupExpandedStatusBar()

@@ -4875,7 +4875,8 @@ public final class Settings {
         public static final String CALL_CONNECTED_TONE_ENABLED = "call_connected_tone_enabled";
 
         /**
-         * The user selected min refresh rate in frames per second.
+         * The user selected min refresh rate in frames per second. If infinite, the user wants
+         * the highest possible refresh rate.
          *
          * If this isn't set, 0 will be used.
          * @hide
@@ -4884,7 +4885,8 @@ public final class Settings {
         public static final String MIN_REFRESH_RATE = "min_refresh_rate";
 
         /**
-         * The user selected peak refresh rate in frames per second.
+         * The user selected peak refresh rate in frames per second. If infinite, the user wants
+         * the highest possible refresh rate.
          *
          * If this isn't set, the system falls back to a device specific default.
          * @hide
@@ -5359,6 +5361,37 @@ public final class Settings {
         public static final String NOTIFICATION_SOUND_CACHE = "notification_sound_cache";
         /** {@hide} */
         public static final Uri NOTIFICATION_SOUND_CACHE_URI = getUriFor(NOTIFICATION_SOUND_CACHE);
+
+        /**
+         * When enabled, notifications attention effects: sound, vibration, flashing
+         * will have a cooldown timer.
+         *
+         * The value 1 - enable, 0 - disable
+         * @hide
+         */
+        public static final String NOTIFICATION_COOLDOWN_ENABLED =
+            "notification_cooldown_enabled";
+
+        /**
+         * When enabled, notification cooldown will apply to all notifications.
+         * Otherwise cooldown will only apply to conversations.
+         *
+         * The value 1 - enable, 0 - disable
+         * Only valid if {@code NOTIFICATION_COOLDOWN_ENABLED} is enabled.
+         * @hide
+         */
+        public static final String NOTIFICATION_COOLDOWN_ALL =
+            "notification_cooldown_all";
+
+        /**
+         * When enabled, notification attention effects will be restricted to vibration only
+         * as long as the screen is unlocked.
+         *
+         * The value 1 - enable, 0 - disable
+         * @hide
+         */
+        public static final String NOTIFICATION_COOLDOWN_VIBRATE_UNLOCKED =
+            "notification_cooldown_vibrate_unlocked";
 
         /**
          * Persistent store for the system-wide default alarm alert.
@@ -11189,6 +11222,12 @@ public final class Settings {
         public static final String BLUETOOTH_ON_WHILE_DRIVING = "bluetooth_on_while_driving";
 
         /**
+         * Volume dialog timeout in ms.
+         * @hide
+         */
+        public static final String VOLUME_DIALOG_DISMISS_TIMEOUT = "volume_dialog_dismiss_timeout";
+
+        /**
          * What behavior should be invoked when the volume hush gesture is triggered
          * One of VOLUME_HUSH_OFF, VOLUME_HUSH_VIBRATE, VOLUME_HUSH_MUTE.
          *
@@ -11616,6 +11655,45 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED =
                 "accessibility_magnification_joystick_enabled";
+
+        /**
+         * Controls magnification enable gesture. Accessibility magnification can have one or more
+         * enable gestures.
+         *
+         * @see #ACCESSIBILITY_MAGNIFICATION_GESTURE_NONE
+         * @see #ACCESSIBILITY_MAGNIFICATION_GESTURE_SINGLE_FINGER_TRIPLE_TAP
+         * @see #ACCESSIBILITY_MAGNIFICATION_GESTURE_TWO_FINGER_TRIPLE_TAP
+         * @hide
+         */
+        public static final String ACCESSIBILITY_MAGNIFICATION_GESTURE =
+                "accessibility_magnification_gesture";
+
+        /**
+         * Magnification enable gesture value that is a default value.
+         * @hide
+         */
+        public static final int ACCESSIBILITY_MAGNIFICATION_GESTURE_NONE = 0x0;
+
+        /**
+         * Magnification enable gesture value is single finger triple tap.
+         * @hide
+         */
+        public static final int ACCESSIBILITY_MAGNIFICATION_GESTURE_SINGLE_FINGER_TRIPLE_TAP = 0x1;
+
+        /**
+         * Magnification enable gesture value is two finger triple tap.
+         * @hide
+         */
+        public static final int ACCESSIBILITY_MAGNIFICATION_GESTURE_TWO_FINGER_TRIPLE_TAP = 0x2;
+
+        /**
+         * Magnification enable gesture values include single finger triple tap and two finger
+         * triple tap.
+         * @hide
+         */
+        public static final int ACCESSIBILITY_MAGNIFICATION_GESTURE_ALL =
+                ACCESSIBILITY_MAGNIFICATION_GESTURE_SINGLE_FINGER_TRIPLE_TAP
+                | ACCESSIBILITY_MAGNIFICATION_GESTURE_TWO_FINGER_TRIPLE_TAP;
 
         /**
          * Controls magnification capability. Accessibility magnification is capable of at least one
@@ -12433,6 +12511,13 @@ public final class Settings {
         @Readable
         public static final String WIRELESS_CHARGING_STARTED_SOUND =
                 "wireless_charging_started_sound";
+
+        /**
+         * Whether to auto enable reverse charging once plugged-in.
+         * @hide
+         */
+        public static final String REVERSE_CHARGING_AUTO_ON =
+                "settings_key_reverse_charging_auto_turn_on";
 
         /**
          * URI for "wired charging started" sound.

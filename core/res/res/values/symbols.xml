@@ -1841,6 +1841,7 @@
   <java-symbol type="integer" name="config_lidNavigationAccessibility" />
   <java-symbol type="integer" name="config_lidOpenRotation" />
   <java-symbol type="integer" name="config_longPressOnHomeBehavior" />
+  <java-symbol type="integer" name="config_shortPressOnSettingsBehavior" />
   <java-symbol type="layout" name="global_actions" />
   <java-symbol type="layout" name="global_actions_item" />
   <java-symbol type="layout" name="global_actions_silent_mode" />
@@ -2021,6 +2022,7 @@
   <java-symbol type="drawable" name="stat_sys_throttled" />
   <java-symbol type="drawable" name="vpn_connected" />
   <java-symbol type="drawable" name="vpn_disconnected" />
+  <java-symbol type="drawable" name="usb_cable_unknown_issue" />
   <java-symbol type="id" name="ask_checkbox" />
   <java-symbol type="id" name="compat_checkbox" />
   <java-symbol type="id" name="original_app_icon" />
@@ -3512,6 +3514,8 @@
   <java-symbol type="array" name="config_displayWhiteBalanceDisplaySteps" />
   <java-symbol type="bool" name="config_displayWhiteBalanceLightModeAllowed" />
   <java-symbol type="integer" name="config_displayWhiteBalanceTransitionTime" />
+  <java-symbol type="integer" name="config_displayWhiteBalanceTransitionTimeIncrease" />
+  <java-symbol type="integer" name="config_displayWhiteBalanceTransitionTimeDecrease" />
 
   <!-- Device states where the sensor based rotation values should be reversed around the Z axis
        for the default display.
@@ -3837,6 +3841,7 @@
   <java-symbol type="string" name="notification_channel_do_not_disturb" />
   <java-symbol type="string" name="notification_channel_accessibility_magnification" />
   <java-symbol type="string" name="notification_channel_accessibility_security_policy" />
+  <java-symbol type="string" name="notification_channel_display" />
   <java-symbol type="string" name="config_defaultAutofillService" />
   <java-symbol type="string" name="config_defaultFieldClassificationService" />
   <java-symbol type="string" name="config_defaultOnDeviceSpeechRecognitionService" />
@@ -4573,7 +4578,10 @@
   <java-symbol type="integer" name="device_idle_light_idle_to_init_flex_ms" />
   <java-symbol type="integer" name="device_idle_light_idle_to_max_flex_ms" />
   <java-symbol type="integer" name="device_idle_light_idle_factor" />
+  <java-symbol type="bool" name="device_idle_light_idle_increase_linearly" />
   <java-symbol type="integer" name="device_idle_light_max_idle_to_ms" />
+  <java-symbol type="integer" name="device_idle_light_idle_linear_increase_factor_ms" />
+  <java-symbol type="integer" name="device_idle_light_idle_flex_linear_increase_factor_ms" />
   <java-symbol type="integer" name="device_idle_light_idle_maintenance_min_budget_ms" />
   <java-symbol type="integer" name="device_idle_light_idle_maintenance_max_budget_ms" />
   <java-symbol type="integer" name="device_idle_min_light_maintenance_time_ms" />
@@ -5096,6 +5104,8 @@
   <java-symbol type="array" name="device_state_notification_thermal_contents"/>
   <java-symbol type="array" name="device_state_notification_power_save_titles"/>
   <java-symbol type="array" name="device_state_notification_power_save_contents"/>
+  <java-symbol type="string" name="connected_display_unavailable_notification_title"/>
+  <java-symbol type="string" name="connected_display_unavailable_notification_content"/>
   <java-symbol type="string" name="concurrent_display_notification_name"/>
   <java-symbol type="string" name="concurrent_display_notification_active_title"/>
   <java-symbol type="string" name="concurrent_display_notification_active_content"/>
