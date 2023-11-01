@@ -18223,7 +18223,7 @@ package android.hardware {
 
   @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public final class OverlayProperties implements android.os.Parcelable {
     method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public int describeContents();
-    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public boolean supportMixedColorSpaces();
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public boolean isMixedColorSpacesSupported();
     method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public void writeToParcel(@NonNull android.os.Parcel, int);
     field @FlaggedApi("android.hardware.flags.overlayproperties_class_api") @NonNull public static final android.os.Parcelable.Creator<android.hardware.OverlayProperties> CREATOR;
   }
@@ -32204,7 +32204,7 @@ package android.os {
     field public static final int S_V2 = 32; // 0x20
     field public static final int TIRAMISU = 33; // 0x21
     field public static final int UPSIDE_DOWN_CAKE = 34; // 0x22
-    field public static final int VANILLA_ICE_CREAM = 10000; // 0x2710
+    field @FlaggedApi("android.os.android_os_build_vanilla_ice_cream") public static final int VANILLA_ICE_CREAM = 10000; // 0x2710
   }
 
   public final class Bundle extends android.os.BaseBundle implements java.lang.Cloneable android.os.Parcelable {
