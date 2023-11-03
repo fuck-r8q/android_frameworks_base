@@ -6727,7 +6727,7 @@ package android.app {
     field protected android.app.Notification.Builder mBuilder;
   }
 
-  public static final class Notification.TvExtender implements android.app.Notification.Extender {
+  @FlaggedApi("android.app.api_tvextender") public static final class Notification.TvExtender implements android.app.Notification.Extender {
     ctor public Notification.TvExtender();
     ctor public Notification.TvExtender(@NonNull android.app.Notification);
     method @NonNull public android.app.Notification.Builder extend(@NonNull android.app.Notification.Builder);
@@ -18526,11 +18526,13 @@ package android.hardware.biometrics {
   public class BiometricManager {
     method @Deprecated @RequiresPermission(android.Manifest.permission.USE_BIOMETRIC) public int canAuthenticate();
     method @RequiresPermission(android.Manifest.permission.USE_BIOMETRIC) public int canAuthenticate(int);
+    method @FlaggedApi("android.hardware.biometrics.last_authentication_time") @RequiresPermission(android.Manifest.permission.USE_BIOMETRIC) public long getLastAuthenticationTime(int);
     method @NonNull @RequiresPermission(android.Manifest.permission.USE_BIOMETRIC) public android.hardware.biometrics.BiometricManager.Strings getStrings(int);
     field public static final int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1; // 0x1
     field public static final int BIOMETRIC_ERROR_NONE_ENROLLED = 11; // 0xb
     field public static final int BIOMETRIC_ERROR_NO_HARDWARE = 12; // 0xc
     field public static final int BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED = 15; // 0xf
+    field @FlaggedApi("android.hardware.biometrics.last_authentication_time") public static final long BIOMETRIC_NO_AUTHENTICATION = -1L; // 0xffffffffffffffffL
     field public static final int BIOMETRIC_SUCCESS = 0; // 0x0
   }
 
@@ -18576,6 +18578,7 @@ package android.hardware.biometrics {
     field public static final int BIOMETRIC_ERROR_UNABLE_TO_PROCESS = 2; // 0x2
     field public static final int BIOMETRIC_ERROR_USER_CANCELED = 10; // 0xa
     field public static final int BIOMETRIC_ERROR_VENDOR = 8; // 0x8
+    field @FlaggedApi("android.hardware.biometrics.last_authentication_time") public static final long BIOMETRIC_NO_AUTHENTICATION = -1L; // 0xffffffffffffffffL
   }
 
   public abstract static class BiometricPrompt.AuthenticationCallback {
@@ -23842,14 +23845,14 @@ package android.media {
     field @FlaggedApi("com.android.media.flags.enable_audio_policies_device_and_bluetooth_controller") public static final int TYPE_HDMI_EARC = 29; // 0x1d
     field public static final int TYPE_HEARING_AID = 23; // 0x17
     field public static final int TYPE_REMOTE_AUDIO_VIDEO_RECEIVER = 1003; // 0x3eb
-    field public static final int TYPE_REMOTE_CAR = 1008; // 0x3f0
-    field public static final int TYPE_REMOTE_COMPUTER = 1006; // 0x3ee
-    field public static final int TYPE_REMOTE_GAME_CONSOLE = 1007; // 0x3ef
-    field public static final int TYPE_REMOTE_SMARTPHONE = 1010; // 0x3f2
-    field public static final int TYPE_REMOTE_SMARTWATCH = 1009; // 0x3f1
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_CAR = 1008; // 0x3f0
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_COMPUTER = 1006; // 0x3ee
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_GAME_CONSOLE = 1007; // 0x3ef
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_SMARTPHONE = 1010; // 0x3f2
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_SMARTWATCH = 1009; // 0x3f1
     field public static final int TYPE_REMOTE_SPEAKER = 1002; // 0x3ea
-    field public static final int TYPE_REMOTE_TABLET = 1004; // 0x3ec
-    field public static final int TYPE_REMOTE_TABLET_DOCKED = 1005; // 0x3ed
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_TABLET = 1004; // 0x3ec
+    field @FlaggedApi("com.android.media.flags.enable_new_media_route_2_info_types") public static final int TYPE_REMOTE_TABLET_DOCKED = 1005; // 0x3ed
     field public static final int TYPE_REMOTE_TV = 1001; // 0x3e9
     field public static final int TYPE_UNKNOWN = 0; // 0x0
     field public static final int TYPE_USB_ACCESSORY = 12; // 0xc
@@ -28503,12 +28506,12 @@ package android.net.vcn {
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig build();
-    method @FlaggedApi("android.net.vcn.safe_mode_config") @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder enableSafeMode(boolean);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setMaxMtu(@IntRange(from=0x500) int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setMinUdpPort4500NatTimeoutSeconds(@IntRange(from=0x78) int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setRetryIntervalsMillis(@NonNull long[]);
+    method @FlaggedApi("android.net.vcn.safe_mode_config") @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setSafeModeEnabled(boolean);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setVcnUnderlyingNetworkPriorities(@NonNull java.util.List<android.net.vcn.VcnUnderlyingNetworkTemplate>);
   }
 

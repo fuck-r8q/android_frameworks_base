@@ -28,6 +28,7 @@ import static android.view.WindowManager.TRANSIT_SLEEP;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.fixScale;
+import static android.window.TransitionInfo.FLAG_BACK_GESTURE_ANIMATED;
 import static android.window.TransitionInfo.FLAG_IS_BEHIND_STARTING_WINDOW;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
@@ -191,6 +192,8 @@ public class Transitions implements RemoteCallable<Transitions>,
 
     private final ArrayList<TransitionObserver> mObservers = new ArrayList<>();
 
+    private HomeTransitionObserver mHomeTransitionObserver;
+
     /** List of {@link Runnable} instances to run when the last active transition has finished.  */
     private final ArrayList<Runnable> mRunWhenIdleQueue = new ArrayList<>();
 
@@ -203,12 +206,6 @@ public class Transitions implements RemoteCallable<Transitions>,
      * however it can't be too small since there is some potential IPC involved.
      */
     private static final int SYNC_ALLOWANCE_MS = 120;
-
-    /**
-     * Keyguard gets a more generous timeout to finish its animations, because we are always holding
-     * a sleep token during occlude/unocclude transitions and we want them to finish playing cleanly
-     */
-    private static final int SYNC_ALLOWANCE_KEYGUARD_MS = 2000;
 
     /** For testing only. Disables the force-finish timeout on sync. */
     private boolean mDisableForceSync = false;
@@ -272,10 +269,11 @@ public class Transitions implements RemoteCallable<Transitions>,
             @NonNull DisplayController displayController,
             @NonNull ShellExecutor mainExecutor,
             @NonNull Handler mainHandler,
-            @NonNull ShellExecutor animExecutor) {
+            @NonNull ShellExecutor animExecutor,
+            @NonNull HomeTransitionObserver observer) {
         this(context, shellInit, new ShellCommandHandler(), shellController, organizer, pool,
                 displayController, mainExecutor, mainHandler, animExecutor,
-                new RootTaskDisplayAreaOrganizer(mainExecutor, context, shellInit));
+                new RootTaskDisplayAreaOrganizer(mainExecutor, context, shellInit), observer);
     }
 
     public Transitions(@NonNull Context context,
@@ -288,7 +286,8 @@ public class Transitions implements RemoteCallable<Transitions>,
             @NonNull ShellExecutor mainExecutor,
             @NonNull Handler mainHandler,
             @NonNull ShellExecutor animExecutor,
-            @NonNull RootTaskDisplayAreaOrganizer rootTDAOrganizer) {
+            @NonNull RootTaskDisplayAreaOrganizer rootTDAOrganizer,
+            @NonNull HomeTransitionObserver observer) {
         mOrganizer = organizer;
         mContext = context;
         mMainExecutor = mainExecutor;
@@ -307,6 +306,7 @@ public class Transitions implements RemoteCallable<Transitions>,
         mHandlers.add(mRemoteTransitionHandler);
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, "addHandler: Remote");
         shellInit.addInitCallback(this::onInit, this);
+        mHomeTransitionObserver = observer;
     }
 
     private void onInit() {
@@ -356,7 +356,7 @@ public class Transitions implements RemoteCallable<Transitions>,
     }
 
     private ExternalInterfaceBinder createExternalInterface() {
-        return new IShellTransitionsImpl(mContext, getMainExecutor(), this);
+        return new IShellTransitionsImpl(this);
     }
 
     @Override
@@ -742,6 +742,11 @@ public class Transitions implements RemoteCallable<Transitions>,
             }
             if (!change.hasFlags(FLAG_IS_OCCLUDED)) {
                 allOccluded = false;
+            }
+            // The change has already animated by back gesture, don't need to play transition
+            // animation on it.
+            if (change.hasFlags(FLAG_BACK_GESTURE_ANIMATED)) {
+                info.getChanges().remove(i);
             }
         }
         // There does not need animation when:
@@ -1203,11 +1208,8 @@ public class Transitions implements RemoteCallable<Transitions>,
             if (track.mActiveTransition == playing) {
                 if (!mDisableForceSync) {
                     // Give it a short amount of time to process it before forcing.
-                    final int tolerance = KeyguardTransitionHandler.handles(playing.mInfo)
-                            ? SYNC_ALLOWANCE_KEYGUARD_MS
-                            : SYNC_ALLOWANCE_MS;
                     mMainExecutor.executeDelayed(
-                            () -> finishForSync(reason, trackIdx, playing), tolerance);
+                            () -> finishForSync(reason, trackIdx, playing), SYNC_ALLOWANCE_MS);
                 }
                 break;
             }
@@ -1400,12 +1402,9 @@ public class Transitions implements RemoteCallable<Transitions>,
     private static class IShellTransitionsImpl extends IShellTransitions.Stub
             implements ExternalInterfaceBinder {
         private Transitions mTransitions;
-        private final HomeTransitionObserver mHomeTransitionObserver;
 
-        IShellTransitionsImpl(Context context, ShellExecutor executor, Transitions transitions) {
+        IShellTransitionsImpl(Transitions transitions) {
             mTransitions = transitions;
-            mHomeTransitionObserver = new HomeTransitionObserver(context, executor,
-                    mTransitions);
         }
 
         /**
@@ -1413,7 +1412,7 @@ public class Transitions implements RemoteCallable<Transitions>,
          */
         @Override
         public void invalidate() {
-            mHomeTransitionObserver.invalidate();
+            mTransitions.mHomeTransitionObserver.invalidate(mTransitions);
             mTransitions = null;
         }
 
@@ -1443,7 +1442,8 @@ public class Transitions implements RemoteCallable<Transitions>,
         public void setHomeTransitionListener(IHomeTransitionListener listener) {
             executeRemoteCallWithTaskPermission(mTransitions, "setHomeTransitionListener",
                     (transitions) -> {
-                        mHomeTransitionObserver.setHomeTransitionListener(listener);
+                        transitions.mHomeTransitionObserver.setHomeTransitionListener(mTransitions,
+                                listener);
                     });
         }
     }
