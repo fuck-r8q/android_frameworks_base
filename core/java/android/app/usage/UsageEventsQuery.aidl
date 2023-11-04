@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,22 +14,6 @@
  * limitations under the License.
  */
 
-package com.android.systemui.aconfig
+package android.app.usage;
 
-import com.android.systemui.FeatureFlags
-import com.android.systemui.FeatureFlagsImpl
-import com.android.systemui.dagger.SysUISingleton
-import dagger.Module
-import dagger.Provides
-
-@Module
-abstract class AConfigModule {
-    @Module
-    companion object {
-        @Provides
-        @SysUISingleton
-        fun providesImpl(): FeatureFlags {
-            return FeatureFlagsImpl()
-        }
-    }
-}
+parcelable UsageEventsQuery;

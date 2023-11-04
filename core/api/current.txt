@@ -9321,6 +9321,21 @@ package android.app.usage {
     field public static final int USER_INTERACTION = 7; // 0x7
   }
 
+  @FlaggedApi("android.app.usage.filter_based_event_query_api") public final class UsageEventsQuery implements android.os.Parcelable {
+    method public int describeContents();
+    method public long getBeginTimeMillis();
+    method public long getEndTimeMillis();
+    method @NonNull public java.util.Set<java.lang.Integer> getEventTypes();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.usage.UsageEventsQuery> CREATOR;
+  }
+
+  public static final class UsageEventsQuery.Builder {
+    ctor public UsageEventsQuery.Builder(long, long);
+    method @NonNull public android.app.usage.UsageEventsQuery.Builder addEventTypes(@NonNull int...);
+    method @NonNull public android.app.usage.UsageEventsQuery build();
+  }
+
   public final class UsageStats implements android.os.Parcelable {
     ctor public UsageStats(android.app.usage.UsageStats);
     method public void add(android.app.usage.UsageStats);
@@ -9345,6 +9360,7 @@ package android.app.usage {
     method public java.util.List<android.app.usage.ConfigurationStats> queryConfigurations(int, long, long);
     method public java.util.List<android.app.usage.EventStats> queryEventStats(int, long, long);
     method public android.app.usage.UsageEvents queryEvents(long, long);
+    method @FlaggedApi("android.app.usage.filter_based_event_query_api") @NonNull @RequiresPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) public android.app.usage.UsageEvents queryEvents(@NonNull android.app.usage.UsageEventsQuery);
     method public android.app.usage.UsageEvents queryEventsForSelf(long, long);
     method public java.util.List<android.app.usage.UsageStats> queryUsageStats(int, long, long);
     field public static final int INTERVAL_BEST = 4; // 0x4
@@ -18617,6 +18633,7 @@ package android.hardware.biometrics {
     method @Deprecated @Nullable public android.security.identity.IdentityCredential getIdentityCredential();
     method @FlaggedApi("android.hardware.biometrics.add_key_agreement_crypto_object") @Nullable public javax.crypto.KeyAgreement getKeyAgreement();
     method @Nullable public javax.crypto.Mac getMac();
+    method @FlaggedApi("android.hardware.biometrics.get_op_id_crypto_object") public long getOpId();
     method @Nullable public android.security.identity.PresentationSession getPresentationSession();
     method @Nullable public java.security.Signature getSignature();
   }
@@ -25850,15 +25867,15 @@ package android.media.midi {
     method public abstract void onDisconnect(android.media.midi.MidiReceiver);
   }
 
-  @FlaggedApi("com.android.media.midi.flags.virtual_ump") public abstract class MidiUmpDeviceService extends android.app.Service {
+  @FlaggedApi("android.media.midi.virtual_ump") public abstract class MidiUmpDeviceService extends android.app.Service {
     ctor public MidiUmpDeviceService();
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @Nullable public final android.media.midi.MidiDeviceInfo getDeviceInfo();
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @NonNull public final java.util.List<android.media.midi.MidiReceiver> getOutputPortReceivers();
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") public void onClose();
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") public void onDeviceStatusChanged(@NonNull android.media.midi.MidiDeviceStatus);
-    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @NonNull public abstract java.util.List<android.media.midi.MidiReceiver> onGetInputPortReceivers();
-    field @FlaggedApi("com.android.media.midi.flags.virtual_ump") public static final String SERVICE_INTERFACE = "android.media.midi.MidiUmpDeviceService";
+    method @FlaggedApi("android.media.midi.virtual_ump") @Nullable public final android.media.midi.MidiDeviceInfo getDeviceInfo();
+    method @FlaggedApi("android.media.midi.virtual_ump") @NonNull public final java.util.List<android.media.midi.MidiReceiver> getOutputPortReceivers();
+    method @FlaggedApi("android.media.midi.virtual_ump") @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
+    method @FlaggedApi("android.media.midi.virtual_ump") public void onClose();
+    method @FlaggedApi("android.media.midi.virtual_ump") public void onDeviceStatusChanged(@NonNull android.media.midi.MidiDeviceStatus);
+    method @FlaggedApi("android.media.midi.virtual_ump") @NonNull public abstract java.util.List<android.media.midi.MidiReceiver> onGetInputPortReceivers();
+    field @FlaggedApi("android.media.midi.virtual_ump") public static final String SERVICE_INTERFACE = "android.media.midi.MidiUmpDeviceService";
   }
 
 }
@@ -49813,6 +49830,7 @@ package android.view {
     method public default void removeOnBufferTransformHintChangedListener(@NonNull android.view.AttachedSurfaceControl.OnBufferTransformHintChangedListener);
     method public default void setChildBoundingInsets(@NonNull android.graphics.Rect);
     method public default void setTouchableRegion(@Nullable android.graphics.Region);
+    method @FlaggedApi("com.android.window.flags.transfer_gesture_to_embedded") public default boolean transferHostTouchGestureToEmbedded(@NonNull android.view.SurfaceControlViewHost.SurfacePackage);
   }
 
   @UiThread public static interface AttachedSurfaceControl.OnBufferTransformHintChangedListener {
