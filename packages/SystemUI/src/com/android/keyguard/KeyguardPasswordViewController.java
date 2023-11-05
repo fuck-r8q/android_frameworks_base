@@ -39,11 +39,12 @@ import android.widget.TextView.OnEditorActionListener;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
-import com.android.systemui.res.R;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController;
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 
 import java.util.List;
@@ -51,7 +52,6 @@ import java.util.List;
 public class KeyguardPasswordViewController
         extends KeyguardAbsKeyInputViewController<KeyguardPasswordView> {
 
-    private static final int DELAY_MILLIS_TO_REEVALUATE_IME_SWITCH_ICON = 500;  // 500ms
     private final KeyguardSecurityCallback mKeyguardSecurityCallback;
     private final DevicePostureController mPostureController;
     private final DevicePostureController.Callback mPostureCallback = posture ->
@@ -112,10 +112,11 @@ public class KeyguardPasswordViewController
             FalsingCollector falsingCollector,
             KeyguardViewController keyguardViewController,
             DevicePostureController postureController,
-            FeatureFlags featureFlags) {
+            FeatureFlags featureFlags,
+            SelectedUserInteractor selectedUserInteractor) {
         super(view, keyguardUpdateMonitor, securityMode, lockPatternUtils, keyguardSecurityCallback,
                 messageAreaControllerFactory, latencyTracker, falsingCollector,
-                emergencyButtonController, featureFlags);
+                emergencyButtonController, featureFlags, selectedUserInteractor);
         mKeyguardSecurityCallback = keyguardSecurityCallback;
         mInputMethodManager = inputMethodManager;
         mPostureController = postureController;
@@ -132,7 +133,8 @@ public class KeyguardPasswordViewController
     @Override
     protected void onViewAttached() {
         super.onViewAttached();
-        mPasswordEntry.setTextOperationUser(UserHandle.of(KeyguardUpdateMonitor.getCurrentUser()));
+        mPasswordEntry.setTextOperationUser(
+                UserHandle.of(mSelectedUserInteractor.getSelectedUserId()));
         mPasswordEntry.setKeyListener(TextKeyListener.getInstance());
         mPasswordEntry.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_PASSWORD);
@@ -164,13 +166,6 @@ public class KeyguardPasswordViewController
 
         // If there's more than one IME, enable the IME switcher button
         updateSwitchImeButton();
-
-        // When we the current user is switching, InputMethodManagerService sometimes has not
-        // switched internal state yet here. As a quick workaround, we check the keyboard state
-        // again.
-        // TODO: Remove this workaround by ensuring such a race condition never happens.
-        mMainExecutor.executeDelayed(
-                this::updateSwitchImeButton, DELAY_MILLIS_TO_REEVALUATE_IME_SWITCH_ICON);
     }
 
     @Override
@@ -187,7 +182,8 @@ public class KeyguardPasswordViewController
 
     @Override
     void resetState() {
-        mPasswordEntry.setTextOperationUser(UserHandle.of(KeyguardUpdateMonitor.getCurrentUser()));
+        mPasswordEntry.setTextOperationUser(
+                UserHandle.of(mSelectedUserInteractor.getSelectedUserId()));
         mMessageAreaController.setMessage(getInitialMessageResId());
         final boolean wasDisabled = mPasswordEntry.isEnabled();
         mView.setPasswordEntryEnabled(true);
@@ -280,7 +276,7 @@ public class KeyguardPasswordViewController
             final boolean shouldIncludeAuxiliarySubtypes) {
         final List<InputMethodInfo> enabledImis =
                 imm.getEnabledInputMethodListAsUser(
-                        UserHandle.of(KeyguardUpdateMonitor.getCurrentUser()));
+                        UserHandle.of(mSelectedUserInteractor.getSelectedUserId()));
 
         // Number of the filtered IMEs
         int filteredImisCount = 0;

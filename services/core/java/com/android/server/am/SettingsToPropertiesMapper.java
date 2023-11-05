@@ -118,6 +118,7 @@ public class SettingsToPropertiesMapper {
     // The list is sorted.
     @VisibleForTesting
     static final String[] sDeviceConfigAconfigScopes = new String[] {
+        "accessibility",
         "android_core_networking",
         "angle",
         "arc_next",
@@ -144,6 +145,7 @@ public class SettingsToPropertiesMapper {
         "media_drm",
         "media_solutions",
         "nfc",
+        "pdf_viewer",
         "pixel_audio_android",
         "pixel_system_sw_touch",
         "pixel_watch",
@@ -152,6 +154,7 @@ public class SettingsToPropertiesMapper {
         "preload_safety",
         "responsible_apis",
         "rust",
+        "safety_center",
         "system_performance",
         "test_suites",
         "text",
@@ -159,7 +162,14 @@ public class SettingsToPropertiesMapper {
         "tv_system_ui",
         "vibrator",
         "virtual_devices",
+        "wear_calling_messaging",
+        "wear_connectivity",
+        "wear_esim_carriers",
         "wear_frameworks",
+        "wear_health_services",
+        "wear_media",
+        "wear_offload",
+        "wear_security",
         "wear_system_health",
         "wear_systems",
         "window_surfaces",

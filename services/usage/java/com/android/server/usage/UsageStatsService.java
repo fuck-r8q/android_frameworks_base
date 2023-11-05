@@ -201,6 +201,8 @@ public class UsageStatsService extends SystemService implements
     static final int MSG_ON_START = 7;
     static final int MSG_HANDLE_LAUNCH_TIME_ON_USER_UNLOCK = 8;
     static final int MSG_NOTIFY_ESTIMATED_LAUNCH_TIMES_CHANGED = 9;
+    static final int MSG_UID_REMOVED = 10;
+    static final int MSG_USER_STARTED = 11;
 
     private final Object mLock = new Object();
     private Handler mHandler;
@@ -333,7 +335,7 @@ public class UsageStatsService extends SystemService implements
         mUserManager = (UserManager) getContext().getSystemService(Context.USER_SERVICE);
         mPackageManager = getContext().getPackageManager();
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
-        mHandler = new H(BackgroundThread.get().getLooper());
+        mHandler = getUsageEventProcessingHandler();
         mIoHandler = new Handler(IoThread.get().getLooper(), mIoHandlerCallback);
 
         mAppStandby = mInjector.getAppStandbyController(getContext());
@@ -380,10 +382,11 @@ public class UsageStatsService extends SystemService implements
         IntentFilter filter = new IntentFilter(Intent.ACTION_USER_REMOVED);
         filter.addAction(Intent.ACTION_USER_STARTED);
         getContext().registerReceiverAsUser(new UserActionsReceiver(), UserHandle.ALL, filter,
-                null, mHandler);
+                null, /* scheduler= */ Flags.useDedicatedHandlerThread() ? mHandler : null);
 
         getContext().registerReceiverAsUser(new UidRemovedReceiver(), UserHandle.ALL,
-                new IntentFilter(ACTION_UID_REMOVED), null, mHandler);
+                new IntentFilter(ACTION_UID_REMOVED), null,
+                /* scheduler= */ Flags.useDedicatedHandlerThread() ? mHandler : null);
 
         mRealTimeSnapshot = SystemClock.elapsedRealtime();
         mSystemTimeSnapshot = System.currentTimeMillis();
@@ -468,6 +471,14 @@ public class UsageStatsService extends SystemService implements
                 alarmQueue.removeAllAlarms();
                 mLaunchTimeAlarmQueues.remove(userId);
             }
+        }
+    }
+
+    private Handler getUsageEventProcessingHandler() {
+        if (Flags.useDedicatedHandlerThread()) {
+            return new H(UsageStatsHandlerThread.get().getLooper());
+        } else {
+            return new H(BackgroundThread.get().getLooper());
         }
     }
 
@@ -615,11 +626,10 @@ public class UsageStatsService extends SystemService implements
             if (Intent.ACTION_USER_REMOVED.equals(action)) {
                 if (userId >= 0) {
                     mHandler.obtainMessage(MSG_REMOVE_USER, userId, 0).sendToTarget();
-                    mResponseStatsTracker.onUserRemoved(userId);
                 }
             } else if (Intent.ACTION_USER_STARTED.equals(action)) {
                 if (userId >= 0) {
-                    mAppStandby.postCheckIdleStates(userId);
+                    mHandler.obtainMessage(MSG_USER_STARTED, userId, 0).sendToTarget();
                 }
             }
         }
@@ -633,9 +643,7 @@ public class UsageStatsService extends SystemService implements
                 return;
             }
 
-            synchronized (mLock) {
-                mResponseStatsTracker.onUidRemoved(uid);
-            }
+            mHandler.obtainMessage(MSG_UID_REMOVED, uid, 0).sendToTarget();
         }
     }
 
@@ -1302,6 +1310,8 @@ public class UsageStatsService extends SystemService implements
             mPendingLaunchTimeChangePackages.remove(userId);
         }
         mAppStandby.onUserRemoved(userId);
+        mResponseStatsTracker.onUserRemoved(userId);
+
         // Cancel any scheduled jobs for this user since the user is being removed.
         UsageStatsIdleService.cancelPruneJob(getContext(), userId);
         UsageStatsIdleService.cancelUpdateMappingsJob(getContext(), userId);
@@ -1555,8 +1565,7 @@ public class UsageStatsService extends SystemService implements
         synchronized (mLaunchTimeAlarmQueues) {
             LaunchTimeAlarmQueue alarmQueue = mLaunchTimeAlarmQueues.get(userId);
             if (alarmQueue == null) {
-                alarmQueue = new LaunchTimeAlarmQueue(
-                    userId, getContext(), BackgroundThread.get().getLooper());
+                alarmQueue = new LaunchTimeAlarmQueue(userId, getContext(), mHandler.getLooper());
                 mLaunchTimeAlarmQueues.put(userId, alarmQueue);
             }
 
@@ -2038,6 +2047,12 @@ public class UsageStatsService extends SystemService implements
                 case MSG_REMOVE_USER:
                     onUserRemoved(msg.arg1);
                     break;
+                case MSG_UID_REMOVED:
+                    mResponseStatsTracker.onUidRemoved(msg.arg1);
+                    break;
+                case MSG_USER_STARTED:
+                    mAppStandby.postCheckIdleStates(msg.arg1);
+                    break;
                 case MSG_PACKAGE_REMOVED:
                     onPackageRemoved(msg.arg1, (String) msg.obj);
                     break;
@@ -2125,14 +2140,11 @@ public class UsageStatsService extends SystemService implements
         }
 
         private boolean canReportUsageStats() {
-            final boolean isSystem = isCallingUidSystem();
-            if (!Flags.reportUsageStatsPermission()) {
-                // If the flag is disabled, do no check for the new permission and instead return
-                // true only if the calling uid is system since System UID can always report stats.
-                return isSystem;
+            if (isCallingUidSystem()) {
+                // System UID can always report UsageStats
+                return true;
             }
-            return isSystem
-                    || getContext().checkCallingPermission(Manifest.permission.REPORT_USAGE_STATS)
+            return getContext().checkCallingPermission(Manifest.permission.REPORT_USAGE_STATS)
                         == PackageManager.PERMISSION_GRANTED;
         }
 
@@ -2625,9 +2637,12 @@ public class UsageStatsService extends SystemService implements
                 return;
             }
 
-            if (!canReportUsageStats()) {
-                throw new SecurityException("Only the system or holders of the REPORT_USAGE_STATS"
-                        + " permission are allowed to call reportChooserSelection");
+            if (Flags.reportUsageStatsPermission()) {
+                if (!canReportUsageStats()) {
+                    throw new SecurityException(
+                        "Only the system or holders of the REPORT_USAGE_STATS"
+                            + " permission are allowed to call reportChooserSelection");
+                }
             }
 
             // Verify if this package exists before reporting an event for it.
@@ -2647,9 +2662,17 @@ public class UsageStatsService extends SystemService implements
         @Override
         public void reportUserInteraction(String packageName, int userId) {
             Objects.requireNonNull(packageName);
-            if (!canReportUsageStats()) {
-                throw new SecurityException("Only the system or holders of the REPORT_USAGE_STATS"
-                        + " permission are allowed to call reportUserInteraction");
+            if (Flags.reportUsageStatsPermission()) {
+                if (!canReportUsageStats()) {
+                    throw new SecurityException(
+                        "Only the system or holders of the REPORT_USAGE_STATS"
+                            + " permission are allowed to call reportUserInteraction");
+                }
+            } else {
+                if (!isCallingUidSystem()) {
+                    throw new SecurityException("Only system is allowed to call"
+                            + " reportUserInteraction");
+                }
             }
 
             final Event event = new Event(USER_INTERACTION, SystemClock.elapsedRealtime());

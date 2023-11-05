@@ -16,11 +16,15 @@ aconfig_srcjars = [
     ":android.app.usage.flags-aconfig-java{.generated_srcjars}",
     ":android.companion.flags-aconfig-java{.generated_srcjars}",
     ":android.content.pm.flags-aconfig-java{.generated_srcjars}",
+    ":android.content.res.flags-aconfig-java{.generated_srcjars}",
+    ":android.hardware.flags-aconfig-java{.generated_srcjars}",
     ":android.hardware.radio.flags-aconfig-java{.generated_srcjars}",
+    ":android.location.flags-aconfig-java{.generated_srcjars}",
     ":android.nfc.flags-aconfig-java{.generated_srcjars}",
     ":android.os.flags-aconfig-java{.generated_srcjars}",
     ":android.os.vibrator.flags-aconfig-java{.generated_srcjars}",
     ":android.security.flags-aconfig-java{.generated_srcjars}",
+    ":android.service.notification.flags-aconfig-java{.generated_srcjars}",
     ":android.view.flags-aconfig-java{.generated_srcjars}",
     ":android.view.accessibility.flags-aconfig-java{.generated_srcjars}",
     ":camera_platform_flags_core_java_lib{.generated_srcjars}",
@@ -33,6 +37,7 @@ aconfig_srcjars = [
     ":android.companion.virtual.flags-aconfig-java{.generated_srcjars}",
     ":android.view.inputmethod.flags-aconfig-java{.generated_srcjars}",
     ":android.widget.flags-aconfig-java{.generated_srcjars}",
+    ":com.android.media.audio.flags-aconfig-java{.generated_srcjars}",
     ":com.android.media.flags.bettertogether-aconfig-java{.generated_srcjars}",
     ":sdk_sandbox_flags_lib{.generated_srcjars}",
     ":android.permission.flags-aconfig-java{.generated_srcjars}",
@@ -46,8 +51,10 @@ aconfig_srcjars = [
     ":android.credentials.flags-aconfig-java{.generated_srcjars}",
     ":android.view.contentprotection.flags-aconfig-java{.generated_srcjars}",
     ":android.service.voice.flags-aconfig-java{.generated_srcjars}",
+    ":aconfig_midi_flags_java_lib{.generated_srcjars}",
     ":android.service.autofill.flags-aconfig-java{.generated_srcjars}",
     ":com.android.net.flags-aconfig-java{.generated_srcjars}",
+    ":device_policy_aconfig_flags_lib{.generated_srcjars}",
 ]
 
 filegroup {
@@ -137,6 +144,21 @@ cc_aconfig_library {
     aconfig_declarations: "com.android.text.flags-aconfig",
 }
 
+// Location
+aconfig_declarations {
+    name: "android.location.flags-aconfig",
+    package: "android.location.flags",
+    srcs: [
+        "location/java/android/location/flags/*.aconfig",
+    ],
+}
+
+java_aconfig_library {
+    name: "android.location.flags-aconfig-java",
+    aconfig_declarations: "android.location.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // NFC
 aconfig_declarations {
     name: "android.nfc.flags-aconfig",
@@ -147,6 +169,11 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.nfc.flags-aconfig-java",
     aconfig_declarations: "android.nfc.flags-aconfig",
+    min_sdk_version: "VanillaIceCream",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.nfcservices",
+    ],
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -271,6 +298,19 @@ cc_aconfig_library {
     aconfig_declarations: "android.view.accessibility.flags-aconfig",
 }
 
+// Hardware
+aconfig_declarations {
+    name: "android.hardware.flags-aconfig",
+    package: "android.hardware.flags",
+    srcs: ["core/java/android/hardware/flags/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.hardware.flags-aconfig-java",
+    aconfig_declarations: "android.hardware.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // Widget
 aconfig_declarations {
     name: "android.widget.flags-aconfig",
@@ -282,6 +322,12 @@ java_aconfig_library {
     name: "android.widget.flags-aconfig-java",
     aconfig_declarations: "android.widget.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+rust_aconfig_library {
+    name: "libandroid_security_flags_rust",
+    crate_name: "android_security_flags",
+    aconfig_declarations: "android.security.flags-aconfig",
 }
 
 // Package Manager
@@ -304,6 +350,19 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+// Resources
+aconfig_declarations {
+    name: "android.content.res.flags-aconfig",
+    package: "android.content.res",
+    srcs: ["core/java/android/content/res/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.content.res.flags-aconfig-java",
+    aconfig_declarations: "android.content.res.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // Media BetterTogether
 aconfig_declarations {
     name: "com.android.media.flags.bettertogether-aconfig",
@@ -314,6 +373,13 @@ aconfig_declarations {
 java_aconfig_library {
     name: "com.android.media.flags.bettertogether-aconfig-java",
     aconfig_declarations: "com.android.media.flags.bettertogether-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Media Audio
+java_aconfig_library {
+    name: "com.android.media.audio.flags-aconfig-java",
+    aconfig_declarations: "aconfig_audio_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -498,5 +564,38 @@ java_aconfig_library {
 java_aconfig_library {
     name: "com.android.net.flags-aconfig-java",
     aconfig_declarations: "com.android.net.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// DevicePolicy
+aconfig_declarations {
+    name: "device_policy_aconfig_flags",
+    package: "android.app.admin.flags",
+    srcs: [
+        "core/java/android/app/admin/flags/flags.aconfig",
+    ],
+}
+
+java_aconfig_library {
+    name: "device_policy_aconfig_flags_lib",
+    aconfig_declarations: "device_policy_aconfig_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "device_policy_aconfig_flags_c_lib",
+    aconfig_declarations: "device_policy_aconfig_flags",
+}
+
+// Notifications
+aconfig_declarations {
+    name: "android.service.notification.flags-aconfig",
+    package: "android.service.notification",
+    srcs: ["core/java/android/service/notification/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.service.notification.flags-aconfig-java",
+    aconfig_declarations: "android.service.notification.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

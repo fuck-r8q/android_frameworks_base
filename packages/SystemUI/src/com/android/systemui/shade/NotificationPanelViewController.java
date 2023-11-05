@@ -1454,9 +1454,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                     mBarState);
         }
 
-        if (mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
-            setKeyguardVisibility(mBarState, false);
-        } else {
+        if (!mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
             setKeyguardBottomAreaVisibility(mBarState, false);
         }
 
@@ -2370,14 +2368,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         }
     }
 
-    private void setKeyguardVisibility(int statusBarState, boolean goingToFullShade) {
-        mKeyguardInteractor.setKeyguardRootVisibility(
-            statusBarState,
-            goingToFullShade,
-            mIsOcclusionTransitionRunning
-        );
-    }
-
     @Deprecated
     private void setKeyguardBottomAreaVisibility(int statusBarState, boolean goingToFullShade) {
         mKeyguardBottomArea.animate().cancel();
@@ -2651,7 +2641,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         if (isPanelExpanded() != isExpanded) {
             setExpandedOrAwaitingInputTransfer(isExpanded);
             updateSystemUiStateFlags();
-            mShadeExpansionStateManager.onShadeExpansionFullyChanged(isExpanded);
             if (!isExpanded) {
                 mQsController.closeQsCustomizer();
             }
@@ -4455,11 +4444,13 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                     && statusBarState == KEYGUARD) {
                 // This means we're doing the screen off animation - position the keyguard status
                 // view where it'll be on AOD, so we can animate it in.
-                mKeyguardStatusViewController.updatePosition(
-                        mClockPositionResult.clockX,
-                        mClockPositionResult.clockYFullyDozing,
-                        mClockPositionResult.clockScale,
-                        false /* animate */);
+                if (!mFeatureFlags.isEnabled(Flags.MIGRATE_NSSL)) {
+                    mKeyguardStatusViewController.updatePosition(
+                            mClockPositionResult.clockX,
+                            mClockPositionResult.clockYFullyDozing,
+                            mClockPositionResult.clockScale,
+                            false /* animate */);
+                }
             }
 
             mKeyguardStatusViewController.setKeyguardStatusViewVisibility(
@@ -4468,9 +4459,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                     goingToFullShade,
                     mBarState);
 
-            if (mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
-                setKeyguardVisibility(statusBarState, goingToFullShade);
-            } else {
+            if (!mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
                 setKeyguardBottomAreaVisibility(statusBarState, goingToFullShade);
             }
 
@@ -4574,7 +4563,12 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     public void showAodUi() {
         setDozing(true /* dozing */, false /* animate */);
         mStatusBarStateController.setUpcomingState(KEYGUARD);
-        mStatusBarStateListener.onStateChanged(KEYGUARD);
+
+        if (mFeatureFlags.isEnabled(Flags.MIGRATE_NSSL)) {
+            mStatusBarStateController.setState(KEYGUARD);
+        } else {
+            mStatusBarStateListener.onStateChanged(KEYGUARD);
+        }
         mStatusBarStateListener.onDozeAmountChanged(1f, 1f);
         setExpandedFraction(1f);
     }

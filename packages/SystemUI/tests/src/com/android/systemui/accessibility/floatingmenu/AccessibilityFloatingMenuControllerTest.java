@@ -19,6 +19,8 @@ package com.android.systemui.accessibility.floatingmenu;
 import static android.provider.Settings.Secure.ACCESSIBILITY_BUTTON_MODE_FLOATING_MENU;
 import static android.provider.Settings.Secure.ACCESSIBILITY_BUTTON_MODE_NAVIGATION_BAR;
 
+import static com.android.systemui.accessibility.utils.FlagUtils.setFlagDefaults;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -87,6 +89,7 @@ public class AccessibilityFloatingMenuControllerTest extends SysuiTestCase {
 
     @Before
     public void setUp() throws Exception {
+        setFlagDefaults(mSetFlagsRule);
         MockitoAnnotations.initMocks(this);
         mContextWrapper = new ContextWrapper(mContext) {
             @Override

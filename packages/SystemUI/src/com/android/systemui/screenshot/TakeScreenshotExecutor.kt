@@ -10,14 +10,13 @@ import com.android.internal.util.ScreenshotRequest
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.display.data.repository.DisplayRepository
+import com.android.systemui.res.R
+import com.android.systemui.screenshot.ScreenshotEvent.SCREENSHOT_CAPTURE_FAILED
 import com.android.systemui.screenshot.TakeScreenshotService.RequestCallback
 import java.util.function.Consumer
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -34,16 +33,13 @@ constructor(
     displayRepository: DisplayRepository,
     @Application private val mainScope: CoroutineScope,
     private val screenshotRequestProcessor: ScreenshotRequestProcessor,
-    private val uiEventLogger: UiEventLogger
+    private val uiEventLogger: UiEventLogger,
+    private val screenshotNotificationControllerFactory: ScreenshotNotificationsController.Factory,
 ) {
 
-    private lateinit var displays: StateFlow<Set<Display>>
-    private val displaysCollectionJob: Job =
-        mainScope.launch {
-            displays = displayRepository.displays.stateIn(this, SharingStarted.Eagerly, emptySet())
-        }
-
+    private val displays = displayRepository.displays
     private val screenshotControllers = mutableMapOf<Int, ScreenshotController>()
+    private val notificationControllers = mutableMapOf<Int, ScreenshotNotificationsController>()
 
     /**
      * Executes the [ScreenshotRequest].
@@ -58,48 +54,77 @@ constructor(
     ) {
         val displayIds = getDisplaysToScreenshot(screenshotRequest.type)
         val resultCallbackWrapper = MultiResultCallbackWrapper(requestCallback)
-        screenshotRequest.oneForEachDisplay(displayIds).forEach { screenshotData: ScreenshotData ->
+        displayIds.forEach { displayId: Int ->
+            Log.d(TAG, "Executing screenshot for display $displayId")
             dispatchToController(
-                screenshotData = screenshotData,
+                rawScreenshotData = ScreenshotData.fromRequest(screenshotRequest, displayId),
                 onSaved =
-                    if (screenshotData.displayId == Display.DEFAULT_DISPLAY) onSaved else { _ -> },
-                callback = resultCallbackWrapper.createCallbackForId(screenshotData.displayId)
+                    if (displayId == Display.DEFAULT_DISPLAY) {
+                        onSaved
+                    } else { _ -> },
+                callback = resultCallbackWrapper.createCallbackForId(displayId)
             )
         }
     }
 
-    /** Creates a [ScreenshotData] for each display. */
-    private suspend fun ScreenshotRequest.oneForEachDisplay(
-        displayIds: List<Int>
-    ): List<ScreenshotData> {
-        return displayIds
-            .map { displayId -> ScreenshotData.fromRequest(this, displayId) }
-            .map { screenshotData: ScreenshotData ->
-                screenshotRequestProcessor.process(screenshotData)
-            }
-    }
-
-    private fun dispatchToController(
-        screenshotData: ScreenshotData,
+    /** All logging should be triggered only by this method. */
+    private suspend fun dispatchToController(
+        rawScreenshotData: ScreenshotData,
         onSaved: (Uri) -> Unit,
         callback: RequestCallback
     ) {
+        // Let's wait before logging "screenshot requested", as we should log the processed
+        // ScreenshotData.
+        val screenshotData =
+            try {
+                screenshotRequestProcessor.process(rawScreenshotData)
+            } catch (e: RequestProcessorException) {
+                Log.e(TAG, "Failed to process screenshot request!", e)
+                logScreenshotRequested(rawScreenshotData)
+                onFailedScreenshotRequest(rawScreenshotData, callback)
+                return
+            }
+
+        logScreenshotRequested(screenshotData)
+        Log.d(TAG, "Screenshot request: $screenshotData")
+        try {
+            getScreenshotController(screenshotData.displayId)
+                .handleScreenshot(screenshotData, onSaved, callback)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Error while ScreenshotController was handling ScreenshotData!", e)
+            onFailedScreenshotRequest(screenshotData, callback)
+            return // After a failure log, nothing else should run.
+        }
+    }
+
+    /**
+     * This should be logged also in case of failed requests, before the [SCREENSHOT_CAPTURE_FAILED]
+     * event.
+     */
+    private fun logScreenshotRequested(screenshotData: ScreenshotData) {
         uiEventLogger.log(
             ScreenshotEvent.getScreenshotSource(screenshotData.source),
             0,
             screenshotData.packageNameString
         )
-        Log.d(TAG, "Screenshot request: $screenshotData")
-        getScreenshotController(screenshotData.displayId)
-            .handleScreenshot(screenshotData, onSaved, callback)
     }
 
-    private fun getDisplaysToScreenshot(requestType: Int): List<Int> {
+    private fun onFailedScreenshotRequest(
+        screenshotData: ScreenshotData,
+        callback: RequestCallback
+    ) {
+        uiEventLogger.log(SCREENSHOT_CAPTURE_FAILED, 0, screenshotData.packageNameString)
+        getNotificationController(screenshotData.displayId)
+            .notifyScreenshotError(R.string.screenshot_failed_to_capture_text)
+        callback.reportError()
+    }
+
+    private suspend fun getDisplaysToScreenshot(requestType: Int): List<Int> {
         return if (requestType == TAKE_SCREENSHOT_PROVIDED_IMAGE) {
             // If this is a provided image, let's show the UI on the default display only.
             listOf(Display.DEFAULT_DISPLAY)
         } else {
-            displays.value.filter { it.type in ALLOWED_DISPLAY_TYPES }.map { it.displayId }
+            displays.first().filter { it.type in ALLOWED_DISPLAY_TYPES }.map { it.displayId }
         }
     }
 
@@ -131,12 +156,17 @@ constructor(
             screenshotController.onDestroy()
         }
         screenshotControllers.clear()
-        displaysCollectionJob.cancel()
     }
 
     private fun getScreenshotController(id: Int): ScreenshotController {
         return screenshotControllers.computeIfAbsent(id) {
             screenshotControllerFactory.create(id, /* showUIOnExternalDisplay= */ false)
+        }
+    }
+
+    private fun getNotificationController(id: Int): ScreenshotNotificationsController {
+        return notificationControllers.computeIfAbsent(id) {
+            screenshotNotificationControllerFactory.create(id)
         }
     }
 

@@ -498,6 +498,7 @@ public final class DisplayManagerService extends SystemService {
 
     // If we would like to keep a particular eye on a package, we can set the package name.
     private final boolean mExtraDisplayEventLogging;
+    private final String mExtraDisplayLoggingPackageName;
 
     private final BroadcastReceiver mIdleModeReceiver = new BroadcastReceiver() {
         @Override
@@ -596,8 +597,9 @@ public final class DisplayManagerService extends SystemService {
         mSystemReady = false;
         mDumpInProgress = false;
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
-        final String name = DisplayProperties.debug_vri_package().orElse(null);
-        mExtraDisplayEventLogging = !TextUtils.isEmpty(name);
+        mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
+        // TODO: b/306170135 - return TextUtils package name check instead
+        mExtraDisplayEventLogging = true;
     }
 
     public void setupSchedulerPolicies() {
@@ -769,7 +771,8 @@ public final class DisplayManagerService extends SystemService {
 
         mContext.registerReceiver(mIdleModeReceiver, filter);
 
-        mSmallAreaDetectionController = SmallAreaDetectionController.create(mContext);
+        mSmallAreaDetectionController = (mFlags.isSmallAreaDetectionEnabled())
+                ? SmallAreaDetectionController.create(mContext) : null;
     }
 
     @VisibleForTesting
@@ -1141,6 +1144,7 @@ public final class DisplayManagerService extends SystemService {
                     new Display.Mode(Display.DISPLAY_MODE_ID_FOR_FRAME_RATE_OVERRIDE,
                             currentMode.getPhysicalWidth(), currentMode.getPhysicalHeight(),
                             overriddenInfo.refreshRateOverride,
+                            currentMode.getVsyncRate(),
                             new float[0], currentMode.getSupportedHdrTypes());
             overriddenInfo.modeId =
                     overriddenInfo.supportedModes[overriddenInfo.supportedModes.length - 1]
@@ -2321,8 +2325,10 @@ public final class DisplayManagerService extends SystemService {
 
     @GuardedBy("mSyncRoot")
     private boolean hdrConversionIntroducesLatencyLocked() {
+        HdrConversionMode mode = getHdrConversionModeSettingInternal();
         final int preferredHdrOutputType =
-                getHdrConversionModeSettingInternal().getPreferredHdrOutputType();
+                mode.getConversionMode() == HdrConversionMode.HDR_CONVERSION_SYSTEM
+                        ? mSystemPreferredHdrOutputType : mode.getPreferredHdrOutputType();
         if (preferredHdrOutputType != Display.HdrCapabilities.HDR_TYPE_INVALID) {
             int[] hdrTypesWithLatency = mInjector.getHdrOutputTypesWithLatency();
             return ArrayUtils.contains(hdrTypesWithLatency, preferredHdrOutputType);
@@ -2603,16 +2609,14 @@ public final class DisplayManagerService extends SystemService {
             // TODO(b/202378408) set minimal post-processing only if it's supported once we have a
             // separate API for disabling on-device processing.
             boolean mppRequest = isMinimalPostProcessingAllowed() && preferMinimalPostProcessing;
-            boolean disableHdrConversionForLatency = false;
+            // If HDR conversion introduces latency, disable that in case minimal
+            // post-processing is requested
+            boolean disableHdrConversionForLatency =
+                    mppRequest ? hdrConversionIntroducesLatencyLocked() : false;
 
             if (display.getRequestedMinimalPostProcessingLocked() != mppRequest) {
                 display.setRequestedMinimalPostProcessingLocked(mppRequest);
                 shouldScheduleTraversal = true;
-                // If HDR conversion introduces latency, disable that in case minimal
-                // post-processing is requested
-                if (mppRequest) {
-                    disableHdrConversionForLatency = hdrConversionIntroducesLatencyLocked();
-                }
             }
 
             if (shouldScheduleTraversal) {
@@ -2948,15 +2952,27 @@ public final class DisplayManagerService extends SystemService {
     // Send a display event if the display is enabled
     private void sendDisplayEventIfEnabledLocked(@NonNull LogicalDisplay display,
                                                  @DisplayEvent int event) {
+        final boolean displayIsEnabled = display.isEnabledLocked();
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
+            Trace.instant(Trace.TRACE_TAG_POWER,
+                    "sendDisplayEventLocked#event=" + event + ",displayEnabled="
+                            + displayIsEnabled);
+        }
+
         // Only send updates outside of DisplayManagerService for enabled displays
-        if (display.isEnabledLocked()) {
+        if (displayIsEnabled) {
             sendDisplayEventLocked(display, event);
+        } else if (mExtraDisplayEventLogging) {
+            Slog.i(TAG, "Not Sending Display Event; display is not enabled: " + display);
         }
     }
 
     private void sendDisplayEventLocked(@NonNull LogicalDisplay display, @DisplayEvent int event) {
         int displayId = display.getDisplayIdLocked();
         Message msg = mHandler.obtainMessage(MSG_DELIVER_DISPLAY_EVENT, displayId, event);
+        if (mExtraDisplayEventLogging) {
+            Slog.i(TAG, "Deliver Display Event on Handler: " + event);
+        }
         mHandler.sendMessage(msg);
     }
 
@@ -2984,7 +3000,7 @@ public final class DisplayManagerService extends SystemService {
 
     // Check if the target app is in cached mode
     private boolean isUidCached(int uid) {
-        if (mActivityManagerInternal == null) {
+        if (mActivityManagerInternal == null || uid < FIRST_APPLICATION_UID) {
             return false;
         }
         int procState = mActivityManagerInternal.getUidProcessState(uid);
@@ -3001,7 +3017,11 @@ public final class DisplayManagerService extends SystemService {
                     + displayId + ", event=" + event
                     + (uids != null ? ", uids=" + uids : ""));
         }
-
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
+            Trace.instant(Trace.TRACE_TAG_POWER,
+                    "deliverDisplayEvent#event=" + event + ",displayId="
+                            + displayId   + (uids != null ? ", uids=" + uids : ""));
+        }
         // Grab the lock and copy the callbacks.
         final int count;
         synchronized (mSyncRoot) {
@@ -3022,6 +3042,10 @@ public final class DisplayManagerService extends SystemService {
                 // For cached apps, save the pending event until it becomes non-cached
                 synchronized (mPendingCallbackSelfLocked) {
                     PendingCallback pendingCallback = mPendingCallbackSelfLocked.get(uid);
+                    if (extraLogging(callbackRecord.mPackageName)) {
+                        Slog.i(TAG,
+                                "Uid is cached: " + uid + ", pendingCallback: " + pendingCallback);
+                    }
                     if (pendingCallback == null) {
                         mPendingCallbackSelfLocked.put(uid,
                                 new PendingCallback(callbackRecord, displayId, event));
@@ -3034,6 +3058,11 @@ public final class DisplayManagerService extends SystemService {
             }
         }
         mTempCallbacks.clear();
+    }
+
+    private boolean extraLogging(String packageName) {
+        // TODO: b/306170135 - return mExtraDisplayLoggingPackageName & package name check instead
+        return true;
     }
 
     // Runs on Handler thread.
@@ -3490,6 +3519,7 @@ public final class DisplayManagerService extends SystemService {
         public final int mUid;
         private final IDisplayManagerCallback mCallback;
         private @EventsMask AtomicLong mEventsMask;
+        private final String mPackageName;
 
         public boolean mWifiDisplayScanRequested;
 
@@ -3499,6 +3529,9 @@ public final class DisplayManagerService extends SystemService {
             mUid = uid;
             mCallback = callback;
             mEventsMask = new AtomicLong(eventsMask);
+
+            String[] packageNames = mContext.getPackageManager().getPackagesForUid(uid);
+            mPackageName = packageNames == null ? null : packageNames[0];
         }
 
         public void updateEventsMask(@EventsMask long eventsMask) {
@@ -3507,8 +3540,12 @@ public final class DisplayManagerService extends SystemService {
 
         @Override
         public void binderDied() {
-            if (DEBUG) {
+            if (DEBUG || extraLogging(mPackageName)) {
                 Slog.d(TAG, "Display listener for pid " + mPid + " died.");
+            }
+            if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
+                Trace.instant(Trace.TRACE_TAG_POWER,
+                        "displayManagerBinderDied#mPid=" + mPid);
             }
             onCallbackDied(this);
         }
@@ -3518,6 +3555,15 @@ public final class DisplayManagerService extends SystemService {
          */
         public boolean notifyDisplayEventAsync(int displayId, @DisplayEvent int event) {
             if (!shouldSendEvent(event)) {
+                if (extraLogging(mPackageName)) {
+                    Slog.i(TAG,
+                            "Not sending displayEvent: " + event + " due to mask:" + mEventsMask);
+                }
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
+                    Trace.instant(Trace.TRACE_TAG_POWER,
+                            "notifyDisplayEventAsync#notSendingEvent=" + event + ",mEventsMask="
+                                    + mEventsMask);
+                }
                 return true;
             }
 

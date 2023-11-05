@@ -22,6 +22,7 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.TransitionModeOnCanceled
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.util.kotlin.Utils.Companion.toTriple
 import com.android.systemui.util.kotlin.sample
@@ -114,7 +115,9 @@ constructor(
                 .collect { (isAsleep, lastStartedStep, isAodAvailable) ->
                     if (lastStartedStep.to == KeyguardState.GONE && isAsleep) {
                         startTransitionTo(
-                            if (isAodAvailable) KeyguardState.AOD else KeyguardState.DOZING
+                            toState =
+                                if (isAodAvailable) KeyguardState.AOD else KeyguardState.DOZING,
+                            modeOnCanceled = TransitionModeOnCanceled.RESET,
                         )
                     }
                 }
@@ -127,6 +130,7 @@ constructor(
             duration =
                 when (toState) {
                     KeyguardState.DREAMING -> TO_DREAMING_DURATION
+                    KeyguardState.AOD -> TO_AOD_DURATION
                     else -> DEFAULT_DURATION
                 }.inWholeMilliseconds
         }
@@ -134,5 +138,6 @@ constructor(
     companion object {
         private val DEFAULT_DURATION = 500.milliseconds
         val TO_DREAMING_DURATION = 933.milliseconds
+        val TO_AOD_DURATION = 1100.milliseconds
     }
 }

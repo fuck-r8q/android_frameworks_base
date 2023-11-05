@@ -28,7 +28,6 @@ import com.android.keyguard.KeyguardSecurityModel
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.DejankUtils
-import com.android.systemui.res.R
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants.EXPANSION_HIDDEN
@@ -41,8 +40,10 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.data.repository.TrustRepository
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.res.R
 import com.android.systemui.shared.system.SysUiStatsLog
 import com.android.systemui.statusbar.policy.KeyguardStateController
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -73,6 +74,7 @@ constructor(
     private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
     private val trustRepository: TrustRepository,
     @Application private val applicationScope: CoroutineScope,
+    private val selectedUserInteractor: SelectedUserInteractor,
 ) {
     private val passiveAuthBouncerDelay =
         context.resources.getInteger(R.integer.primary_bouncer_passive_auth_delay).toLong()
@@ -144,6 +146,16 @@ constructor(
     /** Show the bouncer if necessary and set the relevant states. */
     @JvmOverloads
     fun show(isScrimmed: Boolean) {
+        if (primaryBouncerView.delegate == null) {
+            Log.d(
+                TAG,
+                "PrimaryBouncerInteractor#show is being called before the " +
+                    "primaryBouncerDelegate is set. Let's exit early so we don't set the wrong " +
+                    "primaryBouncer state."
+            )
+            return
+        }
+
         // Reset some states as we show the bouncer.
         repository.setKeyguardAuthenticatedBiometrics(null)
         repository.setPrimaryStartingToHide(false)
@@ -384,7 +396,7 @@ constructor(
     /** Returns whether the bouncer should be full screen. */
     private fun needsFullscreenBouncer(): Boolean {
         val mode: KeyguardSecurityModel.SecurityMode =
-            keyguardSecurityModel.getSecurityMode(KeyguardUpdateMonitor.getCurrentUser())
+            keyguardSecurityModel.getSecurityMode(selectedUserInteractor.getSelectedUserId())
         return mode == KeyguardSecurityModel.SecurityMode.SimPin ||
             mode == KeyguardSecurityModel.SecurityMode.SimPuk
     }

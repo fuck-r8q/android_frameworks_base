@@ -42,6 +42,8 @@ import com.android.systemui.bouncer.ui.BouncerView
 import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel
 import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.classifier.FalsingCollectorFake
+import com.android.systemui.communal.data.repository.FakeCommunalRepository
+import com.android.systemui.communal.ui.viewmodel.CommunalViewModel
 import com.android.systemui.dock.DockManager
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.dump.logcatLogBuffer
@@ -79,6 +81,7 @@ import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider
 import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
@@ -141,9 +144,12 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
     private lateinit var unfoldTransitionProgressProvider:
         Optional<UnfoldTransitionProgressProvider>
     @Mock private lateinit var notificationInsetsController: NotificationInsetsController
+    @Mock private lateinit var mCommunalViewModel: CommunalViewModel
+    private lateinit var mCommunalRepository: FakeCommunalRepository
     @Mock private lateinit var keyguardTransitionInteractor: KeyguardTransitionInteractor
     @Mock lateinit var primaryBouncerInteractor: PrimaryBouncerInteractor
     @Mock lateinit var alternateBouncerInteractor: AlternateBouncerInteractor
+    @Mock private lateinit var mSelectedUserInteractor: SelectedUserInteractor
     @Mock
     private lateinit var primaryBouncerToGoneTransitionViewModel:
         PrimaryBouncerToGoneTransitionViewModel
@@ -176,6 +182,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
         whenever(keyguardTransitionInteractor.lockscreenToDreamingTransition)
             .thenReturn(emptyFlow())
 
+        mCommunalRepository = FakeCommunalRepository()
+
         val featureFlags = FakeFeatureFlags()
         featureFlags.set(Flags.TRACKPAD_GESTURE_COMMON, true)
         featureFlags.set(Flags.TRACKPAD_GESTURE_FEATURES, false)
@@ -202,8 +210,6 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 centralSurfaces,
                 dozeServiceHost,
                 dozeScrimController,
-                backActionInteractor,
-                powerInteractor,
                 notificationShadeWindowController,
                 unfoldTransitionProgressProvider,
                 keyguardUnlockAnimationController,
@@ -218,6 +224,8 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 Mockito.mock(KeyguardMessageAreaController.Factory::class.java),
                 keyguardTransitionInteractor,
                 primaryBouncerToGoneTransitionViewModel,
+                mCommunalViewModel,
+                mCommunalRepository,
                 NotificationExpansionRepository(),
                 featureFlags,
                 FakeSystemClock(),
@@ -245,6 +253,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                             Mockito.mock(KeyguardUpdateMonitor::class.java),
                             FakeTrustRepository(),
                             testScope.backgroundScope,
+                            mSelectedUserInteractor,
                         ),
                     facePropertyRepository = FakeFacePropertyRepository(),
                     deviceEntryFingerprintAuthRepository =
@@ -256,6 +265,7 @@ class NotificationShadeWindowViewTest : SysuiTestCase() {
                 Mockito.mock(SysUIKeyEventHandler::class.java),
                 primaryBouncerInteractor,
                 alternateBouncerInteractor,
+                mSelectedUserInteractor,
             )
 
         controller.setupExpandedStatusBar()

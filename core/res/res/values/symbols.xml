@@ -2078,6 +2078,8 @@
   <java-symbol type="integer" name="config_previousVibrationsDumpAggregationTimeMillisLimit" />
   <java-symbol type="integer" name="config_defaultVibrationAmplitude" />
   <java-symbol type="dimen" name="config_hapticChannelMaxVibrationAmplitude" />
+  <java-symbol type="dimen" name="config_keyboardHapticFeedbackFixedAmplitude" />
+  <java-symbol type="bool" name="config_defaultKeyboardVibrationEnabled" />
   <java-symbol type="integer" name="config_vibrationWaveformRampStepDuration" />
   <java-symbol type="bool" name="config_ignoreVibrationsOnWirelessCharger" />
   <java-symbol type="integer" name="config_vibrationWaveformRampDownDuration" />
@@ -4342,6 +4344,8 @@
   <java-symbol type="string" name="config_factoryResetPackage" />
   <java-symbol type="array" name="config_highRefreshRateBlacklist" />
   <java-symbol type="array" name="config_forceSlowJpegModeList" />
+  <java-symbol type="array" name="pause_wallpaper_render_when_state_change" />
+  <java-symbol type="bool" name="config_pauseWallpaperRenderWhenStateChangeEnabled" />
 
   <java-symbol type="array" name="config_smallAreaDetectionAllowlist" />
 
@@ -5106,6 +5110,8 @@
   <java-symbol type="array" name="device_state_notification_power_save_contents"/>
   <java-symbol type="string" name="connected_display_unavailable_notification_title"/>
   <java-symbol type="string" name="connected_display_unavailable_notification_content"/>
+  <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_title"/>
+  <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_content"/>
   <java-symbol type="string" name="concurrent_display_notification_name"/>
   <java-symbol type="string" name="concurrent_display_notification_active_title"/>
   <java-symbol type="string" name="concurrent_display_notification_active_content"/>
@@ -5159,6 +5165,8 @@
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugHighBatteryLevel" />
   <java-symbol type="bool" name="config_batteryStatsResetOnUnplugAfterSignificantCharge" />
   <java-symbol type="integer" name="config_defaultPowerStatsThrottlePeriodCpu" />
+  <java-symbol type="integer" name="config_powerStatsAggregationPeriod" />
+  <java-symbol type="integer" name="config_aggregatedPowerStatsSpanDuration" />
 
   <java-symbol name="materialColorOnSecondaryFixedVariant" type="attr"/>
   <java-symbol name="materialColorOnTertiaryFixedVariant" type="attr"/>

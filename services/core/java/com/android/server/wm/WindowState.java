@@ -1196,7 +1196,21 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
-    public boolean isWindowTrustedOverlay() {
+    @Override
+    void setInitialSurfaceControlProperties(SurfaceControl.Builder b) {
+        super.setInitialSurfaceControlProperties(b);
+        if (surfaceTrustedOverlay() && isWindowTrustedOverlay()) {
+            getPendingTransaction().setTrustedOverlay(mSurfaceControl, true);
+        }
+    }
+
+    void updateTrustedOverlay() {
+        mInputWindowHandle.setTrustedOverlay(getPendingTransaction(), mSurfaceControl,
+                isWindowTrustedOverlay());
+        mInputWindowHandle.forceChange();
+    }
+
+    boolean isWindowTrustedOverlay() {
         return InputMonitor.isTrustedOverlay(mAttrs.type)
                 || ((mAttrs.privateFlags & PRIVATE_FLAG_TRUSTED_OVERLAY) != 0
                         && mSession.mCanAddInternalSystemWindow)
@@ -1338,6 +1352,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mLastRequestedWidth = requestedWidth;
             mLastRequestedHeight = requestedHeight;
             windowFrames.setContentChanged(true);
+        }
+
+        if (!windowFrames.mFrame.equals(windowFrames.mLastFrame)
+                || !windowFrames.mRelFrame.equals(windowFrames.mLastRelFrame)) {
+            mWmService.mFrameChangingWindows.add(this);
         }
 
         if (mAttrs.type == TYPE_DOCK_DIVIDER) {
@@ -2763,12 +2782,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 // bounds, as they would be used to display the dim layer.
                 final TaskFragment taskFragment = getTaskFragment();
                 if (taskFragment != null) {
-                    final Task task = taskFragment.asTask();
-                    if (task != null) {
-                        task.getDimBounds(mTmpRect);
-                    } else {
-                        mTmpRect.set(taskFragment.getBounds());
-                    }
+                    taskFragment.getDimBounds(mTmpRect);
                 } else if (getRootTask() != null) {
                     getRootTask().getDimBounds(mTmpRect);
                 }
@@ -3714,10 +3728,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // that may cause WINDOW_FREEZE_TIMEOUT because resizing the client keeps failing.
         mDragResizingChangeReported = true;
         mWindowFrames.clearReportResizeHints();
-
-        // We update mLastFrame always rather than in the conditional with the last inset
-        // variables, because mFrameSizeChanged only tracks the width and height changing.
-        updateLastFrames();
 
         final int prevRotation = mLastReportedConfiguration
                 .getMergedConfiguration().windowConfiguration.getRotation();
@@ -5135,8 +5145,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     private void applyDims() {
         if (((mAttrs.flags & FLAG_DIM_BEHIND) != 0 || shouldDrawBlurBehind())
-                && mToken.isVisibleRequested() && isVisibleNow() && !mHidden
-                && mTransitionController.canApplyDim(getTask())) {
+                && (Dimmer.DIMMER_REFACTOR ? mWinAnimator.getShown() : isVisibleNow())
+                && !mHidden && mTransitionController.canApplyDim(getTask())) {
             // Only show the Dimmer when the following is satisfied:
             // 1. The window has the flag FLAG_DIM_BEHIND or blur behind is requested
             // 2. The WindowToken is not hidden so dims aren't shown when the window is exiting.
@@ -5146,7 +5156,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mIsDimming = true;
             final float dimAmount = (mAttrs.flags & FLAG_DIM_BEHIND) != 0 ? mAttrs.dimAmount : 0;
             final int blurRadius = shouldDrawBlurBehind() ? mAttrs.getBlurBehindRadius() : 0;
-            getDimmer().dimBelow(this, dimAmount, blurRadius);
+            // If the window is visible from surface flinger perspective (mWinAnimator.getShown())
+            // but not window manager visible (!isVisibleNow()), it can still be the parent of the
+            // dim, but can not create a new surface or continue a dim alone.
+            if (isVisibleNow()) {
+                getDimmer().adjustAppearance(this, dimAmount, blurRadius);
+            }
+            getDimmer().adjustRelativeLayer(this, -1 /* relativeLayer */);
         }
     }
 
@@ -5206,14 +5222,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void prepareSurfaces() {
         mIsDimming = false;
         if (mHasSurface) {
-            applyDims();
+            if (!Dimmer.DIMMER_REFACTOR) {
+                applyDims();
+            }
             updateSurfacePositionNonOrganized();
             // Send information to SurfaceFlinger about the priority of the current window.
             updateFrameRateSelectionPriorityIfNeeded();
             updateScaleIfNeeded();
             mWinAnimator.prepareSurfaceLocked(getSyncTransaction());
-            if (surfaceTrustedOverlay()) {
-                getSyncTransaction().setTrustedOverlay(mSurfaceControl, isWindowTrustedOverlay());
+            if (Dimmer.DIMMER_REFACTOR) {
+                applyDims();
             }
         }
         super.prepareSurfaces();
