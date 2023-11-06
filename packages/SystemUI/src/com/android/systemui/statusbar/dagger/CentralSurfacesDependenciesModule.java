@@ -16,22 +16,19 @@
 
 package com.android.systemui.statusbar.dagger;
 
-import android.app.WallpaperManager;
 import android.content.Context;
-import android.hardware.display.DisplayManager;
 import android.os.RemoteException;
 import android.service.dreams.IDreamManager;
 import android.util.Log;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.statusbar.IStatusBarService;
+import com.android.systemui.CoreStartable;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.AnimationFeatureFlags;
 import com.android.systemui.animation.DialogLaunchAnimator;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
-import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dagger.SysUISingleton;
-import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpHandler;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
@@ -43,14 +40,13 @@ import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.shade.ShadeSurface;
 import com.android.systemui.shade.carrier.ShadeCarrierGroupController;
+import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.statusbar.ActionClickLogger;
 import com.android.systemui.statusbar.CommandQueue;
-import com.android.systemui.statusbar.MediaArtworkProcessor;
 import com.android.systemui.statusbar.NotificationClickNotifier;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
-import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
@@ -61,7 +57,6 @@ import com.android.systemui.statusbar.notification.collection.NotifCollection;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.phone.CentralSurfacesImpl;
-import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.ManagedProfileController;
 import com.android.systemui.statusbar.phone.ManagedProfileControllerImpl;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
@@ -71,12 +66,14 @@ import com.android.systemui.statusbar.phone.StatusBarNotificationPresenterModule
 import com.android.systemui.statusbar.phone.StatusBarRemoteInputCallback;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.RemoteInputUriController;
-import com.android.systemui.util.concurrency.DelayableExecutor;
+import com.android.systemui.util.kotlin.JavaAdapter;
 
 import dagger.Binds;
 import dagger.Lazy;
 import dagger.Module;
 import dagger.Provides;
+import dagger.multibindings.ClassKey;
+import dagger.multibindings.IntoMap;
 
 /**
  * This module provides instances needed to construct {@link CentralSurfacesImpl}. These are moved to
@@ -87,7 +84,6 @@ import dagger.Provides;
 @Module(includes = {StatusBarNotificationPresenterModule.class})
 public interface CentralSurfacesDependenciesModule {
     /** */
-    @SysUISingleton
     @Provides
     static NotificationRemoteInputManager provideNotificationRemoteInputManager(
             Context context,
@@ -101,7 +97,8 @@ public interface CentralSurfacesDependenciesModule {
             RemoteInputControllerLogger remoteInputControllerLogger,
             NotificationClickNotifier clickNotifier,
             ActionClickLogger actionClickLogger,
-            DumpManager dumpManager) {
+            JavaAdapter javaAdapter,
+            ShadeInteractor shadeInteractor) {
         return new NotificationRemoteInputManager(
                 context,
                 notifPipelineFlags,
@@ -114,44 +111,33 @@ public interface CentralSurfacesDependenciesModule {
                 remoteInputControllerLogger,
                 clickNotifier,
                 actionClickLogger,
-                dumpManager);
+                javaAdapter,
+                shadeInteractor);
     }
+
+    /** */
+    @Binds
+    @IntoMap
+    @ClassKey(NotificationRemoteInputManager.class)
+    CoreStartable bindsStartNotificationRemoteInputManager(NotificationRemoteInputManager nrim);
 
     /** */
     @SysUISingleton
     @Provides
     static NotificationMediaManager provideNotificationMediaManager(
             Context context,
-            Lazy<NotificationShadeWindowController> notificationShadeWindowController,
             NotificationVisibilityProvider visibilityProvider,
-            MediaArtworkProcessor mediaArtworkProcessor,
-            KeyguardBypassController keyguardBypassController,
             NotifPipeline notifPipeline,
             NotifCollection notifCollection,
-            @Main DelayableExecutor mainExecutor,
             MediaDataManager mediaDataManager,
-            StatusBarStateController statusBarStateController,
-            SysuiColorExtractor colorExtractor,
-            KeyguardStateController keyguardStateController,
-            DumpManager dumpManager,
-            WallpaperManager wallpaperManager,
-            DisplayManager displayManager) {
+            DumpManager dumpManager) {
         return new NotificationMediaManager(
                 context,
-                notificationShadeWindowController,
                 visibilityProvider,
-                mediaArtworkProcessor,
-                keyguardBypassController,
                 notifPipeline,
                 notifCollection,
-                mainExecutor,
                 mediaDataManager,
-                statusBarStateController,
-                colorExtractor,
-                keyguardStateController,
-                dumpManager,
-                wallpaperManager,
-                displayManager);
+                dumpManager);
     }
 
     /** */
@@ -190,20 +176,23 @@ public interface CentralSurfacesDependenciesModule {
         return new CommandQueue(context, displayTracker, registry, dumpHandler, powerInteractor);
     }
 
-    /**
-     */
+    /** */
     @Binds
     ManagedProfileController provideManagedProfileController(
             ManagedProfileControllerImpl controllerImpl);
 
-    /**
-     */
+    /** */
     @Binds
     SysuiStatusBarStateController providesSysuiStatusBarStateController(
             StatusBarStateControllerImpl statusBarStateControllerImpl);
 
-    /**
-     */
+    /** */
+    @Binds
+    @IntoMap
+    @ClassKey(SysuiStatusBarStateController.class)
+    CoreStartable bindsStartStatusBarStateController(StatusBarStateControllerImpl sbsc);
+
+    /** */
     @Binds
     StatusBarIconController provideStatusBarIconController(
             StatusBarIconControllerImpl controllerImpl);
@@ -238,16 +227,14 @@ public interface CentralSurfacesDependenciesModule {
     ShadeCarrierGroupController.SlotIndexResolver provideSlotIndexResolver(
             ShadeCarrierGroupController.SubscriptionManagerSlotIndexResolver impl);
 
-    /**
-     */
+    /** */
     @Provides
     @SysUISingleton
     static ActivityLaunchAnimator provideActivityLaunchAnimator() {
         return new ActivityLaunchAnimator();
     }
 
-    /**
-     */
+    /** */
     @Provides
     @SysUISingleton
     static DialogLaunchAnimator provideDialogLaunchAnimator(IDreamManager dreamManager,
@@ -279,8 +266,7 @@ public interface CentralSurfacesDependenciesModule {
         return new DialogLaunchAnimator(callback, interactionJankMonitor, animationFeatureFlags);
     }
 
-    /**
-     */
+    /** */
     @Provides
     @SysUISingleton
     static AnimationFeatureFlags provideAnimationFeatureFlags(FeatureFlags featureFlags) {

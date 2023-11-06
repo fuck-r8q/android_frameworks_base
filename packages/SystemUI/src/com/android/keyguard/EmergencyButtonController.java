@@ -47,6 +47,7 @@ import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener;
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.util.EmergencyDialerConstants;
 import com.android.systemui.util.ViewController;
 
@@ -71,6 +72,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     private LockPatternUtils mLockPatternUtils;
     private Executor mMainExecutor;
     private Executor mBackgroundExecutor;
+    private SelectedUserInteractor mSelectedUserInteractor;
 
     private EmergencyButtonCallback mEmergencyButtonCallback;
     private boolean mIsCellAvailable;
@@ -113,7 +115,8 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
             ShadeController shadeController,
             @Nullable TelecomManager telecomManager, MetricsLogger metricsLogger,
             LockPatternUtils lockPatternUtils,
-            Executor mainExecutor, Executor backgroundExecutor) {
+            Executor mainExecutor, Executor backgroundExecutor,
+            SelectedUserInteractor selectedUserInteractor) {
         super(view);
         mConfigurationController = configurationController;
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
@@ -126,6 +129,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
         mLockPatternUtils = lockPatternUtils;
         mMainExecutor = mainExecutor;
         mBackgroundExecutor = backgroundExecutor;
+        mSelectedUserInteractor = selectedUserInteractor;
     }
 
     @Override
@@ -159,7 +163,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
             mBackgroundExecutor.execute(() -> {
                 boolean isInCall = mTelecomManager != null && mTelecomManager.isInCall();
                 boolean isSecure = mLockPatternUtils
-                        .isSecure(KeyguardUpdateMonitor.getCurrentUser());
+                        .isSecure(mSelectedUserInteractor.getSelectedUserId());
                 mMainExecutor.execute(() -> mView.updateEmergencyCallButton(
                         /* isInCall= */ isInCall,
                         /* hasTelephonyRadio= */ getContext().getPackageManager()
@@ -210,7 +214,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
 
                     getContext().startActivityAsUser(emergencyDialIntent,
                             ActivityOptions.makeCustomAnimation(getContext(), 0, 0).toBundle(),
-                            new UserHandle(KeyguardUpdateMonitor.getCurrentUser()));
+                            new UserHandle(mSelectedUserInteractor.getSelectedUserId()));
                 }
             });
         });
@@ -270,6 +274,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
         private final LockPatternUtils mLockPatternUtils;
         private final Executor mMainExecutor;
         private final Executor mBackgroundExecutor;
+        private final SelectedUserInteractor mSelectedUserInteractor;
 
         @Inject
         public Factory(ConfigurationController configurationController,
@@ -279,7 +284,8 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
                 @Nullable TelecomManager telecomManager, MetricsLogger metricsLogger,
                 LockPatternUtils lockPatternUtils,
                 @Main Executor mainExecutor,
-                @Background Executor backgroundExecutor) {
+                @Background Executor backgroundExecutor,
+                SelectedUserInteractor selectedUserInteractor) {
 
             mConfigurationController = configurationController;
             mKeyguardUpdateMonitor = keyguardUpdateMonitor;
@@ -292,6 +298,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
             mLockPatternUtils = lockPatternUtils;
             mMainExecutor = mainExecutor;
             mBackgroundExecutor = backgroundExecutor;
+            mSelectedUserInteractor = selectedUserInteractor;
         }
 
         /** Construct an {@link com.android.keyguard.EmergencyButtonController}. */
@@ -299,7 +306,7 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
             return new EmergencyButtonController(view, mConfigurationController,
                     mKeyguardUpdateMonitor, mTelephonyManager, mPowerManager, mActivityTaskManager,
                     mShadeController, mTelecomManager, mMetricsLogger, mLockPatternUtils,
-                    mMainExecutor, mBackgroundExecutor);
+                    mMainExecutor, mBackgroundExecutor, mSelectedUserInteractor);
         }
     }
 }

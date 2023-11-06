@@ -36,11 +36,12 @@ import com.android.internal.widget.LockPatternView.Cell;
 import com.android.internal.widget.LockscreenCredential;
 import com.android.keyguard.EmergencyButtonController.EmergencyButtonCallback;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
-import com.android.systemui.res.R;
 import com.android.systemui.classifier.FalsingClassifier;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.flags.FeatureFlags;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController;
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 
 import java.util.HashMap;
 import java.util.List;
@@ -110,7 +111,7 @@ public class KeyguardPatternViewController
                 mPendingLockCheck.cancel(false);
             }
 
-            final int userId = KeyguardUpdateMonitor.getCurrentUser();
+            final int userId = mSelectedUserInteractor.getSelectedUserId();
             if (pattern.size() < LockPatternUtils.MIN_PATTERN_REGISTER_FAIL) {
                 // Treat single-sized patterns as erroneous taps.
                 if (pattern.size() == 1) {
@@ -163,7 +164,7 @@ public class KeyguardPatternViewController
 
         private void onPatternChecked(int userId, boolean matched, int timeoutMs,
                 boolean isValidPattern) {
-            boolean dismissKeyguard = KeyguardUpdateMonitor.getCurrentUser() == userId;
+            boolean dismissKeyguard = mSelectedUserInteractor.getSelectedUserId() == userId;
             if (matched) {
                 mLockPatternUtils.sanitizePassword();
                 getKeyguardSecurityCallback().reportUnlockAttempt(userId, true, 0);
@@ -199,9 +200,10 @@ public class KeyguardPatternViewController
             FalsingCollector falsingCollector,
             EmergencyButtonController emergencyButtonController,
             KeyguardMessageAreaController.Factory messageAreaControllerFactory,
-            DevicePostureController postureController, FeatureFlags featureFlags) {
+            DevicePostureController postureController, FeatureFlags featureFlags,
+            SelectedUserInteractor selectedUserInteractor) {
         super(view, securityMode, keyguardSecurityCallback, emergencyButtonController,
-                messageAreaControllerFactory, featureFlags);
+                messageAreaControllerFactory, featureFlags, selectedUserInteractor);
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mLockPatternUtils = lockPatternUtils;
         mLatencyTracker = latencyTracker;
@@ -224,7 +226,7 @@ public class KeyguardPatternViewController
         mLockPatternView.setOnPatternListener(new UnlockPatternListener());
         mLockPatternView.setSaveEnabled(false);
         mLockPatternView.setInStealthMode(!mLockPatternUtils.isVisiblePatternEnabled(
-                KeyguardUpdateMonitor.getCurrentUser()));
+                mSelectedUserInteractor.getSelectedUserId()));
         mLockPatternView.setOnTouchListener((v, event) -> {
             if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
                 mFalsingCollector.avoidGesture();
@@ -244,7 +246,7 @@ public class KeyguardPatternViewController
         mPostureController.addCallback(mPostureCallback);
         // if the user is currently locked out, enforce it.
         long deadline = mLockPatternUtils.getLockoutAttemptDeadline(
-                KeyguardUpdateMonitor.getCurrentUser());
+                mSelectedUserInteractor.getSelectedUserId());
         if (deadline != 0) {
             handleAttemptLockout(deadline);
         }
@@ -267,7 +269,7 @@ public class KeyguardPatternViewController
     public void reset() {
         // reset lock pattern
         mLockPatternView.setInStealthMode(!mLockPatternUtils.isVisiblePatternEnabled(
-                KeyguardUpdateMonitor.getCurrentUser()));
+                mSelectedUserInteractor.getSelectedUserId()));
         mLockPatternView.enableInput();
         mLockPatternView.setEnabled(true);
         mLockPatternView.clearPattern();

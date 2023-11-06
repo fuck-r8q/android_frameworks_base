@@ -16,7 +16,7 @@
 
 package com.android.server.pm;
 
-import static android.content.pm.Flags.preventSdkLibApp;
+import static android.content.pm.Flags.disallowSdkLibsToBeApps;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.INSTALL_FAILED_ALREADY_EXISTS;
@@ -997,7 +997,7 @@ final class InstallPackageHelper {
                     }
                     final boolean isApex = (request.getScanFlags() & SCAN_AS_APEX) != 0;
                     final boolean isSdkLibrary = packageToScan.isSdkLibrary();
-                    if (isApex || (isSdkLibrary && preventSdkLibApp())) {
+                    if (isApex || (isSdkLibrary && disallowSdkLibsToBeApps())) {
                         request.getScannedPackageSetting().setAppId(Process.INVALID_UID);
                     } else {
                         createdAppId.put(packageName, optimisticallyRegisterAppId(request));
@@ -1280,10 +1280,9 @@ final class InstallPackageHelper {
                         }
                     }
                 }
-                final AndroidPackage oldPackage = mPm.mPackages.get(pkgName);
-                if (replace && oldPackage != null) {
+                if (replace) {
                     // Prevent apps opting out from runtime permissions
-                    final int oldTargetSdk = oldPackage.getTargetSdkVersion();
+                    final int oldTargetSdk = ps.getTargetSdkVersion();
                     final int newTargetSdk = parsedPackage.getTargetSdkVersion();
                     if (oldTargetSdk > Build.VERSION_CODES.LOLLIPOP_MR1
                             && newTargetSdk <= Build.VERSION_CODES.LOLLIPOP_MR1) {
@@ -1295,10 +1294,10 @@ final class InstallPackageHelper {
                                         + " target SDK " + oldTargetSdk + " does.");
                     }
                     // Prevent persistent apps from being updated
-                    if (oldPackage.isPersistent()
+                    if (ps.isPersistent()
                             && ((installFlags & PackageManager.INSTALL_STAGED) == 0)) {
                         throw new PrepareFailure(PackageManager.INSTALL_FAILED_INVALID_APK,
-                                "Package " + oldPackage.getPackageName() + " is a persistent app. "
+                                "Package " + pkgName + " is a persistent app. "
                                         + "Persistent apps are not updateable.");
                     }
                 }
@@ -1679,7 +1678,7 @@ final class InstallPackageHelper {
                     }
 
                     // don't allow a system upgrade unless the upgrade hash matches
-                    if (oldPackage != null && oldPackage.getRestrictUpdateHash() != null
+                    if (oldPackageState.getRestrictUpdateHash() != null
                             && oldPackageState.isSystem()) {
                         final byte[] digestBytes;
                         try {
@@ -1695,12 +1694,13 @@ final class InstallPackageHelper {
                             throw new PrepareFailure(INSTALL_FAILED_INVALID_APK,
                                     "Could not compute hash: " + pkgName11);
                         }
-                        if (!Arrays.equals(oldPackage.getRestrictUpdateHash(), digestBytes)) {
+                        if (!Arrays.equals(oldPackageState.getRestrictUpdateHash(), digestBytes)) {
                             throw new PrepareFailure(INSTALL_FAILED_INVALID_APK,
                                     "New package fails restrict-update check: " + pkgName11);
                         }
                         // retain upgrade restriction
-                        parsedPackage.setRestrictUpdateHash(oldPackage.getRestrictUpdateHash());
+                        parsedPackage.setRestrictUpdateHash(
+                                oldPackageState.getRestrictUpdateHash());
                     }
 
                     if (oldPackage != null) {

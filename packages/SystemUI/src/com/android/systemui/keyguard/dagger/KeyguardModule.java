@@ -38,9 +38,6 @@ import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.classifier.FalsingModule;
-import com.android.systemui.communal.data.repository.CommunalRepositoryModule;
-import com.android.systemui.communal.data.repository.CommunalTutorialRepositoryModule;
-import com.android.systemui.communal.data.repository.CommunalWidgetRepositoryModule;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
@@ -71,6 +68,7 @@ import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
 import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 import com.android.systemui.util.DeviceConfigProxy;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.SecureSettings;
@@ -96,9 +94,6 @@ import kotlinx.coroutines.CoroutineDispatcher;
         KeyguardStatusViewComponent.class,
         KeyguardUserSwitcherComponent.class},
         includes = {
-            CommunalRepositoryModule.class,
-            CommunalTutorialRepositoryModule.class,
-            CommunalWidgetRepositoryModule.class,
             FalsingModule.class,
             KeyguardDataQuickAffordanceModule.class,
             KeyguardRepositoryModule.class,
@@ -156,7 +151,8 @@ public class KeyguardModule {
             @Main CoroutineDispatcher mainDispatcher,
             Lazy<DreamingToLockscreenTransitionViewModel> dreamingToLockscreenTransitionViewModel,
             SystemPropertiesHelper systemPropertiesHelper,
-            Lazy<WindowManagerLockscreenVisibilityManager> wmLockscreenVisibilityManager) {
+            Lazy<WindowManagerLockscreenVisibilityManager> wmLockscreenVisibilityManager,
+            SelectedUserInteractor selectedUserInteractor) {
         return new KeyguardViewMediator(
                 context,
                 uiEventLogger,
@@ -200,7 +196,8 @@ public class KeyguardModule {
                 mainDispatcher,
                 dreamingToLockscreenTransitionViewModel,
                 systemPropertiesHelper,
-                wmLockscreenVisibilityManager);
+                wmLockscreenVisibilityManager,
+                selectedUserInteractor);
     }
 
     /** */

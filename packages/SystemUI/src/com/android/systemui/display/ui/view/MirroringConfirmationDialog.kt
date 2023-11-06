@@ -19,8 +19,12 @@ import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import androidx.core.view.updatePadding
+import com.android.systemui.biometrics.Utils
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIBottomSheetDialog
+import com.android.systemui.statusbar.policy.ConfigurationController
+import kotlin.math.max
 
 /**
  * Dialog used to decide what to do with a connected display.
@@ -32,8 +36,9 @@ class MirroringConfirmationDialog(
     context: Context,
     private val onStartMirroringClickListener: View.OnClickListener,
     private val onCancelMirroring: View.OnClickListener,
+    configurationController: ConfigurationController? = null,
     theme: Int = R.style.Theme_SystemUI_Dialog,
-) : SystemUIBottomSheetDialog(context, theme) {
+) : SystemUIBottomSheetDialog(context, configurationController, theme) {
 
     private lateinit var mirrorButton: TextView
     private lateinit var dismissButton: TextView
@@ -56,5 +61,23 @@ class MirroringConfirmationDialog(
                 onCancelMirroring.onClick(null)
             }
         }
+        setupInsets()
+    }
+
+    private fun setupInsets() {
+        // This avoids overlap between dialog content and navigation bars.
+        requireViewById<View>(R.id.cd_bottom_sheet).apply {
+            val navbarInsets = Utils.getNavbarInsets(context)
+            val defaultDialogBottomInset =
+                context.resources.getDimensionPixelSize(R.dimen.dialog_bottom_padding)
+            // we only care about the bottom inset as in all other configuration where navigations
+            // are in other display sides there is no overlap with the dialog.
+            updatePadding(bottom = max(navbarInsets.bottom, defaultDialogBottomInset))
+        }
+    }
+
+    override fun onConfigurationChanged() {
+        super.onConfigurationChanged()
+        setupInsets()
     }
 }

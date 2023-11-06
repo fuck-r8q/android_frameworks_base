@@ -1333,6 +1333,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mLaunchIntoPipHostActivity != null) {
             pw.println(prefix + "launchIntoPipHostActivity=" + mLaunchIntoPipHostActivity);
         }
+        if (mWaitForEnteringPinnedMode) {
+            pw.print(prefix); pw.println("mWaitForEnteringPinnedMode=true");
+        }
 
         mLetterboxUiController.dump(pw, prefix);
 
@@ -3156,9 +3159,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     boolean canReceiveKeys() {
-        // TODO(156521483): Propagate the state down the hierarchy instead of checking the parent
-        return getWindowConfiguration().canReceiveKeys()
-                && (task == null || task.getWindowConfiguration().canReceiveKeys());
+        return getWindowConfiguration().canReceiveKeys() && !mWaitForEnteringPinnedMode;
     }
 
     boolean isResizeable() {
@@ -4060,6 +4061,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         if (mAppStopped) {
             abortAndClearOptionsAnimation();
+        }
+        if (mDisplayContent != null) {
+            mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         }
     }
 
@@ -5420,12 +5424,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         mLastDeferHidingClient = deferHidingClient;
 
         if (!visible) {
-            // If this activity is about to finish/stopped and now becomes invisible, remove it
-            // from the unknownApp list in case the activity does not want to draw anything, which
-            // keep the user waiting for the next transition to start.
-            if (finishing || isState(STOPPED)) {
-                displayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
-            }
             // Because starting window was transferred, this activity may be a trampoline which has
             // been occluded by next activity. If it has added windows, set client visibility
             // immediately to avoid the client getting RELAYOUT_RES_FIRST_TIME from relayout and
@@ -5871,6 +5869,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 break;
             case STOPPED:
                 mAtmService.updateActivityUsageStats(this, Event.ACTIVITY_STOPPED);
+                if (mDisplayContent != null) {
+                    mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
+                }
                 break;
             case DESTROYED:
                 if (app != null && (mVisible || mVisibleRequested)) {
@@ -6638,7 +6639,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         // Reset the last saved PiP snap fraction on app stop.
         mDisplayContent.mPinnedTaskController.onActivityHidden(mActivityComponent);
-        mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         if (isClientVisible()) {
             // Though this is usually unlikely to happen, still make sure the client is invisible.
             setClientVisible(false);

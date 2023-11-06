@@ -76,7 +76,6 @@ import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.IndentingPrintWriter;
 import android.util.Log;
-import android.util.MathUtils;
 import android.view.Display;
 import android.view.IRemoteAnimationRunner;
 import android.view.IWindowManager;
@@ -176,7 +175,6 @@ import com.android.systemui.shade.ShadeSurface;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.shared.recents.utilities.Utilities;
 import com.android.systemui.statusbar.AutoHideUiElement;
-import com.android.systemui.statusbar.BackDropView;
 import com.android.systemui.statusbar.CircleReveal;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
@@ -237,9 +235,9 @@ import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.SplashscreenContentDrawer;
 import com.android.wm.shell.startingsurface.StartingSurface;
 
-import dagger.Lazy;
-
 import dalvik.annotation.optimization.NeverCompile;
+
+import dagger.Lazy;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -376,9 +374,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private boolean mBrightnessMirrorVisible;
     private BiometricUnlockController mBiometricUnlockController;
     private final LightBarController mLightBarController;
-    private final Lazy<LockscreenWallpaper> mLockscreenWallpaperLazy;
-    @Nullable
-    protected LockscreenWallpaper mLockscreenWallpaper;
     private final AutoHideController mAutoHideController;
 
     private final Point mCurrentDisplaySize = new Point();
@@ -658,7 +653,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             NotificationExpansionRepository notificationExpansionRepository,
             DozeParameters dozeParameters,
             ScrimController scrimController,
-            Lazy<LockscreenWallpaper> lockscreenWallpaperLazy,
             Lazy<BiometricUnlockController> biometricUnlockControllerLazy,
             AuthRippleController authRippleController,
             DozeServiceHost dozeServiceHost,
@@ -770,7 +764,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mPowerManager = powerManager;
         mDozeParameters = dozeParameters;
         mScrimController = scrimController;
-        mLockscreenWallpaperLazy = lockscreenWallpaperLazy;
         mDozeScrimController = dozeScrimController;
         mBiometricUnlockControllerLazy = biometricUnlockControllerLazy;
         mAuthRippleController = authRippleController;
@@ -819,8 +812,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         ShadeExpansionChangeEvent currentState =
                 mShadeExpansionStateManager.addExpansionListener(shadeExpansionListener);
         shadeExpansionListener.onPanelExpansionChanged(currentState);
-
-        mShadeExpansionStateManager.addFullExpansionListener(this::onShadeExpansionFullyChanged);
 
         mActivityIntentHelper = new ActivityIntentHelper(mContext);
         mActivityLaunchAnimator = activityLaunchAnimator;
@@ -1198,10 +1189,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         createNavigationBar(result);
 
-        if (ENABLE_LOCKSCREEN_WALLPAPER && mWallpaperSupported) {
-            mLockscreenWallpaper = mLockscreenWallpaperLazy.get();
-        }
-
         mAmbientIndicationContainer = getNotificationShadeWindowView().findViewById(
                 R.id.ambient_indication_container);
 
@@ -1267,24 +1254,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mShadeController::makeExpandedInvisible,
                 mNotificationShelfController,
                 mHeadsUpManager);
-
-        BackDropView backdrop = getNotificationShadeWindowView().findViewById(R.id.backdrop);
-        if (mWallpaperManager.isLockscreenLiveWallpaperEnabled()) {
-            mMediaManager.setup(null, null, null, mScrimController, null);
-        } else {
-            mMediaManager.setup(backdrop, backdrop.findViewById(R.id.backdrop_front),
-                    backdrop.findViewById(R.id.backdrop_back), mScrimController,
-                    mLockscreenWallpaper);
-        }
-        float maxWallpaperZoom = mContext.getResources().getFloat(
-                com.android.internal.R.dimen.config_wallpaperMaxScale);
-        mNotificationShadeDepthControllerLazy.get().addListener(depth -> {
-            float scale = MathUtils.lerp(maxWallpaperZoom, 1f, depth);
-            backdrop.setPivotX(backdrop.getWidth() / 2f);
-            backdrop.setPivotY(backdrop.getHeight() / 2f);
-            backdrop.setScaleX(scale);
-            backdrop.setScaleY(scale);
-        });
 
         // Set up the quick settings tile panel
         final View container = getNotificationShadeWindowView().findViewById(R.id.qs_frame);
@@ -1357,14 +1326,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         // receive broadcasts
         registerBroadcastReceiver();
 
-        IntentFilter demoFilter = new IntentFilter();
-        if (DEBUG_MEDIA_FAKE_ARTWORK) {
-            demoFilter.addAction(ACTION_FAKE_ARTWORK);
-        }
-        mContext.registerReceiverAsUser(mDemoReceiver, UserHandle.ALL, demoFilter,
-                android.Manifest.permission.DUMP, null,
-                Context.RECEIVER_EXPORTED_UNAUDITED);
-
         // listen for USER_SETUP_COMPLETE setting (per-user)
         mDeviceProvisionedController.addCallback(mUserSetupObserver);
         mUserSetupObserver.onUserSetupChanged();
@@ -1435,20 +1396,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 // SYSUI_STATE_QUICK_SETTINGS_EXPANDED
                 getShadeViewController().updateSystemUiStateFlags();
             }
-        }
-    }
-
-    @VisibleForTesting
-    void onShadeExpansionFullyChanged(Boolean isExpanded) {
-        if (isExpanded && mStatusBarStateController.getState() != StatusBarState.KEYGUARD) {
-            if (DEBUG) {
-                Log.v(TAG, "clearing notification effects from Height");
-            }
-            clearNotificationEffects();
-        }
-
-        if (!isExpanded) {
-            mRemoteInputManager.onPanelCollapsed();
         }
     }
 
@@ -1525,6 +1472,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         // regressions, we'll continue standing up the root view in CentralSurfaces.
         mNotificationShadeWindowController.fetchWindowRootView();
         getNotificationShadeWindowViewController().setupExpandedStatusBar();
+        getNotificationShadeWindowViewController().setupCommunalHubLayout();
         mShadeController.setNotificationShadeWindowViewController(
                 getNotificationShadeWindowViewController());
         mBackActionInteractor.setup(mQsController, mShadeSurface);
@@ -1582,7 +1530,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mRemoteInputManager.addControllerCallback(mStatusBarKeyguardViewManager);
 
         mLightBarController.setBiometricUnlockController(mBiometricUnlockController);
-        mMediaManager.setBiometricUnlockController(mBiometricUnlockController);
         Trace.endSection();
     }
 
@@ -1869,7 +1816,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     void updateDisplaySize() {
         mDisplay.getMetrics(mDisplayMetrics);
         mDisplay.getSize(mCurrentDisplaySize);
-        mMediaManager.onDisplayUpdated(mDisplay);
         if (DEBUG_GESTURES) {
             mGestureRec.tag("display",
                     String.format("%dx%d", mDisplayMetrics.widthPixels, mDisplayMetrics.heightPixels));
@@ -1940,19 +1886,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mNotificationsController.resetUserExpandedStates();
             }
             Trace.endSection();
-        }
-    };
-
-    private final BroadcastReceiver mDemoReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (DEBUG) Log.v(TAG, "onReceive: " + intent);
-            String action = intent.getAction();
-            if (ACTION_FAKE_ARTWORK.equals(action)) {
-                if (DEBUG_MEDIA_FAKE_ARTWORK) {
-                    mPresenterLazy.get().updateMediaMetaData(true, true);
-                }
-            }
         }
     };
 
@@ -2138,7 +2071,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         releaseGestureWakeLock();
         runLaunchTransitionEndRunnable();
         mKeyguardStateController.setLaunchTransitionFadingAway(false);
-        mPresenterLazy.get().updateMediaMetaData(true /* metaDataChanged */, true);
     }
 
     /**
@@ -2162,7 +2094,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 beforeFading.run();
             }
             updateScrimController();
-            mPresenterLazy.get().updateMediaMetaData(false, true);
             mShadeSurface.resetAlpha();
             mShadeSurface.fadeOut(
                     FADE_KEYGUARD_START_DELAY, FADE_KEYGUARD_DURATION,
@@ -3193,7 +3124,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             if (mAmbientIndicationContainer instanceof AutoReinflateContainer) {
                 ((AutoReinflateContainer) mAmbientIndicationContainer).inflateLayout();
             }
-            mNotificationIconAreaController.onThemeChanged();
+            if (!mFeatureFlags.isEnabled(Flags.NOTIFICATION_ICON_CONTAINER_REFACTOR)) {
+                mNotificationIconAreaController.onThemeChanged();
+            }
         }
 
         @Override
@@ -3237,8 +3170,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     updateDozingState();
                     checkBarModes();
                     updateScrimController();
-                    mPresenterLazy.get()
-                            .updateMediaMetaData(false, mState != StatusBarState.KEYGUARD);
                     Trace.endSection();
                 }
 

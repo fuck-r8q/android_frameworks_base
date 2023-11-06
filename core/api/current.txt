@@ -1,6 +1,4 @@
 // Signature format: 2.0
-// - add-additional-overrides=no
-// - migrating=Migration in progress see b/299366704
 package android {
 
   public final class Manifest {
@@ -671,6 +669,7 @@ package android {
     field public static final int debuggable = 16842767; // 0x101000f
     field public static final int defaultFocusHighlightEnabled = 16844130; // 0x1010562
     field public static final int defaultHeight = 16844021; // 0x10104f5
+    field @FlaggedApi("android.content.res.default_locale") public static final int defaultLocale;
     field public static final int defaultToDeviceProtectedStorage = 16844036; // 0x1010504
     field public static final int defaultValue = 16843245; // 0x10101ed
     field public static final int defaultWidth = 16844020; // 0x10104f4
@@ -3289,10 +3288,10 @@ package android.accessibilityservice {
 
   public abstract class AccessibilityService extends android.app.Service {
     ctor public AccessibilityService();
-    method @Deprecated public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl);
-    method public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
-    method @Deprecated public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl);
-    method public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
+    method public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl);
+    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public void attachAccessibilityOverlayToDisplay(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
+    method public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl);
+    method @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public void attachAccessibilityOverlayToWindow(int, @NonNull android.view.SurfaceControl, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
     method public boolean clearCache();
     method public boolean clearCachedSubtree(@NonNull android.view.accessibility.AccessibilityNodeInfo);
     method public final void disableSelf();
@@ -3404,9 +3403,9 @@ package android.accessibilityservice {
     field public static final int GLOBAL_ACTION_RECENTS = 3; // 0x3
     field public static final int GLOBAL_ACTION_TAKE_SCREENSHOT = 9; // 0x9
     field public static final int GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN = 7; // 0x7
-    field public static final int OVERLAY_RESULT_INTERNAL_ERROR = 1; // 0x1
-    field public static final int OVERLAY_RESULT_INVALID = 2; // 0x2
-    field public static final int OVERLAY_RESULT_SUCCESS = 0; // 0x0
+    field @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public static final int OVERLAY_RESULT_INTERNAL_ERROR = 1; // 0x1
+    field @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public static final int OVERLAY_RESULT_INVALID = 2; // 0x2
+    field @FlaggedApi("android.view.accessibility.a11y_overlay_callbacks") public static final int OVERLAY_RESULT_SUCCESS = 0; // 0x0
     field public static final String SERVICE_INTERFACE = "android.accessibilityservice.AccessibilityService";
     field public static final String SERVICE_META_DATA = "android.accessibilityservice";
     field public static final int SHOW_MODE_AUTO = 0; // 0x0
@@ -5755,6 +5754,7 @@ package android.app {
     ctor @Deprecated public FragmentBreadCrumbs(android.content.Context, android.util.AttributeSet);
     ctor @Deprecated public FragmentBreadCrumbs(android.content.Context, android.util.AttributeSet, int);
     method @Deprecated public void onBackStackChanged();
+    method @Deprecated protected void onLayout(boolean, int, int, int, int);
     method @Deprecated public void setActivity(android.app.Activity);
     method @Deprecated public void setMaxVisible(int);
     method @Deprecated public void setOnBreadCrumbClickListener(android.app.FragmentBreadCrumbs.OnBreadCrumbClickListener);
@@ -6203,6 +6203,7 @@ package android.app {
     ctor public LocaleConfig(@NonNull android.os.LocaleList);
     method public int describeContents();
     method @NonNull public static android.app.LocaleConfig fromContextIgnoringOverride(@NonNull android.content.Context);
+    method @FlaggedApi("android.content.res.default_locale") @Nullable public java.util.Locale getDefaultLocale();
     method public int getStatus();
     method @Nullable public android.os.LocaleList getSupportedLocales();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
@@ -9614,7 +9615,8 @@ package android.companion {
     method @Nullable public CharSequence getDisplayName();
     method public int getId();
     method public int getSystemDataSyncFlags();
-    method @Nullable public String getTag();
+    method @FlaggedApi("android.companion.association_tag") @Nullable public String getTag();
+    method public boolean isSelfManaged();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.AssociationInfo> CREATOR;
   }
@@ -9684,7 +9686,7 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void attachSystemDataTransport(int, @NonNull java.io.InputStream, @NonNull java.io.OutputStream) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public android.content.IntentSender buildAssociationCancellationIntent();
     method @Nullable public android.content.IntentSender buildPermissionTransferUserConsentIntent(int) throws android.companion.DeviceNotAssociatedException;
-    method public void clearAssociationTag(int);
+    method @FlaggedApi("android.companion.association_tag") public void clearAssociationTag(int);
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method public void disableSystemDataSyncForTypes(int, int);
     method @Deprecated public void disassociate(@NonNull String);
@@ -9694,7 +9696,7 @@ package android.companion {
     method @NonNull public java.util.List<android.companion.AssociationInfo> getMyAssociations();
     method @Deprecated public boolean hasNotificationAccess(android.content.ComponentName);
     method public void requestNotificationAccess(android.content.ComponentName);
-    method public void setAssociationTag(int, @NonNull String);
+    method @FlaggedApi("android.companion.association_tag") public void setAssociationTag(int, @NonNull String);
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
     method public void startSystemDataTransfer(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.companion.CompanionException>) throws android.companion.DeviceNotAssociatedException;
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void stopObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
@@ -9872,7 +9874,7 @@ package android.content {
     method @NonNull public android.content.AttributionSource.Builder setAttributionTag(@Nullable String);
     method @FlaggedApi("android.permission.flags.device_aware_permission_apis") @NonNull public android.content.AttributionSource.Builder setDeviceId(int);
     method @Deprecated @NonNull public android.content.AttributionSource.Builder setNext(@Nullable android.content.AttributionSource);
-    method @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
+    method @FlaggedApi("android.permission.flags.set_next_attribution_source") @NonNull public android.content.AttributionSource.Builder setNextAttributionSource(@NonNull android.content.AttributionSource);
     method @NonNull public android.content.AttributionSource.Builder setPackageName(@Nullable String);
     method @NonNull public android.content.AttributionSource.Builder setPid(int);
   }
@@ -10655,7 +10657,7 @@ package android.content {
   public final class ContextParams {
     method @Nullable public String getAttributionTag();
     method @Nullable public android.content.AttributionSource getNextAttributionSource();
-    method @NonNull public boolean shouldRegisterAttributionSource();
+    method @FlaggedApi("android.permission.flags.should_register_attribution_source") @NonNull public boolean shouldRegisterAttributionSource();
   }
 
   public static final class ContextParams.Builder {
@@ -10664,7 +10666,7 @@ package android.content {
     method @NonNull public android.content.ContextParams build();
     method @NonNull public android.content.ContextParams.Builder setAttributionTag(@Nullable String);
     method @NonNull public android.content.ContextParams.Builder setNextAttributionSource(@Nullable android.content.AttributionSource);
-    method @NonNull public android.content.ContextParams.Builder setShouldRegisterAttributionSource(boolean);
+    method @FlaggedApi("android.permission.flags.should_register_attribution_source") @NonNull public android.content.ContextParams.Builder setShouldRegisterAttributionSource(boolean);
   }
 
   public class ContextWrapper extends android.content.Context {
@@ -11803,7 +11805,7 @@ package android.content.om {
     method @NonNull public void setResourceValue(@NonNull String, @IntRange(from=android.util.TypedValue.TYPE_FIRST_INT, to=android.util.TypedValue.TYPE_LAST_INT) int, int, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, int, @NonNull String, @Nullable String);
     method @NonNull public void setResourceValue(@NonNull String, @NonNull android.os.ParcelFileDescriptor, @Nullable String);
-    method @NonNull public void setResourceValue(@NonNull String, @NonNull android.content.res.AssetFileDescriptor, @Nullable String);
+    method @FlaggedApi("android.content.res.asset_file_descriptor_frro") @NonNull public void setResourceValue(@NonNull String, @NonNull android.content.res.AssetFileDescriptor, @Nullable String);
     method public void setTargetOverlayable(@Nullable String);
   }
 
@@ -12759,6 +12761,7 @@ package android.content.pm {
     method public boolean isDeviceUpgrading();
     method public abstract boolean isInstantApp();
     method public abstract boolean isInstantApp(@NonNull String);
+    method @FlaggedApi("android.content.pm.quarantined_enabled") public boolean isPackageQuarantined(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method @FlaggedApi("android.content.pm.stay_stopped") public boolean isPackageStopped(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPackageSuspended(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method public boolean isPackageSuspended();
@@ -12997,6 +13000,7 @@ package android.content.pm {
     field public static final int MATCH_DIRECT_BOOT_UNAWARE = 262144; // 0x40000
     field public static final int MATCH_DISABLED_COMPONENTS = 512; // 0x200
     field public static final int MATCH_DISABLED_UNTIL_USED_COMPONENTS = 32768; // 0x8000
+    field @FlaggedApi("android.content.pm.quarantined_enabled") public static final long MATCH_QUARANTINED_COMPONENTS = 4294967296L; // 0x100000000L
     field public static final int MATCH_SYSTEM_ONLY = 1048576; // 0x100000
     field public static final int MATCH_UNINSTALLED_PACKAGES = 8192; // 0x2000
     field public static final long MAXIMUM_VERIFICATION_TIMEOUT = 3600000L; // 0x36ee80L
@@ -13736,6 +13740,7 @@ package android.content.res {
 
   public interface XmlResourceParser extends org.xmlpull.v1.XmlPullParser android.util.AttributeSet java.lang.AutoCloseable {
     method public void close();
+    method public String getAttributeNamespace(int);
   }
 
 }
@@ -14435,14 +14440,14 @@ package android.database.sqlite {
   public final class SQLiteDatabase extends android.database.sqlite.SQLiteClosable {
     method public void beginTransaction();
     method public void beginTransactionNonExclusive();
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") public void beginTransactionReadOnly();
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") public void beginTransactionReadOnly();
     method public void beginTransactionWithListener(@Nullable android.database.sqlite.SQLiteTransactionListener);
     method public void beginTransactionWithListenerNonExclusive(@Nullable android.database.sqlite.SQLiteTransactionListener);
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") public void beginTransactionWithListenerReadOnly(@Nullable android.database.sqlite.SQLiteTransactionListener);
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") public void beginTransactionWithListenerReadOnly(@Nullable android.database.sqlite.SQLiteTransactionListener);
     method public android.database.sqlite.SQLiteStatement compileStatement(String) throws android.database.SQLException;
     method @NonNull public static android.database.sqlite.SQLiteDatabase create(@Nullable android.database.sqlite.SQLiteDatabase.CursorFactory);
     method @NonNull public static android.database.sqlite.SQLiteDatabase createInMemory(@NonNull android.database.sqlite.SQLiteDatabase.OpenParams);
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") @NonNull public android.database.sqlite.SQLiteRawStatement createRawStatement(@NonNull String);
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") @NonNull public android.database.sqlite.SQLiteRawStatement createRawStatement(@NonNull String);
     method public int delete(@NonNull String, @Nullable String, @Nullable String[]);
     method public static boolean deleteDatabase(@NonNull java.io.File);
     method public void disableWriteAheadLogging();
@@ -14453,13 +14458,13 @@ package android.database.sqlite {
     method public void execSQL(@NonNull String, @NonNull Object[]) throws android.database.SQLException;
     method public static String findEditTable(String);
     method public java.util.List<android.util.Pair<java.lang.String,java.lang.String>> getAttachedDbs();
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") public long getLastChangedRowCount();
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") public long getLastInsertRowId();
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") public long getLastChangedRowCount();
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") public long getLastInsertRowId();
     method public long getMaximumSize();
     method public long getPageSize();
     method public String getPath();
     method @Deprecated public java.util.Map<java.lang.String,java.lang.String> getSyncedTables();
-    method @FlaggedApi("android.database.sqlite.sqlite_apis_15") public long getTotalChangedRowCount();
+    method @FlaggedApi("android.database.sqlite.sqlite_apis_35") public long getTotalChangedRowCount();
     method public int getVersion();
     method public boolean inTransaction();
     method public long insert(@NonNull String, @Nullable String, @Nullable android.content.ContentValues);
@@ -14681,7 +14686,7 @@ package android.database.sqlite {
     method public int update(@NonNull android.database.sqlite.SQLiteDatabase, @NonNull android.content.ContentValues, @Nullable String, @Nullable String[]);
   }
 
-  @FlaggedApi("android.database.sqlite.sqlite_apis_15") public final class SQLiteRawStatement implements java.io.Closeable {
+  @FlaggedApi("android.database.sqlite.sqlite_apis_35") public final class SQLiteRawStatement implements java.io.Closeable {
     method public void bindBlob(int, @NonNull byte[]) throws android.database.sqlite.SQLiteException;
     method public void bindBlob(int, @NonNull byte[], int, int) throws android.database.sqlite.SQLiteException;
     method public void bindDouble(int, double) throws android.database.sqlite.SQLiteException;
@@ -17655,7 +17660,7 @@ package android.graphics.fonts {
     ctor public FontFamily.Builder(@NonNull android.graphics.fonts.Font);
     method @NonNull public android.graphics.fonts.FontFamily.Builder addFont(@NonNull android.graphics.fonts.Font);
     method @NonNull public android.graphics.fonts.FontFamily build();
-    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") @Nullable public android.graphics.fonts.FontFamily buildVariableFamily();
+    method @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") @Nullable public android.graphics.fonts.FontFamily buildVariableFamily();
   }
 
   public final class FontStyle {
@@ -17843,18 +17848,18 @@ package android.graphics.text {
     method public float getAdvance();
     method public float getAscent();
     method public float getDescent();
-    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public boolean getFakeBold(@IntRange(from=0) int);
-    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public boolean getFakeItalic(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") public boolean getFakeBold(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") public boolean getFakeItalic(@IntRange(from=0) int);
     method @NonNull public android.graphics.fonts.Font getFont(@IntRange(from=0) int);
     method @IntRange(from=0) public int getGlyphId(@IntRange(from=0) int);
     method public float getGlyphX(@IntRange(from=0) int);
     method public float getGlyphY(@IntRange(from=0) int);
-    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public float getItalicOverride(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") public float getItalicOverride(@IntRange(from=0) int);
     method public float getOffsetX();
     method public float getOffsetY();
-    method @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public float getWeightOverride(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") public float getWeightOverride(@IntRange(from=0) int);
     method @IntRange(from=0) public int glyphCount();
-    field @FlaggedApi("com.android.text.flags.deprecate_fonts_xml") public static final float NO_OVERRIDE = 1.4E-45f;
+    field @FlaggedApi("com.android.text.flags.new_fonts_fallback_xml") public static final float NO_OVERRIDE = 1.4E-45f;
   }
 
   public class TextRunShaper {
@@ -18251,6 +18256,13 @@ package android.hardware {
     field public static final int YCBCR_P010 = 54; // 0x36
   }
 
+  @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public final class OverlayProperties implements android.os.Parcelable {
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public int describeContents();
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public boolean supportMixedColorSpaces();
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("android.hardware.flags.overlayproperties_class_api") @NonNull public static final android.os.Parcelable.Creator<android.hardware.OverlayProperties> CREATOR;
+  }
+
   public final class Sensor {
     method public int getFifoMaxEventCount();
     method public int getFifoReservedEventCount();
@@ -18630,12 +18642,12 @@ package android.hardware.biometrics {
     ctor @Deprecated public BiometricPrompt.CryptoObject(@NonNull android.security.identity.IdentityCredential);
     ctor public BiometricPrompt.CryptoObject(@NonNull android.security.identity.PresentationSession);
     ctor @FlaggedApi("android.hardware.biometrics.add_key_agreement_crypto_object") public BiometricPrompt.CryptoObject(@NonNull javax.crypto.KeyAgreement);
-    method public javax.crypto.Cipher getCipher();
+    method @Nullable public javax.crypto.Cipher getCipher();
     method @Deprecated @Nullable public android.security.identity.IdentityCredential getIdentityCredential();
     method @FlaggedApi("android.hardware.biometrics.add_key_agreement_crypto_object") @Nullable public javax.crypto.KeyAgreement getKeyAgreement();
-    method public javax.crypto.Mac getMac();
+    method @Nullable public javax.crypto.Mac getMac();
     method @Nullable public android.security.identity.PresentationSession getPresentationSession();
-    method public java.security.Signature getSignature();
+    method @Nullable public java.security.Signature getSignature();
   }
 
 }
@@ -20488,7 +20500,7 @@ package android.inputmethodservice {
     method @Deprecated public boolean isPreviewEnabled();
     method @Deprecated public boolean isProximityCorrectionEnabled();
     method @Deprecated public boolean isShifted();
-    method public void onClick(android.view.View);
+    method @Deprecated public void onClick(android.view.View);
     method @Deprecated public void onDetachedFromWindow();
     method @Deprecated public void onDraw(android.graphics.Canvas);
     method @Deprecated protected boolean onLongPress(android.inputmethodservice.Keyboard.Key);
@@ -23859,6 +23871,8 @@ package android.media {
     field public static final int TYPE_DOCK = 13; // 0xd
     field public static final int TYPE_GROUP = 2000; // 0x7d0
     field public static final int TYPE_HDMI = 9; // 0x9
+    field @FlaggedApi("com.android.media.flags.enable_audio_policies_device_and_bluetooth_controller") public static final int TYPE_HDMI_ARC = 10; // 0xa
+    field @FlaggedApi("com.android.media.flags.enable_audio_policies_device_and_bluetooth_controller") public static final int TYPE_HDMI_EARC = 29; // 0x1d
     field public static final int TYPE_HEARING_AID = 23; // 0x17
     field public static final int TYPE_REMOTE_AUDIO_VIDEO_RECEIVER = 1003; // 0x3eb
     field public static final int TYPE_REMOTE_CAR = 1008; // 0x3f0
@@ -24058,7 +24072,7 @@ package android.media {
     method @NonNull public android.media.MediaRouter2.RoutingController getSystemController();
     method public void registerControllerCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.ControllerCallback);
     method public void registerRouteCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.RouteCallback, @NonNull android.media.RouteDiscoveryPreference);
-    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void registerRouteListingPreferenceCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.RouteListingPreferenceCallback);
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void registerRouteListingPreferenceUpdatedCallback(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<android.media.RouteListingPreference>);
     method public void registerTransferCallback(@NonNull java.util.concurrent.Executor, @NonNull android.media.MediaRouter2.TransferCallback);
     method public void setOnGetControllerHintsListener(@Nullable android.media.MediaRouter2.OnGetControllerHintsListener);
     method public void setRouteListingPreference(@Nullable android.media.RouteListingPreference);
@@ -24067,7 +24081,7 @@ package android.media {
     method public void transferTo(@NonNull android.media.MediaRoute2Info);
     method public void unregisterControllerCallback(@NonNull android.media.MediaRouter2.ControllerCallback);
     method public void unregisterRouteCallback(@NonNull android.media.MediaRouter2.RouteCallback);
-    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void unregisterRouteListingPreferenceCallback(@NonNull android.media.MediaRouter2.RouteListingPreferenceCallback);
+    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void unregisterRouteListingPreferenceUpdatedCallback(@NonNull java.util.function.Consumer<android.media.RouteListingPreference>);
     method public void unregisterTransferCallback(@NonNull android.media.MediaRouter2.TransferCallback);
   }
 
@@ -24086,11 +24100,6 @@ package android.media {
     method @Deprecated public void onRoutesChanged(@NonNull java.util.List<android.media.MediaRoute2Info>);
     method @Deprecated public void onRoutesRemoved(@NonNull java.util.List<android.media.MediaRoute2Info>);
     method public void onRoutesUpdated(@NonNull java.util.List<android.media.MediaRoute2Info>);
-  }
-
-  @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public abstract static class MediaRouter2.RouteListingPreferenceCallback {
-    ctor @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public MediaRouter2.RouteListingPreferenceCallback();
-    method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") public void onRouteListingPreferenceChanged(@Nullable android.media.RouteListingPreference);
   }
 
   public class MediaRouter2.RoutingController {
@@ -24316,7 +24325,7 @@ package android.media {
 
   @Deprecated public class RemoteControlClient.MetadataEditor extends android.media.MediaMetadataEditor {
     method @Deprecated public void apply();
-    method public Object clone() throws java.lang.CloneNotSupportedException;
+    method @Deprecated public Object clone() throws java.lang.CloneNotSupportedException;
     method @Deprecated public android.media.RemoteControlClient.MetadataEditor putBitmap(int, android.graphics.Bitmap) throws java.lang.IllegalArgumentException;
     method @Deprecated public android.media.RemoteControlClient.MetadataEditor putLong(int, long) throws java.lang.IllegalArgumentException;
     method @Deprecated public android.media.RemoteControlClient.MetadataEditor putObject(int, Object) throws java.lang.IllegalArgumentException;
@@ -25871,15 +25880,15 @@ package android.media.midi {
     method public abstract void onDisconnect(android.media.midi.MidiReceiver);
   }
 
-  public abstract class MidiUmpDeviceService extends android.app.Service {
+  @FlaggedApi("com.android.media.midi.flags.virtual_ump") public abstract class MidiUmpDeviceService extends android.app.Service {
     ctor public MidiUmpDeviceService();
-    method @Nullable public final android.media.midi.MidiDeviceInfo getDeviceInfo();
-    method @NonNull public final java.util.List<android.media.midi.MidiReceiver> getOutputPortReceivers();
-    method @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
-    method public void onClose();
-    method public void onDeviceStatusChanged(@NonNull android.media.midi.MidiDeviceStatus);
-    method @NonNull public abstract java.util.List<android.media.midi.MidiReceiver> onGetInputPortReceivers();
-    field public static final String SERVICE_INTERFACE = "android.media.midi.MidiUmpDeviceService";
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @Nullable public final android.media.midi.MidiDeviceInfo getDeviceInfo();
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @NonNull public final java.util.List<android.media.midi.MidiReceiver> getOutputPortReceivers();
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @Nullable public android.os.IBinder onBind(@NonNull android.content.Intent);
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") public void onClose();
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") public void onDeviceStatusChanged(@NonNull android.media.midi.MidiDeviceStatus);
+    method @FlaggedApi("com.android.media.midi.flags.virtual_ump") @NonNull public abstract java.util.List<android.media.midi.MidiReceiver> onGetInputPortReceivers();
+    field @FlaggedApi("com.android.media.midi.flags.virtual_ump") public static final String SERVICE_INTERFACE = "android.media.midi.MidiUmpDeviceService";
   }
 
 }
@@ -27180,6 +27189,7 @@ package android.media.tv {
     method @NonNull public java.util.List<android.media.AudioPresentation> getAudioPresentations();
     method public String getSelectedTrack(int);
     method public java.util.List<android.media.tv.TvTrackInfo> getTracks(int);
+    method protected void onLayout(boolean, int, int, int, int);
     method public boolean onUnhandledInputEvent(android.view.InputEvent);
     method public void overrideTvAppAttributionSource(@NonNull android.content.AttributionSource);
     method public void reset();
@@ -43633,7 +43643,6 @@ package android.telephony {
     method public int getLongitude();
     method public int getNetworkId();
     method public int getSystemId();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityCdma> CREATOR;
   }
 
@@ -43649,7 +43658,6 @@ package android.telephony {
     method @Nullable public String getMncString();
     method @Nullable public String getMobileNetworkOperator();
     method @Deprecated public int getPsc();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityGsm> CREATOR;
   }
 
@@ -43667,7 +43675,6 @@ package android.telephony {
     method @Nullable public String getMobileNetworkOperator();
     method public int getPci();
     method public int getTac();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityLte> CREATOR;
   }
 
@@ -43680,7 +43687,6 @@ package android.telephony {
     method @IntRange(from=0, to=3279165) public int getNrarfcn();
     method @IntRange(from=0, to=1007) public int getPci();
     method @IntRange(from=0, to=16777215) public int getTac();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityNr> CREATOR;
   }
 
@@ -43694,7 +43700,6 @@ package android.telephony {
     method @Nullable public String getMncString();
     method @Nullable public String getMobileNetworkOperator();
     method public int getUarfcn();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityTdscdma> CREATOR;
   }
 
@@ -43710,7 +43715,6 @@ package android.telephony {
     method @Nullable public String getMobileNetworkOperator();
     method public int getPsc();
     method public int getUarfcn();
-    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellIdentityWcdma> CREATOR;
   }
 
@@ -43794,6 +43798,7 @@ package android.telephony {
 
   public final class CellSignalStrengthCdma extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method public int getCdmaDbm();
     method public int getCdmaEcio();
@@ -43804,24 +43809,28 @@ package android.telephony {
     method public int getEvdoLevel();
     method public int getEvdoSnr();
     method @IntRange(from=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN, to=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_GREAT) public int getLevel();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthCdma> CREATOR;
   }
 
   public final class CellSignalStrengthGsm extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method public int getBitErrorRate();
     method public int getDbm();
     method @IntRange(from=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN, to=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_GREAT) public int getLevel();
     method public int getRssi();
     method public int getTimingAdvance();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthGsm> CREATOR;
   }
 
   public final class CellSignalStrengthLte extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method @IntRange(from=0, to=15) public int getCqi();
     method @IntRange(from=1, to=6) public int getCqiTableIndex();
@@ -43832,12 +43841,14 @@ package android.telephony {
     method public int getRssi();
     method public int getRssnr();
     method public int getTimingAdvance();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthLte> CREATOR;
   }
 
   public final class CellSignalStrengthNr extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method @IntRange(from=0, to=15) @NonNull public java.util.List<java.lang.Integer> getCsiCqiReport();
     method @IntRange(from=1, to=3) public int getCsiCqiTableIndex();
@@ -43850,26 +43861,31 @@ package android.telephony {
     method public int getSsRsrq();
     method public int getSsSinr();
     method @IntRange(from=0, to=1282) public int getTimingAdvanceMicros();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthNr> CREATOR;
   }
 
   public final class CellSignalStrengthTdscdma extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method public int getDbm();
     method @IntRange(from=0, to=4) public int getLevel();
     method public int getRscp();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthTdscdma> CREATOR;
   }
 
   public final class CellSignalStrengthWcdma extends android.telephony.CellSignalStrength implements android.os.Parcelable {
     method public int describeContents();
+    method public boolean equals(Object);
     method public int getAsuLevel();
     method public int getDbm();
     method public int getEcNo();
     method @IntRange(from=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_NONE_OR_UNKNOWN, to=android.telephony.CellSignalStrength.SIGNAL_STRENGTH_GREAT) public int getLevel();
+    method public int hashCode();
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.CellSignalStrengthWcdma> CREATOR;
   }
@@ -45549,7 +45565,6 @@ package android.telephony {
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_THROTTLED = 2; // 0x2
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_TIMEOUT = 9; // 0x9
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_CANCELED = 6; // 0x6
-    field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED = 16; // 0x10
     field public static final int SET_OPPORTUNISTIC_SUB_INACTIVE_SUBSCRIPTION = 2; // 0x2
     field public static final int SET_OPPORTUNISTIC_SUB_NO_OPPORTUNISTIC_SUB_AVAILABLE = 3; // 0x3
     field public static final int SET_OPPORTUNISTIC_SUB_REMOTE_SERVICE_EXCEPTION = 4; // 0x4
@@ -45779,6 +45794,7 @@ package android.telephony.data {
     field public static final int TYPE_IMS = 64; // 0x40
     field public static final int TYPE_MCX = 1024; // 0x400
     field public static final int TYPE_MMS = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final int TYPE_RCS = 32768; // 0x8000
     field public static final int TYPE_SUPL = 4; // 0x4
     field public static final int TYPE_VSIM = 4096; // 0x1000
     field public static final int TYPE_XCAP = 2048; // 0x800
@@ -46657,6 +46673,7 @@ package android.text {
     method @Deprecated public int length();
     method @Deprecated public static android.text.AlteredCharSequence make(CharSequence, char[], int, int);
     method @Deprecated public CharSequence subSequence(int, int);
+    method @Deprecated public String toString();
   }
 
   @Deprecated public class AndroidCharacter {
@@ -47108,6 +47125,7 @@ package android.text {
     method public void removeSpan(Object);
     method public void setSpan(Object, int, int, int);
     method public CharSequence subSequence(int, int);
+    method public String toString();
   }
 
   public static final class PrecomputedText.Params {
@@ -47237,6 +47255,7 @@ package android.text {
     method public void setFilters(android.text.InputFilter[]);
     method public void setSpan(Object, int, int, int);
     method public CharSequence subSequence(int, int);
+    method public String toString();
     method public static android.text.SpannableStringBuilder valueOf(CharSequence);
   }
 
@@ -48877,7 +48896,9 @@ package android.util {
     method public boolean containsValue(Object);
     method public void ensureCapacity(int);
     method public java.util.Set<java.util.Map.Entry<K,V>> entrySet();
+    method public boolean equals(@Nullable Object);
     method public V get(Object);
+    method public int hashCode();
     method public int indexOfKey(Object);
     method public int indexOfValue(Object);
     method public boolean isEmpty();
@@ -48909,7 +48930,9 @@ package android.util {
     method public boolean contains(Object);
     method public boolean containsAll(java.util.Collection<?>);
     method public void ensureCapacity(int);
+    method public boolean equals(@Nullable Object);
     method public void forEach(java.util.function.Consumer<? super E>);
+    method public int hashCode();
     method public int indexOf(Object);
     method public boolean isEmpty();
     method public java.util.Iterator<E> iterator();
@@ -49914,6 +49937,7 @@ package android.view {
     method public android.view.Display.Mode getMode();
     method public String getName();
     method @Deprecated public int getOrientation();
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") @NonNull public android.hardware.OverlayProperties getOverlaySupport();
     method @Deprecated public int getPixelFormat();
     method @Nullable public android.graphics.ColorSpace getPreferredWideGamutColorSpace();
     method public long getPresentationDeadlineNanos();
@@ -50190,13 +50214,6 @@ package android.view {
     field public static final int TOGGLE_ON = 21; // 0x15
     field public static final int VIRTUAL_KEY = 1; // 0x1
     field public static final int VIRTUAL_KEY_RELEASE = 8; // 0x8
-  }
-
-  @FlaggedApi("android.view.flags.scroll_feedback_api") public class HapticScrollFeedbackProvider implements android.view.ScrollFeedbackProvider {
-    ctor public HapticScrollFeedbackProvider(@NonNull android.view.View);
-    method public void onScrollLimit(int, int, int, boolean);
-    method public void onScrollProgress(int, int, int, int);
-    method public void onSnapToItem(int, int, int);
   }
 
   public class InflateException extends java.lang.RuntimeException {
@@ -51365,9 +51382,10 @@ package android.view {
   }
 
   @FlaggedApi("android.view.flags.scroll_feedback_api") public interface ScrollFeedbackProvider {
-    method public void onScrollLimit(int, int, int, boolean);
-    method public void onScrollProgress(int, int, int, int);
-    method public void onSnapToItem(int, int, int);
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") @NonNull public static android.view.ScrollFeedbackProvider createProvider(@NonNull android.view.View);
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") public void onScrollLimit(int, int, int, boolean);
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") public void onScrollProgress(int, int, int, int);
+    method @FlaggedApi("android.view.flags.scroll_feedback_api") public void onSnapToItem(int, int, int);
   }
 
   public class SearchEvent {
@@ -52649,7 +52667,6 @@ package android.view {
     method @Deprecated public static int getEdgeSlop();
     method @Deprecated public static int getFadingEdgeLength();
     method @Deprecated public static long getGlobalActionKeyTimeout();
-    method @FlaggedApi("android.view.flags.scroll_feedback_api") public int getHapticScrollFeedbackTickInterval(int, int, int);
     method public static int getJumpTapTimeout();
     method public static int getKeyRepeatDelay();
     method public static int getKeyRepeatTimeout();
@@ -52689,7 +52706,6 @@ package android.view {
     method @Deprecated public static int getWindowTouchSlop();
     method public static long getZoomControlsTimeout();
     method public boolean hasPermanentMenuKey();
-    method @FlaggedApi("android.view.flags.scroll_feedback_api") public boolean isHapticScrollFeedbackEnabled(int, int, int);
     method public boolean shouldShowMenuShortcutsWhenKeyboardPresent();
   }
 
@@ -54582,8 +54598,8 @@ package android.view.animation {
   public class AnimationUtils {
     ctor public AnimationUtils();
     method public static long currentAnimationTimeMillis();
-    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeMillis();
-    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static long getExpectedPresentationTimeNanos();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static long getExpectedPresentationTimeMillis();
+    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static long getExpectedPresentationTimeNanos();
     method public static android.view.animation.Animation loadAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.Interpolator loadInterpolator(android.content.Context, @AnimRes @InterpolatorRes int) throws android.content.res.Resources.NotFoundException;
     method public static android.view.animation.LayoutAnimationController loadLayoutAnimation(android.content.Context, @AnimRes int) throws android.content.res.Resources.NotFoundException;
@@ -57648,6 +57664,7 @@ package android.widget {
     ctor @Deprecated public AbsoluteLayout(android.content.Context, android.util.AttributeSet);
     ctor @Deprecated public AbsoluteLayout(android.content.Context, android.util.AttributeSet, int);
     ctor @Deprecated public AbsoluteLayout(android.content.Context, android.util.AttributeSet, int, int);
+    method @Deprecated protected void onLayout(boolean, int, int, int, int);
   }
 
   @Deprecated public static class AbsoluteLayout.LayoutParams extends android.view.ViewGroup.LayoutParams {
@@ -57726,6 +57743,7 @@ package android.widget {
     method public long getSelectedItemId();
     method public int getSelectedItemPosition();
     method public abstract android.view.View getSelectedView();
+    method protected void onLayout(boolean, int, int, int, int);
     method public boolean performItemClick(android.view.View, int, long);
     method public abstract void setAdapter(T);
     method public void setEmptyView(android.view.View);
@@ -58372,6 +58390,7 @@ package android.widget {
     method public android.widget.FrameLayout.LayoutParams generateLayoutParams(android.util.AttributeSet);
     method @Deprecated public boolean getConsiderGoneChildrenWhenMeasuring();
     method public boolean getMeasureAllChildren();
+    method protected void onLayout(boolean, int, int, int, int);
     method public void setMeasureAllChildren(boolean);
   }
 
@@ -58425,6 +58444,7 @@ package android.widget {
     method public boolean getUseDefaultMargins();
     method public boolean isColumnOrderPreserved();
     method public boolean isRowOrderPreserved();
+    method protected void onLayout(boolean, int, int, int, int);
     method public void setAlignmentMode(int);
     method public void setColumnCount(int);
     method public void setColumnOrderPreserved(boolean);
@@ -58647,6 +58667,7 @@ package android.widget {
     method public float getWeightSum();
     method public boolean isBaselineAligned();
     method public boolean isMeasureWithLargestChildEnabled();
+    method protected void onLayout(boolean, int, int, int, int);
     method public void setBaselineAligned(boolean);
     method public void setBaselineAlignedChildIndex(int);
     method public void setDividerDrawable(android.graphics.drawable.Drawable);
@@ -59195,6 +59216,7 @@ package android.widget {
     method public android.widget.RelativeLayout.LayoutParams generateLayoutParams(android.util.AttributeSet);
     method public int getGravity();
     method public int getIgnoreGravity();
+    method protected void onLayout(boolean, int, int, int, int);
     method public void setGravity(int);
     method public void setHorizontalGravity(int);
     method public void setIgnoreGravity(int);
@@ -59649,6 +59671,7 @@ package android.widget {
     method @Deprecated public boolean isMoving();
     method @Deprecated public boolean isOpened();
     method @Deprecated public void lock();
+    method @Deprecated protected void onLayout(boolean, int, int, int, int);
     method @Deprecated public void open();
     method @Deprecated public void setOnDrawerCloseListener(android.widget.SlidingDrawer.OnDrawerCloseListener);
     method @Deprecated public void setOnDrawerOpenListener(android.widget.SlidingDrawer.OnDrawerOpenListener);
@@ -60295,6 +60318,7 @@ package android.widget {
     method public boolean hideOverflowMenu();
     method public void inflateMenu(@MenuRes int);
     method public boolean isOverflowMenuShowing();
+    method protected void onLayout(boolean, int, int, int, int);
     method public void setCollapseContentDescription(@StringRes int);
     method public void setCollapseContentDescription(@Nullable CharSequence);
     method public void setCollapseIcon(@DrawableRes int);
@@ -60449,7 +60473,7 @@ package android.widget {
     method @Deprecated public android.view.View getZoomControls();
     method @Deprecated public boolean isAutoDismissed();
     method @Deprecated public boolean isVisible();
-    method public boolean onTouch(android.view.View, android.view.MotionEvent);
+    method @Deprecated public boolean onTouch(android.view.View, android.view.MotionEvent);
     method @Deprecated public void setAutoDismissed(boolean);
     method @Deprecated public void setFocusable(boolean);
     method @Deprecated public void setOnZoomListener(android.widget.ZoomButtonsController.OnZoomListener);

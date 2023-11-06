@@ -856,6 +856,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         handleResizingWindows();
+        clearFrameChangingWindows();
 
         if (mWmService.mDisplayFrozen) {
             ProtoLog.v(WM_DEBUG_ORIENTATION,
@@ -1021,6 +1022,17 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             win.reportResized();
             mWmService.mResizingWindows.remove(i);
         }
+    }
+
+    /**
+     * Clears frame changing windows after handling moving and resizing windows.
+     */
+    private void clearFrameChangingWindows() {
+        final ArrayList<WindowState> frameChangingWindows = mWmService.mFrameChangingWindows;
+        for (int i = frameChangingWindows.size() - 1; i >= 0; i--) {
+            frameChangingWindows.get(i).updateLastFrames();
+        }
+        frameChangingWindows.clear();
     }
 
     /**
@@ -2219,6 +2231,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // Otherwise, it will keep waiting for the empty TaskFragment to be non-empty.
                 mService.mTaskFragmentOrganizerController.dispatchPendingInfoChangedEvent(
                         organizedTf);
+            }
+
+            if (taskDisplayArea.getFocusedRootTask() == rootTask) {
+                taskDisplayArea.clearPreferredTopFocusableRootTask();
             }
         } finally {
             mService.continueWindowLayout();

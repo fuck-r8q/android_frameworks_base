@@ -31,6 +31,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
+import android.app.ActivityThread;
 import android.app.KeyguardManager;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
@@ -776,7 +777,8 @@ public final class DisplayManager {
      */
     public void registerDisplayListener(@NonNull DisplayListener listener,
             @Nullable Handler handler, @EventsMask long eventsMask) {
-        mGlobal.registerDisplayListener(listener, handler, eventsMask);
+        mGlobal.registerDisplayListener(listener, handler, eventsMask,
+                ActivityThread.currentPackageName());
     }
 
     /**
@@ -1818,6 +1820,12 @@ public final class DisplayManager {
          * 123,1,critical,0.8,default;123,1,moderate,0.6,id_2;456,2,moderate,0.9,critical,0.7
          */
         String KEY_BRIGHTNESS_THROTTLING_DATA = "brightness_throttling_data";
+
+        /**
+         * Key for the power throttling data as a String formatted, from the display
+         * device config.
+         */
+        String KEY_POWER_THROTTLING_DATA = "power_throttling_data";
 
         /**
          * Key for new power controller feature flag. If enabled new DisplayPowerController will

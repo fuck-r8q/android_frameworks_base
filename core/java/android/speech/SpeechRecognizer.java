@@ -768,7 +768,7 @@ public class SpeechRecognizer {
         try {
             mService.startListening(recognizerIntent, mListener, mContext.getAttributionSource());
             if (DBG) Log.d(TAG, "service start listening command succeeded");
-        } catch (final RemoteException e) {
+        } catch (final Exception e) {
             Log.e(TAG, "startListening() failed", e);
             mListener.onError(ERROR_CLIENT);
         }
@@ -782,7 +782,7 @@ public class SpeechRecognizer {
         try {
             mService.stopListening(mListener);
             if (DBG) Log.d(TAG, "service stop listening command succeeded");
-        } catch (final RemoteException e) {
+        } catch (final Exception e) {
             Log.e(TAG, "stopListening() failed", e);
             mListener.onError(ERROR_CLIENT);
         }
@@ -796,7 +796,7 @@ public class SpeechRecognizer {
         try {
             mService.cancel(mListener, /*isShutdown*/ false);
             if (DBG) Log.d(TAG, "service cancel command succeeded");
-        } catch (final RemoteException e) {
+        } catch (final Exception e) {
             Log.e(TAG, "cancel() failed", e);
             mListener.onError(ERROR_CLIENT);
         }
@@ -831,7 +831,7 @@ public class SpeechRecognizer {
                     mContext.getAttributionSource(),
                     new InternalSupportCallback(callbackExecutor, recognitionSupportCallback));
             if (DBG) Log.d(TAG, "service support command succeeded");
-        } catch (final RemoteException e) {
+        } catch (final Exception e) {
             Log.e(TAG, "checkRecognitionSupport() failed", e);
             callbackExecutor.execute(() -> recognitionSupportCallback.onError(ERROR_CLIENT));
         }
@@ -851,7 +851,7 @@ public class SpeechRecognizer {
                 mService.triggerModelDownload(
                         recognizerIntent, mContext.getAttributionSource(), null);
                 if (DBG) Log.d(TAG, "triggerModelDownload() without a listener");
-            } catch (final RemoteException e) {
+            } catch (final Exception e) {
                 Log.e(TAG, "triggerModelDownload() without a listener failed", e);
                 mListener.onError(ERROR_CLIENT);
             }
@@ -863,7 +863,7 @@ public class SpeechRecognizer {
                         recognizerIntent, mContext.getAttributionSource(),
                         new InternalModelDownloadListener(callbackExecutor, modelDownloadListener));
                 if (DBG) Log.d(TAG, "triggerModelDownload() with a listener");
-            } catch (final RemoteException e) {
+            } catch (final Exception e) {
                 Log.e(TAG, "triggerModelDownload() with a listener failed", e);
                 callbackExecutor.execute(() -> modelDownloadListener.onError(ERROR_CLIENT));
             }
@@ -890,7 +890,7 @@ public class SpeechRecognizer {
         if (mService != null) {
             try {
                 mService.cancel(mListener, /*isShutdown*/ true);
-            } catch (final RemoteException e) {
+            } catch (final Exception e) {
                 // Not important
             }
         }

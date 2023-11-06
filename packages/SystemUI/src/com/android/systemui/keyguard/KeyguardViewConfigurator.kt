@@ -20,6 +20,7 @@ package com.android.systemui.keyguard
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
+import com.android.internal.jank.InteractionJankMonitor
 import com.android.keyguard.KeyguardStatusView
 import com.android.keyguard.KeyguardStatusViewController
 import com.android.keyguard.LockIconView
@@ -27,6 +28,7 @@ import com.android.keyguard.LockIconViewController
 import com.android.keyguard.dagger.KeyguardStatusViewComponent
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryHapticsInteractor
 import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.ui.binder.KeyguardBlueprintViewBinder
@@ -43,6 +45,7 @@ import com.android.systemui.res.R
 import com.android.systemui.shade.NotificationShadeWindowView
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.KeyguardIndicationController
+import com.android.systemui.statusbar.VibratorHelper
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.temporarydisplay.chipbar.ChipbarCoordinator
 import javax.inject.Inject
@@ -71,6 +74,9 @@ constructor(
     private val keyguardIndicationController: KeyguardIndicationController,
     private val lockIconViewController: LockIconViewController,
     private val shadeInteractor: ShadeInteractor,
+    private val interactionJankMonitor: InteractionJankMonitor,
+    private val deviceEntryHapticsInteractor: DeviceEntryHapticsInteractor,
+    private val vibratorHelper: VibratorHelper,
 ) : CoreStartable {
 
     private var rootViewHandle: DisposableHandle? = null
@@ -140,6 +146,9 @@ constructor(
                 keyguardStateController,
                 shadeInteractor,
                 { keyguardStatusViewController!!.getClockController() },
+                interactionJankMonitor,
+                deviceEntryHapticsInteractor,
+                vibratorHelper,
             )
     }
 

@@ -219,6 +219,7 @@ import static android.app.admin.ProvisioningException.ERROR_REMOVE_NON_REQUIRED_
 import static android.app.admin.ProvisioningException.ERROR_SETTING_PROFILE_OWNER_FAILED;
 import static android.app.admin.ProvisioningException.ERROR_SET_DEVICE_OWNER_FAILED;
 import static android.app.admin.ProvisioningException.ERROR_STARTING_PROFILE_FAILED;
+import static android.app.admin.flags.Flags.policyEngineMigrationV2Enabled;
 import static android.content.Intent.ACTION_MANAGED_PROFILE_AVAILABLE;
 import static android.content.Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
@@ -490,7 +491,6 @@ import com.android.server.SystemServerInitThreadPool;
 import com.android.server.SystemService;
 import com.android.server.SystemServiceManager;
 import com.android.server.devicepolicy.ActiveAdmin.TrustAgentInfo;
-import com.android.server.devicepolicy.flags.FlagUtils;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.net.NetworkPolicyManagerInternal;
 import com.android.server.pdb.PersistentDataBlockManagerInternal;
@@ -3430,7 +3430,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
             }
 
             revertTransferOwnershipIfNecessaryLocked();
-            if (!FlagUtils.isPolicyEngineMigrationV2Enabled()) {
+            if (!policyEngineMigrationV2Enabled()) {
                 updateUsbDataSignal(mContext, isUsbDataSignalingEnabledInternalLocked());
             }
         }
@@ -21571,7 +21571,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         Objects.requireNonNull(packageName, "Admin package name must be provided");
         final CallerIdentity caller = getCallerIdentity(packageName);
 
-        if (!FlagUtils.isPolicyEngineMigrationV2Enabled()) {
+        if (!policyEngineMigrationV2Enabled()) {
             Preconditions.checkCallAuthorization(
                     isDefaultDeviceOwner(caller) || isProfileOwnerOfOrganizationOwnedDevice(caller),
                     "USB data signaling can only be controlled by a device owner or "
@@ -21581,7 +21581,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
         }
 
         synchronized (getLockObject()) {
-            if (FlagUtils.isPolicyEngineMigrationV2Enabled()) {
+            if (policyEngineMigrationV2Enabled()) {
                 EnforcingAdmin enforcingAdmin = enforcePermissionAndGetEnforcingAdmin(
                         /* admin= */ null, MANAGE_DEVICE_POLICY_USB_DATA_SIGNALLING,
                         caller.getPackageName(),
@@ -21621,7 +21621,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub {
     @Override
     public boolean isUsbDataSignalingEnabled(String packageName) {
         final CallerIdentity caller = getCallerIdentity(packageName);
-        if (FlagUtils.isPolicyEngineMigrationV2Enabled()) {
+        if (policyEngineMigrationV2Enabled()) {
             Boolean enabled = mDevicePolicyEngine.getResolvedPolicy(
                     PolicyDefinition.USB_DATA_SIGNALING,
                     caller.getUserId());

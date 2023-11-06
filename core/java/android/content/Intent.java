@@ -64,6 +64,7 @@ import android.os.Process;
 import android.os.ResultReceiver;
 import android.os.ShellCommand;
 import android.os.StrictMode;
+import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.storage.StorageManager;
 import android.provider.ContactsContract.QuickContact;
@@ -2796,6 +2797,8 @@ public class Intent implements Parcelable, Cloneable {
      * started and is no longer considered stopped.
      * <ul>
      * <li> {@link #EXTRA_UID} containing the integer uid assigned to the package.
+     * <li> {@link #EXTRA_TIME} containing the {@link SystemClock#elapsedRealtime()
+     *          elapsed realtime} of when the package was unstopped.
      * </ul>
      *
      * <p class="note">This is a protected intent that can only be sent by the system.
@@ -2869,9 +2872,15 @@ public class Intent implements Parcelable, Cloneable {
      *
      * <p class="note">This is a protected intent that can only be sent
      * by the system.
+     * <p>
+     * Starting in {@link Build.VERSION_CODES#VANILLA_ICE_CREAM Android V}, an extra timestamp
+     * {@link #EXTRA_TIME} is included with this broadcast to indicate the exact time the package
+     * was restarted, in {@link SystemClock#elapsedRealtime() elapsed realtime}.
+     * </p>
      */
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_PACKAGE_RESTARTED = "android.intent.action.PACKAGE_RESTARTED";
+
     /**
      * Broadcast Action: The user has cleared the data of a package.  This should
      * be preceded by {@link #ACTION_PACKAGE_RESTARTED}, after which all of
@@ -3941,6 +3950,8 @@ public class Intent implements Parcelable, Cloneable {
      * {@link #ACTION_BOOT_COMPLETED} is sent.  This is sent as a foreground
      * broadcast, since it is part of a visible user interaction; be as quick
      * as possible when handling it.
+     *
+     * <p><b>Note:</b> This broadcast is not sent to the system user.
      */
     public static final String ACTION_USER_INITIALIZE =
             "android.intent.action.USER_INITIALIZE";
@@ -4192,7 +4203,7 @@ public class Intent implements Parcelable, Cloneable {
      * new state of quiet mode. This is only sent to registered receivers, not manifest receivers.
      *
      * <p>This broadcast is similar to {@link #ACTION_MANAGED_PROFILE_AVAILABLE} but functions as a
-     * generic broadcast for all users of type {@link android.content.pm.UserInfo#isProfile()}}.
+     * generic broadcast for all profile users.
      */
     @FlaggedApi(FLAG_ALLOW_PRIVATE_PROFILE)
     public static final String ACTION_PROFILE_AVAILABLE =
@@ -4206,7 +4217,7 @@ public class Intent implements Parcelable, Cloneable {
      * new state of quiet mode. This is only sent to registered receivers, not manifest receivers.
      *
      * <p>This broadcast is similar to {@link #ACTION_MANAGED_PROFILE_UNAVAILABLE} but functions as
-     * a generic broadcast for all users of type {@link android.content.pm.UserInfo#isProfile()}}.
+     * a generic broadcast for all profile users.
      */
     @FlaggedApi(FLAG_ALLOW_PRIVATE_PROFILE)
     public static final String ACTION_PROFILE_UNAVAILABLE =
@@ -4234,7 +4245,7 @@ public class Intent implements Parcelable, Cloneable {
      * that was removed.
      *
      * <p>This broadcast is similar to {@link #ACTION_MANAGED_PROFILE_REMOVED} but functions as a
-     * generic broadcast for all users of type {@link android.content.pm.UserInfo#isProfile()}}.
+     * generic broadcast for all profile users.
      * It is sent in addition to the {@link #ACTION_MANAGED_PROFILE_REMOVED} broadcast when a
      * managed user is removed.
      *
@@ -4254,7 +4265,7 @@ public class Intent implements Parcelable, Cloneable {
      * that was added.
      *
      * <p>This broadcast is similar to {@link #ACTION_MANAGED_PROFILE_ADDED} but functions as a
-     * generic broadcast for all users of type {@link android.content.pm.UserInfo#isProfile()}}.
+     * generic broadcast for all profile users.
      * It is sent in addition to the {@link #ACTION_MANAGED_PROFILE_ADDED} broadcast when a
      * managed user is added.
      *
@@ -4291,6 +4302,14 @@ public class Intent implements Parcelable, Cloneable {
      */
     public static final String ACTION_SHOW_BRIGHTNESS_DIALOG =
             "com.android.intent.action.SHOW_BRIGHTNESS_DIALOG";
+
+    /**
+     * Intent Extra: holds boolean that determines whether brightness dialog is full width when
+     * in landscape mode.
+     * @hide
+     */
+    public static final String EXTRA_BRIGHTNESS_DIALOG_IS_FULL_WIDTH =
+            "android.intent.extra.BRIGHTNESS_DIALOG_IS_FULL_WIDTH";
 
     /**
      * Activity Action: Shows the contrast setting dialog.
@@ -5335,6 +5354,7 @@ public class Intent implements Parcelable, Cloneable {
      * @hide
      */
     @SystemApi
+    @FlaggedApi(android.content.pm.Flags.FLAG_ARCHIVING)
     public static final String ACTION_UNARCHIVE_PACKAGE = "android.intent.action.UNARCHIVE_PACKAGE";
 
     // ---------------------------------------------------------------------
@@ -6587,8 +6607,8 @@ public class Intent implements Parcelable, Cloneable {
             = "android.intent.extra.SHUTDOWN_USERSPACE_ONLY";
 
     /**
-     * Optional extra specifying a time in milliseconds since the Epoch. The value must be
-     * non-negative.
+     * Optional extra specifying a time in milliseconds. The timebase depends on the Intent
+     * including this extra. The value must be non-negative.
      * <p>
      * Type: long
      * </p>

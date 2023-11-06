@@ -1801,6 +1801,12 @@
       "group": "WM_ERROR",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
+    "-504637678": {
+      "message": "Starting animation on dim layer %s, requested by %s, alpha: %f -> %f, blur: %d -> %d",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_DIMMER",
+      "at": "com\/android\/server\/wm\/SmoothDimmer.java"
+    },
     "-503656156": {
       "message": "Update process config of %s to new config %s",
       "level": "VERBOSE",
@@ -2893,6 +2899,12 @@
       "group": "WM_DEBUG_RESIZE",
       "at": "com\/android\/server\/wm\/WindowState.java"
     },
+    "419378610": {
+      "message": "Content Recording: Apply transformations of shift %d x %d, scale %f x %f, crop (aka recorded content size) %d x %d for display %d; display has size %d x %d; surface has size %d x %d",
+      "level": "VERBOSE",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
+    },
     "422634333": {
       "message": "First draw done in potential wallpaper target %s",
       "level": "VERBOSE",
@@ -3757,6 +3769,12 @@
       "group": "WM_DEBUG_CONFIGURATION",
       "at": "com\/android\/server\/wm\/ActivityClientController.java"
     },
+    "1309365288": {
+      "message": "Removing dim surface %s on transaction %s",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_DIMMER",
+      "at": "com\/android\/server\/wm\/SmoothDimmer.java"
+    },
     "1316533291": {
       "message": "State movement: %s from:%s to:%s reason:%s",
       "level": "VERBOSE",
@@ -4020,6 +4038,12 @@
       "level": "VERBOSE",
       "group": "WM_DEBUG_STATES",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
+    },
+    "1620751818": {
+      "message": "Dim %s skipping animation and directly setting alpha=%f, blur=%d",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_DIMMER",
+      "at": "com\/android\/server\/wm\/SmoothDimmer.java"
     },
     "1621562070": {
       "message": "    startWCT=%s",
@@ -4351,12 +4375,6 @@
       "group": "WM_DEBUG_REMOTE_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RemoteAnimationController.java"
     },
-    "1936800105": {
-      "message": "Content Recording: Apply transformations of shift %d x %d, scale %f, crop (aka recorded content size) %d x %d for display %d; display has size %d x %d; surface has size %d x %d",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_CONTENT_RECORDING",
-      "at": "com\/android\/server\/wm\/ContentRecorder.java"
-    },
     "1945495497": {
       "message": "Focused window didn't have a valid surface drawn.",
       "level": "DEBUG",
@@ -4588,6 +4606,9 @@
       "tag": "WindowManager"
     },
     "WM_DEBUG_CONTENT_RECORDING": {
+      "tag": "WindowManager"
+    },
+    "WM_DEBUG_DIMMER": {
       "tag": "WindowManager"
     },
     "WM_DEBUG_DRAW": {

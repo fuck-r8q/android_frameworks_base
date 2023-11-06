@@ -24,7 +24,9 @@ import static android.content.pm.SuspendDialogInfo.BUTTON_ACTION_MORE_DETAILS;
 import static android.content.pm.SuspendDialogInfo.BUTTON_ACTION_UNSUSPEND;
 import static android.content.pm.parsing.FrameworkParsingPackageUtils.parsePublicKey;
 import static android.content.res.Resources.ID_NULL;
+
 import static com.android.server.pm.PackageManagerService.WRITE_USER_PACKAGE_RESTRICTIONS;
+
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
@@ -41,6 +43,7 @@ import static org.mockito.Mockito.when;
 
 import android.annotation.NonNull;
 import android.app.PropertyInvalidatedCache;
+import android.content.ComponentName;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.SuspendDialogInfo;
@@ -871,12 +874,20 @@ public class PackageManagerSettingsTests {
                 .setUid(packageSetting.getAppId())
                 .hideAsFinal());
 
-        ArchiveState archiveState = new ArchiveState(
-                List.of(new ArchiveState.ArchiveActivityInfo("title1", Path.of("/path1"),
-                                Path.of("/monochromePath1")),
-                        new ArchiveState.ArchiveActivityInfo("title2", Path.of("/path2"),
-                                Path.of("/monochromePath2"))),
-                "installerTitle");
+        ArchiveState archiveState =
+                new ArchiveState(
+                        List.of(
+                                new ArchiveState.ArchiveActivityInfo(
+                                        "title1",
+                                        new ComponentName("pkg1", "class1"),
+                                        Path.of("/path1"),
+                                        Path.of("/monochromePath1")),
+                                new ArchiveState.ArchiveActivityInfo(
+                                        "title2",
+                                        new ComponentName("pkg2", "class2"),
+                                        Path.of("/path2"),
+                                        Path.of("/monochromePath2"))),
+                        "installerTitle");
         packageSetting.modifyUserState(UserHandle.SYSTEM.getIdentifier()).setArchiveState(
                 archiveState);
         settings.mPackages.put(PACKAGE_NAME_1, packageSetting);
@@ -956,20 +967,12 @@ public class PackageManagerSettingsTests {
                 PACKAGE_NAME,
                 REAL_PACKAGE_NAME,
                 INITIAL_CODE_PATH /*codePath*/,
-                null /*legacyNativeLibraryPathString*/,
-                "x86_64" /*primaryCpuAbiString*/,
-                "x86" /*secondaryCpuAbiString*/,
-                null /*cpuAbiOverrideString*/,
-                INITIAL_VERSION_CODE,
                 ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_HAS_CODE,
                 ApplicationInfo.PRIVATE_FLAG_PRIVILEGED|ApplicationInfo.PRIVATE_FLAG_HIDDEN,
-                0,
-                null /*usesSdkLibraries*/,
-                null /*usesSdkLibrariesVersions*/,
-                null /*usesStaticLibraries*/,
-                null /*usesStaticLibrariesVersions*/,
-                null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID())
+                .setPrimaryCpuAbi("x86_64")
+                .setSecondaryCpuAbi("x86")
+                .setLongVersionCode(INITIAL_VERSION_CODE);
         origPkgSetting01.setPkg(mockAndroidPackage(origPkgSetting01));
         final PackageSetting testPkgSetting01 = new PackageSetting(origPkgSetting01);
         verifySettingCopy(origPkgSetting01, testPkgSetting01);
@@ -978,23 +981,15 @@ public class PackageManagerSettingsTests {
     @Test
     public void testPackageStateCopy02() {
         final PackageSetting origPkgSetting01 = new PackageSetting(
-                PACKAGE_NAME /*pkgName*/,
-                REAL_PACKAGE_NAME /*realPkgName*/,
+                PACKAGE_NAME,
+                REAL_PACKAGE_NAME,
                 INITIAL_CODE_PATH /*codePath*/,
-                null /*legacyNativeLibraryPathString*/,
-                "x86_64" /*primaryCpuAbiString*/,
-                "x86" /*secondaryCpuAbiString*/,
-                null /*cpuAbiOverrideString*/,
-                INITIAL_VERSION_CODE,
                 ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_HAS_CODE,
                 ApplicationInfo.PRIVATE_FLAG_PRIVILEGED|ApplicationInfo.PRIVATE_FLAG_HIDDEN,
-                0,
-                null /*usesSdkLibraries*/,
-                null /*usesSdkLibrariesVersions*/,
-                null /*usesStaticLibraries*/,
-                null /*usesStaticLibrariesVersions*/,
-                null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID())
+                .setPrimaryCpuAbi("x86_64")
+                .setSecondaryCpuAbi("x86")
+                .setLongVersionCode(INITIAL_VERSION_CODE);
         origPkgSetting01.setUserState(0, 100, 100, 1, true, false, false, false, 0, null, false,
                 false, "lastDisabledCaller", new ArraySet<>(new String[]{"enabledComponent1"}),
                 new ArraySet<>(new String[]{"disabledComponent1"}), 0, 0, "harmfulAppWarning",
@@ -1017,20 +1012,10 @@ public class PackageManagerSettingsTests {
                 PACKAGE_NAME /*pkgName*/,
                 REAL_PACKAGE_NAME /*realPkgName*/,
                 UPDATED_CODE_PATH /*codePath*/,
-                null /*legacyNativeLibraryPathString*/,
-                null /*primaryCpuAbiString*/,
-                null /*secondaryCpuAbiString*/,
-                null /*cpuAbiOverrideString*/,
-                UPDATED_VERSION_CODE,
                 0 /*pkgFlags*/,
                 0 /*pkgPrivateFlags*/,
-                0,
-                null /*usesSdkLibraries*/,
-                null /*usesSdkLibrariesVersions*/,
-                null /*usesStaticLibraries*/,
-                null /*usesStaticLibrariesVersions*/,
-                null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID())
+                .setLongVersionCode(UPDATED_VERSION_CODE);
         testPkgSetting01.copyPackageSetting(origPkgSetting01, true);
         verifySettingCopy(origPkgSetting01, testPkgSetting01);
         verifyUserStatesCopy(origPkgSetting01.readUserState(0),
@@ -1065,7 +1050,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getPrimaryCpuAbi(), is("arm64-v8a"));
         assertThat(testPkgSetting01.getPrimaryCpuAbiLegacy(), is("arm64-v8a"));
         assertThat(testPkgSetting01.getSecondaryCpuAbi(), is("armeabi"));
@@ -1103,7 +1091,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getPrimaryCpuAbi(), is("arm64-v8a"));
         assertThat(testPkgSetting01.getPrimaryCpuAbiLegacy(), is("arm64-v8a"));
         assertThat(testPkgSetting01.getSecondaryCpuAbi(), is("armeabi"));
@@ -1143,7 +1134,10 @@ public class PackageManagerSettingsTests {
                     null /*usesStaticLibraries*/,
                     null /*usesStaticLibrariesVersions*/,
                     null /*mimeGroups*/,
-                    UUID.randomUUID());
+                    UUID.randomUUID(),
+                    false /*isPersistent*/,
+                    34 /*targetSdkVersion*/,
+                    null /*restrictUpdateHash*/);
             fail("Expected a PackageManagerException");
         } catch (PackageManagerException expected) {
         }
@@ -1179,7 +1173,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getPath(), is(UPDATED_CODE_PATH));
         assertThat(testPkgSetting01.getPackageName(), is(PACKAGE_NAME));
         assertThat(testPkgSetting01.getFlags(), is(ApplicationInfo.FLAG_SYSTEM));
@@ -1224,7 +1221,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getAppId(), is(0));
         assertThat(testPkgSetting01.getPath(), is(INITIAL_CODE_PATH));
         assertThat(testPkgSetting01.getPackageName(), is(PACKAGE_NAME));
@@ -1269,7 +1269,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getAppId(), is(10064));
         assertThat(testPkgSetting01.getPath(), is(INITIAL_CODE_PATH));
         assertThat(testPkgSetting01.getPackageName(), is(PACKAGE_NAME));
@@ -1315,7 +1318,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getAppId(), is(10064));
         assertThat(testPkgSetting01.getPath(), is(UPDATED_CODE_PATH));
         assertThat(testPkgSetting01.getPackageName(), is(PACKAGE_NAME));
@@ -1358,7 +1364,10 @@ public class PackageManagerSettingsTests {
                 null /*usesStaticLibraries*/,
                 null /*usesStaticLibrariesVersions*/,
                 null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID(),
+                false /*isPersistent*/,
+                34 /*targetSdkVersion*/,
+                null /*restrictUpdateHash*/);
         assertThat(testPkgSetting01.getAppId(), is(0));
         assertThat(testPkgSetting01.getPath(), is(UPDATED_CODE_PATH));
         assertThat(testPkgSetting01.getPackageName(), is(PACKAGE_NAME));
@@ -1682,20 +1691,13 @@ public class PackageManagerSettingsTests {
                 PACKAGE_NAME,
                 REAL_PACKAGE_NAME,
                 INITIAL_CODE_PATH /*codePath*/,
-                null /*legacyNativeLibraryPathString*/,
-                "x86_64" /*primaryCpuAbiString*/,
-                "x86" /*secondaryCpuAbiString*/,
-                null /*cpuAbiOverrideString*/,
-                INITIAL_VERSION_CODE,
                 pkgFlags,
                 0 /*privateFlags*/,
-                sharedUserId,
-                null /*usesSdkLibraries*/,
-                null /*usesSdkLibrariesVersions*/,
-                null /*usesStaticLibraries*/,
-                null /*usesStaticLibrariesVersions*/,
-                null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID())
+                .setPrimaryCpuAbi("x86_64")
+                .setSecondaryCpuAbi("x86")
+                .setLongVersionCode(INITIAL_VERSION_CODE)
+                .setSharedUserAppId(sharedUserId);
     }
 
     private PackageSetting createPackageSetting(String packageName) {
@@ -1703,20 +1705,12 @@ public class PackageManagerSettingsTests {
                 packageName,
                 packageName,
                 INITIAL_CODE_PATH /*codePath*/,
-                null /*legacyNativeLibraryPathString*/,
-                "x86_64" /*primaryCpuAbiString*/,
-                "x86" /*secondaryCpuAbiString*/,
-                null /*cpuAbiOverrideString*/,
-                INITIAL_VERSION_CODE,
                 0,
                 0 /*privateFlags*/,
-                0,
-                null /*usesSdkLibraries*/,
-                null /*usesSdkLibrariesVersions*/,
-                null /*usesStaticLibraries*/,
-                null /*usesStaticLibrariesVersions*/,
-                null /*mimeGroups*/,
-                UUID.randomUUID());
+                UUID.randomUUID())
+                .setPrimaryCpuAbi("x86_64")
+                .setSecondaryCpuAbi("x86")
+                .setLongVersionCode(INITIAL_VERSION_CODE);
     }
 
     static @NonNull List<UserInfo> createFakeUsers() {

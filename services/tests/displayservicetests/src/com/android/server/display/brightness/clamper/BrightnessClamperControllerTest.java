@@ -35,6 +35,7 @@ import androidx.test.filters.SmallTest;
 import com.android.server.display.DisplayBrightnessState;
 import com.android.server.display.brightness.BrightnessReason;
 import com.android.server.display.feature.DeviceConfigParameterProvider;
+import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.testutils.TestHandler;
 
 import org.junit.Before;
@@ -63,12 +64,13 @@ public class BrightnessClamperControllerTest {
     @Mock
     private BrightnessClamper<BrightnessClamperController.DisplayDeviceData> mMockClamper;
     @Mock
+    private DisplayManagerFlags mFlags;
+    @Mock
     private BrightnessModifier mMockModifier;
     @Mock
     private DisplayManagerInternal.DisplayPowerRequest mMockRequest;
     @Mock
     private DeviceConfig.Properties mMockProperties;
-
     private BrightnessClamperController mClamperController;
     private TestInjector mTestInjector;
 
@@ -135,8 +137,10 @@ public class BrightnessClamperControllerTest {
         float initialBrightness = 0.8f;
         boolean initialSlowChange = true;
         float clampedBrightness = 0.6f;
+        float customAnimationRate = 0.01f;
         when(mMockClamper.getBrightnessCap()).thenReturn(clampedBrightness);
         when(mMockClamper.getType()).thenReturn(BrightnessClamper.Type.THERMAL);
+        when(mMockClamper.getCustomAnimationRate()).thenReturn(customAnimationRate);
         when(mMockClamper.isActive()).thenReturn(false);
         mTestInjector.mCapturedChangeListener.onChanged();
         mTestHandler.flush();
@@ -148,6 +152,7 @@ public class BrightnessClamperControllerTest {
         assertEquals(PowerManager.BRIGHTNESS_MAX, state.getMaxBrightness(), FLOAT_TOLERANCE);
         assertEquals(0,
                 state.getBrightnessReason().getModifier() & BrightnessReason.MODIFIER_THROTTLED);
+        assertEquals(-1, state.getCustomAnimationRate(), FLOAT_TOLERANCE);
         assertEquals(initialSlowChange, state.isSlowChange());
     }
 
@@ -156,8 +161,10 @@ public class BrightnessClamperControllerTest {
         float initialBrightness = 0.8f;
         boolean initialSlowChange = true;
         float clampedBrightness = 0.6f;
+        float customAnimationRate = 0.01f;
         when(mMockClamper.getBrightnessCap()).thenReturn(clampedBrightness);
         when(mMockClamper.getType()).thenReturn(BrightnessClamper.Type.THERMAL);
+        when(mMockClamper.getCustomAnimationRate()).thenReturn(customAnimationRate);
         when(mMockClamper.isActive()).thenReturn(true);
         mTestInjector.mCapturedChangeListener.onChanged();
         mTestHandler.flush();
@@ -169,6 +176,7 @@ public class BrightnessClamperControllerTest {
         assertEquals(clampedBrightness, state.getMaxBrightness(), FLOAT_TOLERANCE);
         assertEquals(BrightnessReason.MODIFIER_THROTTLED,
                 state.getBrightnessReason().getModifier() & BrightnessReason.MODIFIER_THROTTLED);
+        assertEquals(customAnimationRate, state.getCustomAnimationRate(), FLOAT_TOLERANCE);
         assertFalse(state.isSlowChange());
     }
 
@@ -177,8 +185,10 @@ public class BrightnessClamperControllerTest {
         float initialBrightness = 0.6f;
         boolean initialSlowChange = true;
         float clampedBrightness = 0.8f;
+        float customAnimationRate = 0.01f;
         when(mMockClamper.getBrightnessCap()).thenReturn(clampedBrightness);
         when(mMockClamper.getType()).thenReturn(BrightnessClamper.Type.THERMAL);
+        when(mMockClamper.getCustomAnimationRate()).thenReturn(customAnimationRate);
         when(mMockClamper.isActive()).thenReturn(true);
         mTestInjector.mCapturedChangeListener.onChanged();
         mTestHandler.flush();
@@ -190,6 +200,7 @@ public class BrightnessClamperControllerTest {
         assertEquals(clampedBrightness, state.getMaxBrightness(), FLOAT_TOLERANCE);
         assertEquals(BrightnessReason.MODIFIER_THROTTLED,
                 state.getBrightnessReason().getModifier() & BrightnessReason.MODIFIER_THROTTLED);
+        assertEquals(customAnimationRate, state.getCustomAnimationRate(), FLOAT_TOLERANCE);
         assertFalse(state.isSlowChange());
     }
 
@@ -198,8 +209,10 @@ public class BrightnessClamperControllerTest {
         float initialBrightness = 0.8f;
         boolean initialSlowChange = true;
         float clampedBrightness = 0.6f;
+        float customAnimationRate = 0.01f;
         when(mMockClamper.getBrightnessCap()).thenReturn(clampedBrightness);
         when(mMockClamper.getType()).thenReturn(BrightnessClamper.Type.THERMAL);
+        when(mMockClamper.getCustomAnimationRate()).thenReturn(customAnimationRate);
         when(mMockClamper.isActive()).thenReturn(true);
         mTestInjector.mCapturedChangeListener.onChanged();
         mTestHandler.flush();
@@ -214,12 +227,13 @@ public class BrightnessClamperControllerTest {
         assertEquals(clampedBrightness, state.getMaxBrightness(), FLOAT_TOLERANCE);
         assertEquals(BrightnessReason.MODIFIER_THROTTLED,
                 state.getBrightnessReason().getModifier() & BrightnessReason.MODIFIER_THROTTLED);
+        assertEquals(customAnimationRate, state.getCustomAnimationRate(), FLOAT_TOLERANCE);
         assertEquals(initialSlowChange, state.isSlowChange());
     }
 
     private BrightnessClamperController createBrightnessClamperController() {
         return new BrightnessClamperController(mTestInjector, mTestHandler, mMockExternalListener,
-                mMockDisplayDeviceData, mMockContext);
+                mMockDisplayDeviceData, mMockContext, mFlags);
     }
 
     private class TestInjector extends BrightnessClamperController.Injector {
@@ -247,7 +261,8 @@ public class BrightnessClamperControllerTest {
         List<BrightnessClamper<? super BrightnessClamperController.DisplayDeviceData>> getClampers(
                 Handler handler,
                 BrightnessClamperController.ClamperChangeListener clamperChangeListener,
-                BrightnessClamperController.DisplayDeviceData data) {
+                BrightnessClamperController.DisplayDeviceData data,
+                DisplayManagerFlags flags) {
             mCapturedChangeListener = clamperChangeListener;
             return mClampers;
         }

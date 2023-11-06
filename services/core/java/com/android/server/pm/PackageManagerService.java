@@ -36,6 +36,7 @@ import static android.os.storage.StorageManager.FLAG_STORAGE_CE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_DE;
 import static android.os.storage.StorageManager.FLAG_STORAGE_EXTERNAL;
 import static android.provider.DeviceConfig.NAMESPACE_PACKAGE_MANAGER_SERVICE;
+import static android.util.FeatureFlagUtils.SETTINGS_TREAT_PAUSE_AS_QUARANTINE;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility;
 import static com.android.internal.util.FrameworkStatsLog.BOOT_TIME_EVENT_DURATION__EVENT__OTA_PACKAGE_MANAGER_INIT_TIME;
@@ -164,6 +165,7 @@ import android.util.ArraySet;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.ExceptionUtils;
+import android.util.FeatureFlagUtils;
 import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
@@ -1472,8 +1474,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             archPkg.versionCodeMajor = (int) (longVersionCode >> 32);
             archPkg.versionCode = (int) longVersionCode;
 
-            // TODO(b/297916136): extract target sdk version.
-            archPkg.targetSdkVersion = MIN_INSTALLABLE_TARGET_SDK;
+            archPkg.targetSdkVersion = ps.getTargetSdkVersion();
 
             // These get translated in flags important for user data management.
             archPkg.defaultToDeviceProtectedStorage = String.valueOf(
@@ -4593,6 +4594,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 final Bundle extras = new Bundle();
                 extras.putInt(Intent.EXTRA_UID, pmi.getPackageUid(packageName, 0, userId));
                 extras.putInt(Intent.EXTRA_USER_HANDLE, userId);
+                extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
                 mHandler.post(() -> {
                     mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_UNSTOPPED,
                             packageName, extras,
@@ -4605,7 +4607,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     void notifyComponentUsed(@NonNull Computer snapshot, @NonNull String packageName,
-            @UserIdInt int userId, @NonNull String recentCallingPackage,
+            @UserIdInt int userId, @Nullable String recentCallingPackage,
             @NonNull String debugInfo) {
         synchronized (mLock) {
             final PackageSetting pkgSetting = mSettings.getPackageLPr(packageName);
@@ -6162,8 +6164,16 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final Computer snapshot = snapshotComputer();
             enforceCanSetPackagesSuspendedAsUser(snapshot, callingPackage, callingUid, userId,
                     "setPackagesSuspendedAsUser");
-            boolean quarantined = ((flags & PackageManager.FLAG_SUSPEND_QUARANTINED) != 0)
-                    && Flags.quarantinedEnabled();
+            boolean quarantined = false;
+            if (Flags.quarantinedEnabled()) {
+                if ((flags & PackageManager.FLAG_SUSPEND_QUARANTINED) != 0) {
+                    quarantined = true;
+                } else if (FeatureFlagUtils.isEnabled(mContext,
+                        SETTINGS_TREAT_PAUSE_AS_QUARANTINE)) {
+                    final String wellbeingPkg = mContext.getString(R.string.config_systemWellbeing);
+                    quarantined = callingPackage.equals(wellbeingPkg);
+                }
+            }
             return mSuspendPackageHelper.setPackagesSuspended(snapshot, packageNames, suspended,
                     appExtras, launcherExtras, dialogInfo, callingPackage, userId, callingUid,
                     false /* forQuietMode */, quarantined);
@@ -6988,6 +6998,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final Bundle extras = new Bundle();
             extras.putInt(Intent.EXTRA_UID, uid);
             extras.putInt(Intent.EXTRA_USER_HANDLE, userId);
+            extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
             mHandler.post(() -> {
                 mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_RESTARTED,
                         packageName, extras,

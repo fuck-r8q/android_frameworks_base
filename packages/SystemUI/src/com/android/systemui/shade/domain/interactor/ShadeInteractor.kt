@@ -34,8 +34,7 @@ import com.android.systemui.statusbar.notification.stack.domain.interactor.Share
 import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.UserSetupRepository
 import com.android.systemui.statusbar.policy.data.repository.DeviceProvisioningRepository
-import com.android.systemui.user.domain.interactor.UserInteractor
-import com.android.systemui.util.kotlin.pairwise
+import com.android.systemui.user.domain.interactor.UserSwitcherInteractor
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
@@ -71,7 +70,7 @@ constructor(
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     powerInteractor: PowerInteractor,
     userSetupRepository: UserSetupRepository,
-    userInteractor: UserInteractor,
+    userSwitcherInteractor: UserSwitcherInteractor,
     sharedNotificationContainerInteractor: SharedNotificationContainerInteractor,
     repository: ShadeRepository,
 ) {
@@ -140,13 +139,6 @@ constructor(
     /** Whether either the shade or QS is fully expanded. */
     val isAnyFullyExpanded: Flow<Boolean> = anyExpansion.map { it >= 1f }.distinctUntilChanged()
 
-    /** Whether either the shade or QS is expanding from a fully collapsed state. */
-    val isAnyExpanding: Flow<Boolean> =
-        anyExpansion
-            .pairwise(1f)
-            .map { (prev, curr) -> curr > 0f && curr < 1f && prev < 1f }
-            .distinctUntilChanged()
-
     /**
      * Whether either the shade or QS is partially or fully expanded, i.e. not fully collapsed. At
      * this time, this is not simply a matter of checking if either value in shadeExpansion and
@@ -156,12 +148,13 @@ constructor(
      *
      * TODO(b/300258424) remove all but the first sentence of this comment
      */
-    val isAnyExpanded: Flow<Boolean> =
+    val isAnyExpanded: StateFlow<Boolean> =
         if (sceneContainerFlags.isEnabled()) {
-            anyExpansion.map { it > 0f }.distinctUntilChanged()
-        } else {
-            repository.legacyExpandedOrAwaitingInputTransfer
-        }
+                anyExpansion.map { it > 0f }.distinctUntilChanged()
+            } else {
+                repository.legacyExpandedOrAwaitingInputTransfer
+            }
+            .stateIn(scope, SharingStarted.Eagerly, false)
 
     /**
      * Whether the user is expanding or collapsing the shade with user input. This will be true even
@@ -192,7 +185,7 @@ constructor(
      * but a transition they initiated is still animating.
      */
     val isUserInteracting: Flow<Boolean> =
-        combine(isUserInteractingWithShade, isUserInteractingWithShade) { shade, qs -> shade || qs }
+        combine(isUserInteractingWithShade, isUserInteractingWithQs) { shade, qs -> shade || qs }
             .distinctUntilChanged()
 
     /** Are touches allowed on the notification panel? */
@@ -227,7 +220,7 @@ constructor(
             isDeviceProvisioned &&
                 // Disallow QS during setup if it's a simple user switcher. (The user intends to
                 // use the lock screen user switcher, QS is not needed.)
-                (isUserSetup || !userInteractor.isSimpleUserSwitcher) &&
+                (isUserSetup || !userSwitcherInteractor.isSimpleUserSwitcher) &&
                 isShadeEnabled &&
                 disableFlags.isQuickSettingsEnabled() &&
                 !isDozing

@@ -57,6 +57,8 @@ import kotlinx.coroutines.SupervisorJob
 
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class HostUserHandle
 
+@Qualifier @Retention(AnnotationRetention.BINARY) annotation class HostUid
+
 @Retention(AnnotationRetention.RUNTIME) @Scope annotation class MediaProjectionAppSelectorScope
 
 @Module(
@@ -143,9 +145,13 @@ interface MediaProjectionAppSelectorComponent {
         /** Create a factory to inject the activity into the graph */
         fun create(
             @BindsInstance @HostUserHandle hostUserHandle: UserHandle,
+            @BindsInstance @HostUid hostUid: Int,
             @BindsInstance @MediaProjectionAppSelector callingPackage: String?,
             @BindsInstance view: MediaProjectionAppSelectorView,
             @BindsInstance resultHandler: MediaProjectionAppSelectorResultHandler,
+            // Whether the app selector is starting for the first time. False when it is re-starting
+            // due to a config change.
+            @BindsInstance @MediaProjectionAppSelector isFirstStart: Boolean,
         ): MediaProjectionAppSelectorComponent
     }
 

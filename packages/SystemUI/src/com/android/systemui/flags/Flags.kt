@@ -180,6 +180,10 @@ object Flags {
     @JvmField
     val NEW_AOD_TRANSITION = unreleasedFlag("new_aod_transition", teamfood = true)
 
+    // TODO(b/305984787):
+    @JvmField
+    val REFACTOR_GETCURRENTUSER = unreleasedFlag("refactor_getcurrentuser", teamfood = true)
+
     /** Flag to control the migration of face auth to modern architecture. */
     // TODO(b/262838215): Tracking bug
     @JvmField val FACE_AUTH_REFACTOR = releasedFlag("face_auth_refactor")
@@ -419,7 +423,7 @@ object Flags {
         releasedFlag("incompatible_charging_battery_icon")
 
     // TODO(b/293585143): Tracking Bug
-    val INSTANT_TETHER = unreleasedFlag("instant_tether")
+    val INSTANT_TETHER = unreleasedFlag("instant_tether", teamfood = true)
 
     // TODO(b/294588085): Tracking Bug
     val WIFI_SECONDARY_NETWORKS = releasedFlag("wifi_secondary_networks")
@@ -503,10 +507,9 @@ object Flags {
     @Keep
     @JvmField
     val WM_ENABLE_PARTIAL_SCREEN_SHARING =
-        unreleasedFlag(
-            name = "record_task_content",
+        releasedFlag(
+            name = "enable_record_task_content",
             namespace = DeviceConfig.NAMESPACE_WINDOW_MANAGER,
-            teamfood = true
         )
 
     // TODO(b/254512674): Tracking Bug
@@ -545,12 +548,6 @@ object Flags {
     @JvmField
     val LOCKSCREEN_ENABLE_LANDSCAPE =
             unreleasedFlag("lockscreen.enable_landscape")
-
-    // TODO(b/273443374): Tracking Bug
-    @Keep
-    @JvmField
-    val LOCKSCREEN_LIVE_WALLPAPER =
-        sysPropBooleanFlag("persist.wm.debug.lockscreen_live_wallpaper", default = true)
 
     // TODO(b/281648899): Tracking bug
     @Keep
@@ -626,7 +623,7 @@ object Flags {
 
     /** TODO(b/295143676): Tracking bug. When enable, captures a screenshot for each display. */
     @JvmField
-    val MULTI_DISPLAY_SCREENSHOT = unreleasedFlag("multi_display_screenshot")
+    val MULTI_DISPLAY_SCREENSHOT = unreleasedFlag("multi_display_screenshot", teamfood = true)
 
     // 1400 - columbus
     // TODO(b/254512756): Tracking Bug
@@ -770,11 +767,10 @@ object Flags {
 
     // TODO(b/283740863): Tracking Bug
     @JvmField
-    val ENABLE_NEW_PRIVACY_DIALOG =
-        unreleasedFlag("enable_new_privacy_dialog", teamfood = true)
+    val ENABLE_NEW_PRIVACY_DIALOG = releasedFlag("enable_new_privacy_dialog")
 
     // TODO(b/289573946): Tracking Bug
-    @JvmField val PRECOMPUTED_TEXT = unreleasedFlag("precomputed_text", teamfood = true)
+    @JvmField val PRECOMPUTED_TEXT = releasedFlag("precomputed_text")
 
     // TODO(b/302087895): Tracking Bug
     @JvmField val CALL_LAYOUT_ASYNC_SET_DATA = unreleasedFlag("call_layout_async_set_data")
@@ -797,8 +793,7 @@ object Flags {
 
     /** TODO(b/296223317): Enables the new keyguard presentation containing a clock. */
     @JvmField
-    val ENABLE_CLOCK_KEYGUARD_PRESENTATION =
-        unreleasedFlag("enable_clock_keyguard_presentation", teamfood = true)
+    val ENABLE_CLOCK_KEYGUARD_PRESENTATION = releasedFlag("enable_clock_keyguard_presentation")
 
     /** Enable the Compose implementation of the PeopleSpaceActivity. */
     @JvmField
@@ -818,8 +813,7 @@ object Flags {
 
     // TODO(b/287205379): Tracking bug
     @JvmField
-    val QS_CONTAINER_GRAPH_OPTIMIZER = unreleasedFlag( "qs_container_graph_optimizer",
-            teamfood = true)
+    val QS_CONTAINER_GRAPH_OPTIMIZER = releasedFlag( "qs_container_graph_optimizer")
 
     /** Enable showing a dialog when clicking on Quick Settings bluetooth tile. */
     @JvmField

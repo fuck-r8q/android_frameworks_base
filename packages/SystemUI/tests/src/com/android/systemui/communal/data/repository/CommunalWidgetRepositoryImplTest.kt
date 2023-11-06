@@ -11,11 +11,15 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.broadcast.BroadcastDispatcher
+import com.android.systemui.communal.data.model.CommunalWidgetMetadata
+import com.android.systemui.communal.shared.model.CommunalContentSize
+import com.android.systemui.communal.shared.model.CommunalWidgetContentModel
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.flags.FeatureFlags
+import com.android.systemui.flags.FeatureFlagsClassic
 import com.android.systemui.flags.Flags
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.FakeLogBuffer
+import com.android.systemui.res.R
 import com.android.systemui.settings.UserTracker
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.kotlinArgumentCaptor
@@ -35,6 +39,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.anyInt
+import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -55,30 +60,52 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
 
     @Mock private lateinit var userTracker: UserTracker
 
-    @Mock private lateinit var featureFlags: FeatureFlags
+    @Mock private lateinit var featureFlags: FeatureFlagsClassic
 
     @Mock private lateinit var stopwatchProviderInfo: AppWidgetProviderInfo
+
+    @Mock private lateinit var providerInfoA: AppWidgetProviderInfo
+
+    @Mock private lateinit var providerInfoB: AppWidgetProviderInfo
+
+    @Mock private lateinit var providerInfoC: AppWidgetProviderInfo
+
+    private lateinit var communalRepository: FakeCommunalRepository
 
     private lateinit var logBuffer: LogBuffer
 
     private val testDispatcher = StandardTestDispatcher()
+
     private val testScope = TestScope(testDispatcher)
+
+    private val fakeAllowlist =
+        listOf(
+            "com.android.fake/WidgetProviderA",
+            "com.android.fake/WidgetProviderB",
+            "com.android.fake/WidgetProviderC",
+        )
 
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
 
         logBuffer = FakeLogBuffer.Factory.create()
+        communalRepository = FakeCommunalRepository()
 
-        featureFlagEnabled(true)
+        communalEnabled(true)
+        widgetOnKeyguardEnabled(true)
+        setAppWidgetIds(emptyList())
+
+        overrideResource(R.array.config_communalWidgetAllowlist, fakeAllowlist.toTypedArray())
+
         whenever(stopwatchProviderInfo.loadLabel(any())).thenReturn("Stopwatch")
         whenever(userTracker.userHandle).thenReturn(userHandle)
     }
 
     @Test
-    fun broadcastReceiver_featureDisabled_doNotRegisterUserUnlockedBroadcastReceiver() =
+    fun broadcastReceiver_communalDisabled_doNotRegisterUserUnlockedBroadcastReceiver() =
         testScope.runTest {
-            featureFlagEnabled(false)
+            communalEnabled(false)
             val repository = initCommunalWidgetRepository()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
             verifyBroadcastReceiverNeverRegistered()
@@ -115,7 +142,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
             job.cancel()
             runCurrent()
 
-            Mockito.verify(broadcastDispatcher).unregisterReceiver(receiver)
+            verify(broadcastDispatcher).unregisterReceiver(receiver)
         }
 
     @Test
@@ -152,7 +179,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
             installedProviders(listOf(stopwatchProviderInfo))
             val repository = initCommunalWidgetRepository()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
-            Mockito.verify(appWidgetHost).allocateAppWidgetId()
+            verify(appWidgetHost).allocateAppWidgetId()
         }
 
     @Test
@@ -171,8 +198,8 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
 
             // Verify app widget id allocated
             assertThat(lastStopwatchProviderInfo()?.appWidgetId).isEqualTo(123456)
-            Mockito.verify(appWidgetHost).allocateAppWidgetId()
-            Mockito.verify(appWidgetHost, Mockito.never()).deleteAppWidgetId(anyInt())
+            verify(appWidgetHost).allocateAppWidgetId()
+            verify(appWidgetHost, Mockito.never()).deleteAppWidgetId(anyInt())
 
             // User locked again
             userUnlocked(false)
@@ -180,7 +207,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
 
             // Verify app widget id deleted
             assertThat(lastStopwatchProviderInfo()).isNull()
-            Mockito.verify(appWidgetHost).deleteAppWidgetId(123456)
+            verify(appWidgetHost).deleteAppWidgetId(123456)
         }
 
     @Test
@@ -189,13 +216,13 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
             userUnlocked(false)
             val repository = initCommunalWidgetRepository()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
-            Mockito.verify(appWidgetHost, Mockito.never()).startListening()
+            verify(appWidgetHost, Mockito.never()).startListening()
 
             userUnlocked(true)
             broadcastReceiverUpdate()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
 
-            Mockito.verify(appWidgetHost).startListening()
+            verify(appWidgetHost).startListening()
         }
 
     @Test
@@ -209,21 +236,105 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
             broadcastReceiverUpdate()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
 
-            Mockito.verify(appWidgetHost).startListening()
-            Mockito.verify(appWidgetHost, Mockito.never()).stopListening()
+            verify(appWidgetHost).startListening()
+            verify(appWidgetHost, Mockito.never()).stopListening()
 
             userUnlocked(false)
             broadcastReceiverUpdate()
             collectLastValue(repository.stopwatchAppWidgetInfo)()
 
-            Mockito.verify(appWidgetHost).stopListening()
+            verify(appWidgetHost).stopListening()
+        }
+
+    @Test
+    fun getCommunalWidgetAllowList_onInit() {
+        testScope.runTest {
+            val repository = initCommunalWidgetRepository()
+            val communalWidgetAllowlist = repository.communalWidgetAllowlist
+            assertThat(
+                    listOf(
+                        CommunalWidgetMetadata(
+                            componentName = fakeAllowlist[0],
+                            priority = 3,
+                            sizes = listOf(CommunalContentSize.HALF),
+                        ),
+                        CommunalWidgetMetadata(
+                            componentName = fakeAllowlist[1],
+                            priority = 2,
+                            sizes = listOf(CommunalContentSize.HALF),
+                        ),
+                        CommunalWidgetMetadata(
+                            componentName = fakeAllowlist[2],
+                            priority = 1,
+                            sizes = listOf(CommunalContentSize.HALF),
+                        ),
+                    )
+                )
+                .containsExactly(*communalWidgetAllowlist.toTypedArray())
+        }
+    }
+
+    // This behavior is temporary before the local database is set up.
+    @Test
+    fun communalWidgets_withPreviouslyBoundWidgets_removeEachBinding() =
+        testScope.runTest {
+            whenever(appWidgetHost.allocateAppWidgetId()).thenReturn(1, 2, 3)
+            setAppWidgetIds(listOf(1, 2, 3))
+            whenever(appWidgetManager.getAppWidgetInfo(anyInt())).thenReturn(providerInfoA)
+            userUnlocked(true)
+
+            val repository = initCommunalWidgetRepository()
+
+            collectLastValue(repository.communalWidgets)()
+
+            verify(appWidgetHost).deleteAppWidgetId(1)
+            verify(appWidgetHost).deleteAppWidgetId(2)
+            verify(appWidgetHost).deleteAppWidgetId(3)
+        }
+
+    @Test
+    fun communalWidgets_allowlistNotEmpty_bindEachWidgetFromTheAllowlist() =
+        testScope.runTest {
+            whenever(appWidgetHost.allocateAppWidgetId()).thenReturn(0, 1, 2)
+            userUnlocked(true)
+
+            whenever(appWidgetManager.getAppWidgetInfo(0)).thenReturn(providerInfoA)
+            whenever(appWidgetManager.getAppWidgetInfo(1)).thenReturn(providerInfoB)
+            whenever(appWidgetManager.getAppWidgetInfo(2)).thenReturn(providerInfoC)
+
+            val repository = initCommunalWidgetRepository()
+
+            val inventory by collectLastValue(repository.communalWidgets)
+
+            assertThat(
+                    listOf(
+                        CommunalWidgetContentModel(
+                            appWidgetId = 0,
+                            providerInfo = providerInfoA,
+                            priority = 3,
+                        ),
+                        CommunalWidgetContentModel(
+                            appWidgetId = 1,
+                            providerInfo = providerInfoB,
+                            priority = 2,
+                        ),
+                        CommunalWidgetContentModel(
+                            appWidgetId = 2,
+                            providerInfo = providerInfoC,
+                            priority = 1,
+                        ),
+                    )
+                )
+                .containsExactly(*inventory!!.toTypedArray())
         }
 
     private fun initCommunalWidgetRepository(): CommunalWidgetRepositoryImpl {
         return CommunalWidgetRepositoryImpl(
+            context,
             appWidgetManager,
             appWidgetHost,
             broadcastDispatcher,
+            communalRepository,
             packageManager,
             userManager,
             userTracker,
@@ -233,7 +344,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
     }
 
     private fun verifyBroadcastReceiverRegistered() {
-        Mockito.verify(broadcastDispatcher)
+        verify(broadcastDispatcher)
             .registerReceiver(
                 any(),
                 any(),
@@ -245,7 +356,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
     }
 
     private fun verifyBroadcastReceiverNeverRegistered() {
-        Mockito.verify(broadcastDispatcher, Mockito.never())
+        verify(broadcastDispatcher, Mockito.never())
             .registerReceiver(
                 any(),
                 any(),
@@ -258,7 +369,7 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
 
     private fun broadcastReceiverUpdate(): BroadcastReceiver {
         val broadcastReceiverCaptor = kotlinArgumentCaptor<BroadcastReceiver>()
-        Mockito.verify(broadcastDispatcher)
+        verify(broadcastDispatcher)
             .registerReceiver(
                 broadcastReceiverCaptor.capture(),
                 any(),
@@ -271,7 +382,11 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
         return broadcastReceiverCaptor.value
     }
 
-    private fun featureFlagEnabled(enabled: Boolean) {
+    private fun communalEnabled(enabled: Boolean) {
+        communalRepository.setIsCommunalEnabled(enabled)
+    }
+
+    private fun widgetOnKeyguardEnabled(enabled: Boolean) {
         whenever(featureFlags.isEnabled(Flags.WIDGET_ON_KEYGUARD)).thenReturn(enabled)
     }
 
@@ -281,5 +396,9 @@ class CommunalWidgetRepositoryImplTest : SysuiTestCase() {
 
     private fun installedProviders(providers: List<AppWidgetProviderInfo>) {
         whenever(appWidgetManager.installedProviders).thenReturn(providers)
+    }
+
+    private fun setAppWidgetIds(ids: List<Int>) {
+        whenever(appWidgetHost.appWidgetIds).thenReturn(ids.toIntArray())
     }
 }
