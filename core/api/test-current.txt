@@ -1,6 +1,4 @@
 // Signature format: 2.0
-// - add-additional-overrides=no
-// - migrating=Migration in progress see b/299366704
 package android {
 
   public static final class Manifest.permission {
@@ -543,7 +541,7 @@ package android.app.admin {
     field public static final String PERMITTED_INPUT_METHODS_POLICY = "permittedInputMethods";
     field public static final String PERSONAL_APPS_SUSPENDED_POLICY = "personalAppsSuspended";
     field public static final String SCREEN_CAPTURE_DISABLED_POLICY = "screenCaptureDisabled";
-    field public static final String USB_DATA_SIGNALING_POLICY = "usbDataSignaling";
+    field @FlaggedApi("android.app.admin.flags.policy_engine_migration_v2_enabled") public static final String USB_DATA_SIGNALING_POLICY = "usbDataSignaling";
   }
 
   public class DevicePolicyManager {
@@ -853,13 +851,13 @@ package android.companion {
     method @NonNull public android.companion.AssociationInfo.Builder setRevoked(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationInfo.Builder setSystemDataSyncFlags(int);
-    method @NonNull public android.companion.AssociationInfo.Builder setTag(@Nullable String);
+    method @FlaggedApi("android.companion.association_tag") @NonNull public android.companion.AssociationInfo.Builder setTag(@Nullable String);
     method @NonNull public android.companion.AssociationInfo.Builder setTimeApproved(long);
   }
 
   public final class CompanionDeviceManager {
     method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public void enableSecureTransport(boolean);
-    field public static final int MESSAGE_REQUEST_PING = 1669362552; // 0x63807378
+    field @FlaggedApi("android.companion.companion_transport_apis") public static final int MESSAGE_REQUEST_PING = 1669362552; // 0x63807378
   }
 
   public abstract class CompanionDeviceService extends android.app.Service {
@@ -2119,7 +2117,7 @@ package android.net.wifi.sharedconnectivity.app {
 
   public class SharedConnectivityManager {
     method @Nullable public static android.net.wifi.sharedconnectivity.app.SharedConnectivityManager create(@NonNull android.content.Context, @NonNull String, @NonNull String);
-    method @NonNull public android.content.BroadcastReceiver getBroadcastReceiver();
+    method @FlaggedApi("com.android.wifi.flags.shared_connectivity_broadcast_receiver_test_api") @NonNull public android.content.BroadcastReceiver getBroadcastReceiver();
     method @Nullable public android.content.ServiceConnection getServiceConnection();
     method public void setService(@Nullable android.os.IInterface);
   }
@@ -2150,7 +2148,7 @@ package android.os {
   }
 
   public final class BugreportParams {
-    field public static final int BUGREPORT_MODE_MAX_VALUE = 7; // 0x7
+    field @FlaggedApi("android.os.bugreport_mode_max_value") public static final int BUGREPORT_MODE_MAX_VALUE = 7; // 0x7
   }
 
   public class Build {
@@ -3187,7 +3185,6 @@ package android.telephony {
     field public static final int HAL_SERVICE_MESSAGING = 2; // 0x2
     field public static final int HAL_SERVICE_MODEM = 3; // 0x3
     field public static final int HAL_SERVICE_NETWORK = 4; // 0x4
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final int HAL_SERVICE_SATELLITE = 8; // 0x8
     field public static final int HAL_SERVICE_SIM = 5; // 0x5
     field public static final int HAL_SERVICE_VOICE = 6; // 0x6
     field public static final android.util.Pair HAL_VERSION_UNKNOWN;
@@ -3587,8 +3584,8 @@ package android.view {
     field public static final int ACCESSIBILITY_TITLE_CHANGED = 33554432; // 0x2000000
     field public static final int FLAG_SLIPPERY = 536870912; // 0x20000000
     field public CharSequence accessibilityTitle;
-    field public float preferredMaxDisplayRefreshRate;
-    field public float preferredMinDisplayRefreshRate;
+    field @FlaggedApi("android.view.flags.wm_display_refresh_rate_test") public float preferredMaxDisplayRefreshRate;
+    field @FlaggedApi("android.view.flags.wm_display_refresh_rate_test") public float preferredMinDisplayRefreshRate;
     field public int privateFlags;
   }
 
@@ -3618,7 +3615,6 @@ package android.view.accessibility {
 
   public final class AccessibilityWindowInfo implements android.os.Parcelable {
     method public static void setNumInstancesInUseCounter(java.util.concurrent.atomic.AtomicInteger);
-    field public static final int UNDEFINED_WINDOW_ID = -1; // 0xffffffff
   }
 
 }
@@ -3626,7 +3622,7 @@ package android.view.accessibility {
 package android.view.animation {
 
   public class AnimationUtils {
-    method @FlaggedApi("android.view.flags.expected_presentation_time_api") public static void lockAnimationClock(long, long);
+    method @FlaggedApi("android.view.flags.expected_presentation_time_read_only") public static void lockAnimationClock(long, long);
     method public static void unlockAnimationClock();
   }
 
@@ -3801,14 +3797,14 @@ package android.view.inputmethod {
   public final class InputMethodManager {
     method @RequiresPermission(android.Manifest.permission.TEST_INPUT_METHOD) public void addVirtualStylusIdForTestSession();
     method public int getDisplayId();
-    method @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public java.util.List<android.view.inputmethod.InputMethodInfo> getEnabledInputMethodListAsUser(@NonNull android.os.UserHandle);
-    method @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public java.util.List<android.view.inputmethod.InputMethodSubtype> getEnabledInputMethodSubtypeListAsUser(@NonNull String, boolean, @NonNull android.os.UserHandle);
+    method @FlaggedApi("android.view.inputmethod.imm_userhandle_hostsidetests") @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public java.util.List<android.view.inputmethod.InputMethodInfo> getEnabledInputMethodListAsUser(@NonNull android.os.UserHandle);
+    method @FlaggedApi("android.view.inputmethod.imm_userhandle_hostsidetests") @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public java.util.List<android.view.inputmethod.InputMethodSubtype> getEnabledInputMethodSubtypeListAsUser(@NonNull String, boolean, @NonNull android.os.UserHandle);
     method @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public java.util.List<android.view.inputmethod.InputMethodInfo> getInputMethodListAsUser(int);
     method public boolean hasActiveInputConnection(@Nullable android.view.View);
     method @RequiresPermission(android.Manifest.permission.TEST_INPUT_METHOD) public boolean hasPendingImeVisibilityRequests();
     method @RequiresPermission(android.Manifest.permission.TEST_INPUT_METHOD) public boolean isCurrentRootView(@NonNull android.view.View);
     method @RequiresPermission(android.Manifest.permission.TEST_INPUT_METHOD) public boolean isInputMethodPickerShown();
-    method @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public boolean isStylusHandwritingAvailableAsUser(@NonNull android.os.UserHandle);
+    method @FlaggedApi("android.view.inputmethod.imm_userhandle_hostsidetests") @NonNull @RequiresPermission(value=android.Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional=true) public boolean isStylusHandwritingAvailableAsUser(@NonNull android.os.UserHandle);
     method @RequiresPermission(android.Manifest.permission.TEST_INPUT_METHOD) public void setStylusWindowIdleTimeoutForTest(long);
     field public static final long CLEAR_SHOW_FORCED_FLAG_WHEN_LEAVING = 214016041L; // 0xcc1a029L
   }
@@ -3946,7 +3942,9 @@ package android.widget.inline {
 package android.window {
 
   public final class BackNavigationInfo implements android.os.Parcelable {
+    method public int describeContents();
     method @NonNull public static String typeToString(int);
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.window.BackNavigationInfo> CREATOR;
     field public static final String KEY_TRIGGER_BACK = "TriggerBack";
     field public static final int TYPE_CALLBACK = 4; // 0x4
@@ -4007,11 +4005,13 @@ package android.window {
   }
 
   public final class TaskFragmentCreationParams implements android.os.Parcelable {
+    method public int describeContents();
     method @NonNull public android.os.IBinder getFragmentToken();
     method @NonNull public android.graphics.Rect getInitialRelativeBounds();
     method @NonNull public android.window.TaskFragmentOrganizerToken getOrganizer();
     method @NonNull public android.os.IBinder getOwnerToken();
     method public int getWindowingMode();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.window.TaskFragmentCreationParams> CREATOR;
   }
 
@@ -4023,6 +4023,7 @@ package android.window {
   }
 
   public final class TaskFragmentInfo implements android.os.Parcelable {
+    method public int describeContents();
     method public boolean equalsForTaskFragmentOrganizer(@Nullable android.window.TaskFragmentInfo);
     method @NonNull public java.util.List<android.os.IBinder> getActivities();
     method @NonNull public java.util.List<android.os.IBinder> getActivitiesRequestedInTaskFragment();
@@ -4036,6 +4037,7 @@ package android.window {
     method public boolean isEmpty();
     method public boolean isTaskClearedForReuse();
     method public boolean isVisible();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.window.TaskFragmentInfo> CREATOR;
   }
 
@@ -4058,6 +4060,8 @@ package android.window {
   }
 
   public final class TaskFragmentOrganizerToken implements android.os.Parcelable {
+    method public int describeContents();
+    method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.window.TaskFragmentOrganizerToken> CREATOR;
   }
 

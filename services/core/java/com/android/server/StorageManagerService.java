@@ -387,15 +387,14 @@ class StorageManagerService extends IStorageManager.Stub
     private final Object mLock = LockGuard.installNewLock(LockGuard.INDEX_STORAGE);
 
     /**
-     * mLocalUnlockedUsers affects the return value of isUserUnlocked.  If
-     * any value in the array changes, then the binder cache for
-     * isUserUnlocked must be invalidated.  When adding mutating methods to
-     * WatchedLockedUsers, be sure to invalidate the cache in the new
-     * methods.
+     * mCeUnlockedUsers affects the return value of {@link UserManager#isUserUnlocked}.  If any
+     * value in the array changes, then the binder cache for {@link UserManager#isUserUnlocked} must
+     * be invalidated.  When adding mutating methods to this class, be sure to invalidate the cache
+     * in the new methods.
      */
-    private static class WatchedLockedUsers {
+    private static class WatchedUnlockedUsers {
         private int[] users = EmptyArray.INT;
-        public WatchedLockedUsers() {
+        public WatchedUnlockedUsers() {
             invalidateIsUserUnlockedCache();
         }
         public void append(int userId) {
@@ -427,10 +426,14 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
-    /** Set of users that we know are unlocked. */
+    /** Set of users whose CE storage is unlocked. */
     @GuardedBy("mLock")
-    private WatchedLockedUsers mLocalUnlockedUsers = new WatchedLockedUsers();
-    /** Set of users that system knows are unlocked. */
+    private WatchedUnlockedUsers mCeUnlockedUsers = new WatchedUnlockedUsers();
+
+    /**
+     * Set of users that are in the RUNNING_UNLOCKED state.  This differs from {@link
+     * mCeUnlockedUsers} in that a user can be stopped but still have its CE storage unlocked.
+     */
     @GuardedBy("mLock")
     private int[] mSystemUnlockedUsers = EmptyArray.INT;
 
@@ -1145,11 +1148,10 @@ class StorageManagerService extends IStorageManager.Stub
         }
     }
 
-    // If vold knows that some users have their storage unlocked already (which
-    // can happen after a "userspace reboot"), then add those users to
-    // mLocalUnlockedUsers.  Do this right away and don't wait until
-    // PHASE_BOOT_COMPLETED, since the system may unlock users before then.
-    private void restoreLocalUnlockedUsers() {
+    // If vold knows that some users have their CE storage unlocked already (which can happen after
+    // a "userspace reboot"), then add those users to mCeUnlockedUsers.  Do this right away and
+    // don't wait until PHASE_BOOT_COMPLETED, since the system may unlock users before then.
+    private void restoreCeUnlockedUsers() {
         final int[] userIds;
         try {
             userIds = mVold.getUnlockedUsers();
@@ -1165,7 +1167,7 @@ class StorageManagerService extends IStorageManager.Stub
                 // reconnecting to vold after it crashed and was restarted, in
                 // which case things will be the other way around --- we'll know
                 // about the unlocked users but vold won't.
-                mLocalUnlockedUsers.appendAll(userIds);
+                mCeUnlockedUsers.appendAll(userIds);
             }
         }
     }
@@ -1237,7 +1239,7 @@ class StorageManagerService extends IStorageManager.Stub
     private void onUserStopped(int userId) {
         Slog.d(TAG, "onUserStopped " + userId);
 
-        Watchdog.getInstance().setOneOffTimeoutForMonitors(
+        Watchdog.getInstance().pauseWatchingMonitorsFor(
                 SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#onUserStopped might be slow");
         try {
             mVold.onUserStopped(userId);
@@ -1321,7 +1323,7 @@ class StorageManagerService extends IStorageManager.Stub
                 unlockedUsers.add(userId);
             }
         }
-        Watchdog.getInstance().setOneOffTimeoutForMonitors(
+        Watchdog.getInstance().pauseWatchingMonitorsFor(
                 SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#onUserStopped might be slow");
         for (Integer userId : unlockedUsers) {
             try {
@@ -2076,7 +2078,7 @@ class StorageManagerService extends IStorageManager.Stub
                 connectVold();
             }, DateUtils.SECOND_IN_MILLIS);
         } else {
-            restoreLocalUnlockedUsers();
+            restoreCeUnlockedUsers();
             onDaemonConnected();
         }
     }
@@ -2342,7 +2344,7 @@ class StorageManagerService extends IStorageManager.Stub
         try {
             // TODO(b/135341433): Remove cautious logging when FUSE is stable
             Slog.i(TAG, "Mounting volume " + vol);
-            Watchdog.getInstance().setOneOffTimeoutForMonitors(
+            Watchdog.getInstance().pauseWatchingMonitorsFor(
                     SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#mount might be slow");
             mVold.mount(vol.id, vol.mountFlags, vol.mountUserId, new IVoldMountCallback.Stub() {
                 @Override
@@ -2473,7 +2475,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         final CountDownLatch latch = findOrCreateDiskScanLatch(diskId);
 
-        Watchdog.getInstance().setOneOffTimeoutForMonitors(
+        Watchdog.getInstance().pauseWatchingMonitorsFor(
                 PARTITION_OPERATION_WATCHDOG_TIMEOUT_MS, "#partition might be very slow");
         try {
             mVold.partition(diskId, IVold.PARTITION_TYPE_PUBLIC, -1);
@@ -2492,7 +2494,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         final CountDownLatch latch = findOrCreateDiskScanLatch(diskId);
 
-        Watchdog.getInstance().setOneOffTimeoutForMonitors(
+        Watchdog.getInstance().pauseWatchingMonitorsFor(
                 PARTITION_OPERATION_WATCHDOG_TIMEOUT_MS, "#partition might be very slow");
         try {
             mVold.partition(diskId, IVold.PARTITION_TYPE_PRIVATE, -1);
@@ -2511,7 +2513,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         final CountDownLatch latch = findOrCreateDiskScanLatch(diskId);
 
-        Watchdog.getInstance().setOneOffTimeoutForMonitors(
+        Watchdog.getInstance().pauseWatchingMonitorsFor(
                 PARTITION_OPERATION_WATCHDOG_TIMEOUT_MS, "#partition might be very slow");
         try {
             mVold.partition(diskId, IVold.PARTITION_TYPE_MIXED, ratio);
@@ -3236,9 +3238,9 @@ class StorageManagerService extends IStorageManager.Stub
 
         try {
             mVold.createUserKey(userId, serialNumber, ephemeral);
-            // New keys are always unlocked.
+            // Since the user's CE key was just created, the user's CE storage is now unlocked.
             synchronized (mLock) {
-                mLocalUnlockedUsers.append(userId);
+                mCeUnlockedUsers.append(userId);
             }
         } catch (Exception e) {
             Slog.wtf(TAG, e);
@@ -3253,9 +3255,9 @@ class StorageManagerService extends IStorageManager.Stub
 
         try {
             mVold.destroyUserKey(userId);
-            // Destroying a key also locks it.
+            // Since the user's CE key was just destroyed, the user's CE storage is now locked.
             synchronized (mLock) {
-                mLocalUnlockedUsers.remove(userId);
+                mCeUnlockedUsers.remove(userId);
             }
         } catch (Exception e) {
             Slog.wtf(TAG, e);
@@ -3282,7 +3284,7 @@ class StorageManagerService extends IStorageManager.Stub
             mVold.unlockUserKey(userId, serialNumber, HexDump.toHexString(secret));
         }
         synchronized (mLock) {
-            mLocalUnlockedUsers.append(userId);
+            mCeUnlockedUsers.append(userId);
         }
     }
 
@@ -3311,14 +3313,14 @@ class StorageManagerService extends IStorageManager.Stub
         }
 
         synchronized (mLock) {
-            mLocalUnlockedUsers.remove(userId);
+            mCeUnlockedUsers.remove(userId);
         }
     }
 
     @Override
     public boolean isUserKeyUnlocked(int userId) {
         synchronized (mLock) {
-            return mLocalUnlockedUsers.contains(userId);
+            return mCeUnlockedUsers.contains(userId);
         }
     }
 
@@ -3621,7 +3623,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         @Override
         public ParcelFileDescriptor open() throws AppFuseMountException {
-            Watchdog.getInstance().setOneOffTimeoutForMonitors(
+            Watchdog.getInstance().pauseWatchingMonitorsFor(
                 SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#open might be slow");
             try {
                 final FileDescriptor fd = mVold.mountAppFuse(uid, mountId);
@@ -3635,7 +3637,7 @@ class StorageManagerService extends IStorageManager.Stub
         @Override
         public ParcelFileDescriptor openFile(int mountId, int fileId, int flags)
                 throws AppFuseMountException {
-            Watchdog.getInstance().setOneOffTimeoutForMonitors(
+            Watchdog.getInstance().pauseWatchingMonitorsFor(
                 SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#openFile might be slow");
             try {
                 return new ParcelFileDescriptor(
@@ -3647,7 +3649,7 @@ class StorageManagerService extends IStorageManager.Stub
 
         @Override
         public void close() throws Exception {
-            Watchdog.getInstance().setOneOffTimeoutForMonitors(
+            Watchdog.getInstance().pauseWatchingMonitorsFor(
                 SLOW_OPERATION_WATCHDOG_TIMEOUT_MS, "#close might be slow");
             if (mMounted) {
                 mVold.unmountAppFuse(uid, mountId);
@@ -4717,7 +4719,7 @@ class StorageManagerService extends IStorageManager.Stub
             }
 
             pw.println();
-            pw.println("Local unlocked users: " + mLocalUnlockedUsers);
+            pw.println("CE unlocked users: " + mCeUnlockedUsers);
             pw.println("System unlocked users: " + Arrays.toString(mSystemUnlockedUsers));
         }
 

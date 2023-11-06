@@ -87,14 +87,16 @@ class MediaProjectionAppSelectorActivity(
 
     override fun getLayoutResource() = R.layout.media_projection_app_selector
 
-    public override fun onCreate(bundle: Bundle?) {
+    public override fun onCreate(savedInstanceState: Bundle?) {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         component =
             componentFactory.create(
                 hostUserHandle = hostUserHandle,
+                hostUid = hostUid,
                 callingPackage = callingPackage,
                 view = this,
-                resultHandler = this
+                resultHandler = this,
+                isFirstStart = savedInstanceState == null
             )
         component.lifecycleObservers.forEach { lifecycle.addObserver(it) }
 
@@ -113,7 +115,7 @@ class MediaProjectionAppSelectorActivity(
         reviewGrantedConsentRequired =
             intent.getBooleanExtra(EXTRA_USER_REVIEW_GRANTED_CONSENT, false)
 
-        super.onCreate(bundle)
+        super.onCreate(savedInstanceState)
         controller.init()
         // we override AppList's AccessibilityDelegate set in ResolverActivity.onCreate because in
         // our case this delegate must extend RecyclerViewAccessibilityDelegate, otherwise
@@ -304,6 +306,17 @@ class MediaProjectionAppSelectorActivity(
                 )
         }
 
+    private val hostUid: Int
+        get() {
+            if (!intent.hasExtra(EXTRA_HOST_APP_UID)) {
+                error(
+                    "MediaProjectionAppSelectorActivity should be provided with " +
+                        "$EXTRA_HOST_APP_UID extra"
+                )
+            }
+            return intent.getIntExtra(EXTRA_HOST_APP_UID, /* defaultValue= */ -1)
+        }
+
     companion object {
         const val TAG = "MediaProjectionAppSelectorActivity"
 
@@ -314,8 +327,16 @@ class MediaProjectionAppSelectorActivity(
          */
         const val EXTRA_CAPTURE_REGION_RESULT_RECEIVER = "capture_region_result_receiver"
 
-        /** UID of the app that originally launched the media projection flow (host app user) */
+        /**
+         * User on the device that launched the media projection flow. (Primary, Secondary, Guest,
+         * Work, etc)
+         */
         const val EXTRA_HOST_APP_USER_HANDLE = "launched_from_user_handle"
+        /**
+         * The kernel user-ID that has been assigned to the app that originally launched the media
+         * projection flow.
+         */
+        const val EXTRA_HOST_APP_UID = "launched_from_host_uid"
         const val KEY_CAPTURE_TARGET = "capture_region"
 
         /** Set up intent for the [ChooserActivity] */

@@ -143,6 +143,7 @@ import android.os.DeviceIntegrationUtils;
 import android.os.FactoryTest;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeReason;
@@ -720,6 +721,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_LOG_KEYBOARD_SYSTEM_EVENT = 26;
 
     private class PolicyHandler extends Handler {
+
+        private PolicyHandler(Looper looper) {
+            super(looper);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
@@ -2192,10 +2198,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static class Injector {
         private final Context mContext;
         private final WindowManagerFuncs mWindowManagerFuncs;
+        private final Looper mLooper;
 
-        Injector(Context context, WindowManagerFuncs funcs) {
+        Injector(Context context, WindowManagerFuncs funcs, Looper looper) {
             mContext = context;
             mWindowManagerFuncs = funcs;
+            mLooper = looper;
         }
 
         Context getContext() {
@@ -2204,6 +2212,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         WindowManagerFuncs getWindowManagerFuncs() {
             return mWindowManagerFuncs;
+        }
+
+        Looper getLooper() {
+            return mLooper;
         }
 
         AccessibilityShortcutController getAccessibilityShortcutController(
@@ -2234,7 +2246,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /** {@inheritDoc} */
     @Override
     public void init(Context context, WindowManagerFuncs funcs) {
-        init(new Injector(context, funcs));
+        init(new Injector(context, funcs, Looper.myLooper()));
     }
 
     @VisibleForTesting
@@ -2310,7 +2322,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     mContext, minHorizontal, maxHorizontal, minVertical, maxVertical, maxRadius);
         }
 
-        mHandler = new PolicyHandler();
+        mHandler = new PolicyHandler(injector.getLooper());
         mWakeGestureListener = new MyWakeGestureListener(mContext, mHandler);
         mSettingsObserver = new SettingsObserver(mHandler);
         mSettingsObserver.observe();

@@ -52,6 +52,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -310,8 +311,11 @@ public final class MediaRouter2 {
                 IMediaRouterService.Stub.asInterface(
                         ServiceManager.getService(Context.MEDIA_ROUTER_SERVICE));
 
+        mSystemController =
+                new SystemRoutingController(
+                        ProxyMediaRouter2Impl.getSystemSessionInfoImpl(
+                                mMediaRouterService, clientPackageName));
         mImpl = new ProxyMediaRouter2Impl(context, clientPackageName);
-        mSystemController = new SystemRoutingController(mImpl.getSystemSessionInfo());
     }
 
     /**
@@ -380,9 +384,9 @@ public final class MediaRouter2 {
      * @see #setRouteListingPreference(RouteListingPreference)
      */
     @FlaggedApi(FLAG_ENABLE_RLP_CALLBACKS_IN_MEDIA_ROUTER2)
-    public void registerRouteListingPreferenceCallback(
+    public void registerRouteListingPreferenceUpdatedCallback(
             @NonNull @CallbackExecutor Executor executor,
-            @NonNull RouteListingPreferenceCallback routeListingPreferenceCallback) {
+            @NonNull Consumer<RouteListingPreference> routeListingPreferenceCallback) {
         Objects.requireNonNull(executor, "executor must not be null");
         Objects.requireNonNull(routeListingPreferenceCallback, "callback must not be null");
 
@@ -395,15 +399,20 @@ public final class MediaRouter2 {
 
     /**
      * Unregisters the given callback to not receive {@link RouteListingPreference} change events.
+     *
+     * @see #registerRouteListingPreferenceUpdatedCallback(Executor, Consumer)
      */
     @FlaggedApi(FLAG_ENABLE_RLP_CALLBACKS_IN_MEDIA_ROUTER2)
-    public void unregisterRouteListingPreferenceCallback(
-            @NonNull RouteListingPreferenceCallback callback) {
+    public void unregisterRouteListingPreferenceUpdatedCallback(
+            @NonNull Consumer<RouteListingPreference> callback) {
         Objects.requireNonNull(callback, "callback must not be null");
 
         if (!mListingPreferenceCallbackRecords.remove(
                 new RouteListingPreferenceCallbackRecord(/* executor */ null, callback))) {
-            Log.w(TAG, "unregisterRouteListingPreferenceCallback: Ignoring an unknown callback");
+            Log.w(
+                    TAG,
+                    "unregisterRouteListingPreferenceUpdatedCallback: Ignoring an unknown"
+                        + " callback");
         }
     }
 
@@ -1116,9 +1125,7 @@ public final class MediaRouter2 {
     private void notifyRouteListingPreferenceUpdated(@Nullable RouteListingPreference preference) {
         for (RouteListingPreferenceCallbackRecord record : mListingPreferenceCallbackRecords) {
             record.mExecutor.execute(
-                    () ->
-                            record.mRouteListingPreferenceCallback.onRouteListingPreferenceChanged(
-                                    preference));
+                    () -> record.mRouteListingPreferenceCallback.accept(preference));
         }
     }
 
@@ -1203,22 +1210,6 @@ public final class MediaRouter2 {
          */
         @SystemApi
         public void onPreferredFeaturesChanged(@NonNull List<String> preferredFeatures) {}
-    }
-
-    /** Callback for receiving events related to {@link RouteListingPreference}. */
-    @FlaggedApi(FLAG_ENABLE_RLP_CALLBACKS_IN_MEDIA_ROUTER2)
-    public abstract static class RouteListingPreferenceCallback {
-
-        @FlaggedApi(FLAG_ENABLE_RLP_CALLBACKS_IN_MEDIA_ROUTER2)
-        public RouteListingPreferenceCallback() {}
-
-        /**
-         * Called when the {@link RouteListingPreference} changes.
-         *
-         * @see #getRouteListingPreference
-         */
-        @FlaggedApi(FLAG_ENABLE_RLP_CALLBACKS_IN_MEDIA_ROUTER2)
-        public void onRouteListingPreferenceChanged(@Nullable RouteListingPreference preference) {}
     }
 
     /** Callback for receiving events on media transfer. */
@@ -1771,11 +1762,11 @@ public final class MediaRouter2 {
 
     private static final class RouteListingPreferenceCallbackRecord {
         public final Executor mExecutor;
-        public final RouteListingPreferenceCallback mRouteListingPreferenceCallback;
+        public final Consumer<RouteListingPreference> mRouteListingPreferenceCallback;
 
         /* package */ RouteListingPreferenceCallbackRecord(
                 @NonNull Executor executor,
-                @NonNull RouteListingPreferenceCallback routeListingPreferenceCallback) {
+                @NonNull Consumer<RouteListingPreference> routeListingPreferenceCallback) {
             mExecutor = executor;
             mRouteListingPreferenceCallback = routeListingPreferenceCallback;
         }
@@ -2057,15 +2048,7 @@ public final class MediaRouter2 {
 
         @Override
         public RoutingSessionInfo getSystemSessionInfo() {
-            RoutingSessionInfo result;
-            try {
-                result =
-                        mMediaRouterService.getSystemSessionInfoForPackage(
-                                mClient, mClientPackageName);
-            } catch (RemoteException ex) {
-                throw ex.rethrowFromSystemServer();
-            }
-            return ensureClientPackageNameForSystemSession(result);
+            return getSystemSessionInfoImpl(mMediaRouterService, mClientPackageName);
         }
 
         /**
@@ -2427,6 +2410,23 @@ public final class MediaRouter2 {
                 boolean shouldNotifyStop,
                 RoutingController controller) {
             releaseSession(controller.getRoutingSessionInfo());
+        }
+
+        /**
+         * Retrieves the system session info for the given package.
+         *
+         * <p>The returned routing session is guaranteed to have a non-null {@link
+         * RoutingSessionInfo#getClientPackageName() client package name}.
+         *
+         * <p>Extracted into a static method to allow calling this from the constructor.
+         */
+        /* package */ static RoutingSessionInfo getSystemSessionInfoImpl(
+                @NonNull IMediaRouterService service, @NonNull String clientPackageName) {
+            try {
+                return service.getSystemSessionInfoForPackage(clientPackageName);
+            } catch (RemoteException ex) {
+                throw ex.rethrowFromSystemServer();
+            }
         }
 
         /**

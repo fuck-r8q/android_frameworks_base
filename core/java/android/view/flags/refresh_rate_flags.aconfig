@@ -22,8 +22,23 @@ flag {
 }
 
 flag {
+    name: "expected_presentation_time_read_only"
+    namespace: "toolkit"
+    description: "Feature flag for using expected presentation time of the Choreographer"
+    bug: "278730197"
+    is_fixed_read_only: true
+}
+
+flag {
   name: "set_frame_rate_callback"
   namespace: "core_graphics"
   description: "Enable the `setFrameRate` callback"
   bug: "299946220"
+}
+
+flag {
+    name: "wm_display_refresh_rate_test"
+    namespace: "core_graphics"
+    description: "Adds WindowManager display refresh rate fields to test API"
+    bug: "304475199"
 }

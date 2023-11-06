@@ -106,6 +106,7 @@ import com.android.systemui.statusbar.notification.collection.render.NotifStats;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.collection.render.SectionHeaderController;
 import com.android.systemui.statusbar.notification.dagger.SilentHeader;
+import com.android.systemui.statusbar.notification.domain.interactor.SeenNotificationsInteractor;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.logging.NotificationLogger;
 import com.android.systemui.statusbar.notification.row.ActivatableNotificationView;
@@ -114,7 +115,6 @@ import com.android.systemui.statusbar.notification.row.ExpandableView;
 import com.android.systemui.statusbar.notification.row.NotificationGuts;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.row.NotificationSnooze;
-import com.android.systemui.statusbar.notification.stack.domain.interactor.NotificationListInteractor;
 import com.android.systemui.statusbar.notification.stack.ui.viewbinder.NotificationListViewBinder;
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModel;
 import com.android.systemui.statusbar.phone.HeadsUpAppearanceController;
@@ -194,7 +194,7 @@ public class NotificationStackScrollLayoutController {
 
     private final GroupExpansionManager mGroupExpansionManager;
     private final NotifPipelineFlags mNotifPipelineFlags;
-    private final NotificationListInteractor mNotificationListInteractor;
+    private final SeenNotificationsInteractor mSeenNotificationsInteractor;
     private final KeyguardTransitionRepository mKeyguardTransitionRepo;
 
     private NotificationStackScrollLayout mView;
@@ -662,7 +662,7 @@ public class NotificationStackScrollLayoutController {
             UiEventLogger uiEventLogger,
             NotificationRemoteInputManager remoteInputManager,
             VisibilityLocationProviderDelegator visibilityLocationProviderDelegator,
-            NotificationListInteractor notificationListInteractor,
+            SeenNotificationsInteractor seenNotificationsInteractor,
             ShadeController shadeController,
             InteractionJankMonitor jankMonitor,
             StackStateLogger stackLogger,
@@ -715,7 +715,7 @@ public class NotificationStackScrollLayoutController {
         mUiEventLogger = uiEventLogger;
         mRemoteInputManager = remoteInputManager;
         mVisibilityLocationProviderDelegator = visibilityLocationProviderDelegator;
-        mNotificationListInteractor = notificationListInteractor;
+        mSeenNotificationsInteractor = seenNotificationsInteractor;
         mShadeController = shadeController;
         mNotifIconAreaController = notifIconAreaController;
         mFeatureFlags = featureFlags;
@@ -1431,7 +1431,7 @@ public class NotificationStackScrollLayoutController {
     }
 
     public void setShelfController(NotificationShelfController notificationShelfController) {
-        mShelfRefactor.assertDisabled();
+        mShelfRefactor.assertInLegacyMode();
         mView.setShelfController(notificationShelfController);
     }
 
@@ -1644,12 +1644,12 @@ public class NotificationStackScrollLayoutController {
     }
 
     public void setShelf(NotificationShelf shelf) {
-        if (!mShelfRefactor.expectEnabled()) return;
+        if (mShelfRefactor.isUnexpectedlyInLegacyMode()) return;
         mView.setShelf(shelf);
     }
 
     public int getShelfHeight() {
-        if (!mShelfRefactor.expectEnabled()) {
+        if (mShelfRefactor.isUnexpectedlyInLegacyMode()) {
             return 0;
         }
         ExpandableView shelf = mView.getShelf();
@@ -1725,25 +1725,8 @@ public class NotificationStackScrollLayoutController {
         }
 
         @Override
-        public void generateAddAnimation(ExpandableView child, boolean fromMoreCard) {
-            mView.generateAddAnimation(child, fromMoreCard);
-        }
-
-        @Override
-        public void generateChildOrderChangedEvent() {
-            mView.generateChildOrderChangedEvent();
-        }
-
-        @Override
         public int getContainerChildCount() {
             return mView.getContainerChildCount();
-        }
-
-        @Override
-        public void setNotificationActivityStarter(
-                NotificationActivityStarter notificationActivityStarter) {
-            NotificationStackScrollLayoutController.this
-                    .setNotificationActivityStarter(notificationActivityStarter);
         }
 
         @Override
@@ -1838,16 +1821,6 @@ public class NotificationStackScrollLayoutController {
         @Override
         public void setExpandingNotification(ExpandableNotificationRow row) {
             mView.setExpandingNotification(row);
-        }
-
-        @Override
-        public boolean containsView(View v) {
-            return mView.containsView(v);
-        }
-
-        @Override
-        public void setWillExpand(boolean willExpand) {
-            mView.setWillExpand(willExpand);
         }
 
         @Override
@@ -2006,7 +1979,7 @@ public class NotificationStackScrollLayoutController {
         public void setNotifStats(@NonNull NotifStats notifStats) {
             mNotifStats = notifStats;
             mView.setHasFilteredOutSeenNotifications(
-                    mNotificationListInteractor.getHasFilteredOutSeenNotifications().getValue());
+                    mSeenNotificationsInteractor.getHasFilteredOutSeenNotifications().getValue());
             updateFooter();
             updateShowEmptyShadeView();
         }

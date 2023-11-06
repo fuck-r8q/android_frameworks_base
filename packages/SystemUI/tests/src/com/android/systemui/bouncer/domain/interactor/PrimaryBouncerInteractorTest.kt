@@ -25,7 +25,6 @@ import androidx.test.filters.SmallTest
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.systemui.DejankUtils
-import com.android.systemui.res.R
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants.EXPANSION_HIDDEN
@@ -37,7 +36,9 @@ import com.android.systemui.classifier.FalsingCollector
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.data.repository.FakeTrustRepository
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.KeyguardStateController
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.utils.os.FakeHandler
@@ -70,6 +71,7 @@ class PrimaryBouncerInteractorTest : SysuiTestCase() {
     @Mock private lateinit var falsingCollector: FalsingCollector
     @Mock private lateinit var dismissCallbackRegistry: DismissCallbackRegistry
     @Mock private lateinit var keyguardUpdateMonitor: KeyguardUpdateMonitor
+    @Mock private lateinit var mSelectedUserInteractor: SelectedUserInteractor
     private lateinit var mainHandler: FakeHandler
     private lateinit var underTest: PrimaryBouncerInteractor
     private lateinit var resources: TestableResources
@@ -100,11 +102,33 @@ class PrimaryBouncerInteractorTest : SysuiTestCase() {
                 keyguardUpdateMonitor,
                 trustRepository,
                 testScope.backgroundScope,
+                mSelectedUserInteractor,
             )
         whenever(repository.primaryBouncerStartingDisappearAnimation.value).thenReturn(null)
         whenever(repository.primaryBouncerShow.value).thenReturn(false)
         whenever(bouncerView.delegate).thenReturn(bouncerViewDelegate)
         resources = context.orCreateTestableResources
+    }
+
+    @Test
+    fun show_nullDelegate() {
+        testScope.run {
+            whenever(bouncerView.delegate).thenReturn(null)
+            mainHandler.setMode(FakeHandler.Mode.QUEUEING)
+
+            // WHEN bouncer show is requested
+            underTest.show(true)
+
+            // WHEN all queued messages are dispatched
+            mainHandler.dispatchQueuedMessages()
+
+            // THEN primary bouncer state doesn't update to show since delegate was null
+            verify(repository, never()).setPrimaryShow(true)
+            verify(repository, never()).setPrimaryShowingSoon(false)
+            verify(mPrimaryBouncerCallbackInteractor, never()).dispatchStartingToShow()
+            verify(mPrimaryBouncerCallbackInteractor, never())
+                .dispatchVisibilityChanged(View.VISIBLE)
+        }
     }
 
     @Test

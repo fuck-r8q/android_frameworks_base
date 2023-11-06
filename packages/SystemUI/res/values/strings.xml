@@ -214,6 +214,8 @@
     <string name="screenshot_saved_title">Screenshot saved</string>
     <!-- Notification title displayed when we fail to take a screenshot. [CHAR LIMIT=50] -->
     <string name="screenshot_failed_title">Couldn\'t save screenshot</string>
+    <!-- Appended to the notification content when a screenshot failure happens on an external display. [CHAR LIMIT=50] -->
+    <string name="screenshot_failed_external_display_indication">External Display</string>
     <!-- Notification text displayed when we fail to save a screenshot due to locked storage. [CHAR LIMIT=100] -->
     <string name="screenshot_failed_to_save_user_locked_text">Device must be unlocked before screenshot can be saved</string>
     <!-- Notification text displayed when we fail to save a screenshot for unknown reasons. [CHAR LIMIT=100] -->
@@ -3237,6 +3239,9 @@
     <string name="mirror_display">Mirror display</string>
     <!--- Label of the dismiss button of the dialog appearing when an external display is connected [CHAR LIMIT=NONE]-->
     <string name="dismiss_dialog">Dismiss</string>
+
+    <!--- Content description of the connected display status bar icon that appears every time a display is connected [CHAR LIMIT=NONE]-->
+    <string name="connected_display_icon_desc">Display connected</string>
 
     <!-- Title of the privacy dialog, shown for active / recent app usage of some phone sensors [CHAR LIMIT=30] -->
     <string name="privacy_dialog_title">Microphone &amp; Camera</string>

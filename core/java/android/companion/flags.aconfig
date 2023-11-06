@@ -6,3 +6,17 @@ flag {
     description: "Controls if the new Builder is exposed to test apis."
     bug: "296251481"
 }
+
+flag {
+    name: "companion_transport_apis"
+    namespace: "companion"
+    description: "Grants access to the companion transport apis."
+    bug: "288297505"
+}
+
+flag {
+    name: "association_tag"
+    namespace: "companion"
+    description: "Enable Association tag APIs "
+    bug: "289241123"
+}

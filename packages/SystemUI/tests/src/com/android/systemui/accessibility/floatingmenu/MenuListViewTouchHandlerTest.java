@@ -18,6 +18,8 @@ package com.android.systemui.accessibility.floatingmenu;
 
 import static android.view.View.OVER_SCROLL_NEVER;
 
+import static com.android.systemui.accessibility.utils.FlagUtils.setFlagDefaults;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -33,6 +35,7 @@ import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 
+import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.test.filters.SmallTest;
 
@@ -79,6 +82,7 @@ public class MenuListViewTouchHandlerTest extends SysuiTestCase {
 
     @Before
     public void setUp() throws Exception {
+        setFlagDefaults(mSetFlagsRule);
         final WindowManager windowManager = mContext.getSystemService(WindowManager.class);
         final MenuViewModel stubMenuViewModel = new MenuViewModel(mContext, mAccessibilityManager,
                 mock(SecureSettings.class));
@@ -213,5 +217,6 @@ public class MenuListViewTouchHandlerTest extends SysuiTestCase {
     @After
     public void tearDown() {
         mMotionEventHelper.recycleEvents();
+        mMenuAnimationController.mPositionAnimations.values().forEach(DynamicAnimation::cancel);
     }
 }

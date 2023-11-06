@@ -53,7 +53,9 @@ import android.view.Window;
 
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
+import com.android.systemui.mediaprojection.MediaProjectionMetricsLogger;
 import com.android.systemui.mediaprojection.MediaProjectionServiceHelper;
+import com.android.systemui.mediaprojection.SessionCreationSource;
 import com.android.systemui.mediaprojection.appselector.MediaProjectionAppSelectorActivity;
 import com.android.systemui.mediaprojection.devicepolicy.ScreenCaptureDevicePolicyResolver;
 import com.android.systemui.mediaprojection.devicepolicy.ScreenCaptureDisabledDialog;
@@ -74,6 +76,7 @@ public class MediaProjectionPermissionActivity extends Activity
     private final FeatureFlags mFeatureFlags;
     private final Lazy<ScreenCaptureDevicePolicyResolver> mScreenCaptureDevicePolicyResolver;
     private final StatusBarManager mStatusBarManager;
+    private final MediaProjectionMetricsLogger mMediaProjectionMetricsLogger;
 
     private String mPackageName;
     private int mUid;
@@ -90,15 +93,17 @@ public class MediaProjectionPermissionActivity extends Activity
     @Inject
     public MediaProjectionPermissionActivity(FeatureFlags featureFlags,
             Lazy<ScreenCaptureDevicePolicyResolver> screenCaptureDevicePolicyResolver,
-            StatusBarManager statusBarManager) {
+            StatusBarManager statusBarManager,
+            MediaProjectionMetricsLogger mediaProjectionMetricsLogger) {
         mFeatureFlags = featureFlags;
         mScreenCaptureDevicePolicyResolver = screenCaptureDevicePolicyResolver;
         mStatusBarManager = statusBarManager;
+        mMediaProjectionMetricsLogger = mediaProjectionMetricsLogger;
     }
 
     @Override
-    public void onCreate(Bundle icicle) {
-        super.onCreate(icicle);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
         final Intent launchingIntent = getIntent();
         mReviewGrantedConsentRequired = launchingIntent.getBooleanExtra(
@@ -133,6 +138,10 @@ public class MediaProjectionPermissionActivity extends Activity
 
         try {
             if (MediaProjectionServiceHelper.hasProjectionPermission(mUid, mPackageName)) {
+                if (savedInstanceState == null) {
+                    mMediaProjectionMetricsLogger.notifyProjectionInitiated(
+                            mUid, SessionCreationSource.APP);
+                }
                 final IMediaProjection projection =
                         MediaProjectionServiceHelper.createOrReuseProjection(mUid, mPackageName,
                                 mReviewGrantedConsentRequired);
@@ -231,8 +240,20 @@ public class MediaProjectionPermissionActivity extends Activity
             mDialog = dialogBuilder.create();
         }
 
+        if (savedInstanceState == null) {
+            mMediaProjectionMetricsLogger.notifyProjectionInitiated(
+                    mUid,
+                    appName == null
+                            ? SessionCreationSource.CAST
+                            : SessionCreationSource.APP);
+        }
+
         setUpDialog(mDialog);
         mDialog.show();
+
+        if (savedInstanceState == null) {
+            mMediaProjectionMetricsLogger.notifyPermissionRequestDisplayed(mUid);
+        }
     }
 
     @Override
@@ -309,6 +330,9 @@ public class MediaProjectionPermissionActivity extends Activity
                         projection.asBinder());
                 intent.putExtra(MediaProjectionAppSelectorActivity.EXTRA_HOST_APP_USER_HANDLE,
                         getHostUserHandle());
+                intent.putExtra(
+                        MediaProjectionAppSelectorActivity.EXTRA_HOST_APP_UID,
+                        getLaunchedFromUid());
                 intent.putExtra(EXTRA_USER_REVIEW_GRANTED_CONSENT, mReviewGrantedConsentRequired);
                 intent.setFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
 

@@ -24,6 +24,7 @@ import static android.app.admin.PolicyUpdateResult.RESULT_FAILURE_HARDWARE_LIMIT
 import static android.app.admin.PolicyUpdateResult.RESULT_FAILURE_STORAGE_LIMIT_REACHED;
 import static android.app.admin.PolicyUpdateResult.RESULT_POLICY_CLEARED;
 import static android.app.admin.PolicyUpdateResult.RESULT_POLICY_SET;
+import static android.app.admin.flags.Flags.devicePolicySizeTrackingEnabled;
 import static android.content.pm.UserProperties.INHERIT_DEVICE_POLICY_FROM_PARENT;
 
 import android.Manifest;
@@ -65,7 +66,6 @@ import android.util.Xml;
 import com.android.internal.util.XmlUtils;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
-import com.android.server.devicepolicy.flags.FlagUtils;
 import com.android.server.utils.Slogf;
 
 import libcore.io.IoUtils;
@@ -159,7 +159,7 @@ final class DevicePolicyEngine {
 
         synchronized (mLock) {
             PolicyState<V> localPolicyState = getLocalPolicyStateLocked(policyDefinition, userId);
-            if (FlagUtils.isDevicePolicySizeTrackingEnabled()) {
+            if (devicePolicySizeTrackingEnabled()) {
                 if (!handleAdminPolicySizeLimit(localPolicyState, enforcingAdmin, value,
                         policyDefinition, userId)) {
                     return;
@@ -282,7 +282,7 @@ final class DevicePolicyEngine {
             }
             PolicyState<V> localPolicyState = getLocalPolicyStateLocked(policyDefinition, userId);
 
-            if (FlagUtils.isDevicePolicySizeTrackingEnabled()) {
+            if (devicePolicySizeTrackingEnabled()) {
                 decreasePolicySizeForAdmin(localPolicyState, enforcingAdmin);
             }
 
@@ -428,7 +428,7 @@ final class DevicePolicyEngine {
 
         synchronized (mLock) {
             PolicyState<V> globalPolicyState = getGlobalPolicyStateLocked(policyDefinition);
-            if (FlagUtils.isDevicePolicySizeTrackingEnabled()) {
+            if (devicePolicySizeTrackingEnabled()) {
                 if (!handleAdminPolicySizeLimit(globalPolicyState, enforcingAdmin, value,
                         policyDefinition, UserHandle.USER_ALL)) {
                     return;
@@ -499,7 +499,7 @@ final class DevicePolicyEngine {
         synchronized (mLock) {
             PolicyState<V> policyState = getGlobalPolicyStateLocked(policyDefinition);
 
-            if (FlagUtils.isDevicePolicySizeTrackingEnabled()) {
+            if (devicePolicySizeTrackingEnabled()) {
                 decreasePolicySizeForAdmin(policyState, enforcingAdmin);
             }
 
@@ -1781,7 +1781,7 @@ final class DevicePolicyEngine {
 
         private void writeEnforcingAdminSizeInner(TypedXmlSerializer serializer)
                 throws IOException {
-            if (FlagUtils.isDevicePolicySizeTrackingEnabled()) {
+            if (devicePolicySizeTrackingEnabled()) {
                 if (mAdminPolicySize != null) {
                     for (int i = 0; i < mAdminPolicySize.size(); i++) {
                         int userId = mAdminPolicySize.keyAt(i);

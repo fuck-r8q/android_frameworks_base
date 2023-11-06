@@ -427,8 +427,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (transientRoot == null) continue;
             final WindowContainer<?> rootParent = transientRoot.getParent();
             if (rootParent == null || rootParent.getTopChild() == transientRoot) continue;
-            final ActivityRecord topOpaque = mController.mAtm.mTaskSupervisor
-                    .mOpaqueActivityHelper.getOpaqueActivity(rootParent);
+            final ActivityRecord topOpaque = mController.mAtm.mTaskSupervisor.mOpaqueActivityHelper
+                    .getOpaqueActivity(rootParent, true /* ignoringKeyguard */);
             if (transientRoot.compareTo(topOpaque.getRootTask()) < 0) {
                 occludedCount++;
             }
@@ -3340,8 +3340,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mFrozen.add(wc);
             final ChangeInfo changeInfo = Objects.requireNonNull(mChanges.get(wc));
             changeInfo.mSnapshot = snapshotSurface;
-            if (isDisplayRotation) {
-                // This isn't cheap, so only do it for display rotations.
+            if (changeInfo.mRotation != wc.mDisplayContent.getRotation()) {
+                // This isn't cheap, so only do it for rotation change.
                 changeInfo.mSnapshotLuma = TransitionAnimation.getBorderLuma(
                         buffer, screenshotBuffer.getColorSpace());
             }

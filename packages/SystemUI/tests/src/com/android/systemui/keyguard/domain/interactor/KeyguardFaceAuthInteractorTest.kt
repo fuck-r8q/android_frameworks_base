@@ -43,7 +43,7 @@ import com.android.systemui.dump.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.DismissCallbackRegistry
-import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
+import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
 import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFaceAuthRepository
 import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
@@ -62,6 +62,7 @@ import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.user.data.model.SelectionStatus
 import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
@@ -95,9 +96,11 @@ class KeyguardFaceAuthInteractorTest : SysuiTestCase() {
         FakeDeviceEntryFingerprintAuthRepository
     private lateinit var fakeKeyguardRepository: FakeKeyguardRepository
     private lateinit var powerInteractor: PowerInteractor
+    private lateinit var fakeBiometricSettingsRepository: FakeBiometricSettingsRepository
 
     @Mock private lateinit var keyguardUpdateMonitor: KeyguardUpdateMonitor
     @Mock private lateinit var faceWakeUpTriggersConfig: FaceWakeUpTriggersConfig
+    @Mock private lateinit var mSelectedUserInteractor: SelectedUserInteractor
 
     @Before
     fun setup() {
@@ -123,6 +126,8 @@ class KeyguardFaceAuthInteractorTest : SysuiTestCase() {
         facePropertyRepository = FakeFacePropertyRepository()
         fakeKeyguardRepository = FakeKeyguardRepository()
         powerInteractor = PowerInteractorFactory.create().powerInteractor
+        fakeBiometricSettingsRepository = FakeBiometricSettingsRepository()
+
         underTest =
             SystemUIKeyguardFaceAuthInteractor(
                 mContext,
@@ -142,12 +147,13 @@ class KeyguardFaceAuthInteractorTest : SysuiTestCase() {
                     keyguardUpdateMonitor,
                     FakeTrustRepository(),
                     testScope.backgroundScope,
+                    mSelectedUserInteractor,
                 ),
                 AlternateBouncerInteractor(
                     mock(StatusBarStateController::class.java),
                     mock(KeyguardStateController::class.java),
                     bouncerRepository,
-                    mock(BiometricSettingsRepository::class.java),
+                    fakeBiometricSettingsRepository,
                     FakeSystemClock(),
                     keyguardUpdateMonitor,
                 ),
@@ -160,6 +166,7 @@ class KeyguardFaceAuthInteractorTest : SysuiTestCase() {
                 facePropertyRepository,
                 faceWakeUpTriggersConfig,
                 powerInteractor,
+                fakeBiometricSettingsRepository,
             )
     }
 
@@ -481,6 +488,7 @@ class KeyguardFaceAuthInteractorTest : SysuiTestCase() {
     fun faceUnlockIsDisabledWhenFpIsLockedOut() =
         testScope.runTest {
             underTest.start()
+            fakeBiometricSettingsRepository.setIsFaceAuthEnrolledAndEnabled(true)
 
             fakeDeviceEntryFingerprintAuthRepository.setLockedOut(true)
             runCurrent()

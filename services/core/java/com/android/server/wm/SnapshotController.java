@@ -26,6 +26,7 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import android.os.Trace;
 import android.view.WindowManager;
+import android.window.TaskSnapshot;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -85,7 +86,7 @@ class SnapshotController {
             if (info.mWindowingMode == WINDOWING_MODE_PINNED) continue;
             if (info.mContainer.isActivityTypeHome()) continue;
             final Task task = info.mContainer.asTask();
-            if (task != null && !task.isVisibleRequested()) {
+            if (task != null && !task.mCreatedByOrganizer && !task.isVisibleRequested()) {
                 mTaskSnapshotController.recordSnapshot(task, info);
             }
             // Won't need to capture activity snapshot in close transition.
@@ -126,6 +127,18 @@ class SnapshotController {
         }
         mActivitySnapshotController.handleTransitionFinish(windows);
         mActivitySnapshotController.endSnapshotProcess();
+        // Remove task snapshot if it is visible at the end of transition.
+        for (int i = changeInfos.size() - 1; i >= 0; --i) {
+            final WindowContainer wc = changeInfos.get(i).mContainer;
+            final Task task = wc.asTask();
+            if (task != null && wc.isVisibleRequested()) {
+                final TaskSnapshot snapshot = mTaskSnapshotController.getSnapshot(task.mTaskId,
+                        task.mUserId, false /* restoreFromDisk */, false /* isLowResolution */);
+                if (snapshot != null) {
+                    mTaskSnapshotController.removeAndDeleteSnapshot(task.mTaskId, task.mUserId);
+                }
+            }
+        }
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
     }
 

@@ -90,6 +90,7 @@ open class UserTrackerImpl internal constructor(
     private val isBackgroundUserSwitchEnabled: Boolean get() =
         featureFlagsProvider.get().isEnabled(Flags.USER_TRACKER_BACKGROUND_CALLBACKS)
 
+    @Deprecated("Use UserInteractor.getSelectedUserId()")
     override var userId: Int by SynchronizedDelegate(context.userId)
         protected set
 
@@ -226,6 +227,13 @@ open class UserTrackerImpl internal constructor(
     protected open fun handleBeforeUserSwitching(newUserId: Int) {
         Assert.isNotMainThread()
         setUserIdInternal(newUserId)
+
+        val list = synchronized(callbacks) {
+            callbacks.toList()
+        }
+        list.forEach {
+            it.callback.get()?.onBeforeUserSwitching(newUserId)
+        }
     }
 
     @WorkerThread

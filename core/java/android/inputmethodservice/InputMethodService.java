@@ -3231,7 +3231,7 @@ public class InputMethodService extends AbstractInputMethodService {
     }
 
     /**
-     * Called when the user tapped or clicked an {@link android.widget.Editor}.
+     * Called when the user tapped or clicked an editor.
      * This can be useful when IME makes a decision of showing Virtual keyboard based on what
      * {@link MotionEvent#getToolType(int)} was used to click the editor.
      * e.g. when toolType is {@link MotionEvent#TOOL_TYPE_STYLUS}, IME may choose to show a
@@ -3363,6 +3363,13 @@ public class InputMethodService extends AbstractInputMethodService {
                 return true;
             }
             return false;
+        } else if (event.getKeyCode() == KeyEvent.KEYCODE_SPACE && KeyEvent.metaStateHasModifiers(
+                event.getMetaState() & ~KeyEvent.META_SHIFT_MASK, KeyEvent.META_CTRL_ON)) {
+            if (mDecorViewVisible && mWindowVisible) {
+                int direction = (event.getMetaState() & KeyEvent.META_SHIFT_MASK) != 0 ? -1 : 1;
+                mPrivOps.switchKeyboardLayoutAsync(direction);
+                return true;
+            }
         }
         return doMovementKey(keyCode, event, MOVEMENT_DOWN);
     }

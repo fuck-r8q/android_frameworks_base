@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Class holding APDU service info.
@@ -310,7 +311,7 @@ public final class ApduServiceInfo implements Parcelable {
                             com.android.internal.R.styleable.AidFilter);
                     String aid = a.getString(com.android.internal.R.styleable.AidFilter_name).
                             toUpperCase();
-                    if (CardEmulation.isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
+                    if (isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
                         currentGroup.getAids().add(aid);
                     } else {
                         Log.e(TAG, "Ignoring invalid or duplicate aid: " + aid);
@@ -324,7 +325,7 @@ public final class ApduServiceInfo implements Parcelable {
                             toUpperCase();
                     // Add wildcard char to indicate prefix
                     aid = aid.concat("*");
-                    if (CardEmulation.isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
+                    if (isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
                         currentGroup.getAids().add(aid);
                     } else {
                         Log.e(TAG, "Ignoring invalid or duplicate aid: " + aid);
@@ -338,7 +339,7 @@ public final class ApduServiceInfo implements Parcelable {
                             toUpperCase();
                     // Add wildcard char to indicate suffix
                     aid = aid.concat("#");
-                    if (CardEmulation.isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
+                    if (isValidAid(aid) && !currentGroup.getAids().contains(aid)) {
                         currentGroup.getAids().add(aid);
                     } else {
                         Log.e(TAG, "Ignoring invalid or duplicate aid: " + aid);
@@ -809,7 +810,7 @@ public final class ApduServiceInfo implements Parcelable {
      */
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
     public void dumpDebug(@NonNull ProtoOutputStream proto) {
-        Utils.dumpDebugComponentName(getComponent(), proto, ApduServiceInfoProto.COMPONENT_NAME);
+        getComponent().dumpDebug(proto, ApduServiceInfoProto.COMPONENT_NAME);
         proto.write(ApduServiceInfoProto.DESCRIPTION, getDescription());
         proto.write(ApduServiceInfoProto.ON_HOST, mOnHost);
         if (!mOnHost) {
@@ -827,5 +828,35 @@ public final class ApduServiceInfo implements Parcelable {
             proto.end(token);
         }
         proto.write(ApduServiceInfoProto.SETTINGS_ACTIVITY_NAME, mSettingsActivityName);
+    }
+
+    private static final Pattern AID_PATTERN = Pattern.compile("[0-9A-Fa-f]{10,32}\\*?\\#?");
+    /**
+     * Copied over from {@link CardEmulation#isValidAid(String)}
+     * @hide
+     */
+    private static boolean isValidAid(String aid) {
+        if (aid == null)
+            return false;
+
+        // If a prefix/subset AID, the total length must be odd (even # of AID chars + '*')
+        if ((aid.endsWith("*") || aid.endsWith("#")) && ((aid.length() % 2) == 0)) {
+            Log.e(TAG, "AID " + aid + " is not a valid AID.");
+            return false;
+        }
+
+        // If not a prefix/subset AID, the total length must be even (even # of AID chars)
+        if ((!(aid.endsWith("*") || aid.endsWith("#"))) && ((aid.length() % 2) != 0)) {
+            Log.e(TAG, "AID " + aid + " is not a valid AID.");
+            return false;
+        }
+
+        // Verify hex characters
+        if (!AID_PATTERN.matcher(aid).matches()) {
+            Log.e(TAG, "AID " + aid + " is not a valid AID.");
+            return false;
+        }
+
+        return true;
     }
 }

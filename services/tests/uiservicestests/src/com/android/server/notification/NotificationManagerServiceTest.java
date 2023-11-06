@@ -71,6 +71,7 @@ import static android.os.UserHandle.USER_SYSTEM;
 import static android.os.UserManager.USER_TYPE_FULL_SECONDARY;
 import static android.os.UserManager.USER_TYPE_PROFILE_CLONE;
 import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
+import static android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE;
 import static android.service.notification.Adjustment.KEY_IMPORTANCE;
 import static android.service.notification.Adjustment.KEY_USER_SENTIMENT;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_ALERTING;
@@ -84,7 +85,6 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
 
-import static com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.NotificationFlags.ENABLE_ATTENTION_HELPER_REFACTOR;
 import static com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.NotificationFlags.FSI_FORCE_DEMOTE;
 import static com.android.internal.config.sysui.SystemUiSystemPropertiesFlags.NotificationFlags.SHOW_STICKY_HUN_FOR_DENIED_FSI;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
@@ -207,6 +207,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.WorkSource;
 import android.permission.PermissionManager;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.DeviceConfig;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -318,6 +319,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     private static final int UID_HEADLESS = 1_000_000;
     private static final int TOAST_DURATION = 2_000;
     private static final int SECONDARY_DISPLAY_ID = 42;
+    private static final int TEST_PROFILE_USERHANDLE = 12;
 
     private final int mUid = Binder.getCallingUid();
     private final @UserIdInt int mUserId = UserHandle.getUserId(mUid);
@@ -445,7 +447,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     TestableNotificationManagerService.StrongAuthTrackerFake mStrongAuthTracker;
 
     TestableFlagResolver mTestFlagResolver = new TestableFlagResolver();
-
+    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
     private InstanceIdSequence mNotificationInstanceIdSequence = new InstanceIdSequenceFake(
             1 << 30);
     @Mock
@@ -611,7 +613,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 });
 
         // TODO (b/291907312): remove feature flag
-        mTestFlagResolver.setFlagOverride(ENABLE_ATTENTION_HELPER_REFACTOR, false);
+        mSetFlagsRule.disableFlags(Flags.FLAG_REFACTOR_ATTENTION_HELPER,
+                Flags.FLAG_POLITE_NOTIFICATIONS);
         initNMS();
     }
 
@@ -652,7 +655,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mHistoryManager).onBootPhaseAppsCanStart();
 
         // TODO b/291907312: remove feature flag
-        if (mTestFlagResolver.isEnabled(ENABLE_ATTENTION_HELPER_REFACTOR)) {
+        if (Flags.refactorAttentionHelper()) {
             mService.mAttentionHelper.setAudioManager(mAudioManager);
         } else {
             mService.setAudioManager(mAudioManager);
@@ -824,6 +827,12 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         intent.putExtras(extras);
 
         mPackageIntentReceiver.onReceive(getContext(), intent);
+    }
+
+    private void simulateProfileAvailabilityActions(String intentAction) {
+        final Intent intent = new Intent(intentAction);
+        intent.putExtra(Intent.EXTRA_USER_HANDLE, TEST_PROFILE_USERHANDLE);
+        mUserSwitchIntentReceiver.onReceive(mContext, intent);
     }
 
     private ArrayMap<Boolean, ArrayList<ComponentName>> generateResetComponentValues() {
@@ -1683,7 +1692,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     public void testEnqueueNotificationWithTag_WritesExpectedLogs_NAHRefactor() throws Exception {
         // TODO b/291907312: remove feature flag
-        mTestFlagResolver.setFlagOverride(ENABLE_ATTENTION_HELPER_REFACTOR, true);
+        mSetFlagsRule.enableFlags(Flags.FLAG_REFACTOR_ATTENTION_HELPER);
         // Cleanup NMS before re-initializing
         if (mService != null) {
             try {
@@ -7769,6 +7778,74 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertEquals(NotificationManagerService.MAX_PACKAGE_TOASTS, mService.mToastQueue.size());
     }
 
+    @Test
+    public void testPrioritizeSystemToasts() throws Exception {
+        // Insert non-system toasts
+        final String testPackage = "testPackageName";
+        assertEquals(0, mService.mToastQueue.size());
+        mService.isSystemUid = false;
+        mService.isSystemAppId = false;
+        setToastRateIsWithinQuota(true);
+        setIfPackageHasPermissionToAvoidToastRateLimiting(testPackage, false);
+
+        // package is not suspended
+        when(mPackageManager.isPackageSuspendedForUser(testPackage, mUserId))
+                .thenReturn(false);
+
+        INotificationManager nmService = (INotificationManager) mService.mService;
+
+        // Enqueue maximum number of toasts for test package
+        for (int i = 0; i < NotificationManagerService.MAX_PACKAGE_TOASTS; i++) {
+            enqueueTextToast(testPackage, "Text");
+        }
+
+        // Enqueue system toast
+        final String testPackageSystem = "testPackageNameSystem";
+        mService.isSystemUid = true;
+        setIfPackageHasPermissionToAvoidToastRateLimiting(testPackageSystem, false);
+        when(mPackageManager.isPackageSuspendedForUser(testPackageSystem, mUserId))
+                .thenReturn(false);
+
+        enqueueToast(testPackageSystem, new TestableToastCallback());
+
+        // System toast is inserted at the front of the queue, behind current showing toast
+        assertEquals(testPackageSystem, mService.mToastQueue.get(1).pkg);
+    }
+
+    @Test
+    public void testPrioritizeSystemToasts_enqueueAfterExistingSystemToast() throws Exception {
+        // Insert system toasts
+        final String testPackageSystem1 = "testPackageNameSystem1";
+        assertEquals(0, mService.mToastQueue.size());
+        mService.isSystemUid = true;
+        setToastRateIsWithinQuota(true);
+        setIfPackageHasPermissionToAvoidToastRateLimiting(testPackageSystem1, false);
+
+        // package is not suspended
+        when(mPackageManager.isPackageSuspendedForUser(testPackageSystem1, mUserId))
+                .thenReturn(false);
+
+        INotificationManager nmService = (INotificationManager) mService.mService;
+
+        // Enqueue maximum number of toasts for test package
+        for (int i = 0; i < NotificationManagerService.MAX_PACKAGE_TOASTS; i++) {
+            enqueueTextToast(testPackageSystem1, "Text");
+        }
+
+        // Enqueue another system toast
+        final String testPackageSystem2 = "testPackageNameSystem2";
+        mService.isSystemUid = true;
+        setIfPackageHasPermissionToAvoidToastRateLimiting(testPackageSystem2, false);
+        when(mPackageManager.isPackageSuspendedForUser(testPackageSystem2, mUserId))
+                .thenReturn(false);
+
+        enqueueToast(testPackageSystem2, new TestableToastCallback());
+
+        // System toast is inserted at the back of the queue, after the other system toasts
+        assertEquals(testPackageSystem2,
+                mService.mToastQueue.get(mService.mToastQueue.size() - 1).pkg);
+    }
+
     private void setAppInForegroundForToasts(int uid, boolean inForeground) {
         int importance = (inForeground) ? IMPORTANCE_FOREGROUND : IMPORTANCE_NONE;
         when(mActivityManager.getUidImportance(mUid)).thenReturn(importance);
@@ -9078,7 +9155,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testOnBubbleMetadataChangedToSuppressNotification_soundStopped_NAHRefactor()
         throws Exception {
         // TODO b/291907312: remove feature flag
-        mTestFlagResolver.setFlagOverride(ENABLE_ATTENTION_HELPER_REFACTOR, true);
+        mSetFlagsRule.enableFlags(Flags.FLAG_REFACTOR_ATTENTION_HELPER);
         // Cleanup NMS before re-initializing
         if (mService != null) {
             try {
@@ -12681,6 +12758,23 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(mConditionProviders, times(1)).resetDefaultFromConfig();
         verify(service, times(1)).allowDndPackages(user.id);
         verify(service, times(1)).setDNDMigrationDone(user.id);
+    }
+
+    @Test
+    public void testProfileUnavailableIntent() throws RemoteException {
+        mSetFlagsRule.enableFlags(FLAG_ALLOW_PRIVATE_PROFILE);
+        simulateProfileAvailabilityActions(Intent.ACTION_PROFILE_UNAVAILABLE);
+        verify(mWorkerHandler).post(any(Runnable.class));
+        verify(mSnoozeHelper).clearData(anyInt());
+    }
+
+
+    @Test
+    public void testManagedProfileUnavailableIntent() throws RemoteException {
+        mSetFlagsRule.disableFlags(FLAG_ALLOW_PRIVATE_PROFILE);
+        simulateProfileAvailabilityActions(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
+        verify(mWorkerHandler).post(any(Runnable.class));
+        verify(mSnoozeHelper).clearData(anyInt());
     }
 
     private NotificationRecord createAndPostNotification(Notification.Builder nb, String testName)
