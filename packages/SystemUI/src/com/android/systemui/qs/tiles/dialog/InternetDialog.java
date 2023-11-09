@@ -527,6 +527,7 @@ public class InternetDialog extends SystemUIDialog implements
                     stub.setLayoutResource(R.layout.qs_diaglog_secondary_generic_mobile_network);
                     stub.inflate();
                 }
+                mMobileNetworkLayout.setBackground(mBackgroundOn);
                 mSecondaryMobileNetworkLayout = findViewById(R.id.secondary_mobile_network_layout);
                 mSecondaryMobileNetworkLayout.setBackground(mBackgroundOn);
                 mSecondaryMobileDataToggle =
