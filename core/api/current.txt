@@ -6952,6 +6952,8 @@ package android.app {
     field public static final String ACTION_NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED = "android.app.action.NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED";
     field public static final String ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED = "android.app.action.NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED";
     field public static final String ACTION_NOTIFICATION_POLICY_CHANGED = "android.app.action.NOTIFICATION_POLICY_CHANGED";
+    field @FlaggedApi("android.app.modes_api") public static final int AUTOMATIC_RULE_STATUS_ACTIVATED = 4; // 0x4
+    field @FlaggedApi("android.app.modes_api") public static final int AUTOMATIC_RULE_STATUS_DEACTIVATED = 5; // 0x5
     field public static final int AUTOMATIC_RULE_STATUS_DISABLED = 2; // 0x2
     field public static final int AUTOMATIC_RULE_STATUS_ENABLED = 1; // 0x1
     field public static final int AUTOMATIC_RULE_STATUS_REMOVED = 3; // 0x3
@@ -43244,6 +43246,7 @@ package android.telephony {
     field public static final String KEY_RTT_UPGRADE_SUPPORTED_BOOL = "rtt_upgrade_supported_bool";
     field public static final String KEY_RTT_UPGRADE_SUPPORTED_FOR_DOWNGRADED_VT_CALL_BOOL = "rtt_upgrade_supported_for_downgraded_vt_call";
     field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String KEY_SATELLITE_ATTACH_SUPPORTED_BOOL = "satellite_attach_supported_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String KEY_SATELLITE_CONNECTION_HYSTERESIS_SEC_INT = "satellite_connection_hysteresis_sec_int";
     field public static final String KEY_SHOW_4G_FOR_3G_DATA_ICON_BOOL = "show_4g_for_3g_data_icon_bool";
     field public static final String KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL = "show_4g_for_lte_data_icon_bool";
     field public static final String KEY_SHOW_APN_SETTING_CDMA_BOOL = "show_apn_setting_cdma_bool";
@@ -44878,6 +44881,7 @@ package android.telephony {
     field public static final int MMS_ERROR_INVALID_APN = 2; // 0x2
     field public static final int MMS_ERROR_INVALID_SUBSCRIPTION_ID = 9; // 0x9
     field public static final int MMS_ERROR_IO_ERROR = 5; // 0x5
+    field @FlaggedApi("com.android.internal.telephony.flags.mms_disabled_error") public static final int MMS_ERROR_MMS_DISABLED_BY_CARRIER = 12; // 0xc
     field public static final int MMS_ERROR_NO_DATA_NETWORK = 8; // 0x8
     field public static final int MMS_ERROR_RETRY = 6; // 0x6
     field public static final int MMS_ERROR_UNABLE_CONNECT_MMS = 3; // 0x3
@@ -45513,7 +45517,7 @@ package android.telephony {
     field public static final int ERI_FLASH = 2; // 0x2
     field public static final int ERI_OFF = 1; // 0x1
     field public static final int ERI_ON = 0; // 0x0
-    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EVENT_DISPLAY_SOS_MESSAGE = "android.telephony.event.DISPLAY_SOS_MESSAGE";
+    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EVENT_DISPLAY_EMERGENCY_MESSAGE = "android.telephony.event.DISPLAY_EMERGENCY_MESSAGE";
     field public static final String EXTRA_ACTIVE_SIM_SUPPORTED_COUNT = "android.telephony.extra.ACTIVE_SIM_SUPPORTED_COUNT";
     field public static final String EXTRA_APN_PROTOCOL = "android.telephony.extra.APN_PROTOCOL";
     field public static final String EXTRA_APN_TYPE = "android.telephony.extra.APN_TYPE";
@@ -45522,6 +45526,8 @@ package android.telephony {
     field public static final String EXTRA_CARRIER_NAME = "android.telephony.extra.CARRIER_NAME";
     field public static final String EXTRA_DATA_FAIL_CAUSE = "android.telephony.extra.DATA_FAIL_CAUSE";
     field public static final String EXTRA_DEFAULT_NETWORK_AVAILABLE = "android.telephony.extra.DEFAULT_NETWORK_AVAILABLE";
+    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE";
+    field @FlaggedApi("com.android.internal.telephony.flags.oem_enabled_satellite_flag") public static final String EXTRA_EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT = "android.telephony.extra.EMERGENCY_CALL_TO_SATELLITE_LAUNCH_INTENT";
     field public static final String EXTRA_HIDE_PUBLIC_SETTINGS = "android.telephony.extra.HIDE_PUBLIC_SETTINGS";
     field @Deprecated public static final String EXTRA_INCOMING_NUMBER = "incoming_number";
     field public static final String EXTRA_IS_REFRESH = "android.telephony.extra.IS_REFRESH";
@@ -51972,6 +51978,7 @@ package android.view {
     method public android.view.PointerIcon getPointerIcon();
     method @NonNull public final java.util.List<android.graphics.Rect> getPreferKeepClearRects();
     method @Nullable public String[] getReceiveContentMimeTypes();
+    method @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public float getRequestedFrameRate();
     method public android.content.res.Resources getResources();
     method public final boolean getRevealOnFocusHint();
     method public final int getRight();
@@ -52348,6 +52355,7 @@ package android.view {
     method public final void setPreferKeepClearRects(@NonNull java.util.List<android.graphics.Rect>);
     method public void setPressed(boolean);
     method public void setRenderEffect(@Nullable android.graphics.RenderEffect);
+    method @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public void setRequestedFrameRate(float);
     method public final void setRevealOnFocusHint(boolean);
     method public final void setRight(int);
     method public void setRotation(float);
@@ -52530,6 +52538,11 @@ package android.view {
     field protected static final int[] PRESSED_SELECTED_WINDOW_FOCUSED_STATE_SET;
     field protected static final int[] PRESSED_STATE_SET;
     field protected static final int[] PRESSED_WINDOW_FOCUSED_STATE_SET;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = 0.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -120.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -30.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -60.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1.0f;
     field public static final android.util.Property<android.view.View,java.lang.Float> ROTATION;
     field public static final android.util.Property<android.view.View,java.lang.Float> ROTATION_X;
     field public static final android.util.Property<android.view.View,java.lang.Float> ROTATION_Y;
