@@ -87,11 +87,6 @@ object Flags {
     @JvmField
     val NOTIFICATION_SHELF_REFACTOR = releasedFlag("notification_shelf_refactor")
 
-    // TODO(b/290787599): Tracking Bug
-    @JvmField
-    val NOTIFICATION_ICON_CONTAINER_REFACTOR =
-        unreleasedFlag("notification_icon_container_refactor")
-
     // TODO(b/288326013): Tracking Bug
     @JvmField
     val NOTIFICATION_ASYNC_HYBRID_VIEW_INFLATION =
@@ -118,12 +113,12 @@ object Flags {
     // TODO(b/292213543): Tracking Bug
     @JvmField
     val NOTIFICATION_GROUP_EXPANSION_CHANGE =
-            unreleasedFlag("notification_group_expansion_change", teamfood = true)
+            releasedFlag("notification_group_expansion_change")
 
     // TODO(b/301955929)
     @JvmField
     val NOTIF_LS_BACKGROUND_THREAD =
-            unreleasedFlag("notification_lockscreen_mgr_bg_thread")
+            unreleasedFlag("notification_lockscreen_mgr_bg_thread", teamfood = true)
 
     // 200 - keyguard/lockscreen
     // ** Flag retired **
@@ -484,7 +479,7 @@ object Flags {
     val MEDIA_REMOTE_RESUME = unreleasedFlag("media_remote_resume")
 
     // TODO(b/304506662): Tracking Bug
-    val MEDIA_DEVICE_NAME_FIX = unreleasedFlag("media_device_name_fix", teamfood = true)
+    val MEDIA_DEVICE_NAME_FIX = releasedFlag("media_device_name_fix")
 
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag("simulate_dock_through_charging")
@@ -623,7 +618,7 @@ object Flags {
 
     /** TODO(b/295143676): Tracking bug. When enable, captures a screenshot for each display. */
     @JvmField
-    val MULTI_DISPLAY_SCREENSHOT = unreleasedFlag("multi_display_screenshot", teamfood = true)
+    val MULTI_DISPLAY_SCREENSHOT = releasedFlag("multi_display_screenshot")
 
     // 1400 - columbus
     // TODO(b/254512756): Tracking Bug
@@ -727,7 +722,7 @@ object Flags {
     @JvmField val KEYBOARD_BACKLIGHT_INDICATOR = releasedFlag("keyboard_backlight_indicator")
 
     // TODO(b/277192623): Tracking Bug
-    @JvmField val KEYBOARD_EDUCATION = unreleasedFlag("keyboard_education", teamfood = true)
+    @JvmField val KEYBOARD_EDUCATION = releasedFlag("keyboard_education")
 
     // TODO(b/277201412): Tracking Bug
     @JvmField
@@ -773,7 +768,8 @@ object Flags {
     @JvmField val PRECOMPUTED_TEXT = releasedFlag("precomputed_text")
 
     // TODO(b/302087895): Tracking Bug
-    @JvmField val CALL_LAYOUT_ASYNC_SET_DATA = unreleasedFlag("call_layout_async_set_data")
+    @JvmField val CALL_LAYOUT_ASYNC_SET_DATA =
+            unreleasedFlag("call_layout_async_set_data", teamfood = true)
 
     // TODO(b/302144438): Tracking Bug
     @JvmField val DECOUPLE_REMOTE_INPUT_DELEGATE_AND_CALLBACK_UPDATE =

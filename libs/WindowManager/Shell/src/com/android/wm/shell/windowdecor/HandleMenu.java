@@ -29,9 +29,9 @@ import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PointF;
-import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.SurfaceControl;
 import android.view.View;
@@ -58,7 +58,7 @@ class HandleMenu {
     private WindowDecoration.AdditionalWindow mHandleMenuWindow;
     private final PointF mHandleMenuPosition = new PointF();
     private final boolean mShouldShowWindowingPill;
-    private final Drawable mAppIcon;
+    private final Bitmap mAppIconBitmap;
     private final CharSequence mAppName;
     private final View.OnClickListener mOnClickListener;
     private final View.OnTouchListener mOnTouchListener;
@@ -71,10 +71,13 @@ class HandleMenu {
     private int mMenuHeight;
     private int mMenuWidth;
 
+    private final int mCaptionHeight;
+
 
     HandleMenu(WindowDecoration parentDecor, int layoutResId, int captionX, int captionY,
             View.OnClickListener onClickListener, View.OnTouchListener onTouchListener,
-            Drawable appIcon, CharSequence appName, boolean shouldShowWindowingPill) {
+            Bitmap appIcon, CharSequence appName, boolean shouldShowWindowingPill,
+            int captionHeight) {
         mParentDecor = parentDecor;
         mContext = mParentDecor.mDecorWindowContext;
         mTaskInfo = mParentDecor.mTaskInfo;
@@ -83,9 +86,10 @@ class HandleMenu {
         mCaptionY = captionY;
         mOnClickListener = onClickListener;
         mOnTouchListener = onTouchListener;
-        mAppIcon = appIcon;
+        mAppIconBitmap = appIcon;
         mAppName = appName;
         mShouldShowWindowingPill = shouldShowWindowingPill;
+        mCaptionHeight = captionHeight;
         loadHandleMenuDimensions();
         updateHandleMenuPillPositions();
     }
@@ -98,6 +102,7 @@ class HandleMenu {
         ssg.addTransaction(t);
         ssg.markSyncReady();
         setupHandleMenu();
+        animateHandleMenu();
     }
 
     private void createHandleMenuWindow(SurfaceControl.Transaction t, SurfaceSyncGroup ssg) {
@@ -106,6 +111,21 @@ class HandleMenu {
         mHandleMenuWindow = mParentDecor.addWindow(
                 R.layout.desktop_mode_window_decor_handle_menu, "Handle Menu",
                 t, ssg, x, y, mMenuWidth, mMenuHeight);
+    }
+
+    /**
+     * Animates the appearance of the handle menu and its three pills.
+     */
+    private void animateHandleMenu() {
+        final View handleMenuView = mHandleMenuWindow.mWindowViewHost.getView();
+        final HandleMenuAnimator handleMenuAnimator = new HandleMenuAnimator(handleMenuView,
+                mMenuWidth, mCaptionHeight);
+        if (mTaskInfo.getWindowingMode() == WINDOWING_MODE_FULLSCREEN
+                || mTaskInfo.getWindowingMode() == WINDOWING_MODE_MULTI_WINDOW) {
+            handleMenuAnimator.animateCaptionHandleExpandToOpen();
+        } else {
+            handleMenuAnimator.animateOpen();
+        }
     }
 
     /**
@@ -130,7 +150,7 @@ class HandleMenu {
         final ImageView appIcon = handleMenu.findViewById(R.id.application_icon);
         final TextView appName = handleMenu.findViewById(R.id.application_name);
         collapseBtn.setOnClickListener(mOnClickListener);
-        appIcon.setImageDrawable(mAppIcon);
+        appIcon.setImageBitmap(mAppIconBitmap);
         appName.setText(mAppName);
     }
 
@@ -315,13 +335,14 @@ class HandleMenu {
     static final class Builder {
         private final WindowDecoration mParent;
         private CharSequence mName;
-        private Drawable mAppIcon;
+        private Bitmap mAppIcon;
         private View.OnClickListener mOnClickListener;
         private View.OnTouchListener mOnTouchListener;
         private int mLayoutId;
         private int mCaptionX;
         private int mCaptionY;
         private boolean mShowWindowingPill;
+        private int mCaptionHeight;
 
 
         Builder(@NonNull WindowDecoration parent) {
@@ -333,7 +354,7 @@ class HandleMenu {
             return this;
         }
 
-        Builder setAppIcon(@Nullable Drawable appIcon) {
+        Builder setAppIcon(@Nullable Bitmap appIcon) {
             mAppIcon = appIcon;
             return this;
         }
@@ -364,9 +385,14 @@ class HandleMenu {
             return this;
         }
 
+        Builder setCaptionHeight(int captionHeight) {
+            mCaptionHeight = captionHeight;
+            return this;
+        }
+
         HandleMenu build() {
             return new HandleMenu(mParent, mLayoutId, mCaptionX, mCaptionY, mOnClickListener,
-                    mOnTouchListener, mAppIcon, mName, mShowWindowingPill);
+                    mOnTouchListener, mAppIcon, mName, mShowWindowingPill, mCaptionHeight);
         }
     }
 }

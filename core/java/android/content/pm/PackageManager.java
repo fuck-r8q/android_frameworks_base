@@ -3778,6 +3778,7 @@ public abstract class PackageManager {
      * The device is capable of communicating with other devices via
      * <a href="https://www.threadgroup.org">Thread</a> networking protocol.
      */
+    @FlaggedApi("com.android.net.thread.flags.thread_enabled")
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
 
@@ -11024,6 +11025,16 @@ public abstract class PackageManager {
     public void makeUidVisible(int recipientUid, int visibleUid) {
         throw new UnsupportedOperationException(
                 "makeUidVisible not implemented in subclass");
+    }
+
+    /**
+     * Return archived package info for the package or null if the package is not installed.
+     * @see PackageInstaller#installPackageArchived
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_ARCHIVING)
+    public @Nullable ArchivedPackage getArchivedPackage(@NonNull String packageName) {
+        throw new UnsupportedOperationException(
+                "getArchivedPackage not implemented in subclass");
     }
 
     // Some of the flags don't affect the query result, but let's be conservative and cache

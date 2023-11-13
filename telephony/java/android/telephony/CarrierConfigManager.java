@@ -3220,6 +3220,14 @@ public class CarrierConfigManager {
     public static final String KEY_ROAMING_OPERATOR_STRING_ARRAY = "roaming_operator_string_array";
 
     /**
+     * Config to show the roaming indicator (i.e. the "R" icon) from the status bar when roaming.
+     * The roaming indicator will be shown if this is {@code true} and will not be shown if this is
+     * {@code false}.
+     */
+    @FlaggedApi(Flags.FLAG_HIDE_ROAMING_ICON)
+    public static final String KEY_SHOW_ROAMING_INDICATOR_BOOL = "show_roaming_indicator_bool";
+
+    /**
      * URL from which the proto containing the public key of the Carrier used for
      * IMSI encryption will be downloaded.
      * @hide
@@ -3385,11 +3393,11 @@ public class CarrierConfigManager {
      * If {@code false} the SPN display checks if the current MCC/MNC is different from the
      * SIM card's MCC/MNC.
      *
-     * @see KEY_GSM_ROAMING_NETWORKS_STRING_ARRAY
-     * @see KEY_GSM_NONROAMING_NETWORKS_STRING_ARRAY
-     * @see KEY_NON_ROAMING_OPERATOR_STRING_ARRAY
-     * @see KEY_ROAMING_OPERATOR_STRING_ARRAY
-     * @see KEY_FORCE_HOME_NETWORK_BOOL
+     * @see #KEY_GSM_ROAMING_NETWORKS_STRING_ARRAY
+     * @see #KEY_GSM_NONROAMING_NETWORKS_STRING_ARRAY
+     * @see #KEY_NON_ROAMING_OPERATOR_STRING_ARRAY
+     * @see #KEY_ROAMING_OPERATOR_STRING_ARRAY
+     * @see #KEY_FORCE_HOME_NETWORK_BOOL
      *
      * @hide
      */
@@ -8870,7 +8878,9 @@ public class CarrierConfigManager {
          * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_NONE},
          * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_1024_BIT_MODP},
          * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_1536_BIT_MODP},
-         * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_2048_BIT_MODP}
+         * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_2048_BIT_MODP},
+         * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_3072_BIT_MODP},
+         * {@link android.net.ipsec.ike.SaProposal#DH_GROUP_4096_BIT_MODP}
          */
         public static final String KEY_DIFFIE_HELLMAN_GROUPS_INT_ARRAY =
                 KEY_PREFIX + "diffie_hellman_groups_int_array";
@@ -8938,7 +8948,8 @@ public class CarrierConfigManager {
 
         /**
          * List of supported encryption algorithms for child session. Possible values are
-         * {@link android.net.ipsec.ike.SaProposal#ENCRYPTION_ALGORITHM_AES_CBC}
+         * {@link android.net.ipsec.ike.SaProposal#ENCRYPTION_ALGORITHM_AES_CBC},
+         * {@link android.net.ipsec.ike.SaProposal#ENCRYPTION_ALGORITHM_AES_CTR}
          */
         public static final String KEY_SUPPORTED_CHILD_SESSION_ENCRYPTION_ALGORITHMS_INT_ARRAY =
                 KEY_PREFIX + "supported_child_session_encryption_algorithms_int_array";
@@ -10393,6 +10404,7 @@ public class CarrierConfigManager {
                 false);
         sDefaults.putStringArray(KEY_NON_ROAMING_OPERATOR_STRING_ARRAY, null);
         sDefaults.putStringArray(KEY_ROAMING_OPERATOR_STRING_ARRAY, null);
+        sDefaults.putBoolean(KEY_SHOW_ROAMING_INDICATOR_BOOL, true);
         sDefaults.putBoolean(KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL, false);
         sDefaults.putBoolean(KEY_RTT_SUPPORTED_BOOL, false);
         sDefaults.putBoolean(KEY_TTY_SUPPORTED_BOOL, true);

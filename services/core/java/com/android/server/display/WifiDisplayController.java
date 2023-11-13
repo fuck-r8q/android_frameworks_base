@@ -46,6 +46,7 @@ import android.util.Slog;
 import android.view.Surface;
 
 import com.android.internal.util.DumpUtils;
+import com.android.server.display.utils.DebugUtils;
 
 import java.io.PrintWriter;
 import java.lang.StackTraceElement;
@@ -72,10 +73,13 @@ import java.util.Objects;
  */
 final class WifiDisplayController implements DumpUtils.Dump {
     private static final String TAG = "WifiDisplayController";
-    private static final boolean DEBUG =
-            SystemProperties.getBoolean("persist.vendor.debug.wfdcdbg",false);
+
+    // To enable these logs, run:
+    // 'adb shell setprop persist.log.tag.WifiDisplayController DEBUG && adb reboot'
+    private static final boolean DEBUG = DebugUtils.isDebuggable(TAG);
     private static final boolean DEBUGV =
             SystemProperties.getBoolean("persist.vendor.debug.wfdcdbgv",false);
+
     private static final int DEFAULT_CONTROL_PORT = 7236;
     private static final int MAX_THROUGHPUT = 50;
     private static final int CONNECTION_TIMEOUT_SECONDS = 30;

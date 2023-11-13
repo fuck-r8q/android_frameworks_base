@@ -34,6 +34,7 @@ import com.android.internal.logging.UiEventLogger
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.SystemUIDialog
+import com.android.systemui.util.time.SystemClock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -46,7 +47,9 @@ constructor(
     private val bluetoothToggleInitialValue: Boolean,
     private val subtitleResIdInitialValue: Int,
     private val bluetoothTileDialogCallback: BluetoothTileDialogCallback,
+    private val systemClock: SystemClock,
     private val uiEventLogger: UiEventLogger,
+    private val logger: BluetoothTileDialogLogger,
     context: Context,
 ) : SystemUIDialog(context, DEFAULT_THEME, DEFAULT_DISMISS_ON_DEVICE_LOCK) {
 
@@ -75,7 +78,10 @@ constructor(
         super.onCreate(savedInstanceState)
         uiEventLogger.log(BluetoothTileDialogUiEvent.BLUETOOTH_TILE_DIALOG_SHOWN)
 
-        setContentView(LayoutInflater.from(context).inflate(R.layout.bluetooth_tile_dialog, null))
+        LayoutInflater.from(context).inflate(R.layout.bluetooth_tile_dialog, null).apply {
+            accessibilityPaneTitle = context.getText(R.string.accessibility_desc_quick_settings)
+            setContentView(this)
+        }
 
         toggleView = requireViewById(R.id.bluetooth_toggle)
         subtitleTextView = requireViewById(R.id.bluetooth_tile_dialog_subtitle) as TextView
@@ -102,21 +108,32 @@ constructor(
         showSeeAll: Boolean,
         showPairNewDevice: Boolean
     ) {
+        val start = systemClock.elapsedRealtime()
         deviceItemAdapter.refreshDeviceItemList(deviceItem) {
             seeAllViewGroup.visibility = if (showSeeAll) VISIBLE else GONE
             pairNewDeviceViewGroup.visibility = if (showPairNewDevice) VISIBLE else GONE
+            logger.logDeviceUiUpdate(systemClock.elapsedRealtime() - start)
         }
     }
 
     internal fun onBluetoothStateUpdated(isEnabled: Boolean, subtitleResId: Int) {
-        toggleView.isChecked = isEnabled
+        toggleView.apply {
+            isChecked = isEnabled
+            setEnabled(true)
+            alpha = ENABLED_ALPHA
+        }
         subtitleTextView.text = context.getString(subtitleResId)
     }
 
     private fun setupToggle() {
         toggleView.isChecked = bluetoothToggleInitialValue
-        toggleView.setOnCheckedChangeListener { _, isChecked ->
+        toggleView.setOnCheckedChangeListener { view, isChecked ->
             mutableBluetoothStateToggle.value = isChecked
+            view.apply {
+                isEnabled = false
+                alpha = DISABLED_ALPHA
+            }
+            logger.logBluetoothState(BluetoothStateStage.USER_TOGGLED, isChecked.toString())
             uiEventLogger.log(BluetoothTileDialogUiEvent.BLUETOOTH_TOGGLE_CLICKED)
         }
     }
@@ -219,5 +236,7 @@ constructor(
         const val ACTION_PREVIOUSLY_CONNECTED_DEVICE =
             "com.android.settings.PREVIOUSLY_CONNECTED_DEVICE"
         const val ACTION_PAIR_NEW_DEVICE = "android.settings.BLUETOOTH_PAIRING_SETTINGS"
+        const val DISABLED_ALPHA = 0.3f
+        const val ENABLED_ALPHA = 1f
     }
 }

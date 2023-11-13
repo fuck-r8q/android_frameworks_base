@@ -1623,7 +1623,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             return;
         }
 
+        final Transition.ReadyCondition displayConfig = mTransitionController.isCollecting()
+                ? new Transition.ReadyCondition("displayConfig", this) : null;
+        if (displayConfig != null) {
+            mTransitionController.waitFor(displayConfig);
+        } else if (mTransitionController.isShellTransitionsEnabled()) {
+            Slog.e(TAG, "Display reconfigured outside of a transition: " + this);
+        }
         final boolean configUpdated = updateDisplayOverrideConfigurationLocked();
+        if (displayConfig != null) {
+            displayConfig.meet();
+        }
         if (configUpdated) {
             return;
         }
@@ -4704,6 +4714,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             scheduleAnimation();
 
             mWmService.mH.post(() -> InputMethodManagerInternal.get().onImeParentChanged());
+        } else if (mImeControlTarget != null && mImeControlTarget == mImeLayeringTarget) {
+            // Even if the IME surface parent is not changed, the layer target belonging to the
+            // parent may have changes. Then attempt to reassign if the IME control target is
+            // possible to be the relative layer.
+            final SurfaceControl lastRelativeLayer = mImeWindowsContainer.getLastRelativeLayer();
+            if (lastRelativeLayer != mImeLayeringTarget.mSurfaceControl) {
+                assignRelativeLayerForIme(getSyncTransaction(), false /* forceUpdate */);
+                if (lastRelativeLayer != mImeWindowsContainer.getLastRelativeLayer()) {
+                    scheduleAnimation();
+                }
+            }
         }
     }
 

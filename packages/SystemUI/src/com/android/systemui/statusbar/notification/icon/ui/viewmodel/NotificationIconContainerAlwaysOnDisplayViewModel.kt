@@ -15,10 +15,7 @@
  */
 package com.android.systemui.statusbar.notification.icon.ui.viewmodel
 
-import android.graphics.Color
 import android.graphics.Rect
-import androidx.annotation.ColorInt
-import com.android.systemui.common.ui.ConfigurationState
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.flags.FeatureFlagsClassic
@@ -27,11 +24,9 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.TransitionStep
-import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationsKeyguardInteractor
-import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconContainerViewModel.ColorLookup
-import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconContainerViewModel.IconColors
+import com.android.systemui.statusbar.notification.icon.domain.interactor.AlwaysOnDisplayNotificationIconsInteractor
 import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController
 import com.android.systemui.util.kotlin.pairwise
@@ -39,9 +34,9 @@ import com.android.systemui.util.kotlin.sample
 import com.android.systemui.util.ui.AnimatableEvent
 import com.android.systemui.util.ui.AnimatedValue
 import com.android.systemui.util.ui.toAnimatedValueFlow
+import com.android.systemui.util.ui.zip
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -51,26 +46,19 @@ import kotlinx.coroutines.flow.map
 class NotificationIconContainerAlwaysOnDisplayViewModel
 @Inject
 constructor(
-    configuration: ConfigurationState,
     private val deviceEntryInteractor: DeviceEntryInteractor,
     private val dozeParameters: DozeParameters,
     private val featureFlags: FeatureFlagsClassic,
+    iconsInteractor: AlwaysOnDisplayNotificationIconsInteractor,
     keyguardInteractor: KeyguardInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val notificationsKeyguardInteractor: NotificationsKeyguardInteractor,
     screenOffAnimationController: ScreenOffAnimationController,
     shadeInteractor: ShadeInteractor,
-) : NotificationIconContainerViewModel {
+) {
 
-    private val onDozeAnimationComplete = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    private val onVisAnimationComplete = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-
-    override val iconColors: Flow<ColorLookup> =
-        configuration.getColorAttr(R.attr.wallpaperTextColor, DEFAULT_AOD_ICON_COLOR).map { tint ->
-            ColorLookup { IconColorsImpl(tint) }
-        }
-
-    override val animationsEnabled: Flow<Boolean> =
+    /** Are changes to the icon container animated? */
+    val animationsEnabled: Flow<Boolean> =
         combine(
             shadeInteractor.isShadeTouchable,
             keyguardInteractor.isKeyguardVisible,
@@ -78,7 +66,8 @@ constructor(
             panelTouchesEnabled && isKeyguardVisible
         }
 
-    override val isDozing: Flow<AnimatedValue<Boolean>> =
+    /** Should icons be rendered in "dozing" mode? */
+    val isDozing: Flow<AnimatedValue<Boolean>> =
         keyguardTransitionInteractor.startedKeyguardTransitionStep
             // Determine if we're dozing based on the most recent transition
             .map { step: TransitionStep ->
@@ -93,9 +82,10 @@ constructor(
                 AnimatableEvent(isDozing, animate)
             }
             .distinctUntilChanged()
-            .toAnimatedValueFlow(completionEvents = onDozeAnimationComplete)
+            .toAnimatedValueFlow()
 
-    override val isVisible: Flow<AnimatedValue<Boolean>> =
+    /** Is the icon container visible? */
+    val isVisible: Flow<AnimatedValue<Boolean>> =
         combine(
                 keyguardTransitionInteractor.finishedKeyguardState.map { it != KeyguardState.GONE },
                 deviceEntryInteractor.isBypassEnabled,
@@ -103,46 +93,51 @@ constructor(
                 isPulseExpandingAnimated(),
             ) {
                 onKeyguard: Boolean,
-                bypassEnabled: Boolean,
-                (notifsFullyHidden: Boolean, isAnimatingHide: Boolean),
-                (pulseExpanding: Boolean, isAnimatingPulse: Boolean),
+                isBypassEnabled: Boolean,
+                notifsFullyHidden: AnimatedValue<Boolean>,
+                pulseExpanding: AnimatedValue<Boolean>,
                 ->
-                val isAnimating = isAnimatingHide || isAnimatingPulse
                 when {
                     // Hide the AOD icons if we're not in the KEYGUARD state unless the screen off
                     // animation is playing, in which case we want them to be visible if we're
                     // animating in the AOD UI and will be switching to KEYGUARD shortly.
                     !onKeyguard && !screenOffAnimationController.shouldShowAodIconsWhenShade() ->
-                        AnimatedValue(false, isAnimating = false)
-                    // If we're bypassing, then we're visible
-                    bypassEnabled -> AnimatedValue(true, isAnimating)
-                    // If we are pulsing (and not bypassing), then we are hidden
-                    pulseExpanding -> AnimatedValue(false, isAnimating)
-                    // If notifs are fully gone, then we're visible
-                    notifsFullyHidden -> AnimatedValue(true, isAnimating)
-                    // Otherwise, we're hidden
-                    else -> AnimatedValue(false, isAnimating)
+                        AnimatedValue.NotAnimating(false)
+                    else ->
+                        zip(notifsFullyHidden, pulseExpanding) {
+                            areNotifsFullyHidden,
+                            isPulseExpanding,
+                            ->
+                            when {
+                                // If we're bypassing, then we're visible
+                                isBypassEnabled -> true
+                                // If we are pulsing (and not bypassing), then we are hidden
+                                isPulseExpanding -> false
+                                // If notifs are fully gone, then we're visible
+                                areNotifsFullyHidden -> true
+                                // Otherwise, we're hidden
+                                else -> false
+                            }
+                        }
                 }
             }
             .distinctUntilChanged()
 
-    override fun completeDozeAnimation() {
-        onDozeAnimationComplete.tryEmit(Unit)
-    }
-
-    override fun completeVisibilityAnimation() {
-        onVisAnimationComplete.tryEmit(Unit)
-    }
+    /** [NotificationIconsViewData] indicating which icons to display in the view. */
+    val icons: Flow<NotificationIconsViewData> =
+        iconsInteractor.aodNotifs.map { entries ->
+            NotificationIconsViewData(
+                visibleKeys = entries.mapNotNull { it.toIconInfo(it.aodIcon) },
+            )
+        }
 
     /** Is there an expanded pulse, are we animating in response? */
     private fun isPulseExpandingAnimated(): Flow<AnimatedValue<Boolean>> {
         return notificationsKeyguardInteractor.isPulseExpanding
             .pairwise(initialValue = null)
             // If pulsing changes, start animating, unless it's the first emission
-            .map { (prev, expanding) ->
-                AnimatableEvent(expanding!!, startAnimating = prev != null)
-            }
-            .toAnimatedValueFlow(completionEvents = onVisAnimationComplete)
+            .map { (prev, expanding) -> AnimatableEvent(expanding, startAnimating = prev != null) }
+            .toAnimatedValueFlow()
     }
 
     /** Are notifications completely hidden from view, are we animating in response? */
@@ -164,18 +159,14 @@ constructor(
                         // We only want the appear animations to happen when the notifications
                         // get fully hidden, since otherwise the un-hide animation overlaps.
                         featureFlags.isEnabled(Flags.NEW_AOD_TRANSITION) -> true
-                        else -> fullyHidden!!
+                        else -> fullyHidden
                     }
-                AnimatableEvent(fullyHidden!!, animate)
+                AnimatableEvent(fullyHidden, animate)
             }
-            .toAnimatedValueFlow(completionEvents = onVisAnimationComplete)
+            .toAnimatedValueFlow()
     }
 
-    private class IconColorsImpl(override val tint: Int) : IconColors {
+    private class IconColorsImpl(override val tint: Int) : NotificationIconColors {
         override fun staticDrawableColor(viewBounds: Rect, isColorized: Boolean): Int = tint
-    }
-
-    companion object {
-        @ColorInt private val DEFAULT_AOD_ICON_COLOR = Color.WHITE
     }
 }

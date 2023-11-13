@@ -292,8 +292,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             // Resets the isolated navigation and updates the container.
             final TransactionRecord transactionRecord = mTransactionManager.startNewTransaction();
             final WindowContainerTransaction wct = transactionRecord.getTransaction();
-            mPresenter.setTaskFragmentIsolatedNavigation(wct,
-                    containerToUnpin.getTaskFragmentToken(), false /* isolated */);
+            mPresenter.setTaskFragmentIsolatedNavigation(wct, containerToUnpin,
+                    false /* isolated */);
             updateContainer(wct, containerToUnpin);
             transactionRecord.apply(false /* shouldApplyIndependently */);
             updateCallbackIfNecessary();
@@ -880,19 +880,17 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             return true;
         }
 
-        // Skip resolving if the activity is on a pinned TaskFragmentContainer.
-        // TODO(b/243518738): skip resolving for overlay container.
-        final TaskContainer taskContainer = container != null ? container.getTaskContainer() : null;
-        if (container != null && taskContainer != null
-                && taskContainer.isTaskFragmentContainerPinned(container)) {
+        // Skip resolving if the activity is on an isolated navigated TaskFragmentContainer.
+        if (container != null && container.isIsolatedNavigationEnabled()) {
             return true;
         }
 
+        final TaskContainer taskContainer = container != null ? container.getTaskContainer() : null;
         if (!isOnReparent && taskContainer != null
                 && taskContainer.getTopNonFinishingTaskFragmentContainer(false /* includePin */)
                         != container) {
             // Do not resolve if the launched activity is not the top-most container (excludes
-            // the pinned container) in the Task.
+            // the pinned and overlay container) in the Task.
             return true;
         }
 
@@ -1312,15 +1310,12 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     @GuardedBy("mLock")
     TaskFragmentContainer resolveStartActivityIntent(@NonNull WindowContainerTransaction wct,
             int taskId, @NonNull Intent intent, @Nullable Activity launchingActivity) {
-        // Skip resolving if started from pinned TaskFragmentContainer.
-        // TODO(b/243518738): skip resolving for overlay container.
+        // Skip resolving if started from an isolated navigated TaskFragmentContainer.
         if (launchingActivity != null) {
             final TaskFragmentContainer taskFragmentContainer = getContainerWithActivity(
                     launchingActivity);
-            final TaskContainer taskContainer =
-                    taskFragmentContainer != null ? taskFragmentContainer.getTaskContainer() : null;
-            if (taskContainer != null && taskContainer.isTaskFragmentContainerPinned(
-                    taskFragmentContainer)) {
+            if (taskFragmentContainer != null
+                    && taskFragmentContainer.isIsolatedNavigationEnabled()) {
                 return null;
             }
         }
@@ -1756,31 +1751,6 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     }
 
     /**
-     * Returns the topmost not finished container in Task of given task id.
-     */
-    @GuardedBy("mLock")
-    @Nullable
-    TaskFragmentContainer getTopActiveContainer(int taskId) {
-        final TaskContainer taskContainer = mTaskContainers.get(taskId);
-        if (taskContainer == null) {
-            return null;
-        }
-        final List<TaskFragmentContainer> containers = taskContainer.getTaskFragmentContainers();
-        for (int i = containers.size() - 1; i >= 0; i--) {
-            final TaskFragmentContainer container = containers.get(i);
-            if (!container.isFinished() && (container.getRunningActivityCount() > 0
-                    // We may be waiting for the top TaskFragment to become non-empty after
-                    // creation. In that case, we don't want to treat the TaskFragment below it as
-                    // top active, otherwise it may incorrectly launch placeholder on top of the
-                    // pending TaskFragment.
-                    || container.isWaitingActivityAppear())) {
-                return container;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Updates the presentation of the container. If the container is part of the split or should
      * have a placeholder, it will also update the other part of the split.
      */
@@ -1790,6 +1760,15 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
         if (!container.getTaskContainer().isVisible()) {
             // Wait until the Task is visible to avoid unnecessary update when the Task is still in
             // background.
+            return;
+        }
+
+        if (container.isFinished()) {
+            return;
+        }
+
+        if (container.isOverlay()) {
+            updateOverlayContainer(wct, container);
             return;
         }
 
@@ -1811,6 +1790,25 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
         }
 
         updateSplitContainerIfNeeded(splitContainer, wct, null /* splitAttributes */);
+    }
+
+
+    @VisibleForTesting
+    // Suppress GuardedBy warning because lint ask to mark this method as
+    // @GuardedBy(mPresenter.mController.mLock), which is mLock itself
+    @SuppressWarnings("GuardedBy")
+    @GuardedBy("mLock")
+    void updateOverlayContainer(@NonNull WindowContainerTransaction wct,
+                                @NonNull TaskFragmentContainer container) {
+        final TaskContainer taskContainer = container.getTaskContainer();
+        // Dismiss the overlay container if it's the only container in the task and there's no
+        // direct activity in the parent task.
+        if (taskContainer.getTaskFragmentContainers().size() == 1
+                && !taskContainer.hasDirectActivity()) {
+            container.finish(false /* shouldFinishDependent */, mPresenter, wct, this);
+        }
+
+        // TODO(b/295805054): Add the logic to update overlay container
     }
 
     /**
@@ -1968,7 +1966,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     /** Whether or not to allow activity in this container to launch placeholder. */
     @GuardedBy("mLock")
     private boolean allowLaunchPlaceholder(@NonNull TaskFragmentContainer container) {
-        final TaskFragmentContainer topContainer = getTopActiveContainer(container.getTaskId());
+        final TaskFragmentContainer topContainer = container.getTaskContainer()
+                .getTopNonFinishingTaskFragmentContainer();
         if (container != topContainer) {
             // The container is not the top most.
             if (!container.isVisible()) {

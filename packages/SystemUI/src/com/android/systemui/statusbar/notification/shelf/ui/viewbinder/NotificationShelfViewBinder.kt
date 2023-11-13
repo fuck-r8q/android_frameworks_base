@@ -19,19 +19,23 @@ package com.android.systemui.statusbar.notification.shelf.ui.viewbinder
 import android.view.View
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.android.systemui.common.ui.ConfigurationState
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.flags.FeatureFlags
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.statusbar.LegacyNotificationShelfControllerImpl
 import com.android.systemui.statusbar.NotificationShelf
 import com.android.systemui.statusbar.NotificationShelfController
+import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder
+import com.android.systemui.statusbar.notification.icon.ui.viewbinder.ShelfNotificationIconViewStore
 import com.android.systemui.statusbar.notification.row.ui.viewbinder.ActivatableNotificationViewBinder
+import com.android.systemui.statusbar.notification.shared.NotificationIconContainerRefactor
 import com.android.systemui.statusbar.notification.shelf.ui.viewmodel.NotificationShelfViewModel
 import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
 import com.android.systemui.statusbar.phone.NotificationIconAreaController
 import com.android.systemui.statusbar.phone.NotificationIconContainer
+import com.android.systemui.statusbar.policy.ConfigurationController
 import javax.inject.Inject
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -75,14 +79,25 @@ object NotificationShelfViewBinder {
     fun bind(
         shelf: NotificationShelf,
         viewModel: NotificationShelfViewModel,
+        configuration: ConfigurationState,
+        configurationController: ConfigurationController,
         falsingManager: FalsingManager,
-        featureFlags: FeatureFlags,
         notificationIconAreaController: NotificationIconAreaController,
+        shelfIconViewStore: ShelfNotificationIconViewStore,
     ) {
         ActivatableNotificationViewBinder.bind(viewModel, shelf, falsingManager)
         shelf.apply {
-            // TODO(278765923): Replace with eventual NotificationIconContainerViewBinder#bind()
-            notificationIconAreaController.setShelfIcons(shelfIcons)
+            if (NotificationIconContainerRefactor.isEnabled) {
+                NotificationIconContainerViewBinder.bind(
+                    shelfIcons,
+                    viewModel.icons,
+                    configuration,
+                    configurationController,
+                    shelfIconViewStore,
+                )
+            } else {
+                notificationIconAreaController.setShelfIcons(shelfIcons)
+            }
             repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     launch {

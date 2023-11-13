@@ -1000,6 +1000,37 @@ public class PackageInstaller {
         }
     }
 
+    /**
+     * Install package in an archived state.
+     *
+     * @param archivedPackage archived package data such as package name, signature etc.
+     * @param sessionParams used to create an underlying installation session
+     * @param statusReceiver Called when the state of the session changes. Intents
+     *                       sent to this receiver contain {@link #EXTRA_STATUS}. Refer to the
+     *                       individual status codes on how to handle them.
+     * @see #createSession
+     * @see PackageInstaller.Session#commit
+     */
+    @RequiresPermission(Manifest.permission.INSTALL_PACKAGES)
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public void installPackageArchived(@NonNull ArchivedPackage archivedPackage,
+            @NonNull SessionParams sessionParams,
+            @NonNull IntentSender statusReceiver) {
+        Objects.requireNonNull(archivedPackage, "archivedPackage cannot be null");
+        Objects.requireNonNull(sessionParams, "sessionParams cannot be null");
+        Objects.requireNonNull(statusReceiver, "statusReceiver cannot be null");
+        try {
+            mInstaller.installPackageArchived(
+                    archivedPackage.getParcel(),
+                    sessionParams,
+                    statusReceiver,
+                    mInstallerPackageName,
+                    new UserHandle(mUserId));
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     /** {@hide} */
     @SystemApi
     @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES)
@@ -2504,6 +2535,8 @@ public class PackageInstaller {
         public DataLoaderParams dataLoaderParams;
         /** {@hide} */
         public int rollbackDataPolicy = PackageManager.ROLLBACK_DATA_POLICY_RESTORE;
+        /** @hide */
+        public long rollbackLifetimeMillis = 0;
         /** {@hide} */
         public boolean forceQueryableOverride;
         /** {@hide} */
@@ -2558,6 +2591,7 @@ public class PackageInstaller {
                 dataLoaderParams = new DataLoaderParams(dataLoaderParamsParcel);
             }
             rollbackDataPolicy = source.readInt();
+            rollbackLifetimeMillis = source.readLong();
             requireUserAction = source.readInt();
             packageSource = source.readInt();
             applicationEnabledSettingPersistent = source.readBoolean();
@@ -2590,6 +2624,7 @@ public class PackageInstaller {
             ret.requiredInstalledVersionCode = requiredInstalledVersionCode;
             ret.dataLoaderParams = dataLoaderParams;
             ret.rollbackDataPolicy = rollbackDataPolicy;
+            ret.rollbackLifetimeMillis = rollbackLifetimeMillis;
             ret.requireUserAction = requireUserAction;
             ret.packageSource = packageSource;
             ret.applicationEnabledSettingPersistent = applicationEnabledSettingPersistent;
@@ -2871,12 +2906,7 @@ public class PackageInstaller {
          */
         @SystemApi
         public void setEnableRollback(boolean enable) {
-            if (enable) {
-                installFlags |= PackageManager.INSTALL_ENABLE_ROLLBACK;
-            } else {
-                installFlags &= ~PackageManager.INSTALL_ENABLE_ROLLBACK;
-            }
-            rollbackDataPolicy = PackageManager.ROLLBACK_DATA_POLICY_RESTORE;
+            setEnableRollback(enable, PackageManager.ROLLBACK_DATA_POLICY_RESTORE);
         }
 
         /**
@@ -2900,10 +2930,36 @@ public class PackageInstaller {
                 installFlags |= PackageManager.INSTALL_ENABLE_ROLLBACK;
             } else {
                 installFlags &= ~PackageManager.INSTALL_ENABLE_ROLLBACK;
+                rollbackLifetimeMillis = 0;
             }
             rollbackDataPolicy = dataPolicy;
         }
 
+        /**
+         * If rollback enabled for this session (via {@link #setEnableRollback}, set time
+         * after which rollback will no longer be possible
+         *
+         * <p>For multi-package installs, this value must be set on the parent session.
+         * Child session rollback lifetime will be ignored.
+         *
+         * @param lifetimeMillis time after which rollback expires
+         * @throws IllegalArgumentException if lifetimeMillis is negative or rollback is not
+         * enabled via setEnableRollback.
+         * @hide
+         */
+        @SystemApi
+        @RequiresPermission(android.Manifest.permission.MANAGE_ROLLBACKS)
+        @FlaggedApi(Flags.FLAG_ROLLBACK_LIFETIME)
+        public void setRollbackLifetimeMillis(@DurationMillisLong long lifetimeMillis) {
+            if (lifetimeMillis < 0) {
+                throw new IllegalArgumentException("rollbackLifetimeMillis can't be negative.");
+            }
+            if ((installFlags & PackageManager.INSTALL_ENABLE_ROLLBACK) == 0) {
+                throw new IllegalArgumentException(
+                        "Can't set rollbackLifetimeMillis when rollback is not enabled");
+            }
+            rollbackLifetimeMillis = lifetimeMillis;
+        }
 
         /**
          * @deprecated use {@link #setRequestDowngrade(boolean)}.
@@ -3264,6 +3320,7 @@ public class PackageInstaller {
             pw.printPair("requiredInstalledVersionCode", requiredInstalledVersionCode);
             pw.printPair("dataLoaderParams", dataLoaderParams);
             pw.printPair("rollbackDataPolicy", rollbackDataPolicy);
+            pw.printPair("rollbackLifetimeMillis", rollbackLifetimeMillis);
             pw.printPair("applicationEnabledSettingPersistent",
                     applicationEnabledSettingPersistent);
             pw.printHexPair("developmentInstallFlags", developmentInstallFlags);
@@ -3305,6 +3362,7 @@ public class PackageInstaller {
                 dest.writeParcelable(null, flags);
             }
             dest.writeInt(rollbackDataPolicy);
+            dest.writeLong(rollbackLifetimeMillis);
             dest.writeInt(requireUserAction);
             dest.writeInt(packageSource);
             dest.writeBoolean(applicationEnabledSettingPersistent);
@@ -3498,6 +3556,9 @@ public class PackageInstaller {
         /** {@hide} */
         public int rollbackDataPolicy;
 
+        /** @hide */
+        public long rollbackLifetimeMillis;
+
         /** {@hide} */
         public int requireUserAction;
 
@@ -3565,6 +3626,7 @@ public class PackageInstaller {
             isCommitted = source.readBoolean();
             isPreapprovalRequested = source.readBoolean();
             rollbackDataPolicy = source.readInt();
+            rollbackLifetimeMillis = source.readLong();
             createdMillis = source.readLong();
             requireUserAction = source.readInt();
             installerUid = source.readInt();
@@ -4189,6 +4251,7 @@ public class PackageInstaller {
             dest.writeBoolean(isCommitted);
             dest.writeBoolean(isPreapprovalRequested);
             dest.writeInt(rollbackDataPolicy);
+            dest.writeLong(rollbackLifetimeMillis);
             dest.writeLong(createdMillis);
             dest.writeInt(requireUserAction);
             dest.writeInt(installerUid);
