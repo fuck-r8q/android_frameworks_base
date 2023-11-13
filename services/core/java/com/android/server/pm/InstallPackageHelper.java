@@ -59,7 +59,6 @@ import static com.android.server.pm.PackageManagerService.DEBUG_VERIFY;
 import static com.android.server.pm.PackageManagerService.MIN_INSTALLABLE_TARGET_SDK;
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 import static com.android.server.pm.PackageManagerService.POST_INSTALL;
-import static com.android.server.pm.PackageManagerService.PRECOMPILE_LAYOUTS;
 import static com.android.server.pm.PackageManagerService.SCAN_AS_APEX;
 import static com.android.server.pm.PackageManagerService.SCAN_AS_APK_IN_APEX;
 import static com.android.server.pm.PackageManagerService.SCAN_AS_FACTORY;
@@ -135,7 +134,6 @@ import android.os.Message;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.SELinux;
-import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -168,7 +166,6 @@ import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.dex.ArtManagerService;
 import com.android.server.pm.dex.DexManager;
 import com.android.server.pm.dex.DexoptOptions;
-import com.android.server.pm.dex.ViewCompiler;
 import com.android.server.pm.parsing.PackageCacher;
 import com.android.server.pm.parsing.PackageParser2;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
@@ -223,7 +220,6 @@ final class InstallPackageHelper {
     private final Context mContext;
     private final PackageDexOptimizer mPackageDexOptimizer;
     private final PackageAbiHelper mPackageAbiHelper;
-    private final ViewCompiler mViewCompiler;
     private final SharedLibrariesImpl mSharedLibraries;
     private final PackageManagerServiceInjector mInjector;
     private final UpdateOwnershipHelper mUpdateOwnershipHelper;
@@ -247,7 +243,6 @@ final class InstallPackageHelper {
         mContext = pm.mInjector.getContext();
         mPackageDexOptimizer = pm.mInjector.getPackageDexOptimizer();
         mPackageAbiHelper = pm.mInjector.getAbiHelper();
-        mViewCompiler = pm.mInjector.getViewCompiler();
         mSharedLibraries = pm.mInjector.getSharedLibrariesImpl();
         mUpdateOwnershipHelper = pm.mInjector.getUpdateOwnershipHelper();
     }
@@ -1641,7 +1636,8 @@ final class InstallPackageHelper {
                 synchronized (mPm.mLock) {
                     if (DEBUG_INSTALL) {
                         Slog.d(TAG,
-                                "replacePackageLI: new=" + parsedPackage + ", old=" + oldPackage);
+                                "replacePackageLI: new=" + parsedPackage
+                                        + ", old=" + oldPackageState.getName());
                     }
 
                     ps = mPm.mSettings.getPackageLPr(pkgName11);
@@ -1800,7 +1796,7 @@ final class InstallPackageHelper {
 
                     if (DEBUG_INSTALL) {
                         Slog.d(TAG, "replaceSystemPackageLI: new=" + parsedPackage
-                                + ", old=" + oldPackage);
+                                + ", old=" + oldPackageState.getName());
                     }
                     request.setReturnCode(PackageManager.INSTALL_SUCCEEDED);
                     request.setApexModuleName(oldPackageState.getApexModuleName());
@@ -1810,7 +1806,7 @@ final class InstallPackageHelper {
                     if (DEBUG_INSTALL) {
                         Slog.d(TAG,
                                 "replaceNonSystemPackageLI: new=" + parsedPackage + ", old="
-                                        + oldPackage);
+                                        + oldPackageState.getName());
                     }
                 }
             } else { // new package install
@@ -2129,24 +2125,6 @@ final class InstallPackageHelper {
                             // ignore; not possible for non-system app
                         }
                     }
-                    // Successfully deleted the old package; proceed with replace.
-                    // Update the in-memory copy of the previous code paths.
-                    PackageSetting ps1 = mPm.mSettings.getPackageLPr(
-                            installRequest.getExistingPackageName());
-                    if ((installRequest.getInstallFlags() & PackageManager.DONT_KILL_APP)
-                            == 0) {
-                        Set<String> oldCodePaths = ps1.getOldCodePaths();
-                        if (oldCodePaths == null) {
-                            oldCodePaths = new ArraySet<>();
-                        }
-                        if (oldPackage != null) {
-                            Collections.addAll(oldCodePaths, oldPackage.getBaseApkPath());
-                            Collections.addAll(oldCodePaths, oldPackage.getSplitCodePaths());
-                        }
-                        ps1.setOldCodePaths(oldCodePaths);
-                    } else {
-                        ps1.setOldCodePaths(null);
-                    }
 
                     if (installRequest.getReturnCode() == PackageManager.INSTALL_SUCCEEDED) {
                         PackageSetting ps2 = mPm.mSettings.getPackageLPr(
@@ -2418,12 +2396,6 @@ final class InstallPackageHelper {
                 permissionParamsBuilder.setAutoRevokePermissionsMode(autoRevokePermissionsMode);
                 mPm.mPermissionManager.onPackageInstalled(pkg, installRequest.getPreviousAppId(),
                         permissionParamsBuilder.build(), userId);
-                // Apply restricted settings on potentially dangerous packages.
-                if (installRequest.getPackageSource() == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE
-                        || installRequest.getPackageSource()
-                        == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE) {
-                    enableRestrictedSettings(pkgName, pkg.getUid());
-                }
             }
             installRequest.setName(pkgName);
             installRequest.setAppId(pkg.getUid());
@@ -2438,16 +2410,13 @@ final class InstallPackageHelper {
         Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
     }
 
-    private void enableRestrictedSettings(String pkgName, int appId) {
+    private void enableRestrictedSettings(String pkgName, int appId, int userId) {
         final AppOpsManager appOpsManager = mPm.mContext.getSystemService(AppOpsManager.class);
-        final int[] allUsersList = mPm.mUserManager.getUserIds();
-        for (int userId : allUsersList) {
-            final int uid = UserHandle.getUid(userId, appId);
-            appOpsManager.setMode(AppOpsManager.OP_ACCESS_RESTRICTED_SETTINGS,
-                    uid,
-                    pkgName,
-                    AppOpsManager.MODE_ERRORED);
-        }
+        final int uid = UserHandle.getUid(userId, appId);
+        appOpsManager.setMode(AppOpsManager.OP_ACCESS_RESTRICTED_SETTINGS,
+                uid,
+                pkgName,
+                AppOpsManager.MODE_ERRORED);
     }
 
     /**
@@ -2560,13 +2529,6 @@ final class InstallPackageHelper {
                             && !isApex;
 
             if (performDexopt) {
-                // Compile the layout resources.
-                if (SystemProperties.getBoolean(PRECOMPILE_LAYOUTS, false)) {
-                    Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "compileLayouts");
-                    mViewCompiler.compileLayouts(ps, pkg.getBaseApkPath());
-                    Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
-                }
-
                 Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "dexopt");
 
                 // This mirrors logic from commitReconciledScanResultLocked, where the library files
@@ -2871,19 +2833,26 @@ final class InstallPackageHelper {
                     mPm.mRequiredInstallerPackage,
                     /* packageSender= */ mPm, launchedForRestore, killApp, update, archived);
 
-
             // Work that needs to happen on first install within each user
-            if (firstUserIds.length > 0) {
-                for (int userId : firstUserIds) {
-                    mPm.restorePermissionsAndUpdateRolesForNewUserInstall(packageName,
-                            userId);
-                }
+            for (int userId : firstUserIds) {
+                mPm.restorePermissionsAndUpdateRolesForNewUserInstall(packageName,
+                        userId);
             }
 
             if (request.isAllNewUsers() && !update) {
                 mPm.notifyPackageAdded(packageName, request.getAppId());
             } else {
                 mPm.notifyPackageChanged(packageName, request.getAppId());
+            }
+
+            for (int userId : firstUserIds) {
+                // Apply restricted settings on potentially dangerous packages. Needs to happen
+                // after appOpsManager is notified of the new package
+                if (request.getPackageSource() == PackageInstaller.PACKAGE_SOURCE_LOCAL_FILE
+                        || request.getPackageSource()
+                        == PackageInstaller.PACKAGE_SOURCE_DOWNLOADED_FILE) {
+                    enableRestrictedSettings(packageName, request.getAppId(), userId);
+                }
             }
 
             // Log current value of "unknown sources" setting

@@ -34,3 +34,17 @@ flag {
     description: "Introduce a constant as maximum value of bugreport mode."
     bug: "305067125"
 }
+
+flag {
+    name: "adpf_prefer_power_efficiency"
+    namespace: "game"
+    description: "Guards the ADPF power efficiency API"
+    bug: "288117936"
+}
+
+flag {
+    name: "battery_saver_supported_check_api"
+    namespace: "backstage_power"
+    description: "Guards a new API in PowerManager to check if battery saver is supported or not."
+    bug: "305067031"
+}

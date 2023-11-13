@@ -2060,6 +2060,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         transitionController.deferTransitionReady();
+        Transition.ReadyCondition pipChangesApplied = new Transition.ReadyCondition("movedToPip");
+        transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
         try {
             // This will change the root pinned task's windowing mode to its original mode, ensuring
@@ -2244,6 +2246,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 }
             } finally {
                 transitionController.continueTransitionReady();
+                pipChangesApplied.meet();
             }
         }
 

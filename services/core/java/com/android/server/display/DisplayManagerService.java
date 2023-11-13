@@ -165,6 +165,7 @@ import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
 import com.android.server.display.notifications.DisplayNotificationManager;
+import com.android.server.display.utils.DebugUtils;
 import com.android.server.display.utils.SensorUtils;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.utils.FoldSettingProvider;
@@ -229,7 +230,10 @@ import java.util.function.Consumer;
  */
 public final class DisplayManagerService extends SystemService {
     private static final String TAG = "DisplayManagerService";
-    private static final boolean DEBUG = false;
+
+    // To enable these logs, run:
+    // 'adb shell setprop persist.log.tag.DisplayManagerService DEBUG && adb reboot'
+    private static final boolean DEBUG = DebugUtils.isDebuggable(TAG);
 
     // When this system property is set to 0, WFD is forcibly disabled on boot.
     // When this system property is set to 1, WFD is forcibly enabled on boot.
@@ -598,8 +602,7 @@ public final class DisplayManagerService extends SystemService {
         mDumpInProgress = false;
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
         mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
-        // TODO: b/306170135 - return TextUtils package name check instead
-        mExtraDisplayEventLogging = true;
+        mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
     }
 
     public void setupSchedulerPolicies() {
@@ -3061,8 +3064,7 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private boolean extraLogging(String packageName) {
-        // TODO: b/306170135 - return mExtraDisplayLoggingPackageName & package name check instead
-        return true;
+        return mExtraDisplayEventLogging && mExtraDisplayLoggingPackageName.equals(packageName);
     }
 
     // Runs on Handler thread.

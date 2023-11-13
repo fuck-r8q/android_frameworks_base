@@ -21,6 +21,7 @@ import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
 import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 
+import static com.android.systemui.flags.SetFlagsRuleExtensionsKt.setFlagDefault;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 import static com.android.systemui.statusbar.StatusBarState.SHADE;
 
@@ -158,12 +159,12 @@ import com.android.systemui.statusbar.notification.collection.NotifLiveDataStore
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
-import com.android.systemui.statusbar.notification.data.repository.NotificationExpansionRepository;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.interruption.KeyguardNotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptLogger;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
+import com.android.systemui.statusbar.notification.shared.NotificationIconContainerRefactor;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment;
@@ -186,8 +187,6 @@ import com.android.systemui.volume.VolumeComponent;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.startingsurface.StartingSurface;
 
-import dagger.Lazy;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -200,6 +199,8 @@ import java.io.PrintWriter;
 import java.util.Optional;
 
 import javax.inject.Provider;
+
+import dagger.Lazy;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
@@ -336,7 +337,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         mFeatureFlags.set(Flags.WM_ENABLE_PREDICTIVE_BACK_SYSUI, false);
         // Set default value to avoid IllegalStateException.
         mFeatureFlags.set(Flags.SHORTCUT_LIST_SEARCH_LAYOUT, false);
-        mFeatureFlags.setDefault(Flags.NOTIFICATION_ICON_CONTAINER_REFACTOR);
+        setFlagDefault(mSetFlagsRule, NotificationIconContainerRefactor.FLAG_NAME);
         // For the Shade to respond to Back gesture, we must enable the event routing
         mFeatureFlags.set(Flags.WM_SHADE_ALLOW_BACK_GESTURE, true);
         // For the Shade to animate during the Back gesture, we must enable the animation flag.
@@ -502,7 +503,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 (Lazy<NotificationPresenter>) () -> mNotificationPresenter,
                 (Lazy<NotificationActivityStarter>) () -> mNotificationActivityStarter,
                 mNotifLaunchAnimControllerProvider,
-                new NotificationExpansionRepository(),
                 mDozeParameters,
                 mScrimController,
                 mBiometricUnlockControllerLazy,

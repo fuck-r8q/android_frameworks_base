@@ -496,6 +496,10 @@ public final class ProcessList {
     @GuardedBy("mService")
     final ProcessMap<AppZygote> mAppZygotes = new ProcessMap<AppZygote>();
 
+    /** Manages the {@link android.app.ApplicationStartInfo} records. */
+    @GuardedBy("mAppStartInfoTracker")
+    final AppStartInfoTracker mAppStartInfoTracker = new AppStartInfoTracker();
+
     /**
      * The currently running SDK sandbox processes for a uid.
      */
@@ -963,12 +967,14 @@ public final class ProcessList {
                         mSystemServerSocketForZygote.getFileDescriptor(),
                         EVENT_INPUT, this::handleZygoteMessages);
             }
+            mAppStartInfoTracker.init(mService);
             mAppExitInfoTracker.init(mService);
             mImperceptibleKillRunner = new ImperceptibleKillRunner(sKillThread.getLooper());
         }
     }
 
     void onSystemReady() {
+        mAppStartInfoTracker.onSystemReady();
         mAppExitInfoTracker.onSystemReady();
     }
 
@@ -3273,6 +3279,17 @@ public final class ProcessList {
                 sdkSandboxClientAppPackage,
                 hostingRecord.getDefiningUid(), hostingRecord.getDefiningProcessName());
         final ProcessStateRecord state = r.mState;
+
+        // Check if we should mark the processrecord for first launch after force-stopping
+        if ((r.getApplicationInfo().flags & ApplicationInfo.FLAG_STOPPED) != 0) {
+            final boolean wasPackageEverLaunched = mService.getPackageManagerInternal()
+                    .wasPackageEverLaunched(r.getApplicationInfo().packageName, r.userId);
+            // If the package was launched in the past but is currently stopped, only then it
+            // should be considered as stopped after use. Do not mark it if it's the first launch.
+            if (wasPackageEverLaunched) {
+                r.setWasForceStopped(true);
+            }
+        }
 
         if (!isolated && !isSdkSandbox
                 && userId == UserHandle.USER_SYSTEM

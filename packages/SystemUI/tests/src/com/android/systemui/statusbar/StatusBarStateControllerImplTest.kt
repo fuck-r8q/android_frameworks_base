@@ -26,7 +26,6 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepository
 import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
-import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
@@ -115,7 +114,6 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
             powerInteractor,
             featureFlags,
             sceneContainerFlags,
-            FakeDeviceEntryRepository(),
             FakeKeyguardBouncerRepository(),
             configurationRepository,
             shadeRepository,

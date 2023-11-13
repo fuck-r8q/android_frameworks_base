@@ -1025,8 +1025,7 @@ public final class ViewRootImpl implements ViewParent,
         mDisplay = display;
         mBasePackageName = context.getBasePackageName();
         final String name = DisplayProperties.debug_vri_package().orElse(null);
-        // TODO: b/306170135 - return to using textutils check on package name.
-        mExtraDisplayListenerLogging = true;
+        mExtraDisplayListenerLogging = !TextUtils.isEmpty(name) && name.equals(mBasePackageName);
         mThread = Thread.currentThread();
         mLocation = new WindowLeaked(null);
         mLocation.fillInStackTrace();
@@ -11651,7 +11650,14 @@ public final class ViewRootImpl implements ViewParent,
             Log.d(mTag, "registerCallbacksForSync syncBuffer=" + syncBuffer);
         }
 
-        surfaceSyncGroup.addTransaction(mPendingTransaction);
+        final Transaction t;
+        if (mHasPendingTransactions) {
+            t = new Transaction();
+            t.merge(mPendingTransaction);
+        } else {
+            t = null;
+        }
+
         mAttachInfo.mThreadedRenderer.registerRtFrameCallback(new FrameDrawingCallback() {
             @Override
             public void onFrameDraw(long frame) {
@@ -11663,6 +11669,9 @@ public final class ViewRootImpl implements ViewParent,
                     Log.d(mTag,
                             "Received frameDrawingCallback syncResult=" + syncResult + " frameNum="
                                     + frame + ".");
+                }
+                if (t != null) {
+                    mergeWithNextTransaction(t, frame);
                 }
 
                 // If the syncResults are SYNC_LOST_SURFACE_REWARD_IF_FOUND or

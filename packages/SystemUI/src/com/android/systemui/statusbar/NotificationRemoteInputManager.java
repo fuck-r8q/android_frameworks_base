@@ -50,6 +50,7 @@ import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.statusbar.NotificationVisibility;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.Dumpable;
+import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.res.R;
@@ -74,12 +75,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import javax.inject.Inject;
+
 /**
  * Class for handling remote input state over a set of notifications. This class handles things
  * like keeping notifications temporarily that were cancelled as a response to a remote input
  * interaction, keeping track of notifications to remove when NotificationPresenter is collapsed,
  * and handling clicks on remote views.
  */
+@SysUISingleton
 public class NotificationRemoteInputManager implements CoreStartable {
     public static final boolean ENABLE_REMOTE_INPUT =
             SystemProperties.getBoolean("debug.enable_remote_input", true);
@@ -253,6 +257,7 @@ public class NotificationRemoteInputManager implements CoreStartable {
     /**
      * Injected constructor. See {@link CentralSurfacesDependenciesModule}.
      */
+    @Inject
     public NotificationRemoteInputManager(
             Context context,
             NotifPipelineFlags notifPipelineFlags,

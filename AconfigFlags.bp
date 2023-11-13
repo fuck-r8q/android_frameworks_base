@@ -14,12 +14,14 @@
 
 aconfig_srcjars = [
     ":android.app.usage.flags-aconfig-java{.generated_srcjars}",
+    ":android.app.smartspace.flags-aconfig-java{.generated_srcjars}",
     ":android.companion.flags-aconfig-java{.generated_srcjars}",
     ":android.content.pm.flags-aconfig-java{.generated_srcjars}",
     ":android.content.res.flags-aconfig-java{.generated_srcjars}",
     ":android.hardware.flags-aconfig-java{.generated_srcjars}",
     ":android.hardware.radio.flags-aconfig-java{.generated_srcjars}",
     ":android.location.flags-aconfig-java{.generated_srcjars}",
+    ":android.net.vcn.flags-aconfig-java{.generated_srcjars}",
     ":android.nfc.flags-aconfig-java{.generated_srcjars}",
     ":android.os.flags-aconfig-java{.generated_srcjars}",
     ":android.os.vibrator.flags-aconfig-java{.generated_srcjars}",
@@ -567,6 +569,19 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+// VCN
+aconfig_declarations {
+    name: "android.net.vcn.flags-aconfig",
+    package: "android.net.vcn",
+    srcs: ["core/java/android/net/vcn/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.net.vcn.flags-aconfig-java",
+    aconfig_declarations: "android.net.vcn.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
 // DevicePolicy
 aconfig_declarations {
     name: "device_policy_aconfig_flags",
@@ -597,5 +612,18 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.service.notification.flags-aconfig-java",
     aconfig_declarations: "android.service.notification.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Smartspace
+aconfig_declarations {
+    name: "android.app.smartspace.flags-aconfig",
+    package: "android.app.smartspace.flags",
+    srcs: ["core/java/android/app/smartspace/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.app.smartspace.flags-aconfig-java",
+    aconfig_declarations: "android.app.smartspace.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }

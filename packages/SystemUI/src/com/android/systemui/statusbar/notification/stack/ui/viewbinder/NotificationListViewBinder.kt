@@ -17,14 +17,21 @@
 package com.android.systemui.statusbar.notification.stack.ui.viewbinder
 
 import android.view.LayoutInflater
-import com.android.systemui.res.R
-import com.android.systemui.flags.FeatureFlags
+import com.android.systemui.common.ui.ConfigurationState
+import com.android.systemui.common.ui.reinflateAndBindLatest
+import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.plugins.FalsingManager
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.NotificationShelf
+import com.android.systemui.statusbar.notification.footer.ui.view.FooterView
+import com.android.systemui.statusbar.notification.footer.ui.viewbinder.FooterViewBinder
+import com.android.systemui.statusbar.notification.icon.ui.viewbinder.ShelfNotificationIconViewStore
 import com.android.systemui.statusbar.notification.shelf.ui.viewbinder.NotificationShelfViewBinder
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModel
 import com.android.systemui.statusbar.phone.NotificationIconAreaController
+import com.android.systemui.statusbar.policy.ConfigurationController
+import com.android.systemui.util.traceSection
 
 /** Binds a [NotificationStackScrollLayout] to its [view model][NotificationListViewModel]. */
 object NotificationListViewBinder {
@@ -32,9 +39,11 @@ object NotificationListViewBinder {
     fun bind(
         view: NotificationStackScrollLayout,
         viewModel: NotificationListViewModel,
+        configuration: ConfigurationState,
+        configurationController: ConfigurationController,
         falsingManager: FalsingManager,
-        featureFlags: FeatureFlags,
         iconAreaController: NotificationIconAreaController,
+        shelfIconViewStore: ShelfNotificationIconViewStore,
     ) {
         val shelf =
             LayoutInflater.from(view.context)
@@ -42,10 +51,27 @@ object NotificationListViewBinder {
         NotificationShelfViewBinder.bind(
             shelf,
             viewModel.shelf,
+            configuration,
+            configurationController,
             falsingManager,
-            featureFlags,
-            iconAreaController
+            iconAreaController,
+            shelfIconViewStore,
         )
         view.setShelf(shelf)
+
+        viewModel.footer.ifPresent { footerViewModel ->
+            // The footer needs to be re-inflated every time the theme or the font size changes.
+            view.repeatWhenAttached {
+                configuration.reinflateAndBindLatest(
+                    R.layout.status_bar_notification_footer,
+                    view,
+                    attachToRoot = false,
+                ) { footerView: FooterView ->
+                    traceSection("bind FooterView") {
+                        FooterViewBinder.bind(footerView, footerViewModel)
+                    }
+                }
+            }
+        }
     }
 }
