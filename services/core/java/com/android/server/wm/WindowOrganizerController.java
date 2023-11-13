@@ -37,6 +37,7 @@ import static android.window.TaskFragmentOperation.OP_TYPE_SET_RELATIVE_BOUNDS;
 import static android.window.TaskFragmentOperation.OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT;
 import static android.window.TaskFragmentOperation.OP_TYPE_UNKNOWN;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FOCUSABLE;
+import static android.window.WindowContainerTransaction.Change.CHANGE_FORCE_TRANSLUCENT;
 import static android.window.WindowContainerTransaction.Change.CHANGE_HIDDEN;
 import static android.window.WindowContainerTransaction.Change.CHANGE_RELATIVE_BOUNDS;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_ADD_INSETS_FRAME_PROVIDER;
@@ -305,9 +306,12 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     // This is a direct call from shell, so the entire transition lifecycle is
                     // contained in the provided transaction if provided. Thus, we can setReady
                     // immediately after apply.
+                    final Transition.ReadyCondition wctApplied =
+                            new Transition.ReadyCondition("start WCT applied");
                     final boolean needsSetReady = t != null;
                     final Transition nextTransition = new Transition(type, 0 /* flags */,
                             mTransitionController, mService.mWindowManager.mSyncEngine);
+                    nextTransition.mReadyTracker.add(wctApplied);
                     nextTransition.calcParallelCollectType(wct);
                     mTransitionController.startCollectOrQueue(nextTransition,
                             (deferred) -> {
@@ -315,6 +319,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                                 nextTransition.mLogger.mStartWCT = wct;
                                 applyTransaction(wct, -1 /* syncId */, nextTransition, caller,
                                         deferred);
+                                wctApplied.meet();
                                 if (needsSetReady) {
                                     // TODO(b/294925498): Remove this once we have accurate ready
                                     //                    tracking.
@@ -329,6 +334,15 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             });
                     return nextTransition.getToken();
                 }
+                // Currently, application of wct can span multiple looper loops (ie.
+                // waitAsyncStart), so add a condition to ensure that it finishes applying.
+                final Transition.ReadyCondition wctApplied;
+                if (t != null) {
+                    wctApplied = new Transition.ReadyCondition("start WCT applied");
+                    transition.mReadyTracker.add(wctApplied);
+                } else {
+                    wctApplied = null;
+                }
                 // The transition already started collecting before sending a request to shell,
                 // so just start here.
                 if (!transition.isCollecting() && !transition.isForcePlaying()) {
@@ -336,6 +350,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             + " means Shell took too long to respond to a request. WM State may be"
                             + " incorrect now, please file a bug");
                     applyTransaction(wct, -1 /*syncId*/, null /*transition*/, caller);
+                    if (wctApplied != null) {
+                        wctApplied.meet();
+                    }
                     return transition.getToken();
                 }
                 transition.mLogger.mStartWCT = wct;
@@ -344,11 +361,17 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                         synchronized (mService.mGlobalLock) {
                             transition.start();
                             applyTransaction(wct, -1 /* syncId */, transition, caller);
+                            if (wctApplied != null) {
+                                wctApplied.meet();
+                            }
                         }
                     });
                 } else {
                     transition.start();
                     applyTransaction(wct, -1 /* syncId */, transition, caller);
+                    if (wctApplied != null) {
+                        wctApplied.meet();
+                    }
                 }
                 // Since the transition is already provided, it means WMCore is determining the
                 // "readiness lifecycle" outside the provided transaction, so don't set ready here.
@@ -746,8 +769,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             }
         }
 
-        if ((c.getChangeMask()
-                & WindowContainerTransaction.Change.CHANGE_FORCE_TRANSLUCENT) != 0) {
+        if ((c.getChangeMask() & CHANGE_FORCE_TRANSLUCENT) != 0) {
             tr.setForceTranslucent(c.getForceTranslucent());
             effects = TRANSACT_EFFECTS_LIFECYCLE;
         }
@@ -855,6 +877,11 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 effects |= TRANSACT_EFFECTS_LIFECYCLE;
             }
         }
+        if ((c.getChangeMask() & CHANGE_FORCE_TRANSLUCENT) != 0) {
+            taskFragment.setForceTranslucent(c.getForceTranslucent());
+            effects = TRANSACT_EFFECTS_LIFECYCLE;
+        }
+
         effects |= applyChanges(taskFragment, c);
 
         if (taskFragment.shouldStartChangeTransition(mTmpBounds0, mTmpBounds1)) {
@@ -1159,9 +1186,13 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             }
             case HIERARCHY_OP_TYPE_SET_ALWAYS_ON_TOP: {
                 final WindowContainer container = WindowContainer.fromBinder(hop.getContainer());
-                if (container == null || container.asDisplayArea() == null
-                        || !container.isAttached()) {
-                    Slog.e(TAG, "Attempt to operate on unknown or detached display area: "
+                if (container == null || !container.isAttached()) {
+                    Slog.e(TAG, "Attempt to operate on unknown or detached container: "
+                            + container);
+                    break;
+                }
+                if (container.asTask() == null && container.asDisplayArea() == null) {
+                    Slog.e(TAG, "Cannot set always-on-top on non-task or non-display area: "
                             + container);
                     break;
                 }
@@ -1996,9 +2027,11 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
 
         if (mTaskFragmentOrganizerController.isSystemOrganizer(organizer.asBinder())) {
             // System organizer is allowed to update the hidden and focusable state.
-            // We unset the CHANGE_HIDDEN and CHANGE_FOCUSABLE bits because they are checked here.
+            // We unset the CHANGE_HIDDEN, CHANGE_FOCUSABLE, and CHANGE_FORCE_TRANSLUCENT bits
+            // because they are checked here.
             changeMaskToBeChecked &= ~CHANGE_HIDDEN;
             changeMaskToBeChecked &= ~CHANGE_FOCUSABLE;
+            changeMaskToBeChecked &= ~CHANGE_FORCE_TRANSLUCENT;
         }
 
         // setRelativeBounds is allowed.

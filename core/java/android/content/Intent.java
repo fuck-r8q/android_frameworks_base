@@ -6352,6 +6352,7 @@ public class Intent implements Parcelable, Cloneable {
      * the package is being archived. Either by removing the existing APK, or by installing
      * a package without an APK.
      */
+    @FlaggedApi(android.content.pm.Flags.FLAG_ARCHIVING)
     public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
 
     /**

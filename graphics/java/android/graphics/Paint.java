@@ -27,6 +27,9 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Px;
 import android.annotation.Size;
+import android.app.compat.CompatChanges;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.graphics.fonts.FontVariationAxis;
 import android.os.Build;
@@ -614,6 +617,7 @@ public class Paint {
         mCompatScaling = mInvCompatScaling = 1;
         setTextLocales(LocaleList.getAdjustedDefault());
         mColor = Color.pack(Color.BLACK);
+        resetElegantTextHeight();
     }
 
     /**
@@ -654,7 +658,7 @@ public class Paint {
 
         mBidiFlags = BIDI_DEFAULT_LTR;
         setTextLocales(LocaleList.getAdjustedDefault());
-        setElegantTextHeight(false);
+        resetElegantTextHeight();
         mFontFeatureSettings = null;
         mFontVariationSettings = null;
 
@@ -1735,11 +1739,29 @@ public class Paint {
     /**
      * Get the elegant metrics flag.
      *
+     * From API {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, the default value will be true by
+     * default if the app has a target SDK of API {@link Build.VERSION_CODES#VANILLA_ICE_CREAM} or
+     * later.
+     *
      * @return true if elegant metrics are enabled for text drawing.
      */
     public boolean isElegantTextHeight() {
-        return nIsElegantTextHeight(mNativePaint);
+        int rawValue = nGetElegantTextHeight(mNativePaint);
+        switch (rawValue) {
+            case ELEGANT_TEXT_HEIGHT_DISABLED:
+                return false;
+            case ELEGANT_TEXT_HEIGHT_ENABLED:
+                return true;
+            case ELEGANT_TEXT_HEIGHT_UNSET:
+            default:
+                return com.android.text.flags.Flags.deprecateUiFonts();
+        }
     }
+
+    // Note: the following three values must be equal to the ones in the JNI file: Paint.cpp
+    private static final int ELEGANT_TEXT_HEIGHT_UNSET = -1;
+    private static final int ELEGANT_TEXT_HEIGHT_ENABLED = 0;
+    private static final int ELEGANT_TEXT_HEIGHT_DISABLED = 1;
 
     /**
      * Set the paint's elegant height metrics flag. This setting selects font
@@ -1749,7 +1771,29 @@ public class Paint {
      * @param elegant set the paint's elegant metrics flag for drawing text.
      */
     public void setElegantTextHeight(boolean elegant) {
-        nSetElegantTextHeight(mNativePaint, elegant);
+        nSetElegantTextHeight(mNativePaint,
+                elegant ? ELEGANT_TEXT_HEIGHT_ENABLED : ELEGANT_TEXT_HEIGHT_DISABLED);
+    }
+
+    /**
+     * A change ID for deprecating UI fonts.
+     *
+     * From API {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, the default value will be true by
+     * default if the app has a target SDK of API {@link Build.VERSION_CODES#VANILLA_ICE_CREAM} or
+     * later.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public static final long DEPRECATE_UI_FONT = 279646685L;
+
+    private void resetElegantTextHeight() {
+        if (CompatChanges.isChangeEnabled(DEPRECATE_UI_FONT)) {
+            nSetElegantTextHeight(mNativePaint, ELEGANT_TEXT_HEIGHT_UNSET);
+        } else {
+            nSetElegantTextHeight(mNativePaint, ELEGANT_TEXT_HEIGHT_DISABLED);
+        }
     }
 
     /**
@@ -2113,6 +2157,31 @@ public class Paint {
          * The recommended additional space to add between lines of text.
          */
         public float   leading;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || !(o instanceof FontMetrics)) return false;
+            FontMetrics that = (FontMetrics) o;
+            return that.top == top && that.ascent == ascent && that.descent == descent
+                    && that.bottom == bottom && that.leading == leading;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(top, ascent, descent, bottom, leading);
+        }
+
+        @Override
+        public String toString() {
+            return "FontMetrics{"
+                    + "top=" + top
+                    + ", ascent=" + ascent
+                    + ", descent=" + descent
+                    + ", bottom=" + bottom
+                    + ", leading=" + leading
+                    + '}';
+        }
     }
 
     /**
@@ -2308,6 +2377,33 @@ public class Paint {
          * The recommended additional space to add between lines of text.
          */
         public int   leading;
+
+        /**
+         * Set values from {@link FontMetricsInt}.
+         * @param fontMetricsInt a font metrics.
+         */
+        @FlaggedApi(FLAG_FIX_LINE_HEIGHT_FOR_LOCALE)
+        public void set(@NonNull FontMetricsInt fontMetricsInt) {
+            top = fontMetricsInt.top;
+            ascent = fontMetricsInt.ascent;
+            descent = fontMetricsInt.descent;
+            bottom = fontMetricsInt.bottom;
+            leading = fontMetricsInt.leading;
+        }
+
+        /**
+         * Set values from {@link FontMetrics} with rounding accordingly.
+         * @param fontMetrics a font metrics.
+         */
+        @FlaggedApi(FLAG_FIX_LINE_HEIGHT_FOR_LOCALE)
+        public void set(@NonNull FontMetrics fontMetrics) {
+            // See GraphicsJNI::set_metrics_int method for consistency.
+            top = (int) Math.floor(fontMetrics.top);
+            ascent = Math.round(fontMetrics.ascent);
+            descent = Math.round(fontMetrics.descent);
+            bottom = (int) Math.ceil(fontMetrics.bottom);
+            leading = Math.round(fontMetrics.leading);
+        }
 
         @Override public String toString() {
             return "FontMetricsInt: top=" + top + " ascent=" + ascent +
@@ -3608,9 +3704,9 @@ public class Paint {
     @CriticalNative
     private static native void nSetStrikeThruText(long paintPtr, boolean strikeThruText);
     @CriticalNative
-    private static native boolean nIsElegantTextHeight(long paintPtr);
+    private static native int nGetElegantTextHeight(long paintPtr);
     @CriticalNative
-    private static native void nSetElegantTextHeight(long paintPtr, boolean elegant);
+    private static native void nSetElegantTextHeight(long paintPtr, int elegant);
     @CriticalNative
     private static native float nGetTextSize(long paintPtr);
     @CriticalNative

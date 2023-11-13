@@ -3079,7 +3079,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     @Override
     boolean providesOrientation() {
-        return mStyleFillsParent;
+        return mStyleFillsParent || mOccludesParent;
     }
 
     @Override
@@ -9494,8 +9494,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final Task rootTask = getRootTask();
         final float minAspectRatio = getMinAspectRatio();
         final TaskFragment organizedTf = getOrganizedTaskFragment();
+        float aspectRatioToApply = desiredAspectRatio;
         if (task == null || rootTask == null
-                || (maxAspectRatio < 1 && minAspectRatio < 1 && desiredAspectRatio < 1)
+                || (maxAspectRatio < 1 && minAspectRatio < 1 && aspectRatioToApply < 1)
                 // Don't set aspect ratio if we are in VR mode.
                 || isInVrUiMode(getConfiguration())
                 // TODO(b/232898850): Always respect aspect ratio requests.
@@ -9508,30 +9509,30 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final int containingAppHeight = containingAppBounds.height();
         final float containingRatio = computeAspectRatio(containingAppBounds);
 
-        if (desiredAspectRatio < 1) {
-            desiredAspectRatio = containingRatio;
+        if (aspectRatioToApply < 1) {
+            aspectRatioToApply = containingRatio;
         }
 
-        if (maxAspectRatio >= 1 && desiredAspectRatio > maxAspectRatio) {
-            desiredAspectRatio = maxAspectRatio;
-        } else if (minAspectRatio >= 1 && desiredAspectRatio < minAspectRatio) {
-            desiredAspectRatio = minAspectRatio;
+        if (maxAspectRatio >= 1 && aspectRatioToApply > maxAspectRatio) {
+            aspectRatioToApply = maxAspectRatio;
+        } else if (minAspectRatio >= 1 && aspectRatioToApply < minAspectRatio) {
+            aspectRatioToApply = minAspectRatio;
         }
 
         int activityWidth = containingAppWidth;
         int activityHeight = containingAppHeight;
 
-        if (containingRatio - desiredAspectRatio > ASPECT_RATIO_ROUNDING_TOLERANCE) {
+        if (containingRatio - aspectRatioToApply > ASPECT_RATIO_ROUNDING_TOLERANCE) {
             if (containingAppWidth < containingAppHeight) {
                 // Width is the shorter side, so we use that to figure-out what the max. height
                 // should be given the aspect ratio.
-                activityHeight = (int) ((activityWidth * desiredAspectRatio) + 0.5f);
+                activityHeight = (int) ((activityWidth * aspectRatioToApply) + 0.5f);
             } else {
                 // Height is the shorter side, so we use that to figure-out what the max. width
                 // should be given the aspect ratio.
-                activityWidth = (int) ((activityHeight * desiredAspectRatio) + 0.5f);
+                activityWidth = (int) ((activityHeight * aspectRatioToApply) + 0.5f);
             }
-        } else if (desiredAspectRatio - containingRatio > ASPECT_RATIO_ROUNDING_TOLERANCE) {
+        } else if (aspectRatioToApply - containingRatio > ASPECT_RATIO_ROUNDING_TOLERANCE) {
             boolean adjustWidth;
             switch (getRequestedConfigurationOrientation()) {
                 case ORIENTATION_LANDSCAPE:
@@ -9559,9 +9560,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                     break;
             }
             if (adjustWidth) {
-                activityWidth = (int) ((activityHeight / desiredAspectRatio) + 0.5f);
+                activityWidth = (int) ((activityHeight / aspectRatioToApply) + 0.5f);
             } else {
-                activityHeight = (int) ((activityWidth / desiredAspectRatio) + 0.5f);
+                activityHeight = (int) ((activityWidth / aspectRatioToApply) + 0.5f);
             }
         }
 

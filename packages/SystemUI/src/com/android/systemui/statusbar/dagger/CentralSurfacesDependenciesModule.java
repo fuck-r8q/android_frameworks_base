@@ -34,25 +34,19 @@ import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.media.controls.pipeline.MediaDataManager;
-import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.shade.NotificationPanelViewController;
 import com.android.systemui.shade.ShadeSurface;
 import com.android.systemui.shade.carrier.ShadeCarrierGroupController;
-import com.android.systemui.shade.domain.interactor.ShadeInteractor;
-import com.android.systemui.statusbar.ActionClickLogger;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.NotificationClickNotifier;
-import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationMediaManager;
 import com.android.systemui.statusbar.NotificationRemoteInputManager;
 import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.commandline.CommandRegistry;
-import com.android.systemui.statusbar.notification.NotifPipelineFlags;
-import com.android.systemui.statusbar.notification.RemoteInputControllerLogger;
 import com.android.systemui.statusbar.notification.collection.NotifCollection;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
@@ -65,8 +59,6 @@ import com.android.systemui.statusbar.phone.StatusBarIconList;
 import com.android.systemui.statusbar.phone.StatusBarNotificationPresenterModule;
 import com.android.systemui.statusbar.phone.StatusBarRemoteInputCallback;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
-import com.android.systemui.statusbar.policy.RemoteInputUriController;
-import com.android.systemui.util.kotlin.JavaAdapter;
 
 import dagger.Binds;
 import dagger.Lazy;
@@ -83,37 +75,6 @@ import dagger.multibindings.IntoMap;
  */
 @Module(includes = {StatusBarNotificationPresenterModule.class})
 public interface CentralSurfacesDependenciesModule {
-    /** */
-    @Provides
-    static NotificationRemoteInputManager provideNotificationRemoteInputManager(
-            Context context,
-            NotifPipelineFlags notifPipelineFlags,
-            NotificationLockscreenUserManager lockscreenUserManager,
-            SmartReplyController smartReplyController,
-            NotificationVisibilityProvider visibilityProvider,
-            PowerInteractor powerInteractor,
-            StatusBarStateController statusBarStateController,
-            RemoteInputUriController remoteInputUriController,
-            RemoteInputControllerLogger remoteInputControllerLogger,
-            NotificationClickNotifier clickNotifier,
-            ActionClickLogger actionClickLogger,
-            JavaAdapter javaAdapter,
-            ShadeInteractor shadeInteractor) {
-        return new NotificationRemoteInputManager(
-                context,
-                notifPipelineFlags,
-                lockscreenUserManager,
-                smartReplyController,
-                visibilityProvider,
-                powerInteractor,
-                statusBarStateController,
-                remoteInputUriController,
-                remoteInputControllerLogger,
-                clickNotifier,
-                actionClickLogger,
-                javaAdapter,
-                shadeInteractor);
-    }
 
     /** */
     @Binds

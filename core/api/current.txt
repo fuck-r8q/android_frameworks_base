@@ -233,6 +233,7 @@ package android {
     field public static final String READ_CALENDAR = "android.permission.READ_CALENDAR";
     field public static final String READ_CALL_LOG = "android.permission.READ_CALL_LOG";
     field public static final String READ_CONTACTS = "android.permission.READ_CONTACTS";
+    field @FlaggedApi("com.android.server.feature.flags.enable_read_dropbox_permission") public static final String READ_DROPBOX_DATA = "android.permission.READ_DROPBOX_DATA";
     field public static final String READ_EXTERNAL_STORAGE = "android.permission.READ_EXTERNAL_STORAGE";
     field public static final String READ_HOME_APP_SEARCH_DATA = "android.permission.READ_HOME_APP_SEARCH_DATA";
     field @Deprecated public static final String READ_INPUT_STATE = "android.permission.READ_INPUT_STATE";
@@ -9727,13 +9728,13 @@ package android.companion {
     method @Deprecated @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull String);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
-    method @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
-    field public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
-    field public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
-    field public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
-    field public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
-    field public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
-    field public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
+    method @FlaggedApi("android.companion.device_presence") @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
+    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
     field public static final String SERVICE_INTERFACE = "android.companion.CompanionDeviceService";
   }
 
@@ -11184,7 +11185,7 @@ package android.content {
     field public static final String EXTRA_ALLOW_MULTIPLE = "android.intent.extra.ALLOW_MULTIPLE";
     field @Deprecated public static final String EXTRA_ALLOW_REPLACE = "android.intent.extra.ALLOW_REPLACE";
     field public static final String EXTRA_ALTERNATE_INTENTS = "android.intent.extra.ALTERNATE_INTENTS";
-    field public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
+    field @FlaggedApi("android.content.pm.archiving") public static final String EXTRA_ARCHIVAL = "android.intent.extra.ARCHIVAL";
     field public static final String EXTRA_ASSIST_CONTEXT = "android.intent.extra.ASSIST_CONTEXT";
     field public static final String EXTRA_ASSIST_INPUT_DEVICE_ID = "android.intent.extra.ASSIST_INPUT_DEVICE_ID";
     field public static final String EXTRA_ASSIST_INPUT_HINT_KEYBOARD = "android.intent.extra.ASSIST_INPUT_HINT_KEYBOARD";
@@ -12071,6 +12072,40 @@ package android.content.pm {
     method public final int compare(android.content.pm.ApplicationInfo, android.content.pm.ApplicationInfo);
   }
 
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedActivity {
+    ctor public ArchivedActivity(@NonNull CharSequence, @NonNull android.content.ComponentName);
+    method @NonNull public android.content.ComponentName getComponentName();
+    method @Nullable public android.graphics.drawable.Drawable getIcon();
+    method @NonNull public CharSequence getLabel();
+    method @Nullable public android.graphics.drawable.Drawable getMonochromeIcon();
+    method @NonNull public android.content.pm.ArchivedActivity setComponentName(@NonNull android.content.ComponentName);
+    method @NonNull public android.content.pm.ArchivedActivity setIcon(@NonNull android.graphics.drawable.Drawable);
+    method @NonNull public android.content.pm.ArchivedActivity setLabel(@NonNull CharSequence);
+    method @NonNull public android.content.pm.ArchivedActivity setMonochromeIcon(@NonNull android.graphics.drawable.Drawable);
+  }
+
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedPackage {
+    ctor public ArchivedPackage(@NonNull String, @NonNull android.content.pm.SigningInfo, @NonNull java.util.List<android.content.pm.ArchivedActivity>);
+    method @Nullable public String getDefaultToDeviceProtectedStorage();
+    method @NonNull public java.util.List<android.content.pm.ArchivedActivity> getLauncherActivities();
+    method @NonNull public String getPackageName();
+    method @Nullable public String getRequestLegacyExternalStorage();
+    method @NonNull public android.content.pm.SigningInfo getSigningInfo();
+    method public int getTargetSdkVersion();
+    method @Nullable public String getUserDataFragile();
+    method public int getVersionCode();
+    method public int getVersionCodeMajor();
+    method @NonNull public android.content.pm.ArchivedPackage setDefaultToDeviceProtectedStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setLauncherActivities(@NonNull java.util.List<android.content.pm.ArchivedActivity>);
+    method @NonNull public android.content.pm.ArchivedPackage setPackageName(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setRequestLegacyExternalStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setSigningInfo(@NonNull android.content.pm.SigningInfo);
+    method @NonNull public android.content.pm.ArchivedPackage setTargetSdkVersion(int);
+    method @NonNull public android.content.pm.ArchivedPackage setUserDataFragile(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackage setVersionCode(int);
+    method @NonNull public android.content.pm.ArchivedPackage setVersionCodeMajor(int);
+  }
+
   public final class Attribution implements android.os.Parcelable {
     method public int describeContents();
     method @IdRes public int getLabel();
@@ -12403,6 +12438,7 @@ package android.content.pm {
     method @Nullable public android.content.pm.PackageInstaller.SessionInfo getSessionInfo(int);
     method @NonNull public java.util.List<android.content.pm.PackageInstaller.SessionInfo> getStagedSessions();
     method @RequiresPermission(allOf={android.Manifest.permission.INSTALL_PACKAGES, "com.android.permission.INSTALL_EXISTING_PACKAGES"}) public void installExistingPackage(@NonNull String, int, @Nullable android.content.IntentSender);
+    method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void installPackageArchived(@NonNull android.content.pm.ArchivedPackage, @NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.content.IntentSender);
     method @NonNull public android.content.pm.PackageInstaller.Session openSession(int) throws java.io.IOException;
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback, @NonNull android.os.Handler);
@@ -12684,6 +12720,7 @@ package android.content.pm {
     method @NonNull public abstract CharSequence getApplicationLabel(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
+    method @FlaggedApi("android.content.pm.archiving") @Nullable public android.content.pm.ArchivedPackage getArchivedPackage(@NonNull String);
     method @NonNull public CharSequence getBackgroundPermissionOptionLabel();
     method @Nullable public abstract android.content.pm.ChangedPackages getChangedPackages(@IntRange(from=0) int);
     method public abstract int getComponentEnabledSetting(@NonNull android.content.ComponentName);
@@ -12935,7 +12972,7 @@ package android.content.pm {
     field public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
     field public static final String FEATURE_TELEPHONY_SUBSCRIPTION = "android.hardware.telephony.subscription";
     field @Deprecated public static final String FEATURE_TELEVISION = "android.hardware.type.television";
-    field public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
+    field @FlaggedApi("com.android.net.thread.flags.thread_enabled") public static final String FEATURE_THREAD_NETWORK = "android.hardware.thread_network";
     field public static final String FEATURE_TOUCHSCREEN = "android.hardware.touchscreen";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH = "android.hardware.touchscreen.multitouch";
     field public static final String FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT = "android.hardware.touchscreen.multitouch.distinct";
@@ -13368,9 +13405,12 @@ package android.content.pm {
 
   public final class SigningInfo implements android.os.Parcelable {
     ctor public SigningInfo();
+    ctor @FlaggedApi("android.content.pm.archiving") public SigningInfo(@IntRange(from=0) int, @Nullable java.util.Collection<android.content.pm.Signature>, @Nullable java.util.Collection<java.security.PublicKey>, @Nullable java.util.Collection<android.content.pm.Signature>);
     ctor public SigningInfo(android.content.pm.SigningInfo);
     method public int describeContents();
     method public android.content.pm.Signature[] getApkContentsSigners();
+    method @FlaggedApi("android.content.pm.archiving") @NonNull public java.util.Collection<java.security.PublicKey> getPublicKeys();
+    method @FlaggedApi("android.content.pm.archiving") @IntRange(from=0) public int getSchemeVersion();
     method public android.content.pm.Signature[] getSigningCertificateHistory();
     method public boolean hasMultipleSigners();
     method public boolean hasPastSigningCertificates();
@@ -16342,6 +16382,8 @@ package android.graphics {
 
   public static class Paint.FontMetricsInt {
     ctor public Paint.FontMetricsInt();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void set(@NonNull android.graphics.Paint.FontMetricsInt);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void set(@NonNull android.graphics.Paint.FontMetrics);
     field public int ascent;
     field public int bottom;
     field public int descent;
@@ -17757,12 +17799,14 @@ package android.graphics.text {
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_DISABLED = 0; // 0x0
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_ENABLED = 1; // 0x1
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.word_style_auto") public static final int LINE_BREAK_STYLE_AUTO = 5; // 0x5
     field public static final int LINE_BREAK_STYLE_LOOSE = 1; // 0x1
     field public static final int LINE_BREAK_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_STYLE_NORMAL = 2; // 0x2
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_NO_BREAK = 4; // 0x4
     field public static final int LINE_BREAK_STYLE_STRICT = 3; // 0x3
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_STYLE_UNSPECIFIED = -1; // 0xffffffff
+    field @FlaggedApi("com.android.text.flags.word_style_auto") public static final int LINE_BREAK_WORD_STYLE_AUTO = 2; // 0x2
     field public static final int LINE_BREAK_WORD_STYLE_NONE = 0; // 0x0
     field public static final int LINE_BREAK_WORD_STYLE_PHRASE = 1; // 0x1
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int LINE_BREAK_WORD_STYLE_UNSPECIFIED = -1; // 0xffffffff
@@ -32486,7 +32530,7 @@ package android.os {
     method public void addData(@NonNull String, @Nullable byte[], int);
     method public void addFile(@NonNull String, @NonNull java.io.File, int) throws java.io.IOException;
     method public void addText(@NonNull String, @NonNull String);
-    method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_LOGS, android.Manifest.permission.PACKAGE_USAGE_STATS}) public android.os.DropBoxManager.Entry getNextEntry(String, long);
+    method @Nullable @RequiresPermission(allOf={android.Manifest.permission.READ_DROPBOX_DATA, android.Manifest.permission.PACKAGE_USAGE_STATS}) public android.os.DropBoxManager.Entry getNextEntry(String, long);
     method public boolean isTagEnabled(String);
     field public static final String ACTION_DROPBOX_ENTRY_ADDED = "android.intent.action.DROPBOX_ENTRY_ADDED";
     field public static final String EXTRA_DROPPED_COUNT = "android.os.extra.DROPPED_COUNT";
@@ -33093,7 +33137,7 @@ package android.os {
   public static class PerformanceHintManager.Session implements java.io.Closeable {
     method public void close();
     method public void reportActualWorkDuration(long);
-    method public void setPreferPowerEfficiency(boolean);
+    method @FlaggedApi("android.os.adpf_prefer_power_efficiency") public void setPreferPowerEfficiency(boolean);
     method public void setThreads(@NonNull int[]);
     method public void updateTargetWorkDuration(long);
   }
@@ -33495,7 +33539,9 @@ package android.os {
     method @RequiresPermission(anyOf={"android.permission.MANAGE_USERS", "android.permission.INTERACT_ACROSS_USERS"}, conditional=true) public android.os.Bundle getUserRestrictions(android.os.UserHandle);
     method public boolean hasUserRestriction(String);
     method public boolean isAdminUser();
+    method @FlaggedApi("android.multiuser.support_communal_profile") public boolean isCommunalProfile();
     method public boolean isDemoUser();
+    method @FlaggedApi("android.multiuser.support_communal_profile_nextgen") public boolean isForegroundUserAdmin();
     method public static boolean isHeadlessSystemUserMode();
     method public boolean isManagedProfile();
     method public boolean isProfile();
@@ -33557,7 +33603,7 @@ package android.os {
     field public static final String DISALLOW_MICROPHONE_TOGGLE = "disallow_microphone_toggle";
     field public static final String DISALLOW_MODIFY_ACCOUNTS = "no_modify_accounts";
     field public static final String DISALLOW_MOUNT_PHYSICAL_MEDIA = "no_physical_media";
-    field public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
+    field @FlaggedApi("android.nfc.enable_nfc_user_restriction") public static final String DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO = "no_near_field_communication_radio";
     field public static final String DISALLOW_NETWORK_RESET = "no_network_reset";
     field public static final String DISALLOW_OUTGOING_BEAM = "no_outgoing_beam";
     field public static final String DISALLOW_OUTGOING_CALLS = "no_outgoing_calls";
@@ -43209,6 +43255,7 @@ package android.telephony {
     field public static final String KEY_SHOW_ICCID_IN_SIM_STATUS_BOOL = "show_iccid_in_sim_status_bool";
     field public static final String KEY_SHOW_IMS_REGISTRATION_STATUS_BOOL = "show_ims_registration_status_bool";
     field public static final String KEY_SHOW_ONSCREEN_DIAL_BUTTON_BOOL = "show_onscreen_dial_button_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.hide_roaming_icon") public static final String KEY_SHOW_ROAMING_INDICATOR_BOOL = "show_roaming_indicator_bool";
     field public static final String KEY_SHOW_SIGNAL_STRENGTH_IN_SIM_STATUS_BOOL = "show_signal_strength_in_sim_status_bool";
     field public static final String KEY_SHOW_VIDEO_CALL_CHARGES_ALERT_DIALOG_BOOL = "show_video_call_charges_alert_dialog_bool";
     field public static final String KEY_SHOW_WFC_LOCATION_PRIVACY_POLICY_BOOL = "show_wfc_location_privacy_policy_bool";
@@ -44546,7 +44593,7 @@ package android.telephony {
     method public static final boolean isStartsPostDial(char);
     method public static boolean isVoiceMailNumber(String);
     method public static boolean isWellFormedSmsAddress(String);
-    method public static boolean isWpsCallNumber(@Nullable String);
+    method @FlaggedApi("com.android.internal.telephony.flags.enable_wps_check_api_flag") public static boolean isWpsCallNumber(@NonNull String);
     method public static byte[] networkPortionToCalledPartyBCD(String);
     method public static byte[] networkPortionToCalledPartyBCDWithLength(String);
     method public static String normalizeNumber(String);
@@ -46803,6 +46850,7 @@ package android.text {
     method @NonNull public android.text.DynamicLayout.Builder setJustificationMode(int);
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.text.DynamicLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.DynamicLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.DynamicLayout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method @NonNull public android.text.DynamicLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.DynamicLayout.Builder setUseBoundsForWidth(boolean);
     method @NonNull public android.text.DynamicLayout.Builder setUseLineSpacingFromFallbacks(boolean);
@@ -46991,6 +47039,7 @@ package android.text {
     method public int getLineVisibleEnd(int);
     method public float getLineWidth(int);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @IntRange(from=1) public final int getMaxLines();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @Nullable public android.graphics.Paint.FontMetrics getMinimumFontMetrics();
     method public int getOffsetForHorizontal(int, float);
     method public int getOffsetToLeftOf(int);
     method public int getOffsetToRightOf(int);
@@ -47057,6 +47106,7 @@ package android.text {
     method @NonNull public android.text.Layout.Builder setLineSpacingAmount(float);
     method @NonNull public android.text.Layout.Builder setLineSpacingMultiplier(@FloatRange(from=0) float);
     method @NonNull public android.text.Layout.Builder setMaxLines(@IntRange(from=1) int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.Layout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method @NonNull public android.text.Layout.Builder setRightIndents(@Nullable int[]);
     method @NonNull public android.text.Layout.Builder setTextDirectionHeuristic(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.Layout.Builder setUseBoundsForWidth(boolean);
@@ -47328,6 +47378,7 @@ package android.text {
     method @NonNull public android.text.StaticLayout.Builder setLineBreakConfig(@NonNull android.graphics.text.LineBreakConfig);
     method @NonNull public android.text.StaticLayout.Builder setLineSpacing(float, @FloatRange(from=0.0) float);
     method @NonNull public android.text.StaticLayout.Builder setMaxLines(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @NonNull public android.text.StaticLayout.Builder setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method public android.text.StaticLayout.Builder setText(CharSequence);
     method @NonNull public android.text.StaticLayout.Builder setTextDirection(@NonNull android.text.TextDirectionHeuristic);
     method @FlaggedApi("com.android.text.flags.use_bounds_for_width") @NonNull public android.text.StaticLayout.Builder setUseBoundsForWidth(boolean);
@@ -60006,6 +60057,7 @@ package android.widget {
     method public int getMinHeight();
     method public int getMinLines();
     method public int getMinWidth();
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") @Nullable public android.graphics.Paint.FontMetrics getMinimumFontMetrics();
     method public final android.text.method.MovementMethod getMovementMethod();
     method public int getOffsetForPosition(float, float);
     method public android.text.TextPaint getPaint();
@@ -60142,6 +60194,7 @@ package android.widget {
     method public void setMinHeight(int);
     method public void setMinLines(int);
     method public void setMinWidth(int);
+    method @FlaggedApi("com.android.text.flags.fix_line_height_for_locale") public void setMinimumFontMetrics(@Nullable android.graphics.Paint.FontMetrics);
     method public final void setMovementMethod(android.text.method.MovementMethod);
     method public void setOnEditorActionListener(android.widget.TextView.OnEditorActionListener);
     method public void setPaintFlags(int);

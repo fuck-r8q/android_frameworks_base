@@ -448,7 +448,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
             }
         }
         replacingIcons.removeAll(duplicates);
-        hostLayout.setReplacingIcons(replacingIcons);
+        hostLayout.setReplacingIconsLegacy(replacingIcons);
 
         final int toRemoveCount = toRemove.size();
         for (int i = 0; i < toRemoveCount; i++) {
@@ -481,7 +481,7 @@ public class LegacyNotificationIconAreaControllerImpl implements
             hostLayout.addView(expected, i);
         }
         hostLayout.setChangingViewPositions(false);
-        hostLayout.setReplacingIcons(null);
+        hostLayout.setReplacingIconsLegacy(null);
     }
 
     /**

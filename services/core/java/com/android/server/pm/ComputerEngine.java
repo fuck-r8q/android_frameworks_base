@@ -24,7 +24,6 @@ import static android.content.ContentProvider.isAuthorityRedirectedForCloneProfi
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_DEFAULT;
 import static android.content.Intent.CATEGORY_HOME;
-import static android.content.pm.ApplicationInfo.PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE;
 import static android.content.pm.PackageManager.CERT_INPUT_RAW_X509;
 import static android.content.pm.PackageManager.CERT_INPUT_SHA256;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
@@ -1525,9 +1524,6 @@ public class ComputerEngine implements Computer {
             ai.secondaryCpuAbi = ps.getSecondaryCpuAbiLegacy();
             ai.volumeUuid = ps.getVolumeUuid();
             ai.storageUuid = StorageManager.convert(ai.volumeUuid);
-            if (ps.isDefaultToDeviceProtectedStorage()) {
-                ai.privateFlags |= PRIVATE_FLAG_DEFAULT_TO_DEVICE_PROTECTED_STORAGE;
-            }
             ai.setVersionCode(ps.getVersionCode());
             ai.flags = ps.getFlags();
             ai.privateFlags = ps.getPrivateFlags();
@@ -3560,7 +3556,7 @@ public class ComputerEngine implements Computer {
     @Override
     public int getPackageStartability(boolean safeMode, @NonNull String packageName, int callingUid,
             @UserIdInt int userId) {
-        final boolean userKeyUnlocked = StorageManager.isUserKeyUnlocked(userId);
+        final boolean ceStorageUnlocked = StorageManager.isCeStorageUnlocked(userId);
         final PackageStateInternal ps = getPackageStateInternal(packageName);
         if (ps == null || shouldFilterApplication(ps, callingUid, userId)
                 || !ps.getUserStateOrDefault(userId).isInstalled()) {
@@ -3575,7 +3571,7 @@ public class ComputerEngine implements Computer {
             return PackageManagerService.PACKAGE_STARTABILITY_FROZEN;
         }
 
-        if (!userKeyUnlocked && !AndroidPackageUtils.isEncryptionAware(ps.getPkg())) {
+        if (!ceStorageUnlocked && !AndroidPackageUtils.isEncryptionAware(ps.getPkg())) {
             return PackageManagerService.PACKAGE_STARTABILITY_DIRECT_BOOT_UNSUPPORTED;
         }
         return PackageManagerService.PACKAGE_STARTABILITY_OK;
@@ -4596,6 +4592,7 @@ public class ComputerEngine implements Computer {
         flags = updateFlagsForApplication(flags, userId);
         final boolean listUninstalled = (flags & MATCH_KNOWN_PACKAGES) != 0;
         final boolean listApex = (flags & MATCH_APEX) != 0;
+        final boolean listArchivedOnly = !listUninstalled && (flags & MATCH_ARCHIVED_PACKAGES) != 0;
 
         enforceCrossUserPermission(
                 callingUid,
@@ -4607,7 +4604,7 @@ public class ComputerEngine implements Computer {
         ArrayList<ApplicationInfo> list;
         final ArrayMap<String, ? extends PackageStateInternal> packageStates =
                 getPackageStates();
-        if (listUninstalled) {
+        if (listUninstalled || listArchivedOnly) {
             list = new ArrayList<>(packageStates.size());
             for (PackageStateInternal ps : packageStates.values()) {
                 ApplicationInfo ai;
@@ -4617,6 +4614,11 @@ public class ComputerEngine implements Computer {
                 }
                 if (ps.getPkg() != null) {
                     if (!listApex && ps.getPkg().isApex()) {
+                        continue;
+                    }
+                    PackageUserStateInternal userState = ps.getUserStateOrDefault(userId);
+                    if (listArchivedOnly && !userState.isInstalled()
+                            && userState.getArchiveState() == null) {
                         continue;
                     }
                     if (filterSharedLibPackage(ps, callingUid, userId, flags)) {

@@ -46,6 +46,7 @@ import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Iterator;
 import java.util.Objects;
 
@@ -68,6 +69,8 @@ public class BtHelper {
 
     // Bluetooth headset device
     private @Nullable BluetoothDevice mBluetoothHeadsetDevice;
+    private final Map<BluetoothDevice, AudioDeviceAttributes> mResolvedScoAudioDevices =
+            new HashMap<>();
 
     private @Nullable BluetoothDevice mBluetoothHeadsetDummyDevice;
 
@@ -742,7 +745,16 @@ public class BtHelper {
         if (mBluetoothHeadsetDevice == null) {
             return null;
         }
-        return btHeadsetDeviceToAudioDevice(mBluetoothHeadsetDevice);
+        return getHeadsetAudioDevice(mBluetoothHeadsetDevice);
+    }
+
+    private @NonNull AudioDeviceAttributes getHeadsetAudioDevice(BluetoothDevice btDevice) {
+        AudioDeviceAttributes deviceAttr = mResolvedScoAudioDevices.get(btDevice);
+        if (deviceAttr != null) {
+            // Returns the cached device attributes so that it is consistent as the previous one.
+            return deviceAttr;
+        }
+        return btHeadsetDeviceToAudioDevice(btDevice);
     }
 
     @Nullable AudioDeviceAttributes getHeadsetAudioDummyDevice() {
@@ -796,7 +808,7 @@ public class BtHelper {
         BluetoothClass btClass = dummyAddress.equals(address) ? null :
                                  btDevice.getBluetoothClass();
         int inDevice = AudioSystem.DEVICE_IN_BLUETOOTH_SCO_HEADSET;
-        AudioDeviceAttributes audioDevice =  btHeadsetDeviceToAudioDevice(btDevice);
+        AudioDeviceAttributes audioDevice = btHeadsetDeviceToAudioDevice(btDevice);
         boolean result = false;
         if (isActive) {
             result |= mDeviceBroker.handleDeviceConnection(audioDevice, isActive, btDevice);
@@ -816,6 +828,13 @@ public class BtHelper {
         result = mDeviceBroker.handleDeviceConnection(new AudioDeviceAttributes(
                         inDevice, audioDevice.getAddress(), audioDevice.getName()),
                 isActive, btDevice) && result;
+        if (result) {
+            if (isActive) {
+                mResolvedScoAudioDevices.put(btDevice, audioDevice);
+            } else {
+                mResolvedScoAudioDevices.remove(btDevice);
+            }
+        }
         return result;
     }
 

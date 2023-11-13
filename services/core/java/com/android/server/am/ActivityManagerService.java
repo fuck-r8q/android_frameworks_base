@@ -77,8 +77,10 @@ import static android.os.IServiceManager.DUMP_FLAG_PROTO;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.PowerExemptionManager.REASON_ACTIVITY_VISIBILITY_GRACE_PERIOD;
 import static android.os.PowerExemptionManager.REASON_BACKGROUND_ACTIVITY_PERMISSION;
+import static android.os.PowerExemptionManager.REASON_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_COMPANION_DEVICE_MANAGER;
 import static android.os.PowerExemptionManager.REASON_INSTR_BACKGROUND_ACTIVITY_PERMISSION;
+import static android.os.PowerExemptionManager.REASON_LOCKED_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_PROC_STATE_BTOP;
 import static android.os.PowerExemptionManager.REASON_PROC_STATE_PERSISTENT;
 import static android.os.PowerExemptionManager.REASON_PROC_STATE_PERSISTENT_UI;
@@ -2319,7 +2321,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             return;
         }
         // TODO(b/148767783): should we check all profiles under user0?
-        UserspaceRebootLogger.logEventAsync(StorageManager.isUserKeyUnlocked(userId),
+        UserspaceRebootLogger.logEventAsync(StorageManager.isCeStorageUnlocked(userId),
                 BackgroundThread.getExecutor());
     }
 
@@ -4733,7 +4735,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             // We carefully use the same state that PackageManager uses for
             // filtering, since we use this flag to decide if we need to install
             // providers when user is unlocked later
-            app.setUnlocked(StorageManager.isUserKeyUnlocked(app.userId));
+            app.setUnlocked(StorageManager.isCeStorageUnlocked(app.userId));
         }
 
         boolean normalMode = mProcessesReady || isAllowedWhileBooting(app.info);
@@ -4927,6 +4929,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (!mConstants.mEnableWaitForFinishAttachApplication) {
                 finishAttachApplicationInner(startSeq, callingUid, pid);
             }
+            maybeSendBootCompletedLocked(app);
         } catch (Exception e) {
             // We need kill the process group here. (b/148588589)
             Slog.wtf(TAG, "Exception thrown during bind of " + app, e);
@@ -5151,6 +5154,45 @@ public class ActivityManagerService extends IActivityManager.Stub
             // If we are taking more than 50ms, log about it.
             Slog.w(TAG, "Slow operation: " + (now - startTime) + "ms so far, now at " + where);
         }
+    }
+
+    /**
+     * Send LOCKED_BOOT_COMPLETED and BOOT_COMPLETED to the package explicitly when unstopped
+     */
+    private void maybeSendBootCompletedLocked(ProcessRecord app) {
+        // Nothing to do if it wasn't previously stopped
+        if (!android.content.pm.Flags.stayStopped() || !app.wasForceStopped()) return;
+
+        // Send LOCKED_BOOT_COMPLETED, if necessary
+        if (app.getApplicationInfo().isEncryptionAware()) {
+            sendBootBroadcastToAppLocked(app, new Intent(Intent.ACTION_LOCKED_BOOT_COMPLETED),
+                    REASON_LOCKED_BOOT_COMPLETED);
+        }
+        // Send BOOT_COMPLETED if the user is unlocked
+        if (StorageManager.isUserKeyUnlocked(app.userId)) {
+            sendBootBroadcastToAppLocked(app, new Intent(Intent.ACTION_BOOT_COMPLETED),
+                    REASON_BOOT_COMPLETED);
+        }
+        app.setWasForceStopped(false);
+    }
+
+    /** Send a boot_completed broadcast to app */
+    private void sendBootBroadcastToAppLocked(ProcessRecord app, Intent intent,
+            @PowerExemptionManager.ReasonCode int reason) {
+        intent.setPackage(app.info.packageName);
+        intent.putExtra(Intent.EXTRA_USER_HANDLE, app.userId);
+        intent.addFlags(Intent.FLAG_RECEIVER_NO_ABORT
+                | Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
+                | Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
+        final BroadcastOptions bOptions = mUserController.getTemporaryAppAllowlistBroadcastOptions(
+                reason);
+
+        broadcastIntentLocked(null, null, null, intent, null, null, 0, null, null,
+                new String[]{android.Manifest.permission.RECEIVE_BOOT_COMPLETED},
+                null, null, AppOpsManager.OP_NONE,
+                bOptions.toBundle(), true,
+                false, MY_PID, SYSTEM_UID,
+                SYSTEM_UID, MY_PID, app.userId);
     }
 
     @Override
@@ -9764,9 +9806,29 @@ public class ActivityManagerService extends IActivityManager.Stub
     public ParceledListSlice<ApplicationStartInfo> getHistoricalProcessStartReasons(
             String packageName, int maxNum, int userId) {
         enforceNotIsolatedCaller("getHistoricalProcessStartReasons");
+        // For the simplification, we don't support USER_ALL nor USER_CURRENT here.
+        if (userId == UserHandle.USER_ALL || userId == UserHandle.USER_CURRENT) {
+            throw new IllegalArgumentException("Unsupported userId");
+        }
+
+        final int callingPid = Binder.getCallingPid();
+        final int callingUid = Binder.getCallingUid();
+        mUserController.handleIncomingUser(callingPid, callingUid, userId, true, ALLOW_NON_FULL,
+                "getHistoricalProcessStartReasons", null);
 
         final ArrayList<ApplicationStartInfo> results = new ArrayList<ApplicationStartInfo>();
-
+        if (!TextUtils.isEmpty(packageName)) {
+            final int uid = enforceDumpPermissionForPackage(packageName, userId, callingUid,
+                        "getHistoricalProcessStartReasons");
+            if (uid != INVALID_UID) {
+                mProcessList.mAppStartInfoTracker.getStartInfo(
+                        packageName, userId, callingPid, maxNum, results);
+            }
+        } else {
+            // If no package name is given, use the caller's uid as the filter uid.
+            mProcessList.mAppStartInfoTracker.getStartInfo(
+                    packageName, callingUid, callingPid, maxNum, results);
+        }
         return new ParceledListSlice<ApplicationStartInfo>(results);
     }
 
@@ -9775,6 +9837,14 @@ public class ActivityManagerService extends IActivityManager.Stub
     public void setApplicationStartInfoCompleteListener(
             IApplicationStartInfoCompleteListener listener, int userId) {
         enforceNotIsolatedCaller("setApplicationStartInfoCompleteListener");
+
+        // For the simplification, we don't support USER_ALL nor USER_CURRENT here.
+        if (userId == UserHandle.USER_ALL || userId == UserHandle.USER_CURRENT) {
+            throw new IllegalArgumentException("Unsupported userId");
+        }
+
+        final int callingUid = Binder.getCallingUid();
+        mProcessList.mAppStartInfoTracker.addStartInfoCompleteListener(listener, callingUid);
     }
 
 
@@ -9788,6 +9858,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         final int callingUid = Binder.getCallingUid();
+        mProcessList.mAppStartInfoTracker.clearStartInfoCompleteListener(callingUid, true);
     }
 
     @Override
@@ -10088,6 +10159,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             pw.println();
             if (dumpAll) {
+                pw.println("-------------------------------------------------------------------------------");
+                mProcessList.mAppStartInfoTracker.dumpHistoryProcessStartInfo(pw, dumpPackage);
                 pw.println("-------------------------------------------------------------------------------");
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             }
@@ -10485,6 +10558,12 @@ public class ActivityManagerService extends IActivityManager.Stub
                 LockGuard.dump(fd, pw, args);
             } else if ("users".equals(cmd)) {
                 dumpUsers(pw);
+            } else if ("start-info".equals(cmd)) {
+                if (opti < args.length) {
+                    dumpPackage = args[opti];
+                    opti++;
+                }
+                mProcessList.mAppStartInfoTracker.dumpHistoryProcessStartInfo(pw, dumpPackage);
             } else if ("exit-info".equals(cmd)) {
                 if (opti < args.length) {
                     dumpPackage = args[opti];

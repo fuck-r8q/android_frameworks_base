@@ -1116,10 +1116,9 @@ public class LockPatternUtils {
     @UnsupportedAppUsage
     public long setLockoutAttemptDeadline(int userId, int timeoutMs) {
         final long deadline = SystemClock.elapsedRealtime() + timeoutMs;
-        if (isSpecialUserId(userId)) {
-            // For secure password storage (that is required for special users such as FRP), the
-            // underlying storage also enforces the deadline. Since we cannot store settings
-            // for special users, don't.
+        if (userId == USER_FRP) {
+            // For secure password storage (that is required for FRP), the underlying storage also
+            // enforces the deadline. Since we cannot store settings for the FRP user, don't.
             return deadline;
         }
         mLockoutDeadlines.put(userId, deadline);
@@ -1945,15 +1944,21 @@ public class LockPatternUtils {
     }
 
     /**
-     * Unlocks the credential-encrypted storage for the given user if the user is not secured, i.e.
-     * doesn't have an LSKF.
+     * If the user is not secured, ie doesn't have an LSKF, then decrypt the user's synthetic
+     * password and use it to unlock various cryptographic keys associated with the user.  This
+     * primarily includes unlocking the user's credential-encrypted (CE) storage.  It also includes
+     * deriving or decrypting the vendor auth secret and sending it to the AuthSecret HAL.
      * <p>
-     * Whether the storage has been unlocked can be determined by
-     * {@link StorageManager#isUserKeyUnlocked()}.
-     *
+     * These tasks would normally be done when the LSKF is verified.  This method is where these
+     * tasks are done when the user doesn't have an LSKF.  It's called when the user is started.
+     * <p>
+     * Except on permission denied, this method doesn't throw an exception on failure.  However, the
+     * last thing that it does is unlock CE storage, and whether CE storage has been successfully
+     * unlocked can be determined by {@link StorageManager#isCeStorageUnlocked()}.
+     * <p>
      * Requires the {@link android.Manifest.permission#ACCESS_KEYGUARD_SECURE_STORAGE} permission.
      *
-     * @param userId the ID of the user whose storage to unlock
+     * @param userId the ID of the user whose keys to unlock
      */
     public void unlockUserKeyIfUnsecured(@UserIdInt int userId) {
         try {

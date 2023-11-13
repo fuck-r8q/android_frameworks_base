@@ -91,7 +91,7 @@ public class LogModule {
     @SysUISingleton
     @NotifInflationLog
     public static LogBuffer provideNotifInflationLogBuffer(LogBufferFactory factory) {
-        return factory.create("NotifInflationLog", 100);
+        return factory.create("NotifInflationLog", 250);
     }
 
     /** Provides a logging buffer for notification interruption calculations. */
@@ -551,5 +551,13 @@ public class LogModule {
     @SceneFrameworkLog
     public static LogBuffer provideSceneFrameworkLogBuffer(LogBufferFactory factory) {
         return factory.create("SceneFramework", 50);
+    }
+
+    /** Provides a {@link LogBuffer} for the bluetooth QS tile dialog. */
+    @Provides
+    @SysUISingleton
+    @BluetoothTileDialogLog
+    public static LogBuffer provideQBluetoothTileDialogLogBuffer(LogBufferFactory factory) {
+        return factory.create("BluetoothTileDialogLog", 50);
     }
 }

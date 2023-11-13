@@ -857,7 +857,12 @@ public class NotificationTest {
             assertEquals(cDay.getPrimaryAccentColor(), cNight.getPrimaryAccentColor());
             assertEquals(cDay.getSecondaryAccentColor(), cNight.getSecondaryAccentColor());
             assertEquals(cDay.getTertiaryAccentColor(), cNight.getTertiaryAccentColor());
-            assertEquals(cDay.getOnAccentTextColor(), cNight.getOnAccentTextColor());
+            assertEquals(cDay.getOnTertiaryAccentTextColor(),
+                    cNight.getOnTertiaryAccentTextColor());
+            assertEquals(cDay.getTertiaryFixedDimAccentColor(),
+                    cNight.getTertiaryFixedDimAccentColor());
+            assertEquals(cDay.getOnTertiaryFixedAccentTextColor(),
+                    cNight.getOnTertiaryFixedAccentTextColor());
             assertEquals(cDay.getProtectionColor(), cNight.getProtectionColor());
             assertEquals(cDay.getContrastColor(), cNight.getContrastColor());
             assertEquals(cDay.getRippleAlpha(), cNight.getRippleAlpha());
@@ -1830,7 +1835,9 @@ public class NotificationTest {
         assertThat(c.getPrimaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getSecondaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getTertiaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
-        assertThat(c.getOnAccentTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
+        assertThat(c.getOnTertiaryAccentTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
+        assertThat(c.getTertiaryFixedDimAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
+        assertThat(c.getOnTertiaryFixedAccentTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getErrorColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getContrastColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getRippleAlpha()).isAtLeast(0x00);
@@ -1846,9 +1853,12 @@ public class NotificationTest {
         // These colors are only used for emphasized buttons; they do not need contrast
         assertContrastIsAtLeast(c.getSecondaryAccentColor(), c.getBackgroundColor(), 1);
         assertContrastIsAtLeast(c.getTertiaryAccentColor(), c.getBackgroundColor(), 1);
+        assertContrastIsAtLeast(c.getTertiaryFixedDimAccentColor(), c.getBackgroundColor(), 1);
 
         // The text that is used within the accent color DOES need to have contrast
-        assertContrastIsAtLeast(c.getOnAccentTextColor(), c.getTertiaryAccentColor(), 4.5);
+        assertContrastIsAtLeast(c.getOnTertiaryAccentTextColor(), c.getTertiaryAccentColor(), 4.5);
+        assertContrastIsAtLeast(c.getOnTertiaryFixedAccentTextColor(),
+                c.getTertiaryFixedDimAccentColor(), 4.5);
     }
 
     private void resolveColorsInNightMode(boolean nightMode, Notification.Colors c, int rawColor,
