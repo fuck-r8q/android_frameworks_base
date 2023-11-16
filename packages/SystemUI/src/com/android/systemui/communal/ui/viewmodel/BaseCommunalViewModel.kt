@@ -37,6 +37,9 @@ abstract class BaseCommunalViewModel(
     /** A list of all the communal content to be displayed in the communal hub. */
     abstract val communalContent: Flow<List<CommunalContentModel>>
 
+    /** Whether in edit mode for the communal hub. */
+    open val isEditMode = false
+
     /** Called as the UI requests deleting a widget. */
     open fun onDeleteWidget(id: Int) {}
 
