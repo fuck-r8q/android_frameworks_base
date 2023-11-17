@@ -6904,6 +6904,7 @@ package android.app {
 
   public class NotificationManager {
     method public String addAutomaticZenRule(android.app.AutomaticZenRule);
+    method @FlaggedApi("android.app.modes_api") public boolean areAutomaticZenRulesUserManaged();
     method @Deprecated public boolean areBubblesAllowed();
     method public boolean areBubblesEnabled();
     method public boolean areNotificationsEnabled();
@@ -10405,7 +10406,7 @@ package android.content {
     method public abstract java.io.File getDatabasePath(String);
     method public int getDeviceId();
     method public abstract java.io.File getDir(String, int);
-    method @Nullable public android.view.Display getDisplay();
+    method @NonNull public android.view.Display getDisplay();
     method @Nullable public final android.graphics.drawable.Drawable getDrawable(@DrawableRes int);
     method @Nullable public abstract java.io.File getExternalCacheDir();
     method public abstract java.io.File[] getExternalCacheDirs();
@@ -12848,6 +12849,7 @@ package android.content.pm {
     field public static final String FEATURE_CAMERA_LEVEL_FULL = "android.hardware.camera.level.full";
     field public static final String FEATURE_CANT_SAVE_STATE = "android.software.cant_save_state";
     field public static final String FEATURE_COMPANION_DEVICE_SETUP = "android.software.companion_device_setup";
+    field @FlaggedApi("android.view.inputmethod.concurrent_input_methods") public static final String FEATURE_CONCURRENT_INPUT_METHODS = "android.software.concurrent_input_methods";
     field @Deprecated public static final String FEATURE_CONNECTION_SERVICE = "android.software.connectionservice";
     field public static final String FEATURE_CONSUMER_IR = "android.hardware.consumerir";
     field public static final String FEATURE_CONTROLS = "android.software.controls";
@@ -39258,7 +39260,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityForOriginationEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityStart(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMaxUsageCount(int);
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMgf1Digests(@Nullable java.lang.String...);
+    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMgf1Digests(@NonNull java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUnlockedDeviceRequired(boolean);
@@ -40544,19 +40546,26 @@ package android.service.notification {
 
   public final class Condition implements android.os.Parcelable {
     ctor public Condition(android.net.Uri, String, int);
+    ctor @FlaggedApi("android.app.modes_api") public Condition(@Nullable android.net.Uri, @Nullable String, int, int);
     ctor public Condition(android.net.Uri, String, String, String, int, int, int);
+    ctor @FlaggedApi("android.app.modes_api") public Condition(@Nullable android.net.Uri, @Nullable String, @Nullable String, @Nullable String, int, int, int, int);
     ctor public Condition(android.os.Parcel);
     method public android.service.notification.Condition copy();
     method public int describeContents();
     method public static boolean isValidId(android.net.Uri, String);
     method public static android.net.Uri.Builder newId(android.content.Context);
     method public static String relevanceToString(int);
+    method @FlaggedApi("android.app.modes_api") @NonNull public static String sourceToString(int);
     method public static String stateToString(int);
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.service.notification.Condition> CREATOR;
     field public static final int FLAG_RELEVANT_ALWAYS = 2; // 0x2
     field public static final int FLAG_RELEVANT_NOW = 1; // 0x1
     field public static final String SCHEME = "condition";
+    field @FlaggedApi("android.app.modes_api") public static final int SOURCE_CONTEXT = 3; // 0x3
+    field @FlaggedApi("android.app.modes_api") public static final int SOURCE_SCHEDULE = 2; // 0x2
+    field @FlaggedApi("android.app.modes_api") public static final int SOURCE_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("android.app.modes_api") public static final int SOURCE_USER_ACTION = 1; // 0x1
     field public static final int STATE_ERROR = 3; // 0x3
     field public static final int STATE_FALSE = 0; // 0x0
     field public static final int STATE_TRUE = 1; // 0x1
@@ -40566,6 +40575,7 @@ package android.service.notification {
     field public final android.net.Uri id;
     field public final String line1;
     field public final String line2;
+    field @FlaggedApi("android.app.modes_api") public final int source;
     field public final int state;
     field public final String summary;
   }
