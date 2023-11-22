@@ -12072,22 +12072,22 @@ package android.content.pm {
     method public final int compare(android.content.pm.ApplicationInfo, android.content.pm.ApplicationInfo);
   }
 
-  @FlaggedApi("android.content.pm.archiving") public final class ArchivedActivity {
-    ctor public ArchivedActivity(@NonNull CharSequence, @NonNull android.content.ComponentName);
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedActivityInfo {
+    ctor public ArchivedActivityInfo(@NonNull CharSequence, @NonNull android.content.ComponentName);
     method @NonNull public android.content.ComponentName getComponentName();
     method @Nullable public android.graphics.drawable.Drawable getIcon();
     method @NonNull public CharSequence getLabel();
     method @Nullable public android.graphics.drawable.Drawable getMonochromeIcon();
-    method @NonNull public android.content.pm.ArchivedActivity setComponentName(@NonNull android.content.ComponentName);
-    method @NonNull public android.content.pm.ArchivedActivity setIcon(@NonNull android.graphics.drawable.Drawable);
-    method @NonNull public android.content.pm.ArchivedActivity setLabel(@NonNull CharSequence);
-    method @NonNull public android.content.pm.ArchivedActivity setMonochromeIcon(@NonNull android.graphics.drawable.Drawable);
+    method @NonNull public android.content.pm.ArchivedActivityInfo setComponentName(@NonNull android.content.ComponentName);
+    method @NonNull public android.content.pm.ArchivedActivityInfo setIcon(@NonNull android.graphics.drawable.Drawable);
+    method @NonNull public android.content.pm.ArchivedActivityInfo setLabel(@NonNull CharSequence);
+    method @NonNull public android.content.pm.ArchivedActivityInfo setMonochromeIcon(@NonNull android.graphics.drawable.Drawable);
   }
 
-  @FlaggedApi("android.content.pm.archiving") public final class ArchivedPackage {
-    ctor public ArchivedPackage(@NonNull String, @NonNull android.content.pm.SigningInfo, @NonNull java.util.List<android.content.pm.ArchivedActivity>);
+  @FlaggedApi("android.content.pm.archiving") public final class ArchivedPackageInfo {
+    ctor public ArchivedPackageInfo(@NonNull String, @NonNull android.content.pm.SigningInfo, @NonNull java.util.List<android.content.pm.ArchivedActivityInfo>);
     method @Nullable public String getDefaultToDeviceProtectedStorage();
-    method @NonNull public java.util.List<android.content.pm.ArchivedActivity> getLauncherActivities();
+    method @NonNull public java.util.List<android.content.pm.ArchivedActivityInfo> getLauncherActivities();
     method @NonNull public String getPackageName();
     method @Nullable public String getRequestLegacyExternalStorage();
     method @NonNull public android.content.pm.SigningInfo getSigningInfo();
@@ -12095,15 +12095,15 @@ package android.content.pm {
     method @Nullable public String getUserDataFragile();
     method public int getVersionCode();
     method public int getVersionCodeMajor();
-    method @NonNull public android.content.pm.ArchivedPackage setDefaultToDeviceProtectedStorage(@NonNull String);
-    method @NonNull public android.content.pm.ArchivedPackage setLauncherActivities(@NonNull java.util.List<android.content.pm.ArchivedActivity>);
-    method @NonNull public android.content.pm.ArchivedPackage setPackageName(@NonNull String);
-    method @NonNull public android.content.pm.ArchivedPackage setRequestLegacyExternalStorage(@NonNull String);
-    method @NonNull public android.content.pm.ArchivedPackage setSigningInfo(@NonNull android.content.pm.SigningInfo);
-    method @NonNull public android.content.pm.ArchivedPackage setTargetSdkVersion(int);
-    method @NonNull public android.content.pm.ArchivedPackage setUserDataFragile(@NonNull String);
-    method @NonNull public android.content.pm.ArchivedPackage setVersionCode(int);
-    method @NonNull public android.content.pm.ArchivedPackage setVersionCodeMajor(int);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setDefaultToDeviceProtectedStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setLauncherActivities(@NonNull java.util.List<android.content.pm.ArchivedActivityInfo>);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setPackageName(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setRequestLegacyExternalStorage(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setSigningInfo(@NonNull android.content.pm.SigningInfo);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setTargetSdkVersion(int);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setUserDataFragile(@NonNull String);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setVersionCode(int);
+    method @NonNull public android.content.pm.ArchivedPackageInfo setVersionCodeMajor(int);
   }
 
   public final class Attribution implements android.os.Parcelable {
@@ -12438,7 +12438,7 @@ package android.content.pm {
     method @Nullable public android.content.pm.PackageInstaller.SessionInfo getSessionInfo(int);
     method @NonNull public java.util.List<android.content.pm.PackageInstaller.SessionInfo> getStagedSessions();
     method @RequiresPermission(allOf={android.Manifest.permission.INSTALL_PACKAGES, "com.android.permission.INSTALL_EXISTING_PACKAGES"}) public void installExistingPackage(@NonNull String, int, @Nullable android.content.IntentSender);
-    method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void installPackageArchived(@NonNull android.content.pm.ArchivedPackage, @NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.content.IntentSender);
+    method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(android.Manifest.permission.INSTALL_PACKAGES) public void installPackageArchived(@NonNull android.content.pm.ArchivedPackageInfo, @NonNull android.content.pm.PackageInstaller.SessionParams, @NonNull android.content.IntentSender);
     method @NonNull public android.content.pm.PackageInstaller.Session openSession(int) throws java.io.IOException;
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback, @NonNull android.os.Handler);
@@ -12720,7 +12720,7 @@ package android.content.pm {
     method @NonNull public abstract CharSequence getApplicationLabel(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull android.content.pm.ApplicationInfo);
     method @Nullable public abstract android.graphics.drawable.Drawable getApplicationLogo(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
-    method @FlaggedApi("android.content.pm.archiving") @Nullable public android.content.pm.ArchivedPackage getArchivedPackage(@NonNull String);
+    method @FlaggedApi("android.content.pm.archiving") @Nullable public android.content.pm.ArchivedPackageInfo getArchivedPackage(@NonNull String);
     method @NonNull public CharSequence getBackgroundPermissionOptionLabel();
     method @Nullable public abstract android.content.pm.ChangedPackages getChangedPackages(@IntRange(from=0) int);
     method public abstract int getComponentEnabledSetting(@NonNull android.content.ComponentName);
@@ -17791,11 +17791,14 @@ package android.graphics.pdf {
 
 package android.graphics.text {
 
-  public final class LineBreakConfig {
+  public final class LineBreakConfig implements android.os.Parcelable {
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public int describeContents();
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public int getHyphenation();
     method public int getLineBreakStyle();
     method public int getLineBreakWordStyle();
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig merge(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public static final android.os.Parcelable.Creator<android.graphics.text.LineBreakConfig> CREATOR;
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_DISABLED = 0; // 0x0
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_ENABLED = 1; // 0x1
     field @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final int HYPHENATION_UNSPECIFIED = -1; // 0xffffffff
@@ -18275,12 +18278,16 @@ package android.hardware {
     field public static final int D_16 = 48; // 0x30
     field public static final int D_24 = 49; // 0x31
     field public static final int D_FP32 = 51; // 0x33
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RGBA_10101010 = 59; // 0x3b
     field public static final int RGBA_1010102 = 43; // 0x2b
     field public static final int RGBA_8888 = 1; // 0x1
     field public static final int RGBA_FP16 = 22; // 0x16
     field public static final int RGBX_8888 = 2; // 0x2
     field public static final int RGB_565 = 4; // 0x4
     field public static final int RGB_888 = 3; // 0x3
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RG_1616_UINT = 58; // 0x3a
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_16_UINT = 57; // 0x39
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_8 = 56; // 0x38
     field public static final int S_UI8 = 53; // 0x35
     field public static final long USAGE_COMPOSER_OVERLAY = 2048L; // 0x800L
     field public static final long USAGE_CPU_READ_OFTEN = 3L; // 0x3L
@@ -18302,7 +18309,7 @@ package android.hardware {
 
   @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public final class OverlayProperties implements android.os.Parcelable {
     method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public int describeContents();
-    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public boolean supportMixedColorSpaces();
+    method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public boolean isMixedColorSpacesSupported();
     method @FlaggedApi("android.hardware.flags.overlayproperties_class_api") public void writeToParcel(@NonNull android.os.Parcel, int);
     field @FlaggedApi("android.hardware.flags.overlayproperties_class_api") @NonNull public static final android.os.Parcelable.Creator<android.hardware.OverlayProperties> CREATOR;
   }
@@ -28571,6 +28578,7 @@ package android.net.vcn {
     method @NonNull public long[] getRetryIntervalsMillis();
     method @NonNull public java.util.List<android.net.vcn.VcnUnderlyingNetworkTemplate> getVcnUnderlyingNetworkPriorities();
     method public boolean hasGatewayOption(int);
+    method @FlaggedApi("android.net.vcn.safe_mode_config") public boolean isSafeModeEnabled();
     field public static final int VCN_GATEWAY_OPTION_ENABLE_DATA_STALL_RECOVERY_WITH_MOBILITY = 0; // 0x0
   }
 
@@ -28579,6 +28587,7 @@ package android.net.vcn {
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder addGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig build();
+    method @FlaggedApi("android.net.vcn.safe_mode_config") @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder enableSafeMode(boolean);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeExposedCapability(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder removeGatewayOption(int);
     method @NonNull public android.net.vcn.VcnGatewayConnectionConfig.Builder setMaxMtu(@IntRange(from=0x500) int);
@@ -32282,7 +32291,7 @@ package android.os {
     field public static final int S_V2 = 32; // 0x20
     field public static final int TIRAMISU = 33; // 0x21
     field public static final int UPSIDE_DOWN_CAKE = 34; // 0x22
-    field public static final int VANILLA_ICE_CREAM = 10000; // 0x2710
+    field @FlaggedApi("android.os.android_os_build_vanilla_ice_cream") public static final int VANILLA_ICE_CREAM = 10000; // 0x2710
   }
 
   public final class Bundle extends android.os.BaseBundle implements java.lang.Cloneable android.os.Parcelable {
@@ -42674,6 +42683,7 @@ package android.telecom {
     field public static final String EXTRA_CALL_DISCONNECT_CAUSE = "android.telecom.extra.CALL_DISCONNECT_CAUSE";
     field public static final String EXTRA_CALL_DISCONNECT_MESSAGE = "android.telecom.extra.CALL_DISCONNECT_MESSAGE";
     field public static final String EXTRA_CALL_DURATION = "android.telecom.extra.CALL_DURATION";
+    field @FlaggedApi("com.android.server.telecom.flags.add_call_uri_for_missed_calls") public static final String EXTRA_CALL_LOG_URI = "android.telecom.extra.CALL_LOG_URI";
     field public static final String EXTRA_CALL_NETWORK_TYPE = "android.telecom.extra.CALL_NETWORK_TYPE";
     field public static final String EXTRA_CALL_SUBJECT = "android.telecom.extra.CALL_SUBJECT";
     field public static final String EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME = "android.telecom.extra.CHANGE_DEFAULT_DIALER_PACKAGE_NAME";
@@ -45612,6 +45622,7 @@ package android.telephony {
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_THROTTLED = 2; // 0x2
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_TIMEOUT = 9; // 0x9
     field public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_CANCELED = 6; // 0x6
+    field @FlaggedApi("com.android.internal.telephony.flags.slicing_additional_error_codes") public static final int PURCHASE_PREMIUM_CAPABILITY_RESULT_USER_DISABLED = 16; // 0x10
     field public static final int SET_OPPORTUNISTIC_SUB_INACTIVE_SUBSCRIPTION = 2; // 0x2
     field public static final int SET_OPPORTUNISTIC_SUB_NO_OPPORTUNISTIC_SUB_AVAILABLE = 3; // 0x3
     field public static final int SET_OPPORTUNISTIC_SUB_REMOTE_SERVICE_EXCEPTION = 4; // 0x4
@@ -48089,17 +48100,15 @@ package android.text.style {
     method public void writeToParcel(@NonNull android.os.Parcel, int);
   }
 
-  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public class LineBreakConfigSpan {
+  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public final class LineBreakConfigSpan implements android.text.ParcelableSpan {
     ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan(@NonNull android.graphics.text.LineBreakConfig);
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public static android.text.style.LineBreakConfigSpan createNoBreakSpan();
+    method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public static android.text.style.LineBreakConfigSpan createNoHyphenationSpan();
+    method public int describeContents();
     method @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") @NonNull public android.graphics.text.LineBreakConfig getLineBreakConfig();
-  }
-
-  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final class LineBreakConfigSpan.NoBreakSpan extends android.text.style.LineBreakConfigSpan {
-    ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan.NoBreakSpan();
-  }
-
-  @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public static final class LineBreakConfigSpan.NoHyphenationSpan extends android.text.style.LineBreakConfigSpan {
-    ctor @FlaggedApi("com.android.text.flags.no_break_no_hyphenation_span") public LineBreakConfigSpan.NoHyphenationSpan();
+    method public int getSpanTypeId();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.text.style.LineBreakConfigSpan> CREATOR;
   }
 
   public interface LineHeightSpan extends android.text.style.ParagraphStyle android.text.style.WrapTogetherSpan {
@@ -49881,6 +49890,7 @@ package android.view {
     method public boolean applyTransactionOnDraw(@NonNull android.view.SurfaceControl.Transaction);
     method @Nullable public android.view.SurfaceControl.Transaction buildReparentTransaction(@NonNull android.view.SurfaceControl);
     method public default int getBufferTransformHint();
+    method @FlaggedApi("com.android.window.flags.get_host_token_api") @Nullable public default android.os.IBinder getHostToken();
     method public default void removeOnBufferTransformHintChangedListener(@NonNull android.view.AttachedSurfaceControl.OnBufferTransformHintChangedListener);
     method public default void setChildBoundingInsets(@NonNull android.graphics.Rect);
     method public default void setTouchableRegion(@Nullable android.graphics.Region);
@@ -51231,6 +51241,7 @@ package android.view {
     method public void clear();
     method public void copyFrom(android.view.MotionEvent.PointerCoords);
     method public float getAxisValue(int);
+    method @FlaggedApi("com.android.hardware.input.pointer_coords_is_resampled_api") public boolean isResampled();
     method public void setAxisValue(int, float);
     field public float orientation;
     field public float pressure;

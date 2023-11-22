@@ -1078,7 +1078,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         mNotificationStackScrollLayoutController.setOnEmptySpaceClickListener(
                 mOnEmptySpaceClickListener);
         mQsController.init();
-        mShadeExpansionStateManager.addQsExpansionListener(this::onQsExpansionChanged);
         mShadeHeadsUpTracker.addTrackingHeadsUpListener(
                 mNotificationStackScrollLayoutController::setTrackingHeadsUp);
         if (!mFeatureFlags.isEnabled(Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA)) {
@@ -4231,7 +4230,7 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         return mShadeExpansionStateManager;
     }
 
-    private void onQsExpansionChanged(boolean expanded) {
+    void onQsExpansionChanged(boolean expanded) {
         updateExpandedHeightToMaxHeight();
         setStatusAccessibilityImportance(expanded
                 ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS

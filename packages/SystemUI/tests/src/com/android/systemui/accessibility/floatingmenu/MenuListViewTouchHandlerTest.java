@@ -18,8 +18,6 @@ package com.android.systemui.accessibility.floatingmenu;
 
 import static android.view.View.OVER_SCROLL_NEVER;
 
-import static com.android.systemui.accessibility.utils.FlagUtils.setFlagDefaults;
-
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.anyFloat;
@@ -82,7 +80,6 @@ public class MenuListViewTouchHandlerTest extends SysuiTestCase {
 
     @Before
     public void setUp() throws Exception {
-        setFlagDefaults(mSetFlagsRule);
         final WindowManager windowManager = mContext.getSystemService(WindowManager.class);
         final MenuViewModel stubMenuViewModel = new MenuViewModel(mContext, mAccessibilityManager,
                 mock(SecureSettings.class));
@@ -91,7 +88,8 @@ public class MenuListViewTouchHandlerTest extends SysuiTestCase {
         mStubMenuView = new MenuView(mContext, stubMenuViewModel, stubMenuViewAppearance);
         mStubMenuView.setTranslationX(0);
         mStubMenuView.setTranslationY(0);
-        mMenuAnimationController = spy(new MenuAnimationController(mStubMenuView));
+        mMenuAnimationController = spy(new MenuAnimationController(
+                mStubMenuView, stubMenuViewAppearance));
         mDismissView = spy(new DismissView(mContext));
         DismissViewUtils.setup(mDismissView);
         mDismissAnimationController =

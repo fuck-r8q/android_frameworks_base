@@ -16,6 +16,8 @@ android_library {
         "androidx.room_room-runtime",
         "zxing-core",
         "WifiTrackerLib",
+        "guava",
+
         "WifiTrackerLibRes",
         "iconloader",
         "setupdesign",

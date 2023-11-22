@@ -1,13 +1,6 @@
 package: "android.companion.virtual.flags"
 
 flag {
-  name: "more_logs"
-  namespace: "virtual_devices"
-  description: "More logs to test flags with"
-  bug: "291725823"
-}
-
-flag {
   name: "enable_native_vdm"
   namespace: "virtual_devices"
   description: "Enable native VDM service"
@@ -37,10 +30,17 @@ flag {
 }
 
 flag {
-    name: "virtual_camera"
-    namespace: "virtual_devices"
-    description: "Enable Virtual Camera"
-    bug: "270352264"
+  name: "virtual_camera"
+  namespace: "virtual_devices"
+  description: "Enable Virtual Camera"
+  bug: "270352264"
+}
+
+flag {
+  name: "stream_camera"
+  namespace: "virtual_devices"
+  description: "Enable streaming camera to Virtual Devices"
+  bug: "291740640"
 }
 
 flag {
@@ -48,4 +48,18 @@ flag {
   namespace: "virtual_devices"
   description: "Enable streaming permission dialogs to Virtual Devices"
   bug: "291737919"
+}
+
+flag {
+  name: "express_metrics"
+  namespace: "virtual_devices"
+  description: "Enable express metrics in VDM"
+  bug: "307297730"
+}
+
+flag {
+  name: "interactive_screen_mirror"
+  namespace: "virtual_devices"
+  description: "Enable interactive screen mirroring using Virtual Devices"
+  bug: "292212199"
 }

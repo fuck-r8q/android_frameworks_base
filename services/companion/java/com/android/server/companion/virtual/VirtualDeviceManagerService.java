@@ -42,6 +42,7 @@ import android.companion.virtualnative.IVirtualDeviceManagerNative;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.IVirtualDisplayCallback;
 import android.hardware.display.VirtualDisplayConfig;
 import android.os.Binder;
@@ -65,6 +66,8 @@ import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.DumpUtils;
+import com.android.modules.expresslog.Counter;
+import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.companion.virtual.VirtualDeviceImpl.PendingTrampoline;
 import com.android.server.wm.ActivityInterceptorCallback;
@@ -184,6 +187,9 @@ public class VirtualDeviceManagerService extends SystemService {
     }
 
     CameraAccessController getCameraAccessController(UserHandle userHandle) {
+        if (Flags.streamCamera()) {
+            return null;
+        }
         int userId = userHandle.getIdentifier();
         synchronized (mVirtualDeviceManagerLock) {
             for (int i = 0; i < mVirtualDevices.size(); i++) {
@@ -355,14 +361,6 @@ public class VirtualDeviceManagerService extends SystemService {
                 @NonNull IVirtualDeviceSoundEffectListener soundEffectListener) {
             createVirtualDevice_enforcePermission();
             attributionSource.enforceCallingUid();
-            final long identity = Binder.clearCallingIdentity();
-            try {
-                if (Flags.moreLogs()) {
-                    Slog.i(TAG, "Creating VirtualDevice");
-                }
-            } finally {
-                Binder.restoreCallingIdentity(identity);
-            }
 
             final int callingUid = getCallingUid();
             final String packageName = attributionSource.getPackageName();
@@ -390,6 +388,9 @@ public class VirtualDeviceManagerService extends SystemService {
                     deviceId,
                     cameraAccessController, mPendingTrampolineCallback, activityListener,
                     soundEffectListener, runningAppsChangedCallback, params);
+            if (Flags.expressMetrics()) {
+                Counter.logIncrement("virtual_devices.virtual_devices_created_count");
+            }
 
             synchronized (mVirtualDeviceManagerLock) {
                 if (mVirtualDevices.size() == 0) {
@@ -539,6 +540,17 @@ public class VirtualDeviceManagerService extends SystemService {
             if (virtualDevice != null) {
                 virtualDevice.playSoundEffect(effectType);
             }
+        }
+
+        @Override // Binder call
+        public boolean isVirtualDeviceOwnedMirrorDisplay(int displayId) {
+            if (getDeviceIdForDisplayId(displayId) == Context.DEVICE_ID_DEFAULT) {
+                return false;
+            }
+
+            DisplayManagerInternal displayManager = LocalServices.getService(
+                    DisplayManagerInternal.class);
+            return displayManager.getDisplayIdToMirror(displayId) != Display.INVALID_DISPLAY;
         }
 
         @Nullable

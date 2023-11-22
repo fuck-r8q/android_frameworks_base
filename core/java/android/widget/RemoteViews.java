@@ -85,6 +85,7 @@ import android.util.Log;
 import android.util.LongArray;
 import android.util.Pair;
 import android.util.SizeF;
+import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.util.TypedValue;
 import android.util.TypedValue.ComplexDimensionUnit;
@@ -104,7 +105,6 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 
 import com.android.internal.R;
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
-import com.android.internal.util.ContrastColorUtil;
 import com.android.internal.util.Preconditions;
 import com.android.internal.widget.IRemoteViewsFactory;
 
@@ -130,7 +130,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Stack;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -225,10 +224,8 @@ public class RemoteViews implements Parcelable, Filter {
     private static final int BITMAP_REFLECTION_ACTION_TAG = 12;
     private static final int TEXT_VIEW_SIZE_ACTION_TAG = 13;
     private static final int VIEW_PADDING_ACTION_TAG = 14;
-    private static final int SET_REMOTE_VIEW_ADAPTER_LIST_TAG = 15;
     private static final int SET_REMOTE_INPUTS_ACTION_TAG = 18;
     private static final int LAYOUT_PARAM_ACTION_TAG = 19;
-    private static final int OVERRIDE_TEXT_COLORS_TAG = 20;
     private static final int SET_RIPPLE_DRAWABLE_COLOR_TAG = 21;
     private static final int SET_INT_TAG_TAG = 22;
     private static final int REMOVE_FROM_PARENT_ACTION_TAG = 23;
@@ -371,6 +368,11 @@ public class RemoteViews implements Parcelable, Filter {
     @UnsupportedAppUsage
     private BitmapCache mBitmapCache = new BitmapCache();
 
+    /**
+     * Maps Intent ID to RemoteCollectionItems to avoid duplicate items
+     */
+    private RemoteCollectionCache mCollectionCache = new RemoteCollectionCache();
+
     /** Cache of ApplicationInfos used by collection items. */
     private ApplicationInfoCache mApplicationInfoCache = new ApplicationInfoCache();
 
@@ -491,17 +493,6 @@ public class RemoteViews implements Parcelable, Filter {
             Bitmap bitmap = cache.get(i);
             cache.set(i, Icon.scaleDownIfNecessary(bitmap, maxWidth, maxHeight));
         }
-    }
-
-    /**
-     * Override all text colors in this layout and replace them by the given text color.
-     *
-     * @param textColor The color to use.
-     *
-     * @hide
-     */
-    public void overrideTextColors(int textColor) {
-        addAction(new OverrideTextColorsAction(textColor));
     }
 
     /**
@@ -640,7 +631,7 @@ public class RemoteViews implements Parcelable, Filter {
      *
      * SUBCLASSES MUST BE IMMUTABLE SO CLONE WORKS!!!!!
      */
-    private abstract static class Action implements Parcelable {
+    private abstract static class Action {
         @IdRes
         @UnsupportedAppUsage
         int mViewId;
@@ -651,10 +642,6 @@ public class RemoteViews implements Parcelable, Filter {
         public static final int MERGE_REPLACE = 0;
         public static final int MERGE_APPEND = 1;
         public static final int MERGE_IGNORE = 2;
-
-        public int describeContents() {
-            return 0;
-        }
 
         public void setHierarchyRootData(HierarchyRootData root) {
             // Do nothing
@@ -689,6 +676,8 @@ public class RemoteViews implements Parcelable, Filter {
         public void visitUris(@NonNull Consumer<Uri> visitor) {
             // Nothing to visit by default.
         }
+
+        public abstract void writeToParcel(Parcel dest, int flags);
     }
 
     /**
@@ -801,9 +790,12 @@ public class RemoteViews implements Parcelable, Filter {
                 if (action instanceof SetRemoteCollectionItemListAdapterAction itemsAction
                         && itemsAction.mViewId == viewId
                         && itemsAction.mServiceIntent != null) {
-                    mActions.set(i,
-                            new SetRemoteCollectionItemListAdapterAction(itemsAction.mViewId,
-                                    itemsAction.mServiceIntent));
+                    SetRemoteCollectionItemListAdapterAction newCollectionAction =
+                            new SetRemoteCollectionItemListAdapterAction(
+                                    itemsAction.mViewId, itemsAction.mServiceIntent);
+                    newCollectionAction.mIntentId = itemsAction.mIntentId;
+                    newCollectionAction.mIsReplacedIntoAction = true;
+                    mActions.set(i, newCollectionAction);
                     isActionReplaced = true;
                 } else if (action instanceof SetRemoteViewsAdapterIntent intentAction
                         && intentAction.mViewId == viewId) {
@@ -1020,86 +1012,6 @@ public class RemoteViews implements Parcelable, Filter {
         }
     }
 
-    private static class SetRemoteViewsAdapterList extends Action {
-        int mViewTypeCount;
-        ArrayList<RemoteViews> mList;
-
-        public SetRemoteViewsAdapterList(@IdRes int id, ArrayList<RemoteViews> list,
-                int viewTypeCount) {
-            this.mViewId = id;
-            this.mList = list;
-            this.mViewTypeCount = viewTypeCount;
-        }
-
-        public SetRemoteViewsAdapterList(Parcel parcel) {
-            mViewId = parcel.readInt();
-            mViewTypeCount = parcel.readInt();
-            mList = parcel.createTypedArrayList(RemoteViews.CREATOR);
-        }
-
-        public void writeToParcel(Parcel dest, int flags) {
-            dest.writeInt(mViewId);
-            dest.writeInt(mViewTypeCount);
-            dest.writeTypedList(mList, flags);
-        }
-
-        @Override
-        public void apply(View root, ViewGroup rootParent, ActionApplyParams params) {
-            final View target = root.findViewById(mViewId);
-            if (target == null) return;
-
-            // Ensure that we are applying to an AppWidget root
-            if (!(rootParent instanceof AppWidgetHostView)) {
-                Log.e(LOG_TAG, "SetRemoteViewsAdapterIntent action can only be used for " +
-                        "AppWidgets (root id: " + mViewId + ")");
-                return;
-            }
-            // Ensure that we are calling setRemoteAdapter on an AdapterView that supports it
-            if (!(target instanceof AbsListView) && !(target instanceof AdapterViewAnimator)) {
-                Log.e(LOG_TAG, "Cannot setRemoteViewsAdapter on a view which is not " +
-                        "an AbsListView or AdapterViewAnimator (id: " + mViewId + ")");
-                return;
-            }
-
-            if (target instanceof AbsListView) {
-                AbsListView v = (AbsListView) target;
-                Adapter a = v.getAdapter();
-                if (a instanceof RemoteViewsListAdapter && mViewTypeCount <= a.getViewTypeCount()) {
-                    ((RemoteViewsListAdapter) a).setViewsList(mList);
-                } else {
-                    v.setAdapter(new RemoteViewsListAdapter(v.getContext(), mList, mViewTypeCount,
-                            params.colorResources));
-                }
-            } else if (target instanceof AdapterViewAnimator) {
-                AdapterViewAnimator v = (AdapterViewAnimator) target;
-                Adapter a = v.getAdapter();
-                if (a instanceof RemoteViewsListAdapter && mViewTypeCount <= a.getViewTypeCount()) {
-                    ((RemoteViewsListAdapter) a).setViewsList(mList);
-                } else {
-                    v.setAdapter(new RemoteViewsListAdapter(v.getContext(), mList, mViewTypeCount,
-                            params.colorResources));
-                }
-            }
-        }
-
-        @Override
-        public int getActionTag() {
-            return SET_REMOTE_VIEW_ADAPTER_LIST_TAG;
-        }
-
-        @Override
-        public String getUniqueKey() {
-            return (SET_REMOTE_ADAPTER_TAG + "_" + mViewId);
-        }
-
-        @Override
-        public void visitUris(@NonNull Consumer<Uri> visitor) {
-            for (RemoteViews remoteViews : mList) {
-                remoteViews.visitUris(visitor);
-            }
-        }
-    }
-
     /**
      * Cache of {@link ApplicationInfo}s that can be used to ensure that the same
      * {@link ApplicationInfo} instance is used throughout the RemoteViews.
@@ -1145,6 +1057,8 @@ public class RemoteViews implements Parcelable, Filter {
         @NonNull
         private CompletableFuture<RemoteCollectionItems> mItemsFuture;
         final Intent mServiceIntent;
+        int mIntentId = -1;
+        boolean mIsReplacedIntoAction = false;
 
         SetRemoteCollectionItemListAdapterAction(@IdRes int id,
                 @NonNull RemoteCollectionItems items) {
@@ -1205,38 +1119,36 @@ public class RemoteViews implements Parcelable, Filter {
 
         SetRemoteCollectionItemListAdapterAction(Parcel parcel) {
             mViewId = parcel.readInt();
-            mItemsFuture = CompletableFuture.completedFuture(
-                    new RemoteCollectionItems(parcel, getHierarchyRootData()));
+            mIntentId = parcel.readInt();
+            mItemsFuture = CompletableFuture.completedFuture(mIntentId != -1
+                    ? null
+                    : new RemoteCollectionItems(parcel, getHierarchyRootData()));
             mServiceIntent = parcel.readTypedObject(Intent.CREATOR);
         }
 
         @Override
         public void setHierarchyRootData(HierarchyRootData rootData) {
-            mItemsFuture = mItemsFuture
-                    .thenApply(rc -> {
-                        rc.setHierarchyRootData(rootData);
-                        return rc;
-                    });
-        }
-
-        private static RemoteCollectionItems getCollectionItemsFromFuture(
-                CompletableFuture<RemoteCollectionItems> itemsFuture) {
-            RemoteCollectionItems items;
-            try {
-                items = itemsFuture.get();
-            } catch (Exception e) {
-                Log.e(LOG_TAG, "Error getting collection items from future", e);
-                items = new RemoteCollectionItems.Builder().build();
+            if (mIntentId == -1) {
+                mItemsFuture = mItemsFuture
+                        .thenApply(rc -> {
+                            rc.setHierarchyRootData(rootData);
+                            return rc;
+                        });
+                return;
             }
 
-            return items;
+            // Set the root data for items in the cache instead
+            mCollectionCache.setHierarchyDataForId(mIntentId, rootData);
         }
 
         @Override
         public void writeToParcel(Parcel dest, int flags) {
             dest.writeInt(mViewId);
-            RemoteCollectionItems items = getCollectionItemsFromFuture(mItemsFuture);
-            items.writeToParcel(dest, flags, /* attached= */ true);
+            dest.writeInt(mIntentId);
+            if (mIntentId == -1) {
+                RemoteCollectionItems items = getCollectionItemsFromFuture(mItemsFuture);
+                items.writeToParcel(dest, flags, /* attached= */ true);
+            }
             dest.writeTypedObject(mServiceIntent, flags);
         }
 
@@ -1246,7 +1158,9 @@ public class RemoteViews implements Parcelable, Filter {
             View target = root.findViewById(mViewId);
             if (target == null) return;
 
-            RemoteCollectionItems items = getCollectionItemsFromFuture(mItemsFuture);
+            RemoteCollectionItems items = mIntentId == -1
+                    ? getCollectionItemsFromFuture(mItemsFuture)
+                    : mCollectionCache.getItemsForId(mIntentId);
 
             // Ensure that we are applying to an AppWidget root
             if (!(rootParent instanceof AppWidgetHostView)) {
@@ -1304,6 +1218,153 @@ public class RemoteViews implements Parcelable, Filter {
         public void visitUris(@NonNull Consumer<Uri> visitor) {
             RemoteCollectionItems items = getCollectionItemsFromFuture(mItemsFuture);
             items.visitUris(visitor);
+        }
+    }
+
+    private static RemoteCollectionItems getCollectionItemsFromFuture(
+            CompletableFuture<RemoteCollectionItems> itemsFuture) {
+        RemoteCollectionItems items;
+        try {
+            items = itemsFuture.get();
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "Error getting collection items from future", e);
+            items = new RemoteCollectionItems.Builder().build();
+        }
+
+        return items;
+    }
+
+    /**
+     * @hide
+     */
+    public void collectAllIntents() {
+        mCollectionCache.collectAllIntentsNoComplete(this);
+    }
+
+    private class RemoteCollectionCache {
+        private SparseArray<String> mIdToUriMapping = new SparseArray<>();
+        private HashMap<String, RemoteCollectionItems> mUriToCollectionMapping = new HashMap<>();
+
+        // We don't put this into the parcel
+        private HashMap<String, CompletableFuture<RemoteCollectionItems>> mTempUriToFutureMapping =
+                new HashMap<>();
+
+        RemoteCollectionCache() { }
+
+        RemoteCollectionCache(RemoteCollectionCache src) {
+            boolean isWaitingCache = src.mTempUriToFutureMapping.size() != 0;
+            for (int i = 0; i < src.mIdToUriMapping.size(); i++) {
+                String uri = src.mIdToUriMapping.valueAt(i);
+                mIdToUriMapping.put(src.mIdToUriMapping.keyAt(i), uri);
+                if (isWaitingCache) {
+                    mTempUriToFutureMapping.put(uri, src.mTempUriToFutureMapping.get(uri));
+                } else {
+                    mUriToCollectionMapping.put(uri, src.mUriToCollectionMapping.get(uri));
+                }
+            }
+        }
+
+        RemoteCollectionCache(Parcel in) {
+            int cacheSize = in.readInt();
+            HierarchyRootData currentRootData = new HierarchyRootData(mBitmapCache,
+                    this,
+                    mApplicationInfoCache,
+                    mClassCookies);
+            for (int i = 0; i < cacheSize; i++) {
+                int intentId = in.readInt();
+                String intentUri = in.readString8();
+                RemoteCollectionItems items = new RemoteCollectionItems(in, currentRootData);
+                mIdToUriMapping.put(intentId, intentUri);
+                mUriToCollectionMapping.put(intentUri, items);
+            }
+        }
+
+        void setHierarchyDataForId(int intentId, HierarchyRootData data) {
+            String uri = mIdToUriMapping.get(intentId);
+            if (mTempUriToFutureMapping.get(uri) != null) {
+                CompletableFuture<RemoteCollectionItems> itemsFuture =
+                        mTempUriToFutureMapping.get(uri);
+                mTempUriToFutureMapping.put(uri, itemsFuture.thenApply(rc -> {
+                    rc.setHierarchyRootData(data);
+                    return rc;
+                }));
+
+                return;
+            }
+
+            RemoteCollectionItems items = mUriToCollectionMapping.get(uri);
+            items.setHierarchyRootData(data);
+        }
+
+        RemoteCollectionItems getItemsForId(int intentId) {
+            String uri = mIdToUriMapping.get(intentId);
+            return mUriToCollectionMapping.get(uri);
+        }
+
+        void collectAllIntentsNoComplete(@NonNull RemoteViews inViews) {
+            if (inViews.hasSizedRemoteViews()) {
+                for (RemoteViews remoteViews : inViews.mSizedRemoteViews) {
+                    remoteViews.collectAllIntents();
+                }
+            } else if (inViews.hasLandscapeAndPortraitLayouts()) {
+                inViews.mLandscape.collectAllIntents();
+                inViews.mPortrait.collectAllIntents();
+            } else if (inViews.mActions != null) {
+                for (Action action : inViews.mActions) {
+                    if (action instanceof SetRemoteCollectionItemListAdapterAction rca) {
+                        // Deal with the case where the intent is replaced into the action list
+                        if (rca.mIntentId != -1 && !rca.mIsReplacedIntoAction) {
+                            continue;
+                        }
+
+                        if (rca.mIntentId != -1 && rca.mIsReplacedIntoAction) {
+                            String uri = mIdToUriMapping.get(rca.mIntentId);
+                            mTempUriToFutureMapping.put(uri, rca.mItemsFuture);
+                            rca.mItemsFuture = CompletableFuture.completedFuture(null);
+                            continue;
+                        }
+
+                        // Differentiate between the normal collection actions and the ones with
+                        // intents.
+                        if (rca.mServiceIntent != null) {
+                            String uri = rca.mServiceIntent.toUri(0);
+                            int index = mIdToUriMapping.indexOfValue(uri);
+                            if (index == -1) {
+                                int newIntentId = mIdToUriMapping.size();
+                                rca.mIntentId = newIntentId;
+                                mIdToUriMapping.put(newIntentId, uri);
+                                // mUriToIntentMapping.put(uri, mServiceIntent);
+                                mTempUriToFutureMapping.put(uri, rca.mItemsFuture);
+                            } else {
+                                rca.mIntentId = mIdToUriMapping.keyAt(index);
+                            }
+                            rca.mItemsFuture = CompletableFuture.completedFuture(null);
+                        } else {
+                            RemoteCollectionItems items = getCollectionItemsFromFuture(
+                                    rca.mItemsFuture);
+                            for (RemoteViews views : items.mViews) {
+                                views.collectAllIntents();
+                            }
+                        }
+                    } else if (action instanceof ViewGroupActionAdd vgaa
+                            && vgaa.mNestedViews != null) {
+                        vgaa.mNestedViews.collectAllIntents();
+                    }
+                }
+            }
+        }
+
+        public void writeToParcel(Parcel out, int flags) {
+            out.writeInt(mIdToUriMapping.size());
+            for (int i = 0; i < mIdToUriMapping.size(); i++) {
+                out.writeInt(mIdToUriMapping.keyAt(i));
+                String intentUri = mIdToUriMapping.valueAt(i);
+                out.writeString8(intentUri);
+                RemoteCollectionItems items = mTempUriToFutureMapping.get(intentUri) != null
+                        ? getCollectionItemsFromFuture(mTempUriToFutureMapping.get(intentUri))
+                        : mUriToCollectionMapping.get(intentUri);
+                items.writeToParcel(out, flags, true);
+            }
         }
     }
 
@@ -3491,51 +3552,6 @@ public class RemoteViews implements Parcelable, Filter {
         }
     }
 
-    /**
-     * Helper action to override all textViewColors
-     */
-    private static class OverrideTextColorsAction extends Action {
-        private final int mTextColor;
-
-        public OverrideTextColorsAction(int textColor) {
-            this.mTextColor = textColor;
-        }
-
-        public OverrideTextColorsAction(Parcel parcel) {
-            mTextColor = parcel.readInt();
-        }
-
-        public void writeToParcel(Parcel dest, int flags) {
-            dest.writeInt(mTextColor);
-        }
-
-        @Override
-        public void apply(View root, ViewGroup rootParent, ActionApplyParams params) {
-            // Let's traverse the viewtree and override all textColors!
-            Stack<View> viewsToProcess = new Stack<>();
-            viewsToProcess.add(root);
-            while (!viewsToProcess.isEmpty()) {
-                View v = viewsToProcess.pop();
-                if (v instanceof TextView) {
-                    TextView textView = (TextView) v;
-                    textView.setText(ContrastColorUtil.clearColorSpans(textView.getText()));
-                    textView.setTextColor(mTextColor);
-                }
-                if (v instanceof ViewGroup) {
-                    ViewGroup viewGroup = (ViewGroup) v;
-                    for (int i = 0; i < viewGroup.getChildCount(); i++) {
-                        viewsToProcess.push(viewGroup.getChildAt(i));
-                    }
-                }
-            }
-        }
-
-        @Override
-        public int getActionTag() {
-            return OVERRIDE_TEXT_COLORS_TAG;
-        }
-    }
-
     private static class SetIntTagAction extends Action {
         @IdRes private final int mViewId;
         @IdRes private final int mKey;
@@ -3992,9 +4008,12 @@ public class RemoteViews implements Parcelable, Filter {
     private void initializeFrom(@NonNull RemoteViews src, @Nullable RemoteViews hierarchyRoot) {
         if (hierarchyRoot == null) {
             mBitmapCache = src.mBitmapCache;
+            // We need to create a new instance because we don't reconstruct collection cache
+            mCollectionCache = new RemoteCollectionCache(src.mCollectionCache);
             mApplicationInfoCache = src.mApplicationInfoCache;
         } else {
             mBitmapCache = hierarchyRoot.mBitmapCache;
+            mCollectionCache = hierarchyRoot.mCollectionCache;
             mApplicationInfoCache = hierarchyRoot.mApplicationInfoCache;
         }
         if (hierarchyRoot == null || src.mIsRoot) {
@@ -4068,6 +4087,7 @@ public class RemoteViews implements Parcelable, Filter {
             mBitmapCache = new BitmapCache(parcel);
             // Store the class cookies such that they are available when we clone this RemoteView.
             mClassCookies = parcel.copyClassCookies();
+            mCollectionCache = new RemoteCollectionCache(parcel);
         } else {
             configureAsChild(rootData);
         }
@@ -4156,14 +4176,10 @@ public class RemoteViews implements Parcelable, Filter {
                 return new ViewPaddingAction(parcel);
             case BITMAP_REFLECTION_ACTION_TAG:
                 return new BitmapReflectionAction(parcel);
-            case SET_REMOTE_VIEW_ADAPTER_LIST_TAG:
-                return new SetRemoteViewsAdapterList(parcel);
             case SET_REMOTE_INPUTS_ACTION_TAG:
                 return new SetRemoteInputsAction(parcel);
             case LAYOUT_PARAM_ACTION_TAG:
                 return new LayoutParamAction(parcel);
-            case OVERRIDE_TEXT_COLORS_TAG:
-                return new OverrideTextColorsAction(parcel);
             case SET_RIPPLE_DRAWABLE_COLOR_TAG:
                 return new SetRippleDrawableColor(parcel);
             case SET_INT_TAG_TAG:
@@ -4233,6 +4249,7 @@ public class RemoteViews implements Parcelable, Filter {
     private void configureAsChild(@NonNull HierarchyRootData rootData) {
         mIsRoot = false;
         mBitmapCache = rootData.mBitmapCache;
+        mCollectionCache = rootData.mRemoteCollectionCache;
         mApplicationInfoCache = rootData.mApplicationInfoCache;
         mClassCookies = rootData.mClassCookies;
         configureDescendantsAsChildren();
@@ -4910,7 +4927,11 @@ public class RemoteViews implements Parcelable, Filter {
     @Deprecated
     public void setRemoteAdapter(@IdRes int viewId, ArrayList<RemoteViews> list,
             int viewTypeCount) {
-        addAction(new SetRemoteViewsAdapterList(viewId, list, viewTypeCount));
+        RemoteCollectionItems.Builder b = new RemoteCollectionItems.Builder();
+        for (int i = 0; i < list.size(); i++) {
+            b.addItem(i, list.get(i));
+        }
+        setRemoteAdapter(viewId, b.setViewTypeCount(viewTypeCount).build());
     }
 
     /**
@@ -6499,6 +6520,7 @@ public class RemoteViews implements Parcelable, Filter {
             // is shared by all children.
             if (mIsRoot) {
                 mBitmapCache.writeBitmapsToParcel(dest, flags);
+                mCollectionCache.writeToParcel(dest, flags);
             }
             mApplication.writeToParcel(dest, flags);
             if (mIsRoot || mIdealSize == null) {
@@ -6515,6 +6537,7 @@ public class RemoteViews implements Parcelable, Filter {
             dest.writeInt(MODE_HAS_SIZED_REMOTEVIEWS);
             if (mIsRoot) {
                 mBitmapCache.writeBitmapsToParcel(dest, flags);
+                mCollectionCache.writeToParcel(dest, flags);
             }
             dest.writeInt(mSizedRemoteViews.size());
             for (RemoteViews view : mSizedRemoteViews) {
@@ -6526,6 +6549,7 @@ public class RemoteViews implements Parcelable, Filter {
             // is shared by all children.
             if (mIsRoot) {
                 mBitmapCache.writeBitmapsToParcel(dest, flags);
+                mCollectionCache.writeToParcel(dest, flags);
             }
             mLandscape.writeToParcel(dest, flags);
             // Both RemoteViews already share the same package and user
@@ -7404,19 +7428,23 @@ public class RemoteViews implements Parcelable, Filter {
     }
 
     private HierarchyRootData getHierarchyRootData() {
-        return new HierarchyRootData(mBitmapCache, mApplicationInfoCache, mClassCookies);
+        return new HierarchyRootData(mBitmapCache, mCollectionCache,
+                mApplicationInfoCache, mClassCookies);
     }
 
     private static final class HierarchyRootData {
         final BitmapCache mBitmapCache;
+        final RemoteCollectionCache mRemoteCollectionCache;
         final ApplicationInfoCache mApplicationInfoCache;
         final Map<Class, Object> mClassCookies;
 
         HierarchyRootData(
                 BitmapCache bitmapCache,
+                RemoteCollectionCache remoteCollectionCache,
                 ApplicationInfoCache applicationInfoCache,
                 Map<Class, Object> classCookies) {
             mBitmapCache = bitmapCache;
+            mRemoteCollectionCache = remoteCollectionCache;
             mApplicationInfoCache = applicationInfoCache;
             mClassCookies = classCookies;
         }

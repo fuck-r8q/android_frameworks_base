@@ -254,7 +254,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
     private boolean mIsSeamlessRotation = false;
     private IContainerFreezer mContainerFreezer = null;
-    private final SurfaceControl.Transaction mTmpTransaction = new SurfaceControl.Transaction();
 
     /**
      * {@code true} if some other operation may have caused the originally-recorded state (in
@@ -643,11 +642,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         mLogger.mStartTimeNs = SystemClock.elapsedRealtimeNanos();
 
-        mController.updateAnimatingState(mTmpTransaction);
-        // merge into the next-time the global transaction is applied. This is too-early to set
-        // early-wake anyways, so we don't need to apply immediately (in fact applying right now
-        // can preempt more-important work).
-        SurfaceControl.mergeToGlobalTransaction(mTmpTransaction);
+        mController.updateAnimatingState();
     }
 
     /**
@@ -719,7 +714,11 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (dc == null || mTargetDisplays.contains(dc)) return;
         mTargetDisplays.add(dc);
         addOnTopTasks(dc, mOnTopTasksStart);
-        mController.startPerfHintForDisplay(dc.mDisplayId);
+        // Handle the case {transition.start(); applyTransaction(wct);} that the animating state
+        // is set before collecting participants.
+        if (mController.isAnimating()) {
+            dc.enableHighPerfTransition(true);
+        }
     }
 
     /**
@@ -1067,7 +1066,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
      * @return true if we are *guaranteed* to enter-pip. This means we return false if there's
      *         a chance we won't thus legacy-entry (via pause+userLeaving) will return false.
      */
-    private boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar) {
+    private boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar,
+            @Nullable ActivityRecord resuming) {
         if (!mCanPipOnFinish || !ar.isVisible() || ar.getTask() == null || !ar.isState(RESUMED)) {
             return false;
         }
@@ -1112,8 +1112,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         try {
             // If not going auto-pip, the activity should be paused with user-leaving.
             mController.mAtm.mTaskSupervisor.mUserLeaving = true;
-            ar.getTaskFragment().startPausing(false /* uiSleeping */,
-                    null /* resuming */, "finishTransition");
+            ar.getTaskFragment().startPausing(false /* uiSleeping */, resuming, "finishTransition");
         } finally {
             mController.mAtm.mTaskSupervisor.mUserLeaving = false;
         }
@@ -1211,7 +1210,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final boolean isScreenOff = ar.mDisplayContent == null
                         || ar.mDisplayContent.getDisplayInfo().state == Display.STATE_OFF;
                 if ((!visibleAtTransitionEnd || isScreenOff) && !ar.isVisibleRequested()) {
-                    final boolean commitVisibility = !checkEnterPipOnFinish(ar);
+                    final ActivityRecord resuming = getVisibleTransientLaunch(
+                            ar.getTaskDisplayArea());
+                    final boolean commitVisibility = !checkEnterPipOnFinish(ar, resuming);
                     // Avoid commit visibility if entering pip or else we will get a sudden
                     // "flash" / surface going invisible for a split second.
                     if (commitVisibility) {
@@ -1426,13 +1427,28 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                     false /* forceRelayout */);
         }
         cleanUpInternal();
-        mController.updateAnimatingState(mTmpTransaction);
-        mTmpTransaction.apply();
+        mController.updateAnimatingState();
 
         // Handle back animation if it's already started.
         mController.mAtm.mBackNavigationController.onTransitionFinish(mTargets, this);
         mController.mFinishingTransition = null;
         mController.mSnapshotController.onTransitionFinish(mType, mTargets);
+    }
+
+    @Nullable
+    private ActivityRecord getVisibleTransientLaunch(TaskDisplayArea taskDisplayArea) {
+        if (mTransientLaunches == null) return null;
+        for (int i = mTransientLaunches.size() - 1; i >= 0; --i) {
+            final ActivityRecord candidateActivity = mTransientLaunches.keyAt(i);
+            if (candidateActivity.getTaskDisplayArea() != taskDisplayArea) {
+                continue;
+            }
+            if (!candidateActivity.isVisible()) {
+                continue;
+            }
+            return candidateActivity;
+        }
+        return null;
     }
 
     void abort() {
