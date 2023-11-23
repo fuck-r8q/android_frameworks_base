@@ -1352,8 +1352,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 DisplayContent dc = mRoot.getDisplayContent(displayId);
                 return (dc == null) ? null : dc.getSurfaceControl();
             }
-
         }, mTransactionFactory);
+        mSystemPerformanceHinter.mTraceTag = TRACE_TAG_WINDOW_MANAGER;
     }
 
     DisplayAreaPolicy.Provider getDisplayAreaPolicyProvider() {
@@ -6595,7 +6595,7 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public boolean destroyInputConsumer(String name, int displayId) {
+    public boolean destroyInputConsumer(IBinder token, int displayId) {
         if (!mAtmService.isCallerRecents(Binder.getCallingUid())
                 && mContext.checkCallingOrSelfPermission(INPUT_CONSUMER) != PERMISSION_GRANTED) {
             throw new SecurityException("destroyInputConsumer requires INPUT_CONSUMER permission");
@@ -6604,7 +6604,7 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             DisplayContent display = mRoot.getDisplayContent(displayId);
             if (display != null) {
-                return display.getInputMonitor().destroyInputConsumer(name);
+                return display.getInputMonitor().destroyInputConsumer(token);
             }
             return false;
         }
@@ -7237,6 +7237,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.println(separator);
             }
             mConstants.dump(pw);
+            if (dumpAll) {
+                pw.println(separator);
+            }
+            mSystemPerformanceHinter.dump(pw, "");
         }
     }
 

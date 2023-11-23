@@ -18,8 +18,6 @@ package com.android.systemui.accessibility.floatingmenu;
 
 import static android.app.UiModeManager.MODE_NIGHT_YES;
 
-import static com.android.systemui.accessibility.utils.FlagUtils.setFlagDefaults;
-
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.Mockito.mock;
@@ -29,6 +27,9 @@ import static org.mockito.Mockito.verify;
 import android.app.UiModeManager;
 import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.view.WindowManager;
@@ -36,6 +37,7 @@ import android.view.accessibility.AccessibilityManager;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.systemui.Flags;
 import com.android.systemui.Prefs;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.util.settings.SecureSettings;
@@ -64,12 +66,15 @@ public class MenuViewTest extends SysuiTestCase {
     @Rule
     public MockitoRule mockito = MockitoJUnit.rule();
 
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule =
+            DeviceFlagsValueProvider.createCheckFlagsRule();
+
     @Mock
     private AccessibilityManager mAccessibilityManager;
 
     @Before
     public void setUp() throws Exception {
-        setFlagDefaults(mSetFlagsRule);
         mUiModeManager = mContext.getSystemService(UiModeManager.class);
         mNightMode = mUiModeManager.getNightMode();
         mUiModeManager.setNightMode(MODE_NIGHT_YES);
@@ -141,12 +146,37 @@ public class MenuViewTest extends SysuiTestCase {
         assertThat(radii[7]).isEqualTo(0.0f);
     }
 
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_FLOATING_MENU_RADII_ANIMATION)
+    public void onEdgeChanged_startsRadiiAnimation() {
+        final RadiiAnimator radiiAnimator = getRadiiAnimator();
+        mMenuView.onEdgeChanged();
+        assertThat(radiiAnimator.isStarted()).isTrue();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_FLOATING_MENU_RADII_ANIMATION)
+    public void onDraggingStart_startsRadiiAnimation() {
+        final RadiiAnimator radiiAnimator = getRadiiAnimator();
+        mMenuView.onDraggingStart();
+        assertThat(radiiAnimator.isStarted()).isTrue();
+    }
+
     private InstantInsetLayerDrawable getMenuViewInsetLayer() {
         return (InstantInsetLayerDrawable) mMenuView.getBackground();
     }
 
     private GradientDrawable getMenuViewGradient() {
         return (GradientDrawable) getMenuViewInsetLayer().getDrawable(INDEX_MENU_ITEM);
+    }
+
+    private RadiiAnimator getRadiiAnimator() {
+        final RadiiAnimator radiiAnimator = mMenuView.getMenuAnimationController().mRadiiAnimator;
+        if (radiiAnimator.isStarted()) {
+            radiiAnimator.skipAnimationToEnd();
+        }
+        assertThat(radiiAnimator.isStarted()).isFalse();
+        return radiiAnimator;
     }
 
     @After

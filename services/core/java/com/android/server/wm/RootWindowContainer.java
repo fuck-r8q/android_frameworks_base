@@ -2063,6 +2063,12 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         Transition.ReadyCondition pipChangesApplied = new Transition.ReadyCondition("movedToPip");
         transitionController.waitFor(pipChangesApplied);
         mService.deferWindowLayout();
+        boolean localVisibilityDeferred = false;
+        // If the caller is from WindowOrganizerController, it should be already deferred.
+        if (!mTaskSupervisor.isRootVisibilityUpdateDeferred()) {
+            mTaskSupervisor.setDeferRootVisibilityUpdate(true);
+            localVisibilityDeferred = true;
+        }
         try {
             // This will change the root pinned task's windowing mode to its original mode, ensuring
             // we only have one root task that is in pinned mode.
@@ -2234,14 +2240,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 mService.mTaskFragmentOrganizerController.dispatchPendingInfoChangedEvent(
                         organizedTf);
             }
-
-            if (taskDisplayArea.getFocusedRootTask() == rootTask) {
-                taskDisplayArea.clearPreferredTopFocusableRootTask();
-            }
         } finally {
             mService.continueWindowLayout();
             try {
-                if (!isPip2ExperimentEnabled()) {
+                if (localVisibilityDeferred) {
+                    mTaskSupervisor.setDeferRootVisibilityUpdate(false);
                     ensureActivitiesVisible(null, 0, false /* preserveWindows */);
                 }
             } finally {

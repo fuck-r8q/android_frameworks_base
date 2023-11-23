@@ -83,7 +83,11 @@ class MobileIconViewModelTest : SysuiTestCase() {
     @Mock private lateinit var tableLogBuffer: TableLogBuffer
     @Mock private lateinit var carrierConfigTracker: CarrierConfigTracker
 
-    private val flags = FakeFeatureFlagsClassic().also { it.set(Flags.NEW_NETWORK_SLICE_UI, false) }
+    private val flags =
+        FakeFeatureFlagsClassic().also {
+            it.set(Flags.NEW_NETWORK_SLICE_UI, false)
+            it.set(Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS, true)
+        }
     private val testDispatcher = UnconfinedTestDispatcher()
     private val testScope = TestScope(testDispatcher)
 
@@ -121,6 +125,7 @@ class MobileIconViewModelTest : SysuiTestCase() {
                 FakeUserSetupRepository(),
                 testScope.backgroundScope,
                 context,
+                flags,
             )
 
         interactor =

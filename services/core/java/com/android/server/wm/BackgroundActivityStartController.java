@@ -357,15 +357,23 @@ public class BackgroundActivityStartController {
 
         public String toString() {
             StringBuilder builder = new StringBuilder();
-            if (mBackground) {
-                builder.append("Background ");
-            }
-            builder.append("Activity start allowed: " + mMessage + ".");
-            builder.append("BAL Code: ");
+            builder.append(". BAL Code: ");
             builder.append(balCodeToString(mCode));
-            if (mProcessInfo != null) {
+            if (DEBUG_ACTIVITY_STARTS) {
                 builder.append(" ");
-                builder.append(mProcessInfo);
+                if (mBackground) {
+                    builder.append("Background ");
+                }
+                builder.append("Activity start ");
+                if (mCode == BAL_BLOCK) {
+                    builder.append("denied");
+                } else {
+                    builder.append("allowed: ").append(mMessage);
+                }
+                if (mProcessInfo != null) {
+                    builder.append(" ");
+                    builder.append(mProcessInfo);
+                }
             }
             return builder.toString();
         }
@@ -415,8 +423,9 @@ public class BackgroundActivityStartController {
         }
 
         BalVerdict resultForCaller = checkBackgroundActivityStartAllowedByCaller(state);
-        BalVerdict resultForRealCaller = callingUid == realCallingUid
+        BalVerdict resultForRealCaller = callingUid == realCallingUid && resultForCaller.allows()
                 ? resultForCaller // no need to calculate again
+                // otherwise we might need to recalculate because the logic is not the same
                 : checkBackgroundActivityStartAllowedBySender(state, checkedOptions);
 
         if (resultForCaller.allows()

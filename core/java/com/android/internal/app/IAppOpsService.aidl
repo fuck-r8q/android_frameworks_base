@@ -20,6 +20,7 @@ import android.app.AppOpsManager;
 import android.app.AsyncNotedAppOp;
 import android.app.SyncNotedAppOp;
 import android.app.RuntimeAppOpAccessMessage;
+import android.content.AttributionSource;
 import android.content.AttributionSourceState;
 import android.content.pm.ParceledListSlice;
 import android.os.Bundle;
@@ -32,20 +33,31 @@ import com.android.internal.app.IAppOpsNotedCallback;
 import com.android.internal.app.IAppOpsStartedCallback;
 import com.android.internal.app.MessageSamplingConfig;
 
+// AppOpsService AIDL interface.
+// PLEASE READ BEFORE MODIFYING THIS FILE.
+// Some methods in this interface or their transaction codes are mentioned in
+// frameworks/base/boot/hiddenapi/hiddenapi-unsupported.txt, meaning that we cannot change their
+// signature or ordering as they may be used by 3p apps.
+// Also, some methods are mentioned in native code, meaning that the numbering in
+// frameworks/native/libs/permission/include/binder/IAppOpsService.h must match the order here.
+// Please be careful to respect both these issues when modifying this file.
 interface IAppOpsService {
-    // These methods are also called by native code, so must
-    // be kept in sync with frameworks/native/libs/permission/include/binder/IAppOpsService.h
-    // and not be reordered
+    // Deprecated, use checkOperationWithState instead.
     int checkOperation(int code, int uid, String packageName);
+    // Deprecated, use noteOperationWithState instead.
     SyncNotedAppOp noteOperation(int code, int uid, String packageName, @nullable String attributionTag,
             boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage);
+    // Deprecated, use startOperationWithState instead.
     SyncNotedAppOp startOperation(IBinder clientId, int code, int uid, String packageName,
             @nullable String attributionTag, boolean startIfModeDefault,
             boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
             int attributionFlags, int attributionChainId);
+    // Deprecated, use finishOperationWithState instead.
     @UnsupportedAppUsage
     void finishOperation(IBinder clientId, int code, int uid, String packageName,
             @nullable String attributionTag);
+    // These methods are also called by native code, so please be careful that the number in
+    // frameworks/native/libs/permission/include/binder/IAppOpsService.h matches the ordering here.
     void startWatchingMode(int op, String packageName, IAppOpsCallback callback);
     void stopWatchingMode(IAppOpsCallback callback);
     int permissionToOpCode(String permission);
@@ -54,21 +66,21 @@ interface IAppOpsService {
     void setCameraAudioRestriction(int mode);
     void startWatchingModeWithFlags(int op, String packageName, int flags,
             IAppOpsCallback callback);
-    // End of methods also called by native code.
-    // Any new method exposed to native must be added after the last one, do not reorder
-
-    SyncNotedAppOp noteProxyOperation(int code, in AttributionSourceState attributionSourceState,
+    // End of methods also called by native code (there may be more blocks like this of native
+    // methods later in this file).
+    // Deprecated, use noteProxyOperationWithState instead.
+    SyncNotedAppOp noteProxyOperation(int code, in AttributionSource attributionSource,
             boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
             boolean skipProxyOperation);
+    // Deprecated, use startProxyOperationWithState instead.
     SyncNotedAppOp startProxyOperation(IBinder clientId, int code,
-            in AttributionSourceState attributionSourceState, boolean startIfModeDefault,
+            in AttributionSource attributionSource, boolean startIfModeDefault,
             boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
             boolean skipProxyOperation, int proxyAttributionFlags, int proxiedAttributionFlags,
             int attributionChainId);
-    void finishProxyOperation(IBinder clientId, int code,
-            in AttributionSourceState attributionSourceState, boolean skipProxyOperation);
-
-    // Remaining methods are only used in Java.
+    // Deprecated, use finishProxyOperationWithState instead.
+    void finishProxyOperation(IBinder clientId, int code, in AttributionSource attributionSource,
+            boolean skipProxyOperation);
     int checkPackage(int uid, String packageName);
     RuntimeAppOpAccessMessage collectRuntimeAppOpAccessMessage();
     MessageSamplingConfig reportRuntimeAppOpAccessMessageAndGetConfig(String packageName,
@@ -126,9 +138,33 @@ interface IAppOpsService {
     void stopWatchingAsyncNoted(String packageName, IAppOpsAsyncNotedCallback callback);
     List<AsyncNotedAppOp> extractAsyncOps(String packageName);
 
+    // Deprecated, use checkOperationWithStateRaw instead.
     int checkOperationRaw(int code, int uid, String packageName, @nullable String attributionTag);
-
     void reloadNonHistoricalState();
 
     void collectNoteOpCallsForValidation(String stackTrace, int op, String packageName, long version);
+    // These methods are also called by native code, so please be careful that the number in
+    // frameworks/native/libs/permission/include/binder/IAppOpsService.h matches the ordering here.
+    int checkOperationWithState(int code, in AttributionSourceState attributionSourceState);
+    int checkOperationWithStateRaw(int code, in AttributionSourceState attributionSourceState);
+    SyncNotedAppOp noteOperationWithState(int code, in AttributionSourceState attributionSourceState,
+            boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage);
+    SyncNotedAppOp startOperationWithState(IBinder clientId, int code,
+            in AttributionSourceState attributionSourceState, boolean startIfModeDefault,
+            boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
+            int attributionFlags, int attributionChainId);
+    void finishOperationWithState(IBinder clientId, int code, in AttributionSourceState attributionSourceState);
+    // End of methods also called by native code (there may be more blocks like this of native
+    // methods later in this file).
+    SyncNotedAppOp noteProxyOperationWithState(int code,
+            in AttributionSourceState attributionSourceStateState,
+            boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
+            boolean skipProxyOperation);
+    SyncNotedAppOp startProxyOperationWithState(IBinder clientId, int code,
+            in AttributionSourceState attributionSourceStateState, boolean startIfModeDefault,
+            boolean shouldCollectAsyncNotedOp, String message, boolean shouldCollectMessage,
+            boolean skipProxyOperation, int proxyAttributionFlags, int proxiedAttributionFlags,
+            int attributionChainId);
+    void finishProxyOperationWithState(IBinder clientId, int code,
+            in AttributionSourceState attributionSourceStateState, boolean skipProxyOperation);
 }

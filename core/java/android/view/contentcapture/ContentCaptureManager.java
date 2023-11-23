@@ -395,6 +395,31 @@ public final class ContentCaptureManager {
     public static final String DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD =
             "content_protection_optional_groups_threshold";
 
+    /**
+     * Sets the initial delay for fetching content protection allowlist in milliseconds.
+     *
+     * @hide
+     */
+    public static final String DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_ALLOWLIST_DELAY_MS =
+            "content_protection_allowlist_delay_ms";
+
+    /**
+     * Sets the timeout for fetching content protection allowlist in milliseconds.
+     *
+     * @hide
+     */
+    public static final String DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_ALLOWLIST_TIMEOUT_MS =
+            "content_protection_allowlist_timeout_ms";
+
+    /**
+     * Sets the auto disconnect timeout for the content protection service in milliseconds.
+     *
+     * @hide
+     */
+    // Unit can't be in the name in order to pass the checkstyle hook, line would be too long.
+    public static final String DEVICE_CONFIG_PROPERTY_CONTENT_PROTECTION_AUTO_DISCONNECT_TIMEOUT =
+            "content_protection_auto_disconnect_timeout_ms";
+
     /** @hide */
     @TestApi
     public static final int LOGGING_LEVEL_OFF = 0;
@@ -445,6 +470,12 @@ public final class ContentCaptureManager {
     public static final String DEFAULT_CONTENT_PROTECTION_OPTIONAL_GROUPS_CONFIG = "";
     /** @hide */
     public static final int DEFAULT_CONTENT_PROTECTION_OPTIONAL_GROUPS_THRESHOLD = 0;
+    /** @hide */
+    public static final long DEFAULT_CONTENT_PROTECTION_ALLOWLIST_DELAY_MS = 30000;
+    /** @hide */
+    public static final long DEFAULT_CONTENT_PROTECTION_ALLOWLIST_TIMEOUT_MS = 250;
+    /** @hide */
+    public static final long DEFAULT_CONTENT_PROTECTION_AUTO_DISCONNECT_TIMEOUT_MS = 3000;
 
     private final Object mLock = new Object();
 
@@ -763,7 +794,9 @@ public final class ContentCaptureManager {
                 (params.flags & WindowManager.LayoutParams.FLAG_SECURE) != 0;
 
         MainContentCaptureSession mainSession;
+        boolean alreadyDisabledByApp;
         synchronized (mLock) {
+            alreadyDisabledByApp = (mFlags & ContentCaptureContext.FLAG_DISABLED_BY_APP) != 0;
             if (flagSecureEnabled) {
                 mFlags |= ContentCaptureContext.FLAG_DISABLED_BY_FLAG_SECURE;
             } else {
@@ -771,7 +804,9 @@ public final class ContentCaptureManager {
             }
             mainSession = mMainSession;
         }
-        if (mainSession != null) {
+
+        // Prevent overriding the status of disabling by app
+        if (mainSession != null && !alreadyDisabledByApp) {
             mainSession.setDisabled(flagSecureEnabled);
         }
     }
