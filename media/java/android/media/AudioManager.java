@@ -21,9 +21,11 @@ import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
 
 import static com.android.media.audio.flags.Flags.autoPublicVolumeApiHardening;
+import static com.android.media.audio.flags.Flags.FLAG_FOCUS_FREEZE_TEST_API;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -4775,6 +4777,7 @@ public class AudioManager {
      * @return the list of UIDs, can be empty when no app is being ducked.
      */
     @TestApi
+    @FlaggedApi(FLAG_FOCUS_FREEZE_TEST_API)
     @RequiresPermission("android.permission.QUERY_AUDIO_STATE")
     public @NonNull List<Integer> getFocusDuckedUidsForTest() {
         try {
@@ -4790,6 +4793,7 @@ public class AudioManager {
      * @return the fade out duration in ms
      */
     @TestApi
+    @FlaggedApi(FLAG_FOCUS_FREEZE_TEST_API)
     @RequiresPermission("android.permission.QUERY_AUDIO_STATE")
     public long getFocusFadeOutDurationForTest() {
         try {
@@ -4806,6 +4810,7 @@ public class AudioManager {
      * @return the time gap after a fade-out completion on focus loss, and fade-in start in ms.
      */
     @TestApi
+    @FlaggedApi(FLAG_FOCUS_FREEZE_TEST_API)
     @RequiresPermission("android.permission.QUERY_AUDIO_STATE")
     public long getFocusUnmuteDelayAfterFadeOutForTest() {
         try {
@@ -4832,6 +4837,7 @@ public class AudioManager {
      *     in a proper state with a predictable behavior for audio focus management.
      */
     @TestApi
+    @FlaggedApi(FLAG_FOCUS_FREEZE_TEST_API)
     @RequiresPermission("Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     public boolean enterAudioFocusFreezeForTest(@NonNull List<Integer> exemptedUids) {
         Objects.requireNonNull(exemptedUids);
@@ -4850,6 +4856,7 @@ public class AudioManager {
      *     such as the freeze already having ended, or not started.
      */
     @TestApi
+    @FlaggedApi(FLAG_FOCUS_FREEZE_TEST_API)
     @RequiresPermission("Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     public boolean exitAudioFocusFreezeForTest() {
         try {

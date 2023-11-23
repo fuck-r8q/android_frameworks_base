@@ -961,6 +961,12 @@
       "group": "WM_DEBUG_RECENTS_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RecentsAnimationController.java"
     },
+    "-1204565480": {
+      "message": "Adding display switch to existing collecting transition",
+      "level": "DEBUG",
+      "group": "WM_DEBUG_WINDOW_TRANSITIONS",
+      "at": "com\/android\/server\/wm\/PhysicalDisplaySwitchTransitionLauncher.java"
+    },
     "-1198579104": {
       "message": "Pushing next activity %s out to target's task %s",
       "level": "VERBOSE",
@@ -2658,6 +2664,12 @@
       "level": "VERBOSE",
       "group": "WM_DEBUG_WINDOW_TRANSITIONS",
       "at": "com\/android\/server\/wm\/TransitionController.java"
+    },
+    "261227010": {
+      "message": "Content Recording: Unable to tell log windowing mode change: %s",
+      "level": "ERROR",
+      "group": "WM_DEBUG_CONTENT_RECORDING",
+      "at": "com\/android\/server\/wm\/ContentRecorder.java"
     },
     "269576220": {
       "message": "Resuming rotation after drag",

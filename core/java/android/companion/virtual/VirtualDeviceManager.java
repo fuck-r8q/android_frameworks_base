@@ -28,6 +28,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
+import android.annotation.TestApi;
 import android.annotation.UserIdInt;
 import android.app.PendingIntent;
 import android.companion.AssociationInfo;
@@ -184,9 +185,6 @@ public final class VirtualDeviceManager {
             int associationId,
             @NonNull VirtualDeviceParams params) {
         Objects.requireNonNull(params, "params must not be null");
-        if (Flags.moreLogs()) {
-            Log.i(TAG, "Creating VirtualDevice");
-        }
         try {
             return new VirtualDevice(mService, mContext, associationId, params);
         } catch (RemoteException e) {
@@ -430,6 +428,25 @@ public final class VirtualDeviceManager {
         }
         try {
             mService.playSoundEffect(deviceId, effectType);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns whether the given display is an auto-mirror display owned by a virtual device.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_INTERACTIVE_SCREEN_MIRROR)
+    @TestApi
+    public boolean isVirtualDeviceOwnedMirrorDisplay(int displayId) {
+        if (mService == null) {
+            Log.w(TAG, "Failed to retrieve virtual devices; no virtual device manager service.");
+            return false;
+        }
+        try {
+            return mService.isVirtualDeviceOwnedMirrorDisplay(displayId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

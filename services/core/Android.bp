@@ -96,27 +96,12 @@ genrule {
     out: ["com/android/server/location/contexthub/ContextHubStatsLog.java"],
 }
 
-/*
- * This module is used to refer aconfig flag libraries that are
- * added to the framework via static_libs.
- * These libraries are referred here via libs prevent duplication of classes in both
- * the framework and the system server.
-*/
-java_defaults {
-    name: "shared-framework-aconfig-libs",
-    libs: [
-        "display_flags_lib",
-        "camera_platform_flags_core_java_lib",
-    ],
-}
-
 java_library_static {
     name: "services.core.unboosted",
     defaults: [
         "framework-wifi-vendor-hide-access-defaults",
         "platform_service_defaults",
         "android.hardware.power-java_static",
-        "shared-framework-aconfig-libs",
     ],
     srcs: [
         ":android.hardware.biometrics.face-V3-java-source",
@@ -175,7 +160,7 @@ java_library_static {
         "android.hardware.boot-V1.2-java", // HIDL
         "android.hardware.boot-V1-java", // AIDL
         "android.hardware.broadcastradio-V2.0-java", // HIDL
-        "android.hardware.broadcastradio-V1-java", // AIDL
+        "android.hardware.broadcastradio-V2-java", // AIDL
         "android.hardware.health-V1.0-java", // HIDL
         "android.hardware.health-V2.0-java", // HIDL
         "android.hardware.health-V2.1-java", // HIDL
@@ -211,12 +196,12 @@ java_library_static {
         "vendor.qti.hardware.servicetracker-V1.0-java",
         "vendor.qti.hardware.servicetracker-V1.2-java",
         "vendor.qti.hardware.servicetrackeraidl-V1-java",
-        "android.content.pm.flags-aconfig-java",
         "apache-commons-math",
         "backstage_power_flags_lib",
         "notification_flags_lib",
         "biometrics_flags_lib",
         "am_flags_lib",
+        "com_android_wm_shell_flags_lib",
     ],
     javac_shard_size: 50,
     javacflags: [

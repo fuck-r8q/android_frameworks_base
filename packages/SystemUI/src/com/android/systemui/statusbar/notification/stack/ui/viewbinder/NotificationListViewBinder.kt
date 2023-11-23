@@ -31,7 +31,7 @@ import com.android.systemui.statusbar.notification.stack.NotificationStackScroll
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationListViewModel
 import com.android.systemui.statusbar.phone.NotificationIconAreaController
 import com.android.systemui.statusbar.policy.ConfigurationController
-import com.android.systemui.util.traceSection
+import com.android.systemui.tracing.traceSection
 
 /** Binds a [NotificationStackScrollLayout] to its [view model][NotificationListViewModel]. */
 object NotificationListViewBinder {
@@ -45,30 +45,61 @@ object NotificationListViewBinder {
         iconAreaController: NotificationIconAreaController,
         shelfIconViewStore: ShelfNotificationIconViewStore,
     ) {
+        bindShelf(
+            view,
+            viewModel,
+            configuration,
+            configurationController,
+            falsingManager,
+            iconAreaController,
+            shelfIconViewStore
+        )
+
+        bindFooter(view, viewModel, configuration)
+    }
+
+    private fun bindShelf(
+        parentView: NotificationStackScrollLayout,
+        parentViewModel: NotificationListViewModel,
+        configuration: ConfigurationState,
+        configurationController: ConfigurationController,
+        falsingManager: FalsingManager,
+        iconAreaController: NotificationIconAreaController,
+        shelfIconViewStore: ShelfNotificationIconViewStore
+    ) {
         val shelf =
-            LayoutInflater.from(view.context)
-                .inflate(R.layout.status_bar_notification_shelf, view, false) as NotificationShelf
+            LayoutInflater.from(parentView.context)
+                .inflate(R.layout.status_bar_notification_shelf, parentView, false)
+                as NotificationShelf
         NotificationShelfViewBinder.bind(
             shelf,
-            viewModel.shelf,
+            parentViewModel.shelf,
             configuration,
             configurationController,
             falsingManager,
             iconAreaController,
             shelfIconViewStore,
         )
-        view.setShelf(shelf)
+        parentView.setShelf(shelf)
+    }
 
-        viewModel.footer.ifPresent { footerViewModel ->
+    private fun bindFooter(
+        parentView: NotificationStackScrollLayout,
+        parentViewModel: NotificationListViewModel,
+        configuration: ConfigurationState
+    ) {
+        parentViewModel.footer.ifPresent { footerViewModel ->
             // The footer needs to be re-inflated every time the theme or the font size changes.
-            view.repeatWhenAttached {
+            parentView.repeatWhenAttached {
                 configuration.reinflateAndBindLatest(
                     R.layout.status_bar_notification_footer,
-                    view,
+                    parentView,
                     attachToRoot = false,
                 ) { footerView: FooterView ->
                     traceSection("bind FooterView") {
-                        FooterViewBinder.bind(footerView, footerViewModel)
+                        val disposableHandle = FooterViewBinder.bind(footerView, footerViewModel)
+                        parentView.setFooterView(footerView)
+                        return@reinflateAndBindLatest disposableHandle
                     }
                 }
             }
