@@ -16,42 +16,49 @@
 
 package com.android.systemui.communal.ui.viewmodel
 
-import android.appwidget.AppWidgetHost
-import android.content.Context
+import android.content.ComponentName
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
-import com.android.systemui.communal.domain.interactor.CommunalTutorialInteractor
-import com.android.systemui.communal.ui.model.CommunalContentUiModel
+import com.android.systemui.communal.domain.model.CommunalContentModel
+import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.media.controls.ui.MediaHost
+import com.android.systemui.media.dagger.MediaModule
 import javax.inject.Inject
+import javax.inject.Named
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.StateFlow
 
 @SysUISingleton
 class CommunalViewModel
 @Inject
 constructor(
-    @Application private val context: Context,
-    private val appWidgetHost: AppWidgetHost,
-    communalInteractor: CommunalInteractor,
-    tutorialInteractor: CommunalTutorialInteractor,
+    private val communalInteractor: CommunalInteractor,
+    @Named(MediaModule.COMMUNAL_HUB) val mediaHost: MediaHost,
 ) {
-    /** Whether communal hub should show tutorial content. */
-    val showTutorialContent: Flow<Boolean> = tutorialInteractor.isTutorialAvailable
+    val currentScene: StateFlow<CommunalSceneKey> = communalInteractor.desiredScene
+    fun onSceneChanged(scene: CommunalSceneKey) {
+        communalInteractor.onSceneChanged(scene)
+    }
 
-    /** List of widgets to be displayed in the communal hub. */
-    val widgetContent: Flow<List<CommunalContentUiModel>> =
-        communalInteractor.widgetContent.map { widgets ->
-            widgets.map Widget@{ widget ->
-                // TODO(b/306406256): As adding and removing widgets functionalities are
-                // supported, cache the host views so they're not recreated each time.
-                val hostView =
-                    appWidgetHost.createView(context, widget.appWidgetId, widget.providerInfo)
-                return@Widget CommunalContentUiModel(
-                    // TODO(b/308148193): a more scalable solution for unique ids.
-                    id = "widget_${widget.appWidgetId}",
-                    view = hostView,
-                )
-            }
-        }
+    /** A list of all the communal content to be displayed in the communal hub. */
+    val communalContent: Flow<List<CommunalContentModel>> = communalInteractor.communalContent
+
+    /** Delete a widget by id. */
+    fun onDeleteWidget(id: Int) = communalInteractor.deleteWidget(id)
+
+    /** Open the widget picker */
+    fun onOpenWidgetPicker() {
+        // STOPSHIP(b/306500486): refactor this when integrating with the widget picker.
+        // Eventually clicking on this button will bring up the widget picker and inside
+        // the widget picker, addWidget will be called to add the user selected widget.
+        // For now, a stopwatch widget will be added to the end of the grid.
+        communalInteractor.addWidget(
+            componentName =
+                ComponentName(
+                    "com.google.android.deskclock",
+                    "com.android.alarmclock.StopwatchAppWidgetProvider"
+                ),
+            priority = 0
+        )
+    }
 }

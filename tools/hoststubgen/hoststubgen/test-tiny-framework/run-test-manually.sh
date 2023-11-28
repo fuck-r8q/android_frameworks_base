@@ -92,6 +92,8 @@ run $HOSTSTUBGEN \
     --policy-override-file policy-override-tiny-framework.txt \
     --gen-keep-all-file out/tiny-framework_keep_all.txt \
     --gen-input-dump-file out/tiny-framework_dump.txt \
+    --package-redirect com.unsupported:com.supported \
+    --annotation-allowed-classes-file annotation-allowed-classes-tiny-framework.txt \
     $HOSTSTUBGEN_OPTS
 
 # Extract the jar files, so we can look into them.

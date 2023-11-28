@@ -719,6 +719,7 @@ class FullMobileConnectionRepositoryTest : SysuiTestCase() {
                 SUB_ID,
                 tableLogBuffer,
                 telephonyManager,
+                testScope.backgroundScope.coroutineContext,
                 testScope.backgroundScope,
                 wifiRepository,
             )

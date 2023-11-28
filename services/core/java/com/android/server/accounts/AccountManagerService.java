@@ -93,6 +93,7 @@ import android.os.StrictMode;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.stats.devicepolicy.DevicePolicyEnums;
 import android.text.TextUtils;
 import android.util.EventLog;
@@ -190,7 +191,7 @@ public class AccountManagerService
 
     final MessageHandler mHandler;
 
-    private static final int TIMEOUT_DELAY_MS = 1000 * 60;
+    private static final int TIMEOUT_DELAY_MS = 1000 * 60 * 15;
     // Messages that can be sent on mHandler
     private static final int MESSAGE_TIMED_OUT = 3;
     private static final int MESSAGE_COPY_SHARED_ACCOUNT = 4;
@@ -2348,6 +2349,18 @@ public class AccountManagerService
             }
             return;
         }
+        if (isFirstAccountRemovalDisabled(account)) {
+            try {
+                response.onError(
+                        AccountManager.ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE,
+                        "User cannot remove the first "
+                                + account.type
+                                + " account on the device.");
+            } catch (RemoteException re) {
+                Log.w(TAG, "RemoteException while removing account", re);
+            }
+            return;
+        }
         final long identityToken = clearCallingIdentity();
         UserAccounts accounts = getUserAccounts(userId);
         cancelNotification(getSigninRequiredNotificationId(accounts, account), accounts);
@@ -2396,6 +2409,10 @@ public class AccountManagerService
                     callingUid,
                     account.type);
             throw new SecurityException(msg);
+        }
+        if (isFirstAccountRemovalDisabled(account)) {
+            Log.e(TAG, "Cannot remove the first " + account.type + " account on the device.");
+            return false;
         }
         UserAccounts accounts = getUserAccountsForCaller();
         final long accountId = accounts.accountsDb.findDeAccountId(account);
@@ -6431,6 +6448,48 @@ public class AccountManagerService
                 Log.v(TAG, "failure while notifying response", e);
             }
         }
+    }
+
+    /**
+     * Returns true if the config_canRemoveOrRenameFirstUser is false, and the given account type
+     * matches the one provided by config_accountTypeToKeepFirstUser.
+     */
+    private boolean isFirstAccountRemovalDisabled(Account account) {
+        // Skip if not targeting the first user.
+        int userId = UserHandle.getCallingUserId();
+        if (userId != 0) {
+            return false;
+        }
+
+        // Skip if we are allowed to remove/rename first account.
+        if (mContext.getResources()
+                .getBoolean(com.android.internal.R.bool.config_canRemoveFirstAccount)) {
+            return false;
+        }
+
+        // Skip if needed for testing.
+        if (Settings.Secure.getIntForUser(
+                mContext.getContentResolver(),
+                Settings.Secure.ALLOW_PRIMARY_GAIA_ACCOUNT_REMOVAL_FOR_TESTS,
+                0 /* default */,
+                0 /* userHandle */) != 0) {
+            return false;
+        }
+
+        // Skip if not targeting desired account.
+        String typeToKeep =
+                mContext.getResources()
+                        .getString(
+                                com.android.internal.R.string.config_accountTypeToKeepFirstAccount);
+        if (typeToKeep.isEmpty() || !typeToKeep.equals(account.type)) {
+            return false;
+        }
+
+        // Only restrict first account.
+        UserAccounts accounts = getUserAccounts(0 /* userId */);
+        Account[] accountsOfType = getAccountsFromCache(accounts, typeToKeep,
+                Process.SYSTEM_UID, "android" /* packageName */, false);
+        return accountsOfType.length > 0 && accountsOfType[0].equals(account);
     }
 
     private final class AccountManagerInternalImpl extends AccountManagerInternal {

@@ -13,19 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package com.android.systemui.statusbar.notification.icon.ui.viewmodel
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.SysUITestComponent
 import com.android.SysUITestModule
 import com.android.TestMocksModule
+import com.android.collectLastValue
+import com.android.runCurrent
+import com.android.runTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.biometrics.domain.BiometricsDomainLayerModule
-import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository
 import com.android.systemui.flags.FakeFeatureFlagsClassicModule
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
@@ -38,101 +39,101 @@ import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.power.data.repository.FakePowerRepository
 import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.power.shared.model.WakefulnessState
-import com.android.systemui.statusbar.notification.data.repository.FakeNotificationsKeyguardViewStateRepository
 import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController
 import com.android.systemui.statusbar.policy.data.repository.FakeDeviceProvisioningRepository
 import com.android.systemui.user.domain.UserDomainLayerModule
+import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
-import com.android.systemui.util.ui.isAnimating
-import com.android.systemui.util.ui.stopAnimating
-import com.android.systemui.util.ui.value
 import com.google.common.truth.Truth.assertThat
 import dagger.BindsInstance
 import dagger.Component
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
 
-    @Mock private lateinit var dozeParams: DozeParameters
-    @Mock private lateinit var screenOffAnimController: ScreenOffAnimationController
+    @SysUISingleton
+    @Component(
+        modules =
+            [
+                SysUITestModule::class,
+                BiometricsDomainLayerModule::class,
+                UserDomainLayerModule::class,
+            ]
+    )
+    interface TestComponent :
+        SysUITestComponent<NotificationIconContainerAlwaysOnDisplayViewModel> {
 
-    private lateinit var testComponent: TestComponent
-    private val underTest: NotificationIconContainerAlwaysOnDisplayViewModel
-        get() = testComponent.underTest
-    private val deviceEntryRepository: FakeDeviceEntryRepository
-        get() = testComponent.deviceEntryRepository
-    private val deviceProvisioningRepository: FakeDeviceProvisioningRepository
-        get() = testComponent.deviceProvisioningRepository
-    private val keyguardRepository: FakeKeyguardRepository
-        get() = testComponent.keyguardRepository
-    private val keyguardTransitionRepository: FakeKeyguardTransitionRepository
-        get() = testComponent.keyguardTransitionRepository
-    private val notifsKeyguardRepository: FakeNotificationsKeyguardViewStateRepository
-        get() = testComponent.notifsKeyguardRepository
-    private val powerRepository: FakePowerRepository
-        get() = testComponent.powerRepository
-    private val scope: TestScope
-        get() = testComponent.scope
+        val deviceProvisioningRepository: FakeDeviceProvisioningRepository
+        val keyguardRepository: FakeKeyguardRepository
+        val keyguardTransitionRepository: FakeKeyguardTransitionRepository
+        val powerRepository: FakePowerRepository
+
+        @Component.Factory
+        interface Factory {
+            fun create(
+                @BindsInstance test: SysuiTestCase,
+                mocks: TestMocksModule,
+                featureFlags: FakeFeatureFlagsClassicModule,
+            ): TestComponent
+        }
+    }
+
+    private val dozeParams: DozeParameters = mock()
+    private val screenOffAnimController: ScreenOffAnimationController = mock()
+
+    private val testComponent: TestComponent =
+        DaggerNotificationIconContainerAlwaysOnDisplayViewModelTest_TestComponent.factory()
+            .create(
+                test = this,
+                featureFlags =
+                    FakeFeatureFlagsClassicModule {
+                        setDefault(Flags.FACE_AUTH_REFACTOR)
+                        set(Flags.FULL_SCREEN_USER_SWITCHER, value = false)
+                        setDefault(Flags.NEW_AOD_TRANSITION)
+                    },
+                mocks =
+                    TestMocksModule(
+                        dozeParameters = dozeParams,
+                        screenOffAnimationController = screenOffAnimController,
+                    ),
+            )
 
     @Before
     fun setup() {
-        MockitoAnnotations.initMocks(this)
-
-        testComponent =
-            DaggerNotificationIconContainerAlwaysOnDisplayViewModelTest_TestComponent.factory()
-                .create(
-                    test = this,
-                    featureFlags =
-                        FakeFeatureFlagsClassicModule {
-                            setDefault(Flags.FACE_AUTH_REFACTOR)
-                            set(Flags.FULL_SCREEN_USER_SWITCHER, value = false)
-                            setDefault(Flags.NEW_AOD_TRANSITION)
-                        },
-                    mocks =
-                        TestMocksModule(
-                            dozeParameters = dozeParams,
-                            screenOffAnimationController = screenOffAnimController,
-                        ),
-                )
-
-        keyguardRepository.setKeyguardShowing(true)
-        keyguardRepository.setKeyguardOccluded(false)
-        deviceProvisioningRepository.setFactoryResetProtectionActive(false)
-        powerRepository.updateWakefulness(
-            rawState = WakefulnessState.AWAKE,
-            lastWakeReason = WakeSleepReason.OTHER,
-            lastSleepReason = WakeSleepReason.OTHER,
-        )
+        testComponent.apply {
+            keyguardRepository.setKeyguardShowing(true)
+            keyguardRepository.setKeyguardOccluded(false)
+            deviceProvisioningRepository.setFactoryResetProtectionActive(false)
+            powerRepository.updateWakefulness(
+                rawState = WakefulnessState.AWAKE,
+                lastWakeReason = WakeSleepReason.OTHER,
+                lastSleepReason = WakeSleepReason.OTHER,
+            )
+        }
     }
 
     @Test
     fun animationsEnabled_isFalse_whenFrpIsActive() =
-        scope.runTest {
+        testComponent.runTest {
             deviceProvisioningRepository.setFactoryResetProtectionActive(true)
             keyguardTransitionRepository.sendTransitionStep(
                 TransitionStep(
                     transitionState = TransitionState.STARTED,
                 )
             )
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isFalse()
         }
 
     @Test
     fun animationsEnabled_isFalse_whenDeviceAsleepAndNotPulsing() =
-        scope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.ASLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -148,14 +149,14 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
                     to = DozeStateModel.DOZE_AOD,
                 )
             )
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isFalse()
         }
 
     @Test
     fun animationsEnabled_isTrue_whenDeviceAsleepAndPulsing() =
-        scope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.ASLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -171,14 +172,14 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
                     to = DozeStateModel.DOZE_PULSING,
                 )
             )
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isTrue()
         }
 
     @Test
     fun animationsEnabled_isFalse_whenStartingToSleepAndNotControlScreenOff() =
-        scope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.STARTING_TO_SLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -192,14 +193,14 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
                 )
             )
             whenever(dozeParams.shouldControlScreenOff()).thenReturn(false)
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isFalse()
         }
 
     @Test
     fun animationsEnabled_isTrue_whenStartingToSleepAndControlScreenOff() =
-        scope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.STARTING_TO_SLEEP,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -213,14 +214,14 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
                 )
             )
             whenever(dozeParams.shouldControlScreenOff()).thenReturn(true)
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isTrue()
         }
 
     @Test
     fun animationsEnabled_isTrue_whenNotAsleep() =
-        scope.runTest {
+        testComponent.runTest {
             powerRepository.updateWakefulness(
                 rawState = WakefulnessState.AWAKE,
                 lastWakeReason = WakeSleepReason.POWER_BUTTON,
@@ -231,20 +232,20 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
                     transitionState = TransitionState.STARTED,
                 )
             )
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
             assertThat(animationsEnabled).isTrue()
         }
 
     @Test
     fun animationsEnabled_isTrue_whenKeyguardIsShowing() =
-        scope.runTest {
+        testComponent.runTest {
             keyguardTransitionRepository.sendTransitionStep(
                 TransitionStep(
                     transitionState = TransitionState.STARTED,
                 )
             )
-            val animationsEnabled by collectLastValue(underTest.animationsEnabled)
+            val animationsEnabled by collectLastValue(underTest.areContainerChangesAnimated)
             runCurrent()
 
             keyguardRepository.setKeyguardShowing(true)
@@ -266,253 +267,151 @@ class NotificationIconContainerAlwaysOnDisplayViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun isDozing_startAodTransition() =
-        scope.runTest {
-            val isDozing by collectLastValue(underTest.isDozing)
-            runCurrent()
-            keyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    from = KeyguardState.GONE,
-                    to = KeyguardState.AOD,
-                    transitionState = TransitionState.STARTED,
-                )
-            )
-            runCurrent()
-            assertThat(isDozing?.value).isTrue()
-            assertThat(isDozing?.isAnimating).isTrue()
-        }
-
-    @Test
-    fun isDozing_startDozeTransition() =
-        scope.runTest {
-            val isDozing by collectLastValue(underTest.isDozing)
-            runCurrent()
-            keyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    from = KeyguardState.GONE,
-                    to = KeyguardState.DOZING,
-                    transitionState = TransitionState.STARTED,
-                )
-            )
-            runCurrent()
-            assertThat(isDozing?.value).isTrue()
-            assertThat(isDozing?.isAnimating).isFalse()
-        }
-
-    @Test
-    fun isDozing_startDozeToAodTransition() =
-        scope.runTest {
-            val isDozing by collectLastValue(underTest.isDozing)
-            runCurrent()
-            keyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    from = KeyguardState.DOZING,
-                    to = KeyguardState.AOD,
-                    transitionState = TransitionState.STARTED,
-                )
-            )
-            runCurrent()
-            assertThat(isDozing?.value).isTrue()
-            assertThat(isDozing?.isAnimating).isTrue()
-        }
-
-    @Test
-    fun isNotDozing_startAodToGoneTransition() =
-        scope.runTest {
-            val isDozing by collectLastValue(underTest.isDozing)
-            runCurrent()
-            keyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    from = KeyguardState.AOD,
-                    to = KeyguardState.GONE,
-                    transitionState = TransitionState.STARTED,
-                )
-            )
-            runCurrent()
-            assertThat(isDozing?.value).isFalse()
-            assertThat(isDozing?.isAnimating).isTrue()
-        }
-
-    @Test
-    fun isDozing_stopAnimation() =
-        scope.runTest {
-            val isDozing by collectLastValue(underTest.isDozing)
-            runCurrent()
-            keyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    from = KeyguardState.AOD,
-                    to = KeyguardState.GONE,
-                    transitionState = TransitionState.STARTED,
-                )
-            )
-            runCurrent()
-
-            assertThat(isDozing?.isAnimating).isEqualTo(true)
-            isDozing?.stopAnimating()
-            runCurrent()
-
-            assertThat(isDozing?.isAnimating).isEqualTo(false)
-        }
-
-    @Test
-    fun isNotVisible_pulseExpanding() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(true)
-            runCurrent()
-
-            assertThat(isVisible?.value).isFalse()
-        }
-
-    @Test
-    fun isNotVisible_notOnKeyguard_dontShowAodIconsWhenShade() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
+    fun tintAlpha_isZero_whenNotOnAodOrDozing() =
+        testComponent.runTest {
+            val tintAlpha by collectLastValue(underTest.tintAlpha)
             runCurrent()
             keyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.OFF,
+                from = KeyguardState.DOZING,
                 to = KeyguardState.GONE,
-                scope,
+                testScope,
             )
-            whenever(screenOffAnimController.shouldShowAodIconsWhenShade()).thenReturn(false)
             runCurrent()
-
-            assertThat(isVisible?.value).isFalse()
-            assertThat(isVisible?.isAnimating).isFalse()
+            assertThat(tintAlpha).isZero()
         }
 
     @Test
-    fun isVisible_bypassEnabled() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
+    fun tintAlpha_isOne_whenOnAod() =
+        testComponent.runTest {
+            val tintAlpha by collectLastValue(underTest.tintAlpha)
             runCurrent()
-            deviceEntryRepository.setBypassEnabled(true)
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.AOD,
+                testScope,
+            )
             runCurrent()
-
-            assertThat(isVisible?.value).isTrue()
+            assertThat(tintAlpha).isEqualTo(1f)
         }
 
     @Test
-    fun isNotVisible_pulseExpanding_notBypassing() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
+    fun tintAlpha_isOne_whenDozing() =
+        testComponent.runTest {
+            val tintAlpha by collectLastValue(underTest.tintAlpha)
             runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(true)
-            deviceEntryRepository.setBypassEnabled(false)
-            runCurrent()
-
-            assertThat(isVisible?.value).isEqualTo(false)
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.DOZING,
+                testScope,
+            )
+            assertThat(tintAlpha).isEqualTo(1f)
         }
 
     @Test
-    fun isVisible_notifsFullyHidden_bypassEnabled() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(false)
-            deviceEntryRepository.setBypassEnabled(true)
-            notifsKeyguardRepository.setNotificationsFullyHidden(true)
+    fun tintAlpha_isOne_whenTransitionFromAodToDoze() =
+        testComponent.runTest {
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.AOD,
+                testScope,
+            )
+            val tintAlpha by collectLastValue(underTest.tintAlpha)
             runCurrent()
 
-            assertThat(isVisible?.value).isTrue()
-            assertThat(isVisible?.isAnimating).isTrue()
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.STARTED,
+                    from = KeyguardState.AOD,
+                    to = KeyguardState.DOZING,
+                    value = 0f,
+                )
+            )
+            runCurrent()
+
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.RUNNING,
+                    from = KeyguardState.AOD,
+                    to = KeyguardState.DOZING,
+                    value = 0.5f,
+                )
+            )
+            runCurrent()
+
+            assertThat(tintAlpha).isEqualTo(1f)
         }
 
     @Test
-    fun isVisible_notifsFullyHidden_bypassDisabled_aodDisabled() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(false)
-            deviceEntryRepository.setBypassEnabled(false)
-            whenever(dozeParams.alwaysOn).thenReturn(false)
-            notifsKeyguardRepository.setNotificationsFullyHidden(true)
+    fun tintAlpha_isFraction_midTransitionToAod() =
+        testComponent.runTest {
+            val tintAlpha by collectLastValue(underTest.tintAlpha)
             runCurrent()
 
-            assertThat(isVisible?.value).isTrue()
-            assertThat(isVisible?.isAnimating).isFalse()
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.STARTED,
+                    from = KeyguardState.GONE,
+                    to = KeyguardState.AOD,
+                    value = 0f,
+                )
+            )
+            runCurrent()
+
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.RUNNING,
+                    from = KeyguardState.GONE,
+                    to = KeyguardState.AOD,
+                    value = 0.5f,
+                )
+            )
+            runCurrent()
+
+            assertThat(tintAlpha).isEqualTo(0.5f)
         }
 
     @Test
-    fun isVisible_notifsFullyHidden_bypassDisabled_displayNeedsBlanking() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(false)
-            deviceEntryRepository.setBypassEnabled(false)
-            whenever(dozeParams.alwaysOn).thenReturn(true)
-            whenever(dozeParams.displayNeedsBlanking).thenReturn(true)
-            notifsKeyguardRepository.setNotificationsFullyHidden(true)
+    fun iconAnimationsEnabled_whenOnLockScreen() =
+        testComponent.runTest {
+            val iconAnimationsEnabled by collectLastValue(underTest.areIconAnimationsEnabled)
             runCurrent()
 
-            assertThat(isVisible?.value).isTrue()
-            assertThat(isVisible?.isAnimating).isFalse()
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.LOCKSCREEN,
+                testScope,
+            )
+
+            assertThat(iconAnimationsEnabled).isTrue()
         }
 
     @Test
-    fun isVisible_notifsFullyHidden_bypassDisabled() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(false)
-            deviceEntryRepository.setBypassEnabled(false)
-            whenever(dozeParams.alwaysOn).thenReturn(true)
-            whenever(dozeParams.displayNeedsBlanking).thenReturn(false)
-            notifsKeyguardRepository.setNotificationsFullyHidden(true)
+    fun iconAnimationsDisabled_whenOnAod() =
+        testComponent.runTest {
+            val iconAnimationsEnabled by collectLastValue(underTest.areIconAnimationsEnabled)
             runCurrent()
 
-            assertThat(isVisible?.value).isTrue()
-            assertThat(isVisible?.isAnimating).isTrue()
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.AOD,
+                testScope,
+            )
+
+            assertThat(iconAnimationsEnabled).isFalse()
         }
 
     @Test
-    fun isVisible_stopAnimation() =
-        scope.runTest {
-            val isVisible by collectLastValue(underTest.isVisible)
-            runCurrent()
-            notifsKeyguardRepository.setPulseExpanding(false)
-            deviceEntryRepository.setBypassEnabled(false)
-            whenever(dozeParams.alwaysOn).thenReturn(true)
-            whenever(dozeParams.displayNeedsBlanking).thenReturn(false)
-            notifsKeyguardRepository.setNotificationsFullyHidden(true)
+    fun iconAnimationsDisabled_whenDozing() =
+        testComponent.runTest {
+            val iconAnimationsEnabled by collectLastValue(underTest.areIconAnimationsEnabled)
             runCurrent()
 
-            assertThat(isVisible?.isAnimating).isEqualTo(true)
-            isVisible?.stopAnimating()
-            runCurrent()
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.GONE,
+                to = KeyguardState.DOZING,
+                testScope,
+            )
 
-            assertThat(isVisible?.isAnimating).isEqualTo(false)
+            assertThat(iconAnimationsEnabled).isFalse()
         }
-
-    @SysUISingleton
-    @Component(
-        modules =
-            [
-                SysUITestModule::class,
-                BiometricsDomainLayerModule::class,
-                UserDomainLayerModule::class,
-            ]
-    )
-    interface TestComponent {
-
-        val underTest: NotificationIconContainerAlwaysOnDisplayViewModel
-
-        val deviceEntryRepository: FakeDeviceEntryRepository
-        val deviceProvisioningRepository: FakeDeviceProvisioningRepository
-        val keyguardRepository: FakeKeyguardRepository
-        val keyguardTransitionRepository: FakeKeyguardTransitionRepository
-        val notifsKeyguardRepository: FakeNotificationsKeyguardViewStateRepository
-        val powerRepository: FakePowerRepository
-        val scope: TestScope
-
-        @Component.Factory
-        interface Factory {
-            fun create(
-                @BindsInstance test: SysuiTestCase,
-                mocks: TestMocksModule,
-                featureFlags: FakeFeatureFlagsClassicModule,
-            ): TestComponent
-        }
-    }
 }

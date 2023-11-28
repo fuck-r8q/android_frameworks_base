@@ -1486,7 +1486,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                         lowBatteryColorRes);
             }
             if (rightBattery >= 0) {
-                if (!spannableBuilder.isEmpty()) {
+                if (spannableBuilder.length() > 0) {
                     spannableBuilder.append(" ");
                 }
                 String right = res.getString(

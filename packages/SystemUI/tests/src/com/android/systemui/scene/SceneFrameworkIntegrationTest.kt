@@ -18,17 +18,23 @@
 
 package com.android.systemui.scene
 
+import android.telecom.TelecomManager
+import android.telephony.TelephonyManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.internal.R
+import com.android.internal.util.EmergencyAffordanceManager
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.domain.model.AuthenticationMethodModel as DomainLayerAuthenticationMethodModel
+import com.android.systemui.bouncer.domain.interactor.BouncerActionButtonInteractor
+import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
 import com.android.systemui.bouncer.ui.viewmodel.PinBouncerViewModel
 import com.android.systemui.coroutines.collectLastValue
-import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardLongPressViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenSceneViewModel
+import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.model.SysUiState
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
@@ -44,16 +50,20 @@ import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
 import com.android.systemui.shade.ui.viewmodel.ShadeSceneViewModel
 import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeMobileConnectionsRepository
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
+import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
+import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
@@ -61,6 +71,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mock
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.MockitoAnnotations
 
 /**
  * Integration test cases for the Scene Framework.
@@ -84,6 +98,10 @@ import org.junit.runner.RunWith
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class SceneFrameworkIntegrationTest : SysuiTestCase() {
+
+    @Mock private lateinit var emergencyAffordanceManager: EmergencyAffordanceManager
+    @Mock private lateinit var tableLogger: TableLogBuffer
+    @Mock private lateinit var telecomManager: TelecomManager
 
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
@@ -121,11 +139,10 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             authenticationInteractor = authenticationInteractor,
             sceneInteractor = sceneInteractor,
         )
-    private val bouncerViewModel =
-        utils.bouncerViewModel(
-            bouncerInteractor = bouncerInteractor,
-            authenticationInteractor = authenticationInteractor,
-        )
+
+    private lateinit var mobileConnectionsRepository: FakeMobileConnectionsRepository
+    private lateinit var bouncerActionButtonInteractor: BouncerActionButtonInteractor
+    private lateinit var bouncerViewModel: BouncerViewModel
 
     private val lockscreenSceneViewModel =
         LockscreenSceneViewModel(
@@ -139,7 +156,6 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         )
 
     private val mobileIconsInteractor = FakeMobileIconsInteractor(FakeMobileMappingsProxy(), mock())
-    private val flags = FakeFeatureFlagsClassic().also { it.set(Flags.NEW_NETWORK_SLICE_UI, false) }
 
     private var mobileIconsViewModel: MobileIconsViewModel =
         MobileIconsViewModel(
@@ -150,9 +166,10 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 AirplaneModeInteractor(
                     FakeAirplaneModeRepository(),
                     FakeConnectivityRepository(),
+                    FakeMobileConnectionsRepository(),
                 ),
             constants = mock(),
-            flags,
+            utils.featureFlags,
             scope = testScope.backgroundScope,
         )
 
@@ -170,6 +187,39 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
+        MockitoAnnotations.initMocks(this)
+        overrideResource(R.bool.config_enable_emergency_call_while_sim_locked, true)
+        whenever(telecomManager.isInCall).thenReturn(false)
+        whenever(emergencyAffordanceManager.needsEmergencyAffordance()).thenReturn(true)
+
+        utils.featureFlags.apply {
+            set(Flags.NEW_NETWORK_SLICE_UI, false)
+            set(Flags.REFACTOR_GETCURRENTUSER, true)
+        }
+
+        mobileConnectionsRepository =
+            FakeMobileConnectionsRepository(FakeMobileMappingsProxy(), tableLogger)
+        mobileConnectionsRepository.isAnySimSecure.value = true
+
+        utils.telephonyRepository.apply {
+            setHasTelephonyRadio(true)
+            setCallState(TelephonyManager.CALL_STATE_IDLE)
+            setIsInCall(false)
+        }
+
+        bouncerActionButtonInteractor =
+            utils.bouncerActionButtonInteractor(
+                mobileConnectionsRepository = mobileConnectionsRepository,
+                telecomManager = telecomManager,
+                emergencyAffordanceManager = emergencyAffordanceManager,
+            )
+        bouncerViewModel =
+            utils.bouncerViewModel(
+                bouncerInteractor = bouncerInteractor,
+                authenticationInteractor = authenticationInteractor,
+                actionButtonInteractor = bouncerActionButtonInteractor,
+            )
+
         shadeHeaderViewModel =
             ShadeHeaderViewModel(
                 applicationScope = testScope.backgroundScope,
@@ -392,6 +442,45 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             emulateUiSceneTransition()
         }
 
+    @Test
+    fun bouncerActionButtonClick_opensEmergencyServicesDialer() =
+        testScope.runTest {
+            setAuthMethod(DomainLayerAuthenticationMethodModel.Password)
+            val upDestinationSceneKey by
+                collectLastValue(lockscreenSceneViewModel.upDestinationSceneKey)
+            assertThat(upDestinationSceneKey).isEqualTo(SceneKey.Bouncer)
+            emulateUserDrivenTransition(to = upDestinationSceneKey)
+
+            val bouncerActionButton by collectLastValue(bouncerViewModel.actionButton)
+            assertWithMessage("Bouncer action button not visible")
+                .that(bouncerActionButton)
+                .isNotNull()
+            bouncerActionButton?.onClick?.invoke()
+            runCurrent()
+
+            // TODO(b/298026988): Assert that an activity was started once we use ActivityStarter.
+        }
+
+    @Test
+    fun bouncerActionButtonClick_duringCall_returnsToCall() =
+        testScope.runTest {
+            setAuthMethod(DomainLayerAuthenticationMethodModel.Password)
+            startPhoneCall()
+            val upDestinationSceneKey by
+                collectLastValue(lockscreenSceneViewModel.upDestinationSceneKey)
+            assertThat(upDestinationSceneKey).isEqualTo(SceneKey.Bouncer)
+            emulateUserDrivenTransition(to = upDestinationSceneKey)
+
+            val bouncerActionButton by collectLastValue(bouncerViewModel.actionButton)
+            assertWithMessage("Bouncer action button not visible during call")
+                .that(bouncerActionButton)
+                .isNotNull()
+            bouncerActionButton?.onClick?.invoke()
+            runCurrent()
+
+            verify(telecomManager).showInCallScreen(any())
+        }
+
     /**
      * Asserts that the current scene in the view-model matches what's expected.
      *
@@ -435,6 +524,17 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         runCurrent()
     }
 
+    /** Emulates a phone call in progress. */
+    private fun TestScope.startPhoneCall() {
+        whenever(telecomManager.isInCall).thenReturn(true)
+        utils.telephonyRepository.apply {
+            setHasTelephonyRadio(true)
+            setIsInCall(true)
+            setCallState(TelephonyManager.CALL_STATE_OFFHOOK)
+        }
+        runCurrent()
+    }
+
     /**
      * Emulates a complete transition in the UI from whatever the current scene is in the UI to
      * whatever the current scene should be, based on the value in
@@ -466,7 +566,8 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 fromScene = getCurrentSceneInUi(),
                 toScene = to.key,
                 progress = progressFlow,
-                isUserInputDriven = false,
+                isInitiatedByUserInput = false,
+                isUserInputOngoing = flowOf(false),
             )
         runCurrent()
 

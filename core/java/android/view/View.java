@@ -19,6 +19,10 @@ package android.view;
 import static android.content.res.Resources.ID_NULL;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.view.ContentInfo.SOURCE_DRAG_AND_DROP;
+import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
+import static android.view.Surface.FRAME_RATE_CATEGORY_LOW;
+import static android.view.Surface.FRAME_RATE_CATEGORY_NORMAL;
+import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_INVALID_BOUNDS;
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_MISSING_WINDOW;
@@ -26,7 +30,9 @@ import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ER
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_UNKNOWN;
 import static android.view.displayhash.DisplayHashResultCallback.EXTRA_DISPLAY_HASH;
 import static android.view.displayhash.DisplayHashResultCallback.EXTRA_DISPLAY_HASH_ERROR_CODE;
+import static android.view.flags.Flags.FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY;
 import static android.view.flags.Flags.FLAG_VIEW_VELOCITY_API;
+import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.view.flags.Flags.viewVelocityApi;
 
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__DEEP_PRESS;
@@ -115,6 +121,7 @@ import android.sysprop.DisplayProperties;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.FloatProperty;
 import android.util.LayoutDirection;
 import android.util.Log;
@@ -2301,6 +2308,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     protected static final int[] PRESSED_ENABLED_FOCUSED_SELECTED_WINDOW_FOCUSED_STATE_SET;
 
+    private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
+
     static {
         EMPTY_STATE_SET = StateSet.get(0);
 
@@ -2382,6 +2391,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 StateSet.VIEW_STATE_WINDOW_FOCUSED | StateSet.VIEW_STATE_SELECTED
                         | StateSet.VIEW_STATE_FOCUSED| StateSet.VIEW_STATE_ENABLED
                         | StateSet.VIEW_STATE_PRESSED);
+
+        sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
     }
 
     /**
@@ -5508,6 +5519,26 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @Nullable
 
     private ViewTranslationResponse mViewTranslationResponse;
+
+    /**
+     * A threshold value to determine the frame rate category of the View based on the size.
+     */
+    private static final float FRAME_RATE_SIZE_PERCENTAGE_THRESHOLD = 0.07f;
+
+    // The preferred frame rate of the view that is mainly used for
+    // touch boosting, view velocity handling, and TextureView.
+    private float mPreferredFrameRate = REQUESTED_FRAME_RATE_CATEGORY_DEFAULT;
+
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = 0;
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1;
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -30;
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -60;
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -120;
 
     /**
      * Simple constructor to use when creating a view from code.
@@ -20193,6 +20224,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             return;
         }
 
+        // For VRR to vote the preferred frame rate
+        votePreferredFrameRate();
+
         // Reset content capture caches
         mPrivateFlags4 &= ~PFLAG4_CONTENT_CAPTURE_IMPORTANCE_MASK;
         mContentCaptureSessionCached = false;
@@ -20295,6 +20329,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     protected void damageInParent() {
         if (mParent != null && mAttachInfo != null) {
+            // For VRR to vote the preferred frame rate
+            votePreferredFrameRate();
             mParent.onDescendantInvalidated(this, this);
         }
     }
@@ -32995,6 +33031,54 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         return null;
     }
 
+    private float getSizePercentage() {
+        if (mResources == null || getAlpha() == 0 || getVisibility() != VISIBLE) {
+            return 0;
+        }
+
+        DisplayMetrics displayMetrics = mResources.getDisplayMetrics();
+        int screenSize = displayMetrics.widthPixels
+                * displayMetrics.heightPixels;
+        int viewSize = getWidth() * getHeight();
+
+        if (screenSize == 0 || viewSize == 0) {
+            return 0f;
+        }
+        return (float) viewSize / screenSize;
+    }
+
+    private int calculateFrameRateCategory(float sizePercentage) {
+        if (sizePercentage <= FRAME_RATE_SIZE_PERCENTAGE_THRESHOLD) {
+            return FRAME_RATE_CATEGORY_LOW;
+        } else {
+            return FRAME_RATE_CATEGORY_NORMAL;
+        }
+    }
+
+    private void votePreferredFrameRate() {
+        // use toolkitSetFrameRate flag to gate the change
+        ViewRootImpl viewRootImpl = getViewRootImpl();
+        float sizePercentage = getSizePercentage();
+        int frameRateCateogry = calculateFrameRateCategory(sizePercentage);
+        if (sToolkitSetFrameRateReadOnlyFlagValue && viewRootImpl != null
+                && sizePercentage > 0) {
+            if (mPreferredFrameRate < 0) {
+                if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE) {
+                    frameRateCateogry = FRAME_RATE_CATEGORY_NO_PREFERENCE;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_LOW) {
+                    frameRateCateogry = FRAME_RATE_CATEGORY_LOW;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_NORMAL) {
+                    frameRateCateogry = FRAME_RATE_CATEGORY_NORMAL;
+                } else if (mPreferredFrameRate == REQUESTED_FRAME_RATE_CATEGORY_HIGH) {
+                    frameRateCateogry = FRAME_RATE_CATEGORY_HIGH;
+                }
+            } else {
+                viewRootImpl.votePreferredFrameRate(mPreferredFrameRate);
+            }
+            viewRootImpl.votePreferredFrameRateCategory(frameRateCateogry);
+        }
+    }
+
     /**
      * Set the current velocity of the View, we only track positive value.
      * We will use the velocity information to adjust the frame rate when applicable.
@@ -33022,6 +33106,44 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public float getFrameContentVelocity() {
         if (viewVelocityApi()) {
             return mFrameContentVelocity;
+        }
+        return 0;
+    }
+
+    /**
+     * You can set the preferred frame rate for a View using a positive number
+     * or by specifying the preferred frame rate category using constants, including
+     * REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE, REQUESTED_FRAME_RATE_CATEGORY_LOW,
+     * REQUESTED_FRAME_RATE_CATEGORY_NORMAL, REQUESTED_FRAME_RATE_CATEGORY_HIGH.
+     * Keep in mind that the preferred frame rate affects the frame rate for the next frame,
+     * so use this method carefully. It's important to note that the preference is valid as
+     * long as the View is invalidated.
+     *
+     * @param frameRate the preferred frame rate of the view.
+     */
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public void setRequestedFrameRate(float frameRate) {
+        if (sToolkitSetFrameRateReadOnlyFlagValue) {
+            mPreferredFrameRate = frameRate;
+        }
+    }
+
+    /**
+     * Get the current preferred frame rate of the View.
+     * The value could be negative when preferred frame rate category is set
+     * instead of perferred frame rate.
+     * The frame rate category includes
+     * REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE, REQUESTED_FRAME_RATE_CATEGORY_LOW,
+     * REQUESTED_FRAME_RATE_CATEGORY_NORMAL, and REQUESTED_FRAME_RATE_CATEGORY_HIGH.
+     * Note that the frame rate value is valid as long as the View is invalidated.
+     *
+     * @return REQUESTED_FRAME_RATE_CATEGORY_DEFAULT by default,
+     * or value passed to {@link #setRequestedFrameRate(float)}.
+     */
+    @FlaggedApi(FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY)
+    public float getRequestedFrameRate() {
+        if (sToolkitSetFrameRateReadOnlyFlagValue) {
+            return mPreferredFrameRate;
         }
         return 0;
     }

@@ -69,6 +69,7 @@ import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
 import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
+
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_CONFIGURATION;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_DREAM;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_FOCUS;
@@ -3854,8 +3855,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     @Override
-    public TaskSnapshot getTaskSnapshot(int taskId, boolean isLowResolution,
-            boolean takeSnapshotIfNeeded) {
+    public TaskSnapshot getTaskSnapshot(int taskId, boolean isLowResolution) {
         mAmInternal.enforceCallingPermission(READ_FRAME_BUFFER, "getTaskSnapshot()");
         final long ident = Binder.clearCallingIdentity();
         try {
@@ -3869,12 +3869,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 }
             }
             // Don't call this while holding the lock as this operation might hit the disk.
-            TaskSnapshot taskSnapshot = mWindowManager.mTaskSnapshotController.getSnapshot(taskId,
+            return mWindowManager.mTaskSnapshotController.getSnapshot(taskId,
                     task.mUserId, true /* restoreFromDisk */, isLowResolution);
-            if (taskSnapshot == null && takeSnapshotIfNeeded) {
-                taskSnapshot = takeTaskSnapshot(taskId, false /* updateCache */);
-            }
-            return taskSnapshot;
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
@@ -3892,10 +3888,14 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     Slog.w(TAG, "takeTaskSnapshot: taskId=" + taskId + " not found or not visible");
                     return null;
                 }
+                // Note that if updateCache is true, ActivityRecord#shouldUseAppThemeSnapshot will
+                // be used to decide whether the task is allowed to be captured because that may
+                // be retrieved by recents. While if updateCache is false, the real snapshot will
+                // always be taken and the snapshot won't be put into SnapshotPersister.
                 if (updateCache) {
                     return mWindowManager.mTaskSnapshotController.recordSnapshot(task);
                 } else {
-                    return mWindowManager.mTaskSnapshotController.captureSnapshot(task);
+                    return mWindowManager.mTaskSnapshotController.snapshot(task);
                 }
             }
         } finally {
@@ -5956,12 +5956,12 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 String callingPackage, @Nullable String callingFeatureId, Intent[] intents,
                 String[] resolvedTypes, IBinder resultTo, SafeActivityOptions options, int userId,
                 boolean validateIncomingUser, PendingIntentRecord originatingPendingIntent,
-                BackgroundStartPrivileges backgroundStartPrivileges) {
+                BackgroundStartPrivileges forcedBalByPiSender) {
             assertPackageMatchesCallingUid(callingPackage);
             return getActivityStartController().startActivitiesInPackage(uid, realCallingPid,
                     realCallingUid, callingPackage, callingFeatureId, intents, resolvedTypes,
                     resultTo, options, userId, validateIncomingUser, originatingPendingIntent,
-                    backgroundStartPrivileges);
+                    forcedBalByPiSender);
         }
 
         @Override
@@ -5970,13 +5970,13 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 String resolvedType, IBinder resultTo, String resultWho, int requestCode,
                 int startFlags, SafeActivityOptions options, int userId, Task inTask, String reason,
                 boolean validateIncomingUser, PendingIntentRecord originatingPendingIntent,
-                BackgroundStartPrivileges backgroundStartPrivileges) {
+                BackgroundStartPrivileges forcedBalByPiSender) {
             assertPackageMatchesCallingUid(callingPackage);
             return getActivityStartController().startActivityInPackage(uid, realCallingPid,
                     realCallingUid, callingPackage, callingFeatureId, intent, resolvedType,
                     resultTo, resultWho, requestCode, startFlags, options, userId, inTask,
                     reason, validateIncomingUser, originatingPendingIntent,
-                    backgroundStartPrivileges);
+                    forcedBalByPiSender);
         }
 
         @Override
@@ -7105,8 +7105,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public TaskSnapshot getTaskSnapshotBlocking(
                 int taskId, boolean isLowResolution) {
-            return ActivityTaskManagerService.this.getTaskSnapshot(taskId, isLowResolution,
-                    false /* takeSnapshotIfNeeded */);
+            return ActivityTaskManagerService.this.getTaskSnapshot(taskId, isLowResolution);
         }
 
         @Override

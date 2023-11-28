@@ -262,7 +262,7 @@ constructor(
                     object : KeyguardUpdateMonitorCallback() {
                         override fun onSimStateChanged(subId: Int, slotId: Int, simState: Int) {
                             logger.logOnSimStateChanged()
-                            trySend(keyguardUpdateMonitor.isSimPinSecure)
+                            trySend(getIsAnySimSecure())
                         }
                     }
                 keyguardUpdateMonitor.registerCallback(callback)
@@ -276,6 +276,8 @@ constructor(
                 initialValue = false,
             )
             .distinctUntilChanged()
+
+    override fun getIsAnySimSecure() = keyguardUpdateMonitor.isSimPinSecure
 
     override fun getRepoForSubId(subId: Int): FullMobileConnectionRepository =
         getOrCreateRepoForSubId(subId)
@@ -341,6 +343,15 @@ constructor(
                 if (prevSub != null && prevSub == nextSub) Unit else null
             }
             .flowOn(bgDispatcher)
+
+    override suspend fun isInEcmMode(): Boolean {
+        if (telephonyManager.emergencyCallbackMode) {
+            return true
+        }
+        return with(subscriptions.value) {
+            any { getOrCreateRepoForSubId(it.subscriptionId).isInEcmMode() }
+        }
+    }
 
     private fun isValidSubId(subId: Int): Boolean = checkSub(subId, subscriptions.value)
 

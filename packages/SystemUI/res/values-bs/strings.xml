@@ -196,8 +196,7 @@
     <string name="keyguard_face_unlock_unavailable" msgid="1581949044193418736">"Otključavanje licem je nedostupno"</string>
     <string name="accessibility_bluetooth_connected" msgid="4745196874551115205">"Bluetooth je povezan."</string>
     <string name="accessibility_bluetooth_device_icon" msgid="9163840051642587982">"Ikona Bluetooth uređaja"</string>
-    <!-- no translation found for accessibility_bluetooth_device_settings_gear (3314916468105272540) -->
-    <skip />
+    <string name="accessibility_bluetooth_device_settings_gear" msgid="3314916468105272540">"Kliknite da konfigurirate detalje uređaja"</string>
     <string name="accessibility_battery_unknown" msgid="1807789554617976440">"Postotak napunjenosti baterije nije poznat"</string>
     <string name="accessibility_bluetooth_name" msgid="7300973230214067678">"Povezan na <xliff:g id="BLUETOOTH">%s</xliff:g>."</string>
     <string name="accessibility_cast_name" msgid="7344437925388773685">"Povezan na <xliff:g id="CAST">%s</xliff:g>."</string>
@@ -250,8 +249,7 @@
     <string name="quick_settings_dnd_label" msgid="7728690179108024338">"Ne ometaj"</string>
     <string name="quick_settings_bluetooth_label" msgid="7018763367142041481">"Bluetooth"</string>
     <string name="quick_settings_bluetooth_detail_empty_text" msgid="5760239584390514322">"Nema dostupnih uparenih uređaja"</string>
-    <!-- no translation found for quick_settings_bluetooth_tile_subtitle (212752719010829550) -->
-    <skip />
+    <string name="quick_settings_bluetooth_tile_subtitle" msgid="212752719010829550">"Dodirnite da povežete uređaj ili prekinete njegovu povezanost"</string>
     <string name="pair_new_bluetooth_devices" msgid="4601767620843349645">"Upari novi uređaj"</string>
     <string name="see_all_bluetooth_devices" msgid="1761596816620200433">"Prikaži sve"</string>
     <string name="turn_on_bluetooth" msgid="5681370462180289071">"Koristi Bluetooth"</string>
@@ -398,7 +396,12 @@
     <string name="keyguard_indication_charging_time_fast" msgid="8390311020603859480">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Brzo punjenje • Potpuna napunjenost za <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Sporo punjenje • Potpuna napunjenost za <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Punjenje • Potpuna napunjenost za <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
-    <string name="communal_tutorial_indicator_text" msgid="700342473477865107">"Kliknite na dugme sa strelicom da pokrenete zajednički vodič"</string>
+    <!-- no translation found for communal_tutorial_indicator_text (4503010353591430123) -->
+    <skip />
+    <!-- no translation found for button_to_open_widget_picker (8007261659745030810) -->
+    <skip />
+    <!-- no translation found for button_to_remove_widget (1511255853677835341) -->
+    <skip />
     <string name="accessibility_multi_user_switch_switcher" msgid="5330448341251092660">"Zamijeni korisnika"</string>
     <string name="accessibility_multi_user_list_switcher" msgid="8574105376229857407">"padajući meni"</string>
     <string name="guest_exit_guest_dialog_message" msgid="8183450985628495709">"Sve aplikacije i podaci iz ove sesije će se izbrisati."</string>
@@ -440,7 +443,7 @@
     <string name="media_projection_task_switcher_notification_channel" msgid="7613206306777814253">"Promjena aplikacije"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_title" msgid="2113331792064527203">"Blokirao je vaš IT administrator"</string>
     <string name="screen_capturing_disabled_by_policy_dialog_description" msgid="6015975736747696431">"Snimanje ekrana je onemogućeno pravilima uređaja"</string>
-    <string name="clear_all_notifications_text" msgid="348312370303046130">"Očisti sve"</string>
+    <string name="clear_all_notifications_text" msgid="348312370303046130">"Obriši sve"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"Upravljajte"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"Historija"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"Novo"</string>
@@ -1182,8 +1185,7 @@
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"Kamera i mikrofon su blokirani"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"Mikrofon je blokiran"</string>
     <string name="priority_mode_dream_overlay_content_description" msgid="6044561000253314632">"Način rada Prioriteti je uključen"</string>
-    <!-- no translation found for assistant_attention_content_description (4166330881435263596) -->
-    <skip />
+    <string name="assistant_attention_content_description" msgid="4166330881435263596">"Otkriveno je prisustvo korisnika"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Postavite zadanu aplikaciju za bilješke u Postavkama"</string>
     <string name="install_app" msgid="5066668100199613936">"Instaliraj aplikaciju"</string>
     <string name="connected_display_dialog_start_mirroring" msgid="6237895789920854982">"Preslikati na vanjski ekran?"</string>
@@ -1208,4 +1210,8 @@
     <string name="privacy_dialog_recent_app_usage_1" msgid="2551340497722370109">"Nedavno je koristila aplikacija <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g>)"</string>
     <string name="privacy_dialog_active_app_usage_2" msgid="2770926061339921767">"Koristi aplikacija <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
     <string name="privacy_dialog_recent_app_usage_2" msgid="2874689735085367167">"Nedavno je koristila aplikacija <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
+    <!-- no translation found for keyboard_backlight_dialog_title (8273102932345564724) -->
+    <skip />
+    <!-- no translation found for keyboard_backlight_value (7336398765584393538) -->
+    <skip />
 </resources>

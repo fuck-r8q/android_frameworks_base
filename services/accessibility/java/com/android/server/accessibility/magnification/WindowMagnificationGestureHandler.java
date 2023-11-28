@@ -39,9 +39,14 @@ import com.android.internal.accessibility.util.AccessibilityStatsLogUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.accessibility.AccessibilityTraceManager;
 import com.android.server.accessibility.EventStreamTransformation;
+import com.android.server.accessibility.Flags;
+import com.android.server.accessibility.gestures.GestureMatcher;
+import com.android.server.accessibility.gestures.MultiFingerMultiTap;
+import com.android.server.accessibility.gestures.MultiFingerMultiTapAndHold;
 import com.android.server.accessibility.gestures.MultiTap;
 import com.android.server.accessibility.gestures.MultiTapAndHold;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -453,20 +458,54 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
         private final MagnificationGesturesObserver mGesturesObserver;
 
         DetectingState(@UiContext Context context) {
-            final MultiTap multiTap = new MultiTap(context, mDetectSingleFingerTripleTap ? 3 : 1,
-                    mDetectSingleFingerTripleTap
-                            ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP
-                            : MagnificationGestureMatcher.GESTURE_SINGLE_TAP, null);
-            final MultiTapAndHold multiTapAndHold = new MultiTapAndHold(context,
-                    mDetectSingleFingerTripleTap ? 3 : 1,
-                    mDetectSingleFingerTripleTap
-                            ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP_AND_HOLD
-                            : MagnificationGestureMatcher.GESTURE_SINGLE_TAP_AND_HOLD, null);
-            mGesturesObserver = new MagnificationGesturesObserver(this,
-                    new SimpleSwipe(context),
-                    multiTap,
-                    multiTapAndHold,
-                    new TwoFingersDownOrSwipe(context));
+            if (Flags.enableMagnificationMultipleFingerMultipleTapGesture()) {
+                final List<GestureMatcher> mGestureMatchers = new ArrayList<>();
+
+                mGestureMatchers.add(new SimpleSwipe(context));
+                // Observe single tap and single tap and hold to reduce response time when the
+                // user performs these two gestures inside the window magnifier.
+                mGestureMatchers.add(new MultiTap(context,
+                        mDetectSingleFingerTripleTap ? 3 : 1,
+                        mDetectSingleFingerTripleTap
+                                ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP
+                                : MagnificationGestureMatcher.GESTURE_SINGLE_TAP,
+                        null));
+                mGestureMatchers.add(new MultiTapAndHold(context,
+                        mDetectSingleFingerTripleTap ? 3 : 1,
+                        mDetectSingleFingerTripleTap
+                                ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP_AND_HOLD
+                                : MagnificationGestureMatcher.GESTURE_SINGLE_TAP_AND_HOLD,
+                        null));
+                mGestureMatchers.add(new TwoFingersDownOrSwipe(context));
+
+                if (mDetectTwoFingerTripleTap) {
+                    mGestureMatchers.add(new MultiFingerMultiTap(context, /* fingers= */ 2,
+                            /* taps= */ 3, MagnificationGestureMatcher.GESTURE_TRIPLE_TAP,
+                            null));
+                    mGestureMatchers.add(new MultiFingerMultiTapAndHold(context, /* fingers= */ 2,
+                            /* taps= */ 3, MagnificationGestureMatcher.GESTURE_TRIPLE_TAP_AND_HOLD,
+                            null));
+                }
+
+                mGesturesObserver = new MagnificationGesturesObserver(this,
+                        mGestureMatchers.toArray(new GestureMatcher[mGestureMatchers.size()]));
+            } else {
+                final MultiTap multiTap = new MultiTap(context,
+                        mDetectSingleFingerTripleTap ? 3 : 1,
+                        mDetectSingleFingerTripleTap
+                                ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP
+                                : MagnificationGestureMatcher.GESTURE_SINGLE_TAP, null);
+                final MultiTapAndHold multiTapAndHold = new MultiTapAndHold(context,
+                        mDetectSingleFingerTripleTap ? 3 : 1,
+                        mDetectSingleFingerTripleTap
+                                ? MagnificationGestureMatcher.GESTURE_TRIPLE_TAP_AND_HOLD
+                                : MagnificationGestureMatcher.GESTURE_SINGLE_TAP_AND_HOLD, null);
+                mGesturesObserver = new MagnificationGesturesObserver(this,
+                        new SimpleSwipe(context),
+                        multiTap,
+                        multiTapAndHold,
+                        new TwoFingersDownOrSwipe(context));
+            }
         }
 
         @Override
@@ -484,7 +523,9 @@ public class WindowMagnificationGestureHandler extends MagnificationGestureHandl
         @Override
         public boolean shouldStopDetection(MotionEvent motionEvent) {
             return !mWindowMagnificationMgr.isWindowMagnifierEnabled(mDisplayId)
-                    && !mDetectSingleFingerTripleTap;
+                    && !mDetectSingleFingerTripleTap
+                    && !(mDetectTwoFingerTripleTap
+                    && Flags.enableMagnificationMultipleFingerMultipleTapGesture());
         }
 
         @Override

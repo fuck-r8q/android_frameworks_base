@@ -16,10 +16,13 @@
 
 package com.android.compose.animation.scene
 
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.platform.LocalDensity
 
 /**
@@ -37,6 +40,7 @@ import androidx.compose.ui.platform.LocalDensity
  *   instance by triggering back navigation or by swiping to a new scene.
  * @param transitions the definition of the transitions used to animate a change of scene.
  * @param state the observable state of this layout.
+ * @param edgeDetector the edge detector used to detect which edge a swipe is started from, if any.
  * @param scenes the configuration of the different scenes of this layout.
  */
 @Composable
@@ -46,25 +50,30 @@ fun SceneTransitionLayout(
     transitions: SceneTransitions,
     modifier: Modifier = Modifier,
     state: SceneTransitionLayoutState = remember { SceneTransitionLayoutState(currentScene) },
+    edgeDetector: EdgeDetector = DefaultEdgeDetector,
     scenes: SceneTransitionLayoutScope.() -> Unit,
 ) {
     val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
     val layoutImpl = remember {
         SceneTransitionLayoutImpl(
-            onChangeScene,
-            scenes,
-            transitions,
-            state,
-            density,
+            onChangeScene = onChangeScene,
+            builder = scenes,
+            transitions = transitions,
+            state = state,
+            density = density,
+            edgeDetector = edgeDetector,
+            coroutineScope = coroutineScope,
         )
     }
 
     layoutImpl.onChangeScene = onChangeScene
     layoutImpl.transitions = transitions
     layoutImpl.density = density
+    layoutImpl.edgeDetector = edgeDetector
+
     layoutImpl.setScenes(scenes)
     layoutImpl.setCurrentScene(currentScene)
-
     layoutImpl.Content(modifier)
 }
 
@@ -112,7 +121,21 @@ interface SceneScope {
      * TODO(b/291566282): Migrate this to the new Modifier Node API and remove the @Composable
      *   constraint.
      */
-    @Composable fun Modifier.element(key: ElementKey): Modifier
+    fun Modifier.element(key: ElementKey): Modifier
+
+    /**
+     * Adds a [NestedScrollConnection] to intercept scroll events not handled by the scrollable
+     * component.
+     *
+     * @param orientation is used to determine if we handle top/bottom or left/right events.
+     * @param startBehavior when we should perform the overscroll animation at the top/left.
+     * @param endBehavior when we should perform the overscroll animation at the bottom/right.
+     */
+    fun Modifier.nestedScrollToScene(
+        orientation: Orientation,
+        startBehavior: NestedScrollBehavior = NestedScrollBehavior.EdgeNoOverscroll,
+        endBehavior: NestedScrollBehavior = NestedScrollBehavior.EdgeNoOverscroll,
+    ): Modifier
 
     /**
      * Create a *movable* element identified by [key].
@@ -137,7 +160,9 @@ interface SceneScope {
      *
      * @param value the value of this shared value in the current scene.
      * @param key the key of this shared value.
-     * @param element the element associated with this value.
+     * @param element the element associated with this value. If `null`, this value will be
+     *   associated at the scene level, which means that [key] should be used maximum once in the
+     *   same scene.
      * @param lerp the *linear* interpolation function that should be used to interpolate between
      *   two different values. Note that it has to be linear because the [fraction] passed to this
      *   interpolator is already interpolated.
@@ -152,7 +177,7 @@ interface SceneScope {
     fun <T> animateSharedValueAsState(
         value: T,
         key: ValueKey,
-        element: ElementKey,
+        element: ElementKey?,
         lerp: (start: T, stop: T, fraction: Float) -> T,
         canOverflow: Boolean,
     ): State<T>
@@ -191,9 +216,9 @@ data class Swipe(
     }
 }
 
-enum class SwipeDirection {
-    Up,
-    Down,
-    Left,
-    Right,
+enum class SwipeDirection(val orientation: Orientation) {
+    Up(Orientation.Vertical),
+    Down(Orientation.Vertical),
+    Left(Orientation.Horizontal),
+    Right(Orientation.Horizontal),
 }

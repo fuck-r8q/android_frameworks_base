@@ -49,7 +49,7 @@ public class CsipDeviceManager {
             List<CachedBluetoothDevice> cachedDevices) {
         mBtManager = localBtManager;
         mCachedDevices = cachedDevices;
-    };
+    }
 
     void initCsipDeviceIfNeeded(CachedBluetoothDevice newDevice) {
         // Current it only supports the base uuid for CSIP and group this set in UI.
@@ -219,11 +219,7 @@ public class CsipDeviceManager {
      * return {@code false}.
      */
     public boolean isExistedGroupId(int groupId) {
-        if (getCachedDevice(groupId) != null) {
-            return true;
-        }
-
-        return false;
+        return getCachedDevice(groupId) != null;
     }
 
     @VisibleForTesting
@@ -272,7 +268,7 @@ public class CsipDeviceManager {
                         .anyMatch(profile -> profile instanceof A2dpProfile
                                 || profile instanceof HeadsetProfile))
                 .findFirst().orElse(null);
-        if (dualModeDevice != null && dualModeDevice.isConnected()) {
+        if (isDeviceConnected(dualModeDevice)) {
             log("getPreferredMainDevice: The connected DUAL mode device");
             return dualModeDevice;
         }
@@ -291,13 +287,15 @@ public class CsipDeviceManager {
                 leAudioLeadDevice != null ? deviceManager.findDevice(leAudioLeadDevice) : null;
         if (leAudioLeadCachedDevice == null) {
             log("getPreferredMainDevice: The LeadDevice is not in the all of devices list");
-        } else if (leAudioLeadCachedDevice.isConnected()) {
+        } else if (isDeviceConnected(leAudioLeadCachedDevice)) {
             log("getPreferredMainDevice: The connected LeadDevice from LE profile");
             return leAudioLeadCachedDevice;
         }
-        CachedBluetoothDevice oneOfConnectedDevices = groupDevicesList.stream()
-                .filter(cachedDevice -> cachedDevice.isConnected())
-                .findFirst().orElse(null);
+        CachedBluetoothDevice oneOfConnectedDevices =
+                groupDevicesList.stream()
+                        .filter(cachedDevice -> isDeviceConnected(cachedDevice))
+                        .findFirst()
+                        .orElse(null);
         if (oneOfConnectedDevices != null) {
             log("getPreferredMainDevice: One of the connected devices.");
             return oneOfConnectedDevices;
@@ -390,5 +388,15 @@ public class CsipDeviceManager {
         if (DEBUG) {
             Log.d(TAG, msg);
         }
+    }
+
+    private boolean isDeviceConnected(CachedBluetoothDevice cachedDevice) {
+        if (cachedDevice == null) {
+            return false;
+        }
+        final BluetoothDevice device = cachedDevice.getDevice();
+        return cachedDevice.isConnected()
+                && device.getBondState() == BluetoothDevice.BOND_BONDED
+                && device.isConnected();
     }
 }

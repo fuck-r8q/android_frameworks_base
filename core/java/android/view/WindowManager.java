@@ -17,7 +17,6 @@
 package android.view;
 
 import static android.content.pm.ActivityInfo.COLOR_MODE_DEFAULT;
-import static android.view.flags.Flags.FLAG_WM_DISPLAY_REFRESH_RATE_TEST;
 import static android.view.View.STATUS_BAR_DISABLE_BACK;
 import static android.view.View.STATUS_BAR_DISABLE_CLOCK;
 import static android.view.View.STATUS_BAR_DISABLE_EXPAND;
@@ -90,6 +89,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
@@ -3918,7 +3918,7 @@ public interface WindowManager extends ViewManager {
          * This value is ignored if {@link #preferredDisplayModeId} is set.
          * @hide
          */
-        @FlaggedApi(FLAG_WM_DISPLAY_REFRESH_RATE_TEST)
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         @TestApi
         public float preferredMinDisplayRefreshRate;
 
@@ -3928,7 +3928,7 @@ public interface WindowManager extends ViewManager {
          * This value is ignored if {@link #preferredDisplayModeId} is set.
          * @hide
          */
-        @FlaggedApi(FLAG_WM_DISPLAY_REFRESH_RATE_TEST)
+        @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         @TestApi
         public float preferredMaxDisplayRefreshRate;
 
@@ -5884,7 +5884,7 @@ public interface WindowManager extends ViewManager {
      *
      * @hide
      */
-    @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR")
+    @SuppressLint("UnflaggedApi") // The API is only used for tests.
     @TestApi
     @RequiresPermission(permission.ACCESS_SURFACE_FLINGER)
     default boolean replaceContentOnDisplayWithMirror(int displayId, @NonNull Window window) {
@@ -5900,7 +5900,7 @@ public interface WindowManager extends ViewManager {
      *
      * @hide
      */
-    @FlaggedApi("REPLACE_CONTENT_WITH_MIRROR")
+    @SuppressLint("UnflaggedApi") // The API is only used for tests.
     @TestApi
     @RequiresPermission(permission.ACCESS_SURFACE_FLINGER)
     default boolean replaceContentOnDisplayWithSc(int displayId, @NonNull SurfaceControl sc) {

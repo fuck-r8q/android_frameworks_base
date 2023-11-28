@@ -103,6 +103,7 @@ import com.android.wm.shell.sysui.ShellInterface;
 import com.android.wm.shell.taskview.TaskViewFactory;
 import com.android.wm.shell.taskview.TaskViewFactoryController;
 import com.android.wm.shell.taskview.TaskViewTransitions;
+import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.ShellTransitions;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.unfold.ShellUnfoldProgressProvider;
@@ -613,14 +614,22 @@ public abstract class WMShellBaseModule {
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellMainThread Handler mainHandler,
             @ShellAnimationThread ShellExecutor animExecutor,
-            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer) {
+            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
+            HomeTransitionObserver homeTransitionObserver) {
         if (!context.getResources().getBoolean(R.bool.config_registerShellTransitionsOnInit)) {
             // TODO(b/238217847): Force override shell init if registration is disabled
             shellInit = new ShellInit(mainExecutor);
         }
         return new Transitions(context, shellInit, shellCommandHandler, shellController, organizer,
                 pool, displayController, mainExecutor, mainHandler, animExecutor,
-                rootTaskDisplayAreaOrganizer);
+                rootTaskDisplayAreaOrganizer, homeTransitionObserver);
+    }
+
+    @WMSingleton
+    @Provides
+    static HomeTransitionObserver provideHomeTransitionObserver(Context context,
+            @ShellMainThread ShellExecutor mainExecutor) {
+        return new HomeTransitionObserver(context, mainExecutor);
     }
 
     @WMSingleton
@@ -637,11 +646,12 @@ public abstract class WMShellBaseModule {
     @Provides
     static KeyguardTransitionHandler provideKeyguardTransitionHandler(
             ShellInit shellInit,
+            ShellController shellController,
             Transitions transitions,
             @ShellMainThread Handler mainHandler,
             @ShellMainThread ShellExecutor mainExecutor) {
         return new KeyguardTransitionHandler(
-                    shellInit, transitions, mainHandler, mainExecutor);
+                    shellInit, shellController, transitions, mainHandler, mainExecutor);
     }
 
     @WMSingleton
@@ -828,10 +838,12 @@ public abstract class WMShellBaseModule {
         // Use optional-of-lazy for the dependency that this provider relies on.
         // Lazy ensures that this provider will not be the cause the dependency is created
         // when it will not be returned due to the condition below.
-        if (DesktopModeStatus.isEnabled()) {
-            return desktopTasksController.map(Lazy::get);
-        }
-        return Optional.empty();
+        return desktopTasksController.flatMap((lazy)-> {
+            if (DesktopModeStatus.isEnabled()) {
+                return Optional.of(lazy.get());
+            }
+            return Optional.empty();
+        });
     }
 
     @BindsOptionalOf
@@ -845,10 +857,12 @@ public abstract class WMShellBaseModule {
         // Use optional-of-lazy for the dependency that this provider relies on.
         // Lazy ensures that this provider will not be the cause the dependency is created
         // when it will not be returned due to the condition below.
-        if (DesktopModeStatus.isEnabled()) {
-            return desktopModeTaskRepository.map(Lazy::get);
-        }
-        return Optional.empty();
+        return desktopModeTaskRepository.flatMap((lazy)-> {
+            if (DesktopModeStatus.isEnabled()) {
+                return Optional.of(lazy.get());
+            }
+            return Optional.empty();
+        });
     }
 
     //

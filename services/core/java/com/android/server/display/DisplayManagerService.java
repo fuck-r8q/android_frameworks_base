@@ -109,6 +109,7 @@ import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
+import android.os.IThermalService;
 import android.os.Looper;
 import android.os.Message;
 import android.os.PowerManager;
@@ -243,6 +244,7 @@ public final class DisplayManagerService extends SystemService {
     private static final String FORCE_WIFI_DISPLAY_ENABLE = "persist.debug.wfd.enable";
 
     private static final String PROP_DEFAULT_DISPLAY_TOP_INSET = "persist.sys.displayinset.top";
+
     private static final long WAIT_FOR_DEFAULT_DISPLAY_TIMEOUT = 10000;
     // This value needs to be in sync with the threshold
     // in RefreshRateConfigs::getFrameRateDivisor.
@@ -265,6 +267,7 @@ public final class DisplayManagerService extends SystemService {
     private final DisplayManagerHandler mHandler;
     private final Handler mUiHandler;
     private final DisplayModeDirector mDisplayModeDirector;
+    private final ExternalDisplayPolicy mExternalDisplayPolicy;
     private WindowManagerInternal mWindowManagerInternal;
     private InputManagerInternal mInputManagerInternal;
     private ActivityManagerInternal mActivityManagerInternal;
@@ -605,6 +608,7 @@ public final class DisplayManagerService extends SystemService {
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
         mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
+        mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
     }
 
     public void setupSchedulerPolicies() {
@@ -674,6 +678,7 @@ public final class DisplayManagerService extends SystemService {
             mDisplayModeDirector.onBootCompleted();
             mLogicalDisplayMapper.onBootCompleted();
             mDisplayNotificationManager.onBootCompleted();
+            mExternalDisplayPolicy.onBootCompleted();
         }
     }
 
@@ -1542,8 +1547,8 @@ public final class DisplayManagerService extends SystemService {
                 throw new SecurityException("Requires CAPTURE_VIDEO_OUTPUT or "
                         + "CAPTURE_SECURE_VIDEO_OUTPUT permission, or an appropriate "
                         + "MediaProjection token in order to create a screen sharing virtual "
-                        + "display. In order to create a virtual display that does not perform"
-                        + "screen sharing (mirroring), please use the flag"
+                        + "display. In order to create a virtual display that does not perform "
+                        + "screen sharing (mirroring), please use the flag "
                         + "VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY.");
             }
         }
@@ -1960,12 +1965,11 @@ public final class DisplayManagerService extends SystemService {
 
         setupLogicalDisplay(display);
 
-        // TODO(b/292196201) Remove when the display can be disabled before DPC is created.
-        if (display.getDisplayInfoLocked().type == Display.TYPE_EXTERNAL) {
-            display.setEnabledLocked(false);
+        if (ExternalDisplayPolicy.isExternalDisplay(display)) {
+            mExternalDisplayPolicy.handleExternalDisplayConnectedLocked(display);
+        } else {
+            sendDisplayEventLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
         }
-
-        sendDisplayEventLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
 
         updateLogicalDisplayState(display);
     }
@@ -3244,6 +3248,10 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncDump) {
             mDumpInProgress = false;
         }
+
+        pw.println();
+        mFlags.dump(pw);
+
     }
 
     private static float[] getFloatArray(TypedArray array) {
@@ -3263,7 +3271,14 @@ public final class DisplayManagerService extends SystemService {
 
     void enableConnectedDisplay(int displayId, boolean enabled) {
         synchronized (mSyncRoot) {
-            mLogicalDisplayMapper.setDisplayEnabledLocked(displayId, enabled);
+            final var logicalDisplay = mLogicalDisplayMapper.getDisplayLocked(displayId);
+            if (logicalDisplay == null) {
+                Slog.w(TAG, "enableConnectedDisplay: Can not find displayId=" + displayId);
+            } else if (ExternalDisplayPolicy.isExternalDisplay(logicalDisplay)) {
+                mExternalDisplayPolicy.setExternalDisplayEnabledLocked(logicalDisplay, enabled);
+            } else {
+                mLogicalDisplayMapper.setDisplayEnabledLocked(logicalDisplay, enabled);
+            }
         }
     }
 
@@ -4485,22 +4500,12 @@ public final class DisplayManagerService extends SystemService {
         @EnforcePermission(MANAGE_DISPLAYS)
         public void enableConnectedDisplay(int displayId) {
             enableConnectedDisplay_enforcePermission();
-            if (!mFlags.isConnectedDisplayManagementEnabled()) {
-                Slog.w(TAG, "External display management is not enabled on your device: "
-                                    + "cannot enable display.");
-                return;
-            }
             DisplayManagerService.this.enableConnectedDisplay(displayId, true);
         }
 
         @EnforcePermission(MANAGE_DISPLAYS)
         public void disableConnectedDisplay(int displayId) {
             disableConnectedDisplay_enforcePermission();
-            if (!mFlags.isConnectedDisplayManagementEnabled()) {
-                Slog.w(TAG, "External display management is not enabled on your device: "
-                                    + "cannot disable display.");
-                return;
-            }
             DisplayManagerService.this.enableConnectedDisplay(displayId, false);
         }
     }
@@ -5057,5 +5062,74 @@ public final class DisplayManagerService extends SystemService {
          * Returns current time in milliseconds since boot, not counting time spent in deep sleep.
          */
         long uptimeMillis();
+    }
+
+    /**
+     * Implements necessary functionality for {@link ExternalDisplayPolicy}
+     */
+    private class ExternalDisplayPolicyInjector implements ExternalDisplayPolicy.Injector {
+        /**
+         * Sends event for the display.
+         */
+        @Override
+        public void sendExternalDisplayEventLocked(@NonNull final LogicalDisplay display,
+                @DisplayEvent int event) {
+            sendDisplayEventLocked(display, event);
+        }
+
+        /**
+         * Gets thermal service
+         */
+        @Override
+        @Nullable
+        public IThermalService getThermalService() {
+            return IThermalService.Stub.asInterface(ServiceManager.getService(
+                    Context.THERMAL_SERVICE));
+        }
+
+        /**
+         * @return display manager flags.
+         */
+        @Override
+        @NonNull
+        public DisplayManagerFlags getFlags() {
+            return mFlags;
+        }
+
+        /**
+         * @return Logical display mapper.
+         */
+        @Override
+        @NonNull
+        public LogicalDisplayMapper getLogicalDisplayMapper() {
+            return mLogicalDisplayMapper;
+        }
+
+        /**
+         * @return Sync root, for synchronization on this object across display manager.
+         */
+        @Override
+        @NonNull
+        public SyncRoot getSyncRoot() {
+            return mSyncRoot;
+        }
+
+        /**
+         * Notification manager for display manager
+         */
+        @Override
+        @NonNull
+        public DisplayNotificationManager getDisplayNotificationManager() {
+            return mDisplayNotificationManager;
+        }
+
+        /**
+         * Handler to use for notification sending to avoid requiring POST_NOTIFICATION permission.
+         */
+        @Override
+        @NonNull
+        public Handler getHandler() {
+            return mHandler;
+        }
     }
 }

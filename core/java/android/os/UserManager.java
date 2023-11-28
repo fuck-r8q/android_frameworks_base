@@ -153,8 +153,8 @@ public class UserManager {
 
     /**
      * User type representing a clone profile. Clone profile is a user profile type used to run
-     * second instance of an otherwise single user App (eg, messengers). Only the primary user
-     * is allowed to have a clone profile.
+     * second instance of an otherwise single user App (eg, messengers). Currently only the
+     * {@link android.content.pm.UserInfo#isMain()} user can have a clone profile.
      *
      * @hide
      */
@@ -166,6 +166,8 @@ public class UserManager {
      * User type representing a private profile.
      * @hide
      */
+    @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
+    @TestApi
     public static final String USER_TYPE_PROFILE_PRIVATE = "android.os.usertype.profile.PRIVATE";
 
     /**
@@ -3261,11 +3263,15 @@ public class UserManager {
     /**
      * Checks if the context user is a private profile.
      *
+     * <p>A Private profile is a separate {@link #isProfile() profile} that can be used to store
+     * sensitive apps and data, which can be hidden or revealed at the user's discretion.
+     *
      * @return whether the context user is a private profile.
      *
-     * @see android.os.UserManager#USER_TYPE_PROFILE_PRIVATE
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     @UserHandleAware(
             requiresAnyOfPermissionsIfNotCallerProfileGroup = {
                     android.Manifest.permission.MANAGE_USERS,
@@ -5071,6 +5077,32 @@ public class UserManager {
         } catch (RemoteException re) {
             throw re.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Returns list of the profiles of the given user, including userId itself, as well as the
+     * communal profile, if there is one.
+     *
+     * <p>Note that this returns both enabled and not enabled profiles.
+     * <p>Note that this includes all profile types (not including Restricted profiles).
+     *
+     * @hide
+     */
+    @FlaggedApi(android.multiuser.Flags.FLAG_SUPPORT_COMMUNAL_PROFILE)
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MANAGE_USERS,
+            Manifest.permission.CREATE_USERS,
+            Manifest.permission.QUERY_USERS})
+    public List<UserInfo> getProfilesIncludingCommunal(@UserIdInt int userId) {
+        final List<UserInfo> profiles = getProfiles(userId);
+        final UserHandle communalProfile = getCommunalProfile();
+        if (communalProfile != null) {
+            final UserInfo communalInfo = getUserInfo(communalProfile.getIdentifier());
+            if (communalInfo != null) {
+                profiles.add(communalInfo);
+            }
+        }
+        return profiles;
     }
 
     /**

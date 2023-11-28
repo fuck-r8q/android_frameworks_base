@@ -196,8 +196,7 @@
     <string name="keyguard_face_unlock_unavailable" msgid="1581949044193418736">"Ξεκλ. με πρόσωπο μη διαθ."</string>
     <string name="accessibility_bluetooth_connected" msgid="4745196874551115205">"Το Bluetooth είναι συνδεδεμένο."</string>
     <string name="accessibility_bluetooth_device_icon" msgid="9163840051642587982">"Εικονίδιο συσκευής Bluetooth"</string>
-    <!-- no translation found for accessibility_bluetooth_device_settings_gear (3314916468105272540) -->
-    <skip />
+    <string name="accessibility_bluetooth_device_settings_gear" msgid="3314916468105272540">"Κάντε κλικ για να διαμορφώσετε τις λεπτομέρειες συσκευής"</string>
     <string name="accessibility_battery_unknown" msgid="1807789554617976440">"Άγνωστο ποσοστό μπαταρίας."</string>
     <string name="accessibility_bluetooth_name" msgid="7300973230214067678">"Συνδέθηκε στο <xliff:g id="BLUETOOTH">%s</xliff:g>."</string>
     <string name="accessibility_cast_name" msgid="7344437925388773685">"Συνδέθηκε σε <xliff:g id="CAST">%s</xliff:g>."</string>
@@ -250,8 +249,7 @@
     <string name="quick_settings_dnd_label" msgid="7728690179108024338">"Μην ενοχλείτε"</string>
     <string name="quick_settings_bluetooth_label" msgid="7018763367142041481">"Bluetooth"</string>
     <string name="quick_settings_bluetooth_detail_empty_text" msgid="5760239584390514322">"Δεν υπάρχουν διαθέσιμες συσκευές σε σύζευξη"</string>
-    <!-- no translation found for quick_settings_bluetooth_tile_subtitle (212752719010829550) -->
-    <skip />
+    <string name="quick_settings_bluetooth_tile_subtitle" msgid="212752719010829550">"Πατήστε για σύνδεση ή αποσύνδεση μιας συσκευής"</string>
     <string name="pair_new_bluetooth_devices" msgid="4601767620843349645">"Σύζευξη νέας συσκευής"</string>
     <string name="see_all_bluetooth_devices" msgid="1761596816620200433">"Εμφάνιση όλων"</string>
     <string name="turn_on_bluetooth" msgid="5681370462180289071">"Χρήση Bluetooth"</string>
@@ -398,7 +396,11 @@
     <string name="keyguard_indication_charging_time_fast" msgid="8390311020603859480">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Γρήγορη φόρτιση • Πλήρης φόρτιση σε <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_slowly" msgid="301936949731705417">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Αργή φόρτιση • Πλήρης φόρτιση σε <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
     <string name="keyguard_indication_charging_time_dock" msgid="3149328898931741271">"<xliff:g id="PERCENTAGE">%2$s</xliff:g> • Φόρτιση • Πλήρης φόρτιση σε <xliff:g id="CHARGING_TIME_LEFT">%1$s</xliff:g>"</string>
-    <string name="communal_tutorial_indicator_text" msgid="700342473477865107">"Κάντε κλικ στο κουμπί βέλους για να ξεκινήσετε τον κοινόχρηστο οδηγό"</string>
+    <string name="communal_tutorial_indicator_text" msgid="4503010353591430123">"Σύρετε προς τα αριστερά για να ξεκινήσετε τον κοινόχρηστο οδηγό"</string>
+    <!-- no translation found for button_to_open_widget_picker (8007261659745030810) -->
+    <skip />
+    <!-- no translation found for button_to_remove_widget (1511255853677835341) -->
+    <skip />
     <string name="accessibility_multi_user_switch_switcher" msgid="5330448341251092660">"Εναλλαγή χρήστη"</string>
     <string name="accessibility_multi_user_list_switcher" msgid="8574105376229857407">"αναπτυσσόμενο μενού"</string>
     <string name="guest_exit_guest_dialog_message" msgid="8183450985628495709">"Όλες οι εφαρμογές και τα δεδομένα αυτής της περιόδου σύνδεσης θα διαγραφούν."</string>
@@ -1182,8 +1184,7 @@
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"Η κάμερα και το μικρόφωνο έχουν αποκλειστεί"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"Το μικρόφωνο έχει αποκλειστεί"</string>
     <string name="priority_mode_dream_overlay_content_description" msgid="6044561000253314632">"Η λειτουργία προτεραιότητας είναι ενεργοποιημένη"</string>
-    <!-- no translation found for assistant_attention_content_description (4166330881435263596) -->
-    <skip />
+    <string name="assistant_attention_content_description" msgid="4166330881435263596">"Εντοπίστηκε παρουσία χρήστη"</string>
     <string name="set_default_notes_app_toast_content" msgid="2812374329662610753">"Ορίστε την προεπιλεγμένη εφαρμογή σημειώσεων στις Ρυθμίσεις"</string>
     <string name="install_app" msgid="5066668100199613936">"Εγκατάσταση εφαρμογής"</string>
     <string name="connected_display_dialog_start_mirroring" msgid="6237895789920854982">"Κατοπτρισμός σε εξωτερική οθόνη;"</string>
@@ -1208,4 +1209,8 @@
     <string name="privacy_dialog_recent_app_usage_1" msgid="2551340497722370109">"Χρησιμοποιήθηκε πρόσφατα από την εφαρμογή <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g>)"</string>
     <string name="privacy_dialog_active_app_usage_2" msgid="2770926061339921767">"Χρησιμοποιείται από την εφαρμογή <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
     <string name="privacy_dialog_recent_app_usage_2" msgid="2874689735085367167">"Χρησιμοποιήθηκε πρόσφατα από την εφαρμογή <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
+    <!-- no translation found for keyboard_backlight_dialog_title (8273102932345564724) -->
+    <skip />
+    <!-- no translation found for keyboard_backlight_value (7336398765584393538) -->
+    <skip />
 </resources>

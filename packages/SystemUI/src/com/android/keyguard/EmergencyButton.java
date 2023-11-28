@@ -18,6 +18,7 @@ package com.android.keyguard;
 
 import android.content.Context;
 import com.android.systemui.Dependency;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -61,7 +62,10 @@ public class EmergencyButton extends Button {
         super.onFinishInflate();
         if (mEmergencyAffordanceManager.needsEmergencyAffordance()) {
             setOnLongClickListener(v -> {
-                if (!mLongPressWasDragged
+                boolean isEmergencyCallButton = getVisibility() == View.VISIBLE
+                        && TextUtils.equals(getText(), getEmergencyButtonLabel());
+                if (isEmergencyCallButton
+                        && !mLongPressWasDragged
                         && mEmergencyAffordanceManager.needsEmergencyAffordance()) {
                     mEmergencyAffordanceManager.performEmergencyCall();
                     return true;
@@ -132,4 +136,7 @@ public class EmergencyButton extends Button {
         }
     }
 
+    private String getEmergencyButtonLabel() {
+        return mContext.getString(com.android.internal.R.string.lockscreen_emergency_call);
+    }
 }

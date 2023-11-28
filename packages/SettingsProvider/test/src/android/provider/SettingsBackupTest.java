@@ -145,6 +145,7 @@ public class SettingsBackupTest {
                     Settings.Global.AUTOFILL_MAX_VISIBLE_DATASETS,
                     Settings.Global.AUTO_TIME_ZONE_EXPLICIT,
                     Settings.Global.AVERAGE_TIME_TO_DISCHARGE,
+                    Settings.Global.BATTERY_CHARGING_STATE_ENFORCE_LEVEL,
                     Settings.Global.BATTERY_CHARGING_STATE_UPDATE_DELAY,
                     Settings.Global.BATTERY_ESTIMATES_LAST_UPDATE_TIME,
                     Settings.Global.BROADCAST_BG_CONSTANTS,
@@ -691,6 +692,7 @@ public class SettingsBackupTest {
              newHashSet(
                  Settings.Secure.ACCESSIBILITY_SOFT_KEYBOARD_MODE,
                  Settings.Secure.ACCESSIBILITY_SPEAK_PASSWORD, // Deprecated since O.
+                 Settings.Secure.ALLOW_PRIMARY_GAIA_ACCOUNT_REMOVAL_FOR_TESTS,
                  Settings.Secure.ALLOWED_GEOLOCATION_ORIGINS,
                  Settings.Secure.ALWAYS_ON_VPN_APP,
                  Settings.Secure.ALWAYS_ON_VPN_LOCKDOWN,

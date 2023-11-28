@@ -98,7 +98,6 @@ import com.android.systemui.shade.TouchLogger;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.EmptyShadeView;
 import com.android.systemui.statusbar.NotificationShelf;
-import com.android.systemui.statusbar.NotificationShelfController;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.notification.FakeShadowView;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
@@ -203,7 +202,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private final boolean mDebugRemoveAnimation;
     private final boolean mSensitiveRevealAnimEndabled;
     private final RefactorFlag mAnimatedInsets;
-    private final RefactorFlag mShelfRefactor;
 
     private final boolean mNewAodTransition;
 
@@ -639,7 +637,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mSensitiveRevealAnimEndabled = mFeatureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
         mAnimatedInsets =
                 new RefactorFlag(mFeatureFlags, Flags.ANIMATED_NOTIFICATION_SHADE_INSETS);
-        mShelfRefactor = new RefactorFlag(mFeatureFlags, Flags.NOTIFICATION_SHELF_REFACTOR);
         mSectionsManager = Dependency.get(NotificationSectionsManager.class);
         mScreenOffAnimationController =
                 Dependency.get(ScreenOffAnimationController.class);
@@ -1160,6 +1157,20 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         return mSpeedBumpIndex;
     }
 
+    private boolean mSuppressChildrenMeasureAndLayout = false;
+
+    /**
+     * Similar to {@link ViewGroup#suppressLayout} but still performs layout of
+     * the container itself and suppresses only measure and layout calls to children.
+     */
+    public void suppressChildrenMeasureAndLayout(boolean suppress) {
+        mSuppressChildrenMeasureAndLayout = suppress;
+
+        if (!suppress) {
+            requestLayout();
+        }
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         Trace.beginSection("NotificationStackScrollLayout#onMeasure");
@@ -1172,6 +1183,12 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
         int width = MeasureSpec.getSize(widthMeasureSpec);
         updateSidePadding(width);
+
+        if (mSuppressChildrenMeasureAndLayout) {
+            Trace.endSection();
+            return;
+        }
+
         int childWidthSpec = MeasureSpec.makeMeasureSpec(width - mSidePaddings * 2,
                 MeasureSpec.getMode(widthMeasureSpec));
         // Don't constrain the height of the children so we know how big they'd like to be
@@ -1195,18 +1212,21 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        // we layout all our children centered on the top
-        float centerX = getWidth() / 2.0f;
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            // We need to layout all children even the GONE ones, such that the heights are
-            // calculated correctly as they are used to calculate how many we can fit on the screen
-            float width = child.getMeasuredWidth();
-            float height = child.getMeasuredHeight();
-            child.layout((int) (centerX - width / 2.0f),
-                    0,
-                    (int) (centerX + width / 2.0f),
-                    (int) height);
+        if (!mSuppressChildrenMeasureAndLayout) {
+            // we layout all our children centered on the top
+            float centerX = getWidth() / 2.0f;
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                // We need to layout all children even the GONE ones, such that the heights are
+                // calculated correctly as they are used to calculate how many we can fit on
+                // the screen
+                float width = child.getMeasuredWidth();
+                float height = child.getMeasuredHeight();
+                child.layout((int) (centerX - width / 2.0f),
+                        0,
+                        (int) (centerX + width / 2.0f),
+                        (int) height);
+            }
         }
         setMaxLayoutHeight(getHeight());
         updateContentHeight();
@@ -2734,15 +2754,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mChildTransferInProgress = childTransferInProgress;
     }
 
-    /**
-     * Set the remove notification listener
-     * @param listener callback for notification removed
-     */
-    public void setOnNotificationRemovedListener(OnNotificationRemovedListener listener) {
-        mShelfRefactor.assertInLegacyMode();
-        mOnNotificationRemovedListener = listener;
-    }
-
     @Override
     public void onViewRemoved(View child) {
         super.onViewRemoved(child);
@@ -2752,15 +2763,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         if (!mChildTransferInProgress) {
             onViewRemovedInternal(expandableView, this);
         }
-        if (mShelfRefactor.isEnabled()) {
-            mShelf.requestRoundnessResetFor(expandableView);
-        } else {
-            if (mOnNotificationRemovedListener != null) {
-                mOnNotificationRemovedListener.onNotificationRemoved(
-                        expandableView,
-                        mChildTransferInProgress);
-            }
-        }
+        mShelf.requestRoundnessResetFor(expandableView);
     }
 
     public void cleanUpViewStateForEntry(NotificationEntry entry) {
@@ -4573,7 +4576,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
                 mFooterClearAllListener.onClearAll();
             }
             clearNotifications(ROWS_ALL, true /* closeShade */);
-            footerView.setSecondaryVisible(false /* visible */, true /* animate */);
+            footerView.setClearAllButtonVisible(false /* visible */, true /* animate */);
         });
         if (FooterViewRefactor.isEnabled()) {
             updateFooter();
@@ -4638,7 +4641,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         }
         boolean animate = mIsExpanded && mAnimationsEnabled;
         mFooterView.setVisible(visible, animate);
-        mFooterView.setSecondaryVisible(showDismissView, animate);
+        mFooterView.setClearAllButtonVisible(showDismissView, animate);
         mFooterView.showHistory(showHistory);
         if (!FooterViewRefactor.isEnabled()) {
             mFooterView.setFooterLabelVisible(mHasFilteredOutSeenNotifications);
@@ -4987,12 +4990,10 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @Nullable
     public ExpandableView getShelf() {
-        if (mShelfRefactor.isUnexpectedlyInLegacyMode()) return null;
         return mShelf;
     }
 
     public void setShelf(NotificationShelf shelf) {
-        if (mShelfRefactor.isUnexpectedlyInLegacyMode()) return;
         int index = -1;
         if (mShelf != null) {
             index = indexOfChild(mShelf);
@@ -5003,20 +5004,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mAmbientState.setShelf(mShelf);
         mStateAnimator.setShelf(mShelf);
         shelf.bind(mAmbientState, this, mController.getNotificationRoundnessManager());
-    }
-
-    public void setShelfController(NotificationShelfController notificationShelfController) {
-        mShelfRefactor.assertInLegacyMode();
-        int index = -1;
-        if (mShelf != null) {
-            index = indexOfChild(mShelf);
-            removeView(mShelf);
-        }
-        mShelf = notificationShelfController.getView();
-        addView(mShelf, index);
-        mAmbientState.setShelf(mShelf);
-        mStateAnimator.setShelf(mShelf);
-        notificationShelfController.bind(mAmbientState, mController);
     }
 
     public void setMaxDisplayedNotifications(int maxDisplayedNotifications) {
@@ -5133,6 +5120,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
             println(pw, "qsClipDismiss", mDismissUsingRowTranslationX);
             println(pw, "visibility", visibilityString(getVisibility()));
             println(pw, "alpha", getAlpha());
+            println(pw, "suppressChildrenMeasureLayout", mSuppressChildrenMeasureAndLayout);
             println(pw, "scrollY", mAmbientState.getScrollY());
             println(pw, "maxTopPadding", mMaxTopPadding);
             println(pw, "showShelfOnly", mShouldShowShelfOnly);
@@ -5702,6 +5690,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         boolean split = mSplitShadeStateController.shouldUseSplitNotificationShade(getResources());
         if (split != mShouldUseSplitNotificationShade) {
             mShouldUseSplitNotificationShade = split;
+            mAmbientState.setUseSplitShade(split);
             updateDismissBehavior();
             updateUseRoundedRectClipping();
         }

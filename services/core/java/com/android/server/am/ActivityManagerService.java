@@ -79,6 +79,7 @@ import static android.os.PowerExemptionManager.REASON_ACTIVITY_VISIBILITY_GRACE_
 import static android.os.PowerExemptionManager.REASON_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_COMPANION_DEVICE_MANAGER;
+import static android.os.PowerExemptionManager.REASON_DENIED;
 import static android.os.PowerExemptionManager.REASON_INSTR_BACKGROUND_ACTIVITY_PERMISSION;
 import static android.os.PowerExemptionManager.REASON_LOCKED_BOOT_COMPLETED;
 import static android.os.PowerExemptionManager.REASON_PROC_STATE_BTOP;
@@ -431,11 +432,10 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.MemInfoReader;
 import com.android.internal.util.Preconditions;
+import com.android.internal.util.function.HeptFunction;
 import com.android.internal.util.function.HexFunction;
-import com.android.internal.util.function.NonaFunction;
 import com.android.internal.util.function.QuadFunction;
 import com.android.internal.util.function.QuintFunction;
-import com.android.internal.util.function.TriFunction;
 import com.android.internal.util.function.UndecFunction;
 import com.android.server.AlarmManagerInternal;
 import com.android.server.BootReceiver;
@@ -1908,7 +1908,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     int exitInfoReason = (int) args.arg3;
                     args.recycle();
                     forceStopPackageLocked(pkg, appId, false, false, true, false,
-                            false, userId, reason, exitInfoReason);
+                            false, false, userId, reason, exitInfoReason);
                 }
             } break;
 
@@ -3174,11 +3174,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     }
 
     private boolean hasUsageStatsPermission(String callingPackage, int callingUid, int callingPid) {
-        final AttributionSource attributionSource = new AttributionSource.Builder(callingUid)
-                .setPackageName(callingPackage)
-                .build();
-        final int mode = mAppOpsService.noteOperationWithState(AppOpsManager.OP_GET_USAGE_STATS,
-                attributionSource.asState(), false, "", false).getOpMode();
+        final int mode = mAppOpsService.noteOperation(AppOpsManager.OP_GET_USAGE_STATS,
+                callingUid, callingPackage, null, false, "", false).getOpMode();
         if (mode == AppOpsManager.MODE_DEFAULT) {
             return checkPermission(Manifest.permission.PACKAGE_USAGE_STATS, callingPid, callingUid)
                     == PackageManager.PERMISSION_GRANTED;
@@ -3620,6 +3617,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         enforceNotIsolatedCaller("clearApplicationUserData");
         int uid = Binder.getCallingUid();
         int pid = Binder.getCallingPid();
+        EventLog.writeEvent(EventLogTags.AM_CLEAR_APP_DATA_CALLER, pid, uid, packageName);
         final int resolvedUserId = mUserController.handleIncomingUser(pid, uid, userId, false,
                 ALLOW_FULL_ONLY, "clearApplicationUserData", null);
 
@@ -3704,30 +3702,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                     }
 
                     if (succeeded) {
-                        final Intent intent = new Intent(Intent.ACTION_PACKAGE_DATA_CLEARED,
-                                Uri.fromParts("package", packageName, null /* fragment */));
-                        intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
-                                | Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-                        intent.putExtra(Intent.EXTRA_UID,
-                                (appInfo != null) ? appInfo.uid : INVALID_UID);
-                        intent.putExtra(Intent.EXTRA_USER_HANDLE, resolvedUserId);
-                        if (isRestore) {
-                            intent.putExtra(Intent.EXTRA_IS_RESTORE, true);
-                        }
-                        if (isInstantApp) {
-                            intent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName);
-                        }
-                        final int[] visibilityAllowList = mPackageManagerInt.getVisibilityAllowList(
-                                packageName, resolvedUserId);
 
-                        broadcastIntentInPackage("android", null /* featureId */,
-                                SYSTEM_UID, uid, pid, intent, null /* resolvedType */,
-                                null /* resultToApp */, null /* resultTo */, 0 /* resultCode */,
-                                null /* resultData */, null /* resultExtras */,
-                                isInstantApp ? permission.ACCESS_INSTANT_APPS : null,
-                                null /* bOptions */, false /* serialized */, false /* sticky */,
-                                resolvedUserId, BackgroundStartPrivileges.NONE,
-                                visibilityAllowList);
+                        mPackageManagerInt.sendPackageDataClearedBroadcast(packageName,
+                                ((appInfo != null) ? appInfo.uid : INVALID_UID), resolvedUserId,
+                                isRestore, isInstantApp);
                     }
 
                     if (observer != null) {
@@ -3986,7 +3964,10 @@ public class ActivityManagerService extends IActivityManager.Stub
                                 + packageName + ": " + e);
                     }
                     if (mUserController.isUserRunning(user, userRunningFlags)) {
-                        forceStopPackageLocked(packageName, pkgUid,
+                        forceStopPackageLocked(packageName, UserHandle.getAppId(pkgUid),
+                                false /* callerWillRestart */, false /* purgeCache */,
+                                true /* doIt */, false /* evenPersistent */,
+                                false /* uninstalling */, true /* packageStateStopped */, user,
                                 reason == null ? ("from pid " + callingPid) : reason);
                         finishForceStopPackageLocked(packageName, pkgUid);
                     }
@@ -4235,7 +4216,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("this")
     private void forceStopPackageLocked(final String packageName, int uid, String reason) {
         forceStopPackageLocked(packageName, UserHandle.getAppId(uid), false,
-                false, true, false, false, UserHandle.getUserId(uid), reason);
+                false, true, false, false, false, UserHandle.getUserId(uid), reason);
     }
 
     @GuardedBy("this")
@@ -4245,29 +4226,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             flags = Intent.FLAG_RECEIVER_REGISTERED_ONLY
                     | Intent.FLAG_RECEIVER_FOREGROUND;
         }
-        if (android.content.pm.Flags.stayStopped()) {
-            // Sent async using the PM handler, to maintain ordering with PACKAGE_UNSTOPPED
-            mPackageManagerInt.sendPackageRestartedBroadcast(packageName,
-                    uid, flags);
-        } else {
-            Intent intent = new Intent(Intent.ACTION_PACKAGE_RESTARTED,
-                    Uri.fromParts("package", packageName, null));
-            intent.addFlags(flags);
-            final int userId = UserHandle.getUserId(uid);
-            final int[] broadcastAllowList =
-                    getPackageManagerInternal().getVisibilityAllowList(packageName, userId);
-            intent.putExtra(Intent.EXTRA_UID, uid);
-            intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
-            broadcastIntentLocked(null /* callerApp */, null /* callerPackage */,
-                    null /* callerFeatureId */, intent, null /* resolvedType */,
-                    null /* resultToApp */, null /* resultTo */,
-                    0 /* resultCode */, null /* resultData */, null /* resultExtras */,
-                    null /* requiredPermissions */, null /* excludedPermissions */,
-                    null /* excludedPackages */, OP_NONE, null /* bOptions */, false /* ordered */,
-                    false /* sticky */, MY_PID, SYSTEM_UID, Binder.getCallingUid(),
-                    Binder.getCallingPid(), userId, BackgroundStartPrivileges.NONE,
-                    broadcastAllowList, null /* filterExtrasForReceiver */);
-        }
+        mPackageManagerInt.sendPackageRestartedBroadcast(packageName, uid, flags);
     }
 
     private void cleanupDisabledPackageComponentsLocked(
@@ -4422,20 +4381,20 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("this")
     final boolean forceStopPackageLocked(String packageName, int appId,
             boolean callerWillRestart, boolean purgeCache, boolean doit,
-            boolean evenPersistent, boolean uninstalling, int userId, String reasonString) {
-
+            boolean evenPersistent, boolean uninstalling, boolean packageStateStopped,
+            int userId, String reasonString) {
         int reason = packageName == null ? ApplicationExitInfo.REASON_USER_STOPPED
                 : ApplicationExitInfo.REASON_USER_REQUESTED;
         return forceStopPackageLocked(packageName, appId, callerWillRestart, purgeCache, doit,
-                evenPersistent, uninstalling, userId, reasonString, reason);
+                evenPersistent, uninstalling, packageStateStopped, userId, reasonString, reason);
 
     }
 
     @GuardedBy("this")
     final boolean forceStopPackageLocked(String packageName, int appId,
             boolean callerWillRestart, boolean purgeCache, boolean doit,
-            boolean evenPersistent, boolean uninstalling, int userId, String reasonString,
-            int reason) {
+            boolean evenPersistent, boolean uninstalling, boolean packageStateStopped,
+            int userId, String reasonString, int reason) {
         int i;
 
         if (userId == UserHandle.USER_ALL && packageName == null) {
@@ -4517,7 +4476,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
         }
 
-        if (packageName == null || uninstalling) {
+        if (packageName == null || uninstalling || packageStateStopped) {
             didSomething |= mPendingIntentController.removePendingIntentsForPackage(
                     packageName, userId, appId, doit);
         }
@@ -5235,7 +5194,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     for (String pkg : pkgs) {
                         synchronized (ActivityManagerService.this) {
                             if (forceStopPackageLocked(pkg, -1, false, false, false, false, false,
-                                    0, "query restart")) {
+                                    false, 0, "query restart")) {
                                 setResultCode(Activity.RESULT_OK);
                                 return;
                             }
@@ -6021,18 +5980,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public int noteOp(String op, int uid, String packageName) {
             // TODO moltmann: Allow to specify featureId
-            final AttributionSource attributionSource = new AttributionSource.Builder(uid)
-                    .setPackageName(packageName)
-                    .build();
-            return mActivityManagerService
-                    .mAppOpsService
-                    .noteOperationWithState(
-                            AppOpsManager.strOpToOp(op),
-                            attributionSource.asState(),
-                            false,
-                            "",
-                            false)
-                    .getOpMode();
+            return mActivityManagerService.mAppOpsService
+                    .noteOperation(AppOpsManager.strOpToOp(op), uid, packageName, null,
+                            false, "", false).getOpMode();
         }
 
         @Override
@@ -7430,7 +7380,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mDebugTransient = !persistent;
                 if (packageName != null) {
                     forceStopPackageLocked(packageName, -1, false, false, true, true,
-                            false, UserHandle.USER_ALL, "set debug app");
+                            false, false, UserHandle.USER_ALL, "set debug app");
                 }
             }
         } finally {
@@ -7799,11 +7749,97 @@ public class ActivityManagerService extends IActivityManager.Stub
                 "getUidProcessState", callingPackage); // Ignore return value
 
         synchronized (mProcLock) {
-            if (mPendingStartActivityUids.isPendingTopUid(uid)) {
-                return PROCESS_STATE_TOP;
-            }
-            return mProcessList.getUidProcStateLOSP(uid);
+            return getUidProcessStateInnerLOSP(uid);
         }
+    }
+
+    @Override
+    public int getBindingUidProcessState(int targetUid, String callingPackage) {
+        if (!hasUsageStatsPermission(callingPackage)) {
+            enforceCallingPermission(android.Manifest.permission.GET_BINDING_UID_IMPORTANCE,
+                    "getBindingUidProcessState");
+        }
+        // We don't need to do a cross-user check here (unlike getUidProcessState),
+        // because we only allow to see UIDs that are actively communicating with the caller.
+
+        final int callingUid = Binder.getCallingUid();
+        final long token = Binder.clearCallingIdentity();
+        try {
+            synchronized (this) {
+                final boolean allowed = (callingUid == targetUid)
+                        || hasServiceBindingOrProviderUseLocked(callingUid, targetUid);
+                if (!allowed) {
+                    return PROCESS_STATE_NONEXISTENT;
+                }
+                return getUidProcessStateInnerLOSP(targetUid);
+            }
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    @GuardedBy(anyOf = {"this", "mProcLock"})
+    private int getUidProcessStateInnerLOSP(int uid) {
+        if (mPendingStartActivityUids.isPendingTopUid(uid)) {
+            return PROCESS_STATE_TOP;
+        }
+        return mProcessList.getUidProcStateLOSP(uid);
+    }
+
+    /**
+     * Ensure that {@code clientUid} has a bound service client to {@code callingUid}
+     */
+    @GuardedBy("this")
+    private boolean hasServiceBindingOrProviderUseLocked(int callingUid, int clientUid) {
+        // See if there's a service binding
+        final Boolean hasBinding = mProcessList.searchEachLruProcessesLOSP(
+                false, pr -> {
+                    if (pr.uid == callingUid) {
+                        final ProcessServiceRecord psr = pr.mServices;
+                        final int serviceCount = psr.mServices.size();
+                        for (int svc = 0; svc < serviceCount; svc++) {
+                            final ArrayMap<IBinder, ArrayList<ConnectionRecord>> conns =
+                                    psr.mServices.valueAt(svc).getConnections();
+                            final int size = conns.size();
+                            for (int conni = 0; conni < size; conni++) {
+                                final ArrayList<ConnectionRecord> crs = conns.valueAt(conni);
+                                for (int con = 0; con < crs.size(); con++) {
+                                    final ConnectionRecord cr = crs.get(con);
+                                    final ProcessRecord clientPr = cr.binding.client;
+
+                                    if (clientPr.uid == clientUid) {
+                                        return Boolean.TRUE;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                });
+        if (Boolean.TRUE.equals(hasBinding)) {
+            return true;
+        }
+
+        final Boolean hasProviderClient = mProcessList.searchEachLruProcessesLOSP(
+                false, pr -> {
+                    if (pr.uid == callingUid) {
+                        final ProcessProviderRecord ppr = pr.mProviders;
+                        for (int provi = ppr.numberOfProviders() - 1; provi >= 0; provi--) {
+                            ContentProviderRecord cpr = ppr.getProviderAt(provi);
+
+                            for (int i = cpr.connections.size() - 1; i >= 0; i--) {
+                                ContentProviderConnection conn = cpr.connections.get(i);
+                                ProcessRecord client = conn.client;
+                                if (client.uid == clientUid) {
+                                    return Boolean.TRUE;
+                                }
+                            }
+                        }
+                    }
+                    return null;
+                });
+
+        return Boolean.TRUE.equals(hasProviderClient);
     }
 
     @Override
@@ -15028,7 +15064,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             if (list != null && list.length > 0) {
                                 for (int i = 0; i < list.length; i++) {
                                     forceStopPackageLocked(list[i], -1, false, true, true,
-                                            false, false, userId, "storage unmount");
+                                            false, false, false, userId, "storage unmount");
                                 }
                                 mAtmInternal.cleanupRecentTasksForUser(UserHandle.USER_ALL);
                                 sendPackageBroadcastLocked(
@@ -15055,8 +15091,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                                     if (killProcess) {
                                         forceStopPackageLocked(ssp, UserHandle.getAppId(
                                                 intent.getIntExtra(Intent.EXTRA_UID, -1)),
-                                                false, true, true, false, fullUninstall, userId,
-                                                "pkg removed");
+                                                false, true, true, false, fullUninstall, false,
+                                                userId, "pkg removed");
                                         getPackageManagerInternal()
                                                 .onPackageProcessKilledForUninstall(ssp);
                                     } else {
@@ -15974,7 +16010,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 } else {
                     // Instrumentation can kill and relaunch even persistent processes
                     forceStopPackageLocked(ii.targetPackage, -1, true, false, true, true, false,
-                            userId, "start instr");
+                            false, userId, "start instr");
                     // Inform usage stats to make the target package active
                     if (mUsageStatsService != null) {
                         mUsageStatsService.reportEvent(ii.targetPackage, userId,
@@ -16103,6 +16139,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         /* doIt= */ true,
                         /* evenPersistent= */ true,
                         /* uninstalling= */ false,
+                        /* packageStateStopped= */ false,
                         userId,
                         "start instr");
 
@@ -16273,8 +16310,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
             } else if (!instr.mNoRestart) {
                 forceStopPackageLocked(app.info.packageName, -1, false, false, true, true, false,
-                        app.userId,
-                        "finished inst");
+                        false, app.userId, "finished inst");
             }
         } finally {
             Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
@@ -20187,26 +20223,20 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public int checkOperation(int code, AttributionSource attributionSource, boolean raw,
-                TriFunction<Integer, AttributionSource, Boolean, Integer> superImpl) {
-            final int uid = attributionSource.getUid();
-
+        public int checkOperation(int code, int uid, String packageName,
+                String attributionTag, boolean raw,
+                QuintFunction<Integer, Integer, String, String, Boolean, Integer> superImpl) {
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
                         Process.SHELL_UID);
-                final AttributionSource shellAttributionSource =
-                        new AttributionSource.Builder(shellUid)
-                                .setPackageName("com.android.shell")
-                                .build();
-
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    return superImpl.apply(code, shellAttributionSource, raw);
+                    return superImpl.apply(code, shellUid, "com.android.shell", null, raw);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(code, attributionSource, raw);
+            return superImpl.apply(code, uid, packageName, attributionTag, raw);
         }
 
         @Override
@@ -20226,30 +20256,23 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public SyncNotedAppOp noteOperation(int code, AttributionSource attributionSource,
-                boolean shouldCollectAsyncNotedOp,
+        public SyncNotedAppOp noteOperation(int code, int uid, @Nullable String packageName,
+                @Nullable String featureId, boolean shouldCollectAsyncNotedOp,
                 @Nullable String message, boolean shouldCollectMessage,
-                @NonNull QuintFunction<Integer, AttributionSource, Boolean, String, Boolean,
+                @NonNull HeptFunction<Integer, Integer, String, String, Boolean, String, Boolean,
                         SyncNotedAppOp> superImpl) {
-            final int uid = attributionSource.getUid();
-            final String attributionTag = attributionSource.getAttributionTag();
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
                         Process.SHELL_UID);
                 final long identity = Binder.clearCallingIdentity();
-                final AttributionSource shellAttributionSource =
-                        new AttributionSource.Builder(shellUid)
-                                .setPackageName("com.android.shell")
-                                .setAttributionTag(attributionTag)
-                                .build();
                 try {
-                    return superImpl.apply(code, shellAttributionSource,
+                    return superImpl.apply(code, shellUid, "com.android.shell", featureId,
                             shouldCollectAsyncNotedOp, message, shouldCollectMessage);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(code, attributionSource, shouldCollectAsyncNotedOp,
+            return superImpl.apply(code, uid, packageName, featureId, shouldCollectAsyncNotedOp,
                     message, shouldCollectMessage);
         }
 
@@ -20280,37 +20303,28 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public SyncNotedAppOp startOperation(IBinder token, int code,
-                AttributionSource attributionSource,
+        public SyncNotedAppOp startOperation(IBinder token, int code, int uid,
+                @Nullable String packageName, @Nullable String attributionTag,
                 boolean startIfModeDefault, boolean shouldCollectAsyncNotedOp,
                 @Nullable String message, boolean shouldCollectMessage,
                 @AttributionFlags int attributionFlags, int attributionChainId,
-                @NonNull NonaFunction<IBinder, Integer, AttributionSource, Boolean,
+                @NonNull UndecFunction<IBinder, Integer, Integer, String, String, Boolean,
                         Boolean, String, Boolean, Integer, Integer, SyncNotedAppOp> superImpl) {
-            final int uid = attributionSource.getUid();
-            final String attributionTag = attributionSource.getAttributionTag();
-
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
                         Process.SHELL_UID);
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    final AttributionSource shellAttributionSource =
-                            new AttributionSource.Builder(shellUid)
-                                    .setPackageName("com.android.shell")
-                                    .setAttributionTag(attributionTag)
-                                    .build();
-
-                    return superImpl.apply(token, code, shellAttributionSource,
-                            startIfModeDefault, shouldCollectAsyncNotedOp, message,
+                    return superImpl.apply(token, code, shellUid, "com.android.shell",
+                            attributionTag, startIfModeDefault, shouldCollectAsyncNotedOp, message,
                             shouldCollectMessage, attributionFlags, attributionChainId);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(token, code, attributionSource, startIfModeDefault,
-                    shouldCollectAsyncNotedOp, message, shouldCollectMessage, attributionFlags,
-                    attributionChainId);
+            return superImpl.apply(token, code, uid, packageName, attributionTag,
+                    startIfModeDefault, shouldCollectAsyncNotedOp, message, shouldCollectMessage,
+                    attributionFlags, attributionChainId);
         }
 
         @Override

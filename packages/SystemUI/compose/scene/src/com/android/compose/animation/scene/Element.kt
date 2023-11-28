@@ -29,10 +29,13 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.geometry.lerp
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.IntermediateMeasureScope
 import androidx.compose.ui.layout.Measurable
@@ -84,6 +87,9 @@ internal class Element(val key: ElementKey) {
         /** The size of this element. */
         var size = SizeUnspecified
 
+        /** The draw scale of this element. */
+        var drawScale = Scale.Default
+
         /** The alpha of this element. */
         var alpha = AlphaUnspecified
     }
@@ -109,14 +115,20 @@ internal class Element(val key: ElementKey) {
     }
 }
 
+data class Scale(val scaleX: Float, val scaleY: Float, val pivot: Offset = Offset.Unspecified) {
+
+    companion object {
+        val Default = Scale(1f, 1f, Offset.Unspecified)
+    }
+}
+
 /** The implementation of [SceneScope.element]. */
-@Composable
 @OptIn(ExperimentalComposeUiApi::class)
 internal fun Modifier.element(
     layoutImpl: SceneTransitionLayoutImpl,
     scene: Scene,
     key: ElementKey,
-): Modifier {
+): Modifier = composed {
     val sceneValues = remember(scene, key) { Element.TargetValues() }
     val element =
         // Get the element associated to [key] if it was already composed in another scene,
@@ -160,9 +172,24 @@ internal fun Modifier.element(
         }
     }
 
-    return drawWithContent {
+    val drawScale by
+        remember(layoutImpl, element, scene, sceneValues) {
+            derivedStateOf { getDrawScale(layoutImpl, element, scene, sceneValues) }
+        }
+
+    drawWithContent {
             if (shouldDrawElement(layoutImpl, scene, element)) {
-                drawContent()
+                if (drawScale == Scale.Default) {
+                    this@drawWithContent.drawContent()
+                } else {
+                    scale(
+                        drawScale.scaleX,
+                        drawScale.scaleY,
+                        if (drawScale.pivot.isUnspecified) center else drawScale.pivot
+                    ) {
+                        this@drawWithContent.drawContent()
+                    }
+                }
             }
         }
         .modifierTransformations(layoutImpl, scene, element, sceneValues)
@@ -375,6 +402,28 @@ private fun IntermediateMeasureScope.measure(
     element.lastSharedValues.size = size
     sceneValues.lastValues.size = size
     return placeable
+}
+
+private fun getDrawScale(
+    layoutImpl: SceneTransitionLayoutImpl,
+    element: Element,
+    scene: Scene,
+    sceneValues: Element.TargetValues
+): Scale {
+    return computeValue(
+        layoutImpl,
+        scene,
+        element,
+        sceneValue = { Scale.Default },
+        transformation = { it.drawScale },
+        idleValue = Scale.Default,
+        currentValue = { Scale.Default },
+        lastValue = {
+            sceneValues.lastValues.drawScale.takeIf { it != Scale.Default }
+                ?: element.lastSharedValues.drawScale
+        },
+        ::lerp,
+    )
 }
 
 @OptIn(ExperimentalComposeUiApi::class)

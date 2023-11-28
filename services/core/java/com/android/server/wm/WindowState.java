@@ -1091,6 +1091,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mClient = c;
         mAppOp = appOp;
         mToken = token;
+        mDisplayContent = token.mDisplayContent;
         mActivityRecord = mToken.asActivityRecord();
         mOwnerUid = ownerId;
         mShowUserId = showUserId;
@@ -1387,7 +1388,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // This window doesn't provide any insets.
             return;
         }
-        if (mGivenInsetsPending) {
+        if (mGivenInsetsPending && mAttrs.providedInsets == null) {
             // The given insets are pending, and they are not reliable for now. The source frame
             // should be updated after the new given insets are sent to window manager.
             return;
@@ -1569,11 +1570,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     void orientationChangeTimedOut() {
         mOrientationChangeTimedOut = true;
-    }
-
-    @Override
-    public DisplayContent getDisplayContent() {
-        return mToken.getDisplayContent();
     }
 
     @Override
@@ -1840,7 +1836,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         for (int i = mInsetsSourceProviders.size() - 1; i >= 0; i--) {
             final InsetsSource source = mInsetsSourceProviders.valueAt(i).getSource();
-            if ((source.getType() & DisplayPolicy.DecorInsets.CONFIG_TYPES) != 0) {
+            if ((source.getType() & mWmService.mConfigTypes) != 0) {
                 return true;
             }
         }
@@ -5269,10 +5265,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             mSurfacePosition.offset(mXOffset, mYOffset);
         }
 
-        // Freeze position while we're unrotated, so the surface remains at the position it was
-        // prior to the rotation.
-        if (!mSurfaceAnimator.hasLeash() && mPendingSeamlessRotate == null
-                && !mLastSurfacePosition.equals(mSurfacePosition)) {
+        final AsyncRotationController asyncRotationController =
+                mDisplayContent.getAsyncRotationController();
+        if ((asyncRotationController != null
+                && asyncRotationController.hasSeamlessOperation(mToken))
+                || mPendingSeamlessRotate != null) {
+            // Freeze position while un-rotating the window, so its surface remains at the position
+            // corresponding to the original rotation.
+            return;
+        }
+
+        if (!mSurfaceAnimator.hasLeash() && !mLastSurfacePosition.equals(mSurfacePosition)) {
             final boolean frameSizeChanged = mWindowFrames.isFrameSizeChangeReported();
             final boolean surfaceInsetsChanged = surfaceInsetsChanging();
             final boolean surfaceSizeChanged = frameSizeChanged || surfaceInsetsChanged;

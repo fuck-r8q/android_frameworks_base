@@ -44,7 +44,7 @@ public class OneShotRemoteHandler implements Transitions.TransitionHandler {
     private IBinder mTransition = null;
 
     /** The remote to delegate animation to */
-    private final RemoteTransition mRemote;
+    private RemoteTransition mRemote;
 
     public OneShotRemoteHandler(@NonNull ShellExecutor mainExecutor,
             @NonNull RemoteTransition remote) {
@@ -83,6 +83,7 @@ public class OneShotRemoteHandler implements Transitions.TransitionHandler {
                 mMainExecutor.execute(() -> {
                     finishCallback.onTransitionFinished(wct);
                 });
+                mRemote = null;
             }
         };
         Transitions.setRunningRemoteTransitionDelegate(mRemote.getAppThread());
@@ -105,6 +106,7 @@ public class OneShotRemoteHandler implements Transitions.TransitionHandler {
                 mRemote.asBinder().unlinkToDeath(remoteDied, 0 /* flags */);
             }
             finishCallback.onTransitionFinished(null /* wct */);
+            mRemote = null;
         }
         return true;
     }
@@ -123,6 +125,7 @@ public class OneShotRemoteHandler implements Transitions.TransitionHandler {
                 // so just assume the worst-case and clear the local transaction.
                 t.clear();
                 mMainExecutor.execute(() -> finishCallback.onTransitionFinished(wct));
+                mRemote = null;
             }
         };
         try {

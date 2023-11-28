@@ -18,6 +18,7 @@ package com.android.systemui.keyguard.domain.interactor
 
 import android.animation.ValueAnimator
 import com.android.app.animation.Interpolators
+import com.android.app.tracing.TraceUtils.Companion.launch
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.flags.FeatureFlags
@@ -31,10 +32,10 @@ import com.android.systemui.keyguard.shared.model.TransitionModeOnCanceled
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.shade.data.repository.ShadeRepository
-import com.android.systemui.tracing.TraceUtils.Companion.launch
 import com.android.systemui.util.kotlin.Utils.Companion.toQuad
 import com.android.systemui.util.kotlin.Utils.Companion.toTriple
 import com.android.systemui.util.kotlin.sample
+import dagger.Lazy
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
@@ -56,6 +57,7 @@ constructor(
     private val flags: FeatureFlags,
     private val shadeRepository: ShadeRepository,
     private val powerInteractor: PowerInteractor,
+    inWindowLauncherUnlockAnimationInteractor: Lazy<InWindowLauncherUnlockAnimationInteractor>,
 ) :
     TransitionInteractor(
         fromState = KeyguardState.LOCKSCREEN,
@@ -104,12 +106,21 @@ constructor(
     val surfaceBehindModel: Flow<KeyguardSurfaceBehindModel?> =
         combine(
                 transitionInteractor.startedKeyguardTransitionStep,
-                transitionInteractor.transitionStepsFromState(KeyguardState.LOCKSCREEN)
-            ) { startedStep, fromLockscreenStep ->
+                transitionInteractor.transitionStepsFromState(KeyguardState.LOCKSCREEN),
+                inWindowLauncherUnlockAnimationInteractor
+                    .get()
+                    .transitioningToGoneWithInWindowAnimation,
+            ) { startedStep, fromLockscreenStep, transitioningToGoneWithInWindowAnimation ->
                 if (startedStep.to != KeyguardState.GONE) {
                     // Only LOCKSCREEN -> GONE has specific surface params (for the unlock
                     // animation).
                     return@combine null
+                } else if (transitioningToGoneWithInWindowAnimation) {
+                    // If we're prepared for the in-window unlock, we're going to play an animation
+                    // in the window. Make it fully visible.
+                    KeyguardSurfaceBehindModel(
+                        alpha = 1f,
+                    )
                 } else if (fromLockscreenStep.value > 0.5f) {
                     // Start the animation once we're 50% transitioned to GONE.
                     KeyguardSurfaceBehindModel(

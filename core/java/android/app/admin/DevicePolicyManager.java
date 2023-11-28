@@ -49,6 +49,7 @@ import static android.Manifest.permission.QUERY_ADMIN_POLICY;
 import static android.Manifest.permission.REQUEST_PASSWORD_COMPLEXITY;
 import static android.Manifest.permission.SET_TIME;
 import static android.Manifest.permission.SET_TIME_ZONE;
+import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_1;
 import static android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
@@ -17047,23 +17048,6 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Overrides the effective cached value of enable_keep_profiles_running for testing purposes.
-     *
-     * @hide
-     */
-    @TestApi
-    @RequiresPermission(permission.MANAGE_PROFILE_AND_DEVICE_OWNERS)
-    public void setOverrideKeepProfilesRunning(boolean enabled) {
-        if (mService != null) {
-            try {
-                mService.setOverrideKeepProfilesRunning(enabled);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
-    }
-
-    /**
      * Triggers the data migration of device policies for existing DPCs to the Device Policy Engine.
      * If {@code forceMigration} is set to {@code true} it skips the prerequisite checks before
      * triggering the migration.
@@ -17135,5 +17119,15 @@ public class DevicePolicyManager {
             }
         }
         return null;
+    }
+
+    // TODO(b/308755220): Remove once the build is finalised.
+    /**
+     * Returns true if the flag for the onboarding bugreport V2 is enabled.
+     *
+     * @hide
+     */
+    public boolean isOnboardingBugreportV2FlagEnabled() {
+        return onboardingBugreportV2Enabled();
     }
 }

@@ -17,8 +17,9 @@
 package com.android.systemui.scene.shared.flag
 
 import androidx.annotation.VisibleForTesting
-import com.android.systemui.FeatureFlags
+import com.android.systemui.Flags.keyguardBottomAreaRefactor
 import com.android.systemui.Flags as AConfigFlags
+import com.android.systemui.Flags.sceneContainer
 import com.android.systemui.compose.ComposeFacade
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FeatureFlagsClassic
@@ -50,7 +51,6 @@ class SceneContainerFlagsImpl
 @AssistedInject
 constructor(
     private val featureFlagsClassic: FeatureFlagsClassic,
-    featureFlags: FeatureFlags,
     @Assisted private val isComposeAvailable: Boolean,
 ) : SceneContainerFlags {
 
@@ -58,11 +58,8 @@ constructor(
         @VisibleForTesting
         val classicFlagTokens: List<Flag<Boolean>> =
             listOf(
-                Flags.MIGRATE_SPLIT_KEYGUARD_BOTTOM_AREA,
-                Flags.MIGRATE_LOCK_ICON,
                 Flags.MIGRATE_NSSL,
                 Flags.MIGRATE_KEYGUARD_STATUS_VIEW,
-                Flags.NOTIFICATION_SHELF_REFACTOR,
                 Flags.MIGRATE_KEYGUARD_STATUS_BAR_VIEW,
             )
     }
@@ -72,7 +69,11 @@ constructor(
         listOf(
             AconfigFlagMustBeEnabled(
                 flagName = AConfigFlags.FLAG_SCENE_CONTAINER,
-                flagValue = featureFlags.sceneContainer(),
+                flagValue = sceneContainer(),
+            ),
+            AconfigFlagMustBeEnabled(
+                flagName = AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR,
+                flagValue = keyguardBottomAreaRefactor(),
             ),
         ) +
             classicFlagTokens.map { flagToken -> FlagMustBeEnabled(flagToken) } +

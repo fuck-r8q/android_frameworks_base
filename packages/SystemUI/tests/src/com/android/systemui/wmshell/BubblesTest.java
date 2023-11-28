@@ -102,9 +102,12 @@ import com.android.systemui.flags.FakeFeatureFlagsClassic;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
+import com.android.systemui.keyguard.data.repository.FakeKeyguardSurfaceBehindRepository;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository;
+import com.android.systemui.keyguard.data.repository.InWindowLauncherUnlockAnimationRepository;
 import com.android.systemui.keyguard.domain.interactor.FromLockscreenTransitionInteractor;
 import com.android.systemui.keyguard.domain.interactor.FromPrimaryBouncerTransitionInteractor;
+import com.android.systemui.keyguard.domain.interactor.InWindowLauncherUnlockAnimationInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.model.SysUiState;
@@ -126,6 +129,7 @@ import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.shade.ShadeWindowLogger;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
+import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.NotificationEntryHelper;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
@@ -330,6 +334,8 @@ public class BubblesTest extends SysuiTestCase {
     @Mock
     private SelectedUserInteractor mSelectedUserInteractor;
     @Mock
+    private UserTracker mUserTracker;
+    @Mock
     private NotifPipelineFlags mNotifPipelineFlags;
     @Mock
     private Icon mAppBubbleIcon;
@@ -395,7 +401,7 @@ public class BubblesTest extends SysuiTestCase {
                 mTestScope.getBackgroundScope(),
                 new SceneContainerRepository(
                         mTestScope.getBackgroundScope(),
-                        mUtils.fakeSceneContainerConfig(mUtils.fakeSceneKeys())),
+                        mUtils.fakeSceneContainerConfig()),
                 powerRepository,
                 mock(SceneLogger.class));
 
@@ -429,7 +435,16 @@ public class BubblesTest extends SysuiTestCase {
                 keyguardInteractor,
                 featureFlags,
                 shadeRepository,
-                powerInteractor);
+                powerInteractor,
+                () ->
+                        new InWindowLauncherUnlockAnimationInteractor(
+                                new InWindowLauncherUnlockAnimationRepository(),
+                                mTestScope.getBackgroundScope(),
+                                keyguardTransitionInteractor,
+                                () -> new FakeKeyguardSurfaceBehindRepository(),
+                                mock(ActivityManagerWrapper.class)
+                        )
+                );
 
         mFromPrimaryBouncerTransitionInteractor = new FromPrimaryBouncerTransitionInteractor(
                 keyguardTransitionRepository,
@@ -475,6 +490,7 @@ public class BubblesTest extends SysuiTestCase {
                 mKeyguardViewMediator,
                 mKeyguardBypassController,
                 syncExecutor,
+                syncExecutor,
                 mColorExtractor,
                 mDumpManager,
                 mKeyguardStateController,
@@ -482,7 +498,8 @@ public class BubblesTest extends SysuiTestCase {
                 mAuthController,
                 () -> mShadeInteractor,
                 mShadeWindowLogger,
-                () -> mSelectedUserInteractor
+                () -> mSelectedUserInteractor,
+                mUserTracker
         );
         mNotificationShadeWindowController.fetchWindowRootView();
         mNotificationShadeWindowController.attach();

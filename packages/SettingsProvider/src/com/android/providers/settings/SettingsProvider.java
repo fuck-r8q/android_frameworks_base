@@ -3030,11 +3030,25 @@ public class SettingsProvider extends ContentProvider {
         }
 
         @GuardedBy("mLock")
-        public void ensureSettingsForUserLocked(int userId) {
+        @Nullable
+        private SettingsState getOrCreateSettingsStateLocked(int key) {
+            SettingsState settingsState = mSettingsStates.get(key);
+            if (settingsState != null) {
+                return settingsState;
+            }
+
+            if (!ensureSettingsForUserLocked(getUserIdFromKey(key))) {
+                return null;
+            }
+            return mSettingsStates.get(key);
+        }
+
+        @GuardedBy("mLock")
+        public boolean ensureSettingsForUserLocked(int userId) {
             // First make sure this user actually exists.
             if (mUserManager.getUserInfo(userId) == null) {
                 Slog.wtf(LOG_TAG, "Requested user " + userId + " does not exist");
-                return;
+                return false;
             }
 
             // Migrate the setting for this user if needed.
@@ -3072,6 +3086,7 @@ public class SettingsProvider extends ContentProvider {
             // Upgrade the settings to the latest version.
             UpgradeController upgrader = new UpgradeController(userId);
             upgrader.upgradeIfNeededLocked();
+            return true;
         }
 
         @GuardedBy("mLock")
@@ -3149,7 +3164,7 @@ public class SettingsProvider extends ContentProvider {
 
             boolean success = false;
             boolean wasUnsetNonPredefinedSetting = false;
-            SettingsState settingsState = mSettingsStates.get(key);
+            SettingsState settingsState = getOrCreateSettingsStateLocked(key);
             if (settingsState != null) {
                 if (!isSettingPreDefined(name, type) && !settingsState.hasSetting(name)) {
                     wasUnsetNonPredefinedSetting = true;
@@ -3184,7 +3199,7 @@ public class SettingsProvider extends ContentProvider {
         @GuardedBy("mLock")
         public boolean setConfigSettingsLocked(int key, String prefix,
                 Map<String, String> keyValues, String packageName) {
-            SettingsState settingsState = mSettingsStates.get(key);
+            SettingsState settingsState = getOrCreateSettingsStateLocked(key);
             if (settingsState != null) {
                 if (settingsState.isNewConfigBannedLocked(prefix, keyValues)) {
                     return false;
@@ -3207,7 +3222,7 @@ public class SettingsProvider extends ContentProvider {
             final int key = makeKey(type, userId);
 
             boolean success = false;
-            SettingsState settingsState = mSettingsStates.get(key);
+            SettingsState settingsState = getOrCreateSettingsStateLocked(key);
             if (settingsState != null) {
                 success = settingsState.deleteSettingLocked(name);
             }
@@ -3232,7 +3247,7 @@ public class SettingsProvider extends ContentProvider {
             final int key = makeKey(type, userId);
 
             boolean success = false;
-            SettingsState settingsState = mSettingsStates.get(key);
+            SettingsState settingsState = getOrCreateSettingsStateLocked(key);
             if (settingsState != null) {
                 success = settingsState.updateSettingLocked(name, value, tag,
                         makeDefault, packageName);
@@ -3284,7 +3299,7 @@ public class SettingsProvider extends ContentProvider {
         public boolean resetSettingsLocked(int type, int userId, String packageName, int mode,
                 String tag, @Nullable String prefix) {
             final int key = makeKey(type, userId);
-            SettingsState settingsState = mSettingsStates.get(key);
+            SettingsState settingsState = getOrCreateSettingsStateLocked(key);
             if (settingsState == null) {
                 return false;
             }
@@ -3777,7 +3792,7 @@ public class SettingsProvider extends ContentProvider {
         }
 
         private final class UpgradeController {
-            private static final int SETTINGS_VERSION = 223;
+            private static final int SETTINGS_VERSION = 224;
 
             private final int mUserId;
 
@@ -5960,8 +5975,23 @@ public class SettingsProvider extends ContentProvider {
                             // Do nothing. Leave the value as is.
                         }
                     }
+                }
 
-                    currentVersion = 223;
+                currentVersion = 223;
+
+                // Version 223: make charging constraint update criteria customizable.
+                if (currentVersion == 223) {
+                    initGlobalSettingsDefaultValLocked(
+                            Global.BATTERY_CHARGING_STATE_UPDATE_DELAY,
+                            getContext().getResources().getInteger(
+                                    R.integer.def_battery_charging_state_update_delay_ms));
+
+                    initGlobalSettingsDefaultValLocked(
+                            Global.BATTERY_CHARGING_STATE_ENFORCE_LEVEL,
+                            getContext().getResources().getInteger(
+                                    R.integer.def_battery_charging_state_enforce_level)
+                    );
+                    currentVersion = 224;
                 }
 
                 // vXXX: Add new settings above this point.

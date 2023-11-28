@@ -97,8 +97,12 @@
     <string name="bluetooth_active_battery_level" msgid="3450745316700494425">"Tengt, <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> rafhlöðuhleðsla"</string>
     <string name="bluetooth_active_battery_level_untethered" msgid="2706188607604205362">"Virkt, V: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> rafhlaða, H: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> rafhlaða"</string>
     <string name="bluetooth_battery_level" msgid="2893696778200201555">"<xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g> rafhlöðuhleðsla"</string>
+    <string name="tv_bluetooth_battery_level" msgid="8786353985605532846">"Rafhlaða <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
     <string name="bluetooth_battery_level_untethered" msgid="4002282355111504349">"V: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_0">%1$s</xliff:g> rafhlaða, H: <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE_1">%2$s</xliff:g> rafhlaða"</string>
+    <string name="bluetooth_battery_level_untethered_left" msgid="2952823007648782646">"Vinstri <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
+    <string name="bluetooth_battery_level_untethered_right" msgid="6525710737740083276">"Hægri <xliff:g id="BATTERY_LEVEL_AS_PERCENTAGE">%1$s</xliff:g>"</string>
     <string name="bluetooth_active_no_battery_level" msgid="4155462233006205630">"Virkt"</string>
+    <string name="bluetooth_saved_device" msgid="4895871321722311428">"Vistað"</string>
     <string name="bluetooth_hearing_aid_left_active" msgid="7084887715570971441">"Virkt, aðeins vinstra"</string>
     <string name="bluetooth_hearing_aid_right_active" msgid="8574683234077567230">"Virkt, aðeins hægra"</string>
     <string name="bluetooth_hearing_aid_left_and_right_active" msgid="407704460573163973">"Virkt, vinstra og hægra"</string>
@@ -432,6 +436,9 @@
     <string name="transcode_default" msgid="3784803084573509491">"Gera ráð fyrir að forrit styðji nútímasnið"</string>
     <string name="transcode_notification" msgid="5560515979793436168">"Sýna umkóðunartilkynningar"</string>
     <string name="transcode_disable_cache" msgid="3160069309377467045">"Slökkva á skyndiminni umkóðunar"</string>
+    <string name="widevine_settings_title" msgid="4023329801172572917">"Stillingar Widevine"</string>
+    <string name="force_l3_fallback_title" msgid="4987972688770202547">"Þvinga fram L3 varaleið"</string>
+    <string name="force_l3_fallback_summary" msgid="3080790841069996016">"Veldu til að þvinga fram L3 varaleið"</string>
     <string name="runningservices_settings_title" msgid="6460099290493086515">"Þjónustur í gangi"</string>
     <string name="runningservices_settings_summary" msgid="1046080643262665743">"Skoða og stjórna þjónustum í gangi"</string>
     <string name="select_webview_provider_title" msgid="3917815648099445503">"Innleiðing WebView"</string>
@@ -542,6 +549,8 @@
     <string name="time_unit_just_now" msgid="3006134267292728099">"Rétt í þessu"</string>
     <string name="media_transfer_this_device_name" product="default" msgid="2357329267148436433">"Þessi sími"</string>
     <string name="media_transfer_this_device_name" product="tablet" msgid="3714653244000242800">"Þessi spjaldtölva"</string>
+    <!-- no translation found for media_transfer_this_device_name (8899776297775466649) -->
+    <skip />
     <string name="media_transfer_dock_speaker_device_name" msgid="2856219597113881950">"Hátalaradokka"</string>
     <string name="media_transfer_external_device_name" msgid="2588672258721846418">"Ytra tæki"</string>
     <string name="media_transfer_default_device_name" msgid="4315604017399871828">"Tengt tæki"</string>
@@ -553,6 +562,14 @@
     <string name="media_output_status_device_in_low_power_mode" msgid="8184631698321758451">"Vektu tæki til að spila hér"</string>
     <string name="media_output_status_unauthorized" msgid="5880222828273853838">"Tæki er ekki samþykkt til spilunar"</string>
     <string name="media_output_status_track_unsupported" msgid="5576313219317709664">"Ekki er hægt að spila þetta efni hér"</string>
+    <string name="tv_media_transfer_connected" msgid="5145011475885290725">"Tengt"</string>
+    <string name="tv_media_transfer_arc_fallback_title" msgid="3674360098755328601">"HDMI ARC"</string>
+    <string name="tv_media_transfer_earc_fallback_title" msgid="3098685494578519940">"HDMI eARC"</string>
+    <string name="tv_media_transfer_arc_subtitle" msgid="1040017851325069082">"Tengt með ARC"</string>
+    <string name="tv_media_transfer_earc_subtitle" msgid="645191413103303077">"Tengt með eARC"</string>
+    <string name="tv_media_transfer_default" msgid="38102257053315304">"Sjálfgefið í sjónvarpi"</string>
+    <string name="tv_media_transfer_hdmi" msgid="2229000864416329818">"HDMI-úttak"</string>
+    <string name="tv_media_transfer_internal_speakers" msgid="2433193551482972117">"Innri hátalarar"</string>
     <string name="profile_connect_timeout_subtext" msgid="4043408193005851761">"Vandamál í tengingu. Slökktu og kveiktu á tækinu"</string>
     <string name="media_transfer_wired_device_name" msgid="4447880899964056007">"Snúrutengt hljómtæki"</string>
     <string name="help_label" msgid="3528360748637781274">"Hjálp og ábendingar"</string>

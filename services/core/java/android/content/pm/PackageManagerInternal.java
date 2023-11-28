@@ -300,14 +300,6 @@ public abstract class PackageManagerInternal {
             @UserIdInt int userId, @NonNull String[] packageNames, boolean suspended);
 
     /**
-     * Suspend or unsuspend packages in a profile when quiet mode is toggled.
-     *
-     * @param userId The target user.
-     * @param suspended Whether the packages should be suspended or unsuspended.
-     */
-    public abstract void setPackagesSuspendedForQuietMode(@UserIdInt int userId, boolean suspended);
-
-    /**
      * Get the information describing the dialog to be shown to the user when they try to launch a
      * suspended application.
      *
@@ -1429,7 +1421,7 @@ public abstract class PackageManagerInternal {
             @UserIdInt int userId);
 
     /**
-     * Sends the PACKAGE_RESTARTED broadcast on the package manager handler thread.
+     * Sends the PACKAGE_RESTARTED broadcast.
      */
     public abstract void sendPackageRestartedBroadcast(@NonNull String packageName,
             int uid, @Intent.Flags int flags);
@@ -1439,4 +1431,10 @@ public abstract class PackageManagerInternal {
      */
     public abstract ParceledListSlice<PackageInstaller.SessionInfo> getHistoricalSessions(
             int userId);
+
+    /**
+     * Sends the ACTION_PACKAGE_DATA_CLEARED broadcast.
+     */
+    public abstract void sendPackageDataClearedBroadcast(@NonNull String packageName,
+            int uid, int userId, boolean isRestore, boolean isInstantApp);
 }

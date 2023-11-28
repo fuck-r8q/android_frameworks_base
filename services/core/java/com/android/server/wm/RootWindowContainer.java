@@ -177,9 +177,13 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     private static final int SET_SCREEN_BRIGHTNESS_OVERRIDE = 1;
     private static final int SET_USER_ACTIVITY_TIMEOUT = 2;
+    private static final int MSG_SEND_SLEEP_TRANSITION = 3;
+
     static final String TAG_TASKS = TAG + POSTFIX_TASKS;
     static final String TAG_STATES = TAG + POSTFIX_STATES;
     private static final String TAG_RECENTS = TAG + POSTFIX_RECENTS;
+
+    private static final long SLEEP_TRANSITION_WAIT_MILLIS = 1000L;
 
     private Object mLastWindowFreezeSource = null;
     private float mScreenBrightnessOverride = PowerManager.BRIGHTNESS_INVALID_FLOAT;
@@ -1141,6 +1145,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     mWmService.mPowerManagerInternal.
                             setUserActivityTimeoutOverrideFromWindowManager((Long) msg.obj);
                     break;
+                case MSG_SEND_SLEEP_TRANSITION:
+                    synchronized (mService.mGlobalLock) {
+                        sendSleepTransition((DisplayContent) msg.obj);
+                    }
+                    break;
                 default:
                     break;
             }
@@ -1690,8 +1699,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             return false;
         }
 
-        if (!StorageManager.isUserKeyUnlocked(mCurrentUser)) {
-            // Can't launch home on secondary display areas if device is still locked.
+        if (!StorageManager.isCeStorageUnlocked(mCurrentUser)) {
+            // Can't launch home on secondary display areas if CE storage is still locked.
             return false;
         }
 
@@ -2095,6 +2104,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
 
             final TaskFragment organizedTf = r.getOrganizedTaskFragment();
+            final TaskFragment taskFragment = r.getTaskFragment();
             final boolean singleActivity = task.getNonFinishingActivityCount() == 1;
             if (singleActivity) {
                 rootTask = task;
@@ -2137,7 +2147,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                         .setIntent(r.intent)
                         .setDeferTaskAppear(true)
                         .setHasBeenVisible(true)
-                        .setWindowingMode(task.getRequestedOverrideWindowingMode())
+                        // In case the activity is in system split screen, or Activity Embedding
+                        // split, we need to animate the PIP Task from the original TaskFragment
+                        // bounds, so also setting the windowing mode, otherwise the bounds may
+                        // be reset to fullscreen.
+                        .setWindowingMode(taskFragment.getWindowingMode())
                         .build();
                 // Establish bi-directional link between the original and pinned task.
                 r.setLastParentBeforePip(launchIntoPipHostActivity);
@@ -2150,7 +2164,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // current bounds.
                 // Use Task#setBoundsUnchecked to skip checking windowing mode as the windowing mode
                 // will be updated later after this is collected in transition.
-                rootTask.setBoundsUnchecked(r.getTaskFragment().getBounds());
+                rootTask.setBoundsUnchecked(taskFragment.getBounds());
 
                 // Move the last recents animation transaction from original task to the new one.
                 if (task.mLastRecentsAnimationTransaction != null) {
@@ -2566,8 +2580,38 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         return result;
     }
 
+    void sendSleepTransition(final DisplayContent display) {
+        // We don't actually care about collecting anything here. We really just want
+        // this as a signal to the transition-player.
+        final Transition transition = new Transition(TRANSIT_SLEEP, 0 /* flags */,
+                display.mTransitionController, mWmService.mSyncEngine);
+        final TransitionController.OnStartCollect sendSleepTransition = (deferred) -> {
+            if (deferred && !display.shouldSleep()) {
+                transition.abort();
+            } else {
+                display.mTransitionController.requestStartTransition(transition,
+                        null /* trigger */, null /* remote */, null /* display */);
+                // Force playing immediately so that unrelated ops can't be collected.
+                transition.playNow();
+            }
+        };
+        if (!display.mTransitionController.isCollecting()) {
+            // Since this bypasses sync, submit directly ignoring whether sync-engine
+            // is active.
+            if (mWindowManager.mSyncEngine.hasActiveSync()) {
+                Slog.w(TAG, "Ongoing sync outside of a transition.");
+            }
+            display.mTransitionController.moveToCollecting(transition);
+            sendSleepTransition.onCollectStarted(false /* deferred */);
+        } else {
+            display.mTransitionController.startCollectOrQueue(transition,
+                    sendSleepTransition);
+        }
+    }
+
     void applySleepTokens(boolean applyToRootTasks) {
-        boolean builtSleepTransition = false;
+        boolean scheduledSleepTransition = false;
+
         for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
             // Set the sleeping state of the display.
             final DisplayContent display = getChildAt(displayNdx);
@@ -2577,35 +2621,16 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             }
             display.setIsSleeping(displayShouldSleep);
 
-            if (display.mTransitionController.isShellTransitionsEnabled() && !builtSleepTransition
+            if (display.mTransitionController.isShellTransitionsEnabled()
+                    && !scheduledSleepTransition
                     // Only care if there are actual sleep tokens.
                     && displayShouldSleep && !display.mAllSleepTokens.isEmpty()) {
-                builtSleepTransition = true;
-                // We don't actually care about collecting anything here. We really just want
-                // this as a signal to the transition-player.
-                final Transition transition = new Transition(TRANSIT_SLEEP, 0 /* flags */,
-                        display.mTransitionController, mWmService.mSyncEngine);
-                final TransitionController.OnStartCollect sendSleepTransition = (deferred) -> {
-                    if (deferred && !display.shouldSleep()) {
-                        transition.abort();
-                    } else {
-                        display.mTransitionController.requestStartTransition(transition,
-                                null /* trigger */, null /* remote */, null /* display */);
-                        // Force playing immediately so that unrelated ops can't be collected.
-                        transition.playNow();
-                    }
-                };
-                if (!display.mTransitionController.isCollecting()) {
-                    // Since this bypasses sync, submit directly ignoring whether sync-engine
-                    // is active.
-                    if (mWindowManager.mSyncEngine.hasActiveSync()) {
-                        Slog.w(TAG, "Ongoing sync outside of a transition.");
-                    }
-                    display.mTransitionController.moveToCollecting(transition);
-                    sendSleepTransition.onCollectStarted(false /* deferred */);
-                } else {
-                    display.mTransitionController.startCollectOrQueue(transition,
-                            sendSleepTransition);
+                scheduledSleepTransition = true;
+
+                if (!mHandler.hasMessages(MSG_SEND_SLEEP_TRANSITION)) {
+                    mHandler.sendMessageDelayed(
+                            mHandler.obtainMessage(MSG_SEND_SLEEP_TRANSITION, display),
+                            SLEEP_TRANSITION_WAIT_MILLIS);
                 }
             }
 
@@ -2658,6 +2683,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                             false /* preserveWindows */);
                 }
             });
+        }
+
+        if (!scheduledSleepTransition) {
+            mHandler.removeMessages(MSG_SEND_SLEEP_TRANSITION);
         }
     }
 

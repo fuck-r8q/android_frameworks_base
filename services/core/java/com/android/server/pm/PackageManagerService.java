@@ -2091,8 +2091,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 mUserNeedsBadging, () -> mResolveInfo, () -> mInstantAppInstallerActivity,
                 injector.getBackgroundHandler());
         mDexOptHelper = new DexOptHelper(this);
-        mSuspendPackageHelper = new SuspendPackageHelper(this, mInjector, mUserManager,
-                mBroadcastHelper, mProtectedPackages);
+        mSuspendPackageHelper = new SuspendPackageHelper(this, mInjector, mBroadcastHelper,
+                mProtectedPackages);
         mDistractingPackageHelper = new DistractingPackageHelper(this, mBroadcastHelper,
                 mSuspendPackageHelper);
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
@@ -4686,6 +4686,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 throw new SecurityException("Cannot clear data for a protected package: "
                         + packageName);
             }
+            final int callingPid = Binder.getCallingPid();
+            EventLog.writeEvent(EventLogTags.PM_CLEAR_APP_DATA_CALLER, callingPid, callingUid,
+                    packageName);
 
             // Queue up an async operation since the package deletion may take a little while.
             mHandler.post(new Runnable() {
@@ -4819,6 +4822,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     /* checkShell= */ false, "delete application cache files");
             final int hasAccessInstantApps = mContext.checkCallingOrSelfPermission(
                     android.Manifest.permission.ACCESS_INSTANT_APPS);
+            final int callingPid = Binder.getCallingPid();
+            EventLog.writeEvent(EventLogTags.PM_CLEAR_APP_DATA_CALLER, callingPid, callingUid,
+                    packageName);
 
             // Queue up an async operation since the package deletion may take a little while.
             mHandler.post(() -> {
@@ -6173,7 +6179,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
             return mSuspendPackageHelper.setPackagesSuspended(snapshot, packageNames, suspended,
                     appExtras, launcherExtras, dialogInfo, callingPackage, userId, callingUid,
-                    false /* forQuietMode */, quarantined);
+                    quarantined);
         }
 
         @Override
@@ -6336,6 +6342,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @Override
         public Bitmap getArchivedAppIcon(@NonNull String packageName, @NonNull UserHandle user) {
             return mInstallerService.mPackageArchiver.getArchivedAppIcon(packageName, user);
+        }
+
+        @Override
+        public boolean isAppArchivable(@NonNull String packageName, @NonNull UserHandle user) {
+            return mInstallerService.mPackageArchiver.isAppArchivable(packageName, user);
         }
 
         /**
@@ -6622,12 +6633,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 @UserIdInt int userId, @NonNull String[] packageNames, boolean suspended) {
             return mSuspendPackageHelper.setPackagesSuspendedByAdmin(
                     snapshotComputer(), userId, packageNames, suspended);
-        }
-
-        @Override
-        public void setPackagesSuspendedForQuietMode(int userId, boolean suspended) {
-            mSuspendPackageHelper.setPackagesSuspendedForQuietMode(
-                    snapshotComputer(), userId, suspended);
         }
 
         @Override
@@ -6995,14 +7000,50 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final Bundle extras = new Bundle();
             extras.putInt(Intent.EXTRA_UID, uid);
             extras.putInt(Intent.EXTRA_USER_HANDLE, userId);
-            extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
-            mHandler.post(() -> {
+            if (android.content.pm.Flags.stayStopped()) {
+                extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
+                // Sent async using the PM handler, to maintain ordering with PACKAGE_UNSTOPPED
+                mHandler.post(() -> {
+                    mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_RESTARTED,
+                            packageName, extras,
+                            flags, null, null,
+                            userIds, null, broadcastAllowList, null,
+                            null);
+                });
+            } else {
                 mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_RESTARTED,
                         packageName, extras,
                         flags, null, null,
                         userIds, null, broadcastAllowList, null,
                         null);
-            });
+            }
+            mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_RESTARTED,
+                    packageName, extras, userIds, null /* instantUserIds */,
+                    broadcastAllowList, mHandler);
+        }
+
+        @Override
+        public void sendPackageDataClearedBroadcast(@NonNull String packageName,
+                int uid, int userId, boolean isRestore, boolean isInstantApp) {
+            int[] visibilityAllowList =
+                    snapshotComputer().getVisibilityAllowList(packageName, userId);
+            final Intent intent = new Intent(Intent.ACTION_PACKAGE_DATA_CLEARED,
+                    Uri.fromParts("package", packageName, null /* fragment */));
+            intent.addFlags(Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
+                    | Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+            intent.putExtra(Intent.EXTRA_UID, uid);
+            intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
+            if (isRestore) {
+                intent.putExtra(Intent.EXTRA_IS_RESTORE, true);
+            }
+            if (isInstantApp) {
+                intent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName);
+            }
+            mBroadcastHelper.sendPackageBroadcastWithIntent(intent, userId, isInstantApp,
+                    0 /* flags */, visibilityAllowList, null /* finishedReceiver */,
+                    null /* filterExtrasForReceiver */, null /* bOptions */);
+            mPackageMonitorCallbackHelper.notifyPackageMonitorWithIntent(intent, userId,
+                    visibilityAllowList, mHandler);
         }
     }
 

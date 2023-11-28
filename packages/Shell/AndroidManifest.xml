@@ -592,6 +592,9 @@
     <!-- Permission needed for CTS test - ConcurrencyTest#testP2pSetWfdInfo -->
     <uses-permission android:name="android.permission.CONFIGURE_WIFI_DISPLAY" />
 
+    <!-- Permission required for CTS test - CtsThreadNetworkTestCases -->
+    <uses-permission android:name="android.permission.THREAD_NETWORK_PRIVILEGED"/>
+
     <!-- Permission required for CTS tests to enable/disable rate limiting toasts. -->
     <uses-permission android:name="android.permission.MANAGE_TOAST_RATE_LIMITING" />
 
@@ -668,6 +671,7 @@
 
     <!-- Permission required for CTS test - SystemMediaRouter2Test -->
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />
+    <uses-permission android:name="android.permission.MEDIA_ROUTING_CONTROL" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_ROUTING" />
 
     <!-- Permission required for CTS test - SoundDoseHelperTest -->
@@ -863,6 +867,7 @@
     <!-- Permissions required for CTS test - CtsVoiceInteractionTestCases -->
     <uses-permission android:name="android.permission.RESET_HOTWORD_TRAINING_DATA_EGRESS_COUNT" />
     <uses-permission android:name="android.permission.RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA" />
+    <uses-permission android:name="android.permission.GET_BINDING_UID_IMPORTANCE" />
 
     <application
         android:label="@string/app_label"

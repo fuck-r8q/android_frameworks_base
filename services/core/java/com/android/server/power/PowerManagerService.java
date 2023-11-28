@@ -32,6 +32,7 @@ import static android.os.PowerManagerInternal.isInteractive;
 import static android.os.PowerManagerInternal.wakefulnessToString;
 
 import static com.android.internal.util.LatencyTracker.ACTION_TURN_ON_SCREEN;
+import static com.android.server.deviceidle.Flags.disableWakelocksInLightIdle;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -545,6 +546,10 @@ public final class PowerManagerService extends SystemService
     // True if doze should not be started until after the screen off transition.
     private boolean mDozeAfterScreenOff;
 
+    // True if bright policy should be applied when we have entered dozing wakefulness but haven't
+    // started doze component.
+    private boolean mBrightWhenDozingConfig;
+
     // The minimum screen off timeout, in milliseconds.
     private long mMinimumScreenOffTimeoutConfig;
 
@@ -644,9 +649,11 @@ public final class PowerManagerService extends SystemService
     private boolean mBatteryLevelLow;
 
     // True if we are currently in device idle mode.
+    @GuardedBy("mLock")
     private boolean mDeviceIdleMode;
 
     // True if we are currently in light device idle mode.
+    @GuardedBy("mLock")
     private boolean mLightDeviceIdleMode;
 
     // Set of app ids that we will respect the wake locks for while in device idle mode.
@@ -1489,6 +1496,8 @@ public final class PowerManagerService extends SystemService
                 com.android.internal.R.bool.config_dreamsDisabledByAmbientModeSuppressionConfig);
         mDozeAfterScreenOff = resources.getBoolean(
                 com.android.internal.R.bool.config_dozeAfterScreenOffByDefault);
+        mBrightWhenDozingConfig = resources.getBoolean(
+                com.android.internal.R.bool.config_brightWhenDozing);
         mMinimumScreenOffTimeoutConfig = resources.getInteger(
                 com.android.internal.R.integer.config_minimumScreenOffTimeout);
         mMaximumScreenDimDurationConfig = resources.getInteger(
@@ -3557,7 +3566,8 @@ public final class PowerManagerService extends SystemService
                                         .getBatterySaverPolicy(ServiceType.SCREEN_BRIGHTNESS)
                                 : new PowerSaveState.Builder().build(),
                         sQuiescent, mDozeAfterScreenOff, mBootCompleted,
-                        mScreenBrightnessBoostInProgress, mRequestWaitForNegativeProximity);
+                        mScreenBrightnessBoostInProgress, mRequestWaitForNegativeProximity,
+                        mBrightWhenDozingConfig);
                 int wakefulness = powerGroup.getWakefulnessLocked();
                 if (DEBUG_SPEW) {
                     Slog.d(TAG, "updateDisplayPowerStateLocked: displayReady=" + ready
@@ -3632,7 +3642,7 @@ public final class PowerManagerService extends SystemService
     int getDesiredScreenPolicyLocked(int groupId) {
         return mPowerGroups.get(groupId).getDesiredScreenPolicyLocked(sQuiescent,
                 mDozeAfterScreenOff, mBootCompleted,
-                mScreenBrightnessBoostInProgress);
+                mScreenBrightnessBoostInProgress, mBrightWhenDozingConfig);
     }
 
     @VisibleForTesting
@@ -4035,6 +4045,9 @@ public final class PowerManagerService extends SystemService
         synchronized (mLock) {
             if (mLightDeviceIdleMode != enabled) {
                 mLightDeviceIdleMode = enabled;
+                if (!mDeviceIdleMode && disableWakelocksInLightIdle()) {
+                    updateWakeLockDisabledStatesLocked();
+                }
                 setPowerModeInternal(MODE_DEVICE_IDLE, mDeviceIdleMode || mLightDeviceIdleMode);
                 return true;
             }
@@ -4045,7 +4058,7 @@ public final class PowerManagerService extends SystemService
     void setDeviceIdleWhitelistInternal(int[] appids) {
         synchronized (mLock) {
             mDeviceIdleWhitelist = appids;
-            if (mDeviceIdleMode) {
+            if (doesIdleStateBlockWakeLocksLocked()) {
                 updateWakeLockDisabledStatesLocked();
             }
         }
@@ -4054,7 +4067,7 @@ public final class PowerManagerService extends SystemService
     void setDeviceIdleTempWhitelistInternal(int[] appids) {
         synchronized (mLock) {
             mDeviceIdleTempWhitelist = appids;
-            if (mDeviceIdleMode) {
+            if (doesIdleStateBlockWakeLocksLocked()) {
                 updateWakeLockDisabledStatesLocked();
             }
         }
@@ -4114,7 +4127,7 @@ public final class PowerManagerService extends SystemService
                     <= ActivityManager.PROCESS_STATE_RECEIVER;
             state.mProcState = procState;
             if (state.mNumWakeLocks > 0) {
-                if (mDeviceIdleMode || mLowPowerStandbyActive) {
+                if (doesIdleStateBlockWakeLocksLocked() || mLowPowerStandbyActive) {
                     handleUidStateChangeLocked();
                 } else if (!state.mActive && oldShouldAllow !=
                         (procState <= ActivityManager.PROCESS_STATE_RECEIVER)) {
@@ -4134,7 +4147,8 @@ public final class PowerManagerService extends SystemService
                 state.mProcState = ActivityManager.PROCESS_STATE_NONEXISTENT;
                 state.mActive = false;
                 mUidState.removeAt(index);
-                if ((mDeviceIdleMode || mLowPowerStandbyActive) && state.mNumWakeLocks > 0) {
+                if ((doesIdleStateBlockWakeLocksLocked() || mLowPowerStandbyActive)
+                        && state.mNumWakeLocks > 0) {
                     handleUidStateChangeLocked();
                 }
             }
@@ -4166,6 +4180,11 @@ public final class PowerManagerService extends SystemService
                 }
             }
         }
+    }
+
+    @GuardedBy("mLock")
+    private boolean doesIdleStateBlockWakeLocksLocked() {
+        return mDeviceIdleMode || (mLightDeviceIdleMode && disableWakelocksInLightIdle());
     }
 
     @GuardedBy("mLock")
@@ -4207,7 +4226,7 @@ public final class PowerManagerService extends SystemService
                                     != ActivityManager.PROCESS_STATE_NONEXISTENT &&
                             wakeLock.mUidState.mProcState > ActivityManager.PROCESS_STATE_RECEIVER);
                 }
-                if (mDeviceIdleMode) {
+                if (doesIdleStateBlockWakeLocksLocked()) {
                     // If we are in idle mode, we will also ignore all partial wake locks that are
                     // for application uids that are not allowlisted.
                     final UidState state = wakeLock.mUidState;
@@ -4643,6 +4662,7 @@ public final class PowerManagerService extends SystemService
             pw.println("  mDreamsActivateOnSleepSetting=" + mDreamsActivateOnSleepSetting);
             pw.println("  mDreamsActivateOnDockSetting=" + mDreamsActivateOnDockSetting);
             pw.println("  mDozeAfterScreenOff=" + mDozeAfterScreenOff);
+            pw.println("  mBrightWhenDozingConfig=" + mBrightWhenDozingConfig);
             pw.println("  mMinimumScreenOffTimeoutConfig=" + mMinimumScreenOffTimeoutConfig);
             pw.println("  mMaximumScreenDimDurationConfig=" + mMaximumScreenDimDurationConfig);
             pw.println("  mMaximumScreenDimRatioConfig=" + mMaximumScreenDimRatioConfig);

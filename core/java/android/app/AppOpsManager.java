@@ -17,6 +17,7 @@
 package android.app;
 
 import static android.view.contentprotection.flags.Flags.FLAG_CREATE_ACCESSIBILITY_OVERLAY_APP_OP_ENABLED;
+import static android.permission.flags.Flags.FLAG_OP_ENABLE_MOBILE_DATA_BY_USER;
 
 import static java.lang.Long.max;
 
@@ -48,6 +49,7 @@ import android.content.pm.ParceledListSlice;
 import android.database.DatabaseUtils;
 import android.health.connect.HealthConnectManager;
 import android.media.AudioAttributes.AttributeUsage;
+import android.media.MediaRouter2;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
@@ -89,6 +91,7 @@ import com.android.internal.util.DataClass;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.Parcelling;
 import com.android.internal.util.Preconditions;
+import com.android.media.flags.Flags;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -1505,10 +1508,22 @@ public class AppOpsManager {
      */
     public static final int OP_CREATE_ACCESSIBILITY_OVERLAY =
             AppProtoEnums.APP_OP_CREATE_ACCESSIBILITY_OVERLAY;
+    /**
+     * Indicate that the user has enabled or disabled mobile data
+     * @hide
+     */
+    public static final int OP_ENABLE_MOBILE_DATA_BY_USER =
+            AppProtoEnums.APP_OP_ENABLE_MOBILE_DATA_BY_USER;
+
+    /**
+     * See {@link #OPSTR_MEDIA_ROUTING_CONTROL}.
+     * @hide
+     */
+    public static final int OP_MEDIA_ROUTING_CONTROL = AppProtoEnums.APP_OP_MEDIA_ROUTING_CONTROL;
 
     /** @hide */
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
-    public static final int _NUM_OP = 139;
+    public static final int _NUM_OP = 141;
 
     /**
      * All app ops represented as strings.
@@ -1654,6 +1669,8 @@ public class AppOpsManager {
             OPSTR_RECEIVE_SANDBOX_TRIGGER_AUDIO,
             OPSTR_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA,
             OPSTR_CREATE_ACCESSIBILITY_OVERLAY,
+            OPSTR_MEDIA_ROUTING_CONTROL,
+            OPSTR_ENABLE_MOBILE_DATA_BY_USER,
     })
     public @interface AppOpString {}
 
@@ -1981,6 +1998,19 @@ public class AppOpsManager {
     public static final String OPSTR_MANAGE_ONGOING_CALLS = "android:manage_ongoing_calls";
 
     /**
+     * Allows apps holding this permission to control the routing of other apps via {@link
+     * MediaRouter2}.
+     *
+     * <p>For example, holding this permission allows watches (via companion apps) to control the
+     * routing of applications running on the phone.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_PRIVILEGED_ROUTING_FOR_MEDIA_ROUTING_CONTROL)
+    public static final String OPSTR_MEDIA_ROUTING_CONTROL = "android:media_routing_control";
+
+    /**
      * AppOp granted to apps that we are started via {@code am instrument -e --no-isolated-storage}
      *
      * <p>MediaProvider is the only component (outside of system server) that should care about this
@@ -2291,6 +2321,14 @@ public class AppOpsManager {
     @FlaggedApi(FLAG_CREATE_ACCESSIBILITY_OVERLAY_APP_OP_ENABLED)
     public static final String OPSTR_CREATE_ACCESSIBILITY_OVERLAY =
             "android:create_accessibility_overlay";
+    /**
+     * Indicate that the user has enabled or disabled mobile data
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_OP_ENABLE_MOBILE_DATA_BY_USER)
+    public static final String OPSTR_ENABLE_MOBILE_DATA_BY_USER =
+            "android:enable_mobile_data_by_user";
 
     /** {@link #sAppOpsToNote} not initialized yet for this op */
     private static final byte SHOULD_COLLECT_NOTE_OP_NOT_INITIALIZED = 0;
@@ -2404,7 +2442,8 @@ public class AppOpsManager {
             OP_CAPTURE_CONSENTLESS_BUGREPORT_ON_USERDEBUG_BUILD,
             OP_USE_FULL_SCREEN_INTENT,
             OP_RECEIVE_SANDBOX_TRIGGER_AUDIO,
-            OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA
+            OP_RECEIVE_SANDBOXED_DETECTION_TRAINING_DATA,
+            OP_MEDIA_ROUTING_CONTROL,
     };
 
     static final AppOpInfo[] sAppOpInfos = new AppOpInfo[]{
@@ -2846,6 +2885,11 @@ public class AppOpsManager {
                 OPSTR_CREATE_ACCESSIBILITY_OVERLAY,
                 "CREATE_ACCESSIBILITY_OVERLAY")
                 .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
+        new AppOpInfo.Builder(OP_MEDIA_ROUTING_CONTROL, OPSTR_MEDIA_ROUTING_CONTROL,
+                "MEDIA_ROUTING_CONTROL")
+                .setPermission(Manifest.permission.MEDIA_ROUTING_CONTROL).build(),
+        new AppOpInfo.Builder(OP_ENABLE_MOBILE_DATA_BY_USER, OPSTR_ENABLE_MOBILE_DATA_BY_USER,
+                "ENABLE_MOBILE_DATA_BY_USER").setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
     };
 
     // The number of longs needed to form a full bitmask of app ops
@@ -8331,9 +8375,7 @@ public class AppOpsManager {
      */
     public int unsafeCheckOpRawNoThrow(int op, int uid, @NonNull String packageName) {
         try {
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid).setPackageName(packageName).build();
-            return mService.checkOperationWithStateRaw(op, attributionSource.asState());
+            return mService.checkOperationRaw(op, uid, packageName, null);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -8496,12 +8538,7 @@ public class AppOpsManager {
                 }
             }
 
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid)
-                            .setPackageName(packageName)
-                            .setAttributionTag(attributionTag)
-                            .build();
-            SyncNotedAppOp syncOp = mService.noteOperationWithState(op, attributionSource.asState(),
+            SyncNotedAppOp syncOp = mService.noteOperation(op, uid, packageName, attributionTag,
                     collectionMode == COLLECT_ASYNC, message, shouldCollectMessage);
 
             if (syncOp.getOpMode() == MODE_ALLOWED) {
@@ -8741,9 +8778,7 @@ public class AppOpsManager {
     @UnsupportedAppUsage
     public int checkOp(int op, int uid, String packageName) {
         try {
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid).setPackageName(packageName).build();
-            int mode = mService.checkOperationWithState(op, attributionSource.asState());
+            int mode = mService.checkOperation(op, uid, packageName);
             if (mode == MODE_ERRORED) {
                 throw new SecurityException(buildSecurityExceptionMsg(op, uid, packageName));
             }
@@ -8764,9 +8799,7 @@ public class AppOpsManager {
     @UnsupportedAppUsage
     public int checkOpNoThrow(int op, int uid, String packageName) {
         try {
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid).setPackageName(packageName).build();
-            int mode = mService.checkOperationWithState(op, attributionSource.asState());
+            int mode = mService.checkOperation(op, uid, packageName);
             return mode == AppOpsManager.MODE_FOREGROUND ? AppOpsManager.MODE_ALLOWED : mode;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -9011,14 +9044,8 @@ public class AppOpsManager {
                 }
             }
 
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid)
-                            .setPackageName(packageName)
-                            .setAttributionTag(attributionTag)
-                            .build();
-            SyncNotedAppOp syncOp = mService.startOperationWithState(token, op,
-                    attributionSource.asState(), startIfModeDefault,
-                    collectionMode == COLLECT_ASYNC, message,
+            SyncNotedAppOp syncOp = mService.startOperation(token, op, uid, packageName,
+                    attributionTag, startIfModeDefault, collectionMode == COLLECT_ASYNC, message,
                     shouldCollectMessage, attributionFlags, attributionChainId);
 
             if (syncOp.getOpMode() == MODE_ALLOWED) {
@@ -9231,12 +9258,7 @@ public class AppOpsManager {
     public void finishOp(IBinder token, int op, int uid, @NonNull String packageName,
             @Nullable String attributionTag) {
         try {
-            final AttributionSource attributionSource =
-                    new AttributionSource.Builder(uid)
-                            .setPackageName(packageName)
-                            .setAttributionTag(attributionTag)
-                            .build();
-            mService.finishOperationWithState(token, op, attributionSource.asState());
+            mService.finishOperation(token, op, uid, packageName, attributionTag);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -15,57 +15,43 @@
  */
 package com.android.systemui.statusbar.notification.icon.ui.viewbinder
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.graphics.Color
 import android.graphics.Rect
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewPropertyAnimator
 import android.widget.FrameLayout
 import androidx.annotation.ColorInt
 import androidx.collection.ArrayMap
 import androidx.lifecycle.lifecycleScope
-import com.android.app.animation.Interpolators
 import com.android.internal.policy.SystemBarUtils
 import com.android.internal.util.ContrastColorUtil
 import com.android.systemui.common.ui.ConfigurationState
-import com.android.systemui.flags.FeatureFlagsClassic
-import com.android.systemui.flags.Flags
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.CrossFadeHelper
 import com.android.systemui.statusbar.StatusBarIconView
-import com.android.systemui.statusbar.notification.NotificationUtils
 import com.android.systemui.statusbar.notification.collection.NotifCollection
 import com.android.systemui.statusbar.notification.icon.ui.viewbinder.NotificationIconContainerViewBinder.IconViewStore
-import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconColorLookup
-import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconColors
 import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconContainerAlwaysOnDisplayViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconContainerShelfViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconContainerStatusBarViewModel
 import com.android.systemui.statusbar.notification.icon.ui.viewmodel.NotificationIconsViewData
-import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.phone.NotificationIconContainer
-import com.android.systemui.statusbar.phone.ScreenOffAnimationController
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.onConfigChanged
 import com.android.systemui.util.children
 import com.android.systemui.util.kotlin.mapValuesNotNullTo
 import com.android.systemui.util.kotlin.sample
 import com.android.systemui.util.kotlin.stateFlow
-import com.android.systemui.util.ui.AnimatedValue
 import com.android.systemui.util.ui.isAnimating
 import com.android.systemui.util.ui.stopAnimating
 import com.android.systemui.util.ui.value
 import javax.inject.Inject
 import kotlinx.coroutines.DisposableHandle
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Binds a view-model to a [NotificationIconContainer]. */
@@ -97,14 +83,21 @@ object NotificationIconContainerViewBinder {
         return view.repeatWhenAttached {
             lifecycleScope.run {
                 launch {
+                    val iconColors =
+                        viewModel.iconColors.mapNotNull { it.iconColors(view.viewBounds) }
                     viewModel.icons.bindIcons(
                         view,
                         configuration,
                         configurationController,
-                        viewStore
-                    )
+                        viewStore,
+                    ) { _, sbiv ->
+                        StatusBarIconViewBinder.bindIconColors(
+                            sbiv,
+                            iconColors,
+                            contrastColorUtil,
+                        )
+                    }
                 }
-                launch { viewModel.iconColors.bindIconColors(view, contrastColorUtil) }
                 launch { viewModel.bindIsolatedIcon(view, viewStore) }
                 launch { viewModel.animationsEnabled.bindAnimationsEnabled(view) }
             }
@@ -117,9 +110,6 @@ object NotificationIconContainerViewBinder {
         viewModel: NotificationIconContainerAlwaysOnDisplayViewModel,
         configuration: ConfigurationState,
         configurationController: ConfigurationController,
-        dozeParameters: DozeParameters,
-        featureFlags: FeatureFlagsClassic,
-        screenOffAnimationController: ScreenOffAnimationController,
         viewStore: IconViewStore,
     ): DisposableHandle {
         return view.repeatWhenAttached {
@@ -130,80 +120,36 @@ object NotificationIconContainerViewBinder {
                         configuration,
                         configurationController,
                         viewStore,
-                    )
+                    ) { _, sbiv ->
+                        viewModel.bindAodStatusBarIconView(sbiv, configuration)
+                    }
                 }
-                launch { viewModel.animationsEnabled.bindAnimationsEnabled(view) }
-                launch { viewModel.isDozing.bindIsDozing(view, dozeParameters) }
-                // TODO(b/278765923): this should live where AOD is bound, not inside of the NIC
-                //  view-binder
-                launch {
-                    viewModel.isVisible.bindIsVisible(
-                        view,
-                        configuration,
-                        featureFlags,
-                        screenOffAnimationController,
-                    )
-                }
-                launch {
-                    configuration
-                        .getColorAttr(R.attr.wallpaperTextColor, DEFAULT_AOD_ICON_COLOR)
-                        .bindIconColors(view)
-                }
+                launch { viewModel.areContainerChangesAnimated.bindAnimationsEnabled(view) }
             }
+        }
+    }
+
+    private suspend fun NotificationIconContainerAlwaysOnDisplayViewModel.bindAodStatusBarIconView(
+        sbiv: StatusBarIconView,
+        configuration: ConfigurationState,
+    ) {
+        coroutineScope {
+            launch {
+                val color: Flow<Int> =
+                    configuration.getColorAttr(
+                        R.attr.wallpaperTextColor,
+                        DEFAULT_AOD_ICON_COLOR,
+                    )
+                StatusBarIconViewBinder.bindColor(sbiv, color)
+            }
+            launch { StatusBarIconViewBinder.bindTintAlpha(sbiv, tintAlpha) }
+            launch { StatusBarIconViewBinder.bindAnimationsEnabled(sbiv, areIconAnimationsEnabled) }
         }
     }
 
     /** Binds to [NotificationIconContainer.setAnimationsEnabled] */
     private suspend fun Flow<Boolean>.bindAnimationsEnabled(view: NotificationIconContainer) {
         collect(view::setAnimationsEnabled)
-    }
-
-    /**
-     * Binds to the [StatusBarIconView.setStaticDrawableColor] and [StatusBarIconView.setDecorColor]
-     * of the [children] of an [NotificationIconContainer].
-     */
-    private suspend fun Flow<NotificationIconColorLookup>.bindIconColors(
-        view: NotificationIconContainer,
-        contrastColorUtil: ContrastColorUtil,
-    ) {
-        mapNotNull { lookup -> lookup.iconColors(view.viewBounds) }
-            .collect { iconLookup -> view.applyTint(iconLookup, contrastColorUtil) }
-    }
-
-    /**
-     * Binds to the [StatusBarIconView.setStaticDrawableColor] and [StatusBarIconView.setDecorColor]
-     * of the [children] of an [NotificationIconContainer].
-     */
-    private suspend fun Flow<Int>.bindIconColors(view: NotificationIconContainer) {
-        collect { tint ->
-            view.children.filterIsInstance<StatusBarIconView>().forEach { icon ->
-                icon.staticDrawableColor = tint
-                icon.setDecorColor(tint)
-            }
-        }
-    }
-
-    private suspend fun Flow<AnimatedValue<Boolean>>.bindIsDozing(
-        view: NotificationIconContainer,
-        dozeParameters: DozeParameters,
-    ) {
-        collect { isDozing ->
-            if (isDozing.isAnimating) {
-                val animate = !dozeParameters.displayNeedsBlanking
-                view.setDozing(
-                    /* dozing = */ isDozing.value,
-                    /* fade = */ animate,
-                    /* delay = */ 0,
-                    /* endRunnable = */ isDozing::stopAnimating,
-                )
-            } else {
-                view.setDozing(
-                    /* dozing = */ isDozing.value,
-                    /* fade= */ false,
-                    /* delay= */ 0,
-                )
-            }
-        }
     }
 
     private suspend fun NotificationIconContainerStatusBarViewModel.bindIsolatedIcon(
@@ -229,12 +175,19 @@ object NotificationIconContainerViewBinder {
         }
     }
 
-    /** Binds [NotificationIconsViewData] to a [NotificationIconContainer]'s [children]. */
+    /**
+     * Binds [NotificationIconsViewData] to a [NotificationIconContainer]'s [children].
+     *
+     * [bindIcon] will be invoked to bind a child [StatusBarIconView] to an icon associated with the
+     * given `iconKey`. The parent [Job] of this coroutine will be cancelled automatically when the
+     * view is to be unbound.
+     */
     private suspend fun Flow<NotificationIconsViewData>.bindIcons(
         view: NotificationIconContainer,
         configuration: ConfigurationState,
         configurationController: ConfigurationController,
         viewStore: IconViewStore,
+        bindIcon: suspend (iconKey: String, view: StatusBarIconView) -> Unit = { _, _ -> },
     ): Unit = coroutineScope {
         val iconSizeFlow: Flow<Int> =
             configuration.getDimensionPixelSize(
@@ -263,6 +216,7 @@ object NotificationIconContainerViewBinder {
             }
         }
 
+        val iconBindings = mutableMapOf<String, Job>()
         var prevIcons = NotificationIconsViewData()
         sample(layoutParams, ::Pair).collect {
             (iconsData: NotificationIconsViewData, layoutParams: FrameLayout.LayoutParams),
@@ -272,7 +226,7 @@ object NotificationIconContainerViewBinder {
 
             val replacingIcons =
                 iconsDiff.groupReplacements.mapValuesNotNullTo(ArrayMap()) { (_, v) ->
-                    viewStore.iconView(v.notifKey)?.statusBarIcon
+                    viewStore.iconView(v.notifKey).statusBarIcon
                 }
             view.setReplacingIcons(replacingIcons)
 
@@ -282,15 +236,21 @@ object NotificationIconContainerViewBinder {
                 }
 
             iconsDiff.removed
-                .mapNotNull { key -> childrenByNotifKey[key] }
-                .forEach { child -> view.removeView(child) }
+                .mapNotNull { key -> childrenByNotifKey[key]?.let { key to it } }
+                .forEach { (key, child) ->
+                    view.removeView(child)
+                    iconBindings.remove(key)?.cancel()
+                }
 
-            val toAdd = iconsDiff.added.mapNotNull { viewStore.iconView(it.notifKey) }
-            for ((i, sbiv) in toAdd.withIndex()) {
+            val toAdd = iconsDiff.added.map { it.notifKey to viewStore.iconView(it.notifKey) }
+            for ((i, keyAndView) in toAdd.withIndex()) {
+                val (key, sbiv) = keyAndView
                 // The view might still be transiently added if it was just removed
                 // and added again
                 view.removeTransientView(sbiv)
                 view.addView(sbiv, i, layoutParams)
+                iconBindings.remove(key)?.cancel()
+                iconBindings[key] = launch { bindIcon(key, sbiv) }
             }
 
             view.setChangingViewPositions(true)
@@ -298,7 +258,7 @@ object NotificationIconContainerViewBinder {
             val childCount = view.childCount
             for (i in 0 until childCount) {
                 val actual = view.getChildAt(i)
-                val expected = viewStore.iconView(iconsData.visibleKeys[i].notifKey)!!
+                val expected = viewStore.iconView(iconsData.visibleKeys[i].notifKey)
                 if (actual === expected) {
                     continue
                 }
@@ -311,128 +271,11 @@ object NotificationIconContainerViewBinder {
         }
     }
 
-    // TODO(b/305739416): Once StatusBarIconView has its own Recommended Architecture stack, this
-    //  can be moved there and cleaned up.
-    private fun ViewGroup.applyTint(
-        iconColors: NotificationIconColors,
-        contrastColorUtil: ContrastColorUtil,
-    ) {
-        children
-            .filterIsInstance<StatusBarIconView>()
-            .filter { it.width != 0 }
-            .forEach { iv -> iv.updateTintForIcon(iconColors, contrastColorUtil) }
-    }
-
-    private fun StatusBarIconView.updateTintForIcon(
-        iconColors: NotificationIconColors,
-        contrastColorUtil: ContrastColorUtil,
-    ) {
-        val isPreL = java.lang.Boolean.TRUE == getTag(R.id.icon_is_pre_L)
-        val isColorized = !isPreL || NotificationUtils.isGrayscale(this, contrastColorUtil)
-        staticDrawableColor = iconColors.staticDrawableColor(viewBounds, isColorized)
-        setDecorColor(iconColors.tint)
-    }
-
-    private suspend fun Flow<AnimatedValue<Boolean>>.bindIsVisible(
-        view: NotificationIconContainer,
-        configuration: ConfigurationState,
-        featureFlags: FeatureFlagsClassic,
-        screenOffAnimationController: ScreenOffAnimationController,
-    ): Unit = coroutineScope {
-        val iconAppearTranslation =
-            configuration.getDimensionPixelSize(R.dimen.shelf_appear_translation).stateIn(this)
-        val statusViewMigrated = featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)
-        collect { isVisible ->
-            view.animate().cancel()
-            val animatorListener =
-                object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        isVisible.stopAnimating()
-                    }
-                }
-            when {
-                !isVisible.isAnimating -> {
-                    view.alpha = 1f
-                    if (!statusViewMigrated) {
-                        view.translationY = 0f
-                    }
-                    view.visibility = if (isVisible.value) View.VISIBLE else View.INVISIBLE
-                }
-                featureFlags.isEnabled(Flags.NEW_AOD_TRANSITION) -> {
-                    view.animateInIconTranslation(statusViewMigrated)
-                    if (isVisible.value) {
-                        CrossFadeHelper.fadeIn(view, animatorListener)
-                    } else {
-                        CrossFadeHelper.fadeOut(view, animatorListener)
-                    }
-                }
-                !isVisible.value -> {
-                    // Let's make sure the icon are translated to 0, since we cancelled it above
-                    view.animateInIconTranslation(statusViewMigrated)
-                    CrossFadeHelper.fadeOut(view, animatorListener)
-                }
-                view.visibility != View.VISIBLE -> {
-                    // No fading here, let's just appear the icons instead!
-                    view.visibility = View.VISIBLE
-                    view.alpha = 1f
-                    view.appearIcons(
-                        animate = screenOffAnimationController.shouldAnimateAodIcons(),
-                        iconAppearTranslation.value,
-                        statusViewMigrated,
-                        animatorListener,
-                    )
-                }
-                else -> {
-                    // Let's make sure the icons are translated to 0, since we cancelled it above
-                    view.animateInIconTranslation(statusViewMigrated)
-                    // We were fading out, let's fade in instead
-                    CrossFadeHelper.fadeIn(view, animatorListener)
-                }
-            }
-        }
-    }
-
-    private fun View.appearIcons(
-        animate: Boolean,
-        iconAppearTranslation: Int,
-        statusViewMigrated: Boolean,
-        animatorListener: Animator.AnimatorListener,
-    ) {
-        if (animate) {
-            if (!statusViewMigrated) {
-                translationY = -iconAppearTranslation.toFloat()
-            }
-            alpha = 0f
-            animate()
-                .alpha(1f)
-                .setInterpolator(Interpolators.LINEAR)
-                .setDuration(AOD_ICONS_APPEAR_DURATION)
-                .apply { if (statusViewMigrated) animateInIconTranslation() }
-                .setListener(animatorListener)
-                .start()
-        } else {
-            alpha = 1.0f
-            if (!statusViewMigrated) {
-                translationY = 0f
-            }
-        }
-    }
-
-    private fun View.animateInIconTranslation(statusViewMigrated: Boolean) {
-        if (!statusViewMigrated) {
-            animate().animateInIconTranslation().setDuration(AOD_ICONS_APPEAR_DURATION).start()
-        }
-    }
-
-    private fun ViewPropertyAnimator.animateInIconTranslation(): ViewPropertyAnimator =
-        setInterpolator(Interpolators.DECELERATE_QUINT).translationY(0f)
-
     /** External storage for [StatusBarIconView] instances. */
     fun interface IconViewStore {
-        fun iconView(key: String): StatusBarIconView?
+        fun iconView(key: String): StatusBarIconView
     }
 
-    private const val AOD_ICONS_APPEAR_DURATION: Long = 200
     @ColorInt private val DEFAULT_AOD_ICON_COLOR = Color.WHITE
 }
 
@@ -442,8 +285,10 @@ class ShelfNotificationIconViewStore
 constructor(
     private val notifCollection: NotifCollection,
 ) : IconViewStore {
-    override fun iconView(key: String): StatusBarIconView? =
-        notifCollection.getEntry(key)?.icons?.shelfIcon
+    override fun iconView(key: String): StatusBarIconView {
+        val entry = notifCollection.getEntry(key) ?: error("No entry found for key: $key")
+        return entry.icons.shelfIcon ?: error("No shelf IconView found for key: $key")
+    }
 }
 
 /** [IconViewStore] for the always-on display. */
@@ -452,8 +297,10 @@ class AlwaysOnDisplayNotificationIconViewStore
 constructor(
     private val notifCollection: NotifCollection,
 ) : IconViewStore {
-    override fun iconView(key: String): StatusBarIconView? =
-        notifCollection.getEntry(key)?.icons?.aodIcon
+    override fun iconView(key: String): StatusBarIconView {
+        val entry = notifCollection.getEntry(key) ?: error("No entry found for key: $key")
+        return entry.icons.aodIcon ?: error("No AOD IconView found for key: $key")
+    }
 }
 
 /** [IconViewStore] for the status bar. */
@@ -462,8 +309,10 @@ class StatusBarNotificationIconViewStore
 constructor(
     private val notifCollection: NotifCollection,
 ) : IconViewStore {
-    override fun iconView(key: String): StatusBarIconView? =
-        notifCollection.getEntry(key)?.icons?.statusBarIcon
+    override fun iconView(key: String): StatusBarIconView {
+        val entry = notifCollection.getEntry(key) ?: error("No entry found for key: $key")
+        return entry.icons.statusBarIcon ?: error("No status bar IconView found for key: $key")
+    }
 }
 
 private val View.viewBounds: Rect

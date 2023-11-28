@@ -998,6 +998,7 @@ public class JobSchedulerService extends com.android.server.SystemService
                     DEFAULT_SYSTEM_STOP_TO_FAILURE_RATIO);
         }
 
+        // TODO(141645789): move into ConnectivityController.CcConfig
         private void updateConnectivityConstantsLocked() {
             CONN_CONGESTION_DELAY_FRAC = DeviceConfig.getFloat(DeviceConfig.NAMESPACE_JOB_SCHEDULER,
                     KEY_CONN_CONGESTION_DELAY_FRAC,
@@ -3859,10 +3860,16 @@ public class JobSchedulerService extends com.android.server.SystemService
             // Only let the app use the higher runtime if it hasn't repeatedly timed out.
             final String timeoutTag = job.shouldTreatAsExpeditedJob()
                     ? QUOTA_TRACKER_TIMEOUT_EJ_TAG : QUOTA_TRACKER_TIMEOUT_REG_TAG;
+            // Developers are informed that expedited jobs can be stopped earlier than regular jobs
+            // and so shouldn't use them for long pieces of work. There's little reason to let
+            // them run longer than the normal 10 minutes.
+            final long normalUpperLimitMs = job.shouldTreatAsExpeditedJob()
+                    ? mConstants.RUNTIME_MIN_GUARANTEE_MS
+                    : mConstants.RUNTIME_FREE_QUOTA_MAX_LIMIT_MS;
             final long upperLimitMs =
                     mQuotaTracker.isWithinQuota(job.getTimeoutBlameUserId(),
                             job.getTimeoutBlamePackageName(), timeoutTag)
-                            ? mConstants.RUNTIME_FREE_QUOTA_MAX_LIMIT_MS
+                            ? normalUpperLimitMs
                             : mConstants.RUNTIME_MIN_GUARANTEE_MS;
             return Math.min(upperLimitMs,
                     mConstants.USE_TARE_POLICY
