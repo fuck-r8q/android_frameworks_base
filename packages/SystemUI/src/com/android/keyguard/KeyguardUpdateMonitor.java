@@ -4260,9 +4260,10 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
             mSimDatas.put(slotId, data);
             changed = true; // no data yet; force update
         } else {
-            changed = (data.simState != state) || (data.slotId != slotId);
+            changed = (data.simState != state) || (data.slotId != slotId) || (data.subId != subId);
             data.simState = state;
             data.slotId = slotId;
+            data.subId = subId;
         }
         return changed;
     }
