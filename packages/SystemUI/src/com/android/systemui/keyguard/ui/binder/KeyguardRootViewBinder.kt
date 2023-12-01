@@ -34,14 +34,14 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.jank.InteractionJankMonitor.CUJ_SCREEN_OFF_SHOW_AOD
 import com.android.keyguard.KeyguardClockSwitch.MISSING_CLOCK_ID
 import com.android.systemui.Flags.keyguardBottomAreaRefactor
+import com.android.systemui.Flags.newAodTransition
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
 import com.android.systemui.common.shared.model.TintedIcon
 import com.android.systemui.common.ui.ConfigurationState
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryHapticsInteractor
 import com.android.systemui.flags.FeatureFlagsClassic
-import com.android.systemui.flags.Flags
-import com.android.systemui.flags.RefactorFlag
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.keyguard.ui.viewmodel.OccludingAppDeviceEntryMessageViewModel
@@ -116,7 +116,7 @@ object KeyguardRootViewBinder {
                         launch { viewModel.alpha.collect { alpha -> view.alpha = alpha } }
                     }
 
-                    if (featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)) {
+                    if (KeyguardShadeMigrationNssl.isEnabled) {
                         launch {
                             viewModel.burnInLayerVisibility.collect { visibility ->
                                 childViews[burnInLayerId]?.visibility = visibility
@@ -342,7 +342,7 @@ object KeyguardRootViewBinder {
         featureFlags: FeatureFlagsClassic,
         screenOffAnimationController: ScreenOffAnimationController,
     ): DisposableHandle? {
-        RefactorFlag(featureFlags, Flags.MIGRATE_KEYGUARD_STATUS_VIEW).assertInLegacyMode()
+        KeyguardShadeMigrationNssl.assertInLegacyMode()
         if (NotificationIconContainerRefactor.isUnexpectedlyInLegacyMode()) return null
         return view.repeatWhenAttached {
             lifecycleScope.launch {
@@ -368,7 +368,7 @@ object KeyguardRootViewBinder {
         iconsAppearTranslationPx: Int,
         screenOffAnimationController: ScreenOffAnimationController,
     ) {
-        val statusViewMigrated = featureFlags.isEnabled(Flags.MIGRATE_KEYGUARD_STATUS_VIEW)
+        val statusViewMigrated = KeyguardShadeMigrationNssl.isEnabled
         animate().cancel()
         val animatorListener =
             object : AnimatorListenerAdapter() {
@@ -384,7 +384,7 @@ object KeyguardRootViewBinder {
                 }
                 visibility = if (isVisible.value) View.VISIBLE else View.INVISIBLE
             }
-            featureFlags.isEnabled(Flags.NEW_AOD_TRANSITION) -> {
+            newAodTransition() -> {
                 animateInIconTranslation(statusViewMigrated)
                 if (isVisible.value) {
                     CrossFadeHelper.fadeIn(this, animatorListener)

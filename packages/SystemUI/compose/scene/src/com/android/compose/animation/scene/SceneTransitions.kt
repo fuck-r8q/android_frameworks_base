@@ -16,9 +16,9 @@
 
 package com.android.compose.animation.scene
 
-import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.snap
+import androidx.compose.runtime.Stable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastForEach
@@ -28,7 +28,6 @@ import com.android.compose.animation.scene.transformation.AnchoredTranslate
 import com.android.compose.animation.scene.transformation.DrawScale
 import com.android.compose.animation.scene.transformation.EdgeTranslate
 import com.android.compose.animation.scene.transformation.Fade
-import com.android.compose.animation.scene.transformation.ModifierTransformation
 import com.android.compose.animation.scene.transformation.PropertyTransformation
 import com.android.compose.animation.scene.transformation.RangedPropertyTransformation
 import com.android.compose.animation.scene.transformation.ScaleSize
@@ -38,12 +37,11 @@ import com.android.compose.animation.scene.transformation.Translate
 
 /** The transitions configuration of a [SceneTransitionLayout]. */
 class SceneTransitions(
-    @get:VisibleForTesting val transitionSpecs: List<TransitionSpec>,
+    internal val transitionSpecs: List<TransitionSpec>,
 ) {
     private val cache = mutableMapOf<SceneKey, MutableMap<SceneKey, TransitionSpec>>()
 
-    @VisibleForTesting
-    fun transitionSpec(from: SceneKey, to: SceneKey): TransitionSpec {
+    internal fun transitionSpec(from: SceneKey, to: SceneKey): TransitionSpec {
         return cache.getOrPut(from) { mutableMapOf() }.getOrPut(to) { findSpec(from, to) }
     }
 
@@ -95,6 +93,7 @@ class SceneTransitions(
 }
 
 /** The definition of a transition between [from] and [to]. */
+@Stable
 data class TransitionSpec(
     val from: SceneKey?,
     val to: SceneKey?,
@@ -124,7 +123,6 @@ data class TransitionSpec(
         scene: SceneKey,
     ): ElementTransformations {
         var shared: SharedElementTransformation? = null
-        val modifier = mutableListOf<ModifierTransformation>()
         var offset: PropertyTransformation<Offset>? = null
         var size: PropertyTransformation<IntSize>? = null
         var drawScale: PropertyTransformation<Scale>? = null
@@ -168,12 +166,11 @@ data class TransitionSpec(
                     throwIfNotNull(shared, element, name = "shared")
                     shared = transformation
                 }
-                is ModifierTransformation -> modifier.add(transformation)
                 is PropertyTransformation<*> -> onPropertyTransformation(transformation)
             }
         }
 
-        return ElementTransformations(shared, modifier, offset, size, drawScale, alpha)
+        return ElementTransformations(shared, offset, size, drawScale, alpha)
     }
 
     private fun throwIfNotNull(
@@ -190,7 +187,6 @@ data class TransitionSpec(
 /** The transformations of an element during a transition. */
 internal class ElementTransformations(
     val shared: SharedElementTransformation?,
-    val modifier: List<ModifierTransformation>,
     val offset: PropertyTransformation<Offset>?,
     val size: PropertyTransformation<IntSize>?,
     val drawScale: PropertyTransformation<Scale>?,

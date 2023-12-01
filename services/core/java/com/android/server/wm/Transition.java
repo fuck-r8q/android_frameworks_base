@@ -174,7 +174,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private final TransitionController mController;
     private final BLASTSyncEngine mSyncEngine;
     private final Token mToken;
-    private IApplicationThread mRemoteAnimApp;
 
     private @Nullable ActivityRecord mPipActivity;
 
@@ -1067,12 +1066,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
      * @return true if we are *guaranteed* to enter-pip. This means we return false if there's
      *         a chance we won't thus legacy-entry (via pause+userLeaving) will return false.
      */
-    private boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar,
-            @Nullable ActivityRecord resuming) {
+    private boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar) {
         if (!mCanPipOnFinish || !ar.isVisible() || ar.getTask() == null || !ar.isState(RESUMED)) {
             return false;
         }
 
+        final ActivityRecord resuming = getVisibleTransientLaunch(ar.getTaskDisplayArea());
         if (ar.pictureInPictureArgs != null && ar.pictureInPictureArgs.isAutoEnterEnabled()) {
             if (!ar.getTask().isVisibleRequested() || didCommitTransientLaunch()) {
                 // force enable pip-on-task-switch now that we've committed to actually launching
@@ -1211,9 +1210,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final boolean isScreenOff = ar.mDisplayContent == null
                         || ar.mDisplayContent.getDisplayInfo().state == Display.STATE_OFF;
                 if ((!visibleAtTransitionEnd || isScreenOff) && !ar.isVisibleRequested()) {
-                    final ActivityRecord resuming = getVisibleTransientLaunch(
-                            ar.getTaskDisplayArea());
-                    final boolean commitVisibility = !checkEnterPipOnFinish(ar, resuming);
+                    final boolean commitVisibility = !checkEnterPipOnFinish(ar);
                     // Avoid commit visibility if entering pip or else we will get a sudden
                     // "flash" / surface going invisible for a split second.
                     if (commitVisibility) {
@@ -1362,6 +1359,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final DisplayContent dc =
                     mController.mAtm.mRootWindowContainer.getDisplayContent(mRecentsDisplayId);
             dc.getInputMonitor().setActiveRecents(null /* activity */, null /* layer */);
+            dc.getInputMonitor().updateInputWindowsLw(false /* force */);
         }
         if (mTransientLaunches != null) {
             for (int i = mTransientLaunches.size() - 1; i >= 0; --i) {
@@ -1450,7 +1448,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (candidateActivity.getTaskDisplayArea() != taskDisplayArea) {
                 continue;
             }
-            if (!candidateActivity.isVisible()) {
+            if (!candidateActivity.isVisibleRequested()) {
                 continue;
             }
             return candidateActivity;
@@ -1506,13 +1504,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         return mForcePlaying;
     }
 
+    /** Adjusts the priority of the process which will run the transition animation. */
     void setRemoteAnimationApp(IApplicationThread app) {
-        mRemoteAnimApp = app;
-    }
-
-    /** Returns the app which will run the transition animation. */
-    IApplicationThread getRemoteAnimationApp() {
-        return mRemoteAnimApp;
+        final WindowProcessController wpc = mController.mAtm.getProcessController(app);
+        if (wpc != null) {
+            // This is an early prediction. If the process doesn't ack the animation in 200 ms,
+            // the priority will be restored.
+            mController.mRemotePlayer.update(wpc, true /* running */, true /* predict */);
+        }
     }
 
     void setNoAnimation(WindowContainer wc) {

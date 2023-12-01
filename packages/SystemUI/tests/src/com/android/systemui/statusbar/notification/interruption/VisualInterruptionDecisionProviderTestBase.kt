@@ -20,6 +20,9 @@ import android.app.ActivityManager
 import android.app.Notification
 import android.app.Notification.BubbleMetadata
 import android.app.Notification.FLAG_BUBBLE
+import android.app.Notification.FLAG_FOREGROUND_SERVICE
+import android.app.Notification.FLAG_FSI_REQUESTED_BUT_DENIED
+import android.app.Notification.FLAG_USER_INITIATED_JOB
 import android.app.Notification.GROUP_ALERT_ALL
 import android.app.Notification.GROUP_ALERT_CHILDREN
 import android.app.Notification.GROUP_ALERT_SUMMARY
@@ -29,6 +32,7 @@ import android.app.NotificationManager.IMPORTANCE_DEFAULT
 import android.app.NotificationManager.IMPORTANCE_HIGH
 import android.app.NotificationManager.IMPORTANCE_LOW
 import android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_AMBIENT
+import android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT
 import android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK
 import android.app.NotificationManager.VISIBILITY_NO_OVERRIDE
 import android.app.PendingIntent
@@ -40,11 +44,16 @@ import android.graphics.drawable.Icon
 import android.hardware.display.FakeAmbientDisplayConfiguration
 import android.os.Looper
 import android.os.PowerManager
+import android.platform.test.flag.junit.SetFlagsRule
 import android.provider.Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED
 import android.provider.Settings.Global.HEADS_UP_OFF
 import android.provider.Settings.Global.HEADS_UP_ON
+import com.android.internal.logging.UiEventLogger.UiEventEnum
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.log.LogBuffer
+import com.android.systemui.log.LogcatEchoTracker
+import com.android.systemui.log.core.LogLevel
 import com.android.systemui.res.R
 import com.android.systemui.settings.FakeUserTracker
 import com.android.systemui.statusbar.FakeStatusBarStateController
@@ -56,36 +65,64 @@ import com.android.systemui.statusbar.notification.NotifPipelineFlags
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl.MAX_HUN_WHEN_AGE_MS
-import com.android.systemui.statusbar.policy.DeviceProvisionedController
+import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl.NotificationInterruptEvent.FSI_SUPPRESSED_NO_HUN_OR_KEYGUARD
+import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl.NotificationInterruptEvent.FSI_SUPPRESSED_SUPPRESSIVE_BUBBLE_METADATA
+import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl.NotificationInterruptEvent.FSI_SUPPRESSED_SUPPRESSIVE_GROUP_ALERT_BEHAVIOR
+import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl.NotificationInterruptEvent.HUN_SUPPRESSED_OLD_WHEN
+import com.android.systemui.statusbar.policy.FakeDeviceProvisionedController
 import com.android.systemui.statusbar.policy.HeadsUpManager
-import com.android.systemui.statusbar.policy.KeyguardStateController
+import com.android.systemui.util.FakeEventLog
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.settings.FakeGlobalSettings
 import com.android.systemui.util.time.FakeSystemClock
 import com.android.systemui.utils.leaks.FakeBatteryController
+import com.android.systemui.utils.leaks.FakeKeyguardStateController
 import com.android.systemui.utils.leaks.LeakCheckedTest
 import com.android.systemui.utils.os.FakeHandler
 import junit.framework.Assert.assertFalse
 import junit.framework.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito.`when` as whenever
 
 abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
+    @JvmField
+    @Rule
+    val setFlagsRule = SetFlagsRule(SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT)
+
+    private val fakeLogBuffer =
+        LogBuffer(
+            name = "FakeLog",
+            maxSize = 1,
+            logcatEchoTracker =
+                object : LogcatEchoTracker {
+                    override fun isBufferLoggable(bufferName: String, level: LogLevel): Boolean =
+                        true
+
+                    override fun isTagLoggable(tagName: String, level: LogLevel): Boolean = true
+                },
+            systrace = false
+        )
+
     private val leakCheck = LeakCheckedTest.SysuiLeakCheck()
 
     protected val ambientDisplayConfiguration = FakeAmbientDisplayConfiguration(context)
     protected val batteryController = FakeBatteryController(leakCheck)
-    protected val deviceProvisionedController: DeviceProvisionedController = mock()
+    protected val deviceProvisionedController = FakeDeviceProvisionedController()
+    protected val eventLog = FakeEventLog()
     protected val flags: NotifPipelineFlags = mock()
-    protected val globalSettings = FakeGlobalSettings()
+    protected val globalSettings =
+        FakeGlobalSettings().also { it.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON) }
     protected val headsUpManager: HeadsUpManager = mock()
     protected val keyguardNotificationVisibilityProvider: KeyguardNotificationVisibilityProvider =
         mock()
-    protected val keyguardStateController: KeyguardStateController = mock()
-    protected val logger: NotificationInterruptLogger = mock()
+    protected val keyguardStateController = FakeKeyguardStateController(leakCheck)
     protected val mainHandler = FakeHandler(Looper.getMainLooper())
+    protected val newLogger = VisualInterruptionDecisionLogger(fakeLogBuffer)
+    protected val oldLogger = NotificationInterruptLogger(fakeLogBuffer)
     protected val powerManager: PowerManager = mock()
     protected val statusBarStateController = FakeStatusBarStateController()
     protected val systemClock = FakeSystemClock()
@@ -113,13 +150,8 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
 
     @Before
     fun setUp() {
-        globalSettings.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON)
-
         val user = UserInfo(ActivityManager.getCurrentUser(), "Current user", /* flags = */ 0)
         userTracker.set(listOf(user), /* currentUserIndex = */ 0)
-
-        whenever(keyguardNotificationVisibilityProvider.shouldHideNotification(any()))
-            .thenReturn(false)
 
         provider.start()
     }
@@ -128,66 +160,86 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
     fun testShouldPeek() {
         ensurePeekState()
         assertShouldHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_settingDisabled() {
         ensurePeekState { hunSettingEnabled = false }
         assertShouldNotHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldNotPeek_packageSnoozed() {
+    fun testShouldNotPeek_packageSnoozed_withoutFsi() {
         ensurePeekState { hunSnoozed = true }
         assertShouldNotHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldPeek_packageSnoozedButFsi() {
-        ensurePeekState { hunSnoozed = true }
-        assertShouldHeadsUp(buildFsiEntry())
+    fun testShouldPeek_packageSnoozed_withFsi() {
+        val entry = buildFsiEntry()
+        forEachPeekableFsiState {
+            ensurePeekState { hunSnoozed = true }
+            assertShouldHeadsUp(entry)
+
+            // The old code logs a UiEvent when a HUN snooze is bypassed because the notification
+            // has an FSI, but that doesn't fit into the new code's suppressor-based logic, so we're
+            // not reimplementing it.
+            if (provider !is NotificationInterruptStateProviderWrapper) {
+                assertNoEventsLogged()
+            }
+        }
     }
 
     @Test
     fun testShouldNotPeek_alreadyBubbled() {
         ensurePeekState { statusBarState = SHADE }
         assertShouldNotHeadsUp(buildPeekEntry { isBubble = true })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldPeek_isBubble_shadeLocked() {
         ensurePeekState { statusBarState = SHADE_LOCKED }
         assertShouldHeadsUp(buildPeekEntry { isBubble = true })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldPeek_isBubble_keyguard() {
         ensurePeekState { statusBarState = KEYGUARD }
         assertShouldHeadsUp(buildPeekEntry { isBubble = true })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_dnd() {
         ensurePeekState()
         assertShouldNotHeadsUp(buildPeekEntry { suppressedVisualEffects = SUPPRESSED_EFFECT_PEEK })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_notImportant() {
         ensurePeekState()
         assertShouldNotHeadsUp(buildPeekEntry { importance = IMPORTANCE_DEFAULT })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_screenOff() {
         ensurePeekState { isScreenOn = false }
         assertShouldNotHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_dreaming() {
         ensurePeekState { isDreaming = true }
         assertShouldNotHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
@@ -197,95 +249,142 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
     }
 
     @Test
-    fun testShouldPeek_notQuiteOldEnoughWhen() {
+    fun testLogsHunOldWhen() {
+        assertNoEventsLogged()
+
+        ensurePeekState()
+        val entry = buildPeekEntry { whenMs = whenAgo(MAX_HUN_WHEN_AGE_MS) }
+
+        // The old code logs the "old when" UiEvent unconditionally, so don't expect that it hasn't.
+        if (provider !is NotificationInterruptStateProviderWrapper) {
+            provider.makeUnloggedHeadsUpDecision(entry)
+            assertNoEventsLogged()
+        }
+
+        provider.makeAndLogHeadsUpDecision(entry)
+        assertUiEventLogged(HUN_SUPPRESSED_OLD_WHEN, entry.sbn.uid, entry.sbn.packageName)
+        assertNoSystemEventLogged()
+    }
+
+    @Test
+    fun testShouldPeek_oldWhen_now() {
+        ensurePeekState()
+        assertShouldHeadsUp(buildPeekEntry { whenMs = whenAgo(0) })
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPeek_oldWhen_notOldEnough() {
         ensurePeekState()
         assertShouldHeadsUp(buildPeekEntry { whenMs = whenAgo(MAX_HUN_WHEN_AGE_MS - 1) })
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldPeek_zeroWhen() {
+    fun testShouldPeek_oldWhen_zeroWhen() {
         ensurePeekState()
         assertShouldHeadsUp(buildPeekEntry { whenMs = 0L })
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldPeek_oldWhenButFsi() {
+    fun testShouldPeek_oldWhen_negativeWhen() {
+        ensurePeekState()
+        assertShouldHeadsUp(buildPeekEntry { whenMs = -1L })
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPeek_oldWhen_fullScreenIntent() {
         ensurePeekState()
         assertShouldHeadsUp(buildFsiEntry { whenMs = whenAgo(MAX_HUN_WHEN_AGE_MS) })
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPeek_oldWhen_foregroundService() {
+        ensurePeekState()
+        assertShouldHeadsUp(
+            buildPeekEntry {
+                whenMs = whenAgo(MAX_HUN_WHEN_AGE_MS)
+                isForegroundService = true
+            }
+        )
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPeek_oldWhen_userInitiatedJob() {
+        ensurePeekState()
+        assertShouldHeadsUp(
+            buildPeekEntry {
+                whenMs = whenAgo(MAX_HUN_WHEN_AGE_MS)
+                isUserInitiatedJob = true
+            }
+        )
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotPeek_hiddenOnKeyguard() {
+        ensurePeekState({ keyguardShouldHideNotification = true })
+        assertShouldNotHeadsUp(buildPeekEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldPeek_defaultLegacySuppressor() {
         ensurePeekState()
-        provider.addLegacySuppressor(neverSuppresses)
-        assertShouldHeadsUp(buildPeekEntry())
+        withLegacySuppressor(neverSuppresses) { assertShouldHeadsUp(buildPeekEntry()) }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_legacySuppressInterruptions() {
         ensurePeekState()
-        provider.addLegacySuppressor(alwaysSuppressesInterruptions)
-        assertShouldNotHeadsUp(buildPeekEntry())
+        withLegacySuppressor(alwaysSuppressesInterruptions) {
+            assertShouldNotHeadsUp(buildPeekEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_legacySuppressAwakeInterruptions() {
         ensurePeekState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeInterruptions)
-        assertShouldNotHeadsUp(buildPeekEntry())
+        withLegacySuppressor(alwaysSuppressesAwakeInterruptions) {
+            assertShouldNotHeadsUp(buildPeekEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPeek_legacySuppressAwakeHeadsUp() {
         ensurePeekState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeHeadsUp)
-        assertShouldNotHeadsUp(buildPeekEntry())
+        withLegacySuppressor(alwaysSuppressesAwakeHeadsUp) {
+            assertShouldNotHeadsUp(buildPeekEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldPulse() {
         ensurePulseState()
         assertShouldHeadsUp(buildPulseEntry())
-    }
-
-    @Test
-    fun testShouldPulse_defaultLegacySuppressor() {
-        ensurePulseState()
-        provider.addLegacySuppressor(neverSuppresses)
-        assertShouldHeadsUp(buildPulseEntry())
-    }
-
-    @Test
-    fun testShouldNotPulse_legacySuppressInterruptions() {
-        ensurePulseState()
-        provider.addLegacySuppressor(alwaysSuppressesInterruptions)
-        assertShouldNotHeadsUp(buildPulseEntry())
-    }
-
-    @Test
-    fun testShouldPulse_legacySuppressAwakeInterruptions() {
-        ensurePulseState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeInterruptions)
-        assertShouldHeadsUp(buildPulseEntry())
-    }
-
-    @Test
-    fun testShouldPulse_legacySuppressAwakeHeadsUp() {
-        ensurePulseState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeHeadsUp)
-        assertShouldHeadsUp(buildPulseEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPulse_disabled() {
         ensurePulseState { pulseOnNotificationsEnabled = false }
         assertShouldNotHeadsUp(buildPulseEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPulse_batterySaver() {
         ensurePulseState { isAodPowerSave = true }
         assertShouldNotHeadsUp(buildPulseEntry())
+        assertNoEventsLogged()
     }
 
     @Test
@@ -294,18 +393,62 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
         assertShouldNotHeadsUp(
             buildPulseEntry { suppressedVisualEffects = SUPPRESSED_EFFECT_AMBIENT }
         )
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPulse_visibilityOverridePrivate() {
         ensurePulseState()
         assertShouldNotHeadsUp(buildPulseEntry { visibilityOverride = VISIBILITY_PRIVATE })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotPulse_importanceLow() {
         ensurePulseState()
         assertShouldNotHeadsUp(buildPulseEntry { importance = IMPORTANCE_LOW })
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotPulse_hiddenOnKeyguard() {
+        ensurePulseState({ keyguardShouldHideNotification = true })
+        assertShouldNotHeadsUp(buildPulseEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPulse_defaultLegacySuppressor() {
+        ensurePulseState()
+        withLegacySuppressor(neverSuppresses) { assertShouldHeadsUp(buildPulseEntry()) }
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotPulse_legacySuppressInterruptions() {
+        ensurePulseState()
+        withLegacySuppressor(alwaysSuppressesInterruptions) {
+            assertShouldNotHeadsUp(buildPulseEntry())
+        }
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPulse_legacySuppressAwakeInterruptions() {
+        ensurePulseState()
+        withLegacySuppressor(alwaysSuppressesAwakeInterruptions) {
+            assertShouldHeadsUp(buildPulseEntry())
+        }
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldPulse_legacySuppressAwakeHeadsUp() {
+        ensurePulseState()
+        withLegacySuppressor(alwaysSuppressesAwakeHeadsUp) {
+            assertShouldHeadsUp(buildPulseEntry())
+        }
+        assertNoEventsLogged()
     }
 
     private fun withPeekAndPulseEntry(
@@ -320,178 +463,409 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
     }
 
     @Test
-    fun testShouldHeadsUp_groupedSummaryNotif_groupAlertAll() {
-        withPeekAndPulseEntry({
-            isGrouped = true
-            isGroupSummary = true
-            groupAlertBehavior = GROUP_ALERT_ALL
-        }) {
-            assertShouldHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldHeadsUp_groupedSummaryNotif_groupAlertSummary() {
-        withPeekAndPulseEntry({
-            isGrouped = true
-            isGroupSummary = true
-            groupAlertBehavior = GROUP_ALERT_SUMMARY
-        }) {
-            assertShouldHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldNotHeadsUp_groupedSummaryNotif_groupAlertChildren() {
-        withPeekAndPulseEntry({
-            isGrouped = true
-            isGroupSummary = true
-            groupAlertBehavior = GROUP_ALERT_CHILDREN
-        }) {
-            assertShouldNotHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldHeadsUp_ungroupedSummaryNotif_groupAlertChildren() {
-        withPeekAndPulseEntry({
-            isGrouped = false
-            isGroupSummary = true
-            groupAlertBehavior = GROUP_ALERT_CHILDREN
-        }) {
-            assertShouldHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldHeadsUp_groupedChildNotif_groupAlertAll() {
-        withPeekAndPulseEntry({
-            isGrouped = true
-            isGroupSummary = false
-            groupAlertBehavior = GROUP_ALERT_ALL
-        }) {
-            assertShouldHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldHeadsUp_groupedChildNotif_groupAlertChildren() {
-        withPeekAndPulseEntry({
-            isGrouped = true
-            isGroupSummary = false
-            groupAlertBehavior = GROUP_ALERT_CHILDREN
-        }) {
-            assertShouldHeadsUp(it)
-        }
-    }
-
-    @Test
-    fun testShouldNotHeadsUp_groupedChildNotif_groupAlertSummary() {
+    fun testShouldNotHeadsUp_suppressiveGroupAlertBehavior() {
         withPeekAndPulseEntry({
             isGrouped = true
             isGroupSummary = false
             groupAlertBehavior = GROUP_ALERT_SUMMARY
         }) {
             assertShouldNotHeadsUp(it)
+            assertNoEventsLogged()
         }
     }
 
     @Test
-    fun testShouldHeadsUp_ungroupedChildNotif_groupAlertSummary() {
+    fun testShouldHeadsUp_suppressiveGroupAlertBehavior_notSuppressive() {
+        withPeekAndPulseEntry({
+            isGrouped = true
+            isGroupSummary = false
+            groupAlertBehavior = GROUP_ALERT_CHILDREN
+        }) {
+            assertShouldHeadsUp(it)
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldHeadsUp_suppressiveGroupAlertBehavior_notGrouped() {
         withPeekAndPulseEntry({
             isGrouped = false
             isGroupSummary = false
             groupAlertBehavior = GROUP_ALERT_SUMMARY
         }) {
             assertShouldHeadsUp(it)
+            assertNoEventsLogged()
         }
     }
 
     @Test
     fun testShouldNotHeadsUp_justLaunchedFsi() {
-        withPeekAndPulseEntry({ hasJustLaunchedFsi = true }) { assertShouldNotHeadsUp(it) }
+        withPeekAndPulseEntry({ hasJustLaunchedFsi = true }) {
+            assertShouldNotHeadsUp(it)
+            assertNoEventsLogged()
+        }
     }
 
     @Test
     fun testShouldBubble_withIntentAndIcon() {
         ensureBubbleState()
         assertShouldBubble(buildBubbleEntry { bubbleIsShortcut = false })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldBubble_withShortcut() {
         ensureBubbleState()
         assertShouldBubble(buildBubbleEntry { bubbleIsShortcut = true })
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldNotBubble_notAllowed() {
+    fun testShouldBubble_suppressiveGroupAlertBehavior() {
         ensureBubbleState()
-        assertShouldNotBubble(buildBubbleEntry { canBubble = false })
+        assertShouldBubble(
+            buildBubbleEntry {
+                isGrouped = true
+                isGroupSummary = false
+                groupAlertBehavior = GROUP_ALERT_SUMMARY
+            }
+        )
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldNotBubble_noBubbleMetadata() {
+    fun testShouldNotBubble_notABubble() {
+        ensureBubbleState()
+        assertShouldNotBubble(
+            buildBubbleEntry {
+                isBubble = false
+                hasBubbleMetadata = false
+            }
+        )
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotBubble_missingBubbleMetadata() {
         ensureBubbleState()
         assertShouldNotBubble(buildBubbleEntry { hasBubbleMetadata = false })
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotBubble_notAllowedToBubble() {
+        ensureBubbleState()
+        assertShouldNotBubble(buildBubbleEntry { canBubble = false })
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldBubble_defaultLegacySuppressor() {
         ensureBubbleState()
-        provider.addLegacySuppressor(neverSuppresses)
-        assertShouldBubble(buildBubbleEntry())
+        withLegacySuppressor(neverSuppresses) { assertShouldBubble(buildBubbleEntry()) }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotBubble_legacySuppressInterruptions() {
         ensureBubbleState()
-        provider.addLegacySuppressor(alwaysSuppressesInterruptions)
-        assertShouldNotBubble(buildBubbleEntry())
+        withLegacySuppressor(alwaysSuppressesInterruptions) {
+            assertShouldNotBubble(buildBubbleEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldNotBubble_legacySuppressAwakeInterruptions() {
         ensureBubbleState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeInterruptions)
-        assertShouldNotBubble(buildBubbleEntry())
+        withLegacySuppressor(alwaysSuppressesAwakeInterruptions) {
+            assertShouldNotBubble(buildBubbleEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldBubble_legacySuppressAwakeHeadsUp() {
         ensureBubbleState()
-        provider.addLegacySuppressor(alwaysSuppressesAwakeHeadsUp)
-        assertShouldBubble(buildBubbleEntry())
+        withLegacySuppressor(alwaysSuppressesAwakeHeadsUp) {
+            assertShouldBubble(buildBubbleEntry())
+        }
+        assertNoEventsLogged()
     }
 
     @Test
-    fun testShouldNotAlert_hiddenOnKeyguard() {
-        ensurePeekState({ keyguardShouldHideNotification = true })
-        assertShouldNotHeadsUp(buildPeekEntry())
-
-        ensurePulseState({ keyguardShouldHideNotification = true })
-        assertShouldNotHeadsUp(buildPulseEntry())
-
+    fun testShouldNotBubble_hiddenOnKeyguard() {
         ensureBubbleState({ keyguardShouldHideNotification = true })
         assertShouldNotBubble(buildBubbleEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotFsi_noFullScreenIntent() {
+        forEachFsiState {
+            assertShouldNotFsi(buildFsiEntry { hasFsi = false })
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_showStickyHun() {
+        forEachFsiState {
+            assertShouldNotFsi(
+                buildFsiEntry {
+                    hasFsi = false
+                    isStickyAndNotDemoted = true
+                }
+            )
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_onlyDnd() {
+        forEachFsiState {
+            assertShouldNotFsi(
+                buildFsiEntry { suppressedVisualEffects = SUPPRESSED_EFFECT_FULL_SCREEN_INTENT },
+                expectWouldInterruptWithoutDnd = true
+            )
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_notImportantEnough() {
+        forEachFsiState {
+            assertShouldNotFsi(buildFsiEntry { importance = IMPORTANCE_DEFAULT })
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_notOnlyDnd() {
+        forEachFsiState {
+            assertShouldNotFsi(
+                buildFsiEntry {
+                    suppressedVisualEffects = SUPPRESSED_EFFECT_FULL_SCREEN_INTENT
+                    importance = IMPORTANCE_DEFAULT
+                },
+                expectWouldInterruptWithoutDnd = false
+            )
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_suppressiveGroupAlertBehavior() {
+        forEachFsiState {
+            assertShouldNotFsi(
+                buildFsiEntry {
+                    isGrouped = true
+                    isGroupSummary = true
+                    groupAlertBehavior = GROUP_ALERT_CHILDREN
+                }
+            )
+        }
+    }
+
+    @Test
+    fun testLogsFsiSuppressiveGroupAlertBehavior() {
+        ensureNotInteractiveFsiState()
+        val entry = buildFsiEntry {
+            isGrouped = true
+            isGroupSummary = true
+            groupAlertBehavior = GROUP_ALERT_CHILDREN
+        }
+
+        val decision = provider.makeUnloggedFullScreenIntentDecision(entry)
+        assertNoEventsLogged()
+
+        provider.logFullScreenIntentDecision(decision)
+        assertUiEventLogged(
+            FSI_SUPPRESSED_SUPPRESSIVE_GROUP_ALERT_BEHAVIOR,
+            entry.sbn.uid,
+            entry.sbn.packageName
+        )
+        assertSystemEventLogged("231322873", entry.sbn.uid, "groupAlertBehavior")
+    }
+
+    @Test
+    fun testShouldFsi_suppressiveGroupAlertBehavior_notGrouped() {
+        forEachFsiState {
+            assertShouldFsi(
+                buildFsiEntry {
+                    isGrouped = false
+                    isGroupSummary = true
+                    groupAlertBehavior = GROUP_ALERT_CHILDREN
+                }
+            )
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldFsi_suppressiveGroupAlertBehavior_notSuppressive() {
+        forEachFsiState {
+            assertShouldFsi(
+                buildFsiEntry {
+                    isGrouped = true
+                    isGroupSummary = true
+                    groupAlertBehavior = GROUP_ALERT_ALL
+                }
+            )
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_suppressiveBubbleMetadata() {
+        forEachFsiState {
+            assertShouldNotFsi(
+                buildFsiEntry {
+                    hasBubbleMetadata = true
+                    bubbleSuppressesNotification = true
+                }
+            )
+        }
+    }
+
+    @Test
+    fun testLogsFsiSuppressiveBubbleMetadata() {
+        ensureNotInteractiveFsiState()
+        val entry = buildFsiEntry {
+            hasBubbleMetadata = true
+            bubbleSuppressesNotification = true
+        }
+
+        val decision = provider.makeUnloggedFullScreenIntentDecision(entry)
+        assertNoEventsLogged()
+
+        provider.logFullScreenIntentDecision(decision)
+        assertUiEventLogged(
+            FSI_SUPPRESSED_SUPPRESSIVE_BUBBLE_METADATA,
+            entry.sbn.uid,
+            entry.sbn.packageName
+        )
+        assertSystemEventLogged("274759612", entry.sbn.uid, "bubbleMetadata")
+    }
+
+    @Test
+    fun testShouldNotFsi_packageSuspended() {
+        forEachFsiState {
+            assertShouldNotFsi(buildFsiEntry { packageSuspended = true })
+            assertNoEventsLogged()
+        }
     }
 
     @Test
     fun testShouldFsi_notInteractive() {
         ensureNotInteractiveFsiState()
         assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldFsi_dreaming() {
         ensureDreamingFsiState()
         assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
     }
 
     @Test
     fun testShouldFsi_keyguard() {
         ensureKeyguardFsiState()
         assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotFsi_expectedToHun() {
+        forEachPeekableFsiState {
+            ensurePeekState()
+            assertShouldNotFsi(buildFsiEntry())
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldNotFsi_expectedToHun_hunSnoozed() {
+        forEachPeekableFsiState {
+            ensurePeekState { hunSnoozed = true }
+            assertShouldNotFsi(buildFsiEntry())
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldFsi_lockedShade() {
+        ensureLockedShadeFsiState()
+        assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldFsi_keyguardOccluded() {
+        ensureKeyguardOccludedFsiState()
+        assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldFsi_deviceNotProvisioned() {
+        ensureDeviceNotProvisionedFsiState()
+        assertShouldFsi(buildFsiEntry())
+        assertNoEventsLogged()
+    }
+
+    @Test
+    fun testShouldNotFsi_noHunOrKeyguard() {
+        ensureNoHunOrKeyguardFsiState()
+        assertShouldNotFsi(buildFsiEntry())
+    }
+
+    @Test
+    fun testLogsFsiNoHunOrKeyguard() {
+        ensureNoHunOrKeyguardFsiState()
+        val entry = buildFsiEntry()
+
+        val decision = provider.makeUnloggedFullScreenIntentDecision(entry)
+        assertNoEventsLogged()
+
+        provider.logFullScreenIntentDecision(decision)
+        assertUiEventLogged(FSI_SUPPRESSED_NO_HUN_OR_KEYGUARD, entry.sbn.uid, entry.sbn.packageName)
+        assertSystemEventLogged("231322873", entry.sbn.uid, "no hun or keyguard")
+    }
+
+    @Test
+    fun testShouldFsi_defaultLegacySuppressor() {
+        forEachFsiState {
+            withLegacySuppressor(neverSuppresses) { assertShouldFsi(buildFsiEntry()) }
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldFsi_suppressInterruptions() {
+        forEachFsiState {
+            withLegacySuppressor(alwaysSuppressesInterruptions) { assertShouldFsi(buildFsiEntry()) }
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldFsi_suppressAwakeInterruptions() {
+        forEachFsiState {
+            withLegacySuppressor(alwaysSuppressesAwakeInterruptions) {
+                assertShouldFsi(buildFsiEntry())
+            }
+            assertNoEventsLogged()
+        }
+    }
+
+    @Test
+    fun testShouldFsi_suppressAwakeHeadsUp() {
+        forEachFsiState {
+            withLegacySuppressor(alwaysSuppressesAwakeHeadsUp) { assertShouldFsi(buildFsiEntry()) }
+            assertNoEventsLogged()
+        }
     }
 
     protected data class State(
@@ -505,6 +879,9 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
         var keyguardShouldHideNotification: Boolean? = null,
         var pulseOnNotificationsEnabled: Boolean? = null,
         var statusBarState: Int? = null,
+        var keyguardIsShowing: Boolean = false,
+        var keyguardIsOccluded: Boolean = false,
+        var deviceProvisioned: Boolean = true
     )
 
     protected fun setState(state: State): Unit =
@@ -536,6 +913,11 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
             }
 
             statusBarState?.let { statusBarStateController.state = it }
+
+            keyguardStateController.isOccluded = keyguardIsOccluded
+            keyguardStateController.isShowing = keyguardIsShowing
+
+            deviceProvisionedController.deviceProvisioned = deviceProvisioned
         }
 
     protected fun ensureState(block: State.() -> Unit) =
@@ -565,33 +947,111 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
     protected fun ensureBubbleState(block: State.() -> Unit = {}) = ensureState(block)
 
     protected fun ensureNotInteractiveFsiState(block: State.() -> Unit = {}) = ensureState {
-        isDreaming = false
         isInteractive = false
-        statusBarState = SHADE
         run(block)
     }
 
     protected fun ensureDreamingFsiState(block: State.() -> Unit = {}) = ensureState {
-        isDreaming = true
         isInteractive = true
-        statusBarState = SHADE
+        isDreaming = true
         run(block)
     }
 
     protected fun ensureKeyguardFsiState(block: State.() -> Unit = {}) = ensureState {
-        isDreaming = false
         isInteractive = true
+        isDreaming = false
         statusBarState = KEYGUARD
         run(block)
     }
 
+    protected fun ensureLockedShadeFsiState(block: State.() -> Unit = {}) = ensureState {
+        // It is assumed *but not checked in the code* that statusBarState is SHADE_LOCKED.
+        isInteractive = true
+        isDreaming = false
+        statusBarState = SHADE
+        hunSettingEnabled = false
+        keyguardIsShowing = true
+        keyguardIsOccluded = false
+        run(block)
+    }
+
+    protected fun ensureKeyguardOccludedFsiState(block: State.() -> Unit = {}) = ensureState {
+        isInteractive = true
+        isDreaming = false
+        statusBarState = SHADE
+        hunSettingEnabled = false
+        keyguardIsShowing = true
+        keyguardIsOccluded = true
+        run(block)
+    }
+
+    protected fun ensureDeviceNotProvisionedFsiState(block: State.() -> Unit = {}) = ensureState {
+        isInteractive = true
+        isDreaming = false
+        statusBarState = SHADE
+        hunSettingEnabled = false
+        keyguardIsShowing = false
+        deviceProvisioned = false
+        run(block)
+    }
+
+    protected fun ensureNoHunOrKeyguardFsiState(block: State.() -> Unit = {}) = ensureState {
+        isInteractive = true
+        isDreaming = false
+        statusBarState = SHADE
+        hunSettingEnabled = false
+        keyguardIsShowing = false
+        deviceProvisioned = true
+        run(block)
+    }
+
+    protected fun forEachFsiState(block: () -> Unit) {
+        ensureNotInteractiveFsiState()
+        block()
+
+        ensureDreamingFsiState()
+        block()
+
+        ensureKeyguardFsiState()
+        block()
+
+        ensureLockedShadeFsiState()
+        block()
+
+        ensureKeyguardOccludedFsiState()
+        block()
+
+        ensureDeviceNotProvisionedFsiState()
+        block()
+    }
+
+    private fun forEachPeekableFsiState(extendState: State.() -> Unit = {}, block: () -> Unit) {
+        ensureLockedShadeFsiState(extendState)
+        block()
+
+        ensureKeyguardOccludedFsiState(extendState)
+        block()
+
+        ensureDeviceNotProvisionedFsiState(extendState)
+        block()
+    }
+
+    protected fun withLegacySuppressor(
+        suppressor: NotificationInterruptSuppressor,
+        block: () -> Unit
+    ) {
+        provider.addLegacySuppressor(suppressor)
+        block()
+        provider.removeLegacySuppressor(suppressor)
+    }
+
     protected fun assertShouldHeadsUp(entry: NotificationEntry) =
-        provider.makeUnloggedHeadsUpDecision(entry).let {
+        provider.makeAndLogHeadsUpDecision(entry).let {
             assertTrue("unexpected suppressed HUN: ${it.logReason}", it.shouldInterrupt)
         }
 
     protected fun assertShouldNotHeadsUp(entry: NotificationEntry) =
-        provider.makeUnloggedHeadsUpDecision(entry).let {
+        provider.makeAndLogHeadsUpDecision(entry).let {
             assertFalse("unexpected unsuppressed HUN: ${it.logReason}", it.shouldInterrupt)
         }
 
@@ -607,29 +1067,56 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
 
     protected fun assertShouldFsi(entry: NotificationEntry) =
         provider.makeUnloggedFullScreenIntentDecision(entry).let {
+            provider.logFullScreenIntentDecision(it)
             assertTrue("unexpected suppressed FSI: ${it.logReason}", it.shouldInterrupt)
         }
 
-    protected fun assertShouldNotFsi(entry: NotificationEntry) =
+    protected fun assertShouldNotFsi(
+        entry: NotificationEntry,
+        expectWouldInterruptWithoutDnd: Boolean? = null
+    ) =
         provider.makeUnloggedFullScreenIntentDecision(entry).let {
+            provider.logFullScreenIntentDecision(it)
             assertFalse("unexpected unsuppressed FSI: ${it.logReason}", it.shouldInterrupt)
+            if (expectWouldInterruptWithoutDnd != null) {
+                assertEquals(
+                    "unexpected wouldInterruptWithoutDnd for FSI: ${it.logReason}",
+                    expectWouldInterruptWithoutDnd,
+                    it.wouldInterruptWithoutDnd
+                )
+            }
         }
 
     protected class EntryBuilder(val context: Context) {
-        var importance = IMPORTANCE_DEFAULT
-        var suppressedVisualEffects: Int? = null
-        var whenMs: Long? = null
-        var visibilityOverride: Int? = null
-        var hasFsi = false
-        var canBubble: Boolean? = null
-        var isBubble = false
-        var hasBubbleMetadata = false
+        // Set on BubbleMetadata:
         var bubbleIsShortcut = false
-        var bubbleSuppressesNotification: Boolean? = null
+        var bubbleSuppressesNotification = false
+
+        // Set on Notification.Builder:
+        var whenMs: Long? = null
         var isGrouped = false
-        var isGroupSummary: Boolean? = null
+        var isGroupSummary = false
         var groupAlertBehavior: Int? = null
+        var hasBubbleMetadata = false
+        var hasFsi = false
+
+        // Set on Notification:
+        var isForegroundService = false
+        var isUserInitiatedJob = false
+        var isBubble = false
+        var isStickyAndNotDemoted = false
+
+        // Set on NotificationEntryBuilder:
+        var importance = IMPORTANCE_DEFAULT
+        var canBubble: Boolean? = null
+
+        // Set on NotificationEntry:
         var hasJustLaunchedFsi = false
+
+        // Set on ModifiedRankingBuilder:
+        var packageSuspended = false
+        var visibilityOverride: Int? = null
+        var suppressedVisualEffects: Int? = null
 
         private fun buildBubbleMetadata(): BubbleMetadata {
             val builder =
@@ -647,62 +1134,87 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
                     )
                 }
 
-            bubbleSuppressesNotification?.let { builder.setSuppressNotification(it) }
+            if (bubbleSuppressesNotification) {
+                builder.setSuppressNotification(true)
+            }
 
             return builder.build()
         }
 
         fun build() =
             Notification.Builder(context, TEST_CHANNEL_ID)
-                .apply {
-                    setContentTitle(TEST_CONTENT_TITLE)
-                    setContentText(TEST_CONTENT_TEXT)
+                .also { nb ->
+                    nb.setContentTitle(TEST_CONTENT_TITLE)
+                    nb.setContentText(TEST_CONTENT_TEXT)
 
-                    if (hasFsi) {
-                        setFullScreenIntent(mock(), /* highPriority = */ true)
-                    }
-
-                    whenMs?.let { setWhen(it) }
-
-                    if (hasBubbleMetadata) {
-                        setBubbleMetadata(buildBubbleMetadata())
-                    }
+                    whenMs?.let { nb.setWhen(it) }
 
                     if (isGrouped) {
-                        setGroup(TEST_GROUP_KEY)
+                        nb.setGroup(TEST_GROUP_KEY)
                     }
 
-                    isGroupSummary?.let { setGroupSummary(it) }
+                    if (isGroupSummary) {
+                        nb.setGroupSummary(true)
+                    }
 
-                    groupAlertBehavior?.let { setGroupAlertBehavior(it) }
+                    groupAlertBehavior?.let { nb.setGroupAlertBehavior(it) }
+
+                    if (hasBubbleMetadata) {
+                        nb.setBubbleMetadata(buildBubbleMetadata())
+                    }
+
+                    if (hasFsi) {
+                        nb.setFullScreenIntent(mock(), /* highPriority = */ true)
+                    }
                 }
                 .build()
-                .apply {
+                .also { n ->
+                    if (isForegroundService) {
+                        n.flags = n.flags or FLAG_FOREGROUND_SERVICE
+                    }
+
+                    if (isUserInitiatedJob) {
+                        n.flags = n.flags or FLAG_USER_INITIATED_JOB
+                    }
+
                     if (isBubble) {
-                        flags = flags or FLAG_BUBBLE
+                        n.flags = n.flags or FLAG_BUBBLE
+                    }
+
+                    if (isStickyAndNotDemoted) {
+                        n.flags = n.flags or FLAG_FSI_REQUESTED_BUT_DENIED
                     }
                 }
                 .let { NotificationEntryBuilder().setNotification(it) }
-                .apply {
-                    setPkg(TEST_PACKAGE)
-                    setOpPkg(TEST_PACKAGE)
-                    setTag(TEST_TAG)
+                .also { neb ->
+                    neb.setPkg(TEST_PACKAGE)
+                    neb.setOpPkg(TEST_PACKAGE)
+                    neb.setTag(TEST_TAG)
 
-                    setImportance(importance)
-                    setChannel(NotificationChannel(TEST_CHANNEL_ID, TEST_CHANNEL_NAME, importance))
+                    neb.setImportance(importance)
+                    neb.setChannel(
+                        NotificationChannel(TEST_CHANNEL_ID, TEST_CHANNEL_NAME, importance)
+                    )
 
-                    canBubble?.let { setCanBubble(it) }
+                    canBubble?.let { neb.setCanBubble(it) }
                 }
                 .build()!!
-                .also {
+                .also { ne ->
                     if (hasJustLaunchedFsi) {
-                        it.notifyFullScreenIntentLaunched()
+                        ne.notifyFullScreenIntentLaunched()
                     }
 
-                    modifyRanking(it)
-                        .apply {
-                            suppressedVisualEffects?.let { setSuppressedVisualEffects(it) }
-                            visibilityOverride?.let { setVisibilityOverride(it) }
+                    if (isStickyAndNotDemoted) {
+                        assertFalse(ne.isDemoted)
+                    }
+
+                    modifyRanking(ne)
+                        .also { mrb ->
+                            if (packageSuspended) {
+                                mrb.setSuspended(true)
+                            }
+                            visibilityOverride?.let { mrb.setVisibilityOverride(it) }
+                            suppressedVisualEffects?.let { mrb.setSuppressedVisualEffects(it) }
                         }
                         .build()
                 }
@@ -723,6 +1235,7 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
     }
 
     protected fun buildBubbleEntry(block: EntryBuilder.() -> Unit = {}) = buildEntry {
+        isBubble = true
         canBubble = true
         hasBubbleMetadata = true
         run(block)
@@ -732,6 +1245,45 @@ abstract class VisualInterruptionDecisionProviderTestBase : SysuiTestCase() {
         importance = IMPORTANCE_HIGH
         hasFsi = true
         run(block)
+    }
+
+    private fun assertNoEventsLogged() {
+        assertNoUiEventLogged()
+        assertNoSystemEventLogged()
+    }
+
+    private fun assertNoUiEventLogged() {
+        assertEquals(0, uiEventLogger.numLogs())
+    }
+
+    private fun assertUiEventLogged(uiEventId: UiEventEnum, uid: Int, packageName: String) {
+        assertEquals(1, uiEventLogger.numLogs())
+
+        val event = uiEventLogger.get(0)
+        assertEquals(uiEventId.id, event.eventId)
+        assertEquals(uid, event.uid)
+        assertEquals(packageName, event.packageName)
+    }
+
+    private fun assertNoSystemEventLogged() {
+        assertEquals(0, eventLog.events.size)
+    }
+
+    private fun assertSystemEventLogged(number: String, uid: Int, description: String) {
+        assertEquals(1, eventLog.events.size)
+
+        val event = eventLog.events[0]
+        assertEquals(0x534e4554, event.tag)
+
+        val value = event.value
+        assertTrue(value is Array<*>)
+
+        if (value is Array<*>) {
+            assertEquals(3, value.size)
+            assertEquals(number, value[0])
+            assertEquals(uid, value[1])
+            assertEquals(description, value[2])
+        }
     }
 
     private fun whenAgo(whenAgeMs: Long) = systemClock.currentTimeMillis() - whenAgeMs

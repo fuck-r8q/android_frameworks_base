@@ -12828,15 +12828,6 @@ public final class Settings {
                 "render_shadows_in_compositor";
 
         /**
-         * If true, submit buffers using blast in ViewRootImpl.
-         * (0 = false, 1 = true)
-         * @hide
-         */
-        @Readable
-        public static final String DEVELOPMENT_USE_BLAST_ADAPTER_VR =
-                "use_blast_adapter_vr";
-
-        /**
          * Path to the WindowManager display settings file. If unset, the default file path will
          * be used.
          *
@@ -19070,6 +19061,14 @@ public final class Settings {
             public static final int BATTERY_SAVER_MODE_CUSTOM = 4;
 
             /**
+             Whether 1P apps vote for enabling data during different modes,
+             i.e. BTM, BBSM
+             * @hide
+             */
+            @Readable(maxTargetSdk = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            public static final String CONNECTIVITY_KEEP_DATA_ON = "wear_connectivity_keep_data_on";
+
+            /**
              * The maximum ambient mode duration when an activity is allowed to auto resume.
              * @hide
              */
@@ -19495,6 +19494,7 @@ public final class Settings {
              *
              * @hide
              */
+            @Readable
             public static final String WEAR_MEDIA_CONTROLS_PACKAGE = "wear_media_controls_package";
 
             /**
@@ -19502,6 +19502,7 @@ public final class Settings {
              *
              * @hide
              */
+            @Readable
             public static final String WEAR_MEDIA_SESSIONS_PACKAGE = "wear_media_sessions_package";
 
             /*

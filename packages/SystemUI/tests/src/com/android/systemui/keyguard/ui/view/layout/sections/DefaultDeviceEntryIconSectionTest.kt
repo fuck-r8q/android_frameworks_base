@@ -24,24 +24,30 @@ import androidx.constraintlayout.widget.ConstraintSet
 import androidx.test.filters.SmallTest
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.LockIconViewController
+import com.android.systemui.Flags as AConfigFlags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.biometrics.AuthController
-import com.android.systemui.Flags as AConfigFlags
 import com.android.systemui.flags.FakeFeatureFlags
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerViewModel
+import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryBackgroundViewModel
+import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryForegroundViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DeviceEntryIconViewModel
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
 import com.android.systemui.shade.NotificationPanelView
+import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import org.mockito.Answers
 import org.mockito.Mock
+import org.mockito.Mockito.mock
 import org.mockito.MockitoAnnotations
 
 @ExperimentalCoroutinesApi
@@ -64,10 +70,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
         mSetFlagsRule.enableFlags(AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR)
 
         featureFlags =
-            FakeFeatureFlagsClassic().apply {
-                set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, false)
-                set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
-            }
+            FakeFeatureFlagsClassic().apply { set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false) }
         underTest =
             DefaultDeviceEntryIconSection(
                 keyguardUpdateMonitor,
@@ -77,8 +80,13 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
                 notificationPanelView,
                 featureFlags,
                 { lockIconViewController },
-                { DeviceEntryIconViewModel() },
+                { mock(DeviceEntryIconViewModel::class.java) },
+                { mock(DeviceEntryForegroundViewModel::class.java) },
+                { mock(DeviceEntryBackgroundViewModel::class.java) },
                 { falsingManager },
+                { mock(AlternateBouncerViewModel::class.java) },
+                { mock(NotificationShadeWindowController::class.java) },
+                TestScope().backgroundScope,
             )
     }
 
@@ -93,7 +101,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
     @Test
     fun addViewsConditionally_migrateAndRefactorFlagsOn() {
         mSetFlagsRule.enableFlags(AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR)
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, true)
+        mSetFlagsRule.enableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val constraintLayout = ConstraintLayout(context, null)
         underTest.addViews(constraintLayout)
         assertThat(constraintLayout.childCount).isGreaterThan(0)
@@ -102,7 +110,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
     @Test
     fun addViewsConditionally_migrateFlagOff() {
         mSetFlagsRule.disableFlags(AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR)
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, false)
+        mSetFlagsRule.disableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val constraintLayout = ConstraintLayout(context, null)
         underTest.addViews(constraintLayout)
         assertThat(constraintLayout.childCount).isEqualTo(0)
@@ -110,7 +118,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
 
     @Test
     fun applyConstraints_udfps_refactor_off() {
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, false)
+        mSetFlagsRule.disableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val cs = ConstraintSet()
         underTest.applyConstraints(cs)
 
@@ -122,7 +130,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
 
     @Test
     fun applyConstraints_udfps_refactor_on() {
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, true)
+        mSetFlagsRule.enableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val cs = ConstraintSet()
         underTest.applyConstraints(cs)
 
@@ -134,7 +142,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
 
     @Test
     fun testCenterIcon_udfps_refactor_off() {
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, false)
+        mSetFlagsRule.disableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val cs = ConstraintSet()
         underTest.centerIcon(Point(5, 6), 1F, cs)
 
@@ -150,7 +158,7 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
 
     @Test
     fun testCenterIcon_udfps_refactor_on() {
-        featureFlags.set(Flags.REFACTOR_UDFPS_KEYGUARD_VIEWS, true)
+        mSetFlagsRule.enableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
         val cs = ConstraintSet()
         underTest.centerIcon(Point(5, 6), 1F, cs)
 
@@ -162,5 +170,22 @@ class DefaultDeviceEntryIconSectionTest : SysuiTestCase() {
         assertThat(constraint.layout.startToStart).isEqualTo(ConstraintSet.PARENT_ID)
         assertThat(constraint.layout.topMargin).isEqualTo(5)
         assertThat(constraint.layout.startMargin).isEqualTo(4)
+    }
+
+    @Test
+    fun deviceEntryIconViewIsAboveAlternateBouncerView() {
+        mSetFlagsRule.enableFlags(AConfigFlags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
+
+        val constraintLayout = ConstraintLayout(context, null)
+        underTest.addViews(constraintLayout)
+        assertThat(constraintLayout.childCount).isGreaterThan(0)
+        val deviceEntryIconView = constraintLayout.getViewById(R.id.device_entry_icon_view)
+        val alternateBouncerView = constraintLayout.getViewById(R.id.alternate_bouncer)
+        assertThat(deviceEntryIconView).isNotNull()
+        assertThat(alternateBouncerView).isNotNull()
+
+        // device entry icon is above the alternate bouncer
+        assertThat(constraintLayout.indexOfChild(deviceEntryIconView))
+            .isGreaterThan(constraintLayout.indexOfChild(alternateBouncerView))
     }
 }

@@ -30,7 +30,6 @@ import android.os.RemoteException;
 import android.util.ArrayMap;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
-import android.view.IWindow;
 import android.view.InputApplicationHandle;
 import android.view.InputChannel;
 
@@ -71,7 +70,7 @@ class EmbeddedWindowController {
             mWindowsByInputTransferToken.put(inputTransferToken, window);
             mWindowsByWindowToken.put(window.getWindowToken(), window);
             updateProcessController(window);
-            window.mClient.asBinder().linkToDeath(()-> {
+            window.mClient.linkToDeath(()-> {
                 synchronized (mGlobalLock) {
                     mWindows.remove(inputToken);
                     mWindowsByInputTransferToken.remove(inputTransferToken);
@@ -100,10 +99,10 @@ class EmbeddedWindowController {
         }
     }
 
-    void remove(IWindow client) {
+    void remove(IBinder client) {
         for (int i = mWindows.size() - 1; i >= 0; i--) {
             EmbeddedWindow ew = mWindows.valueAt(i);
-            if (ew.mClient.asBinder() == client.asBinder()) {
+            if (ew.mClient == client) {
                 mWindows.removeAt(i).onRemoved();
                 mWindowsByInputTransferToken.remove(ew.getInputTransferToken());
                 mWindowsByWindowToken.remove(ew.getWindowToken());
@@ -136,7 +135,7 @@ class EmbeddedWindowController {
     }
 
     static class EmbeddedWindow implements InputTarget {
-        final IWindow mClient;
+        final IBinder mClient;
         @Nullable final WindowState mHostWindowState;
         @Nullable final ActivityRecord mHostActivityRecord;
         final String mName;
@@ -169,7 +168,7 @@ class EmbeddedWindowController {
          * @param windowType to forward to input
          * @param displayId used for focus requests
          */
-        EmbeddedWindow(Session session, WindowManagerService service, IWindow clientToken,
+        EmbeddedWindow(Session session, WindowManagerService service, IBinder clientToken,
                        WindowState hostWindowState, int ownerUid, int ownerPid, int windowType,
                        int displayId, IBinder inputTransferToken, String inputHandleName,
                        boolean isFocusable) {
@@ -241,13 +240,8 @@ class EmbeddedWindowController {
             return mWmService.mRoot.getDisplayContent(getDisplayId());
         }
 
-        @Override
-        public IWindow getIWindow() {
-            return mClient;
-        }
-
         public IBinder getWindowToken() {
-            return mClient.asBinder();
+            return mClient;
         }
 
         @Override

@@ -44,6 +44,7 @@ import android.util.Slog;
 import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.pm.pkg.component.ParsedInstrumentation;
 import com.android.internal.util.ArrayUtils;
 import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.parsing.PackageCacher;
@@ -52,7 +53,6 @@ import com.android.server.pm.parsing.pkg.PackageImpl;
 import com.android.server.pm.permission.PermissionManagerServiceInternal;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
-import com.android.server.pm.pkg.component.ParsedInstrumentation;
 
 import java.io.File;
 import java.util.Collections;
@@ -409,12 +409,17 @@ final class RemovePackageHelper {
             if (DEBUG_REMOVE) {
                 Slog.d(TAG, "Updating installed state to false because of DELETE_KEEP_DATA");
             }
+            final boolean isArchive = (flags & PackageManager.DELETE_ARCHIVE) != 0;
+            final long currentTimeMillis = System.currentTimeMillis();
             for (int userId : outInfo.mRemovedUsers) {
                 if (DEBUG_REMOVE) {
                     final boolean wasInstalled = deletedPs.getInstalled(userId);
                     Slog.d(TAG, "    user " + userId + ": " + wasInstalled + " => " + false);
                 }
                 deletedPs.setInstalled(/* installed= */ false, userId);
+                if (isArchive) {
+                    deletedPs.modifyUserState(userId).setArchiveTimeMillis(currentTimeMillis);
+                }
             }
         }
         // make sure to preserve per-user installed state if this removal was just

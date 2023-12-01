@@ -46,6 +46,7 @@ import com.android.systemui.communal.data.repository.CommunalRepository;
 import com.android.systemui.communal.ui.viewmodel.CommunalViewModel;
 import com.android.systemui.compose.ComposeFacade;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlagsClassic;
@@ -53,6 +54,7 @@ import com.android.systemui.flags.Flags;
 import com.android.systemui.keyevent.domain.interactor.SysUIKeyEventHandler;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl;
 import com.android.systemui.keyguard.shared.model.TransitionState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
@@ -447,7 +449,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 }
 
                 boolean bouncerShowing;
-                if (mFeatureFlagsClassic.isEnabled(Flags.ALTERNATE_BOUNCER_VIEW)) {
+                if (DeviceEntryUdfpsRefactor.isEnabled()) {
                     bouncerShowing = mPrimaryBouncerInteractor.isBouncerShowing()
                             || mAlternateBouncerInteractor.isVisibleState();
                 } else {
@@ -457,7 +459,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                         && !bouncerShowing
                         && !mStatusBarStateController.isDozing()) {
                     if (mDragDownHelper.isDragDownEnabled()) {
-                        if (mFeatureFlagsClassic.isEnabled(Flags.MIGRATE_NSSL)) {
+                        if (KeyguardShadeMigrationNssl.isEnabled()) {
                             // When on lockscreen, if the touch originates at the top of the screen
                             // go directly to QS and not the shade
                             if (mQuickSettingsController.shouldQuickSettingsIntercept(
@@ -469,7 +471,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
                         // This handles drag down over lockscreen
                         boolean result = mDragDownHelper.onInterceptTouchEvent(ev);
-                        if (mFeatureFlagsClassic.isEnabled(Flags.MIGRATE_NSSL)) {
+                        if (KeyguardShadeMigrationNssl.isEnabled()) {
                             if (result) {
                                 mLastInterceptWasDragDownHelper = true;
                                 if (ev.getAction() == MotionEvent.ACTION_DOWN) {
@@ -501,7 +503,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 MotionEvent cancellation = MotionEvent.obtain(ev);
                 cancellation.setAction(MotionEvent.ACTION_CANCEL);
                 mStackScrollLayout.onInterceptTouchEvent(cancellation);
-                if (!mFeatureFlagsClassic.isEnabled(Flags.MIGRATE_NSSL)) {
+                if (!KeyguardShadeMigrationNssl.isEnabled()) {
                     mNotificationPanelViewController.handleExternalInterceptTouch(cancellation);
                 }
                 cancellation.recycle();
@@ -516,7 +518,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 if (mStatusBarKeyguardViewManager.onTouch(ev)) {
                     return true;
                 }
-                if (mFeatureFlagsClassic.isEnabled(Flags.MIGRATE_NSSL)) {
+                if (KeyguardShadeMigrationNssl.isEnabled()) {
                     if (mLastInterceptWasDragDownHelper && (mDragDownHelper.isDraggingDown())) {
                         // we still want to finish our drag down gesture when locking the screen
                         handled |= mDragDownHelper.onTouchEvent(ev) || handled;
@@ -602,7 +604,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
     }
 
     private boolean didNotificationPanelInterceptEvent(MotionEvent ev) {
-        if (mFeatureFlagsClassic.isEnabled(Flags.MIGRATE_NSSL)) {
+        if (KeyguardShadeMigrationNssl.isEnabled()) {
             // Since NotificationStackScrollLayout is now a sibling of notification_panel, we need
             // to also ask NotificationPanelViewController directly, in order to process swipe up
             // events originating from notifications

@@ -17,6 +17,20 @@ flag {
 }
 
 flag {
+    name: "deduplicate_accessibility_warning_dialog"
+    namespace: "accessibility"
+    description: "Removes duplicate definition of the accessibility warning dialog."
+    bug: "303511250"
+}
+
+flag {
+    namespace: "accessibility"
+    name: "flash_notification_system_api"
+    description: "Makes flash notification APIs as system APIs for calling from mainline module"
+    bug: "282821643"
+}
+
+flag {
     namespace: "accessibility"
     name: "force_invert_color"
     description: "Enable force force-dark for smart inversion and dark theme everywhere"

@@ -4,13 +4,13 @@ import androidx.compose.animation.core.tween
 import com.android.compose.animation.scene.Edge
 import com.android.compose.animation.scene.TransitionBuilder
 import com.android.systemui.notifications.ui.composable.Notifications
-import com.android.systemui.qs.footer.ui.compose.QuickSettings
+import com.android.systemui.qs.ui.composable.QuickSettings
 import com.android.systemui.shade.ui.composable.ShadeHeader
 
 fun TransitionBuilder.shadeToQuickSettingsTransition() {
     spec = tween(durationMillis = 500)
 
-    translate(Notifications.Elements.Notifications, Edge.Bottom)
+    translate(Notifications.Elements.NotificationScrim, Edge.Bottom)
     timestampRange(endMillis = 83) { fade(QuickSettings.Elements.FooterActions) }
 
     translate(ShadeHeader.Elements.CollapsedContent, y = ShadeHeader.Dimensions.CollapsedHeight)

@@ -3495,6 +3495,7 @@ public class TelephonyManager {
                     SIM_STATE_LOADED,
                     SIM_STATE_PRESENT,
             })
+    @Retention(RetentionPolicy.SOURCE)
     public @interface SimState {}
 
     /**
@@ -10268,6 +10269,7 @@ public class TelephonyManager {
                 CALL_COMPOSER_STATUS_ON,
                 CALL_COMPOSER_STATUS_OFF,
             })
+    @Retention(RetentionPolicy.SOURCE)
     public @interface CallComposerStatus {}
 
     /**
@@ -13255,7 +13257,7 @@ public class TelephonyManager {
             CARRIER_RESTRICTION_STATUS_RESTRICTED,
             CARRIER_RESTRICTION_STATUS_RESTRICTED_TO_CALLER
     })
-
+    @Retention(RetentionPolicy.SOURCE)
     public @interface CarrierRestrictionStatus {
     }
 

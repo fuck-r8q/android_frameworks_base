@@ -26,7 +26,7 @@ import static com.android.systemui.Flags.keyguardBottomAreaRefactor;
 import static com.android.systemui.doze.util.BurnInHelperKt.getBurnInOffset;
 import static com.android.systemui.flags.Flags.DOZING_MIGRATION_1;
 import static com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED;
-import static com.android.systemui.flags.Flags.NEW_AOD_TRANSITION;
+import static com.android.systemui.Flags.newAodTransition;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.annotation.SuppressLint;
@@ -60,10 +60,10 @@ import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.AuthRippleController;
 import com.android.systemui.biometrics.UdfpsController;
 import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
-import com.android.systemui.bouncer.domain.interactor.BouncerInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
@@ -127,7 +127,7 @@ public class LockIconViewController implements Dumpable {
     @NonNull private final KeyguardTransitionInteractor mTransitionInteractor;
     @NonNull private final KeyguardInteractor mKeyguardInteractor;
     @NonNull private final View.AccessibilityDelegate mAccessibilityDelegate;
-    @NonNull private final Lazy<BouncerInteractor> mBouncerInteractor;
+    @NonNull private final Lazy<DeviceEntryInteractor> mDeviceEntryInteractor;
     @NonNull private final SceneContainerFlags mSceneContainerFlags;
 
     // Tracks the velocity of a touch to help filter out the touches that move too fast.
@@ -205,7 +205,7 @@ public class LockIconViewController implements Dumpable {
             @NonNull FeatureFlags featureFlags,
             PrimaryBouncerInteractor primaryBouncerInteractor,
             Context context,
-            Lazy<BouncerInteractor> bouncerInteractor,
+            Lazy<DeviceEntryInteractor> deviceEntryInteractor,
             SceneContainerFlags sceneContainerFlags
     ) {
         mStatusBarStateController = statusBarStateController;
@@ -232,7 +232,7 @@ public class LockIconViewController implements Dumpable {
         dumpManager.registerDumpable(TAG, this);
         mResources = resources;
         mContext = context;
-        mBouncerInteractor = bouncerInteractor;
+        mDeviceEntryInteractor = deviceEntryInteractor;
         mSceneContainerFlags = sceneContainerFlags;
 
         mAccessibilityDelegate = new View.AccessibilityDelegate() {
@@ -395,7 +395,7 @@ public class LockIconViewController implements Dumpable {
             mView.updateIcon(ICON_LOCK, true);
             mView.setContentDescription(mLockedLabel);
             mView.setVisibility(View.VISIBLE);
-        } else if (mIsDozing && mFeatureFlags.isEnabled(NEW_AOD_TRANSITION)) {
+        } else if (mIsDozing && newAodTransition()) {
             mView.animate()
                     .alpha(0f)
                     .setDuration(FADE_OUT_DURATION_MS)
@@ -747,7 +747,7 @@ public class LockIconViewController implements Dumpable {
         vibrateOnLongPress();
 
         if (mSceneContainerFlags.isEnabled()) {
-            mBouncerInteractor.get().showOrUnlockDevice(null);
+            mDeviceEntryInteractor.get().attemptDeviceEntry();
         } else {
             mKeyguardViewController.showPrimaryBouncer(/* scrim */ true);
         }

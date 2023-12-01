@@ -1182,6 +1182,7 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
             case AudioFormat.ENCODING_EVRCB:
             case AudioFormat.ENCODING_EVRCWB:
             case AudioFormat.ENCODING_EVRCNW:
+            case AudioFormat.ENCODING_E_AC3_JOC:
                 mAudioFormat = audioFormat;
                 break;
             default:
@@ -1194,20 +1195,12 @@ public class AudioRecord implements AudioRouting, MicrophoneDirection,
 
 
     // Convenience method for the contructor's audio buffer size check.
-    // preconditions:
-    //    mChannelCount is valid
-    //    mAudioFormat is AudioFormat.ENCODING_PCM_8BIT, AudioFormat.ENCODING_PCM_16BIT,
-    //                 or AudioFormat.ENCODING_PCM_FLOAT
     // postcondition:
     //    mNativeBufferSizeInBytes is valid (multiple of frame size, positive)
     private void audioBuffSizeCheck(int audioBufferSize) throws IllegalArgumentException {
-        // NB: this section is only valid with PCM data.
-        // To update when supporting compressed formats
-        int frameSizeInBytes = mChannelCount
-            * (AudioFormat.getBytesPerSample(mAudioFormat));
-        if ((audioBufferSize % frameSizeInBytes != 0) || (audioBufferSize < 1)) {
+        if ((audioBufferSize % getFormat().getFrameSizeInBytes() != 0) || (audioBufferSize < 1)) {
             throw new IllegalArgumentException("Invalid audio buffer size " + audioBufferSize
-                    + " (frame size " + frameSizeInBytes + ")");
+                    + " (frame size " + getFormat().getFrameSizeInBytes() + ")");
         }
 
         mNativeBufferSizeInBytes = audioBufferSize;

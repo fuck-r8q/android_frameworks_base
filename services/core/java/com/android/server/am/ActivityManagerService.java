@@ -327,6 +327,7 @@ import android.os.Debug;
 import android.os.DropBoxManager;
 import android.os.FactoryTest;
 import android.os.FileUtils;
+import android.os.Flags;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IDeviceIdentifiersPolicyService;
@@ -603,6 +604,9 @@ public class ActivityManagerService extends IActivityManager.Stub
     // Intent sent when remote bugreport collection has been completed
     private static final String INTENT_REMOTE_BUGREPORT_FINISHED =
             "com.android.internal.intent.action.REMOTE_BUGREPORT_FINISHED";
+
+    public static final String DATA_FILE_PATH_HEADER = "Data File: ";
+    public static final String DATA_FILE_PATH_FOOTER = "End Data File\n";
 
     // If set, we will push process association information in to procstats.
     static final boolean TRACK_PROCSTATS_ASSOCIATIONS = true;
@@ -6648,7 +6652,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
 
             final Intent intent = new Intent();
-            intent.setData(uri);
+            intent.setData(ContentProvider.maybeAddUserId(uri, userId));
             intent.setFlags(modeFlags);
 
             final NeededUriGrants needed = mUgmInternal.checkGrantUriPermissionFromIntent(intent,
@@ -8648,6 +8652,12 @@ public class ActivityManagerService extends IActivityManager.Stub
             // If the processes' memory has increased by more than 1% of the total memory,
             // or 10 MB, whichever is greater, then the processes' are eligible to be killed.
             final long totalMemoryInKb = getTotalMemory() / 1000;
+
+            // This threshold should be applicable to both PSS and RSS because the value is absolute
+            // and represents an increase in process memory relative to its own previous state.
+            //
+            // TODO(b/296454553): Tune this value during the flag rollout process if more processes
+            // seem to be getting killed than before.
             final long memoryGrowthThreshold =
                     Math.max(totalMemoryInKb / 100, MINIMUM_MEMORY_GROWTH_THRESHOLD);
             mProcessList.forEachLruProcessesLOSP(false, proc -> {
@@ -8660,24 +8670,34 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (state.isNotCachedSinceIdle()) {
                     if (setProcState >= ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE
                             && setProcState <= ActivityManager.PROCESS_STATE_SERVICE) {
-                        final long initialIdlePss, lastPss, lastSwapPss;
+                        final long initialIdlePssOrRss, lastPssOrRss, lastSwapPss;
                         synchronized (mAppProfiler.mProfilerLock) {
-                            initialIdlePss = pr.getInitialIdlePss();
-                            lastPss = pr.getLastPss();
+                            initialIdlePssOrRss = pr.getInitialIdlePssOrRss();
+                            lastPssOrRss = !Flags.removeAppProfilerPssCollection()
+                                    ? pr.getLastPss() : pr.getLastRss();
                             lastSwapPss = pr.getLastSwapPss();
                         }
-                        if (doKilling && initialIdlePss != 0
-                                && lastPss > (initialIdlePss * 3 / 2)
-                                && lastPss > (initialIdlePss + memoryGrowthThreshold)) {
+                        if (doKilling && initialIdlePssOrRss != 0
+                                && lastPssOrRss > (initialIdlePssOrRss * 3 / 2)
+                                && lastPssOrRss > (initialIdlePssOrRss + memoryGrowthThreshold)) {
                             final StringBuilder sb2 = new StringBuilder(128);
                             sb2.append("Kill");
                             sb2.append(proc.processName);
-                            sb2.append(" in idle maint: pss=");
-                            sb2.append(lastPss);
-                            sb2.append(", swapPss=");
-                            sb2.append(lastSwapPss);
-                            sb2.append(", initialPss=");
-                            sb2.append(initialIdlePss);
+                            if (!Flags.removeAppProfilerPssCollection()) {
+                                sb2.append(" in idle maint: pss=");
+                            } else {
+                                sb2.append(" in idle maint: rss=");
+                            }
+                            sb2.append(lastPssOrRss);
+
+                            if (!Flags.removeAppProfilerPssCollection()) {
+                                sb2.append(", swapPss=");
+                                sb2.append(lastSwapPss);
+                                sb2.append(", initialPss=");
+                            } else {
+                                sb2.append(", initialRss=");
+                            }
+                            sb2.append(initialIdlePssOrRss);
                             sb2.append(", period=");
                             TimeUtils.formatDuration(timeSinceLastIdle, sb2);
                             sb2.append(", lowRamPeriod=");
@@ -8685,8 +8705,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                             Slog.wtfQuiet(TAG, sb2.toString());
                             mHandler.post(() -> {
                                 synchronized (ActivityManagerService.this) {
-                                    proc.killLocked("idle maint (pss " + lastPss
-                                            + " from " + initialIdlePss + ")",
+                                    proc.killLocked(!Flags.removeAppProfilerPssCollection()
+                                            ? "idle maint (pss " : "idle maint (rss " + lastPssOrRss
+                                            + " from " + initialIdlePssOrRss + ")",
                                             ApplicationExitInfo.REASON_OTHER,
                                             ApplicationExitInfo.SUBREASON_MEMORY_PRESSURE,
                                             true);
@@ -8698,7 +8719,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         && setProcState >= ActivityManager.PROCESS_STATE_PERSISTENT) {
                     state.setNotCachedSinceIdle(true);
                     synchronized (mAppProfiler.mProfilerLock) {
-                        pr.setInitialIdlePss(0);
+                        pr.setInitialIdlePssOrRss(0);
                         mAppProfiler.updateNextPssTimeLPf(
                                 state.getSetProcState(), proc.mProfile, now, true);
                     }
@@ -9452,6 +9473,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     void appendDropBoxProcessHeaders(ProcessRecord process, String processName,
             final VolatileDropboxEntryStates volatileStates, final StringBuilder sb) {
+        sb.append("SystemUptimeMs: ").append(SystemClock.uptimeMillis()).append("\n");
+
         // Watchdog thread ends up invoking this function (with
         // a null ProcessRecord) to add the stack file to dropbox.
         // Do not acquire a lock on this (am) in such cases, as it
@@ -9683,17 +9706,33 @@ public class ActivityManagerService extends IActivityManager.Stub
                         : Settings.Global.getInt(mContext.getContentResolver(), logcatSetting, 0);
                 int dropboxMaxSize = Settings.Global.getInt(
                         mContext.getContentResolver(), maxBytesSetting, DROPBOX_DEFAULT_MAX_SIZE);
-                int maxDataFileSize = dropboxMaxSize - sb.length()
-                        - lines * RESERVED_BYTES_PER_LOGCAT_LINE;
 
-                if (dataFile != null && maxDataFileSize > 0) {
-                    try {
-                        sb.append(FileUtils.readTextFile(dataFile, maxDataFileSize,
-                                    "\n\n[[TRUNCATED]]"));
-                    } catch (IOException e) {
-                        Slog.e(TAG, "Error reading " + dataFile, e);
+                if (dataFile != null) {
+                    // Attach the stack traces file to the report so collectors can load them
+                    // by file if they have access.
+                    sb.append(DATA_FILE_PATH_HEADER)
+                            .append(dataFile.getAbsolutePath()).append('\n');
+
+                    int maxDataFileSize = dropboxMaxSize
+                            - sb.length()
+                            - lines * RESERVED_BYTES_PER_LOGCAT_LINE
+                            - DATA_FILE_PATH_FOOTER.length();
+
+                    if (maxDataFileSize > 0) {
+                        // Inline dataFile contents if there is room.
+                        try {
+                            sb.append(FileUtils.readTextFile(dataFile, maxDataFileSize,
+                                    "\n\n[[TRUNCATED]]\n"));
+                        } catch (IOException e) {
+                            Slog.e(TAG, "Error reading " + dataFile, e);
+                        }
                     }
+
+                    // Always append the footer, even there wasn't enough space to inline the
+                    // dataFile contents.
+                    sb.append(DATA_FILE_PATH_FOOTER);
                 }
+
                 if (crashInfo != null && crashInfo.stackTrace != null) {
                     sb.append(crashInfo.stackTrace);
                 }

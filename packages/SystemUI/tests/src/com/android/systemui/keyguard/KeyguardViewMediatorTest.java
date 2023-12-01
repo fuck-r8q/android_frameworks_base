@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -877,6 +878,20 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
         processAllMessagesAndBgExecutorMessages();
 
         verify(mStatusBarKeyguardViewManager, never()).reset(anyBoolean());
+        assertATMSAndKeyguardViewMediatorStatesMatch();
+    }
+
+    @Test
+    @TestableLooper.RunWithLooper(setAsMainLooper = true)
+    public void testStartKeyguardExitAnimation_whenNotInteractive_doesShowAndUpdatesWM() {
+        // If the exit animation was triggered but the device became non-interactive, make sure
+        // relock happens
+        when(mPowerManager.isInteractive()).thenReturn(false);
+
+        startMockKeyguardExitAnimation();
+        cancelMockKeyguardExitAnimation();
+
+        verify(mStatusBarKeyguardViewManager, atLeast(1)).show(null);
         assertATMSAndKeyguardViewMediatorStatesMatch();
     }
 

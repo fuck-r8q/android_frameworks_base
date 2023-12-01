@@ -1247,6 +1247,22 @@ public class NotificationManager {
     }
 
     /**
+     * Returns true if users can independently and fully manage {@link AutomaticZenRule} rules. This
+     * includes the ability to independently activate/deactivate rules and overwrite/freeze the
+     * behavior (policy) of the rule when activated.
+     * <p>
+     * If this method returns true, calls to
+     * {@link #updateAutomaticZenRule(String, AutomaticZenRule)} may fail and apps should defer
+     * rule management to system settings/uis.
+     */
+    @FlaggedApi(Flags.FLAG_MODES_API)
+    public boolean areAutomaticZenRulesUserManaged() {
+        // modes ui is dependent on modes api
+        return Flags.modesApi() && Flags.modesUi();
+    }
+
+
+    /**
      * Returns AutomaticZenRules owned by the caller.
      *
      * <p>
@@ -1256,17 +1272,21 @@ public class NotificationManager {
     public Map<String, AutomaticZenRule> getAutomaticZenRules() {
         INotificationManager service = getService();
         try {
-            List<ZenModeConfig.ZenRule> rules = service.getZenRules();
-            Map<String, AutomaticZenRule> ruleMap = new HashMap<>();
-            for (ZenModeConfig.ZenRule rule : rules) {
-                AutomaticZenRule azr = new AutomaticZenRule(rule.name, rule.component,
-                        rule.configurationActivity, rule.conditionId, rule.zenPolicy,
-                        zenModeToInterruptionFilter(rule.zenMode), rule.enabled,
-                        rule.creationTime);
-                azr.setPackageName(rule.pkg);
-                ruleMap.put(rule.id, azr);
+            if (Flags.modesApi()) {
+                return service.getAutomaticZenRules();
+            } else {
+                List<ZenModeConfig.ZenRule> rules = service.getZenRules();
+                Map<String, AutomaticZenRule> ruleMap = new HashMap<>();
+                for (ZenModeConfig.ZenRule rule : rules) {
+                    AutomaticZenRule azr = new AutomaticZenRule(rule.name, rule.component,
+                            rule.configurationActivity, rule.conditionId, rule.zenPolicy,
+                            zenModeToInterruptionFilter(rule.zenMode), rule.enabled,
+                            rule.creationTime);
+                    azr.setPackageName(rule.pkg);
+                    ruleMap.put(rule.id, azr);
+                }
+                return ruleMap;
             }
-            return ruleMap;
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1642,6 +1662,7 @@ public class NotificationManager {
      *
      * <p>
      */
+    // TODO(b/309457271): Update documentation with VANILLA_ICE_CREAM behavior.
     public Policy getNotificationPolicy() {
         INotificationManager service = getService();
         try {
@@ -1660,6 +1681,7 @@ public class NotificationManager {
      *
      * @param policy The new desired policy.
      */
+    // TODO(b/309457271): Update documentation with VANILLA_ICE_CREAM behavior.
     public void setNotificationPolicy(@NonNull Policy policy) {
         checkRequired("policy", policy);
         INotificationManager service = getService();
@@ -2608,6 +2630,7 @@ public class NotificationManager {
      * Only available if policy access is granted to this package. See
      * {@link #isNotificationPolicyAccessGranted}.
      */
+    // TODO(b/309457271): Update documentation with VANILLA_ICE_CREAM behavior.
     public final void setInterruptionFilter(@InterruptionFilter int interruptionFilter) {
         final INotificationManager service = getService();
         try {

@@ -103,6 +103,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.SystemClock;
 import android.os.SystemProperties;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.util.BoostFramework;
 import android.util.ArraySet;
@@ -932,6 +933,12 @@ public class DisplayPolicy {
             if (!mDisplayContent.isDefaultDisplay) {
                 return;
             }
+            if (awake) {
+                mService.mAtmService.mVisibleDozeUiProcess = null;
+            } else if (mScreenOnFully && mNotificationShade != null) {
+                // Screen is still on, so it may be showing an always-on UI.
+                mService.mAtmService.mVisibleDozeUiProcess = mNotificationShade.getProcess();
+            }
             mService.mAtmService.mKeyguardController.updateDeferTransitionForAod(
                     mAwake /* waiting */);
         }
@@ -977,12 +984,24 @@ public class DisplayPolicy {
     }
 
     public void screenTurnedOn(ScreenOnListener screenOnListener) {
+        WindowProcessController visibleDozeUiProcess = null;
         synchronized (mLock) {
             mScreenOnEarly = true;
             mScreenOnFully = false;
             mKeyguardDrawComplete = false;
             mWindowManagerDrawComplete = false;
             mScreenOnListener = screenOnListener;
+            if (!mAwake && mNotificationShade != null) {
+                // The screen is turned on without awake state. It is usually triggered by an
+                // adding notification, so make the UI process have a higher priority.
+                visibleDozeUiProcess = mNotificationShade.getProcess();
+                mService.mAtmService.mVisibleDozeUiProcess = visibleDozeUiProcess;
+            }
+        }
+        // The method calls AM directly, so invoke it outside the lock.
+        if (visibleDozeUiProcess != null) {
+            Trace.instant(Trace.TRACE_TAG_WINDOW_MANAGER, "screenTurnedOnWhileDozing");
+            mService.mAtmService.setProcessAnimatingWhileDozing(visibleDozeUiProcess);
         }
     }
 
@@ -993,6 +1012,7 @@ public class DisplayPolicy {
             mKeyguardDrawComplete = false;
             mWindowManagerDrawComplete = false;
             mScreenOnListener = null;
+            mService.mAtmService.mVisibleDozeUiProcess = null;
         }
     }
 
@@ -2028,15 +2048,12 @@ public class DisplayPolicy {
                 final InsetsState insetsState = df.mInsetsState;
                 final Rect displayFrame = insetsState.getDisplayFrame();
                 final Insets decor = insetsState.calculateInsets(displayFrame,
-                        dc.mWmService.mDecorTypes,
-                        true /* ignoreVisibility */);
-                final Insets statusBar = insetsState.calculateInsets(displayFrame,
-                        Type.statusBars(), true /* ignoreVisibility */);
+                        dc.mWmService.mDecorTypes, true /* ignoreVisibility */);
+                final Insets configInsets = insetsState.calculateInsets(displayFrame,
+                        dc.mWmService.mConfigTypes, true /* ignoreVisibility */);
                 mNonDecorInsets.set(decor.left, decor.top, decor.right, decor.bottom);
-                mConfigInsets.set(Math.max(statusBar.left, decor.left),
-                        Math.max(statusBar.top, decor.top),
-                        Math.max(statusBar.right, decor.right),
-                        Math.max(statusBar.bottom, decor.bottom));
+                mConfigInsets.set(configInsets.left, configInsets.top, configInsets.right,
+                        configInsets.bottom);
                 mNonDecorFrame.set(displayFrame);
                 mNonDecorFrame.inset(mNonDecorInsets);
                 mConfigFrame.set(displayFrame);

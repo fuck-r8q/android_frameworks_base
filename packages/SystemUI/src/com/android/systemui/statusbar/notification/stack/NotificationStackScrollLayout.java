@@ -20,6 +20,7 @@ import static android.os.Trace.TRACE_TAG_APP;
 
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_NOTIFICATION_SHADE_SCROLL_FLING;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_SHADE_CLEAR_ALL;
+import static com.android.systemui.Flags.newAodTransition;
 import static com.android.systemui.flags.Flags.UNCLEARED_TRANSIENT_HUN_FIX;
 import static com.android.systemui.statusbar.notification.stack.NotificationPriorityBucketKt.BUCKET_SILENT;
 import static com.android.systemui.statusbar.notification.stack.StackStateAnimator.ANIMATION_DURATION_SWIPE;
@@ -202,9 +203,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private final boolean mDebugRemoveAnimation;
     private final boolean mSensitiveRevealAnimEndabled;
     private final RefactorFlag mAnimatedInsets;
-
-    private final boolean mNewAodTransition;
-
     private int mContentHeight;
     private float mIntrinsicContentHeight;
     private int mPaddingBetweenElements;
@@ -253,6 +251,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
     private NotificationLogger.OnChildLocationsChangedListener mListener;
     private OnOverscrollTopChangedListener mOverscrollTopChangedListener;
     private ExpandableView.OnHeightChangedListener mOnHeightChangedListener;
+    private Runnable mOnHeightChangedRunnable;
     private OnEmptySpaceClickListener mOnEmptySpaceClickListener;
     private boolean mNeedsAnimation;
     private boolean mTopPaddingNeedsAnimation;
@@ -632,7 +631,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         mIsSmallLandscapeLockscreenEnabled = mFeatureFlags.isEnabled(
                 Flags.LOCKSCREEN_ENABLE_LANDSCAPE);
         mDebugLines = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_LINES);
-        mNewAodTransition = mFeatureFlags.isEnabled(Flags.NEW_AOD_TRANSITION);
         mDebugRemoveAnimation = mFeatureFlags.isEnabled(Flags.NSSL_DEBUG_REMOVE_ANIMATION);
         mSensitiveRevealAnimEndabled = mFeatureFlags.isEnabled(Flags.SENSITIVE_REVEAL_ANIM);
         mAnimatedInsets =
@@ -1121,6 +1119,10 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         if (mOnHeightChangedListener != null) {
             mOnHeightChangedListener.onHeightChanged(view, needsAnimation);
         }
+
+        if (mOnHeightChangedRunnable != null) {
+            mOnHeightChangedRunnable.run();
+        }
     }
 
     public boolean isPulseExpanding() {
@@ -1457,7 +1459,7 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     @VisibleForTesting
     public void updateStackHeight(float endHeight, float fraction) {
-        if (!mNewAodTransition) {
+        if (!newAodTransition()) {
             // During the (AOD<=>LS) transition where dozeAmount is changing,
             // apply dozeAmount to stack height instead of expansionFraction
             // to unfurl notifications on AOD=>LS wakeup (and furl up on LS=>AOD sleep)
@@ -4252,6 +4254,10 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
         this.mOnHeightChangedListener = onHeightChangedListener;
     }
 
+    void setOnHeightChangedRunnable(Runnable r) {
+        this.mOnHeightChangedRunnable = r;
+    }
+
     void onChildAnimationFinished() {
         setAnimationRunning(false);
         requestChildrenUpdate();
@@ -4657,22 +4663,6 @@ public class NotificationStackScrollLayout extends ViewGroup implements Dumpable
 
     boolean getClearAllInProgress() {
         return mClearAllInProgress;
-    }
-
-    public boolean isFooterViewNotGone() {
-        return mFooterView != null
-                && mFooterView.getVisibility() != View.GONE
-                && !mFooterView.willBeGone();
-    }
-
-    public boolean isFooterViewContentVisible() {
-        return mFooterView != null && mFooterView.isContentVisible();
-    }
-
-    public int getFooterViewHeightWithPadding() {
-        return mFooterView == null ? 0 : mFooterView.getHeight()
-                + mPaddingBetweenElements
-                + mGapHeight;
     }
 
     /**

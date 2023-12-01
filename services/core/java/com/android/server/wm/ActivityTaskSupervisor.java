@@ -99,7 +99,6 @@ import android.app.ResultInfo;
 import android.app.TaskInfo;
 import android.app.WaitResult;
 import android.app.servertransaction.ActivityLifecycleItem;
-import android.app.servertransaction.ClientTransaction;
 import android.app.servertransaction.LaunchActivityItem;
 import android.app.servertransaction.PauseActivityItem;
 import android.app.servertransaction.ResumeActivityItem;
@@ -967,15 +966,11 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 }
 
                 // Create activity launch transaction.
-                final ClientTransaction clientTransaction = ClientTransaction.obtain(
-                        proc.getThread());
-
                 final boolean isTransitionForward = r.isTransitionForward();
                 final IBinder fragmentToken = r.getTaskFragment().getFragmentToken();
-
                 final int deviceId = getDeviceIdForDisplayId(r.getDisplayId());
-                clientTransaction.addCallback(LaunchActivityItem.obtain(r.token,
-                        new Intent(r.intent), System.identityHashCode(r), r.info,
+                final LaunchActivityItem launchActivityItem = LaunchActivityItem.obtain(r.token,
+                        r.intent, System.identityHashCode(r), r.info,
                         // TODO: Have this take the merged configuration instead of separate global
                         // and override configs.
                         mergedConfiguration.getGlobalConfiguration(),
@@ -984,7 +979,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                         proc.getReportedProcState(), r.getSavedState(), r.getPersistentSavedState(),
                         results, newIntents, r.takeOptions(), isTransitionForward,
                         proc.createProfilerInfoIfNeeded(), r.assistToken, activityClientController,
-                        r.shareableActivityToken, r.getLaunchedFromBubble(), fragmentToken));
+                        r.shareableActivityToken, r.getLaunchedFromBubble(), fragmentToken);
 
                 // Set desired final state.
                 final ActivityLifecycleItem lifecycleItem;
@@ -994,10 +989,10 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 } else {
                     lifecycleItem = PauseActivityItem.obtain(r.token);
                 }
-                clientTransaction.setLifecycleStateRequest(lifecycleItem);
 
                 // Schedule transaction.
-                mService.getLifecycleManager().scheduleTransaction(clientTransaction);
+                mService.getLifecycleManager().scheduleTransactionAndLifecycleItems(
+                        proc.getThread(), launchActivityItem, lifecycleItem);
 
                 if (procConfig.seq > mRootWindowContainer.getConfiguration().seq) {
                     // If the seq is increased, there should be something changed (e.g. registered
@@ -1132,7 +1127,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             // Remove the process record so it won't be considered as alive.
             mService.mProcessNames.remove(wpc.mName, wpc.mUid);
             mService.mProcessMap.remove(wpc.getPid());
-        } else if (r.intent.isSandboxActivity(mService.mContext)) {
+        } else if (ActivityTaskManagerService.isSdkSandboxActivity(mService.mContext, r.intent)) {
             Slog.e(TAG, "Abort sandbox activity launching as no sandbox process to host it.");
             r.finishIfPossible("No sandbox process for the activity", false /* oomAdj */);
             r.launchFailed = true;

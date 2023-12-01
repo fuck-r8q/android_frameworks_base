@@ -88,7 +88,6 @@ import com.android.systemui.statusbar.notification.collection.provider.LaunchFul
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.data.repository.NotificationLaunchAnimationRepository;
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationLaunchAnimationInteractor;
-import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProvider;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.NotificationTestHelper;
 import com.android.systemui.statusbar.notification.row.OnUserInteractionCallback;
@@ -139,8 +138,6 @@ public class StatusBarNotificationActivityStarterTest extends SysuiTestCase {
     @Mock
     private KeyguardStateController mKeyguardStateController;
     @Mock
-    private NotificationInterruptStateProvider mNotificationInterruptStateProvider;
-    @Mock
     private Handler mHandler;
     @Mock
     private BubblesManager mBubblesManager;
@@ -163,7 +160,6 @@ public class StatusBarNotificationActivityStarterTest extends SysuiTestCase {
     @Mock
     private InteractionJankMonitor mJankMonitor;
     private FakePowerRepository mPowerRepository;
-    private PowerInteractor mPowerInteractor;
     @Mock
     private UserTracker mUserTracker;
     private final FakeExecutor mUiBgExecutor = new FakeExecutor(new FakeSystemClock());
@@ -214,7 +210,7 @@ public class StatusBarNotificationActivityStarterTest extends SysuiTestCase {
                 UserHandle.of(ActivityManager.getCurrentUser()));
 
         mPowerRepository = new FakePowerRepository();
-        mPowerInteractor = PowerInteractorFactory.create(
+        PowerInteractor mPowerInteractor = PowerInteractorFactory.create(
                 mPowerRepository,
                 new FalsingCollectorFake(),
                 mScreenOffAnimationController,
@@ -247,7 +243,6 @@ public class StatusBarNotificationActivityStarterTest extends SysuiTestCase {
                         mock(NotificationLockscreenUserManager.class),
                         mShadeController,
                         mKeyguardStateController,
-                        mNotificationInterruptStateProvider,
                         mock(LockPatternUtils.class),
                         mock(StatusBarRemoteInputCallback.class),
                         mActivityIntentHelper,

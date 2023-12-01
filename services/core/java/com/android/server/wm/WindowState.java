@@ -1700,8 +1700,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     @Override
-    public IWindow getIWindow() {
-        return mClient;
+    public IBinder getWindowToken() {
+        return mClient.asBinder();
     }
 
     @Override
@@ -3375,7 +3375,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mAnimatingExit = false;
         ProtoLog.d(WM_DEBUG_ANIM, "Clear animatingExit: reason=destroySurface win=%s", this);
 
-        if (useBLASTSync()) {
+        if (syncNextBuffer()) {
             immediatelyNotifyBlastSync();
         }
     }
@@ -5806,7 +5806,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 // Consume the transaction because the sync group will merge it.
                 postDrawTransaction = null;
             }
-        } else if (useBLASTSync()) {
+        } else if (syncNextBuffer()) {
             // Sync that is not using BLAST
             layoutNeeded = onSyncFinishedDrawing();
         }
@@ -5862,7 +5862,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // drawing for being visible, then no need to request redraw.
             return false;
         }
-        return useBLASTSync();
+        return syncNextBuffer();
     }
 
     int getSyncMethod() {
@@ -5887,11 +5887,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * it's next draw in to a transaction). If we have pending draw handlers, we are
      * looking for the client to sync.
      *
-     * See {@link WindowState#mPendingDrawHandlers}
+     * See {@link WindowState#mDrawHandlers}
      */
     @Override
-    boolean useBLASTSync() {
-        return super.useBLASTSync() || (mDrawHandlers.size() != 0);
+    boolean syncNextBuffer() {
+        return super.syncNextBuffer() || (mDrawHandlers.size() != 0);
     }
 
     /**

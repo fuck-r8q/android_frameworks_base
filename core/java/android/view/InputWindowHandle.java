@@ -26,6 +26,7 @@ import android.graphics.Region;
 import android.gui.TouchOcclusionMode;
 import android.os.IBinder;
 import android.os.InputConfig;
+import android.util.Size;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -82,15 +83,11 @@ public final class InputWindowHandle {
     public IBinder token;
 
     /**
-     * The {@link IWindow} handle if InputWindowHandle is associated with a window, null otherwise.
+     * The {@link IBinder} handle if InputWindowHandle is associated with a client token,
+     * normally the IWindow token, null otherwise.
      */
     @Nullable
     private IBinder windowToken;
-    /**
-     * Used to cache IWindow from the windowToken so we don't need to convert every time getWindow
-     * is called.
-     */
-    private IWindow window;
 
     // The window name.
     public String name;
@@ -105,6 +102,9 @@ public final class InputWindowHandle {
 
     // Window frame.
     public final Rect frame = new Rect();
+
+    // The real size of the content, excluding any crop. If no buffer is rendered, this is 0,0
+    public Size contentSize = new Size(0, 0);
 
     public int surfaceInset;
 
@@ -157,6 +157,11 @@ public final class InputWindowHandle {
     public Matrix transform;
 
     /**
+     * The alpha value returned from SurfaceFlinger. This will be ignored if passed as input data.
+     */
+    public float alpha;
+
+    /**
      * The input token for the window to which focus should be transferred when this input window
      * can be successfully focused. If null, this input window will not transfer its focus to
      * any other window.
@@ -177,7 +182,6 @@ public final class InputWindowHandle {
         inputApplicationHandle = new InputApplicationHandle(other.inputApplicationHandle);
         token = other.token;
         windowToken = other.windowToken;
-        window = other.window;
         name = other.name;
         layoutParamsFlags = other.layoutParamsFlags;
         layoutParamsType = other.layoutParamsType;
@@ -199,6 +203,8 @@ public final class InputWindowHandle {
             transform.set(other.transform);
         }
         focusTransferTarget = other.focusTransferTarget;
+        contentSize = new Size(other.contentSize.getWidth(), other.contentSize.getHeight());
+        alpha = other.alpha;
     }
 
     @Override
@@ -211,6 +217,8 @@ public final class InputWindowHandle {
                 .append(", windowToken=").append(windowToken)
                 .append(", displayId=").append(displayId)
                 .append(", isClone=").append((inputConfig & InputConfig.CLONE) != 0)
+                .append(", contentSize=").append(contentSize)
+                .append(", alpha=").append(alpha)
                 .toString();
 
     }
@@ -243,21 +251,12 @@ public final class InputWindowHandle {
         touchableRegionSurfaceControl = new WeakReference<>(bounds);
     }
 
-    public void setWindowToken(IWindow iwindow) {
-        windowToken = iwindow.asBinder();
-        window = iwindow;
+    public void setWindowToken(IBinder iwindow) {
+        windowToken = iwindow;
     }
 
     public @Nullable IBinder getWindowToken() {
         return windowToken;
-    }
-
-    public IWindow getWindow() {
-        if (window != null) {
-            return window;
-        }
-        window = IWindow.Stub.asInterface(windowToken);
-        return window;
     }
 
     /**

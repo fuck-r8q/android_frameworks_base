@@ -23,16 +23,15 @@ import com.android.systemui.communal.data.repository.CommunalMediaRepository
 import com.android.systemui.communal.data.repository.CommunalRepository
 import com.android.systemui.communal.data.repository.CommunalWidgetRepository
 import com.android.systemui.communal.domain.model.CommunalContentModel
-import com.android.systemui.communal.shared.model.CommunalAppWidgetInfo
 import com.android.systemui.communal.shared.model.CommunalContentSize
 import com.android.systemui.communal.shared.model.CommunalSceneKey
+import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.smartspace.data.repository.SmartspaceRepository
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -47,16 +46,13 @@ constructor(
     private val widgetRepository: CommunalWidgetRepository,
     mediaRepository: CommunalMediaRepository,
     smartspaceRepository: SmartspaceRepository,
-    tutorialInteractor: CommunalTutorialInteractor,
     private val appWidgetHost: AppWidgetHost,
+    private val editWidgetsActivityStarter: EditWidgetsActivityStarter
 ) {
 
     /** Whether communal features are enabled. */
     val isCommunalEnabled: Boolean
         get() = communalRepository.isCommunalEnabled
-
-    /** A flow of info about the widget to be displayed, or null if widget is unavailable. */
-    val appWidgetInfo: Flow<CommunalAppWidgetInfo?> = widgetRepository.stopwatchAppWidgetInfo
 
     /**
      * Target scene as requested by the underlying [SceneTransitionLayout] or through
@@ -76,6 +72,11 @@ constructor(
         communalRepository.setDesiredScene(newScene)
     }
 
+    /** Show the widget editor Activity. */
+    fun showWidgetEditor() {
+        editWidgetsActivityStarter.startActivity()
+    }
+
     /** Add a widget at the specified position. */
     fun addWidget(componentName: ComponentName, priority: Int) =
         widgetRepository.addWidget(componentName, priority)
@@ -83,20 +84,11 @@ constructor(
     /** Delete a widget by id. */
     fun deleteWidget(id: Int) = widgetRepository.deleteWidget(id)
 
-    /** A list of all the communal content to be displayed in the communal hub. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val communalContent: Flow<List<CommunalContentModel>> =
-        tutorialInteractor.isTutorialAvailable.flatMapLatest { isTutorialMode ->
-            if (isTutorialMode) {
-                return@flatMapLatest flowOf(tutorialContent)
-            }
-            combine(smartspaceContent, umoContent, widgetContent) { smartspace, umo, widgets ->
-                smartspace + umo + widgets
-            }
-        }
+    /** Reorder widgets. The order in the list will be their display order in the hub. */
+    fun updateWidgetOrder(ids: List<Int>) = widgetRepository.updateWidgetOrder(ids)
 
     /** A list of widget content to be displayed in the communal hub. */
-    private val widgetContent: Flow<List<CommunalContentModel.Widget>> =
+    val widgetContent: Flow<List<CommunalContentModel.Widget>> =
         widgetRepository.communalWidgets.map { widgets ->
             widgets.map Widget@{ widget ->
                 return@Widget CommunalContentModel.Widget(
@@ -108,7 +100,7 @@ constructor(
         }
 
     /** A flow of available smartspace content. Currently only showing timer targets. */
-    private val smartspaceContent: Flow<List<CommunalContentModel.Smartspace>> =
+    val smartspaceContent: Flow<List<CommunalContentModel.Smartspace>> =
         if (!smartspaceRepository.isSmartspaceRemoteViewsEnabled) {
             flowOf(emptyList())
         } else {
@@ -130,7 +122,7 @@ constructor(
         }
 
     /** A list of tutorial content to be displayed in the communal hub in tutorial mode. */
-    private val tutorialContent: List<CommunalContentModel.Tutorial> =
+    val tutorialContent: List<CommunalContentModel.Tutorial> =
         listOf(
             CommunalContentModel.Tutorial(id = 0, CommunalContentSize.FULL),
             CommunalContentModel.Tutorial(id = 1, CommunalContentSize.THIRD),
@@ -142,9 +134,10 @@ constructor(
             CommunalContentModel.Tutorial(id = 7, CommunalContentSize.HALF),
         )
 
-    private val umoContent: Flow<List<CommunalContentModel.Umo>> =
+    val umoContent: Flow<List<CommunalContentModel.Umo>> =
         mediaRepository.mediaPlaying.flatMapLatest { mediaPlaying ->
             if (mediaPlaying) {
+                // TODO(b/310254801): support HALF and FULL layouts
                 flowOf(listOf(CommunalContentModel.Umo(CommunalContentSize.THIRD)))
             } else {
                 flowOf(emptyList())

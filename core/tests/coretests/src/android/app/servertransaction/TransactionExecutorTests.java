@@ -31,6 +31,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -44,6 +45,8 @@ import android.app.ActivityThread.ActivityClientRecord;
 import android.app.ClientTransactionHandler;
 import android.app.servertransaction.ActivityLifecycleItem.LifecycleState;
 import android.app.servertransaction.TestUtils.LaunchActivityItemBuilder;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -57,6 +60,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -78,20 +83,32 @@ import java.util.stream.Collectors;
 @Presubmit
 public class TransactionExecutorTests {
 
+    @Mock
+    private ClientTransactionHandler mTransactionHandler;
+    @Mock
+    private ActivityLifecycleItem mActivityLifecycleItem;
+    @Mock
+    private IBinder mActivityToken;
+    @Mock
+    private Activity mActivity;
+
     private TransactionExecutor mExecutor;
     private TransactionExecutorHelper mExecutorHelper;
-    private ClientTransactionHandler mTransactionHandler;
     private ActivityClientRecord mClientRecord;
 
     @Before
     public void setUp() throws Exception {
-        mTransactionHandler = mock(ClientTransactionHandler.class);
+        MockitoAnnotations.initMocks(this);
 
         mClientRecord = new ActivityClientRecord();
         when(mTransactionHandler.getActivityClient(any())).thenReturn(mClientRecord);
 
         mExecutor = spy(new TransactionExecutor(mTransactionHandler));
         mExecutorHelper = new TransactionExecutorHelper();
+
+        doReturn(true).when(mActivityLifecycleItem).isActivityLifecycleItem();
+        doReturn(mActivityToken).when(mActivityLifecycleItem).getActivityToken();
+        doReturn(mActivity).when(mTransactionHandler).getActivity(mActivityToken);
     }
 
     @Test
@@ -227,23 +244,21 @@ public class TransactionExecutorTests {
         when(callback1.getPostExecutionState()).thenReturn(UNDEFINED);
         ClientTransactionItem callback2 = mock(ClientTransactionItem.class);
         when(callback2.getPostExecutionState()).thenReturn(UNDEFINED);
-        ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
-        IBinder token = mock(IBinder.class);
-        when(stateRequest.getActivityToken()).thenReturn(token);
-        when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
 
         ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         transaction.addCallback(callback1);
         transaction.addCallback(callback2);
-        transaction.setLifecycleStateRequest(stateRequest);
+        transaction.setLifecycleStateRequest(mActivityLifecycleItem);
 
         transaction.preExecute(mTransactionHandler);
         mExecutor.execute(transaction);
 
-        InOrder inOrder = inOrder(mTransactionHandler, callback1, callback2, stateRequest);
+        InOrder inOrder = inOrder(mTransactionHandler, callback1, callback2,
+                mActivityLifecycleItem);
         inOrder.verify(callback1).execute(eq(mTransactionHandler), any());
         inOrder.verify(callback2).execute(eq(mTransactionHandler), any());
-        inOrder.verify(stateRequest).execute(eq(mTransactionHandler), eq(mClientRecord), any());
+        inOrder.verify(mActivityLifecycleItem).execute(eq(mTransactionHandler), eq(mClientRecord),
+                any());
     }
 
     @Test
@@ -252,23 +267,21 @@ public class TransactionExecutorTests {
         when(callback1.getPostExecutionState()).thenReturn(UNDEFINED);
         ClientTransactionItem callback2 = mock(ClientTransactionItem.class);
         when(callback2.getPostExecutionState()).thenReturn(UNDEFINED);
-        ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
-        IBinder token = mock(IBinder.class);
-        when(stateRequest.getActivityToken()).thenReturn(token);
-        when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
 
         ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         transaction.addTransactionItem(callback1);
         transaction.addTransactionItem(callback2);
-        transaction.addTransactionItem(stateRequest);
+        transaction.addTransactionItem(mActivityLifecycleItem);
 
         transaction.preExecute(mTransactionHandler);
         mExecutor.execute(transaction);
 
-        InOrder inOrder = inOrder(mTransactionHandler, callback1, callback2, stateRequest);
+        InOrder inOrder = inOrder(mTransactionHandler, callback1, callback2,
+                mActivityLifecycleItem);
         inOrder.verify(callback1).execute(eq(mTransactionHandler), any());
         inOrder.verify(callback2).execute(eq(mTransactionHandler), any());
-        inOrder.verify(stateRequest).execute(eq(mTransactionHandler), eq(mClientRecord), any());
+        inOrder.verify(mActivityLifecycleItem).execute(eq(mTransactionHandler), eq(mClientRecord),
+                any());
     }
 
     @Test
@@ -290,7 +303,7 @@ public class TransactionExecutorTests {
         // A previous queued launch transaction runs on main thread (execute).
         final ClientTransaction launchTransaction = ClientTransaction.obtain(null /* client */);
         final LaunchActivityItem launchItem =
-                spy(new LaunchActivityItemBuilder().setActivityToken(token).build());
+                spy(new LaunchActivityItemBuilder(token, new Intent(), new ActivityInfo()).build());
         launchTransaction.addCallback(launchItem);
         mExecutor.execute(launchTransaction);
 
@@ -322,7 +335,7 @@ public class TransactionExecutorTests {
         // A previous queued launch transaction runs on main thread (execute).
         final ClientTransaction launchTransaction = ClientTransaction.obtain(null /* client */);
         final LaunchActivityItem launchItem =
-                spy(new LaunchActivityItemBuilder().setActivityToken(token).build());
+                spy(new LaunchActivityItemBuilder(token, new Intent(), new ActivityInfo()).build());
         launchTransaction.addTransactionItem(launchItem);
         mExecutor.execute(launchTransaction);
 
@@ -534,42 +547,36 @@ public class TransactionExecutorTests {
 
     @Test
     public void testActivityItemExecute() {
-        final IBinder token = mock(IBinder.class);
         final ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         final ActivityTransactionItem activityItem = mock(ActivityTransactionItem.class);
         when(activityItem.getPostExecutionState()).thenReturn(UNDEFINED);
-        when(activityItem.getActivityToken()).thenReturn(token);
+        when(activityItem.getActivityToken()).thenReturn(mActivityToken);
         transaction.addCallback(activityItem);
-        final ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
-        transaction.setLifecycleStateRequest(stateRequest);
-        when(stateRequest.getActivityToken()).thenReturn(token);
-        when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
+        transaction.setLifecycleStateRequest(mActivityLifecycleItem);
 
         mExecutor.execute(transaction);
 
-        final InOrder inOrder = inOrder(activityItem, stateRequest);
+        final InOrder inOrder = inOrder(activityItem, mActivityLifecycleItem);
         inOrder.verify(activityItem).execute(eq(mTransactionHandler), eq(mClientRecord), any());
-        inOrder.verify(stateRequest).execute(eq(mTransactionHandler), eq(mClientRecord), any());
+        inOrder.verify(mActivityLifecycleItem).execute(eq(mTransactionHandler), eq(mClientRecord),
+                any());
     }
 
     @Test
     public void testExecuteTransactionItems_activityItemExecute() {
-        final IBinder token = mock(IBinder.class);
         final ClientTransaction transaction = ClientTransaction.obtain(null /* client */);
         final ActivityTransactionItem activityItem = mock(ActivityTransactionItem.class);
         when(activityItem.getPostExecutionState()).thenReturn(UNDEFINED);
-        when(activityItem.getActivityToken()).thenReturn(token);
+        when(activityItem.getActivityToken()).thenReturn(mActivityToken);
         transaction.addTransactionItem(activityItem);
-        final ActivityLifecycleItem stateRequest = mock(ActivityLifecycleItem.class);
-        transaction.addTransactionItem(stateRequest);
-        when(stateRequest.getActivityToken()).thenReturn(token);
-        when(mTransactionHandler.getActivity(token)).thenReturn(mock(Activity.class));
+        transaction.addTransactionItem(mActivityLifecycleItem);
 
         mExecutor.execute(transaction);
 
-        final InOrder inOrder = inOrder(activityItem, stateRequest);
+        final InOrder inOrder = inOrder(activityItem, mActivityLifecycleItem);
         inOrder.verify(activityItem).execute(eq(mTransactionHandler), eq(mClientRecord), any());
-        inOrder.verify(stateRequest).execute(eq(mTransactionHandler), eq(mClientRecord), any());
+        inOrder.verify(mActivityLifecycleItem).execute(eq(mTransactionHandler), eq(mClientRecord),
+                any());
     }
 
     private static int[] shuffledArray(int[] inputArray) {

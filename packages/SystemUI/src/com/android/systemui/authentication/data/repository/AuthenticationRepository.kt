@@ -25,13 +25,14 @@ import com.android.internal.widget.LockPatternChecker
 import com.android.internal.widget.LockPatternUtils
 import com.android.internal.widget.LockscreenCredential
 import com.android.keyguard.KeyguardSecurityModel
-import com.android.systemui.authentication.data.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationResultModel
 import com.android.systemui.authentication.shared.model.AuthenticationThrottlingModel
 import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.util.kotlin.pairwise
 import com.android.systemui.util.time.SystemClock
@@ -45,7 +46,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -65,7 +68,13 @@ interface AuthenticationRepository {
      * Note that the length of the PIN is also important to take into consideration, please see
      * [hintedPinLength].
      */
-    val isAutoConfirmEnabled: StateFlow<Boolean>
+    val isAutoConfirmFeatureEnabled: StateFlow<Boolean>
+
+    /**
+     * Emits the result whenever a PIN/Pattern/Password security challenge is attempted by the user
+     * in order to unlock the device.
+     */
+    val authenticationChallengeResult: SharedFlow<Boolean>
 
     /**
      * The exact length a PIN should be for us to enable PIN length hinting.
@@ -99,6 +108,12 @@ interface AuthenticationRepository {
 
     /** The minimal length of a pattern. */
     val minPatternLength: Int
+
+    /** The minimal length of a password. */
+    val minPasswordLength: Int
+
+    /** Whether the "enhanced PIN privacy" setting is enabled for the current user. */
+    val isPinEnhancedPrivacyEnabled: StateFlow<Boolean>
 
     /**
      * Returns the currently-configured authentication method. This determines how the
@@ -152,18 +167,20 @@ class AuthenticationRepositoryImpl
 @Inject
 constructor(
     @Application private val applicationScope: CoroutineScope,
-    private val getSecurityMode: Function<Int, KeyguardSecurityModel.SecurityMode>,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
+    private val getSecurityMode: Function<Int, KeyguardSecurityModel.SecurityMode>,
     private val userRepository: UserRepository,
     private val lockPatternUtils: LockPatternUtils,
     broadcastDispatcher: BroadcastDispatcher,
+    mobileConnectionsRepository: MobileConnectionsRepository,
 ) : AuthenticationRepository {
 
-    override val isAutoConfirmEnabled: StateFlow<Boolean> =
+    override val isAutoConfirmFeatureEnabled: StateFlow<Boolean> =
         refreshingFlow(
             initialValue = false,
             getFreshValue = lockPatternUtils::isAutoPinConfirmEnabled,
         )
+    override val authenticationChallengeResult = MutableSharedFlow<Boolean>()
 
     override val hintedPinLength: Int = 6
 
@@ -180,9 +197,11 @@ constructor(
         get() = getSelectedUserInfo().id
 
     override val authenticationMethod: Flow<AuthenticationMethodModel> =
-        userRepository.selectedUserInfo
-            .map { it.id }
-            .distinctUntilChanged()
+        combine(userRepository.selectedUserInfo, mobileConnectionsRepository.isAnySimSecure) {
+                selectedUserInfo,
+                _ ->
+                selectedUserInfo.id
+            }
             .flatMapLatest { selectedUserId ->
                 broadcastDispatcher
                     .broadcastFlow(
@@ -200,8 +219,17 @@ constructor(
                     blockingAuthenticationMethodInternal(selectedUserId)
                 }
             }
+            .distinctUntilChanged()
 
     override val minPatternLength: Int = LockPatternUtils.MIN_LOCK_PATTERN_SIZE
+
+    override val minPasswordLength: Int = LockPatternUtils.MIN_LOCK_PASSWORD_SIZE
+
+    override val isPinEnhancedPrivacyEnabled: StateFlow<Boolean> =
+        refreshingFlow(
+            initialValue = true,
+            getFreshValue = { userId -> lockPatternUtils.isPinEnhancedPrivacyEnabled(userId) },
+        )
 
     override suspend fun getAuthenticationMethod(): AuthenticationMethodModel {
         return withContext(backgroundDispatcher) {
@@ -224,6 +252,7 @@ constructor(
             } else {
                 lockPatternUtils.reportFailedPasswordAttempt(selectedUserId)
             }
+            authenticationChallengeResult.emit(isSuccessful)
         }
     }
 
@@ -335,9 +364,9 @@ constructor(
         userId: Int,
     ): AuthenticationMethodModel {
         return when (getSecurityMode.apply(userId)) {
-            KeyguardSecurityModel.SecurityMode.PIN,
+            KeyguardSecurityModel.SecurityMode.PIN -> AuthenticationMethodModel.Pin
             KeyguardSecurityModel.SecurityMode.SimPin,
-            KeyguardSecurityModel.SecurityMode.SimPuk -> AuthenticationMethodModel.Pin
+            KeyguardSecurityModel.SecurityMode.SimPuk -> AuthenticationMethodModel.Sim
             KeyguardSecurityModel.SecurityMode.Password -> AuthenticationMethodModel.Password
             KeyguardSecurityModel.SecurityMode.Pattern -> AuthenticationMethodModel.Pattern
             KeyguardSecurityModel.SecurityMode.None -> AuthenticationMethodModel.None

@@ -65,6 +65,10 @@ interface ShadeRepository {
      */
     @Deprecated("Use ShadeInteractor instead") val legacyShadeTracking: StateFlow<Boolean>
 
+    /** Specifically tracks the user expanding the shade on the lockscreen only */
+    @Deprecated("Use ShadeInteractor.isUserInteractingWithShade instead")
+    val legacyLockscreenShadeTracking: MutableStateFlow<Boolean>
+
     /**
      * QuickSettingsController.mTracking as a flow. "Tracking" means that the user is moving quick
      * settings up or down with a pointer. Going forward, this concept will be replaced by checks
@@ -89,6 +93,29 @@ interface ShadeRepository {
      */
     @Deprecated("Use ShadeInteractor instead") val legacyIsQsExpanded: StateFlow<Boolean>
 
+    /**
+     * QuickSettingsController.mExpandImmediate as a flow. Indicates that Quick Settings is being
+     * expanded without first expanding the Shade or Quick Settings is being collapsed without first
+     * collapsing to shade, i.e. expanding with 2-finger swipe or collapsing by flinging from the
+     * bottom of the screen. Replaced by ShadeInteractor.isQsBypassingShade.
+     */
+    @Deprecated("Use ShadeInteractor.isQsBypassingShade instead")
+    val legacyExpandImmediate: StateFlow<Boolean>
+
+    /** True when QS is taking up the entire screen, i.e. fully expanded on a non-unfolded phone. */
+    @Deprecated("Use ShadeInteractor instead") val legacyQsFullscreen: StateFlow<Boolean>
+
+    /**  */
+    @Deprecated("Use ShadeInteractor instead")
+    fun setLegacyQsFullscreen(legacyQsFullscreen: Boolean)
+
+    /**
+     * Sets whether Quick Settings is being expanded without first expanding the Shade or Quick
+     * Settings is being collapsed without first collapsing to shade.
+     */
+    @Deprecated("Use ShadeInteractor instead")
+    fun setLegacyExpandImmediate(legacyExpandImmediate: Boolean)
+
     /** Sets whether QS is expanded. */
     @Deprecated("Use ShadeInteractor instead")
     fun setLegacyIsQsExpanded(legacyIsQsExpanded: Boolean)
@@ -101,10 +128,14 @@ interface ShadeRepository {
     fun setLegacyExpandedOrAwaitingInputTransfer(legacyExpandedOrAwaitingInputTransfer: Boolean)
 
     /** Sets whether the user is moving Quick Settings with a pointer */
-    fun setLegacyQsTracking(legacyQsTracking: Boolean)
+    @Deprecated("Use ShadeInteractor instead") fun setLegacyQsTracking(legacyQsTracking: Boolean)
 
     /** Sets whether the user is moving the shade with a pointer */
-    fun setLegacyShadeTracking(tracking: Boolean)
+    @Deprecated("Use ShadeInteractor instead") fun setLegacyShadeTracking(tracking: Boolean)
+
+    /** Sets whether the user is moving the shade with a pointer, on lockscreen only */
+    @Deprecated("Use ShadeInteractor instead")
+    fun setLegacyLockscreenShadeTracking(tracking: Boolean)
 
     /** Amount shade has expanded with regard to the UDFPS location */
     val udfpsTransitionToFullShadeProgress: StateFlow<Float>
@@ -177,6 +208,8 @@ constructor(shadeExpansionStateManager: ShadeExpansionStateManager) : ShadeRepos
     @Deprecated("Use ShadeInteractor instead")
     override val legacyShadeTracking: StateFlow<Boolean> = _legacyShadeTracking.asStateFlow()
 
+    override val legacyLockscreenShadeTracking = MutableStateFlow(false)
+
     private val _legacyQsTracking = MutableStateFlow(false)
     @Deprecated("Use ShadeInteractor instead")
     override val legacyQsTracking: StateFlow<Boolean> = _legacyQsTracking.asStateFlow()
@@ -189,6 +222,22 @@ constructor(shadeExpansionStateManager: ShadeExpansionStateManager) : ShadeRepos
     private val _legacyIsQsExpanded = MutableStateFlow(false)
     @Deprecated("Use ShadeInteractor instead")
     override val legacyIsQsExpanded: StateFlow<Boolean> = _legacyIsQsExpanded.asStateFlow()
+
+    private val _legacyExpandImmediate = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyExpandImmediate: StateFlow<Boolean> = _legacyExpandImmediate.asStateFlow()
+
+    private val _legacyQsFullscreen = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead")
+    override val legacyQsFullscreen: StateFlow<Boolean> = _legacyQsFullscreen.asStateFlow()
+
+    override fun setLegacyQsFullscreen(legacyQsFullscreen: Boolean) {
+        _legacyQsFullscreen.value = legacyQsFullscreen
+    }
+
+    override fun setLegacyExpandImmediate(legacyExpandImmediate: Boolean) {
+        _legacyExpandImmediate.value = legacyExpandImmediate
+    }
 
     @Deprecated("Use ShadeInteractor instead")
     override fun setLegacyIsQsExpanded(legacyIsQsExpanded: Boolean) {
@@ -210,6 +259,11 @@ constructor(shadeExpansionStateManager: ShadeExpansionStateManager) : ShadeRepos
     @Deprecated("Should only be called by NPVC and tests")
     override fun setLegacyShadeTracking(tracking: Boolean) {
         _legacyShadeTracking.value = tracking
+    }
+
+    @Deprecated("Should only be called by NPVC and tests")
+    override fun setLegacyLockscreenShadeTracking(tracking: Boolean) {
+        legacyLockscreenShadeTracking.value = tracking
     }
 
     override fun setQsExpansion(qsExpansion: Float) {

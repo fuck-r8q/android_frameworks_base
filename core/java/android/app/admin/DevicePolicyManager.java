@@ -81,6 +81,9 @@ import android.app.Activity;
 import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.admin.SecurityLog.SecurityEvent;
+import android.app.compat.CompatChanges;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
 import android.content.Context;
@@ -3995,8 +3998,7 @@ public class DevicePolicyManager {
 
     /**
      * An integer array extra for {@link #ACTION_DEVICE_POLICY_RESOURCE_UPDATED} to indicate which
-     * resource IDs (see {@link DevicePolicyResources.Drawables} and
-     * {@link DevicePolicyResources.Strings}) have been updated.
+     * resource IDs (i.e. strings and drawables) have been updated.
      */
     public static final String EXTRA_RESOURCE_IDS =
             "android.app.extra.RESOURCE_IDS";
@@ -8367,9 +8369,7 @@ public class DevicePolicyManager {
      * Bundle, TargetUser, PolicyUpdateResult)} will notify the admin on whether the policy was
      * successfully set or not. This callback will contain:
      * <ul>
-     * <li> The policy identifier returned from
-     * {@link DevicePolicyIdentifiers#getIdentifierForUserRestriction(String)} with user restriction
-     * {@link UserManager#DISALLOW_CAMERA}
+     * <li> The policy identifier: userRestriction_no_camera
      * <li> The {@link TargetUser} that this policy relates to
      * <li> The {@link PolicyUpdateResult}, which will be
      * {@link PolicyUpdateResult#RESULT_POLICY_SET} if the policy was successfully set or the
@@ -9118,6 +9118,19 @@ public class DevicePolicyManager {
     }
 
     /**
+     * For apps targeting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM} and above, the
+     * {@link #isDeviceOwnerApp} method will use the user contained within the
+     * context.
+     * For apps targeting an SDK version <em>below</em> this, the user of the calling process will
+     * be used (Process.myUserHandle()).
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    public static final long IS_DEVICE_OWNER_USER_AWARE = 307233716L;
+
+    /**
      * Used to determine if a particular package has been registered as a Device Owner app.
      * A device owner app is a special device admin that cannot be deactivated by the user, once
      * activated as a device admin. It also cannot be uninstalled. To check whether a particular
@@ -9130,8 +9143,13 @@ public class DevicePolicyManager {
      * app, if any.
      * @return whether or not the package is registered as the device owner app.
      */
+    @UserHandleAware(enabledSinceTargetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public boolean isDeviceOwnerApp(String packageName) {
         throwIfParentInstance("isDeviceOwnerApp");
+        if (android.permission.flags.Flags.roleControllerInSystemServer()
+                && CompatChanges.isChangeEnabled(IS_DEVICE_OWNER_USER_AWARE)) {
+            return isDeviceOwnerAppOnContextUser(packageName);
+        }
         return isDeviceOwnerAppOnCallingUser(packageName);
     }
 
@@ -9186,6 +9204,24 @@ public class DevicePolicyManager {
             return false;
         }
         final ComponentName deviceOwner = getDeviceOwnerComponentInner(callingUserOnly);
+        if (deviceOwner == null) {
+            return false;
+        }
+        return packageName.equals(deviceOwner.getPackageName());
+    }
+
+    private boolean isDeviceOwnerAppOnContextUser(String packageName) {
+        if (packageName == null) {
+            return false;
+        }
+        ComponentName deviceOwner = null;
+        if (mService != null) {
+            try {
+                deviceOwner = mService.getDeviceOwnerComponentOnUser(myUserId());
+            } catch (RemoteException re) {
+                throw re.rethrowFromSystemServer();
+            }
+        }
         if (deviceOwner == null) {
             return false;
         }
@@ -9608,6 +9644,7 @@ public class DevicePolicyManager {
      * @param packageName The package name of the app to compare with the registered profile owner.
      * @return Whether or not the package is registered as the profile owner.
      */
+    @UserHandleAware
     public boolean isProfileOwnerApp(String packageName) {
         throwIfParentInstance("isProfileOwnerApp");
         if (mService != null) {
@@ -13363,7 +13400,7 @@ public class DevicePolicyManager {
      * A device owner, by default, may continue granting these permissions. However, for increased
      * user control, the admin may opt out of controlling grants for these permissions by including
      * {@link #EXTRA_PROVISIONING_SENSORS_PERMISSION_GRANT_OPT_OUT} in the provisioning parameters.
-     * In that case the device owner's control will be limited do denying these permissions.
+     * In that case the device owner's control will be limited to denying these permissions.
      * <p>
      * NOTE: On devices running {@link android.os.Build.VERSION_CODES#S} and above, control over
      * the following permissions are restricted for managed profile owners:
@@ -17073,19 +17110,19 @@ public class DevicePolicyManager {
      * Returns {@code true} if this device is marked as a financed device.
      *
      * <p>A financed device can be entered into lock task mode (see {@link #setLockTaskPackages})
-     * by the holder of the role {@link android.app.role.RoleManager#ROLE_FINANCED_DEVICE_KIOSK}.
+     * by the holder of the role {@code android.app.role.RoleManager#ROLE_FINANCED_DEVICE_KIOSK}.
      * If this occurs, Device Owners and Profile Owners that have set lock task packages or
      * features, or that attempt to set lock task packages or features, will receive a callback
      * indicating that it could not be set. See {@link PolicyUpdateReceiver#onPolicyChanged} and
      * {@link PolicyUpdateReceiver#onPolicySetResult}.
      *
      * <p>To be informed of changes to this status you can subscribe to the broadcast
-     * {@link ACTION_DEVICE_FINANCING_STATE_CHANGED}.
+     * {@link #ACTION_DEVICE_FINANCING_STATE_CHANGED}.
      *
      * @throws SecurityException if the caller is not a device owner, profile owner of an
      * organization-owned managed profile, profile owner on the primary user or holder of one of the
-     * following roles: {@link android.app.role.RoleManager.ROLE_DEVICE_POLICY_MANAGEMENT},
-     * android.app.role.RoleManager.ROLE_SYSTEM_SUPERVISION.
+     * following roles: {@code android.app.role.RoleManager.ROLE_DEVICE_POLICY_MANAGEMENT},
+     * {@code android.app.role.RoleManager.ROLE_SYSTEM_SUPERVISION}.
      */
     public boolean isDeviceFinanced() {
         throwIfParentInstance("isDeviceFinanced");
@@ -17127,6 +17164,7 @@ public class DevicePolicyManager {
      *
      * @hide
      */
+    @UnsupportedAppUsage
     public boolean isOnboardingBugreportV2FlagEnabled() {
         return onboardingBugreportV2Enabled();
     }

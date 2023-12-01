@@ -184,6 +184,7 @@ import android.graphics.Region;
 import android.graphics.Region.Op;
 import android.hardware.HardwareBuffer;
 import android.hardware.display.DisplayManagerInternal;
+import android.hardware.display.VirtualDisplayConfig;
 import android.metrics.LogMaker;
 import android.os.Bundle;
 import android.os.Debug;
@@ -1004,6 +1005,24 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 mTmpApplySurfaceChangesTransactionState.obscured;
         final RootWindowContainer root = mWmService.mRoot;
 
+        if (w.mHasSurface) {
+            // Take care of the window being ready to display.
+            final boolean committed = w.mWinAnimator.commitFinishDrawingLocked();
+            if (isDefaultDisplay && committed) {
+                if (w.hasWallpaper()) {
+                    ProtoLog.v(WM_DEBUG_WALLPAPER,
+                            "First draw done in potential wallpaper target %s", w);
+                    mWallpaperMayChange = true;
+                    pendingLayoutChanges |= FINISH_LAYOUT_REDO_WALLPAPER;
+                    if (DEBUG_LAYOUT_REPEATS) {
+                        surfacePlacer.debugLayoutRepeats(
+                                "wallpaper and commitFinishDrawingLocked true",
+                                pendingLayoutChanges);
+                    }
+                }
+            }
+        }
+
         // Update effect.
         w.mObscured = mTmpApplySurfaceChangesTransactionState.obscured;
 
@@ -1090,29 +1109,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         w.handleWindowMovedIfNeeded();
 
-        final WindowStateAnimator winAnimator = w.mWinAnimator;
-
         //Slog.i(TAG, "Window " + this + " clearing mContentChanged - done placing");
         w.resetContentChanged();
-
-        // Moved from updateWindowsAndWallpaperLocked().
-        if (w.mHasSurface) {
-            // Take care of the window being ready to display.
-            final boolean committed = winAnimator.commitFinishDrawingLocked();
-            if (isDefaultDisplay && committed) {
-                if (w.hasWallpaper()) {
-                    ProtoLog.v(WM_DEBUG_WALLPAPER,
-                            "First draw done in potential wallpaper target %s", w);
-                    mWallpaperMayChange = true;
-                    pendingLayoutChanges |= FINISH_LAYOUT_REDO_WALLPAPER;
-                    if (DEBUG_LAYOUT_REPEATS) {
-                        surfacePlacer.debugLayoutRepeats(
-                                "wallpaper and commitFinishDrawingLocked true",
-                                pendingLayoutChanges);
-                    }
-                }
-            }
-        }
 
         final ActivityRecord activity = w.mActivityRecord;
         if (activity != null && activity.isVisibleRequested()) {
@@ -2192,7 +2190,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * @see DisplayWindowPolicyController#getCustomHomeComponent() ()
      */
     @Nullable ComponentName getCustomHomeComponent() {
-        if (!supportsSystemDecorations() || mDwpcHelper == null) {
+        if (!isHomeSupported() || mDwpcHelper == null) {
             return null;
         }
         return mDwpcHelper.getCustomHomeComponent();
@@ -5768,6 +5766,17 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 && mDisplayId != mWmService.mVr2dDisplayId
                 // Do not show system decorations on untrusted virtual display.
                 && isTrusted();
+    }
+
+    /**
+     * Checks if this display is configured and allowed to show home activity and wallpaper.
+     *
+     * <p>This is implied for displays that have {@link Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS}
+     * and can also be set via {@link VirtualDisplayConfig.Builder#setHomeSupported}.</p>
+     */
+    boolean isHomeSupported() {
+        return (mWmService.mDisplayWindowSettings.isHomeSupportedLocked(this) && isTrusted())
+                || supportsSystemDecorations();
     }
 
     SurfaceControl getWindowingLayer() {

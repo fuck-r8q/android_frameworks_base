@@ -43,6 +43,7 @@ import android.app.PackageInstallObserver;
 import android.app.PropertyInvalidatedCache;
 import android.app.admin.DevicePolicyManager;
 import android.app.usage.StorageStatsManager;
+import android.companion.virtual.VirtualDeviceManager;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
@@ -710,12 +711,31 @@ public abstract class PackageManager {
      */
     @SystemApi
     public interface OnPermissionsChangedListener {
+        /**
+         * Called when the permissions for a UID change for the default device.
+         *
+         * @param uid The UID with a change.
+         * @see Context#DEVICE_ID_DEFAULT
+         */
+        void onPermissionsChanged(int uid);
 
         /**
-         * Called when the permissions for a UID change.
-         * @param uid The UID with a change.
+         * Called when the permissions for a UID change for a device, including virtual devices.
+         *
+         * @param uid The UID of permission change event.
+         * @param persistentDeviceId The persistent device ID of permission change event.
+         *
+         * @see VirtualDeviceManager.VirtualDevice#getPersistentDeviceId()
+         * @see VirtualDeviceManager#PERSISTENT_DEVICE_ID_DEFAULT
          */
-        public void onPermissionsChanged(int uid);
+        @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+        default void onPermissionsChanged(int uid, @NonNull String persistentDeviceId) {
+            Objects.requireNonNull(persistentDeviceId);
+            if (Objects.equals(persistentDeviceId,
+                    VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT)) {
+                onPermissionsChanged(uid);
+            }
+        }
     }
 
     /** @hide */
@@ -1481,6 +1501,7 @@ public abstract class PackageManager {
             INSTALL_STAGED,
             INSTALL_REQUEST_UPDATE_OWNERSHIP,
             INSTALL_IGNORE_DEXOPT_PROFILE,
+            INSTALL_UNARCHIVE_DRAFT,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -1723,6 +1744,16 @@ public abstract class PackageManager {
      * @hide
      */
     public static final int INSTALL_IGNORE_DEXOPT_PROFILE = 1 << 28;
+
+    /**
+     * If set, then the session is a draft session created for an upcoming unarchival by its
+     * installer.
+     *
+     * @see PackageInstaller#requestUnarchive(String)
+     *
+     * @hide
+     */
+    public static final int INSTALL_UNARCHIVE_DRAFT = 1 << 29;
 
     /**
      * Flag parameter for {@link #installPackage} to force a non-staged update of an APEX. This is
@@ -4016,6 +4047,15 @@ public abstract class PackageManager {
      */
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_INPUT_METHODS = "android.software.input_methods";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device supports multiple concurrent IME sessions.
+     */
+    @FlaggedApi("android.view.inputmethod.concurrent_input_methods")
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_CONCURRENT_INPUT_METHODS =
+            "android.software.concurrent_input_methods";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
@@ -6364,9 +6404,8 @@ public abstract class PackageManager {
     /**
      * Permission flags set when granting or revoking a permission.
      *
-     * @hide
+     * @removed mistakenly exposed as system-api previously
      */
-    @SystemApi
     @IntDef(prefix = { "FLAG_PERMISSION_" }, value = {
             FLAG_PERMISSION_USER_SET,
             FLAG_PERMISSION_USER_FIXED,
@@ -9781,7 +9820,8 @@ public abstract class PackageManager {
      * launcher to support customization that they might need to handle the suspended state.
      *
      * <p>The caller must hold {@link Manifest.permission#SUSPEND_APPS} to use this API except for
-     * device owner and profile owner.
+     * device owner and profile owner or the {@link Manifest.permission#QUARANTINE_APPS} if the
+     * caller is using {@link #FLAG_SUSPEND_QUARANTINED}.
      *
      * @param packageNames The names of the packages to set the suspended status.
      * @param suspended If set to {@code true}, the packages will be suspended, if set to
@@ -9809,7 +9849,10 @@ public abstract class PackageManager {
      */
     @SystemApi
     @FlaggedApi(android.content.pm.Flags.FLAG_QUARANTINED_ENABLED)
-    @RequiresPermission(value=Manifest.permission.SUSPEND_APPS, conditional=true)
+    @RequiresPermission(anyOf = {
+            Manifest.permission.SUSPEND_APPS,
+            Manifest.permission.QUARANTINE_APPS
+    }, conditional = true)
     @SuppressLint("NullableCollection")
     @Nullable
     public String[] setPackagesSuspended(@Nullable String[] packageNames, boolean suspended,

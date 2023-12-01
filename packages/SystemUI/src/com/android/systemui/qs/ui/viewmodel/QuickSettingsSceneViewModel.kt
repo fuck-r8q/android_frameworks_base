@@ -16,21 +16,40 @@
 
 package com.android.systemui.qs.ui.viewmodel
 
-import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
+import com.android.systemui.qs.ui.adapter.QSSceneAdapter
+import com.android.systemui.scene.shared.model.Direction
+import com.android.systemui.scene.shared.model.SceneKey
+import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.scene.shared.model.UserAction
 import com.android.systemui.shade.ui.viewmodel.ShadeHeaderViewModel
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.map
 
 /** Models UI state and handles user input for the quick settings scene. */
 @SysUISingleton
 class QuickSettingsSceneViewModel
 @Inject
 constructor(
-    private val bouncerInteractor: BouncerInteractor,
+    private val deviceEntryInteractor: DeviceEntryInteractor,
     val shadeHeaderViewModel: ShadeHeaderViewModel,
+    val qsSceneAdapter: QSSceneAdapter,
+    val notifications: NotificationsPlaceholderViewModel,
 ) {
     /** Notifies that some content in quick settings was clicked. */
-    fun onContentClicked() {
-        bouncerInteractor.showOrUnlockDevice()
-    }
+    fun onContentClicked() = deviceEntryInteractor.attemptDeviceEntry()
+
+    val destinationScenes =
+        qsSceneAdapter.isCustomizing.map { customizing ->
+            if (customizing) {
+                mapOf<UserAction, SceneModel>(UserAction.Back to SceneModel(SceneKey.QuickSettings))
+            } else {
+                mapOf(
+                    UserAction.Back to SceneModel(SceneKey.Shade),
+                    UserAction.Swipe(Direction.UP) to SceneModel(SceneKey.Shade),
+                )
+            }
+        }
 }

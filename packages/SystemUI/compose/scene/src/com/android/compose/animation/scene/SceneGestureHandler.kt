@@ -17,7 +17,6 @@
 package com.android.compose.animation.scene
 
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -27,7 +26,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
@@ -36,15 +35,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-@VisibleForTesting
-class SceneGestureHandler(
-    private val layoutImpl: SceneTransitionLayoutImpl,
+internal class SceneGestureHandler(
+    internal val layoutImpl: SceneTransitionLayoutImpl,
     internal val orientation: Orientation,
     private val coroutineScope: CoroutineScope,
 ) {
     val draggable: DraggableHandler = SceneDraggableHandler(this)
 
-    private var transitionState
+    internal var transitionState
         get() = layoutImpl.state.transitionState
         set(value) {
             layoutImpl.state.transitionState = value
@@ -57,17 +55,15 @@ class SceneGestureHandler(
      * Note: the initialScene here does not matter, it's only used for initializing the transition
      * and will be replaced when a drag event starts.
      */
-    private val swipeTransition = SwipeTransition(initialScene = currentScene)
+    internal val swipeTransition = SwipeTransition(initialScene = currentScene)
 
     internal val currentScene: Scene
         get() = layoutImpl.scene(transitionState.currentScene)
 
-    @VisibleForTesting
-    val isDrivingTransition
+    internal val isDrivingTransition
         get() = transitionState == swipeTransition
 
-    @VisibleForTesting
-    var isAnimatingOffset
+    internal var isAnimatingOffset
         get() = swipeTransition.isAnimatingOffset
         private set(value) {
             swipeTransition.isAnimatingOffset = value
@@ -80,7 +76,7 @@ class SceneGestureHandler(
      * The velocity threshold at which the intent of the user is to swipe up or down. It is the same
      * as SwipeableV2Defaults.VelocityThreshold.
      */
-    @VisibleForTesting val velocityThreshold = with(layoutImpl.density) { 125.dp.toPx() }
+    internal val velocityThreshold = with(layoutImpl.density) { 125.dp.toPx() }
 
     /**
      * The positional threshold at which the intent of the user is to swipe to the next scene. It is
@@ -90,7 +86,7 @@ class SceneGestureHandler(
 
     internal var gestureWithPriority: Any? = null
 
-    internal fun onDragStarted(pointersDown: Int, startedPosition: Offset?) {
+    internal fun onDragStarted(pointersDown: Int, layoutSize: IntSize, startedPosition: Offset?) {
         if (isDrivingTransition) {
             // This [transition] was already driving the animation: simply take over it.
             // Stop animating and start from where the current offset.
@@ -126,14 +122,14 @@ class SceneGestureHandler(
         // we will also have to make sure that we correctly handle overscroll.
         swipeTransition.absoluteDistance =
             when (orientation) {
-                Orientation.Horizontal -> layoutImpl.size.width
-                Orientation.Vertical -> layoutImpl.size.height
+                Orientation.Horizontal -> layoutSize.width
+                Orientation.Vertical -> layoutSize.height
             }.toFloat()
 
         val fromEdge =
             startedPosition?.let { position ->
                 layoutImpl.edgeDetector.edge(
-                    layoutImpl.size,
+                    layoutSize,
                     position.round(),
                     layoutImpl.density,
                     orientation,
@@ -414,7 +410,7 @@ class SceneGestureHandler(
         }
     }
 
-    private class SwipeTransition(initialScene: Scene) : TransitionState.Transition {
+    internal class SwipeTransition(initialScene: Scene) : TransitionState.Transition {
         var _currentScene by mutableStateOf(initialScene)
         override val currentScene: SceneKey
             get() = _currentScene.key
@@ -513,9 +509,9 @@ class SceneGestureHandler(
 private class SceneDraggableHandler(
     private val gestureHandler: SceneGestureHandler,
 ) : DraggableHandler {
-    override fun onDragStarted(startedPosition: Offset, pointersDown: Int) {
+    override fun onDragStarted(layoutSize: IntSize, startedPosition: Offset, pointersDown: Int) {
         gestureHandler.gestureWithPriority = this
-        gestureHandler.onDragStarted(pointersDown, startedPosition)
+        gestureHandler.onDragStarted(pointersDown, layoutSize, startedPosition)
     }
 
     override fun onDelta(pixels: Float) {
@@ -532,31 +528,12 @@ private class SceneDraggableHandler(
     }
 }
 
-@VisibleForTesting
-class SceneNestedScrollHandler(
+internal class SceneNestedScrollHandler(
     private val gestureHandler: SceneGestureHandler,
     private val startBehavior: NestedScrollBehavior,
     private val endBehavior: NestedScrollBehavior,
 ) : NestedScrollHandler {
     override val connection: PriorityNestedScrollConnection = nestedScrollConnection()
-
-    private fun Offset.toAmount() =
-        when (gestureHandler.orientation) {
-            Orientation.Horizontal -> x
-            Orientation.Vertical -> y
-        }
-
-    private fun Velocity.toAmount() =
-        when (gestureHandler.orientation) {
-            Orientation.Horizontal -> x
-            Orientation.Vertical -> y
-        }
-
-    private fun Float.toOffset() =
-        when (gestureHandler.orientation) {
-            Orientation.Horizontal -> Offset(x = this, y = 0f)
-            Orientation.Vertical -> Offset(x = 0f, y = this)
-        }
 
     private fun nestedScrollConnection(): PriorityNestedScrollConnection {
         // If we performed a long gesture before entering priority mode, we would have to avoid
@@ -595,22 +572,40 @@ class SceneNestedScrollHandler(
         }
 
         return PriorityNestedScrollConnection(
+            orientation = gestureHandler.orientation,
             canStartPreScroll = { offsetAvailable, offsetBeforeStart ->
-                canChangeScene = offsetBeforeStart == Offset.Zero
-                gestureHandler.isDrivingTransition &&
-                    canChangeScene &&
-                    offsetAvailable.toAmount() != 0f
+                canChangeScene = offsetBeforeStart == 0f
+
+                val canInterceptSwipeTransition =
+                    canChangeScene && gestureHandler.isDrivingTransition && offsetAvailable != 0f
+                if (!canInterceptSwipeTransition) return@PriorityNestedScrollConnection false
+
+                val progress = gestureHandler.swipeTransition.progress
+                val threshold = gestureHandler.layoutImpl.transitionInterceptionThreshold
+                fun isProgressCloseTo(value: Float) = (progress - value).absoluteValue <= threshold
+
+                // The transition is always between 0 and 1. If it is close to either of these
+                // intervals, we want to go directly to the TransitionState.Idle.
+                // The progress value can go beyond this range in the case of overscroll.
+                val shouldSnapToIdle = isProgressCloseTo(0f) || isProgressCloseTo(1f)
+                if (shouldSnapToIdle) {
+                    gestureHandler.swipeTransition.stopOffsetAnimation()
+                    gestureHandler.transitionState =
+                        TransitionState.Idle(gestureHandler.swipeTransition.currentScene)
+                }
+
+                // Start only if we cannot consume this event
+                !shouldSnapToIdle
             },
             canStartPostScroll = { offsetAvailable, offsetBeforeStart ->
-                val amount = offsetAvailable.toAmount()
                 val behavior: NestedScrollBehavior =
                     when {
-                        amount > 0 -> startBehavior
-                        amount < 0 -> endBehavior
+                        offsetAvailable > 0f -> startBehavior
+                        offsetAvailable < 0f -> endBehavior
                         else -> return@PriorityNestedScrollConnection false
                     }
 
-                val isZeroOffset = offsetBeforeStart == Offset.Zero
+                val isZeroOffset = offsetBeforeStart == 0f
 
                 when (behavior) {
                     NestedScrollBehavior.DuringTransitionBetweenScenes -> {
@@ -619,56 +614,57 @@ class SceneNestedScrollHandler(
                     }
                     NestedScrollBehavior.EdgeNoOverscroll -> {
                         canChangeScene = isZeroOffset
-                        isZeroOffset && hasNextScene(amount)
+                        isZeroOffset && hasNextScene(offsetAvailable)
                     }
                     NestedScrollBehavior.EdgeWithOverscroll -> {
                         canChangeScene = isZeroOffset
-                        hasNextScene(amount)
+                        hasNextScene(offsetAvailable)
                     }
                     NestedScrollBehavior.Always -> {
                         canChangeScene = true
-                        hasNextScene(amount)
+                        hasNextScene(offsetAvailable)
                     }
                 }
             },
             canStartPostFling = { velocityAvailable ->
-                val amount = velocityAvailable.toAmount()
                 val behavior: NestedScrollBehavior =
                     when {
-                        amount > 0 -> startBehavior
-                        amount < 0 -> endBehavior
+                        velocityAvailable > 0f -> startBehavior
+                        velocityAvailable < 0f -> endBehavior
                         else -> return@PriorityNestedScrollConnection false
                     }
 
                 // We could start an overscroll animation
                 canChangeScene = false
-                behavior.canStartOnPostFling && hasNextScene(amount)
+                behavior.canStartOnPostFling && hasNextScene(velocityAvailable)
             },
             canContinueScroll = { true },
             onStart = {
                 gestureHandler.gestureWithPriority = this
-                gestureHandler.onDragStarted(pointersDown = 1, startedPosition = null)
+                gestureHandler.onDragStarted(
+                    pointersDown = 1,
+                    layoutSize = gestureHandler.currentScene.targetSize,
+                    startedPosition = null,
+                )
             },
             onScroll = { offsetAvailable ->
                 if (gestureHandler.gestureWithPriority != this) {
-                    return@PriorityNestedScrollConnection Offset.Zero
+                    return@PriorityNestedScrollConnection 0f
                 }
-
-                val amount = offsetAvailable.toAmount()
 
                 // TODO(b/297842071) We should handle the overscroll or slow drag if the gesture is
                 // initiated in a nested child.
-                gestureHandler.onDrag(amount)
+                gestureHandler.onDrag(offsetAvailable)
 
-                amount.toOffset()
+                offsetAvailable
             },
             onStop = { velocityAvailable ->
                 if (gestureHandler.gestureWithPriority != this) {
-                    return@PriorityNestedScrollConnection Velocity.Zero
+                    return@PriorityNestedScrollConnection 0f
                 }
 
                 gestureHandler.onDragStopped(
-                    velocity = velocityAvailable.toAmount(),
+                    velocity = velocityAvailable,
                     canChangeScene = canChangeScene
                 )
 

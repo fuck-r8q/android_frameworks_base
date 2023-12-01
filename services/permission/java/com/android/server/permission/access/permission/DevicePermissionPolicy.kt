@@ -16,7 +16,9 @@
 
 package com.android.server.permission.access.permission
 
+import android.Manifest
 import android.permission.PermissionManager
+import android.permission.flags.Flags
 import android.util.Slog
 import com.android.modules.utils.BinaryXmlPullParser
 import com.android.modules.utils.BinaryXmlSerializer
@@ -261,10 +263,6 @@ class DevicePermissionPolicy : SchemePolicy() {
         synchronized(listenersLock) { listeners = listeners + listener }
     }
 
-    fun removeOnPermissionFlagsChangedListener(listener: OnDevicePermissionFlagsChangedListener) {
-        synchronized(listenersLock) { listeners = listeners - listener }
-    }
-
     private fun isDeviceAwarePermission(permissionName: String): Boolean =
         DEVICE_AWARE_PERMISSIONS.contains(permissionName)
 
@@ -273,14 +271,16 @@ class DevicePermissionPolicy : SchemePolicy() {
 
         /** These permissions are supported for virtual devices. */
         // TODO: b/298661870 - Use new API to get the list of device aware permissions.
-        val DEVICE_AWARE_PERMISSIONS = emptySet<String>()
+        val DEVICE_AWARE_PERMISSIONS =
+            if (Flags.deviceAwarePermissionApis()) {
+                setOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+            } else {
+                emptySet<String>()
+            }
     }
 
-    /**
-     * TODO: b/289355341 - implement listener for permission changes Listener for permission flags
-     *   changes.
-     */
-    abstract class OnDevicePermissionFlagsChangedListener {
+    /** Listener for permission flags changes. */
+    interface OnDevicePermissionFlagsChangedListener {
         /**
          * Called when a permission flags change has been made to the upcoming new state.
          *
@@ -288,7 +288,7 @@ class DevicePermissionPolicy : SchemePolicy() {
          * and only call external code after [onStateMutated] when the new state has actually become
          * the current state visible to external code.
          */
-        abstract fun onDevicePermissionFlagsChanged(
+        fun onDevicePermissionFlagsChanged(
             appId: Int,
             userId: Int,
             deviceId: String,
@@ -302,6 +302,6 @@ class DevicePermissionPolicy : SchemePolicy() {
          *
          * Implementations should keep this method fast to avoid stalling the locked state mutation.
          */
-        abstract fun onStateMutated()
+        fun onStateMutated()
     }
 }

@@ -162,7 +162,7 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.UiThread;
 import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
-import com.android.server.display.DisplayDeviceConfig.SensorData;
+import com.android.server.display.config.SensorData;
 import com.android.server.display.feature.DeviceConfigParameterProvider;
 import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.layout.Layout;
@@ -1624,6 +1624,19 @@ public final class DisplayManagerService extends SystemService {
         final long secondToken = Binder.clearCallingIdentity();
         try {
             final int displayId;
+            final String displayUniqueId = VirtualDisplayAdapter.generateDisplayUniqueId(
+                    packageName, callingUid, virtualDisplayConfig);
+
+            if (virtualDisplayConfig.isHomeSupported()) {
+                if ((flags & VIRTUAL_DISPLAY_FLAG_TRUSTED) == 0) {
+                    Slog.w(TAG, "Display created with home support but lacks "
+                            + "VIRTUAL_DISPLAY_FLAG_TRUSTED, ignoring the home support request.");
+                } else {
+                    mWindowManagerInternal.setHomeSupportedOnDisplay(displayUniqueId,
+                            Display.TYPE_VIRTUAL, true);
+                }
+            }
+
             synchronized (mSyncRoot) {
                 displayId =
                         createVirtualDisplayLocked(
@@ -1631,6 +1644,7 @@ public final class DisplayManagerService extends SystemService {
                                 projection,
                                 callingUid,
                                 packageName,
+                                displayUniqueId,
                                 virtualDevice,
                                 surface,
                                 flags,
@@ -1640,6 +1654,13 @@ public final class DisplayManagerService extends SystemService {
                             displayId, Pair.create(virtualDevice, dwpc));
                     Slog.d(TAG, "Virtual Display: successfully created virtual display");
                 }
+            }
+
+            if (displayId == Display.INVALID_DISPLAY && virtualDisplayConfig.isHomeSupported()
+                    && (flags & VIRTUAL_DISPLAY_FLAG_TRUSTED) != 0) {
+                // Failed to create the virtual display, so we should clean up the WM settings
+                // because it won't receive the onDisplayRemoved callback.
+                mWindowManagerInternal.clearDisplaySettings(displayUniqueId, Display.TYPE_VIRTUAL);
             }
 
             // Build a session describing the MediaProjection instance, if there is one. A session
@@ -1715,6 +1736,7 @@ public final class DisplayManagerService extends SystemService {
             IMediaProjection projection,
             int callingUid,
             String packageName,
+            String uniqueId,
             IVirtualDevice virtualDevice,
             Surface surface,
             int flags,
@@ -1727,10 +1749,9 @@ public final class DisplayManagerService extends SystemService {
             return -1;
         }
 
-
         Slog.d(TAG, "Virtual Display: creating DisplayDevice with VirtualDisplayAdapter");
         DisplayDevice device = mVirtualDisplayAdapter.createVirtualDisplayLocked(
-                callback, projection, callingUid, packageName, surface, flags,
+                callback, projection, callingUid, packageName, uniqueId, surface, flags,
                 virtualDisplayConfig);
         if (device == null) {
             Slog.w(TAG, "Virtual Display: VirtualDisplayAdapter failed to create DisplayDevice");

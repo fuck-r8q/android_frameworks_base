@@ -203,7 +203,7 @@ java_library_static {
         "biometrics_flags_lib",
         "am_flags_lib",
         "com_android_wm_shell_flags_lib",
-        "android.app.flags-aconfig-java"
+        "service-jobscheduler-deviceidle.flags-aconfig-java",
     ],
     javac_shard_size: 50,
     javacflags: [
@@ -217,6 +217,7 @@ java_library_static {
       "//frameworks/base/services",
       "//frameworks/base/tests/Input",
       "//frameworks/base/tests/InputScreenshotTest",
+      "//packages/modules/AdServices/adservices/apk/unittest",
       "//packages/modules/AdServices/adservices/tests/unittest/adservices-test-utility",
       "//packages/modules/AdServices/adservices/tests/unittest/service-core",
       "//packages/modules/AdServices/adservices/tests/unittest/system-service",

@@ -145,6 +145,7 @@ import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
 import android.net.NetworkPolicyManager;
+import android.os.Flags;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManagerInternal;
@@ -1907,7 +1908,7 @@ public class OomAdjuster {
                     // screen on or animating, promote UI
                     state.setCurProcState(ActivityManager.PROCESS_STATE_PERSISTENT_UI);
                     state.setCurrentSchedulingGroup(SCHED_GROUP_TOP_APP);
-                } else {
+                } else if (!app.getWindowProcessController().isShowingUiWhileDozing()) {
                     // screen off, restrict UI scheduling
                     state.setCurProcState(PROCESS_STATE_BOUND_FOREGROUND_SERVICE);
                     state.setCurrentSchedulingGroup(SCHED_GROUP_RESTRICTED);
@@ -2327,8 +2328,10 @@ public class OomAdjuster {
                             || now < (s.lastActivity + mConstants.MAX_SERVICE_INACTIVITY)) {
                         // This service has seen some activity within
                         // recent memory, so we will keep its process ahead
-                        // of the background processes.
-                        if (adj > SERVICE_ADJ) {
+                        // of the background processes. This does not apply
+                        // to the SDK sandbox process since it should never
+                        // be more important than its corresponding app.
+                        if (!app.isSdkSandbox && adj > SERVICE_ADJ) {
                             adj = SERVICE_ADJ;
                             state.setAdjType("started-services");
                             if (DEBUG_OOM_ADJ_REASON || logUid == appUid) {
@@ -2513,9 +2516,23 @@ public class OomAdjuster {
                     // normally be a B service, but if we are low on RAM and it
                     // is large we want to force it down since we would prefer to
                     // keep launcher over it.
+                    long lastPssOrRss = !Flags.removeAppProfilerPssCollection()
+                            ? app.mProfile.getLastPss() : app.mProfile.getLastRss();
+
+                    // RSS is larger than PSS, but the RSS/PSS ratio varies per-process based on how
+                    // many shared pages a process uses. The threshold is increased if the flag for
+                    // reading RSS instead of PSS is enabled.
+                    //
+                    // TODO(b/296454553): Tune the second value so that the relative number of
+                    // service B is similar before/after this flag is enabled.
+                    double thresholdModifier = !Flags.removeAppProfilerPssCollection()
+                            ? 1
+                            : mConstants.PSS_TO_RSS_THRESHOLD_MODIFIER;
+                    double cachedRestoreThreshold =
+                            mProcessList.getCachedRestoreThresholdKb() * thresholdModifier;
+
                     if (!mService.mAppProfiler.isLastMemoryLevelNormal()
-                            && app.mProfile.getLastPss()
-                            >= mProcessList.getCachedRestoreThresholdKb()) {
+                            && lastPssOrRss >= cachedRestoreThreshold) {
                         state.setServiceHighRam(true);
                         state.setServiceB(true);
                         //Slog.i(TAG, "ADJ " + app + " high ram!");

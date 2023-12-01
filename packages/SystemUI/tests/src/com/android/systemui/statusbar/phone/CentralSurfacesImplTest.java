@@ -16,23 +16,18 @@
 
 package com.android.systemui.statusbar.phone;
 
-import static android.app.NotificationManager.IMPORTANCE_HIGH;
-import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
 import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.provider.Settings.Global.HEADS_UP_NOTIFICATIONS_ENABLED;
 import static android.provider.Settings.Global.HEADS_UP_ON;
 
+import static com.android.systemui.Flags.FLAG_LIGHT_REVEAL_MIGRATION;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 import static com.android.systemui.statusbar.StatusBarState.SHADE;
-
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertTrue;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -48,8 +43,6 @@ import static java.util.Collections.emptySet;
 
 import android.app.ActivityManager;
 import android.app.IWallpaperManager;
-import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.WallpaperManager;
 import android.app.trust.TrustManager;
 import android.content.BroadcastReceiver;
@@ -121,6 +114,8 @@ import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInteractor;
+import com.android.systemui.scene.shared.flag.FakeSceneContainerFlags;
+import com.android.systemui.scene.shared.flag.SceneContainerFlags;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.shade.CameraLauncher;
@@ -155,13 +150,13 @@ import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.notification.NotificationLaunchAnimatorControllerProvider;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
 import com.android.systemui.statusbar.notification.collection.NotifLiveDataStore;
-import com.android.systemui.statusbar.notification.collection.NotificationEntry;
-import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder;
 import com.android.systemui.statusbar.notification.collection.render.NotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
 import com.android.systemui.statusbar.notification.interruption.KeyguardNotificationVisibilityProvider;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptLogger;
 import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderImpl;
+import com.android.systemui.statusbar.notification.interruption.NotificationInterruptStateProviderWrapper;
+import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
@@ -176,6 +171,8 @@ import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
+import com.android.systemui.util.EventLog;
+import com.android.systemui.util.FakeEventLog;
 import com.android.systemui.util.WallpaperController;
 import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.concurrency.MessageRouterImpl;
@@ -214,7 +211,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     private CentralSurfacesImpl mCentralSurfaces;
     private FakeMetricsLogger mMetricsLogger;
     private PowerManager mPowerManager;
-    private TestableNotificationInterruptStateProviderImpl mNotificationInterruptStateProvider;
+    private VisualInterruptionDecisionProvider mVisualInterruptionDecisionProvider;
 
     @Mock private NotificationsController mNotificationsController;
     @Mock private LightBarController mLightBarController;
@@ -322,12 +319,15 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     private ShadeController mShadeController;
     private final FakeSystemClock mFakeSystemClock = new FakeSystemClock();
     private final FakeGlobalSettings mFakeGlobalSettings = new FakeGlobalSettings();
+    private final FakeEventLog mFakeEventLog = new FakeEventLog();
     private final FakeExecutor mMainExecutor = new FakeExecutor(mFakeSystemClock);
     private final FakeExecutor mUiBgExecutor = new FakeExecutor(mFakeSystemClock);
     private final FakeFeatureFlags mFeatureFlags = new FakeFeatureFlags();
     private final InitController mInitController = new InitController();
     private final DumpManager mDumpManager = new DumpManager();
     private final ScreenLifecycle mScreenLifecycle = new ScreenLifecycle(mDumpManager);
+
+    private final SceneContainerFlags mSceneContainerFlags = new FakeSceneContainerFlags();
 
     @Before
     public void setup() throws Exception {
@@ -342,11 +342,11 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
         mFeatureFlags.set(Flags.WM_SHADE_ALLOW_BACK_GESTURE, true);
         // For the Shade to animate during the Back gesture, we must enable the animation flag.
         mFeatureFlags.set(Flags.WM_SHADE_ANIMATE_BACK_GESTURE, true);
-        mFeatureFlags.set(Flags.LIGHT_REVEAL_MIGRATION, true);
+        mSetFlagsRule.enableFlags(FLAG_LIGHT_REVEAL_MIGRATION);
         // Turn AOD on and toggle feature flag for jank fixes
         mFeatureFlags.set(Flags.ZJ_285570694_LOCKSCREEN_TRANSITION_FROM_AOD, true);
-        mFeatureFlags.set(Flags.ALTERNATE_BOUNCER_VIEW, false);
         when(mDozeParameters.getAlwaysOn()).thenReturn(true);
+        mSetFlagsRule.disableFlags(com.android.systemui.Flags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR);
 
         IThermalService thermalService = mock(IThermalService.class);
         mPowerManager = new PowerManager(mContext, mPowerManagerService, thermalService,
@@ -354,23 +354,25 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
 
         mFakeGlobalSettings.putInt(HEADS_UP_NOTIFICATIONS_ENABLED, HEADS_UP_ON);
 
-        mNotificationInterruptStateProvider =
-                new TestableNotificationInterruptStateProviderImpl(
-                        mPowerManager,
-                        mAmbientDisplayConfiguration,
-                        mStatusBarStateController,
-                        mKeyguardStateController,
-                        mBatteryController,
-                        mHeadsUpManager,
-                        mock(NotificationInterruptLogger.class),
-                        new Handler(TestableLooper.get(this).getLooper()),
-                        mock(NotifPipelineFlags.class),
-                        mock(KeyguardNotificationVisibilityProvider.class),
-                        mock(UiEventLogger.class),
-                        mUserTracker,
-                        mDeviceProvisionedController,
-                        mFakeSystemClock,
-                        mFakeGlobalSettings);
+        mVisualInterruptionDecisionProvider =
+                new NotificationInterruptStateProviderWrapper(
+                        new TestableNotificationInterruptStateProviderImpl(
+                                mPowerManager,
+                                mAmbientDisplayConfiguration,
+                                mStatusBarStateController,
+                                mKeyguardStateController,
+                                mBatteryController,
+                                mHeadsUpManager,
+                                mock(NotificationInterruptLogger.class),
+                                new Handler(TestableLooper.get(this).getLooper()),
+                                mock(NotifPipelineFlags.class),
+                                mock(KeyguardNotificationVisibilityProvider.class),
+                                mock(UiEventLogger.class),
+                                mUserTracker,
+                                mDeviceProvisionedController,
+                                mFakeSystemClock,
+                                mFakeGlobalSettings,
+                                mFakeEventLog));
 
         mContext.addMockSystemService(TrustManager.class, mock(TrustManager.class));
         mContext.addMockSystemService(FingerprintManager.class, mock(FingerprintManager.class));
@@ -473,7 +475,7 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 new FalsingCollectorFake(),
                 mBroadcastDispatcher,
                 mNotificationGutsManager,
-                mNotificationInterruptStateProvider,
+                mVisualInterruptionDecisionProvider,
                 new ShadeExpansionStateManager(),
                 mKeyguardViewMediator,
                 new DisplayMetrics(),
@@ -555,7 +557,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mAlternateBouncerInteractor,
                 mUserTracker,
                 () -> mFingerprintManager,
-                mActivityStarter
+                mActivityStarter,
+                mSceneContainerFlags
         );
         mScreenLifecycle.addObserver(mCentralSurfaces.mScreenObserver);
         mCentralSurfaces.initShadeVisibilityListener();
@@ -680,92 +683,6 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 new LogMaker(MetricsEvent.BOUNCER)
                         .setType(MetricsEvent.TYPE_OPEN)
                         .setSubtype(1));
-    }
-
-    @Test
-    public void testShouldHeadsUp_nonSuppressedGroupSummary() throws Exception {
-        when(mPowerManager.isScreenOn()).thenReturn(true);
-        when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
-        when(mStatusBarStateController.isDreaming()).thenReturn(false);
-
-        Notification n = new Notification.Builder(getContext(), "a")
-                .setGroup("a")
-                .setGroupSummary(true)
-                .setGroupAlertBehavior(Notification.GROUP_ALERT_SUMMARY)
-                .build();
-
-        NotificationEntry entry = new NotificationEntryBuilder()
-                .setPkg("a")
-                .setOpPkg("a")
-                .setTag("a")
-                .setNotification(n)
-                .setImportance(IMPORTANCE_HIGH)
-                .build();
-
-        assertTrue(mNotificationInterruptStateProvider.shouldHeadsUp(entry));
-    }
-
-    @Test
-    public void testShouldHeadsUp_suppressedGroupSummary() throws Exception {
-        when(mPowerManager.isScreenOn()).thenReturn(true);
-        when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
-        when(mStatusBarStateController.isDreaming()).thenReturn(false);
-
-        Notification n = new Notification.Builder(getContext(), "a")
-                .setGroup("a")
-                .setGroupSummary(true)
-                .setGroupAlertBehavior(Notification.GROUP_ALERT_CHILDREN)
-                .build();
-
-        NotificationEntry entry = new NotificationEntryBuilder()
-                .setPkg("a")
-                .setOpPkg("a")
-                .setTag("a")
-                .setNotification(n)
-                .setImportance(IMPORTANCE_HIGH)
-                .build();
-
-        assertFalse(mNotificationInterruptStateProvider.shouldHeadsUp(entry));
-    }
-
-    @Test
-    public void testShouldHeadsUp_suppressedHeadsUp() throws Exception {
-        when(mPowerManager.isScreenOn()).thenReturn(true);
-        when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
-        when(mStatusBarStateController.isDreaming()).thenReturn(false);
-
-        Notification n = new Notification.Builder(getContext(), "a").build();
-
-        NotificationEntry entry = new NotificationEntryBuilder()
-                .setPkg("a")
-                .setOpPkg("a")
-                .setTag("a")
-                .setChannel(new NotificationChannel("id", null, IMPORTANCE_HIGH))
-                .setNotification(n)
-                .setImportance(IMPORTANCE_HIGH)
-                .setSuppressedVisualEffects(SUPPRESSED_EFFECT_PEEK)
-                .build();
-
-        assertFalse(mNotificationInterruptStateProvider.shouldHeadsUp(entry));
-    }
-
-    @Test
-    public void testShouldHeadsUp_noSuppressedHeadsUp() throws Exception {
-        when(mPowerManager.isScreenOn()).thenReturn(true);
-        when(mHeadsUpManager.isSnoozed(anyString())).thenReturn(false);
-        when(mStatusBarStateController.isDreaming()).thenReturn(false);
-
-        Notification n = new Notification.Builder(getContext(), "a").build();
-
-        NotificationEntry entry = new NotificationEntryBuilder()
-                .setPkg("a")
-                .setOpPkg("a")
-                .setTag("a")
-                .setNotification(n)
-                .setImportance(IMPORTANCE_HIGH)
-                .build();
-
-        assertTrue(mNotificationInterruptStateProvider.shouldHeadsUp(entry));
     }
 
     @Test
@@ -1182,7 +1099,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 UserTracker userTracker,
                 DeviceProvisionedController deviceProvisionedController,
                 SystemClock systemClock,
-                GlobalSettings globalSettings) {
+                GlobalSettings globalSettings,
+                EventLog eventLog) {
             super(
                     powerManager,
                     ambientDisplayConfiguration,
@@ -1198,7 +1116,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                     userTracker,
                     deviceProvisionedController,
                     systemClock,
-                    globalSettings
+                    globalSettings,
+                    eventLog
             );
             mUseHeadsUp = true;
         }

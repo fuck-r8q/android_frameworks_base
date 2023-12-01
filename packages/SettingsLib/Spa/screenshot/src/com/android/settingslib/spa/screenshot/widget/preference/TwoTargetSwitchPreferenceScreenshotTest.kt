@@ -18,30 +18,30 @@ package com.android.settingslib.spa.screenshot.widget.preference
 
 import androidx.compose.foundation.layout.Column
 import com.android.settingslib.spa.framework.compose.stateOf
-import com.android.settingslib.spa.screenshot.util.SettingsScreenshotTestRule
+import com.android.settingslib.spa.screenshot.util.settingsScreenshotTestRule
 import com.android.settingslib.spa.widget.preference.SwitchPreferenceModel
 import com.android.settingslib.spa.widget.preference.TwoTargetSwitchPreference
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.PhoneAndTabletMinimal
 
 /** A screenshot test for ExampleFeature. */
-@RunWith(Parameterized::class)
+@RunWith(ParameterizedAndroidJunit4::class)
 class TwoTargetSwitchPreferenceScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     companion object {
-        @Parameterized.Parameters(name = "{0}")
+        @Parameters(name = "{0}")
         @JvmStatic
         fun getTestSpecs() = DeviceEmulationSpec.PhoneAndTabletMinimal
     }
 
     @get:Rule
     val screenshotRule =
-        SettingsScreenshotTestRule(
+        settingsScreenshotTestRule(
             emulationSpec,
-            "frameworks/base/packages/SettingsLib/Spa/screenshot/assets"
         )
 
     @Test

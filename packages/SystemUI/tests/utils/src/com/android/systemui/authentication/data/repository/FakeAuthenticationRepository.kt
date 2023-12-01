@@ -20,16 +20,16 @@ import com.android.internal.widget.LockPatternUtils
 import com.android.internal.widget.LockPatternView
 import com.android.internal.widget.LockscreenCredential
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode
-import com.android.systemui.authentication.data.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.authentication.shared.model.AuthenticationPatternCoordinate
 import com.android.systemui.authentication.shared.model.AuthenticationResultModel
 import com.android.systemui.authentication.shared.model.AuthenticationThrottlingModel
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.deviceentry.data.repository.FakeDeviceEntryRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,12 +37,13 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
 
 class FakeAuthenticationRepository(
-    private val deviceEntryRepository: FakeDeviceEntryRepository,
     private val currentTime: () -> Long,
 ) : AuthenticationRepository {
 
-    private val _isAutoConfirmEnabled = MutableStateFlow(false)
-    override val isAutoConfirmEnabled: StateFlow<Boolean> = _isAutoConfirmEnabled.asStateFlow()
+    private val _isAutoConfirmFeatureEnabled = MutableStateFlow(false)
+    override val isAutoConfirmFeatureEnabled: StateFlow<Boolean> =
+        _isAutoConfirmFeatureEnabled.asStateFlow()
+    override val authenticationChallengeResult = MutableSharedFlow<Boolean>()
 
     override val hintedPinLength: Int = HINTING_PIN_LENGTH
 
@@ -58,6 +59,12 @@ class FakeAuthenticationRepository(
         _authenticationMethod.asStateFlow()
 
     override val minPatternLength: Int = 4
+
+    override val minPasswordLength: Int = 4
+
+    private val _isPinEnhancedPrivacyEnabled = MutableStateFlow(false)
+    override val isPinEnhancedPrivacyEnabled: StateFlow<Boolean> =
+        _isPinEnhancedPrivacyEnabled.asStateFlow()
 
     private var failedAttemptCount = 0
     private var throttlingEndTimestamp = 0L
@@ -79,7 +86,7 @@ class FakeAuthenticationRepository(
 
     override suspend fun reportAuthenticationAttempt(isSuccessful: Boolean) {
         failedAttemptCount = if (isSuccessful) 0 else failedAttemptCount + 1
-        deviceEntryRepository.setUnlocked(isSuccessful)
+        authenticationChallengeResult.emit(isSuccessful)
     }
 
     override suspend fun getPinLength(): Int {
@@ -98,8 +105,8 @@ class FakeAuthenticationRepository(
         _throttling.value = throttlingModel
     }
 
-    fun setAutoConfirmEnabled(isEnabled: Boolean) {
-        _isAutoConfirmEnabled.value = isEnabled
+    fun setAutoConfirmFeatureEnabled(isEnabled: Boolean) {
+        _isAutoConfirmFeatureEnabled.value = isEnabled
     }
 
     override suspend fun setThrottleDuration(durationMs: Int) {
@@ -137,6 +144,10 @@ class FakeAuthenticationRepository(
         }
     }
 
+    fun setPinEnhancedPrivacyEnabled(isEnabled: Boolean) {
+        _isPinEnhancedPrivacyEnabled.value = isEnabled
+    }
+
     private fun getExpectedCredential(securityMode: SecurityMode): List<Any> {
         return when (val credentialType = getCurrentCredentialType(securityMode)) {
             LockPatternUtils.CREDENTIAL_TYPE_PIN -> credentialOverride ?: DEFAULT_PIN
@@ -169,6 +180,7 @@ class FakeAuthenticationRepository(
                 is AuthenticationMethodModel.Password -> SecurityMode.Password
                 is AuthenticationMethodModel.Pattern -> SecurityMode.Pattern
                 is AuthenticationMethodModel.None -> SecurityMode.None
+                is AuthenticationMethodModel.Sim -> SecurityMode.SimPin
             }
         }
 
@@ -215,9 +227,8 @@ object FakeAuthenticationRepositoryModule {
     @Provides
     @SysUISingleton
     fun provideFake(
-        deviceEntryRepository: FakeDeviceEntryRepository,
         scope: TestScope,
-    ) = FakeAuthenticationRepository(deviceEntryRepository, currentTime = { scope.currentTime })
+    ) = FakeAuthenticationRepository(currentTime = { scope.currentTime })
 
     @Module
     interface Bindings {

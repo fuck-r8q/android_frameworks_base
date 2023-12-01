@@ -22,6 +22,7 @@ import com.android.systemui.communal.data.repository.FakeCommunalMediaRepository
 import com.android.systemui.communal.data.repository.FakeCommunalRepository
 import com.android.systemui.communal.data.repository.FakeCommunalTutorialRepository
 import com.android.systemui.communal.data.repository.FakeCommunalWidgetRepository
+import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.smartspace.data.repository.FakeSmartspaceRepository
@@ -40,6 +41,7 @@ object CommunalInteractorFactory {
         smartspaceRepository: FakeSmartspaceRepository = FakeSmartspaceRepository(),
         tutorialRepository: FakeCommunalTutorialRepository = FakeCommunalTutorialRepository(),
         appWidgetHost: AppWidgetHost = mock(),
+        editWidgetsActivityStarter: EditWidgetsActivityStarter = mock(),
     ): WithDependencies {
         val withDeps =
             CommunalTutorialInteractorFactory.create(
@@ -57,13 +59,14 @@ object CommunalInteractorFactory {
             withDeps.keyguardInteractor,
             withDeps.communalTutorialInteractor,
             appWidgetHost,
+            editWidgetsActivityStarter,
             CommunalInteractor(
                 communalRepository,
                 widgetRepository,
                 mediaRepository,
                 smartspaceRepository,
-                withDeps.communalTutorialInteractor,
                 appWidgetHost,
+                editWidgetsActivityStarter,
             ),
         )
     }
@@ -78,6 +81,7 @@ object CommunalInteractorFactory {
         val keyguardInteractor: KeyguardInteractor,
         val tutorialInteractor: CommunalTutorialInteractor,
         val appWidgetHost: AppWidgetHost,
+        val editWidgetsActivityStarter: EditWidgetsActivityStarter,
         val communalInteractor: CommunalInteractor,
     )
 }

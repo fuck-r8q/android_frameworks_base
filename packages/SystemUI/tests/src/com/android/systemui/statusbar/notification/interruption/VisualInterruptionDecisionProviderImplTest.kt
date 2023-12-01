@@ -18,6 +18,7 @@ package com.android.systemui.statusbar.notification.interruption
 
 import android.testing.AndroidTestingRunner
 import androidx.test.filters.SmallTest
+import com.android.systemui.Flags
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionType.BUBBLE
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionType.PEEK
@@ -28,18 +29,26 @@ import org.junit.runner.RunWith
 @SmallTest
 @RunWith(AndroidTestingRunner::class)
 class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionProviderTestBase() {
+    init {
+        setFlagsRule.enableFlags(Flags.FLAG_VISUAL_INTERRUPTIONS_REFACTOR)
+    }
+
     override val provider by lazy {
         VisualInterruptionDecisionProviderImpl(
             ambientDisplayConfiguration,
             batteryController,
+            deviceProvisionedController,
+            eventLog,
             globalSettings,
             headsUpManager,
             keyguardNotificationVisibilityProvider,
-            logger,
+            keyguardStateController,
+            newLogger,
             mainHandler,
             powerManager,
             statusBarStateController,
             systemClock,
+            uiEventLogger,
             userTracker,
         )
     }
@@ -50,6 +59,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseNotSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -59,6 +69,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseNotSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -68,6 +79,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekSuppressed()
             assertPulseNotSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -77,6 +89,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekSuppressed()
             assertPulseNotSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -86,6 +99,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -95,6 +109,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseSuppressed()
             assertBubbleNotSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -104,6 +119,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseNotSuppressed()
             assertBubbleSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -113,6 +129,7 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
             assertPeekNotSuppressed()
             assertPulseNotSuppressed()
             assertBubbleSuppressed()
+            assertFsiNotSuppressed()
         }
     }
 
@@ -193,6 +210,10 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
         assertShouldBubble(buildBubbleEntry())
     }
 
+    private fun assertFsiNotSuppressed() {
+        forEachFsiState { assertShouldFsi(buildFsiEntry()) }
+    }
+
     private fun withCondition(condition: VisualInterruptionCondition, block: () -> Unit) {
         provider.addCondition(condition)
         block()
@@ -208,14 +229,14 @@ class VisualInterruptionDecisionProviderImplTest : VisualInterruptionDecisionPro
     private class TestCondition(
         types: Set<VisualInterruptionType>,
         val onShouldSuppress: () -> Boolean
-    ) : VisualInterruptionCondition(types = types, reason = "") {
+    ) : VisualInterruptionCondition(types = types, reason = "test condition") {
         override fun shouldSuppress(): Boolean = onShouldSuppress()
     }
 
     private class TestFilter(
         types: Set<VisualInterruptionType>,
         val onShouldSuppress: (NotificationEntry) -> Boolean = { true }
-    ) : VisualInterruptionFilter(types = types, reason = "") {
+    ) : VisualInterruptionFilter(types = types, reason = "test filter") {
         override fun shouldSuppress(entry: NotificationEntry) = onShouldSuppress(entry)
     }
 }

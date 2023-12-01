@@ -16,6 +16,7 @@
 
 package com.android.settingslib.spa.screenshot.util
 
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -49,15 +50,19 @@ class SettingsScreenshotTestRule(
             )
         )
     private val composeRule = createAndroidComposeRule<ComponentActivity>()
-    private val delegateRule =
-        RuleChain.outerRule(colorsRule)
-            .around(deviceEmulationRule)
+    private val roboRule =
+        RuleChain.outerRule(deviceEmulationRule)
             .around(screenshotRule)
             .around(composeRule)
+    private val delegateRule =
+        RuleChain.outerRule(colorsRule)
+            .around(roboRule)
     private val matcher = UnitTestBitmapMatcher
+    private val isRobolectric = if (Build.FINGERPRINT.contains("robolectric")) true else false
 
     override fun apply(base: Statement, description: Description): Statement {
-        return delegateRule.apply(base, description)
+        val ruleToApply = if (isRobolectric) roboRule else delegateRule
+        return ruleToApply.apply(base, description)
     }
 
     /**
@@ -88,4 +93,19 @@ class SettingsScreenshotTestRule(
         val view = (composeRule.onRoot().fetchSemanticsNode().root as ViewRootForTest).view
         screenshotRule.assertBitmapAgainstGolden(view.drawIntoBitmap(), goldenIdentifier, matcher)
     }
+}
+
+/** Create a [SettingsScreenshotTestRule] for settings screenshot tests. */
+fun settingsScreenshotTestRule(
+    emulationSpec: DeviceEmulationSpec,
+): SettingsScreenshotTestRule {
+    val assetPath = if (Build.FINGERPRINT.contains("robolectric")) {
+        "frameworks/base/packages/SettingsLib/Spa/screenshot/robotests/assets"
+    } else {
+        "frameworks/base/packages/SettingsLib/Spa/screenshot/assets"
+    }
+    return SettingsScreenshotTestRule(
+        emulationSpec,
+        assetPath
+    )
 }

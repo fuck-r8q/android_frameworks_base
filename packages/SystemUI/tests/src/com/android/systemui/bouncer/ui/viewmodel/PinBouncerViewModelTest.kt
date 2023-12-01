@@ -19,9 +19,8 @@ package com.android.systemui.bouncer.ui.viewmodel
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.authentication.data.model.AuthenticationMethodModel
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
-import com.android.systemui.authentication.domain.model.AuthenticationMethodModel as DomainAuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.res.R
 import com.android.systemui.scene.SceneTestUtils
@@ -49,16 +48,9 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     private val testScope = utils.testScope
     private val sceneInteractor = utils.sceneInteractor()
     private val authenticationInteractor = utils.authenticationInteractor()
-    private val deviceEntryInteractor =
-        utils.deviceEntryInteractor(
-            authenticationInteractor = authenticationInteractor,
-            sceneInteractor = utils.sceneInteractor(),
-        )
     private val bouncerInteractor =
         utils.bouncerInteractor(
-            deviceEntryInteractor = deviceEntryInteractor,
             authenticationInteractor = authenticationInteractor,
-            sceneInteractor = sceneInteractor,
         )
     private val bouncerViewModel =
         utils.bouncerViewModel(
@@ -72,6 +64,8 @@ class PinBouncerViewModelTest : SysuiTestCase() {
             viewModelScope = testScope.backgroundScope,
             interactor = bouncerInteractor,
             isInputEnabled = MutableStateFlow(true).asStateFlow(),
+            simBouncerInteractor = utils.simBouncerInteractor,
+            authenticationMethod = AuthenticationMethodModel.Pin,
         )
 
     @Before
@@ -83,50 +77,77 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onShown() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
-            utils.deviceEntryRepository.setUnlocked(false)
-            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
-            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
-
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
-
-            underTest.onShown()
+            lockDeviceAndOpenPinBouncer()
 
             assertThat(message?.text).ignoringCase().isEqualTo(ENTER_YOUR_PIN)
             assertThat(pin).isEmpty()
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
-            assertThat(underTest.authenticationMethod)
-                .isEqualTo(DomainAuthenticationMethodModel.Pin)
+            assertThat(underTest.authenticationMethod).isEqualTo(AuthenticationMethodModel.Pin)
+        }
+
+    @Test
+    fun simBouncerViewModel_simAreaIsVisible() =
+        testScope.runTest {
+            val underTest =
+                PinBouncerViewModel(
+                    applicationContext = context,
+                    viewModelScope = testScope.backgroundScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = MutableStateFlow(true).asStateFlow(),
+                    simBouncerInteractor = utils.simBouncerInteractor,
+                    authenticationMethod = AuthenticationMethodModel.Sim,
+                )
+
+            assertThat(underTest.isSimAreaVisible).isTrue()
+        }
+
+    @Test
+    fun onErrorDialogDismissed_clearsDialogMessage() =
+        testScope.runTest {
+            val dialogMessage by collectLastValue(underTest.errorDialogMessage)
+            utils.simBouncerRepository.setSimVerificationErrorMessage("abc")
+            assertThat(dialogMessage).isEqualTo("abc")
+
+            underTest.onErrorDialogDismissed()
+
+            assertThat(dialogMessage).isNull()
+        }
+
+    @Test
+    fun simBouncerViewModel_autoConfirmEnabled_hintedPinLengthIsNull() =
+        testScope.runTest {
+            val underTest =
+                PinBouncerViewModel(
+                    applicationContext = context,
+                    viewModelScope = testScope.backgroundScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = MutableStateFlow(true).asStateFlow(),
+                    simBouncerInteractor = utils.simBouncerInteractor,
+                    authenticationMethod = AuthenticationMethodModel.Sim,
+                )
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
+            val hintedPinLength by collectLastValue(underTest.hintedPinLength)
+
+            assertThat(hintedPinLength).isNull()
         }
 
     @Test
     fun onPinButtonClicked() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
-            utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.deviceEntryRepository.setUnlocked(false)
-            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
-            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
-
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
-            underTest.onShown()
-            runCurrent()
+            lockDeviceAndOpenPinBouncer()
 
             underTest.onPinButtonClicked(1)
 
             assertThat(message?.text).isEmpty()
             assertThat(pin).containsExactly(1)
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
         }
 
     @Test
     fun onBackspaceButtonClicked() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
             lockDeviceAndOpenPinBouncer()
@@ -138,7 +159,6 @@ class PinBouncerViewModelTest : SysuiTestCase() {
 
             assertThat(message?.text).isEmpty()
             assertThat(pin).isEmpty()
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
         }
 
     @Test
@@ -182,16 +202,15 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAuthenticateButtonClicked_whenCorrect() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
+            val authResult by
+                collectLastValue(authenticationInteractor.authenticationChallengeResult)
             lockDeviceAndOpenPinBouncer()
 
-            FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
-                underTest.onPinButtonClicked(digit)
-            }
+            FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)
 
             underTest.onAuthenticateButtonClicked()
 
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Gone))
+            assertThat(authResult).isTrue()
         }
 
     @Test
@@ -218,7 +237,8 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAuthenticateButtonClicked_correctAfterWrong() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
+            val authResult by
+                collectLastValue(authenticationInteractor.authenticationChallengeResult)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
             lockDeviceAndOpenPinBouncer()
@@ -231,31 +251,28 @@ class PinBouncerViewModelTest : SysuiTestCase() {
             underTest.onAuthenticateButtonClicked()
             assertThat(message?.text).ignoringCase().isEqualTo(WRONG_PIN)
             assertThat(pin).isEmpty()
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
+            assertThat(authResult).isFalse()
 
             // Enter the correct PIN:
-            FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
-                underTest.onPinButtonClicked(digit)
-            }
+            FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)
             assertThat(message?.text).isEmpty()
 
             underTest.onAuthenticateButtonClicked()
 
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Gone))
+            assertThat(authResult).isTrue()
         }
 
     @Test
     fun onAutoConfirm_whenCorrect() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
-            utils.authenticationRepository.setAutoConfirmEnabled(true)
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
+            val authResult by
+                collectLastValue(authenticationInteractor.authenticationChallengeResult)
             lockDeviceAndOpenPinBouncer()
 
-            FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
-                underTest.onPinButtonClicked(digit)
-            }
+            FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)
 
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Gone))
+            assertThat(authResult).isTrue()
         }
 
     @Test
@@ -264,7 +281,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
             val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
-            utils.authenticationRepository.setAutoConfirmEnabled(true)
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
             lockDeviceAndOpenPinBouncer()
 
             FakeAuthenticationRepository.DEFAULT_PIN.dropLast(1).forEach { digit ->
@@ -282,31 +299,21 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onShown_againAfterSceneChange_resetsPin() =
         testScope.runTest {
-            val currentScene by collectLastValue(sceneInteractor.desiredScene)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
             lockDeviceAndOpenPinBouncer()
 
             // The user types a PIN.
-            FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
-                underTest.onPinButtonClicked(digit)
-            }
+            FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)
             assertThat(pin).isNotEmpty()
 
             // The user doesn't confirm the PIN, but navigates back to the lockscreen instead.
-            sceneInteractor.changeScene(SceneModel(SceneKey.Lockscreen), "reason")
-            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Lockscreen), "reason")
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Lockscreen))
+            switchToScene(SceneKey.Lockscreen)
 
             // The user navigates to the bouncer again.
-            sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
-            sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
-
-            underTest.onShown()
+            switchToScene(SceneKey.Bouncer)
 
             // Ensure the previously-entered PIN is not shown.
             assertThat(pin).isEmpty()
-            assertThat(currentScene).isEqualTo(SceneModel(SceneKey.Bouncer))
         }
 
     @Test
@@ -324,7 +331,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val backspaceButtonAppearance by collectLastValue(underTest.backspaceButtonAppearance)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setAutoConfirmEnabled(true)
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
 
             assertThat(backspaceButtonAppearance).isEqualTo(ActionButtonAppearance.Hidden)
         }
@@ -334,7 +341,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val backspaceButtonAppearance by collectLastValue(underTest.backspaceButtonAppearance)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setAutoConfirmEnabled(true)
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
 
             underTest.onPinButtonClicked(1)
 
@@ -356,21 +363,40 @@ class PinBouncerViewModelTest : SysuiTestCase() {
         testScope.runTest {
             val confirmButtonAppearance by collectLastValue(underTest.confirmButtonAppearance)
             utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
-            utils.authenticationRepository.setAutoConfirmEnabled(true)
+            utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
 
             assertThat(confirmButtonAppearance).isEqualTo(ActionButtonAppearance.Hidden)
         }
 
+    @Test
+    fun isDigitButtonAnimationEnabled() =
+        testScope.runTest {
+            val isAnimationEnabled by collectLastValue(underTest.isDigitButtonAnimationEnabled)
+
+            utils.authenticationRepository.setPinEnhancedPrivacyEnabled(true)
+            assertThat(isAnimationEnabled).isFalse()
+
+            utils.authenticationRepository.setPinEnhancedPrivacyEnabled(false)
+            assertThat(isAnimationEnabled).isTrue()
+        }
+
+    private fun TestScope.switchToScene(toScene: SceneKey) {
+        val currentScene by collectLastValue(sceneInteractor.desiredScene)
+        val bouncerShown = currentScene?.key != SceneKey.Bouncer && toScene == SceneKey.Bouncer
+        val bouncerHidden = currentScene?.key == SceneKey.Bouncer && toScene != SceneKey.Bouncer
+        sceneInteractor.changeScene(SceneModel(toScene), "reason")
+        sceneInteractor.onSceneChanged(SceneModel(toScene), "reason")
+        if (bouncerShown) underTest.onShown()
+        if (bouncerHidden) underTest.onHidden()
+        runCurrent()
+
+        assertThat(currentScene).isEqualTo(SceneModel(toScene))
+    }
+
     private fun TestScope.lockDeviceAndOpenPinBouncer() {
         utils.authenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Pin)
         utils.deviceEntryRepository.setUnlocked(false)
-        sceneInteractor.changeScene(SceneModel(SceneKey.Bouncer), "reason")
-        sceneInteractor.onSceneChanged(SceneModel(SceneKey.Bouncer), "reason")
-
-        assertThat(collectLastValue(sceneInteractor.desiredScene).invoke())
-            .isEqualTo(SceneModel(SceneKey.Bouncer))
-        underTest.onShown()
-        runCurrent()
+        switchToScene(SceneKey.Bouncer)
     }
 
     companion object {

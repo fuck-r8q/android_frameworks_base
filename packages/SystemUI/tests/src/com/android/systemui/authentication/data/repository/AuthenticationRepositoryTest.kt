@@ -26,10 +26,13 @@ import androidx.test.filters.SmallTest
 import com.android.internal.widget.LockPatternUtils
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.authentication.data.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
+import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.scene.SceneTestUtils
+import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeMobileConnectionsRepository
+import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
 import com.android.systemui.user.data.repository.FakeUserRepository
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
@@ -51,10 +54,12 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
 
     @Mock private lateinit var lockPatternUtils: LockPatternUtils
     @Mock private lateinit var getSecurityMode: Function<Int, KeyguardSecurityModel.SecurityMode>
+    @Mock private lateinit var tableLogger: TableLogBuffer
 
     private val testUtils = SceneTestUtils(this)
     private val testScope = testUtils.testScope
     private val userRepository = FakeUserRepository()
+    private lateinit var mobileConnectionsRepository: FakeMobileConnectionsRepository
 
     private lateinit var underTest: AuthenticationRepository
 
@@ -67,6 +72,8 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
         userRepository.setUserInfos(USER_INFOS)
         runBlocking { userRepository.setSelectedUserInfo(USER_INFOS[0]) }
         whenever(getSecurityMode.apply(anyInt())).thenAnswer { currentSecurityMode }
+        mobileConnectionsRepository =
+            FakeMobileConnectionsRepository(FakeMobileMappingsProxy(), tableLogger)
 
         underTest =
             AuthenticationRepositoryImpl(
@@ -76,6 +83,7 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
                 userRepository = userRepository,
                 lockPatternUtils = lockPatternUtils,
                 broadcastDispatcher = fakeBroadcastDispatcher,
+                mobileConnectionsRepository = mobileConnectionsRepository,
             )
     }
 
@@ -97,15 +105,20 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
             assertThat(authMethod).isEqualTo(AuthenticationMethodModel.None)
             assertThat(underTest.getAuthenticationMethod())
                 .isEqualTo(AuthenticationMethodModel.None)
+
+            currentSecurityMode = KeyguardSecurityModel.SecurityMode.SimPin
+            mobileConnectionsRepository.isAnySimSecure.value = true
+            assertThat(authMethod).isEqualTo(AuthenticationMethodModel.Sim)
+            assertThat(underTest.getAuthenticationMethod()).isEqualTo(AuthenticationMethodModel.Sim)
         }
 
     @Test
-    fun isAutoConfirmEnabled() =
+    fun isAutoConfirmFeatureEnabled() =
         testScope.runTest {
             whenever(lockPatternUtils.isAutoPinConfirmEnabled(USER_INFOS[0].id)).thenReturn(true)
             whenever(lockPatternUtils.isAutoPinConfirmEnabled(USER_INFOS[1].id)).thenReturn(false)
 
-            val values by collectValues(underTest.isAutoConfirmEnabled)
+            val values by collectValues(underTest.isAutoConfirmFeatureEnabled)
             assertThat(values.first()).isFalse()
             assertThat(values.last()).isTrue()
 
@@ -120,6 +133,38 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
             whenever(lockPatternUtils.isVisiblePatternEnabled(USER_INFOS[1].id)).thenReturn(true)
 
             val values by collectValues(underTest.isPatternVisible)
+            assertThat(values.first()).isTrue()
+            assertThat(values.last()).isFalse()
+
+            userRepository.setSelectedUserInfo(USER_INFOS[1])
+            assertThat(values.last()).isTrue()
+        }
+
+    @Test
+    fun reportAuthenticationAttempt_emitsAuthenticationChallengeResult() =
+        testScope.runTest {
+            val authenticationChallengeResults by
+                collectValues(underTest.authenticationChallengeResult)
+
+            runCurrent()
+            underTest.reportAuthenticationAttempt(true)
+            runCurrent()
+            underTest.reportAuthenticationAttempt(false)
+            runCurrent()
+            underTest.reportAuthenticationAttempt(true)
+
+            assertThat(authenticationChallengeResults).isEqualTo(listOf(true, false, true))
+        }
+
+    @Test
+    fun isPinEnhancedPrivacyEnabled() =
+        testScope.runTest {
+            whenever(lockPatternUtils.isPinEnhancedPrivacyEnabled(USER_INFOS[0].id))
+                .thenReturn(false)
+            whenever(lockPatternUtils.isPinEnhancedPrivacyEnabled(USER_INFOS[1].id))
+                .thenReturn(true)
+
+            val values by collectValues(underTest.isPinEnhancedPrivacyEnabled)
             assertThat(values.first()).isTrue()
             assertThat(values.last()).isFalse()
 

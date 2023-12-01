@@ -26,12 +26,13 @@ import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.RIGHT
 import androidx.constraintlayout.widget.ConstraintSet.TOP
 import com.android.systemui.Flags.keyguardBottomAreaRefactor
-import com.android.systemui.res.R
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
 import com.android.systemui.keyguard.ui.binder.KeyguardQuickAffordanceViewBinder
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardQuickAffordancesCombinedViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.plugins.FalsingManager
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.KeyguardIndicationController
 import com.android.systemui.statusbar.VibratorHelper
 import javax.inject.Inject
@@ -83,20 +84,27 @@ constructor(
         val width = resources.getDimensionPixelSize(R.dimen.keyguard_affordance_fixed_width)
         val height = resources.getDimensionPixelSize(R.dimen.keyguard_affordance_fixed_height)
 
+        val lockIconViewId =
+            if (DeviceEntryUdfpsRefactor.isEnabled) {
+                R.id.device_entry_icon_view
+            } else {
+                R.id.lock_icon_view
+            }
+
         constraintSet.apply {
             constrainWidth(R.id.start_button, width)
             constrainHeight(R.id.start_button, height)
             connect(R.id.start_button, LEFT, PARENT_ID, LEFT)
-            connect(R.id.start_button, RIGHT, R.id.lock_icon_view, LEFT)
-            connect(R.id.start_button, TOP, R.id.lock_icon_view, TOP)
-            connect(R.id.start_button, BOTTOM, R.id.lock_icon_view, BOTTOM)
+            connect(R.id.start_button, RIGHT, lockIconViewId, LEFT)
+            connect(R.id.start_button, TOP, lockIconViewId, TOP)
+            connect(R.id.start_button, BOTTOM, lockIconViewId, BOTTOM)
 
             constrainWidth(R.id.end_button, width)
             constrainHeight(R.id.end_button, height)
             connect(R.id.end_button, RIGHT, PARENT_ID, RIGHT)
-            connect(R.id.end_button, LEFT, R.id.lock_icon_view, RIGHT)
-            connect(R.id.end_button, TOP, R.id.lock_icon_view, TOP)
-            connect(R.id.end_button, BOTTOM, R.id.lock_icon_view, BOTTOM)
+            connect(R.id.end_button, LEFT, lockIconViewId, RIGHT)
+            connect(R.id.end_button, TOP, lockIconViewId, TOP)
+            connect(R.id.end_button, BOTTOM, lockIconViewId, BOTTOM)
         }
     }
 }

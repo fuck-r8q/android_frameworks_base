@@ -20,14 +20,12 @@ import android.graphics.Rect
 import android.graphics.drawable.Icon
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.SysUITestComponent
-import com.android.SysUITestModule
-import com.android.TestMocksModule
-import com.android.collectLastValue
-import com.android.runCurrent
-import com.android.runTest
+import com.android.systemui.SysUITestComponent
+import com.android.systemui.SysUITestModule
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.TestMocksModule
 import com.android.systemui.biometrics.domain.BiometricsDomainLayerModule
+import com.android.systemui.collectLastValue
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.flags.FakeFeatureFlagsClassicModule
 import com.android.systemui.flags.Flags
@@ -42,6 +40,8 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.power.data.repository.FakePowerRepository
 import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.power.shared.model.WakefulnessState
+import com.android.systemui.runCurrent
+import com.android.systemui.runTest
 import com.android.systemui.shade.data.repository.FakeShadeRepository
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationsStore
@@ -388,5 +388,32 @@ class NotificationIconContainerStatusBarViewModelTest : SysuiTestCase() {
 
             assertThat(isolatedIcon?.value?.notifKey).isEqualTo("notif1")
             assertThat(isolatedIcon?.isAnimating).isFalse()
+        }
+
+    @Test
+    fun isolatedIcon_updateWhenIconDataChanges() =
+        testComponent.runTest {
+            val icon: Icon = mock()
+            val isolatedIcon by collectLastValue(underTest.isolatedIcon)
+            runCurrent()
+
+            headsUpViewStateRepository.isolatedNotification.value = "notif1"
+            runCurrent()
+
+            activeNotificationsRepository.activeNotifications.value =
+                ActiveNotificationsStore.Builder()
+                    .apply {
+                        addIndividualNotif(
+                            activeNotificationModel(
+                                key = "notif1",
+                                groupKey = "group",
+                                statusBarIcon = icon
+                            )
+                        )
+                    }
+                    .build()
+            runCurrent()
+
+            assertThat(isolatedIcon?.value?.notifKey).isEqualTo("notif1")
         }
 }

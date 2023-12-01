@@ -21,31 +21,39 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import androidx.constraintlayout.widget.ConstraintLayout
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.shared.model.KeyguardSection
 import com.android.systemui.res.R
+import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.shade.NotificationPanelView
+import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
+import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator
+import com.android.systemui.statusbar.notification.stack.shared.flexiNotifsEnabled
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
+import com.android.systemui.statusbar.notification.stack.ui.viewbinder.NotificationStackAppearanceViewBinder
 import com.android.systemui.statusbar.notification.stack.ui.viewbinder.SharedNotificationContainerBinder
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationStackAppearanceViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.SharedNotificationContainerViewModel
 import kotlinx.coroutines.DisposableHandle
 
 abstract class NotificationStackScrollLayoutSection
 constructor(
     protected val context: Context,
-    protected val featureFlags: FeatureFlags,
+    private val sceneContainerFlags: SceneContainerFlags,
     private val notificationPanelView: NotificationPanelView,
     private val sharedNotificationContainer: SharedNotificationContainer,
     private val sharedNotificationContainerViewModel: SharedNotificationContainerViewModel,
+    private val notificationStackAppearanceViewModel: NotificationStackAppearanceViewModel,
+    private val ambientState: AmbientState,
     private val controller: NotificationStackScrollLayoutController,
+    private val notificationStackSizeCalculator: NotificationStackSizeCalculator,
 ) : KeyguardSection() {
     private val placeHolderId = R.id.nssl_placeholder
     private var disposableHandle: DisposableHandle? = null
 
     override fun addViews(constraintLayout: ConstraintLayout) {
-        if (!featureFlags.isEnabled(Flags.MIGRATE_NSSL)) {
+        if (!KeyguardShadeMigrationNssl.isEnabled) {
             return
         }
         // This moves the existing NSSL view to a different parent, as the controller is a
@@ -60,7 +68,7 @@ constructor(
     }
 
     override fun bindData(constraintLayout: ConstraintLayout) {
-        if (!featureFlags.isEnabled(Flags.MIGRATE_NSSL)) {
+        if (!KeyguardShadeMigrationNssl.isEnabled) {
             return
         }
         disposableHandle?.dispose()
@@ -68,8 +76,19 @@ constructor(
             SharedNotificationContainerBinder.bind(
                 sharedNotificationContainer,
                 sharedNotificationContainerViewModel,
+                sceneContainerFlags,
+                controller,
+                notificationStackSizeCalculator,
+            )
+        if (sceneContainerFlags.flexiNotifsEnabled()) {
+            NotificationStackAppearanceViewBinder.bind(
+                sharedNotificationContainer,
+                notificationStackAppearanceViewModel,
+                sceneContainerFlags,
+                ambientState,
                 controller,
             )
+        }
     }
 
     override fun removeViews(constraintLayout: ConstraintLayout) {

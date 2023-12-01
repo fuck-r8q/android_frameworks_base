@@ -25,6 +25,7 @@ import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_LIGHTS;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_OFF;
 
+import android.annotation.FlaggedApi;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.AlarmManager;
@@ -160,6 +161,7 @@ public class ZenModeConfig implements Parcelable {
     private static final String CONDITION_ATT_LINE2 = "line2";
     private static final String CONDITION_ATT_ICON = "icon";
     private static final String CONDITION_ATT_STATE = "state";
+    private static final String CONDITION_ATT_SOURCE = "source";
     private static final String CONDITION_ATT_FLAGS = "flags";
 
     private static final String ZEN_POLICY_TAG = "zen_policy";
@@ -183,6 +185,18 @@ public class ZenModeConfig implements Parcelable {
     private static final String RULE_ATT_TYPE = "type";
     private static final String RULE_ATT_ICON = "rule_icon";
     private static final String RULE_ATT_TRIGGER_DESC = "triggerDesc";
+
+    private static final String DEVICE_EFFECT_DISPLAY_GRAYSCALE = "zdeDisplayGrayscale";
+    private static final String DEVICE_EFFECT_SUPPRESS_AMBIENT_DISPLAY =
+            "zdeSuppressAmbientDisplay";
+    private static final String DEVICE_EFFECT_DIM_WALLPAPER = "zdeDimWallpaper";
+    private static final String DEVICE_EFFECT_USE_NIGHT_MODE = "zdeUseNightMode";
+    private static final String DEVICE_EFFECT_DISABLE_AUTO_BRIGHTNESS = "zdeDisableAutoBrightness";
+    private static final String DEVICE_EFFECT_DISABLE_TAP_TO_WAKE = "zdeDisableTapToWake";
+    private static final String DEVICE_EFFECT_DISABLE_TILT_TO_WAKE = "zdeDisableTiltToWake";
+    private static final String DEVICE_EFFECT_DISABLE_TOUCH = "zdeDisableTouch";
+    private static final String DEVICE_EFFECT_MINIMIZE_RADIO_USAGE = "zdeMinimizeRadioUsage";
+    private static final String DEVICE_EFFECT_MAXIMIZE_DOZE = "zdeMaximizeDoze";
 
     @UnsupportedAppUsage
     public boolean allowAlarms = DEFAULT_ALLOW_ALARMS;
@@ -629,6 +643,7 @@ public class ZenModeConfig implements Parcelable {
         rt.modified = safeBoolean(parser, RULE_ATT_MODIFIED, false);
         rt.zenPolicy = readZenPolicyXml(parser);
         if (Flags.modesApi()) {
+            rt.zenDeviceEffects = readZenDeviceEffectsXml(parser);
             rt.allowManualInvocation = safeBoolean(parser, RULE_ATT_ALLOW_MANUAL, false);
             rt.iconResId = safeInt(parser, RULE_ATT_ICON, 0);
             rt.triggerDescription = parser.getAttributeValue(null, RULE_ATT_TRIGGER_DESC);
@@ -666,6 +681,9 @@ public class ZenModeConfig implements Parcelable {
         if (rule.zenPolicy != null) {
             writeZenPolicyXml(rule.zenPolicy, out);
         }
+        if (Flags.modesApi() && rule.zenDeviceEffects != null) {
+            writeZenDeviceEffectsXml(rule.zenDeviceEffects, out);
+        }
         out.attributeBoolean(null, RULE_ATT_MODIFIED, rule.modified);
         if (Flags.modesApi()) {
             out.attributeBoolean(null, RULE_ATT_ALLOW_MANUAL, rule.allowManualInvocation);
@@ -687,7 +705,12 @@ public class ZenModeConfig implements Parcelable {
         final int state = safeInt(parser, CONDITION_ATT_STATE, -1);
         final int flags = safeInt(parser, CONDITION_ATT_FLAGS, -1);
         try {
-            return new Condition(id, summary, line1, line2, icon, state, flags);
+            if (Flags.modesApi()) {
+                final int source = safeInt(parser, CONDITION_ATT_SOURCE, Condition.SOURCE_UNKNOWN);
+                return new Condition(id, summary, line1, line2, icon, state, source, flags);
+            } else {
+                return new Condition(id, summary, line1, line2, icon, state, flags);
+            }
         } catch (IllegalArgumentException e) {
             Slog.w(TAG, "Unable to read condition xml", e);
             return null;
@@ -701,6 +724,9 @@ public class ZenModeConfig implements Parcelable {
         out.attribute(null, CONDITION_ATT_LINE2, c.line2);
         out.attributeInt(null, CONDITION_ATT_ICON, c.icon);
         out.attributeInt(null, CONDITION_ATT_STATE, c.state);
+        if (Flags.modesApi()) {
+            out.attributeInt(null, CONDITION_ATT_SOURCE, c.source);
+        }
         out.attributeInt(null, CONDITION_ATT_FLAGS, c.flags);
     }
 
@@ -847,6 +873,57 @@ public class ZenModeConfig implements Parcelable {
             if (val != ZenPolicy.STATE_UNSET) {
                 out.attributeInt(null, attr, val);
             }
+        }
+    }
+
+    @Nullable
+    private static ZenDeviceEffects readZenDeviceEffectsXml(TypedXmlPullParser parser) {
+        ZenDeviceEffects deviceEffects = new ZenDeviceEffects.Builder()
+                .setShouldDisplayGrayscale(
+                        safeBoolean(parser, DEVICE_EFFECT_DISPLAY_GRAYSCALE, false))
+                .setShouldSuppressAmbientDisplay(
+                        safeBoolean(parser, DEVICE_EFFECT_SUPPRESS_AMBIENT_DISPLAY, false))
+                .setShouldDimWallpaper(safeBoolean(parser, DEVICE_EFFECT_DIM_WALLPAPER, false))
+                .setShouldUseNightMode(safeBoolean(parser, DEVICE_EFFECT_USE_NIGHT_MODE, false))
+                .setShouldDisableAutoBrightness(
+                        safeBoolean(parser, DEVICE_EFFECT_DISABLE_AUTO_BRIGHTNESS, false))
+                .setShouldDisableTapToWake(
+                        safeBoolean(parser, DEVICE_EFFECT_DISABLE_TAP_TO_WAKE, false))
+                .setShouldDisableTiltToWake(
+                        safeBoolean(parser, DEVICE_EFFECT_DISABLE_TILT_TO_WAKE, false))
+                .setShouldDisableTouch(safeBoolean(parser, DEVICE_EFFECT_DISABLE_TOUCH, false))
+                .setShouldMinimizeRadioUsage(
+                        safeBoolean(parser, DEVICE_EFFECT_MINIMIZE_RADIO_USAGE, false))
+                .setShouldMaximizeDoze(safeBoolean(parser, DEVICE_EFFECT_MAXIMIZE_DOZE, false))
+                .build();
+
+        return deviceEffects.hasEffects() ? deviceEffects : null;
+    }
+
+    private static void writeZenDeviceEffectsXml(ZenDeviceEffects deviceEffects,
+            TypedXmlSerializer out) throws IOException {
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DISPLAY_GRAYSCALE,
+                deviceEffects.shouldDisplayGrayscale());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_SUPPRESS_AMBIENT_DISPLAY,
+                deviceEffects.shouldSuppressAmbientDisplay());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DIM_WALLPAPER, deviceEffects.shouldDimWallpaper());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_USE_NIGHT_MODE, deviceEffects.shouldUseNightMode());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DISABLE_AUTO_BRIGHTNESS,
+                deviceEffects.shouldDisableAutoBrightness());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DISABLE_TAP_TO_WAKE,
+                deviceEffects.shouldDisableTapToWake());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DISABLE_TILT_TO_WAKE,
+                deviceEffects.shouldDisableTiltToWake());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_DISABLE_TOUCH, deviceEffects.shouldDisableTouch());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_MINIMIZE_RADIO_USAGE,
+                deviceEffects.shouldMinimizeRadioUsage());
+        writeBooleanIfTrue(out, DEVICE_EFFECT_MAXIMIZE_DOZE, deviceEffects.shouldMaximizeDoze());
+    }
+
+    private static void writeBooleanIfTrue(TypedXmlSerializer out, String att, boolean value)
+            throws IOException {
+        if (value) {
+            out.attributeBoolean(null, att, true);
         }
     }
 
@@ -1004,6 +1081,8 @@ public class ZenModeConfig implements Parcelable {
             priorityCategories |= Policy.PRIORITY_CATEGORY_CONVERSATIONS;
             conversationSenders = getConversationSendersWithDefault(
                     zenPolicy.getPriorityConversationSenders(), conversationSenders);
+        } else {
+            conversationSenders = CONVERSATION_SENDERS_NONE;
         }
 
         if (zenPolicy.isCategoryAllowed(ZenPolicy.PRIORITY_CATEGORY_CALLS,
@@ -1102,7 +1181,7 @@ public class ZenModeConfig implements Parcelable {
         return (policy.suppressedVisualEffects & visualEffect) == 0;
     }
 
-    private int getNotificationPolicySenders(@ZenPolicy.PeopleType int senders,
+    private static int getNotificationPolicySenders(@ZenPolicy.PeopleType int senders,
             int defaultPolicySender) {
         switch (senders) {
             case ZenPolicy.PEOPLE_TYPE_ANYONE:
@@ -1116,7 +1195,7 @@ public class ZenModeConfig implements Parcelable {
         }
     }
 
-    private int getConversationSendersWithDefault(@ZenPolicy.ConversationSenders int senders,
+    private static int getConversationSendersWithDefault(@ZenPolicy.ConversationSenders int senders,
             int defaultPolicySender) {
         switch (senders) {
             case ZenPolicy.CONVERSATION_SENDERS_ANYONE:
@@ -1744,6 +1823,8 @@ public class ZenModeConfig implements Parcelable {
         // package name, only used for manual rules when they have turned DND on.
         public String enabler;
         public ZenPolicy zenPolicy;
+        @FlaggedApi(Flags.FLAG_MODES_API)
+        @Nullable public ZenDeviceEffects zenDeviceEffects;
         public boolean modified;    // rule has been modified from initial creation
         public String pkg;
         public int type = AutomaticZenRule.TYPE_UNKNOWN;
@@ -1773,6 +1854,9 @@ public class ZenModeConfig implements Parcelable {
                 enabler = source.readString();
             }
             zenPolicy = source.readParcelable(null, android.service.notification.ZenPolicy.class);
+            if (Flags.modesApi()) {
+                zenDeviceEffects = source.readParcelable(null, ZenDeviceEffects.class);
+            }
             modified = source.readInt() == 1;
             pkg = source.readString();
             if (Flags.modesApi()) {
@@ -1817,6 +1901,9 @@ public class ZenModeConfig implements Parcelable {
                 dest.writeInt(0);
             }
             dest.writeParcelable(zenPolicy, 0);
+            if (Flags.modesApi()) {
+                dest.writeParcelable(zenDeviceEffects, 0);
+            }
             dest.writeInt(modified ? 1 : 0);
             dest.writeString(pkg);
             if (Flags.modesApi()) {
@@ -1848,7 +1935,8 @@ public class ZenModeConfig implements Parcelable {
                     .append(",condition=").append(condition);
 
             if (Flags.modesApi()) {
-                sb.append(",allowManualInvocation=").append(allowManualInvocation)
+                sb.append(",deviceEffects=").append(zenDeviceEffects)
+                        .append(",allowManualInvocation=").append(allowManualInvocation)
                         .append(",iconResId=").append(iconResId)
                         .append(",triggerDescription=").append(triggerDescription)
                         .append(",type=").append(type);
@@ -1906,6 +1994,7 @@ public class ZenModeConfig implements Parcelable {
 
             if (Flags.modesApi()) {
                 return finalEquals
+                        && Objects.equals(other.zenDeviceEffects, zenDeviceEffects)
                         && other.allowManualInvocation == allowManualInvocation
                         && other.iconResId == iconResId
                         && Objects.equals(other.triggerDescription, triggerDescription)
@@ -1919,8 +2008,9 @@ public class ZenModeConfig implements Parcelable {
         public int hashCode() {
             if (Flags.modesApi()) {
                 return Objects.hash(enabled, snoozing, name, zenMode, conditionId, condition,
-                        component, configurationActivity, pkg, id, enabler, zenPolicy, modified,
-                        allowManualInvocation, iconResId, triggerDescription, type);
+                        component, configurationActivity, pkg, id, enabler, zenPolicy,
+                        zenDeviceEffects, modified, allowManualInvocation, iconResId,
+                        triggerDescription, type);
             }
             return Objects.hash(enabled, snoozing, name, zenMode, conditionId, condition,
                     component, configurationActivity, pkg, id, enabler, zenPolicy, modified);

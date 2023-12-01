@@ -20,9 +20,10 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.core.graphics.drawable.toBitmap
 import com.android.systemui.authentication.domain.interactor.AuthenticationInteractor
-import com.android.systemui.authentication.domain.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.bouncer.domain.interactor.BouncerActionButtonInteractor
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
+import com.android.systemui.bouncer.domain.interactor.SimBouncerInteractor
 import com.android.systemui.bouncer.shared.model.BouncerActionButtonModel
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
@@ -64,6 +65,7 @@ class BouncerViewModel(
     users: Flow<List<UserViewModel>>,
     userSwitcherMenu: Flow<List<UserActionViewModel>>,
     actionButtonInteractor: BouncerActionButtonInteractor,
+    private val simBouncerInteractor: SimBouncerInteractor,
 ) {
     val selectedUserImage: StateFlow<Bitmap?> =
         selectedUser
@@ -180,6 +182,19 @@ class BouncerViewModel(
                 initialValue = isSideBySideSupported(authMethodViewModel.value),
             )
 
+    /**
+     * Whether the splitting the UI around the fold seam (where the hinge is on a foldable device)
+     * is required.
+     */
+    val isFoldSplitRequired: StateFlow<Boolean> =
+        authMethodViewModel
+            .map { authMethod -> isFoldSplitRequired(authMethod) }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = isFoldSplitRequired(authMethodViewModel.value),
+            )
+
     init {
         if (flags.isEnabled()) {
             applicationScope.launch {
@@ -212,6 +227,10 @@ class BouncerViewModel(
         return isUserSwitcherVisible || authMethod !is PasswordBouncerViewModel
     }
 
+    private fun isFoldSplitRequired(authMethod: AuthMethodBouncerViewModel?): Boolean {
+        return authMethod !is PasswordBouncerViewModel
+    }
+
     private fun toMessageViewModel(
         message: String?,
         isThrottled: Boolean,
@@ -242,6 +261,17 @@ class BouncerViewModel(
                     viewModelScope = newViewModelScope,
                     interactor = bouncerInteractor,
                     isInputEnabled = isInputEnabled,
+                    simBouncerInteractor = simBouncerInteractor,
+                    authenticationMethod = authenticationMethod
+                )
+            is AuthenticationMethodModel.Sim ->
+                PinBouncerViewModel(
+                    applicationContext = applicationContext,
+                    viewModelScope = newViewModelScope,
+                    interactor = bouncerInteractor,
+                    isInputEnabled = isInputEnabled,
+                    simBouncerInteractor = simBouncerInteractor,
+                    authenticationMethod = authenticationMethod,
                 )
             is AuthenticationMethodModel.Password ->
                 PasswordBouncerViewModel(
@@ -299,6 +329,7 @@ object BouncerViewModelModule {
         flags: SceneContainerFlags,
         userSwitcherViewModel: UserSwitcherViewModel,
         actionButtonInteractor: BouncerActionButtonInteractor,
+        simBouncerInteractor: SimBouncerInteractor,
     ): BouncerViewModel {
         return BouncerViewModel(
             applicationContext = applicationContext,
@@ -311,6 +342,7 @@ object BouncerViewModelModule {
             users = userSwitcherViewModel.users,
             userSwitcherMenu = userSwitcherViewModel.menu,
             actionButtonInteractor = actionButtonInteractor,
+            simBouncerInteractor = simBouncerInteractor,
         )
     }
 }

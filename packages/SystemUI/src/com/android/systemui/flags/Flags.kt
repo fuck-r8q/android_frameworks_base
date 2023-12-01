@@ -135,14 +135,6 @@ object Flags {
             "lockscreen_custom_clocks"
         )
 
-    // TODO(b/286092087): Tracking Bug
-    @JvmField
-    val ENABLE_SYSTEM_UI_DREAM_CONTROLLER = unreleasedFlag("enable_system_ui_dream_controller")
-
-    // TODO(b/288287730): Tracking Bug
-    @JvmField
-    val ENABLE_SYSTEM_UI_DREAM_HOSTING = unreleasedFlag("enable_system_ui_dream_hosting")
-
     /**
      * Whether the clock on a wide lock screen should use the new "stepping" animation for moving
      * the digits when the clock moves.
@@ -155,18 +147,6 @@ object Flags {
      */
     // TODO(b/255607168): Tracking Bug
     @JvmField val DOZING_MIGRATION_1 = unreleasedFlag("dozing_migration_1")
-
-    /**
-     * Migrates control of the LightRevealScrim's reveal effect and amount from legacy code to the
-     * new KeyguardTransitionRepository.
-     */
-    // TODO(b/281655028): Tracking bug
-    @JvmField
-    val LIGHT_REVEAL_MIGRATION = unreleasedFlag("light_reveal_migration", teamfood = true)
-
-    // TODO(b/301915812): Tracking Bug
-    @JvmField
-    val NEW_AOD_TRANSITION = unreleasedFlag("new_aod_transition", teamfood = true)
 
     // TODO(b/305984787):
     @JvmField
@@ -232,15 +212,9 @@ object Flags {
     val WALLPAPER_PICKER_GRID_APPLY_BUTTON =
             unreleasedFlag("wallpaper_picker_grid_apply_button")
 
-    /** Whether to run the new udfps keyguard refactor code. */
-    // TODO(b/279440316): Tracking bug.
-    @JvmField
-    val REFACTOR_UDFPS_KEYGUARD_VIEWS = unreleasedFlag("refactor_udfps_keyguard_views")
-
     /** Provide new auth messages on the bouncer. */
     // TODO(b/277961132): Tracking bug.
-    @JvmField val REVAMPED_BOUNCER_MESSAGES = unreleasedFlag("revamped_bouncer_messages",
-            teamfood = true)
+    @JvmField val REVAMPED_BOUNCER_MESSAGES = unreleasedFlag("revamped_bouncer_messages")
 
     /** Keyguard Migration */
 
@@ -254,17 +228,6 @@ object Flags {
 
     // TODO(b/287268101): Tracking bug.
     @JvmField val TRANSIT_CLOCK = releasedFlag("lockscreen_custom_transit_clock")
-
-    // TODO(b/288276738): Tracking bug.
-    @JvmField val WIDGET_ON_KEYGUARD = unreleasedFlag("widget_on_keyguard")
-
-    /** Migrate the NSSL to the a sibling to both the panel and keyguard root view. */
-    // TODO(b/288074305): Tracking bug.
-    @JvmField val MIGRATE_NSSL = unreleasedFlag("migrate_nssl")
-
-    /** Migrate the status view from the notification panel to keyguard root view. */
-    // TODO(b/291767565): Tracking bug.
-    @JvmField val MIGRATE_KEYGUARD_STATUS_VIEW = unreleasedFlag("migrate_keyguard_status_view")
 
     /** Migrate the status bar view on keyguard from notification panel to keyguard root view. */
     // TODO(b/299115332): Tracking Bug.
@@ -305,11 +268,6 @@ object Flags {
             R.bool.flag_stop_pulsing_face_scanning_animation,
             "stop_pulsing_face_scanning_animation")
 
-    /** Flag to use a separate view for the alternate bouncer. */
-    // TODO(b/300440924): Tracking bug
-    @JvmField
-    val ALTERNATE_BOUNCER_VIEW: UnreleasedFlag = unreleasedFlag("alternate_bouncer_view")
-
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
     @JvmField val POWER_MENU_LITE = releasedFlag("power_menu_lite")
@@ -319,11 +277,6 @@ object Flags {
     // TODO(b/254513100): Tracking Bug
     val SMARTSPACE_SHARED_ELEMENT_TRANSITION_ENABLED =
         releasedFlag("smartspace_shared_element_transition_enabled")
-
-    // TODO(b/258517050): Clean up after the feature is launched.
-    @JvmField
-    val SMARTSPACE_DATE_WEATHER_DECOUPLED =
-        sysPropBooleanFlag("persist.sysui.ss.dw_decoupled", default = true)
 
     // TODO(b/270223352): Tracking Bug
     @JvmField
@@ -372,6 +325,10 @@ object Flags {
 
     // TODO(b/301610137): Tracking bug
     @JvmField val NEW_NETWORK_SLICE_UI = releasedFlag("new_network_slice_ui")
+
+    // TODO(b/311222557): Tracking bug
+    val ROAMING_INDICATOR_VIA_DISPLAY_INFO =
+        releasedFlag("roaming_indicator_via_display_info")
 
     // TODO(b/308138154): Tracking bug
     val FILTER_PROVISIONING_NETWORK_SUBSCRIPTIONS =
@@ -444,9 +401,6 @@ object Flags {
 
     // TODO(b/270437894): Tracking Bug
     val MEDIA_REMOTE_RESUME = unreleasedFlag("media_remote_resume")
-
-    // TODO(b/304506662): Tracking Bug
-    val MEDIA_DEVICE_NAME_FIX = releasedFlag("media_device_name_fix")
 
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag("simulate_dock_through_charging")
@@ -642,10 +596,6 @@ object Flags {
     val WARN_ON_BLOCKING_BINDER_TRANSACTIONS =
         unreleasedFlag("warn_on_blocking_binder_transactions")
 
-    @JvmField
-    val COROUTINE_TRACING =
-        unreleasedFlag("coroutine_tracing")
-
     // TODO(b/283071711): Tracking bug
     @JvmField
     val TRIM_RESOURCES_WITH_BACKGROUND_TRIM_AT_LOCK =
@@ -741,12 +691,6 @@ object Flags {
     @JvmField
     val USE_REPOS_FOR_BOUNCER_SHOWING = releasedFlag("use_repos_for_bouncer_showing")
 
-    // 3100 - Haptic interactions
-
-    // TODO(b/290213663): Tracking Bug
-    @JvmField
-    val ONE_WAY_HAPTICS_API_MIGRATION = releasedFlag("oneway_haptics_api_migration")
-
     /** TODO(b/296223317): Enables the new keyguard presentation containing a clock. */
     @JvmField
     val ENABLE_CLOCK_KEYGUARD_PRESENTATION = releasedFlag("enable_clock_keyguard_presentation")
@@ -776,9 +720,4 @@ object Flags {
     @JvmField
     val COMMUNAL_SERVICE_ENABLED = resourceBooleanFlag(R.bool.config_communalServiceEnabled,
         "communal_service_enabled")
-
-    // TODO(b/303131306): Tracking Bug
-    /** Whether communal hub features are enabled. */
-    @JvmField
-    val COMMUNAL_HUB = unreleasedFlag("communal_hub")
 }

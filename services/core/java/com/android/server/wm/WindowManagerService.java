@@ -338,7 +338,6 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
-import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -666,11 +665,6 @@ public class WindowManagerService extends IWindowManager.Stub
     // The root of the device window hierarchy.
     @NonNull
     final RootWindowContainer mRoot;
-
-    // Whether the system should use BLAST for ViewRootImpl
-    final boolean mUseBLAST;
-    // Whether to enable BLASTSyncEngine Transaction passing.
-    static final boolean USE_BLAST_SYNC = true;
 
     final BLASTSyncEngine mSyncEngine;
 
@@ -1200,10 +1194,11 @@ public class WindowManagerService extends IWindowManager.Stub
                 .getBoolean(R.bool.config_skipActivityRelaunchWhenDocking);
         final boolean isScreenSizeDecoupledFromStatusBarAndCutout = context.getResources()
                 .getBoolean(R.bool.config_decoupleStatusBarAndDisplayCutoutFromScreenSize)
-                && Flags.closeToSquareConfigIncludesStatusBar();
+                && mFlags.mAllowsScreenSizeDecoupledFromStatusBarAndCutout;
         if (!isScreenSizeDecoupledFromStatusBarAndCutout) {
             mDecorTypes = WindowInsets.Type.displayCutout() | WindowInsets.Type.navigationBars();
-            mConfigTypes = WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars();
+            mConfigTypes = WindowInsets.Type.displayCutout() | WindowInsets.Type.statusBars()
+                    | WindowInsets.Type.navigationBars();
         } else {
             mDecorTypes = WindowInsets.Type.navigationBars();
             mConfigTypes = WindowInsets.Type.navigationBars();
@@ -1226,8 +1221,6 @@ public class WindowManagerService extends IWindowManager.Stub
         mRoot = new RootWindowContainer(this);
 
         final ContentResolver resolver = context.getContentResolver();
-        mUseBLAST = Settings.Global.getInt(resolver,
-            Settings.Global.DEVELOPMENT_USE_BLAST_ADAPTER_VR, 1) == 1;
 
         mSyncEngine = new BLASTSyncEngine(this);
 
@@ -1749,13 +1742,6 @@ public class WindowManagerService extends IWindowManager.Stub
             }
 
             // From now on, no exceptions or errors allowed!
-
-            res = ADD_OKAY;
-
-            if (mUseBLAST) {
-                res |= WindowManagerGlobal.ADD_FLAG_USE_BLAST;
-            }
-
             if (displayContent.mCurrentFocus == null) {
                 displayContent.mWinAddedSinceNullFocus.add(win);
             }
@@ -1998,7 +1984,7 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    void removeWindow(Session session, IWindow client) {
+    void removeClientToken(Session session, IBinder client) {
         synchronized (mGlobalLock) {
             WindowState win = windowForClientLocked(session, client, false);
             if (win != null) {
@@ -2573,7 +2559,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
             if (outSyncIdBundle != null) {
                 final int maybeSyncSeqId;
-                if (USE_BLAST_SYNC && win.useBLASTSync() && viewVisibility == View.VISIBLE
+                if (win.syncNextBuffer() && viewVisibility == View.VISIBLE
                         && win.mSyncSeqId > lastSyncSeqId) {
                     maybeSyncSeqId = win.shouldSyncWithBuffers() ? win.mSyncSeqId : -1;
                     win.markRedrawForSyncReported();
@@ -5852,15 +5838,6 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public boolean useBLAST() {
-        return mUseBLAST;
-    }
-
-    public boolean useBLASTSync() {
-        return USE_BLAST_SYNC;
-    }
-
-    @Override
     public void getInitialDisplaySize(int displayId, Point size) {
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
@@ -8334,9 +8311,41 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public boolean shouldShowSystemDecorOnDisplay(int displayId) {
+        public void setHomeSupportedOnDisplay(String displayUniqueId, int displayType,
+                boolean supported) {
+            final long origId = Binder.clearCallingIdentity();
+            try {
+                synchronized (mGlobalLock) {
+                    mDisplayWindowSettings.setHomeSupportedOnDisplayLocked(
+                            displayUniqueId, displayType, supported);
+                }
+            } finally {
+                Binder.restoreCallingIdentity(origId);
+            }
+        }
+
+        @Override
+        public boolean isHomeSupportedOnDisplay(int displayId) {
             synchronized (mGlobalLock) {
-                return WindowManagerService.this.shouldShowSystemDecors(displayId);
+                final DisplayContent displayContent = mRoot.getDisplayContent(displayId);
+                if (displayContent == null) {
+                    ProtoLog.w(WM_ERROR, "Attempted to get home support flag of a display that "
+                            + "does not exist: %d", displayId);
+                    return false;
+                }
+                return displayContent.isHomeSupported();
+            }
+        }
+
+        @Override
+        public void clearDisplaySettings(String displayUniqueId, int displayType) {
+            final long origId = Binder.clearCallingIdentity();
+            try {
+                synchronized (mGlobalLock) {
+                    mDisplayWindowSettings.clearDisplaySettings(displayUniqueId, displayType);
+                }
+            } finally {
+                Binder.restoreCallingIdentity(origId);
             }
         }
 
@@ -8559,6 +8568,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 }
             }
             return null;
+        }
+
+        @Override
+        public void captureDisplay(int displayId, @Nullable ScreenCapture.CaptureArgs captureArgs,
+                                   ScreenCapture.ScreenCaptureListener listener) {
+            WindowManagerService.this.captureDisplay(displayId, captureArgs, listener);
         }
 
         @Override
@@ -8965,7 +8980,7 @@ public class WindowManagerService extends IWindowManager.Stub
      * views.
      */
     void grantInputChannel(Session session, int callingUid, int callingPid, int displayId,
-            SurfaceControl surface, IWindow window, IBinder hostInputToken,
+            SurfaceControl surface, IBinder clientToken, IBinder hostInputToken,
             int flags, int privateFlags, int inputFeatures, int type, IBinder windowToken,
             IBinder inputTransferToken, String inputHandleName, InputChannel outInputChannel) {
         final int sanitizedType = sanitizeWindowType(session, displayId, windowToken, type);
@@ -8974,7 +8989,7 @@ public class WindowManagerService extends IWindowManager.Stub
         Objects.requireNonNull(outInputChannel);
         synchronized (mGlobalLock) {
             EmbeddedWindowController.EmbeddedWindow win =
-                    new EmbeddedWindowController.EmbeddedWindow(session, this, window,
+                    new EmbeddedWindowController.EmbeddedWindow(session, this, clientToken,
                             mInputToWindowMap.get(hostInputToken), callingUid, callingPid,
                             sanitizedType, displayId, inputTransferToken, inputHandleName,
                             (flags & FLAG_NOT_FOCUSABLE) == 0);
@@ -8986,7 +9001,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
         updateInputChannel(outInputChannel.getToken(), callingUid, callingPid, displayId, surface,
                 name, applicationHandle, flags, privateFlags, inputFeatures, sanitizedType,
-                null /* region */, window);
+                null /* region */, clientToken);
     }
 
     boolean transferEmbeddedTouchFocusToHost(IWindow embeddedWindow) {
@@ -9061,10 +9076,10 @@ public class WindowManagerService extends IWindowManager.Stub
     private void updateInputChannel(IBinder channelToken, int callingUid, int callingPid,
             int displayId, SurfaceControl surface, String name,
             InputApplicationHandle applicationHandle, int flags,
-            int privateFlags, int inputFeatures, int type, Region region, IWindow window) {
+            int privateFlags, int inputFeatures, int type, Region region, IBinder clientToken) {
         final InputWindowHandle h = new InputWindowHandle(applicationHandle, displayId);
         h.token = channelToken;
-        h.setWindowToken(window);
+        h.setWindowToken(clientToken);
         h.name = name;
 
         flags = sanitizeFlagSlippery(flags, name, callingUid, callingPid);

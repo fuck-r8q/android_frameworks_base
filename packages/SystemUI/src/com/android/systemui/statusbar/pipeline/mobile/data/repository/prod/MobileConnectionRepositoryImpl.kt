@@ -72,6 +72,8 @@ import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.common.coroutine.ConflatedCallbackFlow.conflatedCallbackFlow
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.flags.FeatureFlagsClassic
+import com.android.systemui.flags.Flags.ROAMING_INDICATOR_VIA_DISPLAY_INFO
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.pipeline.mobile.data.MobileInputLogger
@@ -137,6 +139,7 @@ class MobileConnectionRepositoryImpl(
     private val bgDispatcher: CoroutineDispatcher,
     logger: MobileInputLogger,
     override val tableLogBuffer: TableLogBuffer,
+    flags: FeatureFlagsClassic,
     scope: CoroutineScope,
     private val fiveGServiceClient: FiveGServiceClient,
 ) : MobileConnectionRepository {
@@ -275,9 +278,15 @@ class MobileConnectionRepositoryImpl(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val isRoaming =
-        callbackEvents
-            .mapNotNull { it.onServiceStateChanged }
-            .map { it.serviceState.roaming }
+        if (flags.isEnabled(ROAMING_INDICATOR_VIA_DISPLAY_INFO)) {
+                callbackEvents
+                    .mapNotNull { it.onDisplayInfoChanged }
+                    .map { it.telephonyDisplayInfo.isRoaming }
+            } else {
+                callbackEvents
+                    .mapNotNull { it.onServiceStateChanged }
+                    .map { it.serviceState.roaming }
+            }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     override val operatorAlphaShort =
@@ -700,6 +709,7 @@ class MobileConnectionRepositoryImpl(
         private val logger: MobileInputLogger,
         private val carrierConfigRepository: CarrierConfigRepository,
         private val mobileMappingsProxy: MobileMappingsProxy,
+        private val flags: FeatureFlagsClassic,
         @Background private val bgDispatcher: CoroutineDispatcher,
         @Application private val scope: CoroutineScope,
         private val fiveGServiceClient: FiveGServiceClient,
@@ -725,6 +735,7 @@ class MobileConnectionRepositoryImpl(
                 bgDispatcher,
                 logger,
                 mobileLogger,
+                flags,
                 scope,
                 fiveGServiceClient,
             )
