@@ -354,10 +354,7 @@ public class PackageInstaller {
     /**
      * Extra field for the package name of a package that is requested to be unarchived. Sent as
      * part of the {@link android.content.Intent#ACTION_UNARCHIVE_PACKAGE} intent.
-     *
-     * @hide
      */
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final String EXTRA_UNARCHIVE_PACKAGE_NAME =
             "android.content.pm.extra.UNARCHIVE_PACKAGE_NAME";
@@ -366,25 +363,35 @@ public class PackageInstaller {
      * Extra field for the unarchive ID. Sent as
      * part of the {@link android.content.Intent#ACTION_UNARCHIVE_PACKAGE} intent.
      *
-     * @see Session#setUnarchiveId(int)
-     *
-     * @hide
+     * @see SessionParams#setUnarchiveId
      */
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final String EXTRA_UNARCHIVE_ID =
             "android.content.pm.extra.UNARCHIVE_ID";
 
     /**
      * If true, the requestor of the unarchival has specified that the app should be unarchived
-     * for {@link android.os.UserHandle#ALL}.
-     *
-     * @hide
+     * for all users.
      */
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final String EXTRA_UNARCHIVE_ALL_USERS =
             "android.content.pm.extra.UNARCHIVE_ALL_USERS";
+
+    /**
+     * Current status of an unarchive operation. Will be one of
+     * {@link #UNARCHIVAL_OK}, {@link #UNARCHIVAL_ERROR_USER_ACTION_NEEDED},
+     * {@link #UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE}, {@link #UNARCHIVAL_ERROR_NO_CONNECTIVITY},
+     * {@link #UNARCHIVAL_GENERIC_ERROR}, {@link #UNARCHIVAL_ERROR_INSTALLER_DISABLED} or
+     * {@link #UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED}.
+     *
+     * <p> If the status is not {@link #UNARCHIVAL_OK}, then {@link Intent#EXTRA_INTENT} will be set
+     * with an intent for a corresponding follow-up action (e.g. storage clearing dialog) or a
+     * failure dialog.
+     *
+     * @see #requestUnarchive
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final String EXTRA_UNARCHIVE_STATUS = "android.content.pm.extra.UNARCHIVE_STATUS";
 
     /**
      * A list of warnings that occurred during installation.
@@ -651,6 +658,81 @@ public class PackageInstaller {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserActionReason {}
+
+    /**
+     * The unarchival is possible and will commence.
+     *
+     * <p> Note that this does not mean that the unarchival has completed. This status should be
+     * sent before any longer asynchronous action (e.g. app download) is started.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_OK = 0;
+
+    /**
+     * The user needs to interact with the installer to enable the installation.
+     *
+     * <p> An example use case for this could be that the user needs to login to allow the
+     * download for a paid app.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_ERROR_USER_ACTION_NEEDED = 1;
+
+    /**
+     * Not enough storage to unarchive the application.
+     *
+     * <p> The installer can optionally provide a {@code userActionIntent} for a space-clearing
+     * dialog. If no action is provided, then a generic intent
+     * {@link android.os.storage.StorageManager#ACTION_MANAGE_STORAGE} is started instead.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE = 2;
+
+    /**
+     * The device is not connected to the internet
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_ERROR_NO_CONNECTIVITY = 3;
+
+    /**
+     * The installer responsible for the unarchival is disabled.
+     *
+     * <p> Should only be used by the system.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_ERROR_INSTALLER_DISABLED = 4;
+
+    /**
+     * The installer responsible for the unarchival has been uninstalled
+     *
+     * <p> Should only be used by the system.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED = 5;
+
+    /**
+     * Generic error: The app cannot be unarchived.
+     */
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public static final int UNARCHIVAL_GENERIC_ERROR = 100;
+
+    /**
+     * The set of error types that can be set for
+     * {@link #reportUnarchivalStatus(int, int, PendingIntent)}.
+     *
+     * @hide
+     */
+    @IntDef(value = {
+            UNARCHIVAL_OK,
+            UNARCHIVAL_ERROR_USER_ACTION_NEEDED,
+            UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE,
+            UNARCHIVAL_ERROR_NO_CONNECTIVITY,
+            UNARCHIVAL_ERROR_INSTALLER_DISABLED,
+            UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED,
+            UNARCHIVAL_GENERIC_ERROR,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface UnarchivalStatus {}
+
 
     /** Default set of checksums - includes all available checksums.
      * @see Session#requestChecksums  */
@@ -2223,6 +2305,7 @@ public class PackageInstaller {
      */
     @SystemApi
     @NonNull
+    @FlaggedApi(Flags.FLAG_READ_INSTALL_INFO)
     public InstallInfo readInstallInfo(@NonNull ParcelFileDescriptor pfd,
             @Nullable String debugPathName, int flags) throws PackageParsingException {
         final ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
@@ -2238,8 +2321,8 @@ public class PackageInstaller {
      * Requests to archive a package which is currently installed.
      *
      * <p> During the archival process, the apps APKs and cache are removed from the device while
-     * the user data is kept. Through the {@link #requestUnarchive(String)} call, apps can be
-     * restored again through their responsible installer.
+     * the user data is kept. Through the {@link #requestUnarchive} call, apps
+     * can be restored again through their responsible installer.
      *
      * <p> Archived apps are returned as displayable apps through the {@link LauncherApps} APIs and
      * will be displayed to users with UI treatment to highlight that said apps are archived. If
@@ -2249,12 +2332,10 @@ public class PackageInstaller {
      * @param statusReceiver Callback used to notify when the operation is completed.
      * @throws PackageManager.NameNotFoundException If {@code packageName} isn't found or not
      *                                              available to the caller or isn't archived.
-     * @hide
      */
     @RequiresPermission(anyOf = {
             Manifest.permission.DELETE_PACKAGES,
             Manifest.permission.REQUEST_DELETE_PACKAGES})
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public void requestArchive(@NonNull String packageName, @NonNull IntentSender statusReceiver)
             throws PackageManager.NameNotFoundException {
@@ -2278,25 +2359,57 @@ public class PackageInstaller {
      * <p> The installation will happen asynchronously and can be observed through
      * {@link android.content.Intent#ACTION_PACKAGE_ADDED}.
      *
+     * @param statusReceiver Callback used to notify whether the installer has accepted the
+     *                       unarchival request or an error has occurred. The status update will be
+     *                       sent though {@link #EXTRA_UNARCHIVE_STATUS}. Only one status will be
+     *                       sent.
      * @throws PackageManager.NameNotFoundException If {@code packageName} isn't found or not
      *                                              visible to the caller or if the package has no
      *                                              installer on the device anymore to unarchive it.
      * @throws IOException If parameters were unsatisfiable, such as lack of disk space.
-     *
-     * @hide
      */
     @RequiresPermission(anyOf = {
             Manifest.permission.INSTALL_PACKAGES,
             Manifest.permission.REQUEST_INSTALL_PACKAGES})
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ARCHIVING)
-    public void requestUnarchive(@NonNull String packageName)
+    public void requestUnarchive(@NonNull String packageName, @NonNull IntentSender statusReceiver)
             throws IOException, PackageManager.NameNotFoundException {
         try {
-            mInstaller.requestUnarchive(packageName, mInstallerPackageName,
+            mInstaller.requestUnarchive(packageName, mInstallerPackageName, statusReceiver,
                     new UserHandle(mUserId));
         } catch (ParcelableException e) {
             e.maybeRethrow(IOException.class);
+            e.maybeRethrow(PackageManager.NameNotFoundException.class);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Reports the status of an unarchival to the system.
+     *
+     * @param unarchiveId          the ID provided by the system as part of the
+     *                             intent.action.UNARCHIVE broadcast with EXTRA_UNARCHIVE_ID.
+     * @param status               is used for the system to provide the user with necessary
+     *                             follow-up steps or errors.
+     * @param requiredStorageBytes If the error is UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE this field
+     *                             should be set to specify how many additional bytes of storage
+     *                             are required to unarchive the app.
+     * @param userActionIntent     Optional intent to start a follow up action required to
+     *                             facilitate the unarchival flow (e.g. user needs to log in).
+     * @throws PackageManager.NameNotFoundException if no unarchival with {@code unarchiveId} exists
+     */
+    @RequiresPermission(anyOf = {
+            Manifest.permission.INSTALL_PACKAGES,
+            Manifest.permission.REQUEST_INSTALL_PACKAGES})
+    @FlaggedApi(Flags.FLAG_ARCHIVING)
+    public void reportUnarchivalStatus(int unarchiveId, @UnarchivalStatus int status,
+            long requiredStorageBytes, @Nullable PendingIntent userActionIntent)
+            throws PackageManager.NameNotFoundException {
+        try {
+            mInstaller.reportUnarchivalStatus(unarchiveId, status, requiredStorageBytes,
+                    userActionIntent, new UserHandle(mUserId));
+        } catch (ParcelableException e) {
             e.maybeRethrow(PackageManager.NameNotFoundException.class);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
@@ -2365,6 +2478,7 @@ public class PackageInstaller {
          * and all relevant native code.
          * @throws IOException when size of native binaries cannot be calculated.
          */
+        @FlaggedApi(Flags.FLAG_READ_INSTALL_INFO)
         public long calculateInstalledSize(@NonNull SessionParams params,
                 @NonNull ParcelFileDescriptor pfd) throws IOException {
             return InstallLocationUtils.calculateInstalledSize(mPkg, params.abiOverride,
@@ -2566,6 +2680,8 @@ public class PackageInstaller {
         public int developmentInstallFlags = 0;
         /** {@hide} */
         public int unarchiveId = -1;
+        /** {@hide} */
+        public IntentSender unarchiveIntentSender;
 
         private final ArrayMap<String, Integer> mPermissionStates;
 
@@ -2618,6 +2734,7 @@ public class PackageInstaller {
             applicationEnabledSettingPersistent = source.readBoolean();
             developmentInstallFlags = source.readInt();
             unarchiveId = source.readInt();
+            unarchiveIntentSender = source.readParcelable(null, IntentSender.class);
         }
 
         /** {@hide} */
@@ -2652,6 +2769,7 @@ public class PackageInstaller {
             ret.applicationEnabledSettingPersistent = applicationEnabledSettingPersistent;
             ret.developmentInstallFlags = developmentInstallFlags;
             ret.unarchiveId = unarchiveId;
+            ret.unarchiveIntentSender = unarchiveIntentSender;
             return ret;
         }
 
@@ -3297,11 +3415,8 @@ public class PackageInstaller {
          * <p> The ID should be retrieved from the unarchive intent and passed into the
          * session that's being created to unarchive the app in question. Used to link the unarchive
          * intent and the install session to disambiguate.
-         *
-         * @hide
          */
         @FlaggedApi(Flags.FLAG_ARCHIVING)
-        @SystemApi
         public void setUnarchiveId(int unarchiveId) {
             this.unarchiveId = unarchiveId;
         }
@@ -3364,6 +3479,7 @@ public class PackageInstaller {
                     applicationEnabledSettingPersistent);
             pw.printHexPair("developmentInstallFlags", developmentInstallFlags);
             pw.printPair("unarchiveId", unarchiveId);
+            pw.printPair("unarchiveIntentSender", unarchiveIntentSender);
             pw.println();
         }
 
@@ -3408,6 +3524,7 @@ public class PackageInstaller {
             dest.writeBoolean(applicationEnabledSettingPersistent);
             dest.writeInt(developmentInstallFlags);
             dest.writeInt(unarchiveId);
+            dest.writeParcelable(unarchiveIntentSender, flags);
         }
 
         public static final Parcelable.Creator<SessionParams>

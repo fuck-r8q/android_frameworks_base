@@ -20,7 +20,6 @@ import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAUL
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
-import static android.media.audio.Flags.FLAG_LOUDNESS_CONFIGURATOR_API;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
 
 import android.Manifest;
@@ -51,6 +50,7 @@ import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.media.AudioAttributes.AttributeSystemUsage;
 import android.media.CallbackUtil.ListenerInfo;
 import android.media.audiopolicy.AudioPolicy;
@@ -903,6 +903,7 @@ public class AudioManager {
     @UnsupportedAppUsage
     public AudioManager(Context context) {
         setContext(context);
+        initPlatform();
     }
 
     private Context getContext() {
@@ -916,6 +917,9 @@ public class AudioManager {
     }
 
     private void setContext(Context context) {
+        if (context == null) {
+            return;
+        }
         mOriginalContextDeviceId = context.getDeviceId();
         mApplicationContext = context.getApplicationContext();
         if (mApplicationContext != null) {
@@ -1065,7 +1069,7 @@ public class AudioManager {
      * @see #isVolumeFixed()
      */
     public void adjustVolume(int direction, @PublicVolumeFlags int flags) {
-        if (autoPublicVolumeApiHardening()) {
+        if (applyAutoHardening()) {
             final IAudioService service = getService();
             try {
                 service.adjustVolume(direction, flags);
@@ -1104,7 +1108,7 @@ public class AudioManager {
      */
     public void adjustSuggestedStreamVolume(int direction, int suggestedStreamType,
             @PublicVolumeFlags int flags) {
-        if (autoPublicVolumeApiHardening()) {
+        if (applyAutoHardening()) {
             final IAudioService service = getService();
             try {
                 service.adjustSuggestedStreamVolume(direction, suggestedStreamType, flags);
@@ -2943,33 +2947,6 @@ public class AudioManager {
      */
     public @NonNull Spatializer getSpatializer() {
         return new Spatializer(this);
-    }
-
-    //====================================================================
-    // Loudness management
-    private final Object mLoudnessCodecLock = new Object();
-
-    @GuardedBy("mLoudnessCodecLock")
-    private LoudnessCodecDispatcher mLoudnessCodecDispatcher = null;
-
-    /**
-     * Creates a new instance of {@link LoudnessCodecConfigurator}.
-     * @return the {@link LoudnessCodecConfigurator} instance
-     *
-     * TODO: remove hide once API is final
-     * @hide
-     */
-    @FlaggedApi(FLAG_LOUDNESS_CONFIGURATOR_API)
-    public @NonNull LoudnessCodecConfigurator createLoudnessCodecConfigurator() {
-        LoudnessCodecConfigurator configurator;
-        synchronized (mLoudnessCodecLock) {
-            // initialize lazily
-            if (mLoudnessCodecDispatcher == null) {
-                mLoudnessCodecDispatcher = new LoudnessCodecDispatcher(this);
-            }
-            configurator = mLoudnessCodecDispatcher.createLoudnessCodecConfigurator();
-        }
-        return configurator;
     }
 
     //====================================================================
@@ -10070,6 +10047,30 @@ public class AudioManager {
                     mMuteAwaitConnectionListenerLock,
                     (listener) -> listener.onUnmutedEvent(event, device, mutedUsages));
         }
+    }
+
+    //====================================================================
+    // Flag related utilities
+
+    private boolean mIsAutomotive = false;
+
+    private void initPlatform() {
+        try {
+            final Context context = getContext();
+            if (context != null) {
+                mIsAutomotive = context.getPackageManager()
+                        .hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error querying system feature for AUTOMOTIVE", e);
+        }
+    }
+
+    private boolean applyAutoHardening() {
+        if (mIsAutomotive && autoPublicVolumeApiHardening()) {
+            return true;
+        }
+        return false;
     }
 
     //---------------------------------------------------------

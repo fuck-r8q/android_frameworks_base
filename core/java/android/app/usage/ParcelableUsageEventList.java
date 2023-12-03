@@ -48,13 +48,16 @@ public final class ParcelableUsageEventList implements Parcelable {
 
     private List<Event> mList;
 
-    public ParcelableUsageEventList(List<Event> list) {
+    public ParcelableUsageEventList(@NonNull List<Event> list) {
+        if (list == null) {
+            throw new IllegalArgumentException("Empty list");
+        }
         mList = list;
     }
 
     private ParcelableUsageEventList(Parcel in) {
         final int N = in.readInt();
-        mList = new ArrayList<>();
+        mList = new ArrayList<>(N);
         if (DEBUG) Log.d(TAG, "Retrieving " + N + " items");
         if (N <= 0) {
             return;
@@ -220,6 +223,7 @@ public final class ParcelableUsageEventList implements Parcelable {
         event.mContentAnnotations = null;
         event.mNotificationChannelId = null;
         event.mLocusId = null;
+        event.mExtras = null;
 
         switch (event.mEventType) {
             case Event.CONFIGURATION_CHANGE -> {
@@ -234,6 +238,11 @@ public final class ParcelableUsageEventList implements Parcelable {
             case Event.STANDBY_BUCKET_CHANGED -> event.mBucketAndReason = in.readInt();
             case Event.NOTIFICATION_INTERRUPTION -> event.mNotificationChannelId = in.readString();
             case Event.LOCUS_ID_SET -> event.mLocusId = in.readString();
+            case Event.USER_INTERACTION -> {
+                if (in.readInt() != 0) {
+                    event.mExtras = in.readPersistableBundle(getClass().getClassLoader());
+                }
+            }
         }
         event.mFlags = in.readInt();
 
@@ -260,6 +269,14 @@ public final class ParcelableUsageEventList implements Parcelable {
             case Event.STANDBY_BUCKET_CHANGED -> dest.writeInt(event.mBucketAndReason);
             case Event.NOTIFICATION_INTERRUPTION -> dest.writeString(event.mNotificationChannelId);
             case Event.LOCUS_ID_SET -> dest.writeString(event.mLocusId);
+            case Event.USER_INTERACTION -> {
+                if (event.mExtras != null) {
+                    dest.writeInt(1);
+                    dest.writePersistableBundle(event.mExtras);
+                } else {
+                    dest.writeInt(0);
+                }
+            }
         }
         dest.writeInt(event.mFlags);
     }

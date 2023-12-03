@@ -1566,6 +1566,7 @@ public class UserManagerService extends IUserManager.Stub {
                 : now - userData.info.creationTime);
         DevicePolicyEventLogger
                 .createEvent(DevicePolicyEnums.REQUEST_QUIET_MODE_ENABLED)
+                .setInt(UserJourneyLogger.getUserTypeForStatsd(userData.info.userType))
                 .setStrings(callingPackage)
                 .setBoolean(enableQuietMode)
                 .setTimePeriod(period)
@@ -1592,6 +1593,19 @@ public class UserManagerService extends IUserManager.Stub {
      */
     private void showConfirmCredentialToDisableQuietMode(
             @UserIdInt int userId, @Nullable IntentSender target) {
+        if (android.app.admin.flags.Flags.quietModeCredentialBugFix()) {
+            // TODO (b/308121702) It may be brittle to rely on user states to check profile state
+            int state;
+            synchronized (mUserStates) {
+                state = mUserStates.get(userId, UserState.STATE_NONE);
+            }
+            if (state != UserState.STATE_NONE) {
+                Slog.i(LOG_TAG,
+                        "showConfirmCredentialToDisableQuietMode() called too early, user " + userId
+                                + " is still alive.");
+                return;
+            }
+        }
         // otherwise, we show a profile challenge to trigger decryption of the user
         final KeyguardManager km = (KeyguardManager) mContext.getSystemService(
                 Context.KEYGUARD_SERVICE);
@@ -1942,6 +1956,19 @@ public class UserManagerService extends IUserManager.Stub {
             return Resources.ID_NULL;
         }
         return userTypeDetails.getStatusBarIcon();
+    }
+
+    @Override
+    public @StringRes int getProfileLabelResId(@UserIdInt int userId) {
+        checkQueryOrInteractPermissionIfCallerInOtherProfileGroup(userId,
+                "getProfileLabelResId");
+        final UserInfo userInfo = getUserInfoNoChecks(userId);
+        final UserTypeDetails userTypeDetails = getUserTypeDetails(userInfo);
+        if (userInfo == null || userTypeDetails == null) {
+            return Resources.ID_NULL;
+        }
+        final int userIndex = userInfo.profileBadge;
+        return userTypeDetails.getLabel(userIndex);
     }
 
     public boolean isProfile(@UserIdInt int userId) {

@@ -284,6 +284,7 @@ import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
+import com.android.wm.shell.Flags;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -319,8 +320,6 @@ import java.util.Set;
 public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private static final String GRAMMATICAL_GENDER_PROPERTY = "persist.sys.grammatical_gender";
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityTaskManagerService" : TAG_ATM;
-    private static final String ENABLE_PIP2_IMPLEMENTATION =
-            "persist.wm.debug.enable_pip2_implementation";
     static final String TAG_ROOT_TASK = TAG + POSTFIX_ROOT_TASK;
     static final String TAG_SWITCH = TAG + POSTFIX_SWITCH;
 
@@ -3639,8 +3638,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * @hide
      */
     @Override
-    public void onSplashScreenViewCopyFinished(int taskId, SplashScreenViewParcelable parcelable)
-            throws RemoteException {
+    public void onSplashScreenViewCopyFinished(int taskId,
+            @Nullable SplashScreenViewParcelable parcelable)
+                throws RemoteException {
         mAmInternal.enforceCallingPermission(MANAGE_ACTIVITY_TASKS,
                 "copySplashScreenViewFinish()");
         synchronized (mGlobalLock) {
@@ -7303,6 +7303,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     static boolean isPip2ExperimentEnabled() {
-        return SystemProperties.getBoolean(ENABLE_PIP2_IMPLEMENTATION, false);
+        return Flags.enablePip2Implementation();
     }
 }

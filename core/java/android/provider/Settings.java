@@ -18,6 +18,7 @@ package android.provider;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
@@ -36,6 +37,7 @@ import android.app.ActivityThread;
 import android.app.AppOpsManager;
 import android.app.Application;
 import android.app.AutomaticZenRule;
+import android.app.Flags;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.SearchManager;
@@ -1904,6 +1906,36 @@ public final class Settings {
             = "android.settings.ACTION_CONDITION_PROVIDER_SETTINGS";
 
     /**
+     * Activity Action: Shows the settings page for an {@link AutomaticZenRule} mode.
+     * <p>
+     * Users can change the behavior of the mode when it's activated and access the owning app's
+     * additional configuration screen, where triggering criteria can be modified (see
+     * {@link AutomaticZenRule#setConfigurationActivity(ComponentName)}).
+     * <p>
+     * A matching Activity will only be found if
+     * {@link NotificationManager#areAutomaticZenRulesUserManaged()} is true.
+     * <p>
+     * Input: Intent's data URI set with an application name, using the "package" schema (like
+     * "package:com.my.app").
+     * Input: The id of the rule, provided in {@link #EXTRA_AUTOMATIC_ZEN_RULE_ID}.
+     * <p>
+     * Output: Nothing.
+     */
+    @FlaggedApi(Flags.FLAG_MODES_API)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_AUTOMATIC_ZEN_RULE_SETTINGS
+            = "android.settings.AUTOMATIC_ZEN_RULE_SETTINGS";
+
+    /**
+     * Activity Extra: The String id of the {@link AutomaticZenRule mode} settings to display.
+     * <p>
+     * This must be passed as an extra field to the {@link #ACTION_AUTOMATIC_ZEN_RULE_SETTINGS}.
+     */
+    @FlaggedApi(Flags.FLAG_MODES_API)
+    public static final String EXTRA_AUTOMATIC_ZEN_RULE_ID
+            = "android.provider.extra.AUTOMATIC_ZEN_RULE_ID";
+
+    /**
      * Activity Action: Show settings for video captioning.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you safeguard
@@ -2510,6 +2542,7 @@ public final class Settings {
      * ComponentName)} and only use this action to start an activity if they return {@code false}.
      */
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    @FlaggedApi(android.credentials.flags.Flags.FLAG_NEW_SETTINGS_INTENTS)
     public static final String ACTION_CREDENTIAL_PROVIDER =
             "android.settings.CREDENTIAL_PROVIDER";
 
@@ -8824,6 +8857,24 @@ public final class Settings {
                 "reduce_bright_colors_persist_across_reboots";
 
         /**
+         * Setting that specifies whether Even Dimmer - a feature that allows the brightness
+         * slider to go below what the display can conventionally do, should be enabled.
+         *
+         * @hide
+         */
+        public static final String EVEN_DIMMER_ACTIVATED =
+                "even_dimmer_activated";
+
+        /**
+         * Setting that specifies which nits level Even Dimmer should allow the screen brightness
+         * to go down to.
+         *
+         * @hide
+         */
+        public static final String EVEN_DIMMER_MIN_NITS =
+                "even_dimmer_min_nits";
+
+        /**
          * List of the enabled print services.
          *
          * N and beyond uses {@link #DISABLED_PRINT_SERVICES}. But this might be used in an upgrade
@@ -14964,6 +15015,38 @@ public final class Settings {
         @TestApi
         @Readable
         public static final String APP_OPS_CONSTANTS = "app_ops_constants";
+
+        /**
+         * Device Idle (Doze) specific settings.
+         * This is encoded as a key=value list, separated by commas. Ex:
+         *
+         * "inactive_to=60000,sensing_to=400000"
+         *
+         * The following keys are supported:
+         *
+         * <pre>
+         * inactive_to                      (long)
+         * sensing_to                       (long)
+         * motion_inactive_to               (long)
+         * idle_after_inactive_to           (long)
+         * idle_pending_to                  (long)
+         * max_idle_pending_to              (long)
+         * idle_pending_factor              (float)
+         * quick_doze_delay_to              (long)
+         * idle_to                          (long)
+         * max_idle_to                      (long)
+         * idle_factor                      (float)
+         * min_time_to_alarm                (long)
+         * max_temp_app_whitelist_duration  (long)
+         * notification_whitelist_duration  (long)
+         * </pre>
+         *
+         * <p>
+         * Type: string
+         * @hide
+         * @see com.android.server.DeviceIdleController.Constants
+         */
+        public static final String DEVICE_IDLE_CONSTANTS = "device_idle_constants";
 
         /**
          * Battery Saver specific settings

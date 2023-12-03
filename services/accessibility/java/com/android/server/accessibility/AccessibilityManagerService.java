@@ -158,10 +158,10 @@ import com.android.internal.util.Preconditions;
 import com.android.server.AccessibilityManagerInternal;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
+import com.android.server.accessibility.magnification.MagnificationConnectionManager;
 import com.android.server.accessibility.magnification.MagnificationController;
 import com.android.server.accessibility.magnification.MagnificationProcessor;
 import com.android.server.accessibility.magnification.MagnificationScaleProvider;
-import com.android.server.accessibility.magnification.WindowMagnificationManager;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.WindowManagerPolicy;
@@ -3442,7 +3442,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 && (userState.getMagnificationCapabilitiesLocked()
                 != Settings.Secure.ACCESSIBILITY_MAGNIFICATION_MODE_FULLSCREEN)
                 || userHasMagnificationServicesLocked(userState);
-        getWindowMagnificationMgr().requestConnection(connect);
+        getMagnificationConnectionManager().requestConnection(connect);
     }
 
     /**
@@ -4122,17 +4122,17 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         mSecurityPolicy.enforceCallingOrSelfPermission(
                 android.Manifest.permission.STATUS_BAR_SERVICE);
 
-        getWindowMagnificationMgr().setConnection(connection);
+        getMagnificationConnectionManager().setConnection(connection);
     }
 
     /**
-     * Getter of {@link WindowMagnificationManager}.
+     * Getter of {@link MagnificationConnectionManager}.
      *
-     * @return WindowMagnificationManager
+     * @return MagnificationManager
      */
-    public WindowMagnificationManager getWindowMagnificationMgr() {
+    public MagnificationConnectionManager getMagnificationConnectionManager() {
         synchronized (mLock) {
-            return mMagnificationController.getWindowMagnificationMgr();
+            return mMagnificationController.getMagnificationConnectionManager();
         }
     }
 
@@ -4423,7 +4423,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 pw.println();
             }
             pw.append("hasWindowMagnificationConnection=").append(
-                    String.valueOf(getWindowMagnificationMgr().isConnected()));
+                    String.valueOf(getMagnificationConnectionManager().isConnected()));
             pw.println();
             mMagnificationProcessor.dump(pw, getValidDisplayList());
             final int userCount = mUserStates.size();
@@ -5144,7 +5144,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
             for (int i = 0; i < displays.size(); i++) {
                 final int displayId = displays.get(i).getDisplayId();
-                getWindowMagnificationMgr().removeMagnificationButton(displayId);
+                getMagnificationConnectionManager().removeMagnificationButton(displayId);
             }
         }
     }
@@ -5580,6 +5580,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
     @Override
     public void injectInputEventToInputFilter(InputEvent event) {
+        mSecurityPolicy.enforceCallingPermission(Manifest.permission.INJECT_EVENTS,
+                "injectInputEventToInputFilter");
         synchronized (mLock) {
             final long endMillis =
                     SystemClock.uptimeMillis() + WAIT_INPUT_FILTER_INSTALL_TIMEOUT_MS;

@@ -72,6 +72,7 @@ import java.io.IOException;
 import java.io.BufferedReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -103,11 +104,17 @@ public class Watchdog implements Dumpable {
     //         applications may not work with a debug build. CTS will fail.
     private static final long DEFAULT_TIMEOUT = DB ? 10 * 1000 : 60 * 1000;
 
+    // This ratio is used to compute the pre-watchdog timeout (2 means that the pre-watchdog timeout
+    // will be half the full timeout).
+    //
+    // The pre-watchdog event is similar to a full watchdog except it does not crash system server.
+    private static final int PRE_WATCHDOG_TIMEOUT_RATIO = 3;
+
     // These are temporally ordered: larger values as lateness increases
-    private static final int COMPLETED = 0;
-    private static final int WAITING = 1;
-    private static final int WAITED_HALF = 2;
-    private static final int OVERDUE = 3;
+    static final int COMPLETED = 0;
+    static final int WAITING = 1;
+    static final int WAITED_UNTIL_PRE_WATCHDOG = 2;
+    static final int OVERDUE = 3;
 
     // Track watchdog timeout history and break the crash loop if there is.
     private static final String TIMEOUT_HISTORY_FILE = "/data/system/watchdog-timeout-history.txt";
@@ -244,10 +251,8 @@ public class Watchdog implements Dumpable {
         }
     }
 
-    /**
-     * Used for checking status of handle threads and scheduling monitor callbacks.
-     */
-    public final class HandlerChecker implements Runnable {
+    /** Used for checking status of handle threads and scheduling monitor callbacks. */
+    public static class HandlerChecker implements Runnable {
         private final Handler mHandler;
         private final String mName;
         private final ArrayList<Monitor> mMonitors = new ArrayList<Monitor>();
@@ -258,11 +263,19 @@ public class Watchdog implements Dumpable {
         private long mStartTimeMillis;
         private int mPauseCount;
         private long mPauseEndTimeMillis;
+        private Clock mClock;
+        private Object mLock;
 
-        HandlerChecker(Handler handler, String name) {
+        HandlerChecker(Handler handler, String name, Object lock, Clock clock) {
             mHandler = handler;
             mName = name;
+            mLock = lock;
             mCompleted = true;
+            mClock = clock;
+        }
+
+        HandlerChecker(Handler handler, String name, Object lock) {
+            this(handler, name, lock, SystemClock.uptimeClock());
         }
 
         void addMonitorLocked(Monitor monitor) {
@@ -285,11 +298,9 @@ public class Watchdog implements Dumpable {
                 mMonitorQueue.clear();
             }
 
-            long nowMillis = SystemClock.uptimeMillis();
-            boolean isPaused = mPauseCount > 0
-                    || (mPauseEndTimeMillis > 0 && mPauseEndTimeMillis < nowMillis);
-            if ((mMonitors.size() == 0 && mHandler.getLooper().getQueue().isPolling())
-                    || isPaused) {
+            long nowMillis = mClock.millis();
+            boolean isPaused = mPauseCount > 0 || mPauseEndTimeMillis > nowMillis;
+            if ((mMonitors.size() == 0 && isHandlerPolling()) || isPaused) {
                 // Don't schedule until after resume OR
                 // If the target looper has recently been polling, then
                 // there is no reason to enqueue our checker on it since that
@@ -312,15 +323,19 @@ public class Watchdog implements Dumpable {
             mHandler.postAtFrontOfQueue(this);
         }
 
+        boolean isHandlerPolling() {
+            return mHandler.getLooper().getQueue().isPolling();
+        }
+
         public int getCompletionStateLocked() {
             if (mCompleted) {
                 return COMPLETED;
             } else {
-                long latency = SystemClock.uptimeMillis() - mStartTimeMillis;
-                if (latency < mWaitMaxMillis / 2) {
+                long latency = mClock.millis() - mStartTimeMillis;
+                if (latency < mWaitMaxMillis / PRE_WATCHDOG_TIMEOUT_RATIO) {
                     return WAITING;
                 } else if (latency < mWaitMaxMillis) {
-                    return WAITED_HALF;
+                    return WAITED_UNTIL_PRE_WATCHDOG;
                 }
             }
             return OVERDUE;
@@ -341,7 +356,7 @@ public class Watchdog implements Dumpable {
             } else {
                 prefix =  "Blocked in monitor " + mCurrentMonitor.getClass().getName();
             }
-            long latencySeconds = (SystemClock.uptimeMillis() - mStartTimeMillis) / 1000;
+            long latencySeconds = (mClock.millis() - mStartTimeMillis) / 1000;
             return prefix + " on " + mName + " (" + getThread().getName() + ")"
                 + " for " + latencySeconds + "s";
         }
@@ -373,10 +388,11 @@ public class Watchdog implements Dumpable {
          * the given time.
          */
         public void pauseForLocked(int pauseMillis, String reason) {
-            mPauseEndTimeMillis = SystemClock.uptimeMillis() + pauseMillis;
+            mPauseEndTimeMillis = mClock.millis() + pauseMillis;
             // Mark as completed, because there's a chance we called this after the watchog
-            // thread loop called Object#wait after 'WAITED_HALF'. In that case we want to ensure
-            // the next call to #getCompletionStateLocked for this checker returns 'COMPLETED'
+            // thread loop called Object#wait after 'WAITED_UNTIL_PRE_WATCHDOG'. In that case we
+            // want to ensure the next call to #getCompletionStateLocked for this checker returns
+            // 'COMPLETED'
             mCompleted = true;
             Slog.i(TAG, "Pausing of HandlerChecker: " + mName + " for reason: "
                     + reason + ". Pause end time: " + mPauseEndTimeMillis);
@@ -386,8 +402,9 @@ public class Watchdog implements Dumpable {
         public void pauseLocked(String reason) {
             mPauseCount++;
             // Mark as completed, because there's a chance we called this after the watchog
-            // thread loop called Object#wait after 'WAITED_HALF'. In that case we want to ensure
-            // the next call to #getCompletionStateLocked for this checker returns 'COMPLETED'
+            // thread loop called Object#wait after 'WAITED_UNTIL_PRE_WATCHDOG'. In that case we
+            // want to ensure the next call to #getCompletionStateLocked for this checker returns
+            // 'COMPLETED'
             mCompleted = true;
             Slog.i(TAG, "Pausing HandlerChecker: " + mName + " for reason: "
                     + reason + ". Pause count: " + mPauseCount);
@@ -402,6 +419,11 @@ public class Watchdog implements Dumpable {
             } else {
                 Slog.wtf(TAG, "Already resumed HandlerChecker: " + mName);
             }
+        }
+
+        @Override
+        public String toString() {
+            return "CheckerHandler for " + mName;
         }
     }
 
@@ -452,31 +474,40 @@ public class Watchdog implements Dumpable {
         ServiceThread t = new ServiceThread("watchdog.monitor",
                 android.os.Process.THREAD_PRIORITY_DEFAULT, true /*allowIo*/);
         t.start();
-        mMonitorChecker = new HandlerChecker(new Handler(t.getLooper()), "monitor thread");
+        mMonitorChecker = new HandlerChecker(new Handler(t.getLooper()), "monitor thread", mLock);
         mHandlerCheckers.add(withDefaultTimeout(mMonitorChecker));
 
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(FgThread.getHandler(), "foreground thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(
+                        new HandlerChecker(FgThread.getHandler(), "foreground thread", mLock)));
         // Add checker for main thread.  We only do a quick check since there
         // can be UI running on the thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(new Handler(Looper.getMainLooper()), "main thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(
+                        new HandlerChecker(
+                                new Handler(Looper.getMainLooper()), "main thread", mLock)));
         // Add checker for shared UI thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(UiThread.getHandler(), "ui thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(new HandlerChecker(UiThread.getHandler(), "ui thread", mLock)));
         // And also check IO thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(IoThread.getHandler(), "i/o thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(new HandlerChecker(IoThread.getHandler(), "i/o thread", mLock)));
         // And the display thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(DisplayThread.getHandler(), "display thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(
+                        new HandlerChecker(DisplayThread.getHandler(), "display thread", mLock)));
         // And the animation thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                 new HandlerChecker(AnimationThread.getHandler(), "animation thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(
+                        new HandlerChecker(
+                                AnimationThread.getHandler(), "animation thread", mLock)));
         // And the surface animation thread.
-        mHandlerCheckers.add(withDefaultTimeout(
-                new HandlerChecker(SurfaceAnimationThread.getHandler(),
-                    "surface animation thread")));
+        mHandlerCheckers.add(
+                withDefaultTimeout(
+                        new HandlerChecker(
+                                SurfaceAnimationThread.getHandler(),
+                                "surface animation thread",
+                                mLock)));
         // Initialize monitor for Binder threads.
         addMonitor(new BinderThreadMonitor());
 
@@ -616,7 +647,7 @@ public class Watchdog implements Dumpable {
     public void addThread(Handler thread) {
         synchronized (mLock) {
             final String name = thread.getLooper().getThread().getName();
-            mHandlerCheckers.add(withDefaultTimeout(new HandlerChecker(thread, name)));
+            mHandlerCheckers.add(withDefaultTimeout(new HandlerChecker(thread, name, mLock)));
         }
     }
 
@@ -624,7 +655,7 @@ public class Watchdog implements Dumpable {
         synchronized (mLock) {
             final String name = thread.getLooper().getThread().getName();
             mHandlerCheckers.add(
-                    withCustomTimeout(new HandlerChecker(thread, name), timeoutMillis));
+                    withCustomTimeout(new HandlerChecker(thread, name, mLock), timeoutMillis));
         }
     }
 
@@ -803,11 +834,11 @@ public class Watchdog implements Dumpable {
             String subject = "";
             boolean allowRestart = true;
             int debuggerWasConnected = 0;
-            boolean doWaitedHalfDump = false;
+            boolean doWaitedPreDump = false;
             // The value of mWatchdogTimeoutMillis might change while we are executing the loop.
             // We store the current value to use a consistent value for all handlers.
             final long watchdogTimeoutMillis = mWatchdogTimeoutMillis;
-            final long checkIntervalMillis = watchdogTimeoutMillis / 2;
+            final long checkIntervalMillis = watchdogTimeoutMillis / PRE_WATCHDOG_TIMEOUT_RATIO;
             final ArrayList<Integer> pids;
             synchronized (mLock) {
                 long timeout = checkIntervalMillis;
@@ -854,15 +885,16 @@ public class Watchdog implements Dumpable {
                 } else if (waitState == WAITING) {
                     // still waiting but within their configured intervals; back off and recheck
                     continue;
-                } else if (waitState == WAITED_HALF) {
+                } else if (waitState == WAITED_UNTIL_PRE_WATCHDOG) {
                     if (!waitedHalf) {
-                        Slog.i(TAG, "WAITED_HALF");
+                        Slog.i(TAG, "WAITED_UNTIL_PRE_WATCHDOG");
                         waitedHalf = true;
-                        // We've waited half, but we'd need to do the stack trace dump w/o the lock.
-                        blockedCheckers = getCheckersWithStateLocked(WAITED_HALF);
+                        // We've waited until the pre-watchdog, but we'd need to do the stack trace
+                        // dump w/o the lock.
+                        blockedCheckers = getCheckersWithStateLocked(WAITED_UNTIL_PRE_WATCHDOG);
                         subject = describeCheckersLocked(blockedCheckers);
                         pids = new ArrayList<>(mInterestingJavaPids);
-                        doWaitedHalfDump = true;
+                        doWaitedPreDump = true;
                     } else {
                         continue;
                     }
@@ -887,11 +919,11 @@ public class Watchdog implements Dumpable {
                 //delay 30s to make sure perfetto trace dumped completely
                 dueTime = SystemClock.uptimeMillis() + 30000;
             }
-            logWatchog(doWaitedHalfDump, subject, pids);
-            if (doWaitedHalfDump) {
-                // We have waited for only half of the timeout, we continue to wait for the duration
-                // of the full timeout before killing the process.
+            logWatchog(doWaitedPreDump, subject, pids);
 
+            if (doWaitedPreDump) {
+                // We have waited for only pre-watchdog timeout, we continue to wait for the
+                // duration of the full timeout before killing the process.
                 continue;
             }
 
@@ -947,7 +979,7 @@ public class Watchdog implements Dumpable {
         }
     }
 
-    private void logWatchog(boolean halfWatchdog, String subject, ArrayList<Integer> pids) {
+    private void logWatchog(boolean preWatchdog, String subject, ArrayList<Integer> pids) {
         File initialStack = null;
         ArrayList<Integer> nativePids = getInterestingNativePids();
         // Get critical event log before logging the half watchdog so that it doesn't
@@ -962,7 +994,7 @@ public class Watchdog implements Dumpable {
         }
 
         final String dropboxTag;
-        if (halfWatchdog) {
+        if (preWatchdog) {
             dropboxTag = "pre_watchdog";
             CriticalEventLog.getInstance().logHalfWatchdog(subject);
             // We've waited half the deadlock-detection interval.  Pull a stack
@@ -1056,7 +1088,7 @@ public class Watchdog implements Dumpable {
                 // why kill the system when it is going to die anyways?
                 Slog.e(TAG, "Exception creating Watchdog dump file:", e);
         }
-        if (!halfWatchdog) {
+        if (!preWatchdog) {
             // Trigger the kernel to dump all blocked threads, and backtraces on all CPUs to the
             // kernel log
             doSysRq('w');

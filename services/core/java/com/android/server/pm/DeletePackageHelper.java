@@ -369,6 +369,12 @@ final class DeletePackageHelper {
         final DeletePackageAction action;
         synchronized (mPm.mLock) {
             final PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
+            if (ps == null) {
+                if (DEBUG_REMOVE) {
+                    Slog.d(TAG, "Attempted to remove non-existent package " + packageName);
+                }
+                return false;
+            }
             final PackageSetting disabledPs = mPm.mSettings.getDisabledSystemPkgLPr(ps);
             if (PackageManagerServiceUtils.isSystemApp(ps)
                     && mPm.checkPermission(CONTROL_KEYGUARD, packageName, UserHandle.USER_SYSTEM)
@@ -452,7 +458,7 @@ final class DeletePackageHelper {
         if (outInfo != null) {
             // Remember which users are affected, before the installed states are modified
             outInfo.mRemovedUsers = (systemApp || userId == UserHandle.USER_ALL)
-                    ? ps.queryInstalledUsers(allUserHandles, /* installed= */true)
+                    ? ps.queryUsersInstalledOrHasData(allUserHandles)
                     : new int[]{userId};
         }
 

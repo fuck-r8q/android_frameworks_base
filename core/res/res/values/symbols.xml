@@ -291,6 +291,7 @@
   <java-symbol type="integer" name="config_audio_notif_vol_steps" />
   <java-symbol type="integer" name="config_audio_ring_vol_default" />
   <java-symbol type="integer" name="config_audio_ring_vol_steps" />
+  <java-symbol type="integer" name="config_audio_alarm_min_vol" />
   <java-symbol type="bool" name="config_spatial_audio_head_tracking_enabled_default" />
   <java-symbol type="bool" name="config_avoidGfxAccel" />
   <java-symbol type="bool" name="config_bluetooth_address_validation" />
@@ -1091,6 +1092,13 @@
   <java-symbol type="string" name="managed_profile_label_badge_3" />
   <java-symbol type="string" name="clone_profile_label_badge" />
   <java-symbol type="string" name="private_profile_label_badge" />
+  <java-symbol type="string" name="profile_label_private" />
+  <java-symbol type="string" name="profile_label_clone" />
+  <java-symbol type="string" name="profile_label_work" />
+  <java-symbol type="string" name="profile_label_work_2" />
+  <java-symbol type="string" name="profile_label_work_3" />
+  <java-symbol type="string" name="profile_label_test" />
+  <java-symbol type="string" name="profile_label_communal" />
   <java-symbol type="string" name="mediasize_unknown_portrait" />
   <java-symbol type="string" name="mediasize_unknown_landscape" />
   <java-symbol type="string" name="mediasize_iso_a0" />
@@ -1272,6 +1280,7 @@
   <java-symbol type="array" name="policy_exempt_apps" />
   <java-symbol type="array" name="vendor_policy_exempt_apps" />
   <java-symbol type="array" name="cloneable_apps" />
+  <java-symbol type="array" name="config_securityStatePackages" />
 
   <java-symbol type="drawable" name="default_wallpaper" />
   <java-symbol type="drawable" name="default_lock_wallpaper" />
@@ -2096,6 +2105,7 @@
   <java-symbol type="integer" name="config_screenBrightnessSettingMinimum" />
   <java-symbol type="integer" name="config_screenBrightnessSettingMaximum" />
   <java-symbol type="integer" name="config_screenBrightnessSettingDefault" />
+  <java-symbol type="integer" name="config_screenBrightnessCapForWearBedtimeMode" />
   <java-symbol type="dimen" name="config_screenBrightnessSettingMinimumFloat" />
   <java-symbol type="dimen" name="config_screenBrightnessSettingMaximumFloat" />
   <java-symbol type="dimen" name="config_screenBrightnessSettingDefaultFloat" />
@@ -3405,6 +3415,7 @@
   <java-symbol type="bool" name="config_pinnerCameraApp" />
   <java-symbol type="bool" name="config_pinnerHomeApp" />
   <java-symbol type="bool" name="config_pinnerAssistantApp" />
+  <java-symbol type="integer" name="config_pinnerWebviewPinBytes" />
 
   <java-symbol type="string" name="config_doubleTouchGestureEnableFile" />
 

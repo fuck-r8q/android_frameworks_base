@@ -76,7 +76,6 @@ import static com.android.server.wm.Task.REPARENT_MOVE_ROOT_TASK_TO_FRONT;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_INVISIBLE;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_LAYOUT_REPEATS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WINDOW_TRACE;
-import static com.android.server.wm.WindowManagerDebugConfig.SHOW_LIGHT_TRANSACTIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WINDOW_FREEZE_TIMEOUT;
@@ -637,7 +636,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     void refreshSecureSurfaceState() {
         forAllWindows((w) -> {
             if (w.mHasSurface) {
-                w.mWinAnimator.setSecureLocked(w.isSecureLocked());
+                w.setSecureLocked(w.isSecureLocked());
             }
         }, true /* traverseTopToBottom */);
     }
@@ -797,23 +796,13 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         final DisplayContent defaultDisplay = mWmService.getDefaultDisplayContentLocked();
         final WindowSurfacePlacer surfacePlacer = mWmService.mWindowPlacerLocked;
 
-        if (SHOW_LIGHT_TRANSACTIONS) {
-            Slog.i(TAG,
-                    ">>> OPEN TRANSACTION performLayoutAndPlaceSurfaces");
-        }
         Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "applySurfaceChanges");
-        mWmService.openSurfaceTransaction();
         try {
             applySurfaceChangesTransaction();
         } catch (RuntimeException e) {
             Slog.wtf(TAG, "Unhandled exception in Window Manager", e);
         } finally {
-            mWmService.closeSurfaceTransaction("performLayoutAndPlaceSurfaces");
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
-            if (SHOW_LIGHT_TRANSACTIONS) {
-                Slog.i(TAG,
-                        "<<< CLOSE TRANSACTION performLayoutAndPlaceSurfaces");
-            }
         }
 
         // Send any pending task-info changes that were queued-up during a layout deferment
@@ -1007,9 +996,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // Give the display manager a chance to adjust properties like display rotation if it needs
         // to.
         mWmService.mDisplayManagerInternal.performTraversal(t);
-        if (t != defaultDc.mSyncTransaction) {
-            SurfaceControl.mergeToGlobalTransaction(t);
-        }
     }
 
     /**
@@ -2194,12 +2180,16 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     // now, it will take focus briefly which confuses the RecentTasks tracker.
                     rootTask.setWindowingMode(WINDOWING_MODE_PINNED);
                 }
-
+                // Temporarily disable focus when reparenting to avoid intermediate focus change
+                // (because the task is on top and the activity is resumed), which could cause the
+                // task to be added in recents task list unexpectedly.
+                rootTask.setFocusable(false);
                 // There are multiple activities in the task and moving the top activity should
                 // reveal/leave the other activities in their original task.
                 // On the other hand, ActivityRecord#onParentChanged takes care of setting the
                 // up-to-dated root pinned task information on this newly created root task.
                 r.reparent(rootTask, MAX_VALUE, reason);
+                rootTask.setFocusable(true);
 
                 // Ensure the leash of new task is in sync with its current bounds after reparent.
                 rootTask.maybeApplyLastRecentsAnimationTransaction();
@@ -2854,13 +2844,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         synchronized (mService.mGlobalLock) {
             final DisplayContent displayContent = getDisplayContent(displayId);
             if (displayContent != null) {
-                displayContent.onDisplayChanged();
+                displayContent.requestDisplayUpdate(() -> clearDisplayInfoCaches(displayId));
+            } else {
+                clearDisplayInfoCaches(displayId);
             }
-            // Drop any cached DisplayInfos associated with this display id - the values are now
-            // out of date given this display changed event.
-            mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
-            updateDisplayImePolicyCache();
         }
+    }
+
+    private void clearDisplayInfoCaches(int displayId) {
+        // Drop any cached DisplayInfos associated with this display id - the values are now
+        // out of date given this display changed event.
+        mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
+        updateDisplayImePolicyCache();
     }
 
     void updateDisplayImePolicyCache() {

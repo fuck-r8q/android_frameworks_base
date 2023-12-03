@@ -20,12 +20,10 @@ import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.SurfaceControl.METADATA_OWNER_PID;
 import static android.view.SurfaceControl.METADATA_OWNER_UID;
 import static android.view.SurfaceControl.METADATA_WINDOW_TYPE;
-import static android.view.SurfaceControl.getGlobalTransaction;
 
 import static com.android.internal.protolog.ProtoLogGroup.WM_SHOW_SURFACE_ALLOC;
 import static com.android.internal.protolog.ProtoLogGroup.WM_SHOW_TRANSACTIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
-import static com.android.server.wm.WindowManagerDebugConfig.SHOW_LIGHT_TRANSACTIONS;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowSurfaceControllerProto.SHOWN;
@@ -148,35 +146,9 @@ class WindowSurfaceController {
         if (mSurfaceControl == null) {
             return;
         }
-        if (SHOW_LIGHT_TRANSACTIONS) Slog.i(TAG, ">>> OPEN TRANSACTION setOpaqueLocked");
-        mService.openSurfaceTransaction();
-        try {
-            getGlobalTransaction().setOpaque(mSurfaceControl, isOpaque);
-        } finally {
-            mService.closeSurfaceTransaction("setOpaqueLocked");
-            if (SHOW_LIGHT_TRANSACTIONS) Slog.i(TAG, "<<< CLOSE TRANSACTION setOpaqueLocked");
-        }
-    }
 
-    void setSecure(boolean isSecure) {
-        ProtoLog.i(WM_SHOW_TRANSACTIONS, "SURFACE isSecure=%b: %s", isSecure, title);
-
-        if (mSurfaceControl == null) {
-            return;
-        }
-        if (SHOW_LIGHT_TRANSACTIONS) Slog.i(TAG, ">>> OPEN TRANSACTION setSecureLocked");
-        mService.openSurfaceTransaction();
-        try {
-            getGlobalTransaction().setSecure(mSurfaceControl, isSecure);
-
-            final DisplayContent dc = mAnimator.mWin.mDisplayContent;
-            if (dc != null) {
-                dc.refreshImeSecureFlag(getGlobalTransaction());
-            }
-        } finally {
-            mService.closeSurfaceTransaction("setSecure");
-            if (SHOW_LIGHT_TRANSACTIONS) Slog.i(TAG, "<<< CLOSE TRANSACTION setSecureLocked");
-        }
+        mAnimator.mWin.getPendingTransaction().setOpaque(mSurfaceControl, isOpaque);
+        mService.scheduleAnimationLocked();
     }
 
     void setColorSpaceAgnostic(SurfaceControl.Transaction t, boolean agnostic) {

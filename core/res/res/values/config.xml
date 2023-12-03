@@ -1522,6 +1522,10 @@
     config_screenBrightnessSettingDefaultFloat instead -->
     <integer name="config_screenBrightnessSettingDefault">102</integer>
 
+    <!-- Maximum screen brightness setting when screen brightness capped in Wear Bedtime mode.
+    The value must be in the range [0, 255]. -->
+    <integer name="config_screenBrightnessCapForWearBedtimeMode">20</integer>
+
     <!-- Minimum screen brightness setting allowed by power manager.
          -2 is invalid so setting will resort to int value specified above.
          Set this to 0.0 to allow screen to go to minimal brightness.
@@ -2244,6 +2248,9 @@
 
     <!-- The default volume for the ring stream -->
     <integer name="config_audio_ring_vol_default">5</integer>
+
+    <!-- The default min volume for the alarm stream -->
+    <integer name="config_audio_alarm_min_vol">1</integer>
 
     <!-- The default value for whether head tracking for
          spatial audio is enabled for a newly connected audio device -->
@@ -4342,6 +4349,9 @@
     <!-- True if assistant app should be pinned via Pinner Service -->
     <bool name="config_pinnerAssistantApp">false</bool>
 
+    <!-- Bytes that the PinnerService will pin for WebView -->
+    <integer name="config_pinnerWebviewPinBytes">0</integer>
+
     <!-- Number of days preloaded file cache should be preserved on a device before it can be
          deleted -->
     <integer name="config_keepPreloadsMinDays">7</integer>
@@ -5005,6 +5015,11 @@
     <!-- Component name for the default module metadata provider on this device -->
     <string name="config_defaultModuleMetadataProvider" translatable="false">com.android.modulemetadata</string>
 
+    <!-- Packages that contain a security state.
+         {@link SecurityStateManager#getGlobalSecurityState} will read and report the state/version
+          of these packages. -->
+    <string-array name="config_securityStatePackages" translatable="false" />
+
     <!-- Package name for the default Health Connect app.
          OEMs can set this with their own health app package name to define a default app with high
          priority for the app to store the health data. If set the app always has priority of 1
@@ -5484,6 +5499,7 @@
         <item>1,1,1.0,.15,15</item>
         <item>0,0,0.7,0,1</item>
         <item>0,0,0.83333,0,1</item>
+        <item>0,0,1.1667,0,1</item>
     </string-array>
 
     <!-- The integer index of the selected option in config_udfps_touch_detection_options -->

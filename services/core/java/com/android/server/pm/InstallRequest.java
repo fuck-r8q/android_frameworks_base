@@ -50,9 +50,9 @@ import android.util.ArrayMap;
 import android.util.ExceptionUtils;
 import android.util.Slog;
 
+import com.android.internal.pm.parsing.pkg.ParsedPackage;
 import com.android.internal.util.ArrayUtils;
 import com.android.server.art.model.DexoptResult;
-import com.android.server.pm.parsing.pkg.ParsedPackage;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageState;
 import com.android.server.pm.pkg.PackageStateInternal;
@@ -536,6 +536,12 @@ final class InstallRequest {
     public PackageSetting getScanRequestPackageSetting() {
         assertScanResultExists();
         return mScanResult.mRequest.mPkgSetting;
+    }
+
+    @Nullable
+    public PackageSetting getScanRequestDisabledPackageSetting() {
+        assertScanResultExists();
+        return mScanResult.mRequest.mDisabledPkgSetting;
     }
 
     @Nullable

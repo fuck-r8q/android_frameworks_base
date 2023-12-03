@@ -22,6 +22,8 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import static kotlinx.coroutines.test.TestCoroutineDispatchersKt.StandardTestDispatcher;
+
 import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Looper;
@@ -80,6 +82,8 @@ import com.android.systemui.statusbar.QsFrameTranslateController;
 import com.android.systemui.statusbar.StatusBarStateControllerImpl;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository;
+import com.android.systemui.statusbar.notification.data.repository.ActiveNotificationListRepository;
+import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController;
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor;
@@ -178,6 +182,8 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
     protected SysuiStatusBarStateController mStatusBarStateController;
     protected ShadeInteractor mShadeInteractor;
 
+    protected ActiveNotificationsInteractor mActiveNotificationsInteractor;
+
     protected Handler mMainHandler;
     protected LockscreenShadeTransitionController.Callback mLockscreenShadeTransitionCallback;
 
@@ -220,7 +226,6 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 mKeyguardRepository,
                 new FakeCommandQueue(),
                 powerInteractor,
-                featureFlags,
                 sceneContainerFlags,
                 new FakeKeyguardBouncerRepository(),
                 configurationRepository,
@@ -289,6 +294,11 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                         mShadeRepository
                 )
         );
+
+        mActiveNotificationsInteractor = new ActiveNotificationsInteractor(
+                        new ActiveNotificationListRepository(),
+                        StandardTestDispatcher(/* scheduler = */ null, /* name = */ null)
+                );
 
         KeyguardStatusView keyguardStatusView = new KeyguardStatusView(mContext);
         keyguardStatusView.setId(R.id.keyguard_status_view);
@@ -362,6 +372,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 mock(KeyguardFaceAuthInteractor.class),
                 mShadeRepository,
                 mShadeInteractor,
+                mActiveNotificationsInteractor,
                 new JavaAdapter(mTestScope.getBackgroundScope()),
                 mCastController,
                 splitShadeStateController

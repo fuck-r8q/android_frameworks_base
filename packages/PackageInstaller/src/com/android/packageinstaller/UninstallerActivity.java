@@ -17,8 +17,8 @@
 package com.android.packageinstaller;
 
 import static android.app.AppOpsManager.MODE_ALLOWED;
+import static android.content.pm.Flags.usePiaV2;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
-
 import static com.android.packageinstaller.PackageUtil.getMaxTargetSdkVersionForUid;
 
 import android.Manifest;
@@ -56,6 +56,7 @@ import com.android.packageinstaller.television.ErrorFragment;
 import com.android.packageinstaller.television.UninstallAlertFragment;
 import com.android.packageinstaller.television.UninstallAppProgress;
 
+import com.android.packageinstaller.v2.ui.UninstallLaunch;
 import java.util.List;
 
 /*
@@ -87,6 +88,31 @@ public class UninstallerActivity extends Activity {
         // Never restore any state, esp. never create any fragments. The data in the fragment might
         // be stale, if e.g. the app was uninstalled while the activity was destroyed.
         super.onCreate(null);
+
+        if (usePiaV2() && !isTv()) {
+            Log.i(TAG, "Using Pia V2");
+
+            PackageManager pm = getPackageManager();
+            pm.setComponentEnabledSetting(
+                new ComponentName(this, com.android.packageinstaller.UninstallEventReceiver.class),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0);
+            pm.setComponentEnabledSetting(
+                new ComponentName(this,
+                    com.android.packageinstaller.v2.model.UninstallEventReceiver.class),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0);
+
+            boolean returnResult = getIntent().getBooleanExtra(Intent.EXTRA_RETURN_RESULT, false);
+            Intent piaV2 = new Intent(getIntent());
+            piaV2.putExtra(UninstallLaunch.EXTRA_CALLING_PKG_UID, getLaunchedFromUid());
+            piaV2.putExtra(UninstallLaunch.EXTRA_CALLING_ACTIVITY_NAME, getCallingActivity());
+            if (returnResult) {
+                piaV2.addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
+            }
+            piaV2.setClass(this, UninstallLaunch.class);
+            startActivity(piaV2);
+            finish();
+            return;
+        }
 
         int callingUid = getLaunchedFromUid();
         if (callingUid == Process.INVALID_UID) {
@@ -176,7 +202,8 @@ public class UninstallerActivity extends Activity {
 
         try {
             mDialogInfo.appInfo = pm.getApplicationInfo(mPackageName,
-                    PackageManager.ApplicationInfoFlags.of(PackageManager.MATCH_ANY_USER));
+                    PackageManager.ApplicationInfoFlags.of(PackageManager.MATCH_ANY_USER
+                            | PackageManager.MATCH_ARCHIVED_PACKAGES));
         } catch (PackageManager.NameNotFoundException e) {
             Log.e(TAG, "Unable to get packageName. Package manager is dead?");
         }

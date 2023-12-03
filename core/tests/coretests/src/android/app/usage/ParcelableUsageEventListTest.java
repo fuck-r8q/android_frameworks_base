@@ -20,6 +20,7 @@ import static android.view.Surface.ROTATION_90;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import android.app.usage.UsageEvents.Event;
 import android.content.res.Configuration;
 import android.os.Parcel;
+import android.os.PersistableBundle;
 import android.test.suitebuilder.annotation.LargeTest;
 
 import androidx.test.runner.AndroidJUnit4;
@@ -43,9 +45,27 @@ import java.util.Random;
 @LargeTest
 public class ParcelableUsageEventListTest {
     private static final int SMALL_TEST_EVENT_COUNT = 100;
-    private static final int LARGE_TEST_EVENT_COUNT = 10000;
+    private static final int LARGE_TEST_EVENT_COUNT = 30000;
 
     private Random mRandom = new Random();
+
+    @Test
+    public void testNullList() throws Exception {
+        Parcel parcel = Parcel.obtain();
+        try {
+            parcel.writeParcelable(new ParcelableUsageEventList(null), 0);
+            fail("Expected IllegalArgumentException with null list.");
+        } catch (IllegalArgumentException expected) {
+            // Expected.
+        } finally {
+            parcel.recycle();
+        }
+    }
+
+    @Test
+    public void testEmptyList() throws Exception {
+        testParcelableUsageEventList(0);
+    }
 
     @Test
     public void testSmallList() throws Exception {
@@ -58,15 +78,15 @@ public class ParcelableUsageEventListTest {
     }
 
     private void testParcelableUsageEventList(int eventCount) throws Exception {
-        List<Event> smallList = new ArrayList<>();
+        List<Event> eventList = new ArrayList<>();
         for (int i = 0; i < eventCount; i++) {
-            smallList.add(generateUsageEvent());
+            eventList.add(generateUsageEvent());
         }
 
         ParcelableUsageEventList slice;
         Parcel parcel = Parcel.obtain();
         try {
-            parcel.writeParcelable(new ParcelableUsageEventList(smallList), 0);
+            parcel.writeParcelable(new ParcelableUsageEventList(eventList), 0);
             parcel.setDataPosition(0);
             slice = parcel.readParcelable(getClass().getClassLoader(),
                     ParcelableUsageEventList.class);
@@ -79,7 +99,7 @@ public class ParcelableUsageEventListTest {
         assertEquals(eventCount, slice.getList().size());
 
         for (int i = 0; i < eventCount; i++) {
-            compareUsageEvent(smallList.get(i), slice.getList().get(i));
+            compareUsageEvent(eventList.get(i), slice.getList().get(i));
         }
     }
 
@@ -121,6 +141,12 @@ public class ParcelableUsageEventListTest {
             case Event.LOCUS_ID_SET:
                 event.mLocusId = anyString();
                 break;
+            case Event.USER_INTERACTION:
+                PersistableBundle extras = new PersistableBundle();
+                extras.putString(UsageStatsManager.EXTRA_EVENT_CATEGORY, anyString());
+                extras.putString(UsageStatsManager.EXTRA_EVENT_ACTION, anyString());
+                event.mExtras = extras;
+                break;
         }
 
         event.mFlags = anyInt();
@@ -156,6 +182,14 @@ public class ParcelableUsageEventListTest {
                 break;
             case Event.LOCUS_ID_SET:
                 assertEquals(ue1.mLocusId, ue2.mLocusId);
+                break;
+            case Event.USER_INTERACTION:
+                final PersistableBundle extras1 = ue1.getExtras();
+                final PersistableBundle extras2 = ue2.getExtras();
+                assertEquals(extras1.getString(UsageStatsManager.EXTRA_EVENT_CATEGORY),
+                        extras2.getString(UsageStatsManager.EXTRA_EVENT_CATEGORY));
+                assertEquals(extras1.getString(UsageStatsManager.EXTRA_EVENT_ACTION),
+                        extras2.getString(UsageStatsManager.EXTRA_EVENT_ACTION));
                 break;
         }
 

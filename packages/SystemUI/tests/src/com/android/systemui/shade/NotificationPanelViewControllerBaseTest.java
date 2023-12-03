@@ -148,6 +148,7 @@ import com.android.systemui.statusbar.notification.ConversationNotificationManag
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinatorLogger;
+import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
@@ -337,6 +338,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock private JavaAdapter mJavaAdapter;
     @Mock private CastController mCastController;
     @Mock private SharedNotificationContainerInteractor mSharedNotificationContainerInteractor;
+    @Mock private ActiveNotificationsInteractor mActiveNotificationsInteractor;
     @Mock private KeyguardClockPositionAlgorithm mKeyguardClockPositionAlgorithm;
     @Mock private NaturalScrollingSettingObserver mNaturalScrollingSettingObserver;
 
@@ -711,6 +713,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyguardInteractor,
                 mActivityStarter,
                 mSharedNotificationContainerInteractor,
+                mActiveNotificationsInteractor,
                 mEmergencyButtonControllerFactory,
                 mKeyguardViewConfigurator,
                 mKeyguardFaceAuthInteractor,
@@ -786,6 +789,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mKeyguardFaceAuthInteractor,
                 mShadeRepository,
                 mShadeInteractor,
+                mActiveNotificationsInteractor,
                 mJavaAdapter,
                 mCastController,
                 new ResourcesSplitShadeStateController()

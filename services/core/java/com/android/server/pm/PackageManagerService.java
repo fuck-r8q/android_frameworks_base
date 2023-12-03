@@ -182,6 +182,8 @@ import com.android.internal.app.ResolverActivity;
 import com.android.internal.content.F2fsUtils;
 import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.content.om.OverlayConfig;
+import com.android.internal.pm.parsing.pkg.AndroidPackageInternal;
+import com.android.internal.pm.parsing.pkg.ParsedPackage;
 import com.android.internal.pm.pkg.component.ParsedInstrumentation;
 import com.android.internal.pm.pkg.component.ParsedMainComponent;
 import com.android.internal.telephony.CarrierAppUtils;
@@ -221,9 +223,7 @@ import com.android.server.pm.dex.DynamicCodeLogger;
 import com.android.server.pm.local.PackageManagerLocalImpl;
 import com.android.server.pm.parsing.PackageInfoUtils;
 import com.android.server.pm.parsing.PackageParser2;
-import com.android.server.pm.parsing.pkg.AndroidPackageInternal;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
-import com.android.server.pm.parsing.pkg.ParsedPackage;
 import com.android.server.pm.permission.LegacyPermissionManagerInternal;
 import com.android.server.pm.permission.LegacyPermissionManagerService;
 import com.android.server.pm.permission.LegacyPermissionSettings;
@@ -5244,6 +5244,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         @Override
+        public String getSuspendingPackage(String packageName, int userId) {
+            final int callingUid = Binder.getCallingUid();
+            final Computer snapshot = snapshot();
+            // This will do visibility checks as well.
+            if (!snapshot.isPackageSuspendedForUser(packageName, userId)) {
+                return null;
+            }
+            return mSuspendPackageHelper.getSuspendingPackage(snapshot, packageName, userId,
+                    callingUid);
+        }
+
+        @Override
         public @NonNull ParceledListSlice<FeatureInfo> getSystemAvailableFeatures() {
             // allow instant applications
             ArrayList<FeatureInfo> res;
@@ -7001,6 +7013,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @Override
         public ParceledListSlice<PackageInstaller.SessionInfo> getHistoricalSessions(int userId) {
             return mInstallerService.getHistoricalSessions(userId);
+        }
+
+        @Override
+        public PackageArchiver getPackageArchiver() {
+            return mInstallerService.mPackageArchiver;
         }
 
         @Override
