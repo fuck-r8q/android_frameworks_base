@@ -9706,9 +9706,9 @@ package android.companion {
     method @RequiresPermission(android.Manifest.permission.DELIVER_COMPANION_MESSAGES) public final void detachSystemDataTransport(int) throws android.companion.DeviceNotAssociatedException;
     method @Nullable public final android.os.IBinder onBind(@NonNull android.content.Intent);
     method @Deprecated @MainThread public void onDeviceAppeared(@NonNull String);
-    method @Deprecated @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
+    method @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull String);
-    method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
+    method @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
     method @FlaggedApi("android.companion.device_presence") @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
     field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
     field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
@@ -18787,6 +18787,7 @@ package android.hardware.camera2 {
     method @NonNull public java.util.List<android.hardware.camera2.CaptureRequest.Key<?>> getAvailableCaptureRequestKeys();
     method @NonNull public java.util.List<android.hardware.camera2.CaptureResult.Key<?>> getAvailableCaptureResultKeys();
     method public java.util.List<android.hardware.camera2.CaptureRequest.Key<?>> getAvailablePhysicalCameraRequestKeys();
+    method @FlaggedApi("com.android.internal.camera.flags.feature_combination_query") @NonNull public java.util.List<android.hardware.camera2.CameraCharacteristics.Key<?>> getAvailableSessionCharacteristicsKeys();
     method public java.util.List<android.hardware.camera2.CaptureRequest.Key<?>> getAvailableSessionKeys();
     method @NonNull public java.util.List<android.hardware.camera2.CameraCharacteristics.Key<?>> getKeys();
     method @NonNull public java.util.List<android.hardware.camera2.CameraCharacteristics.Key<?>> getKeysNeedingPermission();
@@ -18939,6 +18940,7 @@ package android.hardware.camera2 {
     method @Deprecated public abstract void createReprocessableCaptureSessionByConfigurations(@NonNull android.hardware.camera2.params.InputConfiguration, @NonNull java.util.List<android.hardware.camera2.params.OutputConfiguration>, @NonNull android.hardware.camera2.CameraCaptureSession.StateCallback, @Nullable android.os.Handler) throws android.hardware.camera2.CameraAccessException;
     method public int getCameraAudioRestriction() throws android.hardware.camera2.CameraAccessException;
     method @NonNull public abstract String getId();
+    method @FlaggedApi("com.android.internal.camera.flags.feature_combination_query") @NonNull public android.hardware.camera2.CameraCharacteristics getSessionCharacteristics(@NonNull android.hardware.camera2.params.SessionConfiguration) throws android.hardware.camera2.CameraAccessException;
     method @Deprecated public boolean isSessionConfigurationSupported(@NonNull android.hardware.camera2.params.SessionConfiguration) throws android.hardware.camera2.CameraAccessException;
     method public void setCameraAudioRestriction(int) throws android.hardware.camera2.CameraAccessException;
     field public static final int AUDIO_RESTRICTION_NONE = 0; // 0x0
@@ -39298,7 +39300,7 @@ package android.security.keystore {
     method @Nullable public java.util.Date getKeyValidityStart();
     method @NonNull public String getKeystoreAlias();
     method public int getMaxUsageCount();
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
     method public int getPurposes();
     method @NonNull public String[] getSignaturePaddings();
     method public int getUserAuthenticationType();
@@ -39306,7 +39308,7 @@ package android.security.keystore {
     method public boolean isDevicePropertiesAttestationIncluded();
     method @NonNull public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public boolean isMgf1DigestsSpecified();
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public boolean isMgf1DigestsSpecified();
     method public boolean isRandomizedEncryptionRequired();
     method public boolean isStrongBoxBacked();
     method public boolean isUnlockedDeviceRequired();
@@ -39338,7 +39340,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityForOriginationEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setKeyValidityStart(java.util.Date);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMaxUsageCount(int);
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMgf1Digests(@NonNull java.lang.String...);
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setMgf1Digests(@NonNull java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyGenParameterSpec.Builder setUnlockedDeviceRequired(boolean);
@@ -39443,14 +39445,14 @@ package android.security.keystore {
     method @Nullable public java.util.Date getKeyValidityForOriginationEnd();
     method @Nullable public java.util.Date getKeyValidityStart();
     method public int getMaxUsageCount();
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public java.util.Set<java.lang.String> getMgf1Digests();
     method public int getPurposes();
     method @NonNull public String[] getSignaturePaddings();
     method public int getUserAuthenticationType();
     method public int getUserAuthenticationValidityDurationSeconds();
     method public boolean isDigestsSpecified();
     method public boolean isInvalidatedByBiometricEnrollment();
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public boolean isMgf1DigestsSpecified();
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public boolean isMgf1DigestsSpecified();
     method public boolean isRandomizedEncryptionRequired();
     method public boolean isUnlockedDeviceRequired();
     method public boolean isUserAuthenticationRequired();
@@ -39472,7 +39474,7 @@ package android.security.keystore {
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityForOriginationEnd(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setKeyValidityStart(java.util.Date);
     method @NonNull public android.security.keystore.KeyProtection.Builder setMaxUsageCount(int);
-    method @FlaggedApi("MGF1_DIGEST_SETTER") @NonNull public android.security.keystore.KeyProtection.Builder setMgf1Digests(@Nullable java.lang.String...);
+    method @FlaggedApi("android.security.mgf1_digest_setter") @NonNull public android.security.keystore.KeyProtection.Builder setMgf1Digests(@Nullable java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setRandomizedEncryptionRequired(boolean);
     method @NonNull public android.security.keystore.KeyProtection.Builder setSignaturePaddings(java.lang.String...);
     method @NonNull public android.security.keystore.KeyProtection.Builder setUnlockedDeviceRequired(boolean);
