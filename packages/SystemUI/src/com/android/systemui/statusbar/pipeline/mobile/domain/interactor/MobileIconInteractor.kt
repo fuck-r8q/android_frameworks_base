@@ -23,6 +23,8 @@
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 
 import android.content.Context
+import android.telephony.CarrierConfigManager
+import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
 import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
@@ -154,6 +156,8 @@ interface MobileIconInteractor {
     val showVowifiIcon: StateFlow<Boolean>
 
     val voWifiAvailable: StateFlow<Boolean>
+
+    val customizedIcon: StateFlow<SignalIconModel?>
 }
 
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
@@ -178,6 +182,8 @@ class MobileIconInteractorImpl(
     override val showVowifiIcon: StateFlow<Boolean>,
     private val context: Context,
     private val defaultDataSubId: StateFlow<Int>,
+    ddsIcon: StateFlow<SignalIconModel?>,
+    crossSimdisplaySingnalLevel: StateFlow<Boolean>,
     val carrierIdOverrides: MobileIconCarrierIdOverrides = MobileIconCarrierIdOverridesImpl()
 ) : MobileIconInteractor {
     override val tableLogBuffer: TableLogBuffer = connectionRepository.tableLogBuffer
@@ -265,6 +271,13 @@ class MobileIconInteractorImpl(
 
     private val isDefaultDataSub = defaultDataSubId
         .mapLatest { connectionRepository.subId == it }
+        .distinctUntilChanged()
+        .logDiffsForTable(
+            tableLogBuffer = tableLogBuffer,
+            columnPrefix = "",
+            columnName = "isDefaultDataSub",
+            initialValue = connectionRepository.subId == defaultDataSubId.value,
+        )
         .stateIn(
             scope,
             SharingStarted.WhileSubscribed(),
@@ -296,7 +309,9 @@ class MobileIconInteractorImpl(
             signalStrengthCustomization,
             connectionRepository.nrIconType,
             networkTypeIconCustomization,
-        ) { signalStrengthCustomization, nrIconType, networkTypeIconCustomization ->
+            connectionRepository.originNetworkType,
+        ) { signalStrengthCustomization, nrIconType, networkTypeIconCustomization,
+            originNetworkType ->
             MobileIconCustomizationMode(
                 dataNetworkType = signalStrengthCustomization.dataNetworkType,
                 voiceNetworkType = signalStrengthCustomization.voiceNetworkType,
@@ -311,7 +326,8 @@ class MobileIconInteractorImpl(
                 mobileDataEnabled = networkTypeIconCustomization.mobileDataEnabled,
                 dataRoamingEnabled = networkTypeIconCustomization.dataRoamingEnabled,
                 isDefaultDataSub = networkTypeIconCustomization.isDefaultDataSub,
-                isRoaming = networkTypeIconCustomization.isRoaming
+                isRoaming = networkTypeIconCustomization.isRoaming,
+                originNetworkType = originNetworkType,
             )
         }
         .stateIn(scope, SharingStarted.WhileSubscribed(), MobileIconCustomizationMode())
@@ -333,6 +349,27 @@ class MobileIconInteractorImpl(
             )
         }
         .stateIn(scope, SharingStarted.WhileSubscribed(), MobileIconCustomizationMode())
+
+    override val customizedIcon: StateFlow<SignalIconModel?> =
+        combine(
+                isDefaultDataSub,
+                connectionRepository.imsRegistrationTech,
+                ddsIcon,
+                crossSimdisplaySingnalLevel,
+                connectionRepository.ciwlanAvailable,
+            ) { isDefaultDataSub, imsRegistrationTech, ddsIcon, ciwlanAvailable,
+                crossSimdisplaySingnalLevel ->
+                if (!isDefaultDataSub
+                    && crossSimdisplaySingnalLevel
+                    && ciwlanAvailable
+                    && (imsRegistrationTech == REGISTRATION_TECH_CROSS_SIM
+                            || imsRegistrationTech == REGISTRATION_TECH_IWLAN))
+                    ddsIcon
+                else
+                    null
+            }
+            .distinctUntilChanged()
+            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
 
     override val voWifiAvailable: StateFlow<Boolean> =
         combine(
@@ -469,10 +506,10 @@ class MobileIconInteractorImpl(
     private fun getLookupKey(resolvedNetworkType: ResolvedNetworkType,
                              customizationInfo: MobileIconCustomizationMode): String {
         return if (isNsa(resolvedNetworkType.networkType)) {
-            if (customizationInfo.dataNetworkType == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
+            if (customizationInfo.originNetworkType  == TelephonyManager.NETWORK_TYPE_UNKNOWN) {
                 MobileMappings.toIconKey(customizationInfo.voiceNetworkType)
             }else {
-                MobileMappings.toIconKey(customizationInfo.dataNetworkType)
+                MobileMappings.toIconKey(customizationInfo.originNetworkType)
             }
         }else {
             resolvedNetworkType.lookupKey
@@ -523,13 +560,16 @@ class MobileIconInteractorImpl(
                 numberOfLevels,
                 showExclamationMark,
                 carrierNetworkChangeActive,
-            ) { shownLevel, numberOfLevels, showExclamationMark, carrierNetworkChange ->
-                SignalIconModel(
-                    shownLevel,
-                    numberOfLevels,
-                    showExclamationMark,
-                    carrierNetworkChange,
-                )
+                customizedIcon,
+            ) { shownLevel, numberOfLevels, showExclamationMark, carrierNetworkChange,
+                customizedIcon ->
+                customizedIcon ?:
+                    SignalIconModel(
+                        shownLevel,
+                        numberOfLevels,
+                        showExclamationMark,
+                        carrierNetworkChange,
+                    )
             }
             .distinctUntilChanged()
             .logDiffsForTable(

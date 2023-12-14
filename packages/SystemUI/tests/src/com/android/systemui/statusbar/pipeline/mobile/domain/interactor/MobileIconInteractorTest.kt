@@ -686,6 +686,8 @@ class MobileIconInteractorTest : SysuiTestCase() {
             mobileIconsInteractor.showVowifiIcon,
             context,
             MutableStateFlow(0),
+            MutableStateFlow(null),
+            MutableStateFlow(false),
             overrides,
         )
 

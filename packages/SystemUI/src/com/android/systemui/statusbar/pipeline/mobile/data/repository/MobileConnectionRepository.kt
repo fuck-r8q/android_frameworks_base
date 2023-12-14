@@ -135,6 +135,7 @@ interface MobileConnectionRepository {
     val imsRegistered: StateFlow<Boolean>
     val imsRegistrationTech: StateFlow<Int>
     val isConnectionFailed: StateFlow<Boolean>
+    val ciwlanAvailable: StateFlow<Boolean>
 
     /**
      * The service provider name for this network connection, or the default name.

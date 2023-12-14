@@ -232,7 +232,8 @@ public class FiveGServiceClient {
         public void onConnected() {
             Log.d(TAG, "ExtTelephony Service connected");
             int[] events = new int[] {
-                    ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE};
+                    ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE,
+                    ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE};
             mServiceConnected = true;
             mIsConnectInProgress = false;
             mClient = mExtTelephonyManager.registerCallbackWithEvents(
@@ -390,9 +391,25 @@ public class FiveGServiceClient {
                 notifyListenersIfNecessary(slotId);
             }
         }
+
+        @Override
+        public void onCiwlanAvailable(int slotId, boolean available)  throws RemoteException {
+            Log.d(TAG,
+                    "onCiwlanAvailable: slotId = " + slotId + " available = " + available);
+            CopyOnWriteArrayList<IFiveGStateListener> statesListenersForPhone =
+                    mStatesListeners.get(slotId);
+            if (statesListenersForPhone != null) {
+                for (IFiveGStateListener listener: statesListenersForPhone) {
+                    if (listener != null) {
+                        listener.onCiwlanAvailableChanged(available);
+                    }
+                }
+            }
+        }
     };
 
     public interface IFiveGStateListener {
         public void onStateChanged(FiveGServiceState state);
+        public default void onCiwlanAvailableChanged(boolean available) {}
     }
 }

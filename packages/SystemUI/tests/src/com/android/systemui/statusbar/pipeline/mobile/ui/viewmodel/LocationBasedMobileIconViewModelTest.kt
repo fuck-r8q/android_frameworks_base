@@ -143,6 +143,8 @@ class LocationBasedMobileIconViewModelTest : SysuiTestCase() {
                 iconsInteractor.showVowifiIcon,
                 context,
                 MutableStateFlow(0),
+                MutableStateFlow(null),
+                MutableStateFlow(false),
                 MobileIconCarrierIdOverridesFake()
             )
 
