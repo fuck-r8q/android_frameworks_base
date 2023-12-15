@@ -12606,6 +12606,7 @@ package android.content.pm {
     method public boolean isStagedSessionApplied();
     method public boolean isStagedSessionFailed();
     method public boolean isStagedSessionReady();
+    method @FlaggedApi("android.content.pm.archiving") public boolean isUnarchival();
     method public void writeToParcel(android.os.Parcel, int);
     field public static final android.os.Parcelable.Creator<android.content.pm.PackageInstaller.SessionInfo> CREATOR;
     field public static final int INVALID_ID = -1; // 0xffffffff
@@ -13296,6 +13297,7 @@ package android.content.pm {
     method @NonNull public java.util.List<android.content.pm.VersionedPackage> getDependentPackages();
     method @IntRange(from=0xffffffff) public long getLongVersion();
     method public String getName();
+    method @FlaggedApi("android.content.pm.sdk_lib_independence") @NonNull public java.util.List<android.content.pm.VersionedPackage> getOptionalDependentPackages();
     method public int getType();
     method @Deprecated @IntRange(from=0xffffffff) public int getVersion();
     method public void writeToParcel(android.os.Parcel, int);

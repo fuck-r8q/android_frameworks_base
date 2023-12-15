@@ -44,12 +44,12 @@ import android.util.Slog;
 import android.util.SparseBooleanArray;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.pm.parsing.pkg.AndroidPackageLegacyUtils;
+import com.android.internal.pm.parsing.pkg.PackageImpl;
 import com.android.internal.pm.pkg.component.ParsedInstrumentation;
 import com.android.internal.util.ArrayUtils;
 import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.parsing.PackageCacher;
-import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
-import com.android.server.pm.parsing.pkg.PackageImpl;
 import com.android.server.pm.permission.PermissionManagerServiceInternal;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
@@ -167,7 +167,7 @@ final class RemovePackageHelper {
             if (removedPackage != null) {
                 // TODO: Use PackageState for isSystem
                 cleanPackageDataStructuresLILPw(removedPackage,
-                        AndroidPackageUtils.isSystem(removedPackage), chatty);
+                        AndroidPackageLegacyUtils.isSystem(removedPackage), chatty);
             }
         }
     }
@@ -347,8 +347,7 @@ final class RemovePackageHelper {
                 mPm.mAppsFilter.removePackage(snapshot,
                         snapshot.getPackageStateInternal(packageName));
                 removedAppId = mPm.mSettings.removePackageLPw(packageName);
-                outInfo.mRemovedAppId = removedAppId;
-
+                outInfo.mIsAppIdRemoved = true;
                 if (!mPm.mSettings.isDisabledSystemPackageLPr(packageName)) {
                     // If we don't have a disabled system package to reinstall, the package is
                     // really gone and its permission state should be removed.
