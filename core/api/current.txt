@@ -428,6 +428,7 @@ package android {
     field public static final int activityCloseExitAnimation = 16842939; // 0x10100bb
     field public static final int activityOpenEnterAnimation = 16842936; // 0x10100b8
     field public static final int activityOpenExitAnimation = 16842937; // 0x10100b9
+    field @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public static final int adServiceTypes;
     field public static final int addPrintersActivity = 16843750; // 0x10103e6
     field public static final int addStatesFromChildren = 16842992; // 0x10100f0
     field public static final int adjustViewBounds = 16843038; // 0x101011e
@@ -13654,6 +13655,16 @@ package android.content.res {
     field public int smallestScreenWidthDp;
     field public int touchscreen;
     field public int uiMode;
+  }
+
+  @FlaggedApi("android.content.res.font_scale_converter_public") public interface FontScaleConverter {
+    method public float convertDpToSp(float);
+    method public float convertSpToDp(float);
+  }
+
+  @FlaggedApi("android.content.res.font_scale_converter_public") public class FontScaleConverterFactory {
+    method @FlaggedApi("android.content.res.font_scale_converter_public") @AnyThread @Nullable public static android.content.res.FontScaleConverter forScale(float);
+    method @FlaggedApi("android.content.res.font_scale_converter_public") @AnyThread public static boolean isNonLinearFontScalingActive(float);
   }
 
   public class ObbInfo implements android.os.Parcelable {
@@ -42790,6 +42801,7 @@ package android.telecom {
     method @Deprecated @RequiresPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) public boolean endCall();
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public android.net.Uri getAdnUriForPhoneAccount(android.telecom.PhoneAccountHandle);
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public java.util.List<android.telecom.PhoneAccountHandle> getCallCapablePhoneAccounts();
+    method @FlaggedApi("com.android.internal.telephony.flags.work_profile_api_split") @NonNull @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.INTERACT_ACROSS_PROFILES}) public java.util.List<android.telecom.PhoneAccountHandle> getCallCapablePhoneAccountsAcrossProfiles();
     method public String getDefaultDialerPackage();
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public android.telecom.PhoneAccountHandle getDefaultOutgoingPhoneAccount(String);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_SMS, android.Manifest.permission.READ_PHONE_NUMBERS}, conditional=true) public String getLine1Number(android.telecom.PhoneAccountHandle);
@@ -46611,6 +46623,8 @@ package android.telephony.ims {
     method public int getTransportType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final int ATTR_EPDG_OVER_CELL_INTERNET = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.ims.ImsRegistrationAttributes> CREATOR;
   }
 
@@ -53896,6 +53910,7 @@ package android.view {
     field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH";
     field public static final String PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE = "android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE";
     field public static final String PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE";
+    field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final String PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE";
     field public static final String PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE";
     field public static final String PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS = "android.window.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS";
     field public static final String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";
