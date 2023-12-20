@@ -97,6 +97,7 @@ import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewConfigurator;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
 import com.android.systemui.keyguard.domain.interactor.KeyguardBottomAreaInteractor;
+import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory;
@@ -127,7 +128,10 @@ import com.android.systemui.res.R;
 import com.android.systemui.scene.SceneTestUtils;
 import com.android.systemui.screenrecord.RecordingController;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
+import com.android.systemui.shade.data.repository.ShadeAnimationRepository;
 import com.android.systemui.shade.data.repository.ShadeRepository;
+import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor;
+import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractorLegacyImpl;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.shade.domain.interactor.ShadeInteractorImpl;
 import com.android.systemui.shade.domain.interactor.ShadeInteractorLegacyImpl;
@@ -345,8 +349,10 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected final int mMaxUdfpsBurnInOffsetY = 5;
     protected FakeFeatureFlagsClassic mFeatureFlags = new FakeFeatureFlagsClassic();
     protected KeyguardBottomAreaInteractor mKeyguardBottomAreaInteractor;
+    protected KeyguardClockInteractor mKeyguardClockInteractor;
     protected FakeKeyguardRepository mFakeKeyguardRepository;
     protected KeyguardInteractor mKeyguardInteractor;
+    protected ShadeAnimationInteractor mShadeAnimationInteractor;
     protected SceneTestUtils mUtils = new SceneTestUtils(this);
     protected TestScope mTestScope = mUtils.getTestScope();
     protected ShadeInteractor mShadeInteractor;
@@ -381,10 +387,10 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mFeatureFlags.set(Flags.TRACKPAD_GESTURE_FEATURES, false);
         mFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false);
         mFeatureFlags.set(Flags.QS_USER_DETAIL_SHORTCUT, false);
-        mFeatureFlags.set(Flags.MIGRATE_CLOCKS_TO_BLUEPRINT, false);
 
         mSetFlagsRule.disableFlags(KeyguardShadeMigrationNssl.FLAG_NAME);
         mSetFlagsRule.disableFlags(com.android.systemui.Flags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR);
+        mSetFlagsRule.disableFlags(com.android.systemui.Flags.FLAG_MIGRATE_CLOCKS_TO_BLUEPRINT);
 
         mMainDispatcher = getMainDispatcher();
         KeyguardInteractorFactory.WithDependencies keyguardInteractorDeps =
@@ -393,6 +399,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         mKeyguardBottomAreaInteractor = new KeyguardBottomAreaInteractor(mFakeKeyguardRepository);
         mKeyguardInteractor = keyguardInteractorDeps.getKeyguardInteractor();
         mShadeRepository = new FakeShadeRepository();
+        mShadeAnimationInteractor = new ShadeAnimationInteractorLegacyImpl(
+                new ShadeAnimationRepository(), mShadeRepository);
         mPowerInteractor = keyguardInteractorDeps.getPowerInteractor();
         when(mKeyguardTransitionInteractor.isInTransitionToStateWhere(any())).thenReturn(
                 StateFlowKt.MutableStateFlow(false));
@@ -529,7 +537,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 .thenReturn(emptyFlow());
         when(mOccludedToLockscreenTransitionViewModel.getLockscreenAlpha())
                 .thenReturn(emptyFlow());
-        when(mOccludedToLockscreenTransitionViewModel.lockscreenTranslationY(anyInt()))
+        when(mOccludedToLockscreenTransitionViewModel.getLockscreenTranslationY())
                 .thenReturn(emptyFlow());
 
         // Lockscreen->Dreaming
@@ -567,7 +575,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 .thenReturn(emptyFlow());
         when(mLockscreenToOccludedTransitionViewModel.getLockscreenAlpha())
                 .thenReturn(emptyFlow());
-        when(mLockscreenToOccludedTransitionViewModel.lockscreenTranslationY(anyInt()))
+        when(mLockscreenToOccludedTransitionViewModel.getLockscreenTranslationY())
                 .thenReturn(emptyFlow());
 
         // Primary Bouncer->Gone
@@ -651,7 +659,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mStatusBarWindowStateController,
                 mNotificationShadeWindowController,
                 mDozeLog, mDozeParameters, mCommandQueue, mVibratorHelper,
-                mLatencyTracker, mPowerManager, mAccessibilityManager, 0, mUpdateMonitor,
+                mLatencyTracker, mAccessibilityManager, 0, mUpdateMonitor,
                 mMetricsLogger,
                 mShadeLog,
                 mConfigurationController,
@@ -698,6 +706,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 systemClock,
                 mKeyguardBottomAreaViewModel,
                 mKeyguardBottomAreaInteractor,
+                mKeyguardClockInteractor,
                 mAlternateBouncerInteractor,
                 mDreamingToLockscreenTransitionViewModel,
                 mOccludedToLockscreenTransitionViewModel,
@@ -715,6 +724,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mSharedNotificationContainerInteractor,
                 mActiveNotificationsInteractor,
                 mEmergencyButtonControllerFactory,
+                mShadeAnimationInteractor,
                 mKeyguardViewConfigurator,
                 mKeyguardFaceAuthInteractor,
                 new ResourcesSplitShadeStateController(),

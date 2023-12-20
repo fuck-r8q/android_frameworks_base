@@ -34,6 +34,7 @@ import static android.view.flags.Flags.FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY;
 import static android.view.flags.Flags.FLAG_VIEW_VELOCITY_API;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.view.flags.Flags.viewVelocityApi;
+import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
 
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__DEEP_PRESS;
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS;
@@ -5155,9 +5156,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     private Runnable mHandwritingDelegatorCallback;
     private String mAllowedHandwritingDelegatePackageName;
 
-    // These two fields are set if the view is a handwriting delegate.
+    // These three fields are set if the view is a handwriting delegate.
     private boolean mIsHandwritingDelegate;
     private String mAllowedHandwritingDelegatorPackageName;
+    private @InputMethodManager.HandwritingDelegateFlags int mHandwritingDelegateFlags;
 
     /**
      * Solid color to use as a background when creating the drawing cache. Enables
@@ -12750,6 +12752,30 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     @Nullable
     public String getAllowedHandwritingDelegatorPackageName() {
         return mAllowedHandwritingDelegatorPackageName;
+    }
+
+    /**
+     * Sets flags configuring the handwriting delegation behavior for this delegate editor view.
+     *
+     * <p>This method has no effect unless {@link #setIsHandwritingDelegate} is also called to
+     * configure this view to act as a handwriting delegate.
+     *
+     * @param flags {@link InputMethodManager#HANDWRITING_DELEGATE_FLAG_HOME_DELEGATOR_ALLOWED} or
+     *     {@code 0}
+     */
+    @FlaggedApi(FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR)
+    public void setHandwritingDelegateFlags(
+            @InputMethodManager.HandwritingDelegateFlags int flags) {
+        mHandwritingDelegateFlags = flags;
+    }
+
+    /**
+     * Returns flags configuring the handwriting delegation behavior for this delegate editor view,
+     * as set by {@link #setHandwritingDelegateFlags}.
+     */
+    @FlaggedApi(FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR)
+    public @InputMethodManager.HandwritingDelegateFlags int getHandwritingDelegateFlags() {
+        return mHandwritingDelegateFlags;
     }
 
     /**
@@ -29889,12 +29915,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     public void setPointerIcon(PointerIcon pointerIcon) {
         mMousePointerIcon = pointerIcon;
-        if (mAttachInfo == null || mAttachInfo.mHandlingPointerEvent) {
-            return;
-        }
-        try {
-            mAttachInfo.mSession.updatePointerIcon(mAttachInfo.mWindow);
-        } catch (RemoteException e) {
+        if (com.android.input.flags.Flags.enablePointerChoreographer()) {
+            final ViewRootImpl viewRootImpl = getViewRootImpl();
+            if (viewRootImpl == null) {
+                return;
+            }
+            viewRootImpl.refreshPointerIcon();
+        } else {
+            if (mAttachInfo == null || mAttachInfo.mHandlingPointerEvent) {
+                return;
+            }
+            try {
+                mAttachInfo.mSession.updatePointerIcon(mAttachInfo.mWindow);
+            } catch (RemoteException e) {
+            }
         }
     }
 

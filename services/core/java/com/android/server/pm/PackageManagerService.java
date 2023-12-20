@@ -525,6 +525,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private static final String PROPERTY_IS_UPDATE_OWNERSHIP_ENFORCEMENT_AVAILABLE =
             "is_update_ownership_enforcement_available";
 
+    private static final String PROPERTY_DEFERRED_NO_KILL_POST_DELETE_DELAY_MS_EXTENDED =
+            "deferred_no_kill_post_delete_delay_ms_extended";
+
     /**
      * The default response for package verification timeout.
      *
@@ -926,7 +929,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     static final int WRITE_USER_PACKAGE_RESTRICTIONS = 30;
 
-    static final int DEFERRED_NO_KILL_POST_DELETE_DELAY_MS = 3 * 1000;
+    private static final int DEFERRED_NO_KILL_POST_DELETE_DELAY_MS = 3 * 1000;
+
+    private static final long DEFERRED_NO_KILL_POST_DELETE_DELAY_MS_EXTENDED =
+            TimeUnit.DAYS.toMillis(1);
+
     private static final int DEFERRED_NO_KILL_INSTALL_OBSERVER_DELAY_MS = 500;
     private static final int DEFERRED_PENDING_KILL_INSTALL_OBSERVER_DELAY_MS = 1000;
 
@@ -1291,7 +1298,19 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     void scheduleDeferredNoKillPostDelete(InstallArgs args) {
         Message message = mHandler.obtainMessage(DEFERRED_NO_KILL_POST_DELETE, args);
-        mHandler.sendMessageDelayed(message, DEFERRED_NO_KILL_POST_DELETE_DELAY_MS);
+        // If the feature flag is on, retain the old files for a day. Otherwise, delete the old
+        // files after a few seconds.
+        long deleteDelayMillis = DEFERRED_NO_KILL_POST_DELETE_DELAY_MS;
+        if (Flags.improveInstallDontKill()) {
+            deleteDelayMillis = Binder.withCleanCallingIdentity(() -> {
+                return DeviceConfig.getLong(NAMESPACE_PACKAGE_MANAGER_SERVICE,
+                        /* name= */ PROPERTY_DEFERRED_NO_KILL_POST_DELETE_DELAY_MS_EXTENDED,
+                        /* defaultValue= */ DEFERRED_NO_KILL_POST_DELETE_DELAY_MS_EXTENDED);
+            });
+            Slog.w(TAG, "Delaying the deletion of <" + args.getCodePath() + "> by "
+                    + deleteDelayMillis + "ms or till the next reboot");
+        }
+        mHandler.sendMessageDelayed(message, deleteDelayMillis);
     }
 
     void schedulePruneUnusedStaticSharedLibraries(boolean delay) {
@@ -1502,8 +1521,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         return archPkg;
     }
 
-    void createArchiveStateIfNeeded(PackageSetting pkgSetting, ArchivedPackageParcel archivePackage,
-            int[] userIds) {
+    void markPackageAsArchivedIfNeeded(PackageSetting pkgSetting,
+                                       ArchivedPackageParcel archivePackage, int[] userIds) {
         if (pkgSetting == null || archivePackage == null
                 || archivePackage.archivedActivities == null || userIds == null
                 || userIds.length == 0) {
@@ -1518,13 +1537,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return;
         }
         for (int userId : userIds) {
-            var archiveState = PackageArchiver.createArchiveState(archivePackage, userId,
-                    responsibleInstallerPackage);
+            var archiveState = mInstallerService.mPackageArchiver.createArchiveState(
+                    archivePackage, userId, responsibleInstallerPackage);
             if (archiveState == null) {
                 continue;
             }
             pkgSetting
                     .modifyUserState(userId)
+                    .setInstalled(false)
                     .setArchiveState(archiveState);
         }
     }

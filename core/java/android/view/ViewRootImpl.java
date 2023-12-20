@@ -92,9 +92,12 @@ import static android.view.WindowManagerGlobal.RELAYOUT_RES_CANCEL_AND_REDRAW;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
 import static android.view.accessibility.Flags.forceInvertColor;
+import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
+
+import static com.android.input.flags.Flags.enablePointerChoreographer;
 
 import android.Manifest;
 import android.accessibilityservice.AccessibilityService;
@@ -122,6 +125,7 @@ import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.database.ContentObserver;
 import android.graphics.BLASTBufferQueue;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -392,6 +396,9 @@ public final class ViewRootImpl implements ViewParent,
      * to view root for apps using legacy back behavior.
      */
     private CompatOnBackInvokedCallback mCompatOnBackInvokedCallback;
+
+    @Nullable
+    private ContentObserver mForceInvertObserver;
 
     /**
      * Callback for notifying about global configuration changes.
@@ -730,10 +737,7 @@ public final class ViewRootImpl implements ViewParent,
 
     private BLASTBufferQueue mBlastBufferQueue;
 
-    private boolean mUpdateHdrSdrRatioInfo = false;
-    private float mDesiredHdrSdrRatio = 1f;
-    private float mRenderHdrSdrRatio = 1f;
-    private Consumer<Display> mHdrSdrRatioChangedListener = null;
+    private final HdrRenderState mHdrRenderState = new HdrRenderState(this);
 
     /**
      * Child container layer of {@code mSurface} with the same bounds as its parent, and cropped to
@@ -1058,6 +1062,9 @@ public final class ViewRootImpl implements ViewParent,
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
     }
+
+    // The latest input event from the gesture that was used to resolve the pointer icon.
+    private MotionEvent mPointerIconEvent = null;
 
     public ViewRootImpl(Context context, Display display) {
         this(context, display, WindowManagerGlobal.getWindowSession(), new WindowLayout());
@@ -1608,6 +1615,24 @@ public final class ViewRootImpl implements ViewParent,
                         | DisplayManager.EVENT_FLAG_DISPLAY_CHANGED
                         | DisplayManager.EVENT_FLAG_DISPLAY_REMOVED,
                         mBasePackageName);
+
+        if (forceInvertColor()) {
+            if (mForceInvertObserver == null) {
+                mForceInvertObserver = new ContentObserver(mHandler) {
+                    @Override
+                    public void onChange(boolean selfChange) {
+                        updateForceDarkMode();
+                    }
+                };
+                mContext.getContentResolver().registerContentObserver(
+                        Settings.Secure.getUriFor(
+                                Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED
+                        ),
+                        false,
+                        mForceInvertObserver,
+                        UserHandle.myUserId());
+            }
+        }
     }
 
     /**
@@ -1621,6 +1646,14 @@ public final class ViewRootImpl implements ViewParent,
         DisplayManagerGlobal
                 .getInstance()
                 .unregisterDisplayListener(mDisplayListener);
+
+        if (forceInvertColor()) {
+            if (mForceInvertObserver != null) {
+                mContext.getContentResolver().unregisterContentObserver(mForceInvertObserver);
+                mForceInvertObserver = null;
+            }
+        }
+
         if (mExtraDisplayListenerLogging) {
             Slog.w(mTag, "Unregister listeners: " + mBasePackageName, new Throwable());
         }
@@ -1789,7 +1822,7 @@ public final class ViewRootImpl implements ViewParent,
                 mAttachInfo.mThreadedRenderer = renderer;
                 renderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
                 updateColorModeIfNeeded(attrs.getColorMode(), attrs.getDesiredHdrHeadroom());
-                updateRenderHdrSdrRatio();
+                mHdrRenderState.forceUpdateHdrSdrRatio();
                 updateForceDarkMode();
                 mAttachInfo.mHardwareAccelerated = true;
                 mAttachInfo.mHardwareAccelerationRequested = true;
@@ -2137,9 +2170,7 @@ public final class ViewRootImpl implements ViewParent,
     private void updateInternalDisplay(int displayId, Resources resources) {
         final Display preferredDisplay =
                 ResourcesManager.getInstance().getAdjustedDisplay(displayId, resources);
-        if (mHdrSdrRatioChangedListener != null && mDisplay != null) {
-            mDisplay.unregisterHdrSdrRatioChangedListener(mHdrSdrRatioChangedListener);
-        }
+        mHdrRenderState.stopListening();
         if (preferredDisplay == null) {
             // Fallback to use default display.
             Slog.w(TAG, "Cannot get desired display with Id: " + displayId);
@@ -2148,9 +2179,7 @@ public final class ViewRootImpl implements ViewParent,
         } else {
             mDisplay = preferredDisplay;
         }
-        if (mHdrSdrRatioChangedListener != null && mDisplay != null) {
-            mDisplay.registerHdrSdrRatioChangedListener(mExecutor, mHdrSdrRatioChangedListener);
-        }
+        mHdrRenderState.startListening();
         mContext.updateDisplay(mDisplay.getDisplayId());
     }
 
@@ -2198,8 +2227,14 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-    void notifyInsetsAnimationRunningStateChanged(boolean running) {
-        mInsetsAnimationRunning = running;
+    /**
+     * Notify the when the running state of a insets animation changed.
+     */
+    @VisibleForTesting
+    public void notifyInsetsAnimationRunningStateChanged(boolean running) {
+        if (sToolkitSetFrameRateReadOnlyFlagValue) {
+            mInsetsAnimationRunning = running;
+        }
     }
 
     @Override
@@ -2459,6 +2494,19 @@ public final class ViewRootImpl implements ViewParent,
 
         if (updateBoundsLayer(t)) {
             applyTransactionOnDraw(t);
+        }
+
+        // Set the frame rate selection strategy to FRAME_RATE_SELECTION_STRATEGY_SELF
+        // This strategy ensures that the frame rate specifications do not cascade down to
+        // the descendant layers. This is particularly important for applications like Chrome,
+        // where child surfaces should adhere to default behavior instead of no preference
+        if (sToolkitSetFrameRateReadOnlyFlagValue) {
+            try {
+                mFrameRateTransaction.setFrameRateSelectionStrategy(sc,
+                        sc.FRAME_RATE_SELECTION_STRATEGY_SELF).applyAsyncUnsafe();
+            } catch (Exception e) {
+                Log.e(mTag, "Unable to set frame rate selection strategy ", e);
+            }
         }
     }
 
@@ -5117,11 +5165,12 @@ public final class ViewRootImpl implements ViewParent,
 
                 useAsyncReport = true;
 
-                if (mUpdateHdrSdrRatioInfo) {
-                    mUpdateHdrSdrRatioInfo = false;
+                if (mHdrRenderState.updateForFrame(mAttachInfo.mDrawingTime)) {
+                    final float renderRatio = mHdrRenderState.getRenderHdrSdrRatio();
                     applyTransactionOnDraw(mTransaction.setExtendedRangeBrightness(
-                            getSurfaceControl(), mRenderHdrSdrRatio, mDesiredHdrSdrRatio));
-                    mAttachInfo.mThreadedRenderer.setTargetHdrSdrRatio(mRenderHdrSdrRatio);
+                            getSurfaceControl(), renderRatio,
+                            mHdrRenderState.getDesiredHdrSdrRatio()));
+                    mAttachInfo.mThreadedRenderer.setTargetHdrSdrRatio(renderRatio);
                 }
 
                 if (activeSyncGroup != null) {
@@ -5732,11 +5781,6 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
-    private void updateRenderHdrSdrRatio() {
-        mRenderHdrSdrRatio = Math.min(mDesiredHdrSdrRatio, mDisplay.getHdrSdrRatio());
-        mUpdateHdrSdrRatioInfo = true;
-    }
-
     private void updateColorModeIfNeeded(@ActivityInfo.ColorMode int colorMode,
             float desiredRatio) {
         if (mAttachInfo.mThreadedRenderer == null) {
@@ -5756,22 +5800,8 @@ public final class ViewRootImpl implements ViewParent,
         if (desiredRatio == 0 || desiredRatio > automaticRatio) {
             desiredRatio = automaticRatio;
         }
-        if (desiredRatio != mDesiredHdrSdrRatio) {
-            mDesiredHdrSdrRatio = desiredRatio;
-            updateRenderHdrSdrRatio();
-            invalidate();
 
-            if (mDesiredHdrSdrRatio < 1.01f) {
-                mDisplay.unregisterHdrSdrRatioChangedListener(mHdrSdrRatioChangedListener);
-                mHdrSdrRatioChangedListener = null;
-            } else {
-                mHdrSdrRatioChangedListener = display -> {
-                    updateRenderHdrSdrRatio();
-                    invalidate();
-                };
-                mDisplay.registerHdrSdrRatioChangedListener(mExecutor, mHdrSdrRatioChangedListener);
-            }
-        }
+        mHdrRenderState.setDesiredHdrSdrRatio(desiredRatio);
     }
 
     @Override
@@ -6056,6 +6086,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_DECOR_VIEW_GESTURE_INTERCEPTION = 38;
     private static final int MSG_TOUCH_BOOST_TIMEOUT = 39;
     private static final int MSG_CHECK_INVALIDATION_IDLE = 40;
+    private static final int MSG_REFRESH_POINTER_ICON = 41;
 
     final class ViewRootHandler extends Handler {
         @Override
@@ -6121,6 +6152,8 @@ public final class ViewRootImpl implements ViewParent,
                     return "MSG_WINDOW_TOUCH_MODE_CHANGED";
                 case MSG_KEEP_CLEAR_RECTS_CHANGED:
                     return "MSG_KEEP_CLEAR_RECTS_CHANGED";
+                case MSG_REFRESH_POINTER_ICON:
+                    return "MSG_REFRESH_POINTER_ICON";
             }
             return super.getMessageName(message);
         }
@@ -6377,12 +6410,18 @@ public final class ViewRootImpl implements ViewParent,
                                 FRAME_RATE_IDLENESS_REEVALUATE_TIME);
                     }
                     break;
+                case MSG_REFRESH_POINTER_ICON:
+                    if (mPointerIconEvent == null) {
+                        break;
+                    }
+                    updatePointerIcon(mPointerIconEvent);
+                    break;
             }
         }
     }
 
     final ViewRootHandler mHandler = new ViewRootHandler();
-    private final Executor mExecutor = (Runnable r) -> {
+    final Executor mExecutor = (Runnable r) -> {
         mHandler.post(r);
     };
 
@@ -7368,23 +7407,42 @@ public final class ViewRootImpl implements ViewParent,
             if (event.getPointerCount() != 1) {
                 return;
             }
+            final int action = event.getActionMasked();
             final boolean needsStylusPointerIcon = event.isStylusPointer()
                     && event.isHoverEvent()
                     && mIsStylusPointerIconEnabled;
-            if (needsStylusPointerIcon || event.isFromSource(InputDevice.SOURCE_MOUSE)) {
-                if (event.getActionMasked() == MotionEvent.ACTION_HOVER_ENTER
-                        || event.getActionMasked() == MotionEvent.ACTION_HOVER_EXIT) {
-                    // Other apps or the window manager may change the icon type outside of
-                    // this app, therefore the icon type has to be reset on enter/exit event.
+            if (!needsStylusPointerIcon && !event.isFromSource(InputDevice.SOURCE_MOUSE)) {
+                return;
+            }
+
+            if (action == MotionEvent.ACTION_HOVER_ENTER
+                    || action == MotionEvent.ACTION_HOVER_EXIT) {
+                // Other apps or the window manager may change the icon type outside of
+                // this app, therefore the icon type has to be reset on enter/exit event.
+                mPointerIconType = null;
+            }
+
+            if (action != MotionEvent.ACTION_HOVER_EXIT) {
+                // Resolve the pointer icon
+                if (!updatePointerIcon(event) && action == MotionEvent.ACTION_HOVER_MOVE) {
                     mPointerIconType = null;
                 }
+            }
 
-                if (event.getActionMasked() != MotionEvent.ACTION_HOVER_EXIT) {
-                    if (!updatePointerIcon(event) &&
-                            event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE) {
-                        mPointerIconType = null;
+            // Keep track of the newest event used to resolve the pointer icon.
+            switch (action) {
+                case MotionEvent.ACTION_HOVER_EXIT:
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (mPointerIconEvent != null) {
+                        mPointerIconEvent.recycle();
                     }
-                }
+                    mPointerIconEvent = null;
+                    break;
+                default:
+                    mPointerIconEvent = MotionEvent.obtain(event);
+                    break;
             }
         }
 
@@ -7425,6 +7483,16 @@ public final class ViewRootImpl implements ViewParent,
         updatePointerIcon(event);
     }
 
+
+    /**
+     * If there is pointer that is showing a PointerIcon in this window, refresh the icon for that
+     * pointer. This will resolve the PointerIcon through the view hierarchy.
+     */
+    public void refreshPointerIcon() {
+        mHandler.removeMessages(MSG_REFRESH_POINTER_ICON);
+        mHandler.sendEmptyMessage(MSG_REFRESH_POINTER_ICON);
+    }
+
     private boolean updatePointerIcon(MotionEvent event) {
         final int pointerIndex = 0;
         final float x = event.getX(pointerIndex);
@@ -7456,18 +7524,34 @@ public final class ViewRootImpl implements ViewParent,
             mPointerIconType = pointerType;
             mCustomPointerIcon = null;
             if (mPointerIconType != PointerIcon.TYPE_CUSTOM) {
-                InputManagerGlobal
-                    .getInstance()
-                    .setPointerIconType(pointerType);
+                if (enablePointerChoreographer()) {
+                    InputManagerGlobal
+                            .getInstance()
+                            .setPointerIcon(PointerIcon.getSystemIcon(mContext, pointerType),
+                                    event.getDisplayId(), event.getDeviceId(),
+                                    event.getPointerId(pointerIndex), getInputToken());
+                } else {
+                    InputManagerGlobal
+                            .getInstance()
+                            .setPointerIconType(pointerType);
+                }
                 return true;
             }
         }
         if (mPointerIconType == PointerIcon.TYPE_CUSTOM &&
                 !pointerIcon.equals(mCustomPointerIcon)) {
             mCustomPointerIcon = pointerIcon;
-            InputManagerGlobal
-                    .getInstance()
-                    .setCustomPointerIcon(mCustomPointerIcon);
+            if (enablePointerChoreographer()) {
+                InputManagerGlobal
+                        .getInstance()
+                        .setPointerIcon(mCustomPointerIcon,
+                                event.getDisplayId(), event.getDeviceId(),
+                                event.getPointerId(pointerIndex), getInputToken());
+            } else {
+                InputManagerGlobal
+                        .getInstance()
+                        .setCustomPointerIcon(mCustomPointerIcon);
+            }
         }
         return true;
     }
@@ -8676,7 +8760,7 @@ public final class ViewRootImpl implements ViewParent,
             if (mAttachInfo.mThreadedRenderer != null) {
                 mAttachInfo.mThreadedRenderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
             }
-            updateRenderHdrSdrRatio();
+            mHdrRenderState.forceUpdateHdrSdrRatio();
             if (mPreviousTransformHint != transformHint) {
                 mPreviousTransformHint = transformHint;
                 dispatchTransformHintChanged(transformHint);
@@ -9224,9 +9308,7 @@ public final class ViewRootImpl implements ViewParent,
     private void destroyHardwareRenderer() {
         ThreadedRenderer hardwareRenderer = mAttachInfo.mThreadedRenderer;
 
-        if (mHdrSdrRatioChangedListener != null) {
-            mDisplay.unregisterHdrSdrRatioChangedListener(mHdrSdrRatioChangedListener);
-        }
+        mHdrRenderState.stopListening();
 
         if (hardwareRenderer != null) {
             if (mHardwareRendererObserver != null) {
@@ -11398,6 +11480,10 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         private boolean canContinueThrottle(View source, int changeType) {
+            if (!reduceWindowContentChangedEventThrottle()) {
+                // Old behavior. Always throttle.
+                return true;
+            }
             if (mSource == null) {
                 // We don't have a pending event.
                 return true;
@@ -11981,7 +12067,7 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
-        int frameRateCategory = mIsFrameRateBoosting
+        int frameRateCategory = mIsFrameRateBoosting || mInsetsAnimationRunning
                 ? FRAME_RATE_CATEGORY_HIGH : preferredFrameRateCategory;
 
         try {
@@ -12092,6 +12178,14 @@ public final class ViewRootImpl implements ViewParent,
     @VisibleForTesting
     public int getPreferredFrameRateCategory() {
         return mPreferredFrameRateCategory;
+    }
+
+    /**
+     * Get the value of mLastPreferredFrameRateCategory
+     */
+    @VisibleForTesting
+    public int getLastPreferredFrameRateCategory() {
+        return mLastPreferredFrameRateCategory;
     }
 
     /**

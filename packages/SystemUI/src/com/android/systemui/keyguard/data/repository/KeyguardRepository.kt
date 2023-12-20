@@ -18,8 +18,6 @@ package com.android.systemui.keyguard.data.repository
 
 import android.graphics.Point
 import android.hardware.biometrics.BiometricSourceType
-import com.android.keyguard.KeyguardClockSwitch.ClockSize
-import com.android.keyguard.KeyguardClockSwitch.LARGE
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.biometrics.AuthController
@@ -39,7 +37,6 @@ import com.android.systemui.keyguard.shared.model.DismissAction
 import com.android.systemui.keyguard.shared.model.DozeStateModel
 import com.android.systemui.keyguard.shared.model.DozeTransitionModel
 import com.android.systemui.keyguard.shared.model.KeyguardDone
-import com.android.systemui.keyguard.shared.model.KeyguardRootViewVisibilityState
 import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.statusbar.policy.KeyguardStateController
@@ -160,6 +157,9 @@ interface KeyguardRepository {
 
     val lastDozeTapToWakePosition: StateFlow<Point?>
 
+    /** Last point that [KeyguardRootView] was tapped */
+    val lastRootViewTapPosition: MutableStateFlow<Point?>
+
     /** Observable for the [StatusBarState] */
     val statusBarState: StateFlow<StatusBarState>
 
@@ -180,9 +180,6 @@ interface KeyguardRepository {
     /** Whether quick settings or quick-quick settings is visible. */
     val isQuickSettingsVisible: Flow<Boolean>
 
-    /** Represents the current state of the KeyguardRootView visibility */
-    val keyguardRootViewVisibility: Flow<KeyguardRootViewVisibilityState>
-
     /** Receive an event for doze time tick */
     val dozeTimeTick: Flow<Long>
 
@@ -191,9 +188,6 @@ interface KeyguardRepository {
 
     /** Observable updated when keyguardDone should be called either now or soon. */
     val keyguardDone: Flow<KeyguardDone>
-
-    /** Receive SMALL or LARGE clock should be displayed on keyguard. */
-    val clockSize: Flow<Int>
 
     /** Receive whether clock should be centered on lockscreen. */
     val clockShouldBeCentered: Flow<Boolean>
@@ -215,12 +209,6 @@ interface KeyguardRepository {
 
     /** Sets the current amount of alpha that should be used for rendering the keyguard. */
     fun setKeyguardAlpha(alpha: Float)
-
-    fun setKeyguardVisibility(
-        statusBarState: Int,
-        goingToFullShade: Boolean,
-        occlusionTransitionRunning: Boolean
-    )
 
     /**
      * Sets the relative offset of the lock-screen clock from its natural position on the screen.
@@ -246,8 +234,6 @@ interface KeyguardRepository {
     fun setDismissAction(dismissAction: DismissAction)
 
     suspend fun setKeyguardDone(keyguardDoneType: KeyguardDone)
-
-    fun setClockSize(@ClockSize size: Int)
 
     fun setClockShouldBeCentered(shouldBeCentered: Boolean)
 }
@@ -292,9 +278,6 @@ constructor(
 
     private val _clockPosition = MutableStateFlow(Position(0, 0))
     override val clockPosition = _clockPosition.asStateFlow()
-
-    private val _clockSize = MutableStateFlow(LARGE)
-    override val clockSize: Flow<Int> = _clockSize.asStateFlow()
 
     private val _clockShouldBeCentered = MutableStateFlow(true)
     override val clockShouldBeCentered: Flow<Boolean> = _clockShouldBeCentered.asStateFlow()
@@ -437,6 +420,8 @@ constructor(
     override fun setLastDozeTapToWakePosition(position: Point) {
         _lastDozeTapToWakePosition.value = position
     }
+
+    override val lastRootViewTapPosition: MutableStateFlow<Point?> = MutableStateFlow(null)
 
     override val isDreamingWithOverlay: Flow<Boolean> =
         conflatedCallbackFlow {
@@ -631,17 +616,6 @@ constructor(
     private val _isActiveDreamLockscreenHosted = MutableStateFlow(false)
     override val isActiveDreamLockscreenHosted = _isActiveDreamLockscreenHosted.asStateFlow()
 
-    private val _keyguardRootViewVisibility =
-        MutableStateFlow(
-            KeyguardRootViewVisibilityState(
-                com.android.systemui.statusbar.StatusBarState.SHADE,
-                goingToFullShade = false,
-                occlusionTransitionRunning = false,
-            )
-        )
-    override val keyguardRootViewVisibility: Flow<KeyguardRootViewVisibilityState> =
-        _keyguardRootViewVisibility.asStateFlow()
-
     override fun setAnimateDozingTransitions(animate: Boolean) {
         _animateBottomAreaDozingTransitions.value = animate
     }
@@ -652,19 +626,6 @@ constructor(
 
     override fun setKeyguardAlpha(alpha: Float) {
         _keyguardAlpha.value = alpha
-    }
-
-    override fun setKeyguardVisibility(
-        statusBarState: Int,
-        goingToFullShade: Boolean,
-        occlusionTransitionRunning: Boolean
-    ) {
-        _keyguardRootViewVisibility.value =
-            KeyguardRootViewVisibilityState(
-                statusBarState,
-                goingToFullShade,
-                occlusionTransitionRunning
-            )
     }
 
     override fun setClockPosition(x: Int, y: Int) {
@@ -679,10 +640,6 @@ constructor(
 
     override fun setIsActiveDreamLockscreenHosted(isLockscreenHosted: Boolean) {
         _isActiveDreamLockscreenHosted.value = isLockscreenHosted
-    }
-
-    override fun setClockSize(@ClockSize size: Int) {
-        _clockSize.value = size
     }
 
     override fun setClockShouldBeCentered(shouldBeCentered: Boolean) {

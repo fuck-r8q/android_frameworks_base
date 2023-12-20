@@ -27,7 +27,9 @@ import static android.service.notification.NotificationServiceProto.ROOT_CONFIG;
 
 import static com.android.internal.util.FrameworkStatsLog.DND_MODE_RULE;
 
+import android.annotation.DrawableRes;
 import android.annotation.IntDef;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
@@ -74,11 +76,13 @@ import android.provider.Settings;
 import android.provider.Settings.Global;
 import android.service.notification.Condition;
 import android.service.notification.ConditionProviderService;
+import android.service.notification.DeviceEffectsApplier;
 import android.service.notification.ZenDeviceEffects;
 import android.service.notification.ZenModeConfig;
 import android.service.notification.ZenModeConfig.ZenRule;
 import android.service.notification.ZenModeProto;
 import android.service.notification.ZenPolicy;
+import android.text.TextUtils;
 import android.util.AndroidRuntimeException;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -172,6 +176,8 @@ public class ZenModeHelper {
 
     @VisibleForTesting protected int mZenMode;
     @VisibleForTesting protected NotificationManager.Policy mConsolidatedPolicy;
+    @GuardedBy("mConfigLock")
+    private ZenDeviceEffects mConsolidatedDeviceEffects = new ZenDeviceEffects.Builder().build();
     private int mUser = UserHandle.USER_SYSTEM;
 
     private final Object mConfigLock = new Object();
@@ -179,6 +185,8 @@ public class ZenModeHelper {
     @VisibleForTesting protected ZenModeConfig mConfig;
     @VisibleForTesting protected AudioManagerInternal mAudioManager;
     protected PackageManager mPm;
+    @GuardedBy("mConfigLock")
+    private DeviceEffectsApplier mDeviceEffectsApplier;
     private long mSuppressedEffects;
 
     public static final long SUPPRESSED_EFFECT_NOTIFICATIONS = 1;
@@ -186,7 +194,7 @@ public class ZenModeHelper {
     public static final long SUPPRESSED_EFFECT_ALL = SUPPRESSED_EFFECT_CALLS
             | SUPPRESSED_EFFECT_NOTIFICATIONS;
 
-    @VisibleForTesting protected boolean mIsBootComplete;
+    @VisibleForTesting protected boolean mIsSystemServicesReady;
 
     private String[] mPriorityOnlyDndExemptPackages;
 
@@ -282,8 +290,31 @@ public class ZenModeHelper {
         mPm = mContext.getPackageManager();
         mHandler.postMetricsTimer();
         cleanUpZenRules();
-        mIsBootComplete = true;
+        mIsSystemServicesReady = true;
         showZenUpgradeNotification(mZenMode);
+    }
+
+    /**
+     * Set the {@link DeviceEffectsApplier} used to apply the consolidated effects.
+     *
+     * <p>If effects were calculated previously (for example, when we loaded a {@link ZenModeConfig}
+     * that includes activated rules), they will be applied immediately.
+     */
+    void setDeviceEffectsApplier(@NonNull DeviceEffectsApplier deviceEffectsApplier) {
+        if (!Flags.modesApi()) {
+            return;
+        }
+        ZenDeviceEffects consolidatedDeviceEffects;
+        synchronized (mConfigLock) {
+            if (mDeviceEffectsApplier != null) {
+                throw new IllegalStateException("Already set up a DeviceEffectsApplier!");
+            }
+            mDeviceEffectsApplier = deviceEffectsApplier;
+            consolidatedDeviceEffects = mConsolidatedDeviceEffects;
+        }
+        if (consolidatedDeviceEffects.hasEffects()) {
+            applyConsolidatedDeviceEffects();
+        }
     }
 
     public void onUserSwitched(int user) {
@@ -868,12 +899,13 @@ public class ZenModeHelper {
         return null;
     }
 
-    private static void populateZenRule(String pkg, AutomaticZenRule automaticZenRule, ZenRule rule,
+    @VisibleForTesting
+    void populateZenRule(String pkg, AutomaticZenRule automaticZenRule, ZenRule rule,
             boolean isNew, @ChangeOrigin int origin) {
-        // TODO: b/308671593,b/311406021 - Handle origins more precisely:
-        //  - FROM_USER can override anything and updates bitmask of user-modified fields;
-        //  - FROM_SYSTEM_OR_SYSTEMUI can override anything and preserves bitmask;
-        //  - FROM_APP can only update if not user-modified.
+            // TODO: b/308671593,b/311406021 - Handle origins more precisely:
+            //  - FROM_USER can override anything and updates bitmask of user-modified fields;
+            //  - FROM_SYSTEM_OR_SYSTEMUI can override anything and preserves bitmask;
+            //  - FROM_APP can only update if not user-modified.
         if (rule.enabled != automaticZenRule.isEnabled()) {
             rule.snoozing = false;
         }
@@ -902,14 +934,14 @@ public class ZenModeHelper {
 
         if (Flags.modesApi()) {
             rule.allowManualInvocation = automaticZenRule.isManualInvocationAllowed();
-            rule.iconResId = automaticZenRule.getIconResId();
+            rule.iconResName = drawableResIdToResName(rule.pkg, automaticZenRule.getIconResId());
             rule.triggerDescription = automaticZenRule.getTriggerDescription();
             rule.type = automaticZenRule.getType();
         }
     }
 
-    /** "
-     * Fix" {@link ZenDeviceEffects} that are being stored as part of a new or updated ZenRule.
+    /**
+     * Fix {@link ZenDeviceEffects} that are being stored as part of a new or updated ZenRule.
      *
      * <ul>
      *     <li> Apps cannot turn on hidden effects (those tagged as {@code @hide}) since they are
@@ -952,13 +984,13 @@ public class ZenModeHelper {
         }
     }
 
-    private static AutomaticZenRule zenRuleToAutomaticZenRule(ZenRule rule) {
+    private AutomaticZenRule zenRuleToAutomaticZenRule(ZenRule rule) {
         AutomaticZenRule azr;
         if (Flags.modesApi()) {
             azr = new AutomaticZenRule.Builder(rule.name, rule.conditionId)
                     .setManualInvocationAllowed(rule.allowManualInvocation)
                     .setCreationTime(rule.creationTime)
-                    .setIconResId(rule.iconResId)
+                    .setIconResId(drawableResNameToResId(rule.pkg, rule.iconResName))
                     .setType(rule.type)
                     .setZenPolicy(rule.zenPolicy)
                     .setDeviceEffects(rule.zenDeviceEffects)
@@ -1345,7 +1377,7 @@ public class ZenModeHelper {
 
             mConfig = config;
             dispatchOnConfigChanged();
-            updateConsolidatedPolicy(reason);
+            updateAndApplyConsolidatedPolicyAndDeviceEffects(reason);
         }
         final String val = Integer.toString(config.hashCode());
         Global.putString(mContext.getContentResolver(), Global.ZEN_MODE_CONFIG_ETAG, val);
@@ -1394,7 +1426,7 @@ public class ZenModeHelper {
         ZenLog.traceSetZenMode(zen, reason);
         mZenMode = zen;
         setZenModeSetting(mZenMode);
-        updateConsolidatedPolicy(reason);
+        updateAndApplyConsolidatedPolicyAndDeviceEffects(reason);
         boolean shouldApplyToRinger = setRingerMode && (zen != zenBefore || (
                 zen == Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS
                         && policyHashBefore != mConsolidatedPolicy.hashCode()));
@@ -1455,25 +1487,56 @@ public class ZenModeHelper {
         }
     }
 
-    private void updateConsolidatedPolicy(String reason) {
+    private void updateAndApplyConsolidatedPolicyAndDeviceEffects(String reason) {
         synchronized (mConfigLock) {
             if (mConfig == null) return;
             ZenPolicy policy = new ZenPolicy();
+            ZenDeviceEffects.Builder deviceEffectsBuilder = new ZenDeviceEffects.Builder();
             if (mConfig.manualRule != null) {
                 applyCustomPolicy(policy, mConfig.manualRule);
+                if (Flags.modesApi()) {
+                    deviceEffectsBuilder.add(mConfig.manualRule.zenDeviceEffects);
+                }
             }
 
             for (ZenRule automaticRule : mConfig.automaticRules.values()) {
                 if (automaticRule.isAutomaticActive()) {
                     applyCustomPolicy(policy, automaticRule);
+                    if (Flags.modesApi()) {
+                        deviceEffectsBuilder.add(automaticRule.zenDeviceEffects);
+                    }
                 }
             }
+
             Policy newPolicy = mConfig.toNotificationPolicy(policy);
             if (!Objects.equals(mConsolidatedPolicy, newPolicy)) {
                 mConsolidatedPolicy = newPolicy;
                 dispatchOnConsolidatedPolicyChanged();
                 ZenLog.traceSetConsolidatedZenPolicy(mConsolidatedPolicy, reason);
             }
+
+            if (Flags.modesApi()) {
+                ZenDeviceEffects deviceEffects = deviceEffectsBuilder.build();
+                if (!deviceEffects.equals(mConsolidatedDeviceEffects)) {
+                    mConsolidatedDeviceEffects = deviceEffects;
+                    mHandler.postApplyDeviceEffects();
+                }
+            }
+        }
+    }
+
+    private void applyConsolidatedDeviceEffects() {
+        if (!Flags.modesApi()) {
+            return;
+        }
+        DeviceEffectsApplier applier;
+        ZenDeviceEffects effects;
+        synchronized (mConfigLock) {
+            applier = mDeviceEffectsApplier;
+            effects = mConsolidatedDeviceEffects;
+        }
+        if (applier != null) {
+            applier.apply(effects);
         }
     }
 
@@ -1519,7 +1582,7 @@ public class ZenModeHelper {
         final boolean muteEverything = zenSilence || (zenPriorityOnly
                 && ZenModeConfig.areAllZenBehaviorSoundsMuted(mConsolidatedPolicy));
 
-        for (int usage : AudioAttributes.SDK_USAGES) {
+        for (int usage : AudioAttributes.SDK_USAGES.toArray()) {
             final int suppressionBehavior = AudioAttributes.SUPPRESSIBLE_USAGES.get(usage);
             if (suppressionBehavior == AudioAttributes.SUPPRESSIBLE_NEVER) {
                 applyRestrictions(zenPriorityOnly, false /*mute*/, usage);
@@ -1889,7 +1952,7 @@ public class ZenModeHelper {
     private void showZenUpgradeNotification(int zen) {
         final boolean isWatch = mContext.getPackageManager().hasSystemFeature(
             PackageManager.FEATURE_WATCH);
-        final boolean showNotification = mIsBootComplete
+        final boolean showNotification = mIsSystemServicesReady
                 && zen != Global.ZEN_MODE_OFF
                 && !isWatch
                 && Settings.Secure.getInt(mContext.getContentResolver(),
@@ -1942,6 +2005,35 @@ public class ZenModeHelper {
                 .build();
     }
 
+    private int drawableResNameToResId(String packageName, String resourceName) {
+        if (TextUtils.isEmpty(resourceName)) {
+            return 0;
+        }
+        try {
+            final Resources res = mPm.getResourcesForApplication(packageName);
+            return res.getIdentifier(resourceName, null, null);
+        } catch (PackageManager.NameNotFoundException e) {
+            Slog.w(TAG, "cannot load rule icon for pkg", e);
+        }
+        return 0;
+    }
+
+    private String drawableResIdToResName(String packageName, @DrawableRes int resId) {
+        if (resId == 0) {
+            return null;
+        }
+        try {
+            final Resources res = mPm.getResourcesForApplication(packageName);
+            final String fullName = res.getResourceName(resId);
+
+            return fullName;
+        } catch (PackageManager.NameNotFoundException | Resources.NotFoundException e) {
+            Log.e(TAG, "Resource name for ID=" + resId + " not found in package " + packageName
+                    + ". Resource IDs may change when the application is upgraded, and the system"
+                    + " may not be able to find the correct resource.");
+            return null;
+        }
+    }
     private final class Metrics extends Callback {
         private static final String COUNTER_MODE_PREFIX = "dnd_mode_";
         private static final String COUNTER_TYPE_PREFIX = "dnd_type_";
@@ -2034,6 +2126,7 @@ public class ZenModeHelper {
         private static final int MSG_DISPATCH = 1;
         private static final int MSG_METRICS = 2;
         private static final int MSG_RINGER_AUDIO = 5;
+        private static final int MSG_APPLY_EFFECTS = 6;
 
         private static final long METRICS_PERIOD_MS = 6 * 60 * 60 * 1000;
 
@@ -2056,6 +2149,11 @@ public class ZenModeHelper {
             sendMessage(obtainMessage(MSG_RINGER_AUDIO, shouldApplyToRinger));
         }
 
+        private void postApplyDeviceEffects() {
+            removeMessages(MSG_APPLY_EFFECTS);
+            sendEmptyMessage(MSG_APPLY_EFFECTS);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             switch (msg.what) {
@@ -2068,6 +2166,10 @@ public class ZenModeHelper {
                 case MSG_RINGER_AUDIO:
                     boolean shouldApplyToRinger = (boolean) msg.obj;
                     updateRingerAndAudio(shouldApplyToRinger);
+                    break;
+                case MSG_APPLY_EFFECTS:
+                    applyConsolidatedDeviceEffects();
+                    break;
             }
         }
     }

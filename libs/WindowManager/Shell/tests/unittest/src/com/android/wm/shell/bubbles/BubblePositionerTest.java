@@ -16,10 +16,15 @@
 
 package com.android.wm.shell.bubbles;
 
+import static com.android.wm.shell.bubbles.BubblePositioner.MAX_HEIGHT;
+
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import static org.mockito.Mockito.mock;
+
 import android.content.Intent;
+import android.content.pm.ShortcutInfo;
 import android.graphics.Insets;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -226,7 +231,271 @@ public class BubblePositionerTest extends ShellTestCase {
     }
 
     @Test
-    public void testExpandedViewHeight_onLargeTablet() {
+    public void testGetExpandedViewHeight_max() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        assertThat(mPositioner.getExpandedViewHeight(bubble)).isEqualTo(MAX_HEIGHT);
+    }
+
+    @Test
+    public void testGetExpandedViewHeight_customHeight_valid() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        final int minHeight = mContext.getResources().getDimensionPixelSize(
+                R.dimen.bubble_expanded_default_height);
+        Bubble bubble = new Bubble("key",
+                mock(ShortcutInfo.class),
+                minHeight + 100 /* desiredHeight */,
+                0 /* desiredHeightResId */,
+                "title",
+                0 /* taskId */,
+                null /* locus */,
+                true /* isDismissable */,
+                directExecutor(),
+                mock(Bubbles.BubbleMetadataFlagListener.class));
+
+        // Ensure the height is the same as the desired value
+        assertThat(mPositioner.getExpandedViewHeight(bubble)).isEqualTo(
+                bubble.getDesiredHeight(mContext));
+    }
+
+
+    @Test
+    public void testGetExpandedViewHeight_customHeight_tooSmall() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Bubble bubble = new Bubble("key",
+                mock(ShortcutInfo.class),
+                10 /* desiredHeight */,
+                0 /* desiredHeightResId */,
+                "title",
+                0 /* taskId */,
+                null /* locus */,
+                true /* isDismissable */,
+                directExecutor(),
+                mock(Bubbles.BubbleMetadataFlagListener.class));
+
+        // Ensure the height is the same as the minimum value
+        final int minHeight = mContext.getResources().getDimensionPixelSize(
+                R.dimen.bubble_expanded_default_height);
+        assertThat(mPositioner.getExpandedViewHeight(bubble)).isEqualTo(minHeight);
+    }
+
+    @Test
+    public void testGetMaxExpandedViewHeight_onLargeTablet() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        int manageButtonHeight =
+                mContext.getResources().getDimensionPixelSize(R.dimen.bubble_manage_button_height);
+        int pointerWidth = mContext.getResources().getDimensionPixelSize(
+                R.dimen.bubble_pointer_width);
+        int expandedViewPadding = mContext.getResources().getDimensionPixelSize(R
+                .dimen.bubble_expanded_view_padding);
+        float expectedHeight = 1800 - 2 * 20 - manageButtonHeight - pointerWidth
+                - expandedViewPadding * 2;
+        assertThat(((float) mPositioner.getMaxExpandedViewHeight(false /* isOverflow */)))
+                .isWithin(0.1f).of(expectedHeight);
+    }
+
+    @Test
+    public void testAreBubblesBottomAligned_largeScreen_true() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        assertThat(mPositioner.areBubblesBottomAligned()).isTrue();
+    }
+
+    @Test
+    public void testAreBubblesBottomAligned_largeScreen_false() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setLandscape()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        assertThat(mPositioner.areBubblesBottomAligned()).isFalse();
+    }
+
+    @Test
+    public void testAreBubblesBottomAligned_smallTablet_false() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setSmallTablet()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        assertThat(mPositioner.areBubblesBottomAligned()).isFalse();
+    }
+
+    @Test
+    public void testAreBubblesBottomAligned_phone_false() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        assertThat(mPositioner.areBubblesBottomAligned()).isFalse();
+    }
+
+    @Test
+    public void testExpandedViewY_phoneLandscape() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLandscape()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        // This bubble will have max height so it'll always be top aligned
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(mPositioner.getExpandedViewYTopAligned());
+    }
+
+    @Test
+    public void testExpandedViewY_phonePortrait() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        // Always top aligned in phone portrait
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(mPositioner.getExpandedViewYTopAligned());
+    }
+
+    @Test
+    public void testExpandedViewY_smallTabletLandscape() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setSmallTablet()
+                .setLandscape()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        // This bubble will have max height which is always top aligned on small tablets
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(mPositioner.getExpandedViewYTopAligned());
+    }
+
+    @Test
+    public void testExpandedViewY_smallTabletPortrait() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setSmallTablet()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        // This bubble will have max height which is always top aligned on small tablets
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(mPositioner.getExpandedViewYTopAligned());
+    }
+
+    @Test
+    public void testExpandedViewY_largeScreenLandscape() {
+        Insets insets = Insets.of(10, 20, 5, 15);
+        Rect screenBounds = new Rect(0, 0, 1800, 2600);
+
+        DeviceConfig deviceConfig = new ConfigBuilder()
+                .setLargeScreen()
+                .setLandscape()
+                .setInsets(insets)
+                .setScreenBounds(screenBounds)
+                .build();
+        mPositioner.update(deviceConfig);
+
+        Intent intent = new Intent(Intent.ACTION_VIEW).setPackage(mContext.getPackageName());
+        Bubble bubble = Bubble.createAppBubble(intent, new UserHandle(1), null, directExecutor());
+
+        // This bubble will have max height which is always top aligned on landscape, large tablet
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(mPositioner.getExpandedViewYTopAligned());
+    }
+
+    @Test
+    public void testExpandedViewY_largeScreenPortrait() {
         Insets insets = Insets.of(10, 20, 5, 15);
         Rect screenBounds = new Rect(0, 0, 1800, 2600);
 
@@ -242,8 +511,20 @@ public class BubblePositionerTest extends ShellTestCase {
 
         int manageButtonHeight =
                 mContext.getResources().getDimensionPixelSize(R.dimen.bubble_manage_button_height);
-        float expectedHeight = 1800 - 2 * 20 - manageButtonHeight;
-        assertThat(mPositioner.getExpandedViewHeight(bubble)).isWithin(0.1f).of(expectedHeight);
+        int manageButtonPlusMargin = manageButtonHeight + 2
+                * mContext.getResources().getDimensionPixelSize(
+                        R.dimen.bubble_manage_button_margin);
+        int pointerWidth = mContext.getResources().getDimensionPixelSize(
+                R.dimen.bubble_pointer_width);
+
+        final float expectedExpandedViewY = mPositioner.getAvailableRect().bottom
+                - manageButtonPlusMargin
+                - mPositioner.getExpandedViewHeightForLargeScreen()
+                - pointerWidth;
+
+        // Bubbles are bottom aligned on portrait, large tablet
+        assertThat(mPositioner.getExpandedViewY(bubble, 0f /* bubblePosition */))
+                .isEqualTo(expectedExpandedViewY);
     }
 
     /**

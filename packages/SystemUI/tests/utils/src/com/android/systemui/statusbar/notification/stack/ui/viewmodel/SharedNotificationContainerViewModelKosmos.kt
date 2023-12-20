@@ -18,6 +18,8 @@ package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
+import com.android.systemui.keyguard.ui.viewmodel.lockscreenToOccludedTransitionViewModel
+import com.android.systemui.keyguard.ui.viewmodel.occludedToLockscreenTransitionViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.kosmos.applicationCoroutineScope
@@ -31,5 +33,7 @@ val Kosmos.sharedNotificationContainerViewModel by Fixture {
         keyguardInteractor = keyguardInteractor,
         keyguardTransitionInteractor = keyguardTransitionInteractor,
         shadeInteractor = shadeInteractor,
+        occludedToLockscreenTransitionViewModel = occludedToLockscreenTransitionViewModel,
+        lockscreenToOccludedTransitionViewModel = lockscreenToOccludedTransitionViewModel,
     )
 }

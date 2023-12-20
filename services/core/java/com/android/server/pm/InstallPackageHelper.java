@@ -691,6 +691,8 @@ final class InstallPackageHelper {
                     pkgSetting.setInstallReason(installReason, userId);
                     pkgSetting.setUninstallReason(PackageManager.UNINSTALL_REASON_UNKNOWN, userId);
                     pkgSetting.setFirstInstallTime(System.currentTimeMillis(), userId);
+                    // Clear any existing archive state.
+                    pkgSetting.setArchiveState(null, userId);
                     mPm.mSettings.writePackageRestrictionsLPr(userId);
                     mPm.mSettings.writeKernelMappingLPr(pkgSetting);
                     installed = true;
@@ -2166,7 +2168,11 @@ final class InstallPackageHelper {
                 }
             }
             if (installRequest.getReturnCode() == PackageManager.INSTALL_SUCCEEDED) {
-                mPm.createArchiveStateIfNeeded(ps,
+                // If this is an archival installation then we'll initialize the archive status,
+                // while also marking package as not installed.
+                // Doing this at the very end of the install as we are using ps.getInstalled
+                // to figure out which users were changed.
+                mPm.markPackageAsArchivedIfNeeded(ps,
                         installRequest.getArchivedPackage(),
                         installRequest.getNewUsers());
                 mPm.updateSequenceNumberLP(ps, installRequest.getNewUsers());
@@ -2285,6 +2291,8 @@ final class InstallPackageHelper {
                         ps.setEnabled(COMPONENT_ENABLED_STATE_DEFAULT, userId,
                                 installerPackageName);
                     }
+                    // Clear any existing archive state.
+                    ps.setArchiveState(null, userId);
                 } else if (allUsers != null) {
                     // The caller explicitly specified INSTALL_ALL_USERS flag.
                     // Thus, updating the settings to install the app for all users.
@@ -2307,6 +2315,8 @@ final class InstallPackageHelper {
                                 ps.setEnabled(COMPONENT_ENABLED_STATE_DEFAULT, currentUserId,
                                         installerPackageName);
                             }
+                            // Clear any existing archive state.
+                            ps.setArchiveState(null, currentUserId);
                         } else {
                             ps.setInstalled(false, currentUserId);
                         }
@@ -2883,10 +2893,11 @@ final class InstallPackageHelper {
                     ? request.getRemovedInfo().mArgs : null;
             if (args != null) {
                 if (!killApp) {
-                    // If we didn't kill the app, defer the deletion of code/resource files, since
-                    // they may still be in use by the running application. This mitigates problems
-                    // in cases where resources or code is loaded by a new Activity before
-                    // ApplicationInfo changes have propagated to all application threads.
+                    // If we didn't kill the app, defer the deletion of code/resource files,
+                    // since the old code/resource files may still be in use by the running
+                    // application. This mitigates problems and cases where resources or
+                    // code is loaded by a new Activity before ApplicationInfo changes have
+                    // propagated to all application threads.
                     mPm.scheduleDeferredNoKillPostDelete(args);
                 } else {
                     mRemovePackageHelper.cleanUpResources(args.mCodeFile, args.mInstructionSets);

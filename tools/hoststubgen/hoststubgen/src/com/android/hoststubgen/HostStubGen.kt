@@ -128,7 +128,7 @@ class HostStubGen(val options: HostStubGenOptions) {
         }
 
         val end = System.currentTimeMillis()
-        log.v("Done reading class structure in %.1f second(s).", (end - start) / 1000.0)
+        log.i("Done reading class structure in %.1f second(s).", (end - start) / 1000.0)
         return allClasses
     }
 
@@ -158,7 +158,7 @@ class HostStubGen(val options: HostStubGenOptions) {
         // This is used when a member (methods, fields, nested classes) don't get any polices
         // from upper filters. e.g. when a method has no annotations, then this filter will apply
         // the class-wide policy, if any. (if not, we'll fall back to the above filter.)
-        filter = ClassWidePolicyPropagatingFilter(filter)
+        filter = ClassWidePolicyPropagatingFilter(allClasses, filter)
 
         // Inject default hooks from options.
         filter = DefaultHookInjectingFilter(
@@ -239,7 +239,7 @@ class HostStubGen(val options: HostStubGenOptions) {
             errors: HostStubGenErrors,
             ) {
         log.i("Converting %s into [stub: %s, impl: %s] ...", inJar, outStubJar, outImplJar)
-        log.i("Checker is %s", if (enableChecker) "enabled" else "disabled")
+        log.i("ASM CheckClassAdapter is %s", if (enableChecker) "enabled" else "disabled")
 
         val start = System.currentTimeMillis()
 
@@ -264,7 +264,7 @@ class HostStubGen(val options: HostStubGenOptions) {
             }
         }
         val end = System.currentTimeMillis()
-        log.v("Done transforming the jar in %.1f second(s).", (end - start) / 1000.0)
+        log.i("Done transforming the jar in %.1f second(s).", (end - start) / 1000.0)
     }
 
     private fun <T> maybeWithZipOutputStream(filename: String?, block: (ZipOutputStream?) -> T): T {

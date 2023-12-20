@@ -432,10 +432,10 @@ import com.android.internal.util.FastPrintWriter;
 import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.MemInfoReader;
 import com.android.internal.util.Preconditions;
-import com.android.internal.util.function.HeptFunction;
+import com.android.internal.util.function.DodecFunction;
 import com.android.internal.util.function.HexFunction;
+import com.android.internal.util.function.OctFunction;
 import com.android.internal.util.function.QuadFunction;
-import com.android.internal.util.function.QuintFunction;
 import com.android.internal.util.function.UndecFunction;
 import com.android.server.AlarmManagerInternal;
 import com.android.server.BootReceiver;
@@ -478,6 +478,7 @@ import com.android.server.sdksandbox.SdkSandboxManagerLocal;
 import com.android.server.uri.GrantUri;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
+import com.android.server.utils.AnrTimer;
 import com.android.server.utils.PriorityDump;
 import com.android.server.utils.Slogf;
 import com.android.server.utils.TimingsTraceAndSlog;
@@ -2508,7 +2509,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mUseFifoUiScheduling = false;
         mEnableOffloadQueue = false;
         mEnableModernQueue = false;
-        mBroadcastQueues = new BroadcastQueue[0];
+        mBroadcastQueues = injector.getBroadcastQueues(this);
         mComponentAliasResolver = new ComponentAliasResolver(this);
     }
 
@@ -2549,40 +2550,12 @@ public class ActivityManagerService extends IActivityManager.Stub
                 ? new OomAdjusterModernImpl(this, mProcessList, activeUids)
                 : new OomAdjuster(this, mProcessList, activeUids);
 
-        // Broadcast policy parameters
-        final BroadcastConstants foreConstants = new BroadcastConstants(
-                Settings.Global.BROADCAST_FG_CONSTANTS);
-        foreConstants.TIMEOUT = BROADCAST_FG_TIMEOUT;
-
-        final BroadcastConstants backConstants = new BroadcastConstants(
-                Settings.Global.BROADCAST_BG_CONSTANTS);
-        backConstants.TIMEOUT = BROADCAST_BG_TIMEOUT;
-
-        final BroadcastConstants offloadConstants = new BroadcastConstants(
-                Settings.Global.BROADCAST_OFFLOAD_CONSTANTS);
-        offloadConstants.TIMEOUT = BROADCAST_BG_TIMEOUT;
-        // by default, no "slow" policy in this queue
-        offloadConstants.SLOW_TIME = Integer.MAX_VALUE;
-
         mEnableOffloadQueue = SystemProperties.getBoolean(
                 "persist.device_config.activity_manager_native_boot.offload_queue_enabled", true);
-        mEnableModernQueue = foreConstants.MODERN_QUEUE_ENABLED;
+        mEnableModernQueue = new BroadcastConstants(
+                Settings.Global.BROADCAST_FG_CONSTANTS).MODERN_QUEUE_ENABLED;
 
-        if (mEnableModernQueue) {
-            mBroadcastQueues = new BroadcastQueue[1];
-            mBroadcastQueues[0] = new BroadcastQueueModernImpl(this, mHandler,
-                    foreConstants, backConstants);
-        } else {
-            mBroadcastQueues = new BroadcastQueue[4];
-            mBroadcastQueues[BROADCAST_QUEUE_FG] = new BroadcastQueueImpl(this, mHandler,
-                    "foreground", foreConstants, false, ProcessList.SCHED_GROUP_DEFAULT);
-            mBroadcastQueues[BROADCAST_QUEUE_BG] = new BroadcastQueueImpl(this, mHandler,
-                    "background", backConstants, true, ProcessList.SCHED_GROUP_BACKGROUND);
-            mBroadcastQueues[BROADCAST_QUEUE_BG_OFFLOAD] = new BroadcastQueueImpl(this, mHandler,
-                    "offload_bg", offloadConstants, true, ProcessList.SCHED_GROUP_BACKGROUND);
-            mBroadcastQueues[BROADCAST_QUEUE_FG_OFFLOAD] = new BroadcastQueueImpl(this, mHandler,
-                    "offload_fg", foreConstants, true, ProcessList.SCHED_GROUP_BACKGROUND);
-        }
+        mBroadcastQueues = mInjector.getBroadcastQueues(this);
 
         mServices = new ActiveServices(this);
         mCpHelper = new ContentProviderHelper(this, true);
@@ -20175,6 +20148,44 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
             return mNmi != null;
         }
+
+        public BroadcastQueue[] getBroadcastQueues(ActivityManagerService service) {
+            // Broadcast policy parameters
+            final BroadcastConstants foreConstants = new BroadcastConstants(
+                    Settings.Global.BROADCAST_FG_CONSTANTS);
+            foreConstants.TIMEOUT = BROADCAST_FG_TIMEOUT;
+
+            final BroadcastConstants backConstants = new BroadcastConstants(
+                    Settings.Global.BROADCAST_BG_CONSTANTS);
+            backConstants.TIMEOUT = BROADCAST_BG_TIMEOUT;
+
+            final BroadcastConstants offloadConstants = new BroadcastConstants(
+                    Settings.Global.BROADCAST_OFFLOAD_CONSTANTS);
+            offloadConstants.TIMEOUT = BROADCAST_BG_TIMEOUT;
+            // by default, no "slow" policy in this queue
+            offloadConstants.SLOW_TIME = Integer.MAX_VALUE;
+
+            final BroadcastQueue[] broadcastQueues;
+            final Handler handler = service.mHandler;
+            if (service.mEnableModernQueue) {
+                broadcastQueues = new BroadcastQueue[1];
+                broadcastQueues[0] = new BroadcastQueueModernImpl(service, handler,
+                        foreConstants, backConstants);
+            } else {
+                broadcastQueues = new BroadcastQueue[4];
+                broadcastQueues[BROADCAST_QUEUE_FG] = new BroadcastQueueImpl(service, handler,
+                        "foreground", foreConstants, false, ProcessList.SCHED_GROUP_DEFAULT);
+                broadcastQueues[BROADCAST_QUEUE_BG] = new BroadcastQueueImpl(service, handler,
+                        "background", backConstants, true, ProcessList.SCHED_GROUP_BACKGROUND);
+                broadcastQueues[BROADCAST_QUEUE_BG_OFFLOAD] = new BroadcastQueueImpl(service,
+                        handler, "offload_bg", offloadConstants, true,
+                        ProcessList.SCHED_GROUP_BACKGROUND);
+                broadcastQueues[BROADCAST_QUEUE_FG_OFFLOAD] = new BroadcastQueueImpl(service,
+                        handler, "offload_fg", foreConstants, true,
+                        ProcessList.SCHED_GROUP_BACKGROUND);
+            }
+            return broadcastQueues;
+        }
     }
 
     @Override
@@ -20264,20 +20275,21 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
 
         @Override
-        public int checkOperation(int code, int uid, String packageName,
-                String attributionTag, boolean raw,
-                QuintFunction<Integer, Integer, String, String, Boolean, Integer> superImpl) {
+        public int checkOperation(int code, int uid, String packageName, String attributionTag,
+                int virtualDeviceId, boolean raw, HexFunction<Integer, Integer, String, String,
+                        Integer, Boolean, Integer> superImpl) {
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
                         Process.SHELL_UID);
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    return superImpl.apply(code, shellUid, "com.android.shell", null, raw);
+                    return superImpl.apply(code, shellUid, "com.android.shell", null,
+                            virtualDeviceId, raw);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(code, uid, packageName, attributionTag, raw);
+            return superImpl.apply(code, uid, packageName, attributionTag, virtualDeviceId, raw);
         }
 
         @Override
@@ -20298,23 +20310,24 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public SyncNotedAppOp noteOperation(int code, int uid, @Nullable String packageName,
-                @Nullable String featureId, boolean shouldCollectAsyncNotedOp,
+                @Nullable String featureId, int virtualDeviceId, boolean shouldCollectAsyncNotedOp,
                 @Nullable String message, boolean shouldCollectMessage,
-                @NonNull HeptFunction<Integer, Integer, String, String, Boolean, String, Boolean,
-                        SyncNotedAppOp> superImpl) {
+                @NonNull OctFunction<Integer, Integer, String, String, Integer, Boolean, String,
+                        Boolean, SyncNotedAppOp> superImpl) {
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
                         Process.SHELL_UID);
                 final long identity = Binder.clearCallingIdentity();
                 try {
                     return superImpl.apply(code, shellUid, "com.android.shell", featureId,
-                            shouldCollectAsyncNotedOp, message, shouldCollectMessage);
+                            virtualDeviceId, shouldCollectAsyncNotedOp, message,
+                            shouldCollectMessage);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(code, uid, packageName, featureId, shouldCollectAsyncNotedOp,
-                    message, shouldCollectMessage);
+            return superImpl.apply(code, uid, packageName, featureId, virtualDeviceId,
+                    shouldCollectAsyncNotedOp, message, shouldCollectMessage);
         }
 
         @Override
@@ -20345,11 +20358,11 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public SyncNotedAppOp startOperation(IBinder token, int code, int uid,
-                @Nullable String packageName, @Nullable String attributionTag,
+                @Nullable String packageName, @Nullable String attributionTag, int virtualDeviceId,
                 boolean startIfModeDefault, boolean shouldCollectAsyncNotedOp,
                 @Nullable String message, boolean shouldCollectMessage,
                 @AttributionFlags int attributionFlags, int attributionChainId,
-                @NonNull UndecFunction<IBinder, Integer, Integer, String, String, Boolean,
+                @NonNull DodecFunction<IBinder, Integer, Integer, String, String, Integer, Boolean,
                         Boolean, String, Boolean, Integer, Integer, SyncNotedAppOp> superImpl) {
             if (uid == mTargetUid && isTargetOp(code)) {
                 final int shellUid = UserHandle.getUid(UserHandle.getUserId(uid),
@@ -20357,13 +20370,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                 final long identity = Binder.clearCallingIdentity();
                 try {
                     return superImpl.apply(token, code, shellUid, "com.android.shell",
-                            attributionTag, startIfModeDefault, shouldCollectAsyncNotedOp, message,
-                            shouldCollectMessage, attributionFlags, attributionChainId);
+                            attributionTag, virtualDeviceId, startIfModeDefault,
+                            shouldCollectAsyncNotedOp, message, shouldCollectMessage,
+                            attributionFlags, attributionChainId);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             }
-            return superImpl.apply(token, code, uid, packageName, attributionTag,
+            return superImpl.apply(token, code, uid, packageName, attributionTag, virtualDeviceId,
                     startIfModeDefault, shouldCollectAsyncNotedOp, message, shouldCollectMessage,
                     attributionFlags, attributionChainId);
         }

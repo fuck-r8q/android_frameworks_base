@@ -2,16 +2,20 @@
 
 com.android.internal.util.ArrayUtils
 
+android.util.AtomicFile
 android.util.DataUnit
 android.util.EventLog
 android.util.IntArray
 android.util.LongArray
+android.util.LruCache
 android.util.Slog
 android.util.TimeUtils
 android.util.Xml
 
 android.os.Binder
 android.os.Binder$IdentitySupplier
+android.os.FileUtils
+android.os.FileUtils$MemoryPipe
 android.os.Handler
 android.os.HandlerExecutor
 android.os.HandlerThread
@@ -19,6 +23,8 @@ android.os.IBinder
 android.os.Looper
 android.os.Message
 android.os.MessageQueue
+android.os.Parcel
+android.os.Parcelable
 android.os.Process
 android.os.SystemClock
 android.os.ThreadLocalWorkSource
@@ -30,9 +36,21 @@ android.content.ClipDescription
 android.content.ComponentName
 android.content.ContentUris
 android.content.ContentValues
+android.content.ContextWrapper
 android.content.Intent
 android.content.IntentFilter
 android.content.UriMatcher
+
+android.content.pm.PackageInfo
+android.content.pm.ApplicationInfo
+android.content.pm.PackageItemInfo
+android.content.pm.ComponentInfo
+android.content.pm.ActivityInfo
+android.content.pm.ServiceInfo
+android.content.pm.PathPermission
+android.content.pm.ProviderInfo
+android.content.pm.ResolveInfo
+android.content.pm.Signature
 
 android.database.AbstractCursor
 android.database.CharArrayBuffer
@@ -59,3 +77,5 @@ android.graphics.Point
 android.graphics.PointF
 android.graphics.Rect
 android.graphics.RectF
+
+com.android.server.LocalServices

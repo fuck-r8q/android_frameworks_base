@@ -230,20 +230,10 @@ object Flags {
     @JvmField val MIGRATE_KEYGUARD_STATUS_BAR_VIEW =
         unreleasedFlag("migrate_keyguard_status_bar_view")
 
-    /** Migrate clocks from keyguard status view to keyguard root view*/
-    // TODO(b/301502635): Tracking Bug.
-    @JvmField val MIGRATE_CLOCKS_TO_BLUEPRINT =
-            unreleasedFlag("migrate_clocks_to_blueprint")
-
     /** Enables preview loading animation in the wallpaper picker. */
     // TODO(b/274443705): Tracking Bug
     @JvmField
     val WALLPAPER_PICKER_PREVIEW_ANIMATION = releasedFlag("wallpaper_picker_preview_animation")
-
-    /** Flag to enable rest to unlock feature. */
-    // TODO(b/303672286): Tracking bug
-    @JvmField
-    val REST_TO_UNLOCK: UnreleasedFlag = unreleasedFlag("rest_to_unlock")
 
     /**
      * TODO(b/278086361): Tracking bug
@@ -257,12 +247,6 @@ object Flags {
     @JvmField
     val KEYGUARD_WM_STATE_REFACTOR: UnreleasedFlag =
             unreleasedFlag("keyguard_wm_state_refactor")
-
-    /** Flag to disable the face scanning animation pulsing. */
-    // TODO(b/295245791): Tracking bug.
-    @JvmField val STOP_PULSING_FACE_SCANNING_ANIMATION = resourceBooleanFlag(
-            R.bool.flag_stop_pulsing_face_scanning_animation,
-            "stop_pulsing_face_scanning_animation")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -453,12 +437,6 @@ object Flags {
     @JvmField
     val LOCKSCREEN_ENABLE_LANDSCAPE =
             unreleasedFlag("lockscreen.enable_landscape")
-
-    // TODO(b/281648899): Tracking bug
-    @Keep
-    @JvmField
-    val WALLPAPER_MULTI_CROP =
-        sysPropBooleanFlag("persist.wm.debug.wallpaper_multi_crop", default = false)
 
     // 1200 - predictive back
     @Keep
