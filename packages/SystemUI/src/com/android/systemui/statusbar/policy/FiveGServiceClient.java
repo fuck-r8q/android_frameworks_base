@@ -27,6 +27,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+  Changes from Qualcomm Innovation Center are provided under the following license:
+
+  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause-Clear
+*/
+
 package com.android.systemui.statusbar.policy;
 
 import android.content.ComponentName;
@@ -75,6 +82,7 @@ public class FiveGServiceClient {
     private static final int MAX_RETRY = 4;
     private static final int DELAY_MILLISECOND = 3000;
     private static final int DELAY_INCREMENT = 2000;
+    private static final int TYPE_5G_PLUS_PLUS = 3;//TODO, wait for interface change
 
     private static FiveGServiceClient sInstance;
     private final ArrayList<WeakReference<KeyguardUpdateMonitorCallback>>
@@ -329,6 +337,9 @@ public class FiveGServiceClient {
                 break;
             case NrIconType.TYPE_5G_UWB:
                 iconGroup = TelephonyIcons.FIVE_G_UWB;
+                break;
+            case TYPE_5G_PLUS_PLUS:
+                iconGroup = TelephonyIcons.FIVE_G_PLUS_PLUS;
                 break;
         }
         return iconGroup;
