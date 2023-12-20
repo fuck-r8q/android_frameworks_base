@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
+/*
+  Changes from Qualcomm Innovation Center are provided under the following license:
+
+  Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+  SPDX-License-Identifier: BSD-3-Clause-Clear
+*/
+
 package com.android.settingslib.mobile;
 
 import com.android.settingslib.R;
@@ -48,6 +55,7 @@ public class TelephonyIcons {
     public static final int ICON_5G_SA = R.drawable.ic_5g_mobiledata;
     public static final int ICON_5G_BASIC = R.drawable.ic_5g_mobiledata;
     public static final int ICON_5G_UWB = R.drawable.ic_5g_uwb_mobiledata;
+    public static final int ICON_5G_PLUS_PLUS = R.drawable.ic_5g_plus_plus_mobiledata;
     public static final int ICON_VOWIFI = R.drawable.ic_vowifi;
     public static final int ICON_VOWIFI_CALLING = R.drawable.ic_vowifi_calling;
 
@@ -193,6 +201,11 @@ public class TelephonyIcons {
             R.string.data_connection_5g_uwb,
             TelephonyIcons.ICON_5G_UWB);
 
+    public static final MobileIconGroup FIVE_G_PLUS_PLUS = new MobileIconGroup(
+            "5G_PLUS_PLUS",
+            R.string.data_connection_5g_plus_plus,
+            TelephonyIcons.ICON_5G_PLUS_PLUS);
+
     public static final MobileIconGroup FIVE_G_SA = new MobileIconGroup(
             "5GSA",
             R.string.data_connection_5g_sa,
@@ -231,6 +244,7 @@ public class TelephonyIcons {
         ICON_NAME_TO_ICON.put("5g", NR_5G);
         ICON_NAME_TO_ICON.put("5g_plus", NR_5G_PLUS);
         ICON_NAME_TO_ICON.put("5guwb", FIVE_G_UWB);
+        ICON_NAME_TO_ICON.put("5g_plus_plus", FIVE_G_PLUS_PLUS);
         ICON_NAME_TO_ICON.put("datadisable", DATA_DISABLED);
         ICON_NAME_TO_ICON.put("notdefaultdata", NOT_DEFAULT_DATA);
     }
