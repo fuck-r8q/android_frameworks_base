@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include "android-base/off64_t.h"
 
 namespace android {
 

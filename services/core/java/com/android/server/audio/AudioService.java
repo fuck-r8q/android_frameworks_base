@@ -24,6 +24,7 @@ package com.android.server.audio;
 import static android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED;
 import static android.app.BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
+import static android.media.audio.Flags.automaticBtDeviceType;
 import static android.media.audio.Flags.focusFreezeTestApi;
 import static android.media.AudioDeviceInfo.TYPE_BLE_HEADSET;
 import static android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER;
@@ -43,6 +44,7 @@ import static android.provider.Settings.Secure.VOLUME_HUSH_MUTE;
 import static android.provider.Settings.Secure.VOLUME_HUSH_OFF;
 import static android.provider.Settings.Secure.VOLUME_HUSH_VIBRATE;
 
+import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.media.audio.Flags.alarmMinVolumeZero;
 import static com.android.media.audio.Flags.bluetoothMacAddressAnonymization;
 import static com.android.media.audio.Flags.disablePrescaleAbsoluteVolume;
@@ -100,6 +102,7 @@ import android.hardware.usb.UsbManager;
 import android.hidl.manager.V1_0.IServiceManager;
 import android.media.AudioAttributes;
 import android.media.AudioAttributes.AttributeSystemUsage;
+import android.media.AudioDescriptor;
 import android.media.AudioDeviceAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioDeviceVolumeManager;
@@ -112,6 +115,7 @@ import android.media.AudioManager.AudioDeviceCategory;
 import android.media.AudioManagerInternal;
 import android.media.AudioMixerAttributes;
 import android.media.AudioPlaybackConfiguration;
+import android.media.AudioProfile;
 import android.media.AudioRecordingConfiguration;
 import android.media.AudioRoutesInfo;
 import android.media.AudioSystem;
@@ -239,6 +243,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -4402,7 +4407,9 @@ public class AudioService extends IAudioService.Stub
         }
     }
 
-    /*package*/ int getBluetoothContextualVolumeStream() {
+    /** only public for mocking/spying, do not call outside of AudioService */
+    @VisibleForTesting
+    public int getBluetoothContextualVolumeStream() {
         return getBluetoothContextualVolumeStream(mMode.get());
     }
 
@@ -6836,7 +6843,8 @@ public class AudioService extends IAudioService.Stub
         return mContentResolver;
     }
 
-    /*package*/ SettingsAdapter getSettings() {
+    @VisibleForTesting(visibility = PACKAGE)
+    public SettingsAdapter getSettings() {
         return mSettings;
     }
 
@@ -7744,6 +7752,13 @@ public class AudioService extends IAudioService.Stub
     @Retention(RetentionPolicy.SOURCE)
     public @interface ConnectionState {}
 
+    /**
+     * Default SAD for a TV using ARC, used when the Amplifier didn't report any SADs.
+     * Represents 2-channel LPCM including all defined sample rates and bit depths.
+     * For the format definition, see Table 34 in the CEA standard CEA-861-D.
+     */
+    private static final byte[] DEFAULT_ARC_AUDIO_DESCRIPTOR = new byte[]{0x09, 0x7f, 0x07};
+
     @android.annotation.EnforcePermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING)
     /**
      * see AudioManager.setWiredDeviceConnectionState()
@@ -7754,6 +7769,27 @@ public class AudioService extends IAudioService.Stub
         Objects.requireNonNull(attributes);
 
         attributes = retrieveBluetoothAddress(attributes);
+
+        // When using ARC, a TV should use default 2 channel LPCM if the Amplifier didn't
+        // report any SADs. See section 13.15.3 of the HDMI-CEC spec version 1.4b.
+        if (attributes.getType() == AudioDeviceInfo.TYPE_HDMI_ARC
+                && attributes.getRole() == AudioDeviceAttributes.ROLE_OUTPUT
+                && attributes.getAudioDescriptors().isEmpty()) {
+            attributes = new AudioDeviceAttributes(
+                    attributes.getRole(),
+                    attributes.getType(),
+                    attributes.getAddress(),
+                    attributes.getName(),
+                    attributes.getAudioProfiles(),
+                    new ArrayList<AudioDescriptor>(Collections.singletonList(
+                            new AudioDescriptor(
+                                    AudioDescriptor.STANDARD_EDID,
+                                    AudioProfile.AUDIO_ENCAPSULATION_TYPE_NONE,
+                                    DEFAULT_ARC_AUDIO_DESCRIPTOR
+                            )
+                    ))
+            );
+        }
 
         if (state != CONNECTION_STATE_CONNECTED
                 && state != CONNECTION_STATE_DISCONNECTED) {
@@ -11195,9 +11231,13 @@ public class AudioService extends IAudioService.Stub
 
     @Override
     @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
-    public void setBluetoothAudioDeviceCategory(@NonNull String address, boolean isBle,
+    public void setBluetoothAudioDeviceCategory_legacy(@NonNull String address, boolean isBle,
             @AudioDeviceCategory int btAudioDeviceCategory) {
-        super.setBluetoothAudioDeviceCategory_enforcePermission();
+        super.setBluetoothAudioDeviceCategory_legacy_enforcePermission();
+        if (automaticBtDeviceType()) {
+            // do nothing
+            return;
+        }
 
         final String addr = Objects.requireNonNull(address);
 
@@ -11229,8 +11269,11 @@ public class AudioService extends IAudioService.Stub
     @Override
     @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
     @AudioDeviceCategory
-    public int getBluetoothAudioDeviceCategory(@NonNull String address, boolean isBle) {
-        super.getBluetoothAudioDeviceCategory_enforcePermission();
+    public int getBluetoothAudioDeviceCategory_legacy(@NonNull String address, boolean isBle) {
+        super.getBluetoothAudioDeviceCategory_legacy_enforcePermission();
+        if (automaticBtDeviceType()) {
+            return AUDIO_DEVICE_CATEGORY_UNKNOWN;
+        }
 
         final AdiDeviceState deviceState = mDeviceBroker.findBtDeviceStateForAddress(
                 Objects.requireNonNull(address), (isBle ? AudioSystem.DEVICE_OUT_BLE_HEADSET
@@ -11240,6 +11283,63 @@ public class AudioService extends IAudioService.Stub
         }
 
         return deviceState.getAudioDeviceCategory();
+    }
+
+    @Override
+    @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+    public boolean setBluetoothAudioDeviceCategory(@NonNull String address,
+            @AudioDeviceCategory int btAudioDeviceCategory) {
+        super.setBluetoothAudioDeviceCategory_enforcePermission();
+        if (!automaticBtDeviceType()) {
+            return false;
+        }
+
+        final String addr = Objects.requireNonNull(address);
+        if (isBluetoothAudioDeviceCategoryFixed(addr)) {
+            Log.w(TAG, "Cannot set fixed audio device type for address "
+                    + Utils.anonymizeBluetoothAddress(address));
+            return false;
+        }
+
+        mDeviceBroker.addAudioDeviceWithCategoryInInventoryIfNeeded(address, btAudioDeviceCategory);
+
+        return true;
+    }
+
+    @Override
+    @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+    @AudioDeviceCategory
+    public int getBluetoothAudioDeviceCategory(@NonNull String address) {
+        super.getBluetoothAudioDeviceCategory_enforcePermission();
+        if (!automaticBtDeviceType()) {
+            return AUDIO_DEVICE_CATEGORY_UNKNOWN;
+        }
+
+        return mDeviceBroker.getAndUpdateBtAdiDeviceStateCategoryForAddress(address);
+    }
+
+    @Override
+    @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+    @AudioDeviceCategory
+    public boolean isBluetoothAudioDeviceCategoryFixed(@NonNull String address) {
+        super.isBluetoothAudioDeviceCategoryFixed_enforcePermission();
+        if (!automaticBtDeviceType()) {
+            return false;
+        }
+
+        return mDeviceBroker.isBluetoothAudioDeviceCategoryFixed(address);
+    }
+
+    /** Update the sound dose and spatializer state based on the new AdiDeviceState. */
+    @VisibleForTesting(visibility = PACKAGE)
+    public void onUpdatedAdiDeviceState(AdiDeviceState deviceState) {
+        if (deviceState == null) {
+            return;
+        }
+        mSpatializerHelper.refreshDevice(deviceState.getAudioDeviceAttributes());
+        mSoundDoseHelper.setAudioDeviceCategory(deviceState.getDeviceAddress(),
+                deviceState.getInternalDeviceType(),
+                deviceState.getAudioDeviceCategory() == AUDIO_DEVICE_CATEGORY_HEADPHONES);
     }
 
     //==========================================================================================

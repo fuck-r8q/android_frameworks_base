@@ -19,6 +19,8 @@ package com.android.systemui.keyguard.ui.binder
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.annotation.DrawableRes
+import android.annotation.SuppressLint
+import android.graphics.Point
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.View.OnLayoutChangeListener
@@ -34,6 +36,7 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.internal.jank.InteractionJankMonitor.CUJ_SCREEN_OFF_SHOW_AOD
 import com.android.keyguard.KeyguardClockSwitch.MISSING_CLOCK_ID
 import com.android.systemui.Flags.keyguardBottomAreaRefactor
+import com.android.systemui.Flags.migrateClocksToBlueprint
 import com.android.systemui.Flags.newAodTransition
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
@@ -46,7 +49,8 @@ import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.keyguard.ui.viewmodel.OccludingAppDeviceEntryMessageViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
-import com.android.systemui.plugins.ClockController
+import com.android.systemui.plugins.FalsingManager
+import com.android.systemui.plugins.clocks.ClockController
 import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.CrossFadeHelper
@@ -72,6 +76,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 object KeyguardRootViewBinder {
 
+    @SuppressLint("ClickableViewAccessibility")
     @JvmStatic
     fun bind(
         view: ViewGroup,
@@ -86,13 +91,24 @@ object KeyguardRootViewBinder {
         interactionJankMonitor: InteractionJankMonitor?,
         deviceEntryHapticsInteractor: DeviceEntryHapticsInteractor?,
         vibratorHelper: VibratorHelper?,
+        falsingManager: FalsingManager?,
     ): DisposableHandle {
         var onLayoutChangeListener: OnLayoutChange? = null
-        val childViews = mutableMapOf<Int, View?>()
+        val childViews = mutableMapOf<Int, View>()
         val statusViewId = R.id.keyguard_status_view
         val burnInLayerId = R.id.burn_in_layer
         val aodNotificationIconContainerId = R.id.aod_notification_icon_container
         val largeClockId = R.id.lockscreen_clock_view_large
+
+        if (keyguardBottomAreaRefactor()) {
+            view.setOnTouchListener { _, event ->
+                if (falsingManager?.isFalseTap(FalsingManager.LOW_PENALTY) == false) {
+                    viewModel.setRootViewLastTapPosition(Point(event.x.toInt(), event.y.toInt()))
+                }
+                false
+            }
+        }
+
         val disposableHandle =
             view.repeatWhenAttached {
                 repeatOnLifecycle(Lifecycle.State.CREATED) {
@@ -113,7 +129,12 @@ object KeyguardRootViewBinder {
                     }
 
                     if (keyguardBottomAreaRefactor()) {
-                        launch { viewModel.alpha.collect { alpha -> view.alpha = alpha } }
+                        launch {
+                            viewModel.alpha.collect { alpha ->
+                                view.alpha = alpha
+                                childViews[statusViewId]?.alpha = alpha
+                            }
+                        }
                     }
 
                     if (KeyguardShadeMigrationNssl.isEnabled) {
@@ -140,25 +161,35 @@ object KeyguardRootViewBinder {
                         }
 
                         launch {
+                            // When translation happens in burnInLayer, it won't be weather clock
+                            // large clock isn't added to burnInLayer due to its scale transition
+                            // so we also need to add translation to it here
+                            // same as translationX
                             viewModel.translationY.collect { y ->
                                 childViews[burnInLayerId]?.translationY = y
+                                childViews[largeClockId]?.translationY = y
                             }
                         }
 
                         launch {
                             viewModel.translationX.collect { x ->
                                 childViews[burnInLayerId]?.translationX = x
+                                childViews[largeClockId]?.translationX = x
                             }
                         }
 
                         launch {
                             viewModel.scale.collect { (scale, scaleClockOnly) ->
                                 if (scaleClockOnly) {
+                                    // For clocks except weather clock, we have scale transition
+                                    // besides translate
                                     childViews[largeClockId]?.let {
                                         it.scaleX = scale
                                         it.scaleY = scale
                                     }
                                 } else {
+                                    // For weather clock, large clock should have only scale
+                                    // transition with other parts in burnInLayer
                                     childViews[burnInLayerId]?.scaleX = scale
                                     childViews[burnInLayerId]?.scaleY = scale
                                 }
@@ -247,7 +278,10 @@ object KeyguardRootViewBinder {
                     }
                 }
             }
-        viewModel.clockControllerProvider = clockControllerProvider
+
+        if (!migrateClocksToBlueprint()) {
+            viewModel.clockControllerProvider = clockControllerProvider
+        }
 
         onLayoutChangeListener = OnLayoutChange(viewModel)
         view.addOnLayoutChangeListener(onLayoutChangeListener)

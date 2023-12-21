@@ -18,7 +18,6 @@
 package com.android.systemui.keyguard.data.repository
 
 import android.graphics.Point
-import com.android.keyguard.KeyguardClockSwitch.LARGE
 import com.android.systemui.common.shared.model.Position
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
@@ -26,7 +25,6 @@ import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.keyguard.shared.model.DismissAction
 import com.android.systemui.keyguard.shared.model.DozeTransitionModel
 import com.android.systemui.keyguard.shared.model.KeyguardDone
-import com.android.systemui.keyguard.shared.model.KeyguardRootViewVisibilityState
 import com.android.systemui.keyguard.shared.model.StatusBarState
 import dagger.Binds
 import dagger.Module
@@ -42,8 +40,6 @@ import kotlinx.coroutines.flow.asStateFlow
 class FakeKeyguardRepository @Inject constructor() : KeyguardRepository {
     private val _deferKeyguardDone: MutableSharedFlow<KeyguardDone> = MutableSharedFlow()
     override val keyguardDone: Flow<KeyguardDone> = _deferKeyguardDone
-    private val _clockSize = MutableStateFlow<Int>(LARGE)
-    override val clockSize: Flow<Int> = _clockSize
 
     private val _clockShouldBeCentered = MutableStateFlow<Boolean>(true)
     override val clockShouldBeCentered: Flow<Boolean> = _clockShouldBeCentered
@@ -123,16 +119,7 @@ class FakeKeyguardRepository @Inject constructor() : KeyguardRepository {
     private val _keyguardAlpha = MutableStateFlow(1f)
     override val keyguardAlpha: StateFlow<Float> = _keyguardAlpha
 
-    private val _keyguardRootViewVisibility =
-        MutableStateFlow(
-            KeyguardRootViewVisibilityState(
-                0,
-                goingToFullShade = false,
-                occlusionTransitionRunning = false
-            )
-        )
-    override val keyguardRootViewVisibility: Flow<KeyguardRootViewVisibilityState> =
-        _keyguardRootViewVisibility.asStateFlow()
+    override val lastRootViewTapPosition: MutableStateFlow<Point?> = MutableStateFlow(null)
 
     override fun setQuickSettingsVisible(isVisible: Boolean) {
         _isQuickSettingsVisible.value = isVisible
@@ -185,10 +172,6 @@ class FakeKeyguardRepository @Inject constructor() : KeyguardRepository {
 
     override suspend fun setKeyguardDone(timing: KeyguardDone) {
         _deferKeyguardDone.emit(timing)
-    }
-
-    override fun setClockSize(size: Int) {
-        _clockSize.value = size
     }
 
     override fun setClockShouldBeCentered(shouldBeCentered: Boolean) {
@@ -253,19 +236,6 @@ class FakeKeyguardRepository @Inject constructor() : KeyguardRepository {
 
     override fun setKeyguardAlpha(alpha: Float) {
         _keyguardAlpha.value = alpha
-    }
-
-    override fun setKeyguardVisibility(
-        statusBarState: Int,
-        goingToFullShade: Boolean,
-        occlusionTransitionRunning: Boolean
-    ) {
-        _keyguardRootViewVisibility.value =
-            KeyguardRootViewVisibilityState(
-                statusBarState,
-                goingToFullShade,
-                occlusionTransitionRunning
-            )
     }
 }
 

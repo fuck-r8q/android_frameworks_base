@@ -21,7 +21,6 @@ package com.android.systemui.authentication.data.repository
 import android.app.admin.DevicePolicyManager
 import android.content.IntentFilter
 import android.os.UserHandle
-import com.android.internal.widget.LockPatternChecker
 import com.android.internal.widget.LockPatternUtils
 import com.android.internal.widget.LockscreenCredential
 import com.android.keyguard.KeyguardSecurityModel
@@ -40,8 +39,6 @@ import dagger.Binds
 import dagger.Module
 import java.util.function.Function
 import javax.inject.Inject
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -80,7 +77,7 @@ interface AuthenticationRepository {
      * The exact length a PIN should be for us to enable PIN length hinting.
      *
      * A PIN that's shorter or longer than this is not eligible for the UI to render hints showing
-     * how many digits the current PIN is, even if [isAutoConfirmEnabled] is enabled.
+     * how many digits the current PIN is, even if [isAutoConfirmFeatureEnabled] is enabled.
      *
      * Note that PIN length hinting is only available if the PIN auto confirmation feature is
      * available.
@@ -90,8 +87,11 @@ interface AuthenticationRepository {
     /** Whether the pattern should be visible for the currently-selected user. */
     val isPatternVisible: StateFlow<Boolean>
 
-    /** The current throttling state, as cached via [setThrottling]. */
-    val throttling: StateFlow<AuthenticationThrottlingModel>
+    /**
+     * The current authentication throttling state, set when the user has to wait before being able
+     * to try another authentication attempt. `null` indicates throttling isn't active.
+     */
+    val throttling: MutableStateFlow<AuthenticationThrottlingModel?>
 
     /**
      * The currently-configured authentication method. This determines how the authentication
@@ -146,9 +146,6 @@ interface AuthenticationRepository {
      */
     suspend fun getThrottlingEndTimestamp(): Long
 
-    /** Sets the cached throttling state, updating the [throttling] flow. */
-    fun setThrottling(throttlingModel: AuthenticationThrottlingModel)
-
     /**
      * Sets the throttling timeout duration (time during which the user should not be allowed to
      * attempt authentication).
@@ -190,11 +187,11 @@ constructor(
             getFreshValue = lockPatternUtils::isVisiblePatternEnabled,
         )
 
-    private val _throttling = MutableStateFlow(AuthenticationThrottlingModel())
-    override val throttling: StateFlow<AuthenticationThrottlingModel> = _throttling.asStateFlow()
+    override val throttling: MutableStateFlow<AuthenticationThrottlingModel?> =
+        MutableStateFlow(null)
 
-    private val UserRepository.selectedUserId: Int
-        get() = getSelectedUserInfo().id
+    private val selectedUserId: Int
+        get() = userRepository.getSelectedUserInfo().id
 
     override val authenticationMethod: Flow<AuthenticationMethodModel> =
         combine(userRepository.selectedUserInfo, mobileConnectionsRepository.isAnySimSecure) {
@@ -233,19 +230,15 @@ constructor(
 
     override suspend fun getAuthenticationMethod(): AuthenticationMethodModel {
         return withContext(backgroundDispatcher) {
-            blockingAuthenticationMethodInternal(userRepository.selectedUserId)
+            blockingAuthenticationMethodInternal(selectedUserId)
         }
     }
 
     override suspend fun getPinLength(): Int {
-        return withContext(backgroundDispatcher) {
-            val selectedUserId = userRepository.selectedUserId
-            lockPatternUtils.getPinLength(selectedUserId)
-        }
+        return withContext(backgroundDispatcher) { lockPatternUtils.getPinLength(selectedUserId) }
     }
 
     override suspend fun reportAuthenticationAttempt(isSuccessful: Boolean) {
-        val selectedUserId = userRepository.selectedUserId
         withContext(backgroundDispatcher) {
             if (isSuccessful) {
                 lockPatternUtils.reportSuccessfulPasswordAttempt(selectedUserId)
@@ -258,56 +251,32 @@ constructor(
 
     override suspend fun getFailedAuthenticationAttemptCount(): Int {
         return withContext(backgroundDispatcher) {
-            val selectedUserId = userRepository.selectedUserId
             lockPatternUtils.getCurrentFailedPasswordAttempts(selectedUserId)
         }
     }
 
     override suspend fun getThrottlingEndTimestamp(): Long {
         return withContext(backgroundDispatcher) {
-            val selectedUserId = userRepository.selectedUserId
             lockPatternUtils.getLockoutAttemptDeadline(selectedUserId)
         }
     }
 
-    override fun setThrottling(throttlingModel: AuthenticationThrottlingModel) {
-        _throttling.value = throttlingModel
-    }
-
     override suspend fun setThrottleDuration(durationMs: Int) {
         withContext(backgroundDispatcher) {
-            lockPatternUtils.setLockoutAttemptDeadline(
-                userRepository.selectedUserId,
-                durationMs,
-            )
+            lockPatternUtils.setLockoutAttemptDeadline(selectedUserId, durationMs)
         }
     }
 
     override suspend fun checkCredential(
         credential: LockscreenCredential
     ): AuthenticationResultModel {
-        return suspendCoroutine { continuation ->
-            LockPatternChecker.checkCredential(
-                lockPatternUtils,
-                credential,
-                userRepository.selectedUserId,
-                object : LockPatternChecker.OnCheckCallback {
-                    override fun onChecked(matched: Boolean, throttleTimeoutMs: Int) {
-                        continuation.resume(
-                            AuthenticationResultModel(
-                                isSuccessful = matched,
-                                throttleDurationMs = throttleTimeoutMs,
-                            )
-                        )
-                    }
-
-                    override fun onCancelled() {
-                        continuation.resume(AuthenticationResultModel(isSuccessful = false))
-                    }
-
-                    override fun onEarlyMatched() = Unit
-                }
-            )
+        return withContext(backgroundDispatcher) {
+            try {
+                val matched = lockPatternUtils.checkCredential(credential, selectedUserId) {}
+                AuthenticationResultModel(isSuccessful = matched, throttleDurationMs = 0)
+            } catch (ex: LockPatternUtils.RequestThrottledException) {
+                AuthenticationResultModel(isSuccessful = false, throttleDurationMs = ex.timeoutMs)
+            }
         }
     }
 

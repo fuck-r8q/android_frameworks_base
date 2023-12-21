@@ -1500,15 +1500,14 @@ public class ComputerEngine implements Computer {
                     state.getFirstInstallTimeMillis(), ps.getLastUpdateTime(), installedPermissions,
                     grantedPermissions, state, userId, ps);
 
-            if (packageInfo == null) {
-                return null;
+            if (packageInfo != null) {
+                packageInfo.packageName = packageInfo.applicationInfo.packageName =
+                        resolveExternalPackageName(p);
+                return packageInfo;
             }
-
-            packageInfo.packageName = packageInfo.applicationInfo.packageName =
-                    resolveExternalPackageName(p);
-
-            return packageInfo;
-        } else if ((flags & (MATCH_UNINSTALLED_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0
+        }
+        // TODO(b/314808978): Set ps.setPkg to null during install-archived.
+        if ((flags & (MATCH_UNINSTALLED_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0
                 && PackageUserStateUtils.isAvailable(state, flags)) {
             PackageInfo pi = new PackageInfo();
             pi.packageName = ps.getPackageName();
@@ -1533,16 +1532,17 @@ public class ComputerEngine implements Computer {
                     ai, flags, state, userId);
             pi.signingInfo = ps.getSigningInfo();
             pi.signatures = getDeprecatedSignatures(pi.signingInfo.getSigningDetails(), flags);
-            pi.setArchiveTimeMillis(state.getArchiveTimeMillis());
+            if (state.getArchiveState() != null) {
+                pi.setArchiveTimeMillis(state.getArchiveState().getArchiveTimeMillis());
+            }
 
             if (DEBUG_PACKAGE_INFO) {
                 Log.v(TAG, "ps.pkg is n/a for ["
                         + ps.getPackageName() + "]. Provides a minimum info.");
             }
             return pi;
-        } else {
-            return null;
         }
+        return null;
     }
 
     public final PackageInfo getPackageInfo(String packageName,

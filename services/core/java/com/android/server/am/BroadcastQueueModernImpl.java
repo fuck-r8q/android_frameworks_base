@@ -88,6 +88,7 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.am.BroadcastProcessQueue.BroadcastConsumer;
 import com.android.server.am.BroadcastProcessQueue.BroadcastPredicate;
 import com.android.server.am.BroadcastRecord.DeliveryState;
+import com.android.server.utils.AnrTimer;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -227,6 +228,14 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
      */
     @GuardedBy("mService")
     private final AtomicReference<ArrayMap<BroadcastRecord, Boolean>> mRecordsLookupCache =
+            new AtomicReference<>();
+
+    /**
+     * Container for holding the set of broadcast records that matches an enqueueing record.
+     * @see BroadcastRecord#isMatchingRecord(BroadcastRecord)
+     */
+    @GuardedBy("mService")
+    private final AtomicReference<ArrayMap<BroadcastRecord, Boolean>> mMatchingRecordsCache =
             new AtomicReference<>();
 
     /**
@@ -747,6 +756,12 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
         if (replacedBroadcasts == null) {
             replacedBroadcasts = new ArraySet<>();
         }
+        ArrayMap<BroadcastRecord, Boolean> matchingBroadcasts =
+                mMatchingRecordsCache.getAndSet(null);
+        if (matchingBroadcasts == null) {
+            matchingBroadcasts = new ArrayMap<>();
+        }
+        r.setMatchingRecordsCache(matchingBroadcasts);
         boolean enqueuedBroadcast = false;
 
         for (int i = 0; i < r.receivers.size(); i++) {
@@ -780,6 +795,9 @@ class BroadcastQueueModernImpl extends BroadcastQueue {
         skipAndCancelReplacedBroadcasts(replacedBroadcasts);
         replacedBroadcasts.clear();
         mReplacedBroadcastsCache.compareAndSet(null, replacedBroadcasts);
+        matchingBroadcasts.clear();
+        r.clearMatchingRecordsCache();
+        mMatchingRecordsCache.compareAndSet(null, matchingBroadcasts);
 
         // If nothing to dispatch, send any pending result immediately
         if (r.receivers.isEmpty() || !enqueuedBroadcast) {

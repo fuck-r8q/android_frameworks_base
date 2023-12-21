@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Hosts application business logic related to user authentication.
@@ -58,8 +59,8 @@ class AuthenticationInteractor
 @Inject
 constructor(
     @Application private val applicationScope: CoroutineScope,
-    private val repository: AuthenticationRepository,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
+    private val repository: AuthenticationRepository,
     private val userRepository: UserRepository,
     private val clock: SystemClock,
 ) {
@@ -83,21 +84,11 @@ constructor(
      */
     val authenticationMethod: Flow<AuthenticationMethodModel> = repository.authenticationMethod
 
-    /** The current authentication throttling state, only meaningful if [isThrottled] is `true`. */
-    val throttling: StateFlow<AuthenticationThrottlingModel> = repository.throttling
-
     /**
-     * Whether currently throttled and the user has to wait before being able to try another
-     * authentication attempt.
+     * The current authentication throttling state, set when the user has to wait before being able
+     * to try another authentication attempt. `null` indicates throttling isn't active.
      */
-    val isThrottled: StateFlow<Boolean> =
-        throttling
-            .map { it.remainingMs > 0 }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.Eagerly,
-                initialValue = throttling.value.remainingMs > 0,
-            )
+    val throttling: StateFlow<AuthenticationThrottlingModel?> = repository.throttling
 
     /**
      * Whether the auto confirm feature is enabled for the currently-selected user.
@@ -108,10 +99,11 @@ constructor(
      * During throttling, this is always disabled (`false`).
      */
     val isAutoConfirmEnabled: StateFlow<Boolean> =
-        combine(repository.isAutoConfirmFeatureEnabled, isThrottled) { featureEnabled, isThrottled
-                ->
+        combine(repository.isAutoConfirmFeatureEnabled, repository.throttling) {
+                featureEnabled,
+                throttling ->
                 // Disable auto-confirm during throttling.
-                featureEnabled && !isThrottled
+                featureEnabled && throttling == null
             }
             .stateIn(
                 scope = applicationScope,
@@ -197,9 +189,8 @@ constructor(
         val authMethod = getAuthenticationMethod()
         val skipCheck =
             when {
-                // We're being throttled, the UI layer should not have called this; skip the
-                // attempt.
-                isThrottled.value -> true
+                // Throttling is active, the UI layer should not have called this; skip the attempt.
+                throttling.value != null -> true
                 // The input is too short; skip the attempt.
                 input.isTooShort(authMethod) -> true
                 // Auto-confirm attempt when the feature is not enabled; skip the attempt.
@@ -237,6 +228,10 @@ constructor(
             // Since authentication succeeded, we should refresh throttling to make sure that our
             // state is completely reflecting the upstream source of truth.
             refreshThrottling()
+
+            // Force a garbage collection in an attempt to erase any credentials left in memory.
+            // Do it after a 5-sec delay to avoid making the bouncer dismiss animation janky.
+            initiateGarbageCollection(delayMs = 5000)
         }
 
         return if (authenticationResult.isSuccessful) {
@@ -259,7 +254,7 @@ constructor(
         cancelThrottlingCountdown()
         throttlingCountdownJob =
             applicationScope.launch {
-                while (refreshThrottling() > 0) {
+                while (refreshThrottling()) {
                     delay(1.seconds.inWholeMilliseconds)
                 }
             }
@@ -274,7 +269,7 @@ constructor(
     /** Notifies that the currently-selected user has changed. */
     private suspend fun onSelectedUserChanged() {
         cancelThrottlingCountdown()
-        if (refreshThrottling() > 0) {
+        if (refreshThrottling()) {
             startThrottlingCountdown()
         }
     }
@@ -282,22 +277,24 @@ constructor(
     /**
      * Refreshes the throttling state, hydrating the repository with the latest state.
      *
-     * @return The remaining time for the current throttling countdown, in milliseconds or `0` if
-     *   not being throttled.
+     * @return Whether throttling is active or not.
      */
-    private suspend fun refreshThrottling(): Long {
-        return withContext("$TAG#refreshThrottling", backgroundDispatcher) {
+    private suspend fun refreshThrottling(): Boolean {
+        withContext("$TAG#refreshThrottling", backgroundDispatcher) {
             val failedAttemptCount = async { repository.getFailedAuthenticationAttemptCount() }
             val deadline = async { repository.getThrottlingEndTimestamp() }
             val remainingMs = max(0, deadline.await() - clock.elapsedRealtime())
-            repository.setThrottling(
-                AuthenticationThrottlingModel(
-                    failedAttemptCount = failedAttemptCount.await(),
-                    remainingMs = remainingMs.toInt(),
-                ),
-            )
-            remainingMs
+            repository.throttling.value =
+                if (remainingMs > 0) {
+                    AuthenticationThrottlingModel(
+                        failedAttemptCount = failedAttemptCount.await(),
+                        remainingMs = remainingMs.toInt(),
+                    )
+                } else {
+                    null // Throttling ended.
+                }
         }
+        return repository.throttling.value != null
     }
 
     private fun AuthenticationMethodModel.createCredential(
@@ -315,6 +312,15 @@ constructor(
                         .map { LockPatternView.Cell.of(it.y, it.x) }
                 )
             else -> null
+        }
+    }
+
+    private suspend fun initiateGarbageCollection(delayMs: Long) {
+        withContext(backgroundDispatcher) {
+            delay(delayMs)
+            System.gc()
+            System.runFinalization()
+            System.gc()
         }
     }
 

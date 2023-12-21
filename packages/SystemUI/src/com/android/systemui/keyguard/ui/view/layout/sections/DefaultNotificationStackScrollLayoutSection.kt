@@ -24,9 +24,9 @@ import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
+import com.android.systemui.Flags.migrateClocksToBlueprint
+import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
-import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
 import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardSmartspaceViewModel
 import com.android.systemui.res.R
@@ -39,13 +39,13 @@ import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificat
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationStackAppearanceViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.SharedNotificationContainerViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 
 /** Single column format for notifications (default for phones) */
 class DefaultNotificationStackScrollLayoutSection
 @Inject
 constructor(
     context: Context,
-    private val featureFlags: FeatureFlags,
     sceneContainerFlags: SceneContainerFlags,
     notificationPanelView: NotificationPanelView,
     sharedNotificationContainer: SharedNotificationContainer,
@@ -55,6 +55,7 @@ constructor(
     controller: NotificationStackScrollLayoutController,
     notificationStackSizeCalculator: NotificationStackSizeCalculator,
     private val smartspaceViewModel: KeyguardSmartspaceViewModel,
+    @Main mainDispatcher: CoroutineDispatcher,
 ) :
     NotificationStackScrollLayoutSection(
         context,
@@ -66,6 +67,7 @@ constructor(
         ambientState,
         controller,
         notificationStackSizeCalculator,
+        mainDispatcher,
     ) {
     override fun applyConstraints(constraintSet: ConstraintSet) {
         if (!KeyguardShadeMigrationNssl.isEnabled) {
@@ -75,7 +77,7 @@ constructor(
             val bottomMargin =
                 context.resources.getDimensionPixelSize(R.dimen.keyguard_status_view_bottom_margin)
 
-            if (featureFlags.isEnabled(Flags.MIGRATE_CLOCKS_TO_BLUEPRINT)) {
+            if (migrateClocksToBlueprint()) {
                 connect(
                     R.id.nssl_placeholder,
                     TOP,

@@ -16,9 +16,10 @@
 
 package com.android.server.pm;
 
-import static android.app.ComponentOptions.MODE_BACKGROUND_ACTIVITY_START_DENIED;
 import static android.app.admin.DevicePolicyResources.Strings.Core.PACKAGE_DELETED_BY_DO;
 import static android.content.pm.PackageInstaller.LOCATION_DATA_APP;
+import static android.content.pm.PackageInstaller.UNARCHIVAL_ERROR_INSTALLER_DISABLED;
+import static android.content.pm.PackageInstaller.UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED;
 import static android.content.pm.PackageInstaller.UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE;
 import static android.content.pm.PackageInstaller.UNARCHIVAL_ERROR_NO_CONNECTIVITY;
 import static android.content.pm.PackageInstaller.UNARCHIVAL_ERROR_USER_ACTION_NEEDED;
@@ -66,6 +67,7 @@ import android.content.pm.PackageInstaller.SessionParams;
 import android.content.pm.PackageInstaller.UnarchivalStatus;
 import android.content.pm.PackageItemInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.DeleteFlags;
 import android.content.pm.ParceledListSlice;
 import android.content.pm.VersionedPackage;
 import android.content.pm.parsing.FrameworkParsingPackageUtils;
@@ -1390,11 +1392,14 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         final PackageDeleteObserverAdapter adapter = new PackageDeleteObserverAdapter(mContext,
                 statusReceiver, versionedPackage.getPackageName(),
                 canSilentlyInstallPackage, userId);
-        if (mContext.checkCallingOrSelfPermission(Manifest.permission.DELETE_PACKAGES)
+        final boolean shouldShowConfirmationDialog =
+                (flags & PackageManager.DELETE_SHOW_DIALOG) != 0;
+        if (!shouldShowConfirmationDialog
+                && mContext.checkCallingOrSelfPermission(Manifest.permission.DELETE_PACKAGES)
                     == PackageManager.PERMISSION_GRANTED) {
             // Sweet, call straight through!
             mPm.deletePackageVersioned(versionedPackage, adapter.getBinder(), userId, flags);
-        } else if (canSilentlyInstallPackage) {
+        } else if (!shouldShowConfirmationDialog && canSilentlyInstallPackage) {
             // Allow the device owner and affiliated profile owner to silently delete packages
             // Need to clear the calling identity to get DELETE_PACKAGES permission
             final long ident = Binder.clearCallingIdentity();
@@ -1419,6 +1424,11 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             intent.setData(Uri.fromParts("package", versionedPackage.getPackageName(), null));
             intent.putExtra(PackageInstaller.EXTRA_CALLBACK,
                     new PackageManager.UninstallCompleteCallback(adapter.getBinder().asBinder()));
+            if ((flags & PackageManager.DELETE_ARCHIVE) != 0) {
+                // Delete flags are passed to the uninstaller activity so it can be preserved
+                // in the follow-up uninstall operation after the user confirmation
+                intent.putExtra(PackageInstaller.EXTRA_DELETE_FLAGS, flags);
+            }
             adapter.onUserActionRequired(intent);
         }
     }
@@ -1631,9 +1641,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             @NonNull String packageName,
             @NonNull String callerPackageName,
             @NonNull IntentSender intentSender,
-            @NonNull UserHandle userHandle) {
+            @NonNull UserHandle userHandle,
+            @DeleteFlags int flags) {
         mPackageArchiver.requestArchive(packageName, callerPackageName, intentSender,
-                userHandle);
+                userHandle, flags);
     }
 
     @Override
@@ -1704,7 +1715,6 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         });
     }
 
-    // TODO(b/307299702) Implement error dialog and propagate userActionIntent.
     @Override
     public void reportUnarchivalStatus(
             int unarchiveId,
@@ -1747,8 +1757,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
 
             // Execute expensive calls outside the sync block.
             mPm.mHandler.post(
-                    () -> notifyUnarchivalListener(status, session.params.appPackageName,
-                            unarchiveIntentSender));
+                    () -> mPackageArchiver.notifyUnarchivalListener(status,
+                            session.getInstallerPackageName(),
+                            session.params.appPackageName, requiredStorageBytes, userActionIntent,
+                            unarchiveIntentSender, userId));
             session.params.unarchiveIntentSender = null;
             if (status != UNARCHIVAL_OK) {
                 Binder.withCleanCallingIdentity(session::abandon);
@@ -1777,26 +1789,10 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 UNARCHIVAL_ERROR_USER_ACTION_NEEDED,
                 UNARCHIVAL_ERROR_INSUFFICIENT_STORAGE,
                 UNARCHIVAL_ERROR_NO_CONNECTIVITY,
+                UNARCHIVAL_ERROR_INSTALLER_DISABLED,
+                UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED,
                 UNARCHIVAL_GENERIC_ERROR).contains(status)) {
             throw new IllegalStateException("Invalid status code passed " + status);
-        }
-    }
-
-    private void notifyUnarchivalListener(int status, String packageName,
-            IntentSender unarchiveIntentSender) {
-        final Intent fillIn = new Intent();
-        fillIn.putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, packageName);
-        fillIn.putExtra(PackageInstaller.EXTRA_UNARCHIVE_STATUS, status);
-        // TODO(b/307299702) Attach failure dialog with EXTRA_INTENT and requiredStorageBytes here.
-        final BroadcastOptions options = BroadcastOptions.makeBasic();
-        options.setPendingIntentBackgroundActivityStartMode(
-                MODE_BACKGROUND_ACTIVITY_START_DENIED);
-        try {
-            unarchiveIntentSender.sendIntent(mContext, 0, fillIn, /* onFinished= */ null,
-                    /* handler= */ null, /* requiredPermission= */ null,
-                    options.toBundle());
-        } catch (SendIntentException e) {
-            Slog.e(TAG, TextUtils.formatSimple("Failed to send unarchive intent"), e);
         }
     }
 

@@ -5124,8 +5124,7 @@ public class UserManagerService extends IUserManager.Stub {
             // unlocked.  We do this to ensure that CE storage isn't prepared before the CE key is
             // saved to disk.  This also matches what is done for user 0.
             t.traceBegin("prepareUserData");
-            mUserDataPreparer.prepareUserData(userId, userInfo.serialNumber,
-                    StorageManager.FLAG_STORAGE_DE);
+            mUserDataPreparer.prepareUserData(userInfo, StorageManager.FLAG_STORAGE_DE);
             t.traceEnd();
 
             t.traceBegin("LSS.createNewUser");
@@ -5137,12 +5136,6 @@ public class UserManagerService extends IUserManager.Stub {
             t.traceBegin("PM.createNewUser");
             mPm.createNewUser(userId, userTypeInstallablePackages, disallowedPackages);
             t.traceEnd();
-
-            userInfo.partial = false;
-            synchronized (mPackagesLock) {
-                writeUserLP(userData);
-            }
-            updateUserIds();
 
             Bundle restrictions = new Bundle();
             if (isGuest) {
@@ -5160,6 +5153,12 @@ public class UserManagerService extends IUserManager.Stub {
             synchronized (mRestrictionsLock) {
                 mBaseUserRestrictions.updateRestrictions(userId, restrictions);
             }
+
+            userInfo.partial = false;
+            synchronized (mPackagesLock) {
+                writeUserLP(userData);
+            }
+            updateUserIds();
 
             t.traceBegin("PM.onNewUserCreated-" + userId);
             mPm.onNewUserCreated(userId, /* convertedFromPreCreated= */ false);
@@ -6387,12 +6386,11 @@ public class UserManagerService extends IUserManager.Stub {
         }
         TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         t.traceBegin("onBeforeStartUser-" + userId);
-        final int userSerial = userInfo.serialNumber;
         // Migrate only if build fingerprints mismatch
         boolean migrateAppsData = !PackagePartitions.FINGERPRINT.equals(
                 userInfo.lastLoggedInFingerprint);
         t.traceBegin("prepareUserData");
-        mUserDataPreparer.prepareUserData(userId, userSerial, StorageManager.FLAG_STORAGE_DE);
+        mUserDataPreparer.prepareUserData(userInfo, StorageManager.FLAG_STORAGE_DE);
         t.traceEnd();
         t.traceBegin("reconcileAppsData");
         getPackageManagerInternal().reconcileAppsData(userId, StorageManager.FLAG_STORAGE_DE,
@@ -6418,14 +6416,13 @@ public class UserManagerService extends IUserManager.Stub {
         if (userInfo == null) {
             return;
         }
-        final int userSerial = userInfo.serialNumber;
         // Migrate only if build fingerprints mismatch
         boolean migrateAppsData = !PackagePartitions.FINGERPRINT.equals(
                 userInfo.lastLoggedInFingerprint);
 
         final TimingsTraceAndSlog t = new TimingsTraceAndSlog();
         t.traceBegin("prepareUserData-" + userId);
-        mUserDataPreparer.prepareUserData(userId, userSerial, StorageManager.FLAG_STORAGE_CE);
+        mUserDataPreparer.prepareUserData(userInfo, StorageManager.FLAG_STORAGE_CE);
         t.traceEnd();
 
         StorageManagerInternal smInternal = LocalServices.getService(StorageManagerInternal.class);

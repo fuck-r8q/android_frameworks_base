@@ -24,6 +24,7 @@ import dagger.Module
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Fake implementation of [ShadeRepository] */
 @SysUISingleton
@@ -103,6 +104,14 @@ class FakeShadeRepository @Inject constructor() : ShadeRepository {
     @Deprecated("Use ShadeInteractor instead")
     override fun setLegacyQsFullscreen(legacyQsFullscreen: Boolean) {
         _legacyQsFullscreen.value = legacyQsFullscreen
+    }
+
+    private val _legacyIsClosing = MutableStateFlow(false)
+    @Deprecated("Use ShadeInteractor instead") override val legacyIsClosing = _legacyIsClosing
+
+    @Deprecated("Use ShadeInteractor instead")
+    override fun setLegacyIsClosing(isClosing: Boolean) {
+        _legacyIsClosing.value = isClosing
     }
 
     fun setShadeModel(model: ShadeModel) {
