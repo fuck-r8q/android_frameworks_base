@@ -85,7 +85,6 @@ import com.android.settingslib.mobile.TelephonyIcons;
 import com.android.settingslib.net.SignalStrengthUtil;
 import com.android.settingslib.wifi.WifiUtils;
 import com.android.settingslib.wifi.dpp.WifiDppIntentHelper;
-import com.android.systemui.res.R;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.animation.DialogLaunchAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -94,6 +93,7 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.plugins.ActivityStarter;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.connectivity.AccessPointController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
@@ -1290,6 +1290,15 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         }
     }
 
+    @Override
+    public void onWifiScan(boolean isScan) {
+        if (!isWifiEnabled() || isDeviceLocked()) {
+            mCallback.onWifiScan(false);
+            return;
+        }
+        mCallback.onWifiScan(isScan);
+    }
+
     private class InternetTelephonyCallback extends TelephonyCallback implements
             TelephonyCallback.DataConnectionStateListener,
             TelephonyCallback.DisplayInfoListener,
@@ -1614,6 +1623,8 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         void onTempDdsSwitchHappened();
 
         void onDualDataEnabledStateChanged();
+
+        void onWifiScan(boolean isScan);
     }
 
     void makeOverlayToast(int stringId) {

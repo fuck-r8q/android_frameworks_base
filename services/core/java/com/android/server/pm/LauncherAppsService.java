@@ -769,6 +769,9 @@ public class LauncherAppsService extends SystemService {
         @NonNull
         private List<LauncherActivityInfoInternal> generateLauncherActivitiesForArchivedApp(
                 @Nullable String packageName, UserHandle user) {
+            if (!canAccessProfile(user.getIdentifier(), "Cannot retrieve activities")) {
+                return List.of();
+            }
             List<ApplicationInfo> applicationInfoList =
                     (packageName == null)
                             ? getApplicationInfoListForAllArchivedApps(user)
@@ -819,7 +822,7 @@ public class LauncherAppsService extends SystemService {
             return new LauncherActivityInfoInternal(
                     activityInfo,
                     new IncrementalStatesInfo(
-                            false /* isLoading */, 1 /* progress */, 0 /* loadingCompletedTime */),
+                            false /* isLoading */, 0 /* progress */, 0 /* loadingCompletedTime */),
                     user);
         }
 
@@ -827,7 +830,7 @@ public class LauncherAppsService extends SystemService {
         private List<ApplicationInfo> getApplicationInfoListForAllArchivedApps(UserHandle user) {
             final int callingUid = injectBinderCallingUid();
             List<ApplicationInfo> installedApplicationInfoList =
-                    mPackageManagerInternal.getInstalledApplications(
+                    mPackageManagerInternal.getInstalledApplicationsCrossUser(
                             PackageManager.MATCH_ARCHIVED_PACKAGES,
                             user.getIdentifier(),
                             callingUid);
@@ -845,11 +848,12 @@ public class LauncherAppsService extends SystemService {
         private List<ApplicationInfo> getApplicationInfoForArchivedApp(
                 @NonNull String packageName, UserHandle user) {
             final int callingUid = injectBinderCallingUid();
-            ApplicationInfo applicationInfo = mPackageManagerInternal.getApplicationInfo(
-                    packageName,
-                    PackageManager.MATCH_ARCHIVED_PACKAGES,
-                    callingUid,
-                    user.getIdentifier());
+            ApplicationInfo applicationInfo = Binder.withCleanCallingIdentity(() ->
+                    mPackageManagerInternal.getApplicationInfo(
+                            packageName,
+                            PackageManager.MATCH_ARCHIVED_PACKAGES,
+                            callingUid,
+                            user.getIdentifier()));
             if (applicationInfo == null || !applicationInfo.isArchived) {
                 return Collections.EMPTY_LIST;
             }
@@ -1567,6 +1571,57 @@ public class LauncherAppsService extends SystemService {
                 return mUserManagerInternal.getLauncherUserInfo(user.getIdentifier());
             } finally {
                 injectRestoreCallingIdentity(ident);
+            }
+        }
+
+        @Override
+        public List<String> getPreInstalledSystemPackages(UserHandle user) {
+            // Only system launchers, which have access to recents should have access to this API.
+            // TODO(b/303803157): Update access control for this API to default Launcher app.
+            if (!mActivityTaskManagerInternal.isCallerRecents(Binder.getCallingUid())) {
+                throw new SecurityException("Caller is not the recents app");
+            }
+            if (!canAccessProfile(user.getIdentifier(),
+                    "Can't access preinstalled packages for another user")) {
+                return null;
+            }
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                String userType = mUm.getUserInfo(user.getIdentifier()).userType;
+                Set<String> preInstalledPackages = mUm.getPreInstallableSystemPackages(userType);
+                if (preInstalledPackages == null) {
+                    return new ArrayList<>();
+                }
+                return List.copyOf(preInstalledPackages);
+            } finally {
+                Binder.restoreCallingIdentity(identity);
+            }
+        }
+
+        @Override
+        public @Nullable IntentSender getAppMarketActivityIntent(@NonNull String callingPackage,
+                @Nullable String packageName, @NonNull UserHandle user) {
+            // Only system launchers, which have access to recents should have access to this API.
+            // TODO(b/303803157): Update access control for this API to default Launcher app.
+            if (!mActivityTaskManagerInternal.isCallerRecents(Binder.getCallingUid())) {
+                throw new SecurityException("Caller is not the recents app");
+            }
+            if (!canAccessProfile(user.getIdentifier(),
+                    "Can't access AppMarketActivity for another user")) {
+                return null;
+            }
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                // TODO(b/316118005): Add code to launch the app installer for the packageName.
+                Intent appMarketIntent = new Intent(Intent.ACTION_MAIN);
+                appMarketIntent.addCategory(Intent.CATEGORY_APP_MARKET);
+                final PendingIntent pi = PendingIntent.getActivityAsUser(
+                        mContext, /* requestCode */ 0, appMarketIntent, PendingIntent.FLAG_ONE_SHOT
+                                | PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_CANCEL_CURRENT,
+                        /* options */ null, user);
+                return pi == null ? null : pi.getIntentSender();
+            } finally {
+                Binder.restoreCallingIdentity(identity);
             }
         }
 

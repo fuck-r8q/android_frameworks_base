@@ -26,7 +26,7 @@ import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.Flags
-import com.android.systemui.flags.featureFlagsClassic
+import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
@@ -55,7 +55,7 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
 
     val kosmos =
         testKosmos().apply {
-            featureFlagsClassic.apply { set(Flags.FULL_SCREEN_USER_SWITCHER, false) }
+            fakeFeatureFlagsClassic.apply { set(Flags.FULL_SCREEN_USER_SWITCHER, false) }
         }
     val testScope = kosmos.testScope
     val configurationRepository = kosmos.fakeConfigurationRepository
@@ -97,6 +97,34 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             configurationRepository.onAnyConfigurationChange()
 
             assertThat(dimens!!.marginStart).isEqualTo(20)
+        }
+
+    @Test
+    fun validatePaddingTopInSplitShade() =
+        testScope.runTest {
+            overrideResource(R.bool.config_use_split_notification_shade, true)
+            overrideResource(R.dimen.large_screen_shade_header_height, 10)
+            overrideResource(R.dimen.keyguard_split_shade_top_margin, 50)
+
+            val dimens by collectLastValue(underTest.configurationBasedDimensions)
+
+            configurationRepository.onAnyConfigurationChange()
+
+            assertThat(dimens!!.paddingTop).isEqualTo(30)
+        }
+
+    @Test
+    fun validatePaddingTop() =
+        testScope.runTest {
+            overrideResource(R.bool.config_use_split_notification_shade, false)
+            overrideResource(R.dimen.large_screen_shade_header_height, 10)
+            overrideResource(R.dimen.keyguard_split_shade_top_margin, 50)
+
+            val dimens by collectLastValue(underTest.configurationBasedDimensions)
+
+            configurationRepository.onAnyConfigurationChange()
+
+            assertThat(dimens!!.paddingTop).isEqualTo(0)
         }
 
     @Test
@@ -226,9 +254,9 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun positionOnLockscreenNotInSplitShade() =
+    fun boundsOnLockscreenNotInSplitShade() =
         testScope.runTest {
-            val position by collectLastValue(underTest.bounds)
+            val bounds by collectLastValue(underTest.bounds)
 
             // When not in split shade
             overrideResource(R.bool.config_use_split_notification_shade, false)
@@ -242,16 +270,19 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
                 NotificationContainerBounds(top = 1f, bottom = 2f)
             )
 
-            assertThat(position).isEqualTo(NotificationContainerBounds(top = 1f, bottom = 2f))
+            assertThat(bounds).isEqualTo(NotificationContainerBounds(top = 1f, bottom = 2f))
         }
 
     @Test
-    fun positionOnLockscreenInSplitShade() =
+    fun boundsOnLockscreenInSplitShade() =
         testScope.runTest {
-            val position by collectLastValue(underTest.bounds)
+            val bounds by collectLastValue(underTest.bounds)
 
             // When in split shade
             overrideResource(R.bool.config_use_split_notification_shade, true)
+            overrideResource(R.dimen.large_screen_shade_header_height, 10)
+            overrideResource(R.dimen.keyguard_split_shade_top_margin, 50)
+
             configurationRepository.onAnyConfigurationChange()
             runCurrent()
 
@@ -263,8 +294,8 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             )
             runCurrent()
 
-            // Top should be overridden to 0f
-            assertThat(position).isEqualTo(NotificationContainerBounds(top = 0f, bottom = 2f))
+            // Top should be equal to bounds (1) + padding adjustment (30)
+            assertThat(bounds).isEqualTo(NotificationContainerBounds(top = 31f, bottom = 2f))
         }
 
     @Test
@@ -301,8 +332,8 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
     fun maxNotificationsOnLockscreen() =
         testScope.runTest {
             var notificationCount = 10
-            val maxNotifications by
-                collectLastValue(underTest.getMaxNotifications { notificationCount })
+            val calculateSpace = { space: Float, useExtraShelfSpace: Boolean -> notificationCount }
+            val maxNotifications by collectLastValue(underTest.getMaxNotifications(calculateSpace))
 
             showLockscreen()
 
@@ -324,8 +355,8 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
     fun maxNotificationsOnLockscreen_DoesNotUpdateWhenUserInteracting() =
         testScope.runTest {
             var notificationCount = 10
-            val maxNotifications by
-                collectLastValue(underTest.getMaxNotifications { notificationCount })
+            val calculateSpace = { space: Float, useExtraShelfSpace: Boolean -> notificationCount }
+            val maxNotifications by collectLastValue(underTest.getMaxNotifications(calculateSpace))
 
             showLockscreen()
 
@@ -359,7 +390,8 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
     @Test
     fun maxNotificationsOnShade() =
         testScope.runTest {
-            val maxNotifications by collectLastValue(underTest.getMaxNotifications { 10 })
+            val calculateSpace = { space: Float, useExtraShelfSpace: Boolean -> 10 }
+            val maxNotifications by collectLastValue(underTest.getMaxNotifications(calculateSpace))
 
             // Show lockscreen with shade expanded
             showLockscreenWithShadeExpanded()
@@ -382,7 +414,7 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             val top = 123f
             val bottom = 456f
             keyguardRootViewModel.onNotificationContainerBoundsChanged(top, bottom)
-            assertThat(bounds).isEqualTo(NotificationContainerBounds(top, bottom))
+            assertThat(bounds).isEqualTo(NotificationContainerBounds(top = top, bottom = bottom))
         }
 
     @Test

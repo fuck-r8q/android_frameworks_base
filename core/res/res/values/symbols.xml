@@ -2119,6 +2119,7 @@
   <java-symbol type="integer" name="config_autoBrightnessShortTermModelTimeout" />
   <java-symbol type="integer" name="config_progressTimeoutFallbackHome" />
   <java-symbol type="integer" name="config_shutdownBatteryTemperature" />
+  <java-symbol type="bool" name="config_shutdownIfNoPower" />
   <java-symbol type="integer" name="config_undockedHdmiRotation" />
   <java-symbol type="integer" name="config_virtualKeyQuietTimeMillis" />
   <java-symbol type="integer" name="config_brightness_ramp_rate_fast" />
@@ -2612,6 +2613,7 @@
   <java-symbol type="string" name="zen_mode_default_weekends_name" />
   <java-symbol type="string" name="zen_mode_default_events_name" />
   <java-symbol type="string" name="zen_mode_default_every_night_name" />
+  <java-symbol type="string" name="zen_mode_implicit_trigger_description" />
   <java-symbol type="string" name="zen_mode_implicit_activated" />
   <java-symbol type="string" name="zen_mode_implicit_deactivated" />
   <java-symbol type="string" name="display_rotation_camera_compat_toast_after_rotation" />
@@ -5142,8 +5144,6 @@
   <java-symbol type="string" name="connected_display_unavailable_notification_title"/>
   <java-symbol type="string" name="connected_display_unavailable_notification_content"/>
   <java-symbol type="string" name="connected_display_thermally_unavailable_notification_content"/>
-  <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_title"/>
-  <java-symbol type="string" name="connected_display_cable_dont_support_displays_notification_content"/>
   <java-symbol type="string" name="concurrent_display_notification_name"/>
   <java-symbol type="string" name="concurrent_display_notification_active_title"/>
   <java-symbol type="string" name="concurrent_display_notification_active_content"/>
@@ -5336,4 +5336,6 @@
   <java-symbol type="array" name="config_tvExternalInputLoggingDeviceBrandNames" />
   <java-symbol type="bool" name="config_viewRotaryEncoderHapticScrollFedbackEnabled" />
   <java-symbol type="bool" name="config_viewBasedRotaryEncoderHapticsEnabled" />
+
+  <java-symbol type="bool" name="config_quickSettingsShowMediaPlayer" />
 </resources>

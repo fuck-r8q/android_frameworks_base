@@ -32,6 +32,7 @@ import android.content.pm.SharedLibraryInfo;
 import android.content.pm.SigningDetails;
 import android.content.pm.SigningInfo;
 import android.content.pm.UserInfo;
+import android.content.pm.UserPackage;
 import android.content.pm.overlay.OverlayPaths;
 import android.os.UserHandle;
 import android.os.incremental.IncrementalManager;
@@ -123,11 +124,15 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
     @Nullable
     private Map<String, Set<String>> mimeGroups;
 
+    // TODO(b/314036181): encapsulate all these fields for usesSdk, instead of having three
+    //  separate arrays.
     @Nullable
     private String[] usesSdkLibraries;
 
     @Nullable
     private long[] usesSdkLibrariesVersionsMajor;
+    @Nullable
+    private boolean[] usesSdkLibrariesOptional;
 
     @Nullable
     private String[] usesStaticLibraries;
@@ -701,6 +706,9 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
         usesSdkLibrariesVersionsMajor = other.usesSdkLibrariesVersionsMajor != null
                 ? Arrays.copyOf(other.usesSdkLibrariesVersionsMajor,
                 other.usesSdkLibrariesVersionsMajor.length) : null;
+        usesSdkLibrariesOptional = other.usesSdkLibrariesOptional != null
+                ? Arrays.copyOf(other.usesSdkLibrariesOptional,
+                other.usesSdkLibrariesOptional.length) : null;
 
         usesStaticLibraries = other.usesStaticLibraries != null
                 ? Arrays.copyOf(other.usesStaticLibraries,
@@ -945,7 +953,7 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
 
     void setUserState(int userId, long ceDataInode, long deDataInode, int enabled,
                       boolean installed, boolean stopped, boolean notLaunched, boolean hidden,
-                      int distractionFlags, ArrayMap<String, SuspendParams> suspendParams,
+                      int distractionFlags, ArrayMap<UserPackage, SuspendParams> suspendParams,
                       boolean instantApp, boolean virtualPreload, String lastDisableAppCaller,
                       ArraySet<String> enabledComponents, ArraySet<String> disabledComponents,
                       int installReason, int uninstallReason,
@@ -1175,7 +1183,7 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
             if (state.isSuspended()) {
                 for (int j = 0; j < state.getSuspendParams().size(); j++) {
                     proto.write(PackageProto.UserInfoProto.SUSPENDING_PACKAGE,
-                            state.getSuspendParams().keyAt(j));
+                            state.getSuspendParams().keyAt(j).packageName);
                 }
             }
             proto.write(PackageProto.UserInfoProto.IS_STOPPED, state.isStopped());
@@ -1344,6 +1352,12 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
 
     @NonNull
     @Override
+    public boolean[] getUsesSdkLibrariesOptional() {
+        return usesSdkLibrariesOptional == null ? EmptyArray.BOOLEAN : usesSdkLibrariesOptional;
+    }
+
+    @NonNull
+    @Override
     public String[] getUsesStaticLibraries() {
         return usesStaticLibraries == null ? EmptyArray.STRING : usesStaticLibraries;
     }
@@ -1440,6 +1454,12 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
 
     public PackageSetting setUsesSdkLibrariesVersionsMajor(long[] usesSdkLibrariesVersions) {
         this.usesSdkLibrariesVersionsMajor = usesSdkLibrariesVersions;
+        onChanged();
+        return this;
+    }
+
+    public PackageSetting setUsesSdkLibrariesOptional(boolean[] usesSdkLibrariesOptional) {
+        this.usesSdkLibrariesOptional = usesSdkLibrariesOptional;
         onChanged();
         return this;
     }

@@ -277,6 +277,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import static com.android.window.flags.Flags.deferDisplayUpdates;
 
 /**
  * Utility class for keeping track of the WindowStates and other pertinent contents of a
@@ -546,10 +547,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     boolean isDefaultDisplay;
 
     /** Detect user tapping outside of current focused task bounds .*/
+    // TODO(b/315321016): Remove once pointer event detection is removed from WM.
     @VisibleForTesting
     final TaskTapPointerEventListener mTapDetector;
 
     /** Detect user tapping outside of current focused root task bounds .*/
+    // TODO(b/315321016): Remove once pointer event detection is removed from WM.
     private Region mTouchExcludeRegion = new Region();
 
     /** Save allocating when calculating rects */
@@ -1159,7 +1162,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         mWallpaperController.resetLargestDisplay(display);
         display.getDisplayInfo(mDisplayInfo);
         display.getMetrics(mDisplayMetrics);
-        mDisplayUpdater = new ImmediateDisplayUpdater(this);
+        if (deferDisplayUpdates()) {
+            mDisplayUpdater = new DeferredDisplayUpdater(this);
+        } else {
+            mDisplayUpdater = new ImmediateDisplayUpdater(this);
+        }
         mSystemGestureExclusionLimit = mWmService.mConstants.mSystemGestureExclusionLimitDp
                 * mDisplayMetrics.densityDpi / DENSITY_DEFAULT;
         isDefaultDisplay = mDisplayId == DEFAULT_DISPLAY;
@@ -1190,12 +1197,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 "PointerEventDispatcher" + mDisplayId, mDisplayId);
         mPointerEventDispatcher = new PointerEventDispatcher(inputChannel);
 
-        // Tap Listeners are supported for:
-        // 1. All physical displays (multi-display).
-        // 2. VirtualDisplays on VR, AA (and everything else).
-        mTapDetector = new TaskTapPointerEventListener(mWmService, this);
-        registerPointerEventListener(mTapDetector);
-        registerPointerEventListener(mWmService.mMousePositionTracker);
+        if (com.android.input.flags.Flags.removePointerEventTrackingInWm()) {
+            mTapDetector = null;
+        } else {
+            // Tap Listeners are supported for:
+            // 1. All physical displays (multi-display).
+            // 2. VirtualDisplays on VR, AA (and everything else).
+            mTapDetector = new TaskTapPointerEventListener(mWmService, this);
+            registerPointerEventListener(mTapDetector);
+        }
+        if (mWmService.mMousePositionTracker != null) {
+            registerPointerEventListener(mWmService.mMousePositionTracker);
+        }
         if (mWmService.mAtmService.getRecentTasks() != null) {
             registerPointerEventListener(
                     mWmService.mAtmService.getRecentTasks().getInputListener());
@@ -1637,12 +1650,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         mWmService.mWindowPlacerLocked.performSurfacePlacement();
     }
 
-    void sendNewConfiguration() {
+    /** Returns {@code true} if the display configuration is changed. */
+    boolean sendNewConfiguration() {
         if (!isReady()) {
-            return;
+            return false;
         }
         if (mRemoteDisplayChangeController.isWaitingForRemoteDisplayChange()) {
-            return;
+            return false;
         }
 
         final Transition.ReadyCondition displayConfig = mTransitionController.isCollecting()
@@ -1657,7 +1671,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             displayConfig.meet();
         }
         if (configUpdated) {
-            return;
+            return true;
         }
 
         // The display configuration doesn't change. If there is a launching transformed app, that
@@ -1675,6 +1689,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             setLayoutNeeded();
             mWmService.mWindowPlacerLocked.performSurfacePlacement();
         }
+        return false;
     }
 
     @Override
@@ -1696,7 +1711,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             final ActivityRecord activityRecord = (ActivityRecord) requestingContainer;
             final boolean kept = updateDisplayOverrideConfigurationLocked(config, activityRecord,
                     false /* deferResume */, null /* result */);
-            activityRecord.frozenBeforeDestroy = true;
             if (!kept) {
                 mRootWindowContainer.resumeFocusedTasksTopActivities();
             }
@@ -3261,6 +3275,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     void updateTouchExcludeRegion() {
+        if (mTapDetector == null) {
+            // The touch exclude region is used to detect the region outside of the focused task
+            // so that the tap detector can detect outside touches. Don't calculate the exclude
+            // region when the tap detector is disabled.
+            return;
+        }
         final Task focusedTask = (mFocusedApp != null ? mFocusedApp.getTask() : null);
         if (focusedTask == null) {
             mTouchExcludeRegion.setEmpty();
@@ -3299,6 +3319,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     private void processTaskForTouchExcludeRegion(Task task, Task focusedTask, int delta) {
+        if (mTapDetector == null) {
+            // The touch exclude region is used to detect the region outside of the focused task
+            // so that the tap detector can detect outside touches. Don't calculate the exclude
+            // region when the tap detector is disabled.
+        }
         final ActivityRecord topVisibleActivity = task.getTopVisibleActivity();
 
         if (topVisibleActivity == null || !topVisibleActivity.hasContentToDisplay()) {
@@ -5122,8 +5147,13 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     /** @return the orientation of the display when it's rotation is ROTATION_0. */
     int getNaturalOrientation() {
-        return mBaseDisplayWidth < mBaseDisplayHeight
-                ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
+        final Configuration config = getConfiguration();
+        if (config.windowConfiguration.getDisplayRotation() == ROTATION_0) {
+            return config.orientation;
+        }
+        final Rect frame = mDisplayPolicy.getDecorInsetsInfo(
+                ROTATION_0, mBaseDisplayWidth, mBaseDisplayHeight).mConfigFrame;
+        return frame.width() <= frame.height() ? ORIENTATION_PORTRAIT : ORIENTATION_LANDSCAPE;
     }
 
     void performLayout(boolean initial, boolean updateInputWindows) {
@@ -5498,6 +5528,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             if (mWmService.mDisplayManagerInternal != null) {
                 setDisplayInfoOverride();
                 configureDisplayPolicy();
+            }
+
+            if (!isDefaultDisplay) {
+                mDisplayRotation.updateRotationUnchecked(true);
             }
 
             reconfigureDisplayLocked();

@@ -608,6 +608,23 @@ public final class Settings {
 
     /**
      * Activity Action: Show settings to allow configuration of
+     * {@link Manifest.permission#MEDIA_ROUTING_CONTROL} permission.
+     *
+     * Input: Optionally, the Intent's data URI can specify the application package name to
+     * directly invoke the management GUI specific to the package name. For example
+     * "package:com.my.app". However, modifying this permission setting for any package is allowed
+     * only when that package holds an appropriate companion device profile such as
+     * {@link android.companion.AssociationRequest#DEVICE_PROFILE_WATCH}.
+     * <p>
+     * Output: Nothing.
+     */
+    @FlaggedApi("com.android.media.flags.enable_privileged_routing_for_media_routing_control")
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_MEDIA_ROUTING_CONTROL =
+            "android.settings.REQUEST_MEDIA_ROUTING_CONTROL";
+
+    /**
+     * Activity Action: Show settings to allow configuration of
      * {@link Manifest.permission#RUN_USER_INITIATED_JOBS} permission
      *
      * Input: Optionally, the Intent's data URI can specify the application package name to
@@ -7785,6 +7802,16 @@ public final class Settings {
         public static final String SHOW_IME_WITH_HARD_KEYBOARD = "show_ime_with_hard_keyboard";
 
         /**
+         * Whether to enable bounce keys for Physical Keyboard accessibility.
+         *
+         * If set to non-zero value, any key press on physical keyboard within the provided
+         * threshold duration (in milliseconds) of the same key, will be ignored.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_BOUNCE_KEYS = "accessibility_bounce_keys";
+
+        /**
          * Whether stylus button presses are disabled. This is a boolean that
          * determines if stylus buttons are ignored.
          *
@@ -8283,6 +8310,17 @@ public final class Settings {
          */
         @Readable
         public static final String ACCESSIBILITY_BUTTON_TARGETS = "accessibility_button_targets";
+
+        /**
+         * Setting specifying the accessibility services, accessibility shortcut targets,
+         * or features to be toggled via a tile in the quick settings panel.
+         *
+         * <p> This is a colon-separated string list which contains the flattened
+         * {@link ComponentName} and the class name of a system class implementing a supported
+         * accessibility feature.
+         * @hide
+         */
+        public static final String ACCESSIBILITY_QS_TARGETS = "accessibility_qs_targets";
 
         /**
          * The system class name of magnification controller which is a target to be toggled via
@@ -12120,6 +12158,7 @@ public final class Settings {
             CLONE_TO_MANAGED_PROFILE.add(LOCATION_CHANGER);
             CLONE_TO_MANAGED_PROFILE.add(LOCATION_MODE);
             CLONE_TO_MANAGED_PROFILE.add(SHOW_IME_WITH_HARD_KEYBOARD);
+            CLONE_TO_MANAGED_PROFILE.add(ACCESSIBILITY_BOUNCE_KEYS);
             CLONE_TO_MANAGED_PROFILE.add(NOTIFICATION_BUBBLES);
         }
 

@@ -26,7 +26,9 @@ aconfig_srcjars = [
     ":android.os.flags-aconfig-java{.generated_srcjars}",
     ":android.os.vibrator.flags-aconfig-java{.generated_srcjars}",
     ":android.security.flags-aconfig-java{.generated_srcjars}",
+    ":android.server.app.flags-aconfig-java{.generated_srcjars}",
     ":android.service.chooser.flags-aconfig-java{.generated_srcjars}",
+    ":android.service.dreams.flags-aconfig-java{.generated_srcjars}",
     ":android.service.notification.flags-aconfig-java{.generated_srcjars}",
     ":android.view.flags-aconfig-java{.generated_srcjars}",
     ":android.view.accessibility.flags-aconfig-java{.generated_srcjars}",
@@ -231,7 +233,6 @@ java_aconfig_library {
     name: "android.security.flags-aconfig-java-host",
     aconfig_declarations: "android.security.flags-aconfig",
     host_supported: true,
-    mode: "test",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -658,7 +659,13 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
-// CoreNetworking
+// Networking
+aconfig_declarations {
+    name: "com.android.net.flags-aconfig",
+    package: "com.android.net.flags",
+    srcs: ["core/java/android/net/flags.aconfig"],
+}
+
 java_aconfig_library {
     name: "com.android.net.flags-aconfig-java",
     aconfig_declarations: "com.android.net.flags-aconfig",
@@ -739,6 +746,19 @@ aconfig_declarations {
 java_aconfig_library {
     name: "framework-jobscheduler-job.flags-aconfig-java",
     aconfig_declarations: "framework-jobscheduler-job.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Dreams
+aconfig_declarations {
+    name: "android.service.dreams.flags-aconfig",
+    package: "android.service.dreams",
+    srcs: ["core/java/android/service/dreams/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.service.dreams.flags-aconfig-java",
+    aconfig_declarations: "android.service.dreams.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -831,6 +851,19 @@ aconfig_declarations {
 java_aconfig_library {
     name: "android.appwidget.flags-aconfig-java",
     aconfig_declarations: "android.appwidget.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// App
+aconfig_declarations {
+    name: "android.server.app.flags-aconfig",
+    package: "android.server.app",
+    srcs: ["services/core/java/com/android/server/app/flags.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.server.app.flags-aconfig-java",
+    aconfig_declarations: "android.server.app.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 

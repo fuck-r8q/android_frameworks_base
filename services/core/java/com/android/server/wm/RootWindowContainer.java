@@ -851,6 +851,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         handleResizingWindows();
         clearFrameChangingWindows();
 
+        // Called after #handleResizingWindows to include WindowStateResizeItem if any.
+        mWmService.mAtmService.getLifecycleManager().dispatchPendingTransactions();
+
         if (mWmService.mDisplayFrozen) {
             ProtoLog.v(WM_DEBUG_ORIENTATION,
                     "With display frozen, orientationChangeComplete=%b",
@@ -1750,14 +1753,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * @param starting                  The currently starting activity or {@code null} if there is
      *                                  none.
      * @param displayId                 The id of the display where operation is executed.
-     * @param markFrozenIfConfigChanged Whether to set {@link ActivityRecord#frozenBeforeDestroy} to
-     *                                  {@code true} if config changed.
      * @param deferResume               Whether to defer resume while updating config.
      * @return 'true' if starting activity was kept or wasn't provided, 'false' if it was relaunched
      * because of configuration update.
      */
-    boolean ensureVisibilityAndConfig(ActivityRecord starting, int displayId,
-            boolean markFrozenIfConfigChanged, boolean deferResume) {
+    boolean ensureVisibilityAndConfig(ActivityRecord starting, int displayId, boolean deferResume) {
         // First ensure visibility without updating the config just yet. We need this to know what
         // activities are affecting configuration now.
         // Passing null here for 'starting' param value, so that visibility of actual starting
@@ -1782,9 +1782,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // configuration push because the visibility of some activities may not be updated yet.
         if (starting != null) {
             starting.reportDescendantOrientationChangeIfNeeded();
-        }
-        if (starting != null && markFrozenIfConfigChanged && config != null) {
-            starting.frozenBeforeDestroy = true;
         }
 
         if (displayContent != null) {

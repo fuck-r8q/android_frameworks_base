@@ -83,6 +83,14 @@ constructor(
                     marginTop =
                         if (it.useLargeScreenHeader) it.marginTopLargeScreen else it.marginTop,
                     useSplitShade = it.useSplitShade,
+                    paddingTop =
+                        if (it.useSplitShade) {
+                            // When in split shade, the margin is applied twice as the legacy shade
+                            // code uses it to calculate padding.
+                            it.keyguardSplitShadeTopMargin - 2 * it.marginTopLargeScreen
+                        } else {
+                            0
+                        }
                 )
             }
             .distinctUntilChanged()
@@ -156,11 +164,7 @@ constructor(
                 ),
             ) { onLockscreen, bounds, config, (top, isInTransitionToAnyState, qsExpansion) ->
                 if (onLockscreen) {
-                    if (config.useSplitShade) {
-                        bounds.copy(top = 0f)
-                    } else {
-                        bounds
-                    }
+                    bounds.copy(top = bounds.top + config.paddingTop)
                 } else {
                     // When QS expansion > 0, it should directly set the top padding so do not
                     // animate it
@@ -173,8 +177,8 @@ constructor(
             }
             .stateIn(
                 scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue = NotificationContainerBounds(0f, 0f),
+                started = SharingStarted.Lazily,
+                initialValue = NotificationContainerBounds(),
             )
 
     val alpha: Flow<Float> =
@@ -225,7 +229,7 @@ constructor(
      * When expanding or when the user is interacting with the shade, keep the count stable; do not
      * emit a value.
      */
-    fun getMaxNotifications(calculateSpace: (Float) -> Int): Flow<Int> {
+    fun getMaxNotifications(calculateSpace: (Float, Boolean) -> Int): Flow<Int> {
         val showLimitedNotifications = isOnLockscreenWithoutShade
         val showUnlimitedNotifications =
             combine(
@@ -241,11 +245,17 @@ constructor(
                 shadeInteractor.isUserInteracting,
                 bounds,
                 interactor.notificationStackChanged.onStart { emit(Unit) },
-            ) { showLimitedNotifications, showUnlimitedNotifications, isUserInteracting, bounds, _
-                ->
+                interactor.useExtraShelfSpace,
+            ) { flows ->
+                val showLimitedNotifications = flows[0] as Boolean
+                val showUnlimitedNotifications = flows[1] as Boolean
+                val isUserInteracting = flows[2] as Boolean
+                val bounds = flows[3] as NotificationContainerBounds
+                val useExtraShelfSpace = flows[5] as Boolean
+
                 if (!isUserInteracting) {
                     if (showLimitedNotifications) {
-                        emit(calculateSpace(bounds.bottom - bounds.top))
+                        emit(calculateSpace(bounds.bottom - bounds.top, useExtraShelfSpace))
                     } else if (showUnlimitedNotifications) {
                         emit(-1)
                     }
@@ -268,5 +278,6 @@ constructor(
         val marginEnd: Int,
         val marginBottom: Int,
         val useSplitShade: Boolean,
+        val paddingTop: Int,
     )
 }

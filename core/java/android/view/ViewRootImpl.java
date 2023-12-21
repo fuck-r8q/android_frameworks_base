@@ -76,13 +76,8 @@ import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_SIZE_E
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_OPTIMIZE_MEASURE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
 import static android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST;
-import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_STARTING;
-import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
-import static android.view.WindowManager.LayoutParams.TYPE_DRAWN_APPLICATION;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
-import static android.view.WindowManager.LayoutParams.TYPE_NOTIFICATION_SHADE;
-import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_STATUS_BAR_ADDITIONAL;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_ALERT;
 import static android.view.WindowManager.LayoutParams.TYPE_TOAST;
@@ -96,6 +91,7 @@ import static android.view.accessibility.Flags.reduceWindowContentChangedEventTh
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
+import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 
 import static com.android.input.flags.Flags.enablePointerChoreographer;
 
@@ -257,7 +253,7 @@ import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
@@ -376,6 +372,8 @@ public final class ViewRootImpl implements ViewParent,
      * Minimum time to wait before reporting changes to keep clear areas.
      */
     private static final int KEEP_CLEAR_AREA_REPORT_RATE_MILLIS = 100;
+
+    private static final long NANOS_PER_SEC = 1000000000;
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     static final ThreadLocal<HandlerActionQueue> sRunQueues = new ThreadLocal<HandlerActionQueue>();
@@ -622,6 +620,13 @@ public final class ViewRootImpl implements ViewParent,
     boolean mUpcomingWindowFocus;
     @GuardedBy("this")
     boolean mUpcomingInTouchMode;
+    // While set, allow this VRI to handle back key without drop it.
+    private boolean mProcessingBackKey;
+    /**
+     * Compatibility {@link OnBackInvokedCallback} for windowless window, to forward the back
+     * key event host app.
+     */
+    private Predicate<KeyEvent> mWindowlessBackKeyCallback;
 
     public boolean mTraversalScheduled;
     int mTraversalBarrier;
@@ -810,6 +815,8 @@ public final class ViewRootImpl implements ViewParent,
     final PointF mDragPoint = new PointF();
     final PointF mLastTouchPoint = new PointF();
     int mLastTouchSource;
+    int mLastTouchDeviceId = KeyCharacterMap.VIRTUAL_KEYBOARD;
+    int mLastTouchPointerId;
     /** Tracks last {@link MotionEvent#getToolType(int)} with {@link MotionEvent#ACTION_UP}. **/
     private int mLastClickToolType;
 
@@ -824,13 +831,23 @@ public final class ViewRootImpl implements ViewParent,
 
     private boolean mInsetsAnimationRunning;
 
+    private long mPreviousFrameDrawnTime = -1;
+
     /**
      * The resolved pointer icon type requested by this window.
      * A null value indicates the resolved pointer icon has not yet been calculated.
      */
+    // TODO(b/293587049): Remove pointer icon tracking by type when refactor is complete.
     @Nullable
     private Integer mPointerIconType = null;
     private PointerIcon mCustomPointerIcon = null;
+
+    /**
+     * The resolved pointer icon requested by this window.
+     * A null value indicates the resolved pointer icon has not yet been calculated.
+     */
+    @Nullable
+    private PointerIcon mResolvedPointerIcon = null;
 
     /**
      * see {@link #playSoundEffect(int)}
@@ -1053,14 +1070,18 @@ public final class ViewRootImpl implements ViewParent,
     private boolean mChildBoundingInsetsChanged = false;
 
     private String mTag = TAG;
+    private String mFpsTraceName;
+
     boolean mHaveMoveEvent = false;
 
     private final RemoteTaskWindowInsetHelper mRTWindowInsetHelper;
 
     private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
+    private static boolean sToolkitMetricsForFrameRateDecisionFlagValue;
 
     static {
         sToolkitSetFrameRateReadOnlyFlagValue = toolkitSetFrameRateReadOnly();
+        sToolkitMetricsForFrameRateDecisionFlagValue = toolkitMetricsForFrameRateDecision();
     }
 
     // The latest input event from the gesture that was used to resolve the pointer icon.
@@ -1311,6 +1332,7 @@ public final class ViewRootImpl implements ViewParent,
 
                 attrs = mWindowAttributes;
                 setTag();
+                mFpsTraceName = "FPS of " + getTitle();
 
                 if (DEBUG_KEEP_SCREEN_ON && (mClientWindowLayoutFlags
                         & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
@@ -3204,7 +3226,11 @@ public final class ViewRootImpl implements ViewParent,
             host.dispatchAttachedToWindow(mAttachInfo, 0);
             mAttachInfo.mTreeObserver.dispatchOnWindowAttachedChange(true);
             dispatchApplyInsets(host);
-            if (!mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()) {
+            if (!mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()
+                    // Don't register compat OnBackInvokedCallback for windowless window.
+                    // The onBackInvoked event by default should forward to host app, so the
+                    // host app can decide the behavior.
+                    && mWindowlessBackKeyCallback == null) {
                 // For apps requesting legacy back behavior, we add a compat callback that
                 // dispatches {@link KeyEvent#KEYCODE_BACK} to their root views.
                 // This way from system point of view, these apps are providing custom
@@ -3233,6 +3259,12 @@ public final class ViewRootImpl implements ViewParent,
             if (viewVisibility != View.VISIBLE || mNewSurfaceNeeded) {
                 endDragResizing();
                 destroyHardwareResources();
+            }
+
+            if (sToolkitSetFrameRateReadOnlyFlagValue && viewVisibility == View.VISIBLE) {
+                // Boost frame rate when the viewVisibility becomes true.
+                // This is mainly for lanuchers that lanuch new windows.
+                boostFrameRate(FRAME_RATE_TOUCH_BOOST_TIME);
             }
         }
 
@@ -3942,6 +3974,11 @@ public final class ViewRootImpl implements ViewParent,
                                 == ViewGroup.FOCUS_AFTER_DESCENDANTS) {
                     focused.restoreDefaultFocus();
                 }
+            }
+
+            if (sToolkitSetFrameRateReadOnlyFlagValue) {
+                // Boost the frame rate when the ViewRootImpl first becomes available.
+                boostFrameRate(FRAME_RATE_TOUCH_BOOST_TIME);
             }
         }
 
@@ -4725,6 +4762,31 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+    /**
+     * Called from draw() to collect metrics for frame rate decision.
+     */
+    private void collectFrameRateDecisionMetrics() {
+        if (!Trace.isEnabled()) {
+            if (mPreviousFrameDrawnTime > 0) mPreviousFrameDrawnTime = -1;
+            return;
+        }
+
+        if (mPreviousFrameDrawnTime < 0) {
+            mPreviousFrameDrawnTime = mChoreographer.getExpectedPresentationTimeNanos();
+            return;
+        }
+
+        long expectedDrawnTime = mChoreographer.getExpectedPresentationTimeNanos();
+        long timeDiff = expectedDrawnTime - mPreviousFrameDrawnTime;
+        if (timeDiff <= 0) {
+            return;
+        }
+
+        long fps = NANOS_PER_SEC / timeDiff;
+        Trace.setCounter(mFpsTraceName, fps);
+        mPreviousFrameDrawnTime = expectedDrawnTime;
+    }
+
     private void reportDrawFinished(@Nullable Transaction t, int seqId) {
         if (DEBUG_BLAST) {
             Log.d(mTag, "reportDrawFinished");
@@ -5042,6 +5104,9 @@ public final class ViewRootImpl implements ViewParent,
 
         if (DEBUG_FPS) {
             trackFPS();
+        }
+        if (sToolkitMetricsForFrameRateDecisionFlagValue) {
+            collectFrameRateDecisionMetrics();
         }
 
         if (!sFirstDrawComplete) {
@@ -6659,7 +6724,8 @@ public final class ViewRootImpl implements ViewParent,
 
             // Find a reason for dropping or canceling the event.
             final String reason;
-            if (!mAttachInfo.mHasWindowFocus
+            // The embedded window is focused, allow this VRI to handle back key.
+            if (!mAttachInfo.mHasWindowFocus && !(mProcessingBackKey && isBack(q.mEvent))
                     && !q.mEvent.isFromSource(InputDevice.SOURCE_CLASS_POINTER)
                     && !isAutofillUiShowing()) {
                 // This is a non-pointer event and the window doesn't currently have input focus
@@ -6882,10 +6948,20 @@ public final class ViewRootImpl implements ViewParent,
 
                 // If the new back dispatch is enabled, intercept KEYCODE_BACK before it reaches the
                 // view tree or IME, and invoke the appropriate {@link OnBackInvokedCallback}.
-                if (isBack(keyEvent)
-                        && mContext != null
-                        && mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()) {
-                    return doOnBackKeyEvent(keyEvent);
+                if (isBack(keyEvent)) {
+                    if (mWindowlessBackKeyCallback != null) {
+                        if (mWindowlessBackKeyCallback.test(keyEvent)) {
+                            return keyEvent.getAction() == KeyEvent.ACTION_UP
+                                    && !keyEvent.isCanceled()
+                                    ? FINISH_HANDLED : FINISH_NOT_HANDLED;
+                        } else {
+                            // Unable to forward the back key to host, forward to next stage.
+                            return FORWARD;
+                        }
+                    } else if (mContext != null
+                            && mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()) {
+                        return doOnBackKeyEvent(keyEvent);
+                    }
                 }
 
                 if (mInputQueue != null) {
@@ -7108,6 +7184,8 @@ public final class ViewRootImpl implements ViewParent,
                 mLastTouchPoint.x = event.getRawX();
                 mLastTouchPoint.y = event.getRawY();
                 mLastTouchSource = event.getSource();
+                mLastTouchDeviceId = event.getDeviceId();
+                mLastTouchPointerId = event.getPointerId(0);
 
                 // Register last ACTION_UP. This will be propagated to IME.
                 if (event.getActionMasked() == MotionEvent.ACTION_UP) {
@@ -7420,12 +7498,14 @@ public final class ViewRootImpl implements ViewParent,
                 // Other apps or the window manager may change the icon type outside of
                 // this app, therefore the icon type has to be reset on enter/exit event.
                 mPointerIconType = null;
+                mResolvedPointerIcon = null;
             }
 
             if (action != MotionEvent.ACTION_HOVER_EXIT) {
                 // Resolve the pointer icon
                 if (!updatePointerIcon(event) && action == MotionEvent.ACTION_HOVER_MOVE) {
                     mPointerIconType = null;
+                    mResolvedPointerIcon = null;
                 }
             }
 
@@ -7480,6 +7560,7 @@ public final class ViewRootImpl implements ViewParent,
 
     private void resetPointerIcon(MotionEvent event) {
         mPointerIconType = null;
+        mResolvedPointerIcon = null;
         updatePointerIcon(event);
     }
 
@@ -7517,6 +7598,21 @@ public final class ViewRootImpl implements ViewParent,
             pointerIcon = mView.onResolvePointerIcon(event, pointerIndex);
         }
 
+        if (enablePointerChoreographer()) {
+            if (pointerIcon == null) {
+                pointerIcon = PointerIcon.getSystemIcon(mContext, PointerIcon.TYPE_NOT_SPECIFIED);
+            }
+            if (Objects.equals(mResolvedPointerIcon, pointerIcon)) {
+                return true;
+            }
+            mResolvedPointerIcon = pointerIcon;
+
+            InputManagerGlobal.getInstance()
+                    .setPointerIcon(pointerIcon, event.getDisplayId(),
+                            event.getDeviceId(), event.getPointerId(0), getInputToken());
+            return true;
+        }
+
         final int pointerType = (pointerIcon != null) ?
                 pointerIcon.getType() : PointerIcon.TYPE_NOT_SPECIFIED;
 
@@ -7524,34 +7620,18 @@ public final class ViewRootImpl implements ViewParent,
             mPointerIconType = pointerType;
             mCustomPointerIcon = null;
             if (mPointerIconType != PointerIcon.TYPE_CUSTOM) {
-                if (enablePointerChoreographer()) {
-                    InputManagerGlobal
-                            .getInstance()
-                            .setPointerIcon(PointerIcon.getSystemIcon(mContext, pointerType),
-                                    event.getDisplayId(), event.getDeviceId(),
-                                    event.getPointerId(pointerIndex), getInputToken());
-                } else {
-                    InputManagerGlobal
-                            .getInstance()
-                            .setPointerIconType(pointerType);
-                }
+                InputManagerGlobal
+                        .getInstance()
+                        .setPointerIconType(pointerType);
                 return true;
             }
         }
         if (mPointerIconType == PointerIcon.TYPE_CUSTOM &&
                 !pointerIcon.equals(mCustomPointerIcon)) {
             mCustomPointerIcon = pointerIcon;
-            if (enablePointerChoreographer()) {
-                InputManagerGlobal
-                        .getInstance()
-                        .setPointerIcon(mCustomPointerIcon,
-                                event.getDisplayId(), event.getDeviceId(),
-                                event.getPointerId(pointerIndex), getInputToken());
-            } else {
-                InputManagerGlobal
-                        .getInstance()
-                        .setCustomPointerIcon(mCustomPointerIcon);
-            }
+            InputManagerGlobal
+                    .getInstance()
+                    .setCustomPointerIcon(mCustomPointerIcon);
         }
         return true;
     }
@@ -8518,6 +8598,14 @@ public final class ViewRootImpl implements ViewParent,
 
     public int getLastTouchSource() {
         return mLastTouchSource;
+    }
+
+    public int getLastTouchDeviceId() {
+        return mLastTouchDeviceId;
+    }
+
+    public int getLastTouchPointerId() {
+        return mLastTouchPointerId;
     }
 
     /**
@@ -10534,6 +10622,11 @@ public final class ViewRootImpl implements ViewParent,
         mHandler.obtainMessage(MSG_REQUEST_SCROLL_CAPTURE, listener).sendToTarget();
     }
 
+    // Make this VRI able to process back key without drop it.
+    void processingBackKey(boolean processing) {
+        mProcessingBackKey = processing;
+    }
+
     /**
      * Collect and include any ScrollCaptureCallback instances registered with the window.
      *
@@ -11769,13 +11862,18 @@ public final class ViewRootImpl implements ViewParent,
                 KeyCharacterMap.VIRTUAL_KEYBOARD, 0 /* scancode */,
                 KeyEvent.FLAG_FROM_SYSTEM | KeyEvent.FLAG_VIRTUAL_HARD_KEY,
                 InputDevice.SOURCE_KEYBOARD);
-        enqueueInputEvent(ev);
+        enqueueInputEvent(ev, null /* receiver */, 0 /* flags */, true /* processImmediately */);
     }
 
     private void registerCompatOnBackInvokedCallback() {
         mCompatOnBackInvokedCallback = () -> {
-            sendBackKeyEvent(KeyEvent.ACTION_DOWN);
-            sendBackKeyEvent(KeyEvent.ACTION_UP);
+            try {
+                processingBackKey(true);
+                sendBackKeyEvent(KeyEvent.ACTION_DOWN);
+                sendBackKeyEvent(KeyEvent.ACTION_UP);
+            } finally {
+                processingBackKey(false);
+            }
         };
         if (mOnBackInvokedDispatcher.hasImeOnBackInvokedDispatcher()) {
             Log.d(TAG, "Skip registering CompatOnBackInvokedCallback on IME dispatcher");
@@ -12042,18 +12140,6 @@ public final class ViewRootImpl implements ViewParent,
         scheduleTraversals();
     }
 
-    @Override
-    public void addTrustedPresentationCallback(@NonNull SurfaceControl.Transaction t,
-            @NonNull SurfaceControl.TrustedPresentationThresholds thresholds,
-            @NonNull Executor executor, @NonNull Consumer<Boolean> listener) {
-        t.setTrustedPresentationCallback(getSurfaceControl(), thresholds, executor, listener);
-    }
-
-    @Override
-    public void removeTrustedPresentationCallback(@NonNull SurfaceControl.Transaction t,
-            @NonNull Consumer<Boolean> listener) {
-        t.clearTrustedPresentationCallback(getSurfaceControl());
-    }
 
     private void logAndTrace(String msg) {
         if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
@@ -12073,7 +12159,7 @@ public final class ViewRootImpl implements ViewParent,
         try {
             if (mLastPreferredFrameRateCategory != frameRateCategory) {
                 mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
-                    frameRateCategory, false).applyAsyncUnsafe();
+                        frameRateCategory, false).applyAsyncUnsafe();
                 mLastPreferredFrameRateCategory = frameRateCategory;
             }
         } catch (Exception e) {
@@ -12125,11 +12211,9 @@ public final class ViewRootImpl implements ViewParent,
         boolean desiredAction = motionEventAction == MotionEvent.ACTION_DOWN
                 || motionEventAction == MotionEvent.ACTION_MOVE
                 || motionEventAction == MotionEvent.ACTION_UP;
-        boolean desiredType = windowType == TYPE_BASE_APPLICATION || windowType == TYPE_APPLICATION
-                || windowType == TYPE_APPLICATION_STARTING || windowType == TYPE_DRAWN_APPLICATION
-                || windowType == TYPE_NOTIFICATION_SHADE || windowType == TYPE_STATUS_BAR;
+        boolean undesiredType = windowType == TYPE_INPUT_METHOD;
         // use toolkitSetFrameRate flag to gate the change
-        return desiredAction && desiredType && sToolkitSetFrameRateReadOnlyFlagValue;
+        return desiredAction && !undesiredType && sToolkitSetFrameRateReadOnlyFlagValue;
     }
 
     /**
@@ -12196,6 +12280,22 @@ public final class ViewRootImpl implements ViewParent,
         return mPreferredFrameRate;
     }
 
+    /**
+     * Get the value of mIsFrameRateBoosting
+     */
+    @VisibleForTesting
+    public boolean getIsFrameRateBoosting() {
+        return mIsFrameRateBoosting;
+    }
+
+    private void boostFrameRate(int boostTimeOut) {
+        mIsFrameRateBoosting = true;
+        setPreferredFrameRateCategory(mPreferredFrameRateCategory);
+        mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
+        mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
+                boostTimeOut);
+    }
+
     @Override
     public boolean transferHostTouchGestureToEmbedded(
             @NonNull SurfaceControlViewHost.SurfacePackage surfacePackage) {
@@ -12207,5 +12307,14 @@ public final class ViewRootImpl implements ViewParent,
             e.rethrowAsRuntimeException();
         }
         return false;
+    }
+
+    /**
+     * Set the default back key callback for windowless window, to forward the back key event
+     * to host app.
+     * MUST NOT call this method for normal window.
+     */
+    void setBackKeyCallbackForWindowlessWindow(@NonNull Predicate<KeyEvent> callback) {
+        mWindowlessBackKeyCallback = callback;
     }
 }

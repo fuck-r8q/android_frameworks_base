@@ -174,6 +174,9 @@ constructor(
     /** Last point that [KeyguardRootView] view was tapped */
     val lastRootViewTapPosition: Flow<Point?> = repository.lastRootViewTapPosition.asStateFlow()
 
+    /** Is the ambient indication area visible? */
+    val ambientIndicationVisible: Flow<Boolean> = repository.ambientIndicationVisible.asStateFlow()
+
     /** Whether the primary bouncer is showing or not. */
     val primaryBouncerShowing: Flow<Boolean> = bouncerRepository.primaryBouncerShow
 
@@ -224,8 +227,8 @@ constructor(
         configurationInteractor
             .dimensionPixelSize(R.dimen.keyguard_translate_distance_on_swipe_up)
             .flatMapLatest { translationDistance ->
-                shadeRepository.shadeModel.map {
-                    if (it.expansionAmount == 0f) {
+                shadeRepository.legacyShadeExpansion.map {
+                    if (it == 0f) {
                         // Reset the translation value
                         0f
                     } else {
@@ -233,7 +236,7 @@ constructor(
                         MathUtils.lerp(
                             translationDistance,
                             0,
-                            Interpolators.FAST_OUT_LINEAR_IN.getInterpolation(it.expansionAmount)
+                            Interpolators.FAST_OUT_LINEAR_IN.getInterpolation(it)
                         )
                     }
                 }
@@ -309,6 +312,14 @@ constructor(
 
     fun setLastRootViewTapPosition(point: Point?) {
         repository.lastRootViewTapPosition.value = point
+    }
+
+    fun setAmbientIndicationVisible(isVisible: Boolean) {
+        repository.ambientIndicationVisible.value = isVisible
+    }
+
+    fun keyguardDoneAnimationsFinished() {
+        repository.keyguardDoneAnimationsFinished()
     }
 
     companion object {

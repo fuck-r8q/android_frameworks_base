@@ -72,12 +72,12 @@ import com.android.internal.logging.UiEvent;
 import com.android.internal.logging.UiEventLogger;
 import com.android.settingslib.wifi.WifiEnterpriseRestrictionUtils;
 import com.android.systemui.Prefs;
-import com.android.systemui.res.R;
 import com.android.systemui.accessibility.floatingmenu.AnnotationLinkSpan;
 import com.android.systemui.animation.DialogLaunchAnimator;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.res.R;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.wifitrackerlib.WifiEntry;
@@ -176,14 +176,6 @@ public class InternetDialog extends SystemUIDialog implements
 
     // Wi-Fi scanning progress bar
     protected boolean mIsProgressBarVisible;
-    protected boolean mIsSearchingHidden;
-    protected final Runnable mHideProgressBarRunnable = () -> {
-        setProgressBarVisible(false);
-    };
-    protected Runnable mHideSearchingRunnable = () -> {
-        mIsSearchingHidden = true;
-        mInternetDialogSubTitle.setText(getSubtitleText());
-    };
 
     private ExtTelephonyManager mExtTelephonyManager;
     private boolean mExtTelServiceConnected = false;
@@ -340,8 +332,6 @@ public class InternetDialog extends SystemUIDialog implements
         if (mExtTelServiceConnected) {
             mExtTelephonyManager.disconnectService(mExtTelServiceCallback);
         }
-        mHandler.removeCallbacks(mHideProgressBarRunnable);
-        mHandler.removeCallbacks(mHideSearchingRunnable);
         mMobileNetworkLayout.setOnClickListener(null);
         mConnectedWifListLayout.setOnClickListener(null);
         if (mSecondaryMobileNetworkLayout != null) {
@@ -393,7 +383,6 @@ public class InternetDialog extends SystemUIDialog implements
             return;
         }
 
-        showProgressBar();
         final boolean isDeviceLocked = mInternetDialogController.isDeviceLocked();
         final boolean isWifiEnabled = mInternetDialogController.isWifiEnabled();
         final boolean isWifiScanEnabled = mInternetDialogController.isWifiScanEnabled();
@@ -785,8 +774,7 @@ public class InternetDialog extends SystemUIDialog implements
 
     @Nullable
     CharSequence getSubtitleText() {
-        return mInternetDialogController.getSubtitleText(
-                mIsProgressBarVisible && !mIsSearchingHidden);
+        return mInternetDialogController.getSubtitleText(mIsProgressBarVisible);
     }
 
     private Drawable getSignalStrengthDrawable(int subId) {
@@ -802,20 +790,6 @@ public class InternetDialog extends SystemUIDialog implements
             return mContext.getString(R.string.mobile_data_summary_not_allowed_to_disable_data);
         }
         return mInternetDialogController.getMobileNetworkSummary(subId);
-    }
-
-    protected void showProgressBar() {
-        if (!mInternetDialogController.isWifiEnabled()
-                || mInternetDialogController.isDeviceLocked()) {
-            setProgressBarVisible(false);
-            return;
-        }
-        setProgressBarVisible(true);
-        if (mConnectedWifiEntry != null || mWifiEntriesCount > 0) {
-            mHandler.postDelayed(mHideProgressBarRunnable, PROGRESS_DELAY_MS);
-        } else if (!mIsSearchingHidden) {
-            mHandler.postDelayed(mHideSearchingRunnable, PROGRESS_DELAY_MS);
-        }
     }
 
     private void setProgressBarVisible(boolean visible) {
@@ -1068,6 +1042,11 @@ public class InternetDialog extends SystemUIDialog implements
             mAdapter.setWifiEntries(wifiEntries, mWifiEntriesCount);
             mAdapter.notifyDataSetChanged();
         });
+    }
+
+    @Override
+    public void onWifiScan(boolean isScan) {
+        setProgressBarVisible(isScan);
     }
 
     @Override

@@ -5254,6 +5254,8 @@
     <!-- Zen mode - name of default automatic calendar time-based rule that is triggered every night (when sleeping). [CHAR LIMIT=40] -->
     <string name="zen_mode_default_every_night_name">Sleeping</string>
 
+    <!-- Zen mode - Trigger description of the rule, indicating which app owns it. [CHAR_LIMIT=100] -->
+    <string name="zen_mode_implicit_trigger_description">Managed by <xliff:g id="app_name">%1$s</xliff:g></string>
     <!-- Zen mode - Condition summary when a rule is activated due to a call to setInterruptionFilter(). [CHAR_LIMIT=NONE] -->
     <string name="zen_mode_implicit_activated">On</string>
     <!-- Zen mode - Condition summary when a rule is deactivated due to a call to setInterruptionFilter(). [CHAR_LIMIT=NONE] -->
@@ -6313,11 +6315,6 @@ ul.</string>
     <string name="connected_display_unavailable_notification_content">Use a different cable and try again</string>
     <!-- Content of connected display unavailable due to thermals notification. [CHAR LIMIT=NONE] -->
     <string name="connected_display_thermally_unavailable_notification_content">Your device is too warm and can\'t mirror to the display until it cools down</string>
-
-    <!-- Title of cable don't support displays notifications. [CHAR LIMIT=NONE] -->
-    <string name="connected_display_cable_dont_support_displays_notification_title">Cable may not support displays</string>
-    <!-- Content of cable don't support displays notification. [CHAR LIMIT=NONE] -->
-    <string name="connected_display_cable_dont_support_displays_notification_content">Your USB-C cable may not connect to displays properly</string>
 
     <!-- Name of concurrent display notifications. [CHAR LIMIT=NONE] -->
     <string name="concurrent_display_notification_name">Dual screen</string>

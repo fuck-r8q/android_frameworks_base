@@ -51,6 +51,7 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.Signature;
 import android.content.pm.SuspendDialogInfo;
 import android.content.pm.UserInfo;
+import android.content.pm.UserPackage;
 import android.content.pm.VerifierDeviceIdentity;
 import android.content.pm.overlay.OverlayPaths;
 import android.net.Uri;
@@ -89,6 +90,7 @@ import android.util.proto.ProtoOutputStream;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.pm.parsing.pkg.PackageImpl;
 import com.android.internal.pm.pkg.component.ParsedComponent;
 import com.android.internal.pm.pkg.component.ParsedIntentInfo;
 import com.android.internal.pm.pkg.component.ParsedPermission;
@@ -339,6 +341,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     private static final String ATTR_DISTRACTION_FLAGS = "distraction_flags";
     private static final String ATTR_SUSPENDED = "suspended";
     private static final String ATTR_SUSPENDING_PACKAGE = "suspending-package";
+
+    private static final String ATTR_OPTIONAL = "optional";
     /**
      * @deprecated Legacy attribute, kept only for upgrading from P builds.
      */
@@ -942,6 +946,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             ret.setLongVersionCode(p.getVersionCode());
             ret.setUsesSdkLibraries(p.getUsesSdkLibraries());
             ret.setUsesSdkLibrariesVersionsMajor(p.getUsesSdkLibrariesVersionsMajor());
+            ret.setUsesSdkLibrariesOptional(p.getUsesSdkLibrariesOptional());
             ret.setUsesStaticLibraries(p.getUsesStaticLibraries());
             ret.setUsesStaticLibrariesVersions(p.getUsesStaticLibrariesVersions());
             ret.setMimeGroups(p.getMimeGroups());
@@ -1061,9 +1066,9 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             UserHandle installUser, boolean allowInstall, boolean instantApp,
             boolean virtualPreload, boolean isStoppedSystemApp, UserManagerService userManager,
             String[] usesSdkLibraries, long[] usesSdkLibrariesVersions,
-            String[] usesStaticLibraries, long[] usesStaticLibrariesVersions,
-            Set<String> mimeGroupNames, @NonNull UUID domainSetId,
-            int targetSdkVersion, byte[] restrictUpdatedHash) {
+            boolean[] usesSdkLibrariesOptional, String[] usesStaticLibraries,
+            long[] usesStaticLibrariesVersions, Set<String> mimeGroupNames,
+            @NonNull UUID domainSetId, int targetSdkVersion, byte[] restrictUpdatedHash) {
         final PackageSetting pkgSetting;
         if (originalPkg != null) {
             if (PackageManagerService.DEBUG_UPGRADE) Log.v(PackageManagerService.TAG, "Package "
@@ -1079,6 +1084,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                     .setLongVersionCode(versionCode)
                     .setUsesSdkLibraries(usesSdkLibraries)
                     .setUsesSdkLibrariesVersionsMajor(usesSdkLibrariesVersions)
+                    .setUsesSdkLibrariesOptional(usesSdkLibrariesOptional)
                     .setUsesStaticLibraries(usesStaticLibraries)
                     .setUsesStaticLibrariesVersions(usesStaticLibrariesVersions)
                     // Update new package state.
@@ -1096,6 +1102,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                     pkgPrivateFlags, domainSetId)
                     .setUsesSdkLibraries(usesSdkLibraries)
                     .setUsesSdkLibrariesVersionsMajor(usesSdkLibrariesVersions)
+                    .setUsesSdkLibrariesOptional(usesSdkLibrariesOptional)
                     .setUsesStaticLibraries(usesStaticLibraries)
                     .setUsesStaticLibrariesVersions(usesStaticLibrariesVersions)
                     .setLegacyNativeLibraryPath(legacyNativeLibraryPath)
@@ -1218,6 +1225,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             @Nullable String primaryCpuAbi, @Nullable String secondaryCpuAbi, int pkgFlags,
             int pkgPrivateFlags, @NonNull UserManagerService userManager,
             @Nullable String[] usesSdkLibraries, @Nullable long[] usesSdkLibrariesVersions,
+            @Nullable boolean[] usesSdkLibrariesOptional,
             @Nullable String[] usesStaticLibraries, @Nullable long[] usesStaticLibrariesVersions,
             @Nullable Set<String> mimeGroupNames, @NonNull UUID domainSetId,
             int targetSdkVersion, byte[] restrictUpdatedHash)
@@ -1277,12 +1285,17 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 .setRestrictUpdateHash(restrictUpdatedHash);
         // Update SDK library dependencies if needed.
         if (usesSdkLibraries != null && usesSdkLibrariesVersions != null
-                && usesSdkLibraries.length == usesSdkLibrariesVersions.length) {
+                && usesSdkLibrariesOptional != null
+                && usesSdkLibraries.length == usesSdkLibrariesVersions.length
+                && usesSdkLibraries.length == usesSdkLibrariesOptional.length) {
             pkgSetting.setUsesSdkLibraries(usesSdkLibraries)
-                    .setUsesSdkLibrariesVersionsMajor(usesSdkLibrariesVersions);
+                    .setUsesSdkLibrariesVersionsMajor(usesSdkLibrariesVersions)
+                    .setUsesSdkLibrariesOptional(usesSdkLibrariesOptional);
         } else {
             pkgSetting.setUsesSdkLibraries(null)
-                    .setUsesSdkLibrariesVersionsMajor(null);
+                    .setUsesSdkLibrariesVersionsMajor(null)
+                    .setUsesSdkLibrariesOptional(null);
+
         }
 
         // Update static shared library dependencies if needed.
@@ -1944,7 +1957,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         ArchiveState archiveState = null;
 
                         int packageDepth = parser.getDepth();
-                        ArrayMap<String, SuspendParams> suspendParamsMap = null;
+                        ArrayMap<UserPackage, SuspendParams> suspendParamsMap = null;
                         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT
                                 && (type != XmlPullParser.END_TAG
                                 || parser.getDepth() > packageDepth)) {
@@ -1971,18 +1984,15 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                             parser);
                                     break;
                                 case TAG_SUSPEND_PARAMS:
-                                    final String suspendingPackage = parser.getAttributeValue(null,
-                                            ATTR_SUSPENDING_PACKAGE);
-                                    if (suspendingPackage == null) {
-                                        Slog.wtf(TAG, "No suspendingPackage found inside tag "
-                                                + TAG_SUSPEND_PARAMS);
+                                    Map.Entry<UserPackage, SuspendParams> entry =
+                                            readSuspensionParamsLPr(userId, parser);
+                                    if (entry == null) {
                                         continue;
                                     }
                                     if (suspendParamsMap == null) {
                                         suspendParamsMap = new ArrayMap<>();
                                     }
-                                    suspendParamsMap.put(suspendingPackage,
-                                            SuspendParams.restoreFromXml(parser));
+                                    suspendParamsMap.put(entry.getKey(), entry.getValue());
                                     break;
                                 case TAG_ARCHIVE_STATE:
                                     archiveState = parseArchiveState(parser);
@@ -2004,7 +2014,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                     oldSuspendedLauncherExtras,
                                     false /* quarantined */);
                             suspendParamsMap = new ArrayMap<>();
-                            suspendParamsMap.put(oldSuspendingPackage, suspendParams);
+                            suspendParamsMap.put(
+                                    UserPackage.of(userId, oldSuspendingPackage), suspendParams);
                         }
 
                         if (blockUninstall) {
@@ -2044,6 +2055,20 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 readPackageRestrictionsLPr(userId, origFirstInstallTimes);
             }
         }
+    }
+
+    @Nullable
+    private static Map.Entry<UserPackage, SuspendParams> readSuspensionParamsLPr(
+            int userId, TypedXmlPullParser parser) throws IOException {
+        final String suspendingPackage = parser.getAttributeValue(null, ATTR_SUSPENDING_PACKAGE);
+        if (suspendingPackage == null) {
+            Slog.wtf(TAG, "No suspendingPackage found inside tag " + TAG_SUSPEND_PARAMS);
+            return null;
+        }
+        final int suspendingUserId = userId;
+        return Map.entry(
+                UserPackage.of(suspendingUserId, suspendingPackage),
+                SuspendParams.restoreFromXml(parser));
     }
 
     private static ArchiveState parseArchiveState(TypedXmlPullParser parser)
@@ -2402,10 +2427,11 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         }
                         if (ustate.isSuspended()) {
                             for (int i = 0; i < ustate.getSuspendParams().size(); i++) {
-                                final String suspendingPackage = ustate.getSuspendParams().keyAt(i);
+                                final UserPackage suspendingPackage =
+                                        ustate.getSuspendParams().keyAt(i);
                                 serializer.startTag(null, TAG_SUSPEND_PARAMS);
                                 serializer.attribute(null, ATTR_SUSPENDING_PACKAGE,
-                                        suspendingPackage);
+                                        suspendingPackage.packageName);
                                 final SuspendParams params =
                                         ustate.getSuspendParams().valueAt(i);
                                 if (params != null) {
@@ -2537,12 +2563,15 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             throws IOException, XmlPullParserException {
         String libName = parser.getAttributeValue(null, ATTR_NAME);
         long libVersion = parser.getAttributeLong(null, ATTR_VERSION, -1);
+        boolean optional = parser.getAttributeBoolean(null, ATTR_OPTIONAL, true);
 
         if (libName != null && libVersion >= 0) {
             outPs.setUsesSdkLibraries(ArrayUtils.appendElement(String.class,
                     outPs.getUsesSdkLibraries(), libName));
             outPs.setUsesSdkLibrariesVersionsMajor(ArrayUtils.appendLong(
                     outPs.getUsesSdkLibrariesVersionsMajor(), libVersion));
+            outPs.setUsesSdkLibrariesOptional(PackageImpl.appendBoolean(
+                    outPs.getUsesSdkLibrariesOptional(), optional));
         }
 
         XmlUtils.skipCurrentTag(parser);
@@ -2564,7 +2593,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     }
 
     void writeUsesSdkLibLPw(TypedXmlSerializer serializer, String[] usesSdkLibraries,
-            long[] usesSdkLibraryVersions) throws IOException {
+            long[] usesSdkLibraryVersions, boolean[] usesSdkLibrariesOptional) throws IOException {
         if (ArrayUtils.isEmpty(usesSdkLibraries) || ArrayUtils.isEmpty(usesSdkLibraryVersions)
                 || usesSdkLibraries.length != usesSdkLibraryVersions.length) {
             return;
@@ -2573,9 +2602,11 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         for (int i = 0; i < libCount; i++) {
             final String libName = usesSdkLibraries[i];
             final long libVersion = usesSdkLibraryVersions[i];
+            boolean libOptional = usesSdkLibrariesOptional[i];
             serializer.startTag(null, TAG_USES_SDK_LIB);
             serializer.attribute(null, ATTR_NAME, libName);
             serializer.attributeLong(null, ATTR_VERSION, libVersion);
+            serializer.attributeBoolean(null, ATTR_OPTIONAL, libOptional);
             serializer.endTag(null, TAG_USES_SDK_LIB);
         }
     }
@@ -3106,7 +3137,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         }
 
         writeUsesSdkLibLPw(serializer, pkg.getUsesSdkLibraries(),
-                pkg.getUsesSdkLibrariesVersionsMajor());
+                pkg.getUsesSdkLibrariesVersionsMajor(), pkg.getUsesSdkLibrariesOptional());
+
 
         writeUsesStaticLibLPw(serializer, pkg.getUsesStaticLibraries(),
                 pkg.getUsesStaticLibrariesVersions());
@@ -3206,7 +3238,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         }
 
         writeUsesSdkLibLPw(serializer, pkg.getUsesSdkLibraries(),
-                pkg.getUsesSdkLibrariesVersionsMajor());
+                pkg.getUsesSdkLibrariesVersionsMajor(), pkg.getUsesSdkLibrariesOptional());
 
         writeUsesStaticLibLPw(serializer, pkg.getUsesStaticLibraries(),
                 pkg.getUsesStaticLibrariesVersions());
@@ -5091,12 +5123,14 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
 
             List<String> usesSdkLibraries = pkg.getUsesSdkLibraries();
             long[] usesSdkLibrariesVersionsMajor = pkg.getUsesSdkLibrariesVersionsMajor();
+            boolean[] usesSdkLibrariesOptional = pkg.getUsesSdkLibrariesOptional();
             if (usesSdkLibraries.size() > 0) {
                 pw.print(prefix); pw.println("  usesSdkLibraries:");
                 for (int i = 0, size = usesSdkLibraries.size(); i < size; ++i) {
                     pw.print(prefix); pw.print("    ");
                     pw.print(usesSdkLibraries.get(i)); pw.print(" version:");
-                    pw.println(usesSdkLibrariesVersionsMajor[i]);
+                    pw.println(usesSdkLibrariesVersionsMajor[i]); pw.print(" optional:");
+                    pw.println(usesSdkLibrariesOptional[i]);
                 }
             }
 

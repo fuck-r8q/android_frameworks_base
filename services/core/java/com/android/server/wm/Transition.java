@@ -1405,7 +1405,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                     // recents, in case IME icon may missing if the moving task has already been
                     // the current focused task.
                     InputMethodManagerInternal.get().updateImeWindowStatus(
-                            false /* disableImeIcon */);
+                            false /* disableImeIcon */, dc.getDisplayId());
                 }
                 // An uncommitted transient launch can leave incomplete lifecycles if visibilities
                 // didn't change (eg. re-ordering with translucent tasks will leave launcher
@@ -2887,8 +2887,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             final WindowContainer<?> wc = mParticipants.valueAt(i);
             final DisplayContent dc = wc.asDisplayContent();
             if (dc == null || !mChanges.get(dc).hasChanged()) continue;
-            final int originalSeq = dc.getConfiguration().seq;
-            dc.sendNewConfiguration();
+            final boolean changed = dc.sendNewConfiguration();
             // Set to ready if no other change controls the ready state. But if there is, such as
             // if an activity is pausing, it will call setReady(ar, false) and wait for the next
             // resumed activity. Then do not set to ready because the transition only contains
@@ -2896,7 +2895,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             if (!mReadyTrackerOld.mUsed) {
                 setReady(dc, true);
             }
-            if (originalSeq == dc.getConfiguration().seq) continue;
+            if (!changed) continue;
             // If the update is deferred, sendNewConfiguration won't deliver new configuration to
             // clients, then it is the caller's responsibility to deliver the changes.
             if (mController.mAtm.mTaskSupervisor.isRootVisibilityUpdateDeferred()) {

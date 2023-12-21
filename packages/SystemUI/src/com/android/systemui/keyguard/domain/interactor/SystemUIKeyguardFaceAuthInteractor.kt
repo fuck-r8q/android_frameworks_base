@@ -16,8 +16,10 @@
 
 package com.android.systemui.keyguard.domain.interactor
 
+import android.app.trust.TrustManager
 import android.content.Context
 import android.hardware.biometrics.BiometricFaceConstants
+import android.hardware.biometrics.BiometricSourceType
 import com.android.keyguard.FaceAuthUiEvent
 import com.android.keyguard.FaceWakeUpTriggersConfig
 import com.android.keyguard.KeyguardUpdateMonitor
@@ -29,7 +31,6 @@ import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
-import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
 import com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthRepository
@@ -70,7 +71,6 @@ constructor(
     private val context: Context,
     @Application private val applicationScope: CoroutineScope,
     @Main private val mainDispatcher: CoroutineDispatcher,
-    @Background private val backgroundDispatcher: CoroutineDispatcher,
     private val repository: DeviceEntryFaceAuthRepository,
     private val primaryBouncerInteractor: Lazy<PrimaryBouncerInteractor>,
     private val alternateBouncerInteractor: AlternateBouncerInteractor,
@@ -83,6 +83,7 @@ constructor(
     private val faceWakeUpTriggersConfig: FaceWakeUpTriggersConfig,
     private val powerInteractor: PowerInteractor,
     private val biometricSettingsRepository: BiometricSettingsRepository,
+    private val trustManager: TrustManager,
 ) : CoreStartable, KeyguardFaceAuthInteractor {
 
     private val listeners: MutableList<FaceAuthenticationListener> = mutableListOf()
@@ -106,7 +107,6 @@ constructor(
                     fallbackToDetect = false
                 )
             }
-            .flowOn(backgroundDispatcher)
             .launchIn(applicationScope)
 
         alternateBouncerInteractor.isVisible
@@ -118,7 +118,6 @@ constructor(
                     fallbackToDetect = false
                 )
             }
-            .flowOn(backgroundDispatcher)
             .launchIn(applicationScope)
 
         merge(
@@ -147,7 +146,6 @@ constructor(
                     fallbackToDetect = true
                 )
             }
-            .flowOn(backgroundDispatcher)
             .launchIn(applicationScope)
 
         deviceEntryFingerprintAuthRepository.isLockedOut
@@ -160,7 +158,6 @@ constructor(
                     }
                 }
             }
-            .flowOn(backgroundDispatcher)
             .launchIn(applicationScope)
 
         // User switching should stop face auth and then when it is complete we should trigger face
@@ -184,7 +181,6 @@ constructor(
                     )
                 }
             }
-            .flowOn(backgroundDispatcher)
             .launchIn(applicationScope)
     }
 
@@ -289,6 +285,19 @@ constructor(
             .launchIn(applicationScope)
         repository.isAuthRunning
             .onEach { running -> listeners.forEach { it.onRunningStateChanged(running) } }
+            .flowOn(mainDispatcher)
+            .launchIn(applicationScope)
+        repository.isAuthenticated
+            .sample(userRepository.selectedUserInfo, ::Pair)
+            .onEach { (isAuthenticated, userInfo) ->
+                if (!isAuthenticated) {
+                    faceAuthenticationLogger.clearFaceRecognized()
+                    trustManager.clearAllBiometricRecognized(BiometricSourceType.FACE, userInfo.id)
+                }
+            }
+            .onEach { (isAuthenticated, _) ->
+                listeners.forEach { it.onAuthenticatedChanged(isAuthenticated) }
+            }
             .flowOn(mainDispatcher)
             .launchIn(applicationScope)
 

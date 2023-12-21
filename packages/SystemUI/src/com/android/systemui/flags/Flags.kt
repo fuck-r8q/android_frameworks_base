@@ -111,7 +111,7 @@ object Flags {
     // TODO(b/301955929)
     @JvmField
     val NOTIF_LS_BACKGROUND_THREAD =
-            unreleasedFlag("notification_lockscreen_mgr_bg_thread", teamfood = true)
+            releasedFlag("notification_lockscreen_mgr_bg_thread")
 
     // 200 - keyguard/lockscreen
     // ** Flag retired **
@@ -278,10 +278,6 @@ object Flags {
             "qs_user_detail_shortcut"
         )
 
-    // TODO(b/296357483): Tracking Bug
-    @JvmField
-    val QS_PIPELINE_NEW_TILES = unreleasedFlag("qs_pipeline_new_tiles")
-
     // TODO(b/254512383): Tracking Bug
     @JvmField
     val FULL_SCREEN_USER_SWITCHER =
@@ -439,11 +435,6 @@ object Flags {
             unreleasedFlag("lockscreen.enable_landscape")
 
     // 1200 - predictive back
-    @Keep
-    @JvmField
-    val WM_ENABLE_PREDICTIVE_BACK =
-        sysPropBooleanFlag("persist.wm.debug.predictive_back", default = true)
-
     @Keep
     @JvmField
     val WM_ENABLE_PREDICTIVE_BACK_ANIM =

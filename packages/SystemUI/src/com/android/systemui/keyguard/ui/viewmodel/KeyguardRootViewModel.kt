@@ -111,10 +111,21 @@ constructor(
 
     /** An observable for the alpha level for the entire keyguard root view. */
     val alpha: Flow<Float> =
-        merge(
-            keyguardInteractor.keyguardAlpha.distinctUntilChanged(),
-            occludedToLockscreenTransitionViewModel.lockscreenAlpha,
-        )
+        combine(
+                keyguardTransitionInteractor.transitionValue(GONE).onStart { emit(0f) },
+                merge(
+                    keyguardInteractor.keyguardAlpha,
+                    occludedToLockscreenTransitionViewModel.lockscreenAlpha,
+                )
+            ) { transitionToGone, alpha ->
+                if (transitionToGone == 1f) {
+                    // Ensures content is not visible when in GONE state
+                    0f
+                } else {
+                    alpha
+                }
+            }
+            .distinctUntilChanged()
 
     private fun burnIn(): Flow<BurnInModel> {
         val dozingAmount: Flow<Float> =
@@ -169,7 +180,9 @@ constructor(
                     goneToAodTransitionViewModel
                         .enterFromTopTranslationY(enterFromTopAmount)
                         .onStart { emit(0f) },
-                    occludedToLockscreenTransitionViewModel.lockscreenTranslationY,
+                    occludedToLockscreenTransitionViewModel.lockscreenTranslationY.onStart {
+                        emit(0f)
+                    },
                 ) {
                     keyguardTransitionY,
                     burnInTranslationY,
@@ -182,6 +195,7 @@ constructor(
                         occludedToLockscreenTransitionTranslationY
                 }
             }
+            .distinctUntilChanged()
 
     val translationX: Flow<Float> = burnIn().map { it.translationX.toFloat() }
 
@@ -229,7 +243,9 @@ constructor(
             .distinctUntilChanged()
 
     fun onNotificationContainerBoundsChanged(top: Float, bottom: Float) {
-        keyguardInteractor.setNotificationContainerBounds(NotificationContainerBounds(top, bottom))
+        keyguardInteractor.setNotificationContainerBounds(
+            NotificationContainerBounds(top = top, bottom = bottom)
+        )
     }
 
     /** Is there an expanded pulse, are we animating in response? */

@@ -33,6 +33,7 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Printer;
@@ -50,6 +51,8 @@ import com.android.server.textservices.TextServicesManagerInternal;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -208,8 +211,6 @@ final class InputMethodUtils {
      */
     @UserHandleAware
     public static class InputMethodSettings {
-        @NonNull
-        private Context mUserAwareContext;
         private final ArrayMap<String, InputMethodInfo> mMethodMap;
 
         private boolean mCopyOnWrite = false;
@@ -253,17 +254,9 @@ final class InputMethodUtils {
             return imsList;
         }
 
-        private void initContentWithUserContext(@NonNull Context context, @UserIdInt int userId) {
-            mUserAwareContext = context.getUserId() == userId
-                    ? context
-                    : context.createContextAsUser(UserHandle.of(userId), 0 /* flags */);
-        }
-
-        InputMethodSettings(@NonNull Context context,
-                ArrayMap<String, InputMethodInfo> methodMap, @UserIdInt int userId,
+        InputMethodSettings(ArrayMap<String, InputMethodInfo> methodMap, @UserIdInt int userId,
                 boolean copyOnWrite) {
             mMethodMap = methodMap;
-            initContentWithUserContext(context, userId);
             switchCurrentUser(userId, copyOnWrite);
         }
 
@@ -281,9 +274,6 @@ final class InputMethodUtils {
             }
             if (mCurrentUserId != userId || mCopyOnWrite != copyOnWrite) {
                 mEnabledInputMethodsStrCache = "";
-            }
-            if (mUserAwareContext.getUserId() != userId) {
-                initContentWithUserContext(mUserAwareContext, userId);
             }
             mCurrentUserId = userId;
             mCopyOnWrite = copyOnWrite;
@@ -375,10 +365,7 @@ final class InputMethodUtils {
             return result;
         }
 
-        void appendAndPutEnabledInputMethodLocked(String id, boolean reloadInputMethodStr) {
-            if (reloadInputMethodStr) {
-                getEnabledInputMethodsStr();
-            }
+        void appendAndPutEnabledInputMethodLocked(String id) {
             if (TextUtils.isEmpty(mEnabledInputMethodsStrCache)) {
                 // Add in the newly enabled input method.
                 putEnabledInputMethodsStr(id);
@@ -968,24 +955,64 @@ final class InputMethodUtils {
         final String enabledInputMethodsStr = TextUtils.nullIfEmpty(
                 SecureSettingsWrapper.getString(Settings.Secure.ENABLED_INPUT_METHODS, null,
                         userId));
-        if (enabledInputMethodsStr == null) {
-            return List.of();
+        final ArrayList<String> result = new ArrayList<>();
+        splitEnabledImeStr(enabledInputMethodsStr, result::add);
+        return result;
+    }
+
+    /**
+     * Split enabled IME string ({@link Settings.Secure#ENABLED_INPUT_METHODS}) into IME IDs.
+     *
+     * @param text a text formatted with {@link Settings.Secure#ENABLED_INPUT_METHODS}.
+     * @param consumer {@link Consumer} called back when a new IME ID is found.
+     */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
+    static void splitEnabledImeStr(@Nullable String text, @NonNull Consumer<String> consumer) {
+        if (TextUtils.isEmpty(text)) {
+            return;
         }
         final TextUtils.SimpleStringSplitter inputMethodSplitter =
                 new TextUtils.SimpleStringSplitter(INPUT_METHOD_SEPARATOR);
         final TextUtils.SimpleStringSplitter subtypeSplitter =
                 new TextUtils.SimpleStringSplitter(INPUT_METHOD_SUBTYPE_SEPARATOR);
-        inputMethodSplitter.setString(enabledInputMethodsStr);
-        final ArrayList<String> result = new ArrayList<>();
+        inputMethodSplitter.setString(text);
         while (inputMethodSplitter.hasNext()) {
             String nextImsStr = inputMethodSplitter.next();
             subtypeSplitter.setString(nextImsStr);
             if (subtypeSplitter.hasNext()) {
                 // The first element is ime id.
-                result.add(subtypeSplitter.next());
+                consumer.accept(subtypeSplitter.next());
             }
         }
-        return result;
+    }
+
+    /**
+     * Concat given IME IDs with an existing enabled IME
+     * ({@link Settings.Secure#ENABLED_INPUT_METHODS}).
+     *
+     * @param existingEnabledImeId an existing {@link Settings.Secure#ENABLED_INPUT_METHODS} to
+     *                             which {@code imeIDs} will be added.
+     * @param imeIds an array of IME IDs to be added. For IME IDs that are already seen in
+     *               {@code existingEnabledImeId} will be skipped.
+     * @return a new enabled IME ID string that can be stored in
+     *         {@link Settings.Secure#ENABLED_INPUT_METHODS}.
+     */
+    @NonNull
+    static String concatEnabledImeIds(@NonNull String existingEnabledImeId,
+            @NonNull String... imeIds) {
+        final ArraySet<String> alreadyEnabledIds = new ArraySet<>();
+        final StringJoiner joiner = new StringJoiner(Character.toString(INPUT_METHOD_SEPARATOR));
+        if (!TextUtils.isEmpty(existingEnabledImeId)) {
+            splitEnabledImeStr(existingEnabledImeId, alreadyEnabledIds::add);
+            joiner.add(existingEnabledImeId);
+        }
+        for (String id : imeIds) {
+            if (!alreadyEnabledIds.contains(id)) {
+                joiner.add(id);
+                alreadyEnabledIds.add(id);
+            }
+        }
+        return joiner.toString();
     }
 
     /**

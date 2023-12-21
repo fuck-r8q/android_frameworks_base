@@ -38,7 +38,7 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_FOR_UNATTENDED_UPDATE;
 import static com.android.systemui.DejankUtils.whitelistIpcs;
-import static com.android.systemui.flags.Flags.REFACTOR_GETCURRENTUSER;
+import static com.android.systemui.Flags.refactorGetCurrentUser;
 import static com.android.systemui.keyguard.ui.viewmodel.LockscreenToDreamingTransitionViewModel.DREAMING_ANIMATION_DURATION_MS;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
@@ -142,6 +142,7 @@ import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.flags.SystemPropertiesHelper;
 import com.android.systemui.keyguard.dagger.KeyguardModule;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
 import com.android.systemui.log.SessionTracker;
@@ -600,7 +601,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         public void onUserSwitching(int userId) {
             if (DEBUG) Log.d(TAG, String.format("onUserSwitching %d", userId));
             synchronized (KeyguardViewMediator.this) {
-                if (mFeatureFlags.isEnabled(REFACTOR_GETCURRENTUSER)) {
+                if (refactorGetCurrentUser()) {
                     notifyTrustedChangedLocked(mUpdateMonitor.getUserHasTrust(userId));
                 }
                 resetKeyguardDonePendingLocked();
@@ -1322,6 +1323,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private DeviceConfigProxy mDeviceConfig;
     private DozeParameters mDozeParameters;
     private SelectedUserInteractor mSelectedUserInteractor;
+    private KeyguardInteractor mKeyguardInteractor;
 
     private final KeyguardStateController mKeyguardStateController;
     private final KeyguardStateController.Callback mKeyguardStateControllerCallback =
@@ -1399,7 +1401,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             Lazy<DreamingToLockscreenTransitionViewModel> dreamingToLockscreenTransitionViewModel,
             SystemPropertiesHelper systemPropertiesHelper,
             Lazy<WindowManagerLockscreenVisibilityManager> wmLockscreenVisibilityManager,
-            SelectedUserInteractor selectedUserInteractor) {
+            SelectedUserInteractor selectedUserInteractor,
+            KeyguardInteractor keyguardInteractor) {
         mContext = context;
         mUserTracker = userTracker;
         mFalsingCollector = falsingCollector;
@@ -1440,6 +1443,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 }));
         mDozeParameters = dozeParameters;
         mSelectedUserInteractor = selectedUserInteractor;
+        mKeyguardInteractor = keyguardInteractor;
 
         mStatusBarStateController = statusBarStateController;
         statusBarStateController.addCallback(this);
@@ -1497,7 +1501,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
         mAlarmManager = (AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
 
-        if (!mFeatureFlags.isEnabled(REFACTOR_GETCURRENTUSER)) {
+        if (!refactorGetCurrentUser()) {
             KeyguardUpdateMonitor.setCurrentUser(mUserTracker.getUserId());
         }
 
@@ -2615,14 +2619,15 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         }
 
         if (mGoingToSleep) {
-            mUpdateMonitor.clearBiometricRecognizedWhenKeyguardDone(currentUser);
+            mUpdateMonitor.clearFingerprintRecognizedWhenKeyguardDone(currentUser);
             Log.i(TAG, "Device is going to sleep, aborting keyguardDone");
             return;
         }
         setPendingLock(false); // user may have authenticated during the screen off animation
 
         handleHide();
-        mUpdateMonitor.clearBiometricRecognizedWhenKeyguardDone(currentUser);
+        mKeyguardInteractor.keyguardDoneAnimationsFinished();
+        mUpdateMonitor.clearFingerprintRecognizedWhenKeyguardDone(currentUser);
         Trace.endSection();
     }
 

@@ -532,10 +532,9 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTripleTap_StateIsIdle_shouldInActivated() {
+    public void testTwoFingerDoubleTap_StateIsIdle_shouldInActivated() {
         goFromStateIdleTo(STATE_IDLE);
 
-        twoFingerTap();
         twoFingerTap();
         twoFingerTap();
 
@@ -546,11 +545,10 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTripleTap_StateIsActivated_shouldInIdle() {
+    public void testTwoFingerDoubleTap_StateIsActivated_shouldInIdle() {
         goFromStateIdleTo(STATE_ACTIVATED);
         reset(mMockMagnificationLogger);
 
-        twoFingerTap();
         twoFingerTap();
         twoFingerTap();
 
@@ -561,10 +559,9 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTripleTapAndHold_StateIsIdle_shouldZoomsImmediately() {
+    public void testTwoFingerDoubleTapAndHold_StateIsIdle_shouldZoomsImmediately() {
         goFromStateIdleTo(STATE_IDLE);
 
-        twoFingerTap();
         twoFingerTap();
         twoFingerTapAndHold();
 
@@ -575,10 +572,9 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTripleSwipeAndHold_StateIsIdle_shouldZoomsImmediately() {
+    public void testTwoFingerDoubleSwipeAndHold_StateIsIdle_shouldZoomsImmediately() {
         goFromStateIdleTo(STATE_IDLE);
 
-        twoFingerTap();
         twoFingerTap();
         twoFingerSwipeAndHold();
 
@@ -717,6 +713,45 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
+    public void testSecondFingerSwipe_twoPointerDownAndActivatedState_shouldInPanningState() {
+        goFromStateIdleTo(STATE_ACTIVATED);
+        PointF pointer1 = DEFAULT_POINT;
+        PointF pointer2 = new PointF(DEFAULT_X * 1.5f, DEFAULT_Y);
+
+        send(downEvent());
+        send(pointerEvent(ACTION_POINTER_DOWN, new PointF[] {pointer1, pointer2}, 1));
+        //The minimum movement to transit to panningState.
+        final float sWipeMinDistance = ViewConfiguration.get(mContext).getScaledTouchSlop();
+        pointer2.offset(sWipeMinDistance + 1, 0);
+        send(pointerEvent(ACTION_MOVE, new PointF[] {pointer1, pointer2}, 1));
+        fastForward(ViewConfiguration.getTapTimeout());
+        assertIn(STATE_PANNING);
+
+        returnToNormalFrom(STATE_PANNING);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
+    public void testTowFingerSwipe_twoPointerDownAndShortcutTriggeredState_shouldInPanningState() {
+        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
+        PointF pointer1 = DEFAULT_POINT;
+        PointF pointer2 = new PointF(DEFAULT_X * 1.5f, DEFAULT_Y);
+
+        send(downEvent());
+        send(pointerEvent(ACTION_POINTER_DOWN, new PointF[] {pointer1, pointer2}, 1));
+        //The minimum movement to transit to panningState.
+        final float sWipeMinDistance = ViewConfiguration.get(mContext).getScaledTouchSlop();
+        pointer2.offset(sWipeMinDistance + 1, 0);
+        send(pointerEvent(ACTION_MOVE, new PointF[] {pointer1, pointer2}, 1));
+        fastForward(ViewConfiguration.getTapTimeout());
+        assertIn(STATE_PANNING);
+
+        returnToNormalFrom(STATE_PANNING);
+    }
+
+    @Test
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
     public void testSecondFingerSwipe_twoPointerDownAndActivatedState_panningState() {
         goFromStateIdleTo(STATE_ACTIVATED);
         PointF pointer1 = DEFAULT_POINT;
@@ -734,6 +769,7 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
     public void testSecondFingerSwipe_twoPointerDownAndShortcutTriggeredState_panningState() {
         goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
         PointF pointer1 = DEFAULT_POINT;

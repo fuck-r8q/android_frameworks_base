@@ -573,7 +573,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     boolean mClientVisibilityDeferred;// was the visibility change message to client deferred?
     boolean idle;           // has the activity gone idle?
     boolean hasBeenLaunched;// has this activity ever been launched?
-    boolean frozenBeforeDestroy;// has been frozen but not yet destroyed.
     boolean immersive;      // immersive mode (don't interrupt if possible)
     boolean forceNewConfig; // force re-create with new config next time
     boolean supportsEnterPipOnTaskSwitch;  // This flag is set by the system to indicate that the
@@ -1218,8 +1217,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 pw.print(" noDisplay="); pw.print(noDisplay);
                 pw.print(" immersive="); pw.print(immersive);
                 pw.print(" launchMode="); pw.println(launchMode);
-        pw.print(prefix); pw.print("frozenBeforeDestroy="); pw.print(frozenBeforeDestroy);
-                pw.print(" forceNewConfig="); pw.println(forceNewConfig);
         pw.print(prefix); pw.print("mActivityType=");
                 pw.println(activityTypeToString(getActivityType()));
         pw.print(prefix); pw.print("mImeInsetsFrozenUntilStartInput=");
@@ -3875,7 +3872,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // updated for restoring original orientation of the display.
         if (next == null) {
             mRootWindowContainer.ensureVisibilityAndConfig(next, getDisplayId(),
-                    false /* markFrozenIfConfigChanged */, true /* deferResume */);
+                    true /* deferResume */);
         }
         if (activityRemoved) {
             mRootWindowContainer.resumeFocusedTasksTopActivities();
@@ -4122,7 +4119,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         cleanUpSplashScreen();
 
         deferRelaunchUntilPaused = false;
-        frozenBeforeDestroy = false;
 
         if (setState) {
             callServiceTrackeronActivityStatechange(DESTROYED, true);
@@ -6387,7 +6383,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     }
 
     void handleAlreadyVisible() {
-        stopFreezingScreenLocked(false);
         try {
             if (returningOptions != null) {
                 app.getThread().scheduleOnNewActivityOptions(token, returningOptions.toBundle());
@@ -6829,19 +6824,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     public void onAppFreezeTimeout() {
         Slog.w(TAG_WM, "Force clearing freeze: " + this);
         stopFreezingScreen(true, true);
-    }
-
-    void stopFreezingScreenLocked(boolean force) {
-        if (force || frozenBeforeDestroy) {
-            frozenBeforeDestroy = false;
-            if (getParent() == null) {
-                return;
-            }
-            ProtoLog.v(WM_DEBUG_ORIENTATION,
-                        "Clear freezing of %s: visible=%b freezing=%b", token,
-                                isVisible(), isFreezingScreen());
-            stopFreezingScreen(true, force);
-        }
     }
 
     void stopFreezingScreen(boolean unfreezeSurfaceNow, boolean force) {
@@ -9745,7 +9727,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (finishing) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration doesn't matter "
                     + "in finishing %s", this);
-            stopFreezingScreenLocked(false);
             return true;
         }
 
@@ -9837,7 +9818,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // pick that up next time it starts.
         if (!attachedToProcess()) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration doesn't matter not running %s", this);
-            stopFreezingScreenLocked(false);
             forceNewConfig = false;
             return true;
         }
@@ -9905,9 +9885,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
         notifyDisplayCompatPolicyAboutConfigurationChange(
                 mLastReportedConfiguration.getMergedConfiguration(), mTmpConfig);
-
-        stopFreezingScreenLocked(false);
-
         return true;
     }
 

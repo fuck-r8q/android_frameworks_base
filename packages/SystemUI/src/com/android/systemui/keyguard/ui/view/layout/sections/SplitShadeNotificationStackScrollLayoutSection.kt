@@ -19,14 +19,12 @@ package com.android.systemui.keyguard.ui.view.layout.sections
 
 import android.content.Context
 import androidx.constraintlayout.widget.ConstraintSet
-import androidx.constraintlayout.widget.ConstraintSet.BOTTOM
 import androidx.constraintlayout.widget.ConstraintSet.END
 import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
 import androidx.constraintlayout.widget.ConstraintSet.START
 import androidx.constraintlayout.widget.ConstraintSet.TOP
 import com.android.systemui.Flags.migrateClocksToBlueprint
 import com.android.systemui.dagger.qualifiers.Main
-import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor
 import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardSmartspaceViewModel
 import com.android.systemui.res.R
@@ -87,18 +85,17 @@ constructor(
                 )
                 setGoneMargin(R.id.nssl_placeholder, TOP, bottomMargin)
             } else {
-                connect(R.id.nssl_placeholder, TOP, R.id.keyguard_status_view, TOP, bottomMargin)
+                val splitShadeTopMargin =
+                    context.resources.getDimensionPixelSize(
+                        R.dimen.large_screen_shade_header_height
+                    )
+                connect(R.id.nssl_placeholder, TOP, PARENT_ID, TOP, splitShadeTopMargin)
             }
+
             connect(R.id.nssl_placeholder, START, PARENT_ID, START)
             connect(R.id.nssl_placeholder, END, PARENT_ID, END)
 
-            val lockId =
-                if (DeviceEntryUdfpsRefactor.isEnabled) {
-                    R.id.device_entry_icon_view
-                } else {
-                    R.id.lock_icon_view
-                }
-            connect(R.id.nssl_placeholder, BOTTOM, lockId, TOP)
+            addNotificationPlaceholderBarrier(this)
         }
     }
 }
