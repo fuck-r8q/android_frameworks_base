@@ -53,7 +53,6 @@ import android.os.Trace;
 import android.os.VibrationAttributes;
 import android.os.VibrationEffect;
 import android.os.VibratorInfo;
-import android.os.vibrator.Flags;
 import android.os.vibrator.PrebakedSegment;
 import android.os.vibrator.VibrationEffectSegment;
 import android.os.vibrator.VibratorInfoFactory;
@@ -87,7 +86,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
 
 /** System implementation of {@link IVibratorManagerService}. */
 public class VibratorManagerService extends IVibratorManagerService.Stub {
@@ -273,10 +271,11 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
         context.registerReceiver(mIntentReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
 
         injector.addService(EXTERNAL_VIBRATOR_SERVICE, new ExternalVibratorService());
-        if (Flags.adaptiveHapticsEnabled()) {
+        if (ServiceManager.isDeclared(VIBRATOR_CONTROL_SERVICE)) {
             injector.addService(VIBRATOR_CONTROL_SERVICE,
                     new VibratorControlService(new VibratorControllerHolder(), mLock));
         }
+
     }
 
     /** Finish initialization at boot phase {@link SystemService#PHASE_SYSTEM_SERVICES_READY}. */
@@ -411,9 +410,13 @@ public class VibratorManagerService extends IVibratorManagerService.Stub {
 
     @Override // Binder call
     public void performHapticFeedback(
-            int uid, int deviceId, String opPkg, int constant, boolean always, String reason,
-            IBinder token) {
-        performHapticFeedbackInternal(uid, deviceId, opPkg, constant, always, reason, token);
+            int uid, int deviceId, String opPkg, int constant, boolean always, String reason) {
+        // Note that the `performHapticFeedback` method does not take a token argument from the
+        // caller, and instead, uses this service as the token. This is to mitigate performance
+        // impact that would otherwise be caused due to marshal latency. Haptic feedback effects are
+        // short-lived, so we don't need to cancel when the process dies.
+        performHapticFeedbackInternal(
+                uid, deviceId, opPkg, constant, always, reason, /* token= */ this);
     }
 
     /**

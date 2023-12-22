@@ -1129,6 +1129,7 @@ class ActivityStarter {
                             callerApp,
                             request.originatingPendingIntent,
                             request.forcedBalByPiSender,
+                            resultRecord,
                             intent,
                             checkedOptions);
                 request.logMessage.append(" (").append(balVerdict).append(")");
@@ -1556,8 +1557,7 @@ class ActivityStarter {
         final ActivityRecord currentTop = startedActivityRootTask.topRunningActivity();
         if (currentTop != null && currentTop.shouldUpdateConfigForDisplayChanged()) {
             mRootWindowContainer.ensureVisibilityAndConfig(
-                    currentTop, currentTop.getDisplayId(),
-                    true /* markFrozenIfConfigChanged */, false /* deferResume */);
+                    currentTop, currentTop.getDisplayId(), false /* deferResume */);
         }
 
         if (!mAvoidMoveToFront && mDoResume && mRootWindowContainer

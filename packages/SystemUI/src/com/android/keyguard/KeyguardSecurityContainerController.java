@@ -27,6 +27,8 @@ import static com.android.keyguard.KeyguardSecurityContainer.BOUNCER_DISMISS_SIM
 import static com.android.keyguard.KeyguardSecurityContainer.USER_TYPE_PRIMARY;
 import static com.android.keyguard.KeyguardSecurityContainer.USER_TYPE_SECONDARY_USER;
 import static com.android.keyguard.KeyguardSecurityContainer.USER_TYPE_WORK_PROFILE;
+import static com.android.keyguard.KeyguardSecurityModel.SecurityMode.SimPin;
+import static com.android.keyguard.KeyguardSecurityModel.SecurityMode.SimPuk;
 import static com.android.systemui.DejankUtils.whitelistIpcs;
 import static com.android.systemui.flags.Flags.LOCKSCREEN_ENABLE_LANDSCAPE;
 import static com.android.systemui.flags.Flags.REVAMPED_BOUNCER_MESSAGES;
@@ -36,7 +38,7 @@ import android.app.admin.DevicePolicyManager;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Resources;
-import android.hardware.biometrics.BiometricOverlayConstants;
+import android.hardware.biometrics.BiometricRequestConstants;
 import android.media.AudioManager;
 import android.metrics.LogMaker;
 import android.os.SystemClock;
@@ -72,6 +74,7 @@ import com.android.systemui.Gefingerpoken;
 import com.android.systemui.biometrics.FaceAuthAccessibilityDelegate;
 import com.android.systemui.biometrics.SideFpsController;
 import com.android.systemui.biometrics.SideFpsUiRequestSource;
+import com.android.systemui.biometrics.shared.SideFpsControllerRefactor;
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.classifier.FalsingA11yDelegate;
@@ -99,6 +102,7 @@ import com.android.systemui.util.settings.GlobalSettings;
 import dagger.Lazy;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Optional;
 
 import javax.inject.Inject;
@@ -164,8 +168,8 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
                     }
                     mCurrentUser = mSelectedUserInteractor.getSelectedUserId();
                     showPrimarySecurityScreen(false);
-                    if (mCurrentSecurityMode != SecurityMode.SimPin
-                            && mCurrentSecurityMode != SecurityMode.SimPuk) {
+                    if (mCurrentSecurityMode != SimPin
+                            && mCurrentSecurityMode != SimPuk) {
                         reinflateViewFlipper((l) -> {
                         });
                     }
@@ -334,6 +338,11 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         public void onSecurityModeChanged(SecurityMode securityMode, boolean needsInput) {
             mViewMediatorCallback.setNeedsInput(needsInput);
         }
+
+        @Override
+        public void showCurrentSecurityScreen() {
+            showPrimarySecurityScreen(false);
+        }
     };
 
     private final SwipeListener mSwipeListener = new SwipeListener() {
@@ -478,7 +487,11 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         mSceneContainerFlags = sceneContainerFlags;
         mGlobalSettings = globalSettings;
         mSessionTracker = sessionTracker;
-        mSideFpsController = sideFpsController;
+        if (SideFpsControllerRefactor.isEnabled()) {
+            mSideFpsController = Optional.empty();
+        } else {
+            mSideFpsController = sideFpsController;
+        }
         mFalsingA11yDelegate = falsingA11yDelegate;
         mTelephonyManager = telephonyManager;
         mViewMediatorCallback = viewMediatorCallback;
@@ -561,12 +574,14 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         mView.clearFocus();
     }
 
+    // TODO(b/288175061): remove with Flags.FLAG_SIDEFPS_CONTROLLER_REFACTOR
     /**
      * Shows and hides the side finger print sensor animation.
      *
      * @param isVisible sets whether we show or hide the side fps animation
      */
     public void updateSideFpsVisibility(boolean isVisible) {
+        SideFpsControllerRefactor.assertInLegacyMode();
         if (!mSideFpsController.isPresent()) {
             return;
         }
@@ -574,7 +589,7 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
         if (isVisible) {
             mSideFpsController.get().show(
                     SideFpsUiRequestSource.PRIMARY_BOUNCER,
-                    BiometricOverlayConstants.REASON_AUTH_KEYGUARD
+                    BiometricRequestConstants.REASON_AUTH_KEYGUARD
             );
         } else {
             mSideFpsController.get().hide(SideFpsUiRequestSource.PRIMARY_BOUNCER);
@@ -888,7 +903,8 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
                         finish = true;
                         eventSubtype = BOUNCER_DISMISS_SIM;
                         uiEvent = BouncerUiEvent.BOUNCER_DISMISS_SIM;
-                    } else {
+                    } else if (Arrays.asList(SimPin, SimPuk).contains(securityMode)) {
+                        // There are additional screens to the sim pin/puk flow.
                         showSecurityScreen(securityMode);
                     }
                     break;
@@ -1095,8 +1111,8 @@ public class KeyguardSecurityContainerController extends ViewController<Keyguard
     }
 
     private void configureMode() {
-        boolean useSimSecurity = mCurrentSecurityMode == SecurityMode.SimPin
-                || mCurrentSecurityMode == SecurityMode.SimPuk;
+        boolean useSimSecurity = mCurrentSecurityMode == SimPin
+                || mCurrentSecurityMode == SimPuk;
         int mode = KeyguardSecurityContainer.MODE_DEFAULT;
         if (canDisplayUserSwitcher() && !useSimSecurity) {
             mode = KeyguardSecurityContainer.MODE_USER_SWITCHER;

@@ -59,6 +59,7 @@ import android.provider.Settings;
 import android.service.notification.ConversationChannelWrapper;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.RankingHelperProto;
+import android.service.notification.ZenModeConfig;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
 import android.util.ArrayMap;
@@ -160,7 +161,6 @@ public class PreferencesHelper implements RankingConfig {
     static final boolean DEFAULT_BUBBLES_ENABLED = true;
     @VisibleForTesting
     static final int DEFAULT_BUBBLE_PREFERENCE = BUBBLE_PREFERENCE_NONE;
-    static final boolean DEFAULT_MEDIA_NOTIFICATION_FILTERING = true;
 
     private static final int NOTIFICATION_UPDATE_LOG_SUBTYPE_FROM_APP = 0;
     private static final int NOTIFICATION_UPDATE_LOG_SUBTYPE_FROM_USER = 1;
@@ -199,7 +199,7 @@ public class PreferencesHelper implements RankingConfig {
     private SparseBooleanArray mBubblesEnabled;
     private SparseBooleanArray mLockScreenShowNotifications;
     private SparseBooleanArray mLockScreenPrivateNotifications;
-    private boolean mIsMediaNotificationFilteringEnabled = DEFAULT_MEDIA_NOTIFICATION_FILTERING;
+    private boolean mIsMediaNotificationFilteringEnabled;
     // When modes_api flag is enabled, this value only tracks whether the current user has any
     // channels marked as "priority channels", but not necessarily whether they are permitted
     // to bypass DND by current zen policy.
@@ -223,6 +223,8 @@ public class PreferencesHelper implements RankingConfig {
         mAppOps = appOpsManager;
         mUserProfiles = userProfiles;
         mShowReviewPermissionsNotification = showReviewPermissionsNotification;
+        mIsMediaNotificationFilteringEnabled = context.getResources()
+                .getBoolean(R.bool.config_quickSettingsShowMediaPlayer);
 
         XML_VERSION = 4;
 
@@ -1862,12 +1864,16 @@ public class PreferencesHelper implements RankingConfig {
     public void updateZenPolicy(boolean areChannelsBypassingDnd, int callingUid,
             boolean fromSystemOrSystemUi) {
         NotificationManager.Policy policy = mZenModeHelper.getNotificationPolicy();
-        mZenModeHelper.setNotificationPolicy(new NotificationManager.Policy(
-                policy.priorityCategories, policy.priorityCallSenders,
-                policy.priorityMessageSenders, policy.suppressedVisualEffects,
-                (areChannelsBypassingDnd ? NotificationManager.Policy.STATE_CHANNELS_BYPASSING_DND
-                        : 0),
-                policy.priorityConversationSenders), callingUid, fromSystemOrSystemUi);
+        mZenModeHelper.setNotificationPolicy(
+                new NotificationManager.Policy(
+                        policy.priorityCategories, policy.priorityCallSenders,
+                        policy.priorityMessageSenders, policy.suppressedVisualEffects,
+                        (areChannelsBypassingDnd
+                                ? NotificationManager.Policy.STATE_CHANNELS_BYPASSING_DND : 0),
+                        policy.priorityConversationSenders),
+                fromSystemOrSystemUi ? ZenModeConfig.UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI
+                        : ZenModeConfig.UPDATE_ORIGIN_APP,
+                callingUid);
     }
 
     // TODO: b/310620812 - rename to hasPriorityChannels() when modes_api is inlined.
@@ -2687,8 +2693,11 @@ public class PreferencesHelper implements RankingConfig {
 
     /** Requests check of the feature setting for showing media notifications in quick settings. */
     public void updateMediaNotificationFilteringEnabled() {
+        // TODO(b/192412820): Consolidate SHOW_MEDIA_ON_QUICK_SETTINGS into compile-time value.
         final boolean newValue = Settings.Global.getInt(mContext.getContentResolver(),
-                Settings.Global.SHOW_MEDIA_ON_QUICK_SETTINGS, 1) > 0;
+                Settings.Global.SHOW_MEDIA_ON_QUICK_SETTINGS, 1) > 0
+                        && mContext.getResources().getBoolean(
+                                R.bool.config_quickSettingsShowMediaPlayer);
         if (newValue != mIsMediaNotificationFilteringEnabled) {
             mIsMediaNotificationFilteringEnabled = newValue;
             updateConfig();

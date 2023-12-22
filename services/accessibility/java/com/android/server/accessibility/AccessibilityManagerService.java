@@ -195,6 +195,7 @@ import java.util.function.Predicate;
  * event dispatch for {@link AccessibilityEvent}s generated across all processes
  * on the device. Events are dispatched to {@link AccessibilityService}s.
  */
+@SuppressWarnings("MissingPermissionAnnotation")
 public class AccessibilityManagerService extends IAccessibilityManager.Stub
         implements AbstractAccessibilityServiceConnection.SystemSupport,
         AccessibilityUserState.ServiceInfoChangeListener,
@@ -2825,8 +2826,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 flags |= AccessibilityInputFilter.FLAG_FEATURE_INJECT_MOTION_EVENTS;
             }
             int combinedGenericMotionEventSources = 0;
+            int combinedMotionEventObservedSources = 0;
             for (AccessibilityServiceConnection connection : userState.mBoundServices) {
                 combinedGenericMotionEventSources |= connection.mGenericMotionEventSources;
+                combinedMotionEventObservedSources |= connection.mObservedMotionEventSources;
             }
             if (combinedGenericMotionEventSources != 0) {
                 flags |= AccessibilityInputFilter.FLAG_FEATURE_INTERCEPT_GENERIC_MOTION_EVENTS;
@@ -2845,6 +2848,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 mInputFilter.setUserAndEnabledFeatures(userState.mUserId, flags);
                 mInputFilter.setCombinedGenericMotionEventSources(
                         combinedGenericMotionEventSources);
+                mInputFilter.setCombinedMotionEventObservedSources(
+                        combinedMotionEventObservedSources);
             } else {
                 if (mHasInputFilter) {
                     mHasInputFilter = false;

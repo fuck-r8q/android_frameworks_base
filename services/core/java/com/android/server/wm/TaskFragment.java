@@ -73,6 +73,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
+import android.app.IApplicationThread;
 import android.app.ResultInfo;
 import android.app.WindowConfiguration;
 import android.app.servertransaction.ActivityResultItem;
@@ -105,6 +106,7 @@ import com.android.internal.app.ActivityTrigger;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.server.am.HostingRecord;
 import com.android.server.pm.pkg.AndroidPackage;
+import com.android.window.flags.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -1518,7 +1520,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 // TODO: Remove this once visibilities are set correctly immediately when
                 // starting an activity.
                 notUpdated = !mRootWindowContainer.ensureVisibilityAndConfig(next, getDisplayId(),
-                        true /* markFrozenIfConfigChanged */, false /* deferResume */);
+                        false /* deferResume */);
             }
 
             if (notUpdated) {
@@ -1542,23 +1544,38 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
 
             try {
-                final ClientTransaction transaction = ClientTransaction.obtain(
-                        next.app.getThread());
+                final IApplicationThread appThread = next.app.getThread();
+                final ClientTransaction transaction = Flags.bundleClientTransactionFlag()
+                        ? null
+                        : ClientTransaction.obtain(appThread);
                 // Deliver all pending results.
-                ArrayList<ResultInfo> a = next.results;
+                final ArrayList<ResultInfo> a = next.results;
                 if (a != null) {
                     final int size = a.size();
                     if (!next.finishing && size > 0) {
                         if (DEBUG_RESULTS) {
                             Slog.v(TAG_RESULTS, "Delivering results to " + next + ": " + a);
                         }
-                        transaction.addCallback(ActivityResultItem.obtain(next.token, a));
+                        final ActivityResultItem activityResultItem = ActivityResultItem.obtain(
+                                next.token, a);
+                        if (transaction == null) {
+                            mAtmService.getLifecycleManager().scheduleTransactionItem(
+                                    appThread, activityResultItem);
+                        } else {
+                            transaction.addCallback(activityResultItem);
+                        }
                     }
                 }
 
                 if (next.newIntents != null) {
-                    transaction.addCallback(
-                            NewIntentItem.obtain(next.token, next.newIntents, true /* resume */));
+                    final NewIntentItem newIntentItem = NewIntentItem.obtain(
+                            next.token, next.newIntents, true /* resume */);
+                    if (transaction == null) {
+                        mAtmService.getLifecycleManager().scheduleTransactionItem(
+                                appThread, newIntentItem);
+                    } else {
+                        transaction.addCallback(newIntentItem);
+                    }
                 }
 
                 // Well the app will no longer be stopped.
@@ -1572,10 +1589,16 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 final int topProcessState = mAtmService.mTopProcessState;
                 next.app.setPendingUiCleanAndForceProcessStateUpTo(topProcessState);
                 next.abortAndClearOptionsAnimation();
-                transaction.setLifecycleStateRequest(
-                        ResumeActivityItem.obtain(next.token, topProcessState,
-                                dc.isNextTransitionForward(), next.shouldSendCompatFakeFocus()));
-                mAtmService.getLifecycleManager().scheduleTransaction(transaction);
+                final ResumeActivityItem resumeActivityItem = ResumeActivityItem.obtain(
+                        next.token, topProcessState, dc.isNextTransitionForward(),
+                        next.shouldSendCompatFakeFocus());
+                if (transaction == null) {
+                    mAtmService.getLifecycleManager().scheduleTransactionItem(
+                            appThread, resumeActivityItem);
+                } else {
+                    transaction.setLifecycleStateRequest(resumeActivityItem);
+                    mAtmService.getLifecycleManager().scheduleTransaction(transaction);
+                }
 
                 ProtoLog.d(WM_DEBUG_STATES, "resumeTopActivity: Resumed %s", next);
             } catch (Exception e) {
@@ -1901,7 +1924,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             // In that case go ahead and remove the freeze this activity has on the screen
             // since it is no longer visible.
             if (prev != null) {
-                prev.stopFreezingScreenLocked(true /*force*/);
+                prev.stopFreezingScreen(true /* unfreezeNow */, true /* force */);
             }
             mPausingActivity = null;
         }

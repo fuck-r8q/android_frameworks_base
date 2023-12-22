@@ -35,7 +35,6 @@ import static android.media.AudioSystem.isBluetoothOutDevice;
 import static android.media.AudioSystem.isBluetoothScoOutDevice;
 import static android.media.audio.Flags.automaticBtDeviceType;
 
-
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 
 import android.annotation.NonNull;
@@ -88,7 +87,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -111,6 +109,14 @@ public class AudioDeviceInventory {
     private static final String SETTING_DEVICE_SEPARATOR_CHAR = "|";
     private static final String SETTING_DEVICE_SEPARATOR = "\\|";
 
+    /** Max String length that can be persisted within the Settings. */
+    // LINT.IfChange(settings_max_length_per_string)
+    private static final int MAX_SETTINGS_LENGTH_PER_STRING = 32768;
+    // LINT.ThenChange(/packages/SettingsProvider/src/com/android/providers/settings/SettingsState.java)
+
+    private static final int MAX_DEVICE_INVENTORY_ENTRIES =
+            MAX_SETTINGS_LENGTH_PER_STRING / AdiDeviceState.getPeristedMaxSize();
+
     // lock to synchronize all access to mConnectedDevices and mApmConnectedDevices
     private final Object mDevicesLock = new Object();
 
@@ -120,7 +126,8 @@ public class AudioDeviceInventory {
     private final Object mDeviceInventoryLock = new Object();
 
     @GuardedBy("mDeviceInventoryLock")
-    private final HashMap<Pair<Integer, String>, AdiDeviceState> mDeviceInventory = new HashMap<>();
+    private final LinkedHashMap<Pair<Integer, String>, AdiDeviceState> mDeviceInventory =
+            new LinkedHashMap<>();
 
     Collection<AdiDeviceState> getImmutableDeviceInventory() {
         final List<AdiDeviceState> newList;
@@ -143,6 +150,7 @@ public class AudioDeviceInventory {
                 oldState.setSAEnabled(newState.isSAEnabled());
                 return oldState;
             });
+            checkDeviceInventorySize_l();
         }
         mDeviceBroker.postSynchronizeAdiDevicesInInventory(deviceState);
     }
@@ -180,6 +188,8 @@ public class AudioDeviceInventory {
             ads.setAudioDeviceCategory(category);
 
             mDeviceInventory.put(ads.getDeviceId(), ads);
+            checkDeviceInventorySize_l();
+
             mDeviceBroker.postUpdatedAdiDeviceState(ads);
             mDeviceBroker.postPersistAudioDeviceSettings();
         }
@@ -207,6 +217,7 @@ public class AudioDeviceInventory {
                         }
                         return oldState;
                     });
+            checkDeviceInventorySize_l();
         }
         if (updatedCategory.get()) {
             mDeviceBroker.postUpdatedAdiDeviceState(deviceState);
@@ -275,6 +286,18 @@ public class AudioDeviceInventory {
                 if (found) {
                     mDeviceBroker.postPersistAudioDeviceSettings();
                 }
+            }
+        }
+    }
+
+    @GuardedBy("mDeviceInventoryLock")
+    private void checkDeviceInventorySize_l() {
+        if (mDeviceInventory.size() > MAX_DEVICE_INVENTORY_ENTRIES) {
+            // remove the first element
+            Iterator<Entry<Pair<Integer, String>, AdiDeviceState>> iterator =
+                    mDeviceInventory.entrySet().iterator();
+            if (iterator.hasNext()) {
+                iterator.remove();
             }
         }
     }
@@ -1542,7 +1565,7 @@ public class AudioDeviceInventory {
             } else {
                 status = addOp.deviceRoleAction(useCase, role, devices);
                 if (status == AudioSystem.SUCCESS) {
-                    rolesMap.put(key, devices);
+                    rolesMap.put(key, new ArrayList(devices));
                 }
             }
             return status;
@@ -2924,7 +2947,7 @@ public class AudioDeviceInventory {
             deviceCatalogSize = mDeviceInventory.size();
 
             final StringBuilder settingsBuilder = new StringBuilder(
-                            deviceCatalogSize * AdiDeviceState.getPeristedMaxSize());
+                    deviceCatalogSize * AdiDeviceState.getPeristedMaxSize());
 
             Iterator<AdiDeviceState> iterator = mDeviceInventory.values().iterator();
             if (iterator.hasNext()) {

@@ -18,7 +18,7 @@
 package com.android.keyguard
 
 import android.content.res.Configuration
-import android.hardware.biometrics.BiometricOverlayConstants
+import android.hardware.biometrics.BiometricRequestConstants
 import android.media.AudioManager
 import android.telephony.TelephonyManager
 import android.testing.TestableLooper.RunWithLooper
@@ -59,6 +59,7 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.model.ObservableTransitionState
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.shared.model.SceneModel
+import com.android.systemui.shared.Flags.FLAG_SIDEFPS_CONTROLLER_REFACTOR
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.DevicePostureController
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
@@ -235,6 +236,7 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
                 sceneInteractor = sceneInteractor,
             )
 
+        mSetFlagsRule.disableFlags(FLAG_SIDEFPS_CONTROLLER_REFACTOR)
         underTest =
             KeyguardSecurityContainerController(
                 view,
@@ -465,29 +467,6 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
     }
 
     @Test
-    fun showNextSecurityScreenOrFinish_setsSecurityScreenToPinAfterSimPinUnlock() {
-        // GIVEN the current security method is SimPin
-        whenever(keyguardUpdateMonitor.getUserHasTrust(anyInt())).thenReturn(false)
-        whenever(keyguardUpdateMonitor.getUserUnlockedWithBiometric(TARGET_USER_ID))
-            .thenReturn(false)
-        underTest.showSecurityScreen(SecurityMode.SimPin)
-
-        // WHEN a request is made from the SimPin screens to show the next security method
-        whenever(keyguardSecurityModel.getSecurityMode(TARGET_USER_ID)).thenReturn(SecurityMode.PIN)
-        underTest.showNextSecurityScreenOrFinish(
-            /* authenticated= */ true,
-            TARGET_USER_ID,
-            /* bypassSecondaryLockScreen= */ true,
-            SecurityMode.SimPin
-        )
-
-        // THEN the next security method of PIN is set, and the keyguard is not marked as done
-        verify(viewMediatorCallback, never()).keyguardDonePending(anyInt())
-        verify(viewMediatorCallback, never()).keyguardDone(anyInt())
-        Truth.assertThat(underTest.currentSecurityMode).isEqualTo(SecurityMode.PIN)
-    }
-
-    @Test
     fun showNextSecurityScreenOrFinish_DeviceNotSecure() {
         // GIVEN the current security method is SimPin
         whenever(keyguardUpdateMonitor.getUserHasTrust(anyInt())).thenReturn(false)
@@ -575,6 +554,57 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
 
         // THEN the next security method of None will dismiss keyguard.
         verify(viewMediatorCallback).keyguardDone(anyInt())
+    }
+
+    @Test
+    fun showNextSecurityScreenOrFinish_SimPin_Password() {
+        // GIVEN the current security method is SimPin
+        whenever(keyguardUpdateMonitor.getUserHasTrust(anyInt())).thenReturn(false)
+        whenever(keyguardUpdateMonitor.getUserUnlockedWithBiometric(TARGET_USER_ID))
+            .thenReturn(false)
+        underTest.showSecurityScreen(SecurityMode.SimPin)
+
+        // WHEN a request is made from the SimPin screens to show the next security method
+        whenever(keyguardSecurityModel.getSecurityMode(TARGET_USER_ID))
+            .thenReturn(SecurityMode.Password)
+        // WHEN security method is SWIPE
+        whenever(lockPatternUtils.isLockScreenDisabled(anyInt())).thenReturn(false)
+        whenever(deviceProvisionedController.isUserSetup(anyInt())).thenReturn(false)
+        underTest.showNextSecurityScreenOrFinish(
+            /* authenticated= */ true,
+            TARGET_USER_ID,
+            /* bypassSecondaryLockScreen= */ true,
+            SecurityMode.SimPin
+        )
+
+        // THEN we will not show the password screen.
+        verify(viewFlipperController, never())
+            .getSecurityView(eq(SecurityMode.Password), any(), any())
+    }
+
+    @Test
+    fun showNextSecurityScreenOrFinish_SimPin_SimPin() {
+        // GIVEN the current security method is SimPin
+        whenever(keyguardUpdateMonitor.getUserHasTrust(anyInt())).thenReturn(false)
+        whenever(keyguardUpdateMonitor.getUserUnlockedWithBiometric(TARGET_USER_ID))
+            .thenReturn(false)
+        underTest.showSecurityScreen(SecurityMode.SimPin)
+
+        // WHEN a request is made from the SimPin screens to show the next security method
+        whenever(keyguardSecurityModel.getSecurityMode(TARGET_USER_ID))
+            .thenReturn(SecurityMode.SimPin)
+        // WHEN security method is SWIPE
+        whenever(lockPatternUtils.isLockScreenDisabled(anyInt())).thenReturn(false)
+        whenever(deviceProvisionedController.isUserSetup(anyInt())).thenReturn(false)
+        underTest.showNextSecurityScreenOrFinish(
+            /* authenticated= */ true,
+            TARGET_USER_ID,
+            /* bypassSecondaryLockScreen= */ true,
+            SecurityMode.SimPin
+        )
+
+        // THEN we will not show the password screen.
+        verify(viewFlipperController).getSecurityView(eq(SecurityMode.SimPin), any(), any())
     }
 
     @Test
@@ -735,16 +765,18 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
 
     @Test
     fun sideFpsControllerShow() {
+        mSetFlagsRule.disableFlags(FLAG_SIDEFPS_CONTROLLER_REFACTOR)
         underTest.updateSideFpsVisibility(/* isVisible= */ true)
         verify(sideFpsController)
             .show(
                 SideFpsUiRequestSource.PRIMARY_BOUNCER,
-                BiometricOverlayConstants.REASON_AUTH_KEYGUARD
+                BiometricRequestConstants.REASON_AUTH_KEYGUARD
             )
     }
 
     @Test
     fun sideFpsControllerHide() {
+        mSetFlagsRule.disableFlags(FLAG_SIDEFPS_CONTROLLER_REFACTOR)
         underTest.updateSideFpsVisibility(/* isVisible= */ false)
         verify(sideFpsController).hide(SideFpsUiRequestSource.PRIMARY_BOUNCER)
     }

@@ -1,10 +1,24 @@
 package: "android.security"
 
 flag {
+    name: "certificate_transparency_configuration"
+    namespace: "network_security"
+    description: "Enable certificate transparency setting in the network security config"
+    bug: "28746284"
+}
+
+flag {
     name: "fsverity_api"
     namespace: "hardware_backed_security"
     description: "Feature flag for fs-verity API"
     bug: "285185747"
+}
+
+flag {
+    name: "mgf1_digest_setter"
+    namespace: "hardware_backed_security"
+    description: "Feature flag for mgf1 digest setter in key generation and import parameters."
+    bug: "308378912"
 }
 
 flag {

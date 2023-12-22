@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import static com.android.server.job.controllers.JobStatus.CONSTRAINT_BACKGROUND
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -167,19 +168,20 @@ public class BackgroundJobsControllerTest {
     }
 
     private void setStoppedState(int uid, String pkgName, boolean stopped) {
+        try {
+            doReturn(stopped).when(mPackageManagerInternal).isPackageStopped(pkgName, uid);
+            sendPackageStoppedBroadcast(uid, pkgName, stopped);
+        } catch (PackageManager.NameNotFoundException e) {
+            fail("Unable to set stopped state for unknown package: " + pkgName);
+        }
+    }
+
+    private void sendPackageStoppedBroadcast(int uid, String pkgName, boolean stopped) {
         Intent intent = new Intent(
                 stopped ? Intent.ACTION_PACKAGE_RESTARTED : Intent.ACTION_PACKAGE_UNSTOPPED);
         intent.putExtra(Intent.EXTRA_UID, uid);
         intent.setData(Uri.fromParts(IntentFilter.SCHEME_PACKAGE, pkgName, null));
         mStoppedReceiver.onReceive(mContext, intent);
-    }
-
-    private void setUidBias(int uid, int bias) {
-        int prevBias = mJobSchedulerService.getUidBias(uid);
-        doReturn(bias).when(mJobSchedulerService).getUidBias(uid);
-        synchronized (mBackgroundJobsController.mLock) {
-            mBackgroundJobsController.onUidBiasChangedLocked(uid, prevBias, bias);
-        }
     }
 
     private void trackJobs(JobStatus... jobs) {
@@ -205,6 +207,47 @@ public class BackgroundJobsControllerTest {
         // Make sure tests aren't passing just because the default bucket is likely ACTIVE.
         js.setStandbyBucket(FREQUENT_INDEX);
         return js;
+    }
+
+    @Test
+    public void testRestartedBroadcastWithoutStopping() {
+        mSetFlagsRule.enableFlags(android.content.pm.Flags.FLAG_STAY_STOPPED);
+        // Scheduled by SOURCE_UID:SOURCE_PACKAGE for itself.
+        JobStatus directJob1 = createJobStatus("testStopped", SOURCE_PACKAGE, SOURCE_UID,
+                createBaseJobInfoBuilder(SOURCE_PACKAGE, 1).build());
+        // Scheduled by ALTERNATE_UID:ALTERNATE_SOURCE_PACKAGE for itself.
+        JobStatus directJob2 = createJobStatus("testStopped",
+                ALTERNATE_SOURCE_PACKAGE, ALTERNATE_UID,
+                createBaseJobInfoBuilder(ALTERNATE_SOURCE_PACKAGE, 2).build());
+        // Scheduled by CALLING_PACKAGE for SOURCE_PACKAGE.
+        JobStatus proxyJob1 = createJobStatus("testStopped", SOURCE_PACKAGE, CALLING_UID,
+                createBaseJobInfoBuilder(CALLING_PACKAGE, 3).build());
+        // Scheduled by CALLING_PACKAGE for ALTERNATE_SOURCE_PACKAGE.
+        JobStatus proxyJob2 = createJobStatus("testStopped",
+                ALTERNATE_SOURCE_PACKAGE, CALLING_UID,
+                createBaseJobInfoBuilder(CALLING_PACKAGE, 4).build());
+
+        trackJobs(directJob1, directJob2, proxyJob1, proxyJob2);
+
+        sendPackageStoppedBroadcast(ALTERNATE_UID, ALTERNATE_SOURCE_PACKAGE, true);
+        assertTrue(directJob1.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(directJob1.isUserBgRestricted());
+        assertTrue(directJob2.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(directJob2.isUserBgRestricted());
+        assertTrue(proxyJob1.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(proxyJob1.isUserBgRestricted());
+        assertTrue(proxyJob2.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(proxyJob2.isUserBgRestricted());
+
+        sendPackageStoppedBroadcast(ALTERNATE_UID, ALTERNATE_SOURCE_PACKAGE, false);
+        assertTrue(directJob1.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(directJob1.isUserBgRestricted());
+        assertTrue(directJob2.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(directJob2.isUserBgRestricted());
+        assertTrue(proxyJob1.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(proxyJob1.isUserBgRestricted());
+        assertTrue(proxyJob2.isConstraintSatisfied(CONSTRAINT_BACKGROUND_NOT_RESTRICTED));
+        assertFalse(proxyJob2.isUserBgRestricted());
     }
 
     @Test

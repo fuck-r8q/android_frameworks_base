@@ -332,6 +332,7 @@ public class UsageStatsService extends SystemService implements
                         mUsageEventListeners.valueAt(i).onUsageEvent(userId, event);
                     }
                 }
+                return true;
             }
         }
         return false;
@@ -1973,6 +1974,8 @@ public class UsageStatsService extends SystemService implements
                 + ": " + Flags.userInteractionTypeApi());
         pw.println("    " + Flags.FLAG_USE_PARCELED_LIST
                 + ": " + Flags.useParceledList());
+        pw.println("    " + Flags.FLAG_FILTER_BASED_EVENT_QUERY_API
+                + ": " + Flags.filterBasedEventQueryApi());
 
         final int[] userIds;
         synchronized (mLock) {
@@ -2244,7 +2247,7 @@ public class UsageStatsService extends SystemService implements
             final int callingUid = Binder.getCallingUid();
             final int callingPid = Binder.getCallingPid();
             final boolean obfuscateInstantApps = shouldObfuscateInstantAppsForCaller(
-                    callingUid, userId);
+                    callingUid, UserHandle.getCallingUserId());
 
             final long token = Binder.clearCallingIdentity();
             try {
@@ -2274,6 +2277,12 @@ public class UsageStatsService extends SystemService implements
                         "Only the system or holders of the REPORT_USAGE_STATS"
                             + " permission are allowed to call reportUserInteraction");
                 }
+                if (userId != UserHandle.getCallingUserId()) {
+                    // Cross-user event reporting.
+                    getContext().enforceCallingPermission(
+                            Manifest.permission.INTERACT_ACROSS_USERS_FULL,
+                            "Caller doesn't have INTERACT_ACROSS_USERS_FULL permission");
+                }
             } else {
                 if (!isCallingUidSystem()) {
                     throw new SecurityException("Only system is allowed to call"
@@ -2283,7 +2292,8 @@ public class UsageStatsService extends SystemService implements
 
             // Verify if this package exists before reporting an event for it.
             if (mPackageManagerInternal.getPackageUid(packageName, 0, userId) < 0) {
-                throw new IllegalArgumentException("Package " + packageName + "not exist!");
+                throw new IllegalArgumentException("Package " + packageName
+                        + " does not exist!");
             }
 
             final Event event = new Event(USER_INTERACTION, SystemClock.elapsedRealtime());
@@ -2383,6 +2393,7 @@ public class UsageStatsService extends SystemService implements
             if (!hasQueryPermission(callingPackage)) {
                 return null;
             }
+
             return queryEventsHelper(UserHandle.getCallingUserId(), query.getBeginTimeMillis(),
                     query.getEndTimeMillis(), callingPackage, query.getEventTypeFilter());
         }

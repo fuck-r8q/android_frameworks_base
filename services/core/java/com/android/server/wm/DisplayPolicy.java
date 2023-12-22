@@ -41,6 +41,7 @@ import static android.view.WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCRE
 import static android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_CONSUME_IME_INSETS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_FORCE_DRAW_BAR_BACKGROUNDS;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_IMMERSIVE_CONFIRMATION_WINDOW;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP;
@@ -289,6 +290,8 @@ public class DisplayPolicy {
     private boolean mIsFreeformWindowOverlappingWithNavBar;
 
     private @InsetsType int mForciblyShownTypes;
+
+    private boolean mImeInsetsConsumed;
 
     private boolean mIsImmersiveMode;
 
@@ -1571,6 +1574,7 @@ public class DisplayPolicy {
         mShowingDream = false;
         mIsFreeformWindowOverlappingWithNavBar = false;
         mForciblyShownTypes = 0;
+        mImeInsetsConsumed = false;
     }
 
     /**
@@ -1630,6 +1634,17 @@ public class DisplayPolicy {
 
         if (win.mSession.mCanForceShowingInsets) {
             mForciblyShownTypes |= win.mAttrs.forciblyShownTypes;
+        }
+
+        if (win.mImeInsetsConsumed != mImeInsetsConsumed) {
+            win.mImeInsetsConsumed = mImeInsetsConsumed;
+            final WindowState imeWin = mDisplayContent.mInputMethodWindow;
+            if (win.isReadyToDispatchInsetsState() && imeWin != null && imeWin.isVisible()) {
+                win.notifyInsetsChanged();
+            }
+        }
+        if ((attrs.privateFlags & PRIVATE_FLAG_CONSUME_IME_INSETS) != 0 && win.isVisible()) {
+            mImeInsetsConsumed = true;
         }
 
         if (!affectsSystemUi) {
@@ -2979,6 +2994,7 @@ public class DisplayPolicy {
             }
         }
         pw.print(prefix); pw.print("mTopIsFullscreen="); pw.println(mTopIsFullscreen);
+        pw.print(prefix); pw.print("mImeInsetsConsumed="); pw.println(mImeInsetsConsumed);
         pw.print(prefix); pw.print("mForceShowNavigationBarEnabled=");
         pw.print(mForceShowNavigationBarEnabled);
         pw.print(" mAllowLockscreenWhenOn="); pw.println(mAllowLockscreenWhenOn);

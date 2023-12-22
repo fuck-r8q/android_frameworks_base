@@ -5154,7 +5154,7 @@ public class AudioService extends IAudioService.Stub
     private void setMasterMuteInternalNoCallerCheck(
             boolean mute, int flags, int userId, String eventSource) {
         if (DEBUG_VOL) {
-            Log.d(TAG, TextUtils.formatSimple("Master mute %s, %d, user=%d from %s",
+            Log.d(TAG, TextUtils.formatSimple("Master mute %s, flags 0x%x, userId=%d from %s",
                     mute, flags, userId, eventSource));
         }
 
@@ -13867,6 +13867,11 @@ public class AudioService extends IAudioService.Stub
 
     List<String> getDeviceAddresses(AudioDeviceAttributes device) {
         return mDeviceBroker.getDeviceAddresses(device);
+    }
+
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
+    MusicFxHelper getMusicFxHelper() {
+        return mMusicFxHelper;
     }
 
     //======================

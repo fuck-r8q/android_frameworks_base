@@ -4862,6 +4862,13 @@
     <permission android:name="android.permission.CHANGE_ACCESSIBILITY_VOLUME"
                 android:protectionLevel="signature" />
 
+    <!-- @FlaggedApi("com.android.server.accessibility.motion_event_observing")
+    @hide
+    @TestApi
+    Allows an accessibility service to observe motion events without consuming them. -->
+    <permission android:name="android.permission.ACCESSIBILITY_MOTION_EVENT_OBSERVING"
+                android:protectionLevel="signature" />
+
     <!-- @hide Allows an application to collect frame statistics -->
     <permission android:name="android.permission.FRAME_STATS"
          android:protectionLevel="signature" />
@@ -7886,6 +7893,22 @@
      @FlaggedApi("android.permission.flags.factory_reset_prep_permission_apis")
      @hide -->
     <permission android:name="android.permission.PREPARE_FACTORY_RESET"
+        android:protectionLevel="signature|privileged" />
+
+    <!-- @SystemApi Allows focused window to override the default behavior of supported system keys.
+        The following keycodes are supported:
+        <p> KEYCODE_STEM_PRIMARY
+        <p>If an app is granted this permission and has a focused window, it will be allowed to
+           receive supported key events that are otherwise handled by the system. The app can choose
+           to consume the key events and trigger its own behavior, in which case the default key
+           behavior will be skipped.
+        <p>For example, KEYCODE_STEM_PRIMARY by default opens recent app launcher. If the foreground
+           fitness app is granted this permission, it can repurpose the KEYCODE_STEM_PRIMARY button
+           to pause/resume the current fitness session.
+        <p>Protection level: signature|privileged
+        @FlaggedApi("com.android.input.flags.override_key_behavior_permission_apis")
+        @hide -->
+    <permission android:name="android.permission.OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW"
         android:protectionLevel="signature|privileged" />
 
     <!-- Attribution for Geofencing service. -->

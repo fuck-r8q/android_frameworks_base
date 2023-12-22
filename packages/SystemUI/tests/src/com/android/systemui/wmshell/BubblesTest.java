@@ -29,6 +29,8 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static kotlinx.coroutines.flow.FlowKt.emptyFlow;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -97,6 +99,7 @@ import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepositor
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor;
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
 import com.android.systemui.flags.FakeFeatureFlagsClassic;
@@ -119,6 +122,7 @@ import com.android.systemui.scene.SceneTestUtils;
 import com.android.systemui.scene.data.repository.SceneContainerRepository;
 import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.scene.shared.flag.FakeSceneContainerFlags;
+import com.android.systemui.scene.shared.flag.SceneContainerFlags;
 import com.android.systemui.scene.shared.logger.SceneLogger;
 import com.android.systemui.settings.FakeDisplayTracker;
 import com.android.systemui.settings.UserTracker;
@@ -343,6 +347,8 @@ public class BubblesTest extends SysuiTestCase {
     private Icon mAppBubbleIcon;
     @Mock
     private Display mDefaultDisplay;
+    @Mock
+    private SceneContainerFlags mSceneContainerFlags;
 
     private final SceneTestUtils mUtils = new SceneTestUtils(this);
     private final TestScope mTestScope = mUtils.getTestScope();
@@ -462,6 +468,10 @@ public class BubblesTest extends SysuiTestCase {
         ResourcesSplitShadeStateController splitShadeStateController =
                 new ResourcesSplitShadeStateController();
 
+        DeviceEntryUdfpsInteractor deviceEntryUdfpsInteractor =
+                mock(DeviceEntryUdfpsInteractor.class);
+        when(deviceEntryUdfpsInteractor.isUdfpsSupported()).thenReturn(emptyFlow());
+
         mShadeInteractor =
                 new ShadeInteractorImpl(
                         mTestScope.getBackgroundScope(),
@@ -478,7 +488,9 @@ public class BubblesTest extends SysuiTestCase {
                                 new SharedNotificationContainerInteractor(
                                         configurationRepository,
                                         mContext,
-                                        splitShadeStateController),
+                                        splitShadeStateController,
+                                        keyguardInteractor,
+                                        deviceEntryUdfpsInteractor),
                                 shadeRepository
                         )
                 );
@@ -503,7 +515,8 @@ public class BubblesTest extends SysuiTestCase {
                 () -> mShadeInteractor,
                 mShadeWindowLogger,
                 () -> mSelectedUserInteractor,
-                mUserTracker
+                mUserTracker,
+                mSceneContainerFlags
         );
         mNotificationShadeWindowController.fetchWindowRootView();
         mNotificationShadeWindowController.attach();

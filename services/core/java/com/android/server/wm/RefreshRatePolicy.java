@@ -26,6 +26,7 @@ import android.view.Display;
 import android.view.Display.Mode;
 import android.view.DisplayInfo;
 import android.view.Surface;
+import android.view.SurfaceControl;
 import android.view.SurfaceControl.RefreshRateRange;
 
 import java.util.HashMap;
@@ -198,26 +199,35 @@ class RefreshRatePolicy {
     public static class FrameRateVote {
         float mRefreshRate;
         @Surface.FrameRateCompatibility int mCompatibility;
+        @SurfaceControl.FrameRateSelectionStrategy int mSelectionStrategy;
 
-        FrameRateVote(float refreshRate, @Surface.FrameRateCompatibility int compatibility) {
-            update(refreshRate, compatibility);
+
+
+        FrameRateVote(float refreshRate, @Surface.FrameRateCompatibility int compatibility,
+                      @SurfaceControl.FrameRateSelectionStrategy int selectionStrategy) {
+            update(refreshRate, compatibility, selectionStrategy);
         }
 
         FrameRateVote() {
             reset();
         }
 
-        boolean update(float refreshRate, @Surface.FrameRateCompatibility int compatibility) {
-            if (!refreshRateEquals(refreshRate) || mCompatibility != compatibility) {
+        boolean update(float refreshRate, @Surface.FrameRateCompatibility int compatibility,
+                       @SurfaceControl.FrameRateSelectionStrategy int selectionStrategy) {
+            if (!refreshRateEquals(refreshRate)
+                    || mCompatibility != compatibility
+                    || mSelectionStrategy != selectionStrategy) {
                 mRefreshRate = refreshRate;
                 mCompatibility = compatibility;
+                mSelectionStrategy = selectionStrategy;
                 return true;
             }
             return false;
         }
 
         boolean reset() {
-            return update(0, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+            return update(0, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                    SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_PROPAGATE);
         }
 
         @Override
@@ -228,17 +238,20 @@ class RefreshRatePolicy {
 
             FrameRateVote other = (FrameRateVote) o;
             return refreshRateEquals(other.mRefreshRate)
-                    && mCompatibility == other.mCompatibility;
+                    && mCompatibility == other.mCompatibility
+                    && mSelectionStrategy == other.mSelectionStrategy;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(mRefreshRate, mCompatibility);
+            return Objects.hash(mRefreshRate, mCompatibility, mSelectionStrategy);
+
         }
 
         @Override
         public String toString() {
-            return "mRefreshRate=" + mRefreshRate + ", mCompatibility=" + mCompatibility;
+            return "mRefreshRate=" + mRefreshRate + ", mCompatibility=" + mCompatibility
+                    + ", mSelectionStrategy=" + mSelectionStrategy;
         }
 
         private boolean refreshRateEquals(float refreshRate) {
@@ -268,7 +281,8 @@ class RefreshRatePolicy {
         float forceRefreshRate = mForceList.getForceRefreshRate(w.getOwningPackage());
         if(forceRefreshRate > 0) {
             return w.mFrameRateVote.update(forceRefreshRate,
-                                        Surface.FRAME_RATE_COMPATIBILITY_EXACT);
+                    Surface.FRAME_RATE_COMPATIBILITY_EXACT,
+                    SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
         }
 
         // If the app set a preferredDisplayModeId, the preferred refresh rate is the refresh rate
@@ -279,7 +293,8 @@ class RefreshRatePolicy {
                 for (Display.Mode mode : mDisplayInfo.supportedModes) {
                     if (preferredModeId == mode.getModeId()) {
                         return w.mFrameRateVote.update(mode.getRefreshRate(),
-                                Surface.FRAME_RATE_COMPATIBILITY_EXACT);
+                                Surface.FRAME_RATE_COMPATIBILITY_EXACT,
+                                SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
                     }
                 }
             }
@@ -287,7 +302,8 @@ class RefreshRatePolicy {
 
         if (w.mAttrs.preferredRefreshRate > 0) {
             return w.mFrameRateVote.update(w.mAttrs.preferredRefreshRate,
-                    Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);
+                    Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                    SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
         }
 
         // If the app didn't set a preferred mode id or refresh rate, but it is part of the deny
@@ -296,7 +312,8 @@ class RefreshRatePolicy {
             final String packageName = w.getOwningPackage();
             if (mHighRefreshRateDenylist.isDenylisted(packageName)) {
                 return w.mFrameRateVote.update(mLowRefreshRateMode.getRefreshRate(),
-                        Surface.FRAME_RATE_COMPATIBILITY_EXACT);
+                        Surface.FRAME_RATE_COMPATIBILITY_EXACT,
+                        SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
             }
         }
 

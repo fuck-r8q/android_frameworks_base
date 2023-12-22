@@ -305,9 +305,11 @@ import android.window.AddToSurfaceSyncGroupResult;
 import android.window.ClientWindowFrames;
 import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
+import android.window.ITrustedPresentationListener;
 import android.window.ScreenCapture;
 import android.window.SystemPerformanceHinter;
 import android.window.TaskSnapshot;
+import android.window.TrustedPresentationThresholds;
 import android.window.WindowContainerToken;
 import android.window.WindowContextInfo;
 
@@ -769,6 +771,9 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final SurfaceSyncGroupController mSurfaceSyncGroupController =
             new SurfaceSyncGroupController();
+
+    final TrustedPresentationListenerController mTrustedPresentationListenerController =
+            new TrustedPresentationListenerController();
 
     @VisibleForTesting
     final class SettingsObserver extends ContentObserver {
@@ -7118,7 +7123,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 return;
             } else if ("containers".equals(cmd)) {
                 synchronized (mGlobalLock) {
-                    mRoot.dumpChildrenNames(pw, " ");
+                    mRoot.dumpChildrenNames(pw, "");
                     pw.println(" ");
                     mRoot.forAllWindows(w -> {pw.println(w);}, true /* traverseTopToBottom */);
                 }
@@ -7213,6 +7218,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 pw.println(separator);
             }
             mSystemPerformanceHinter.dump(pw, "");
+            mTrustedPresentationListenerController.dump(pw);
         }
     }
 
@@ -7344,7 +7350,12 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
-    MousePositionTracker mMousePositionTracker = new MousePositionTracker();
+    // The mouse position tracker will be obsolete after the Pointer Icon Refactor.
+    // TODO(b/293587049): Remove after the refactoring is fully rolled out.
+    @Nullable
+    final MousePositionTracker mMousePositionTracker =
+            com.android.input.flags.Flags.enablePointerChoreographer() ? null
+                    : new MousePositionTracker();
 
     private static class MousePositionTracker implements PointerEventListener {
         private boolean mLatestEventWasMouse;
@@ -7396,6 +7407,9 @@ public class WindowManagerService extends IWindowManager.Stub
     };
 
     void updatePointerIcon(IWindow client) {
+        if (mMousePositionTracker == null) {
+            return;
+        }
         int pointerDisplayId;
         float mouseX, mouseY;
 
@@ -7442,6 +7456,9 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     void restorePointerIconLocked(DisplayContent displayContent, float latestX, float latestY) {
+        if (mMousePositionTracker == null) {
+            return;
+        }
         // Mouse position tracker has not been getting updates while dragging, update it now.
         if (!mMousePositionTracker.updatePosition(
                 displayContent.getDisplayId(), latestX, latestY)) {
@@ -7465,6 +7482,9 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
     void setMousePointerDisplayId(int displayId) {
+        if (mMousePositionTracker == null) {
+            return;
+        }
         mMousePositionTracker.setPointerDisplayId(displayId);
     }
 
@@ -8573,6 +8593,12 @@ public class WindowManagerService extends IWindowManager.Stub
                 WindowManagerService.this.setOrientationRequestPolicy(respected,
                         fromOrientations, toOrientations);
             }
+        }
+
+        @Override
+        public @Nullable IBinder getTargetWindowTokenFromInputToken(IBinder inputToken) {
+            InputTarget inputTarget = WindowManagerService.this.getInputTargetFromToken(inputToken);
+            return inputTarget == null ? null : inputTarget.getWindowToken();
         }
     }
 
@@ -9812,5 +9838,18 @@ public class WindowManagerService extends IWindowManager.Stub
         } finally {
             Binder.restoreCallingIdentity(origId);
         }
+    }
+
+    @Override
+    public void registerTrustedPresentationListener(IBinder window,
+            ITrustedPresentationListener listener,
+            TrustedPresentationThresholds thresholds, int id) {
+        mTrustedPresentationListenerController.registerListener(window, listener, thresholds, id);
+    }
+
+    @Override
+    public void unregisterTrustedPresentationListener(ITrustedPresentationListener listener,
+            int id) {
+        mTrustedPresentationListenerController.unregisterListener(listener, id);
     }
 }

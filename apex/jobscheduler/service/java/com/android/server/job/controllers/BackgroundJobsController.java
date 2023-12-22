@@ -26,6 +26,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.os.SystemClock;
 import android.os.UserHandle;
@@ -98,7 +99,10 @@ public final class BackgroundJobsController extends StateController {
             switch (action) {
                 case Intent.ACTION_PACKAGE_RESTARTED: {
                     synchronized (mLock) {
-                        mPackageStoppedState.add(pkgUid, pkgName, Boolean.TRUE);
+                        // ACTION_PACKAGE_RESTARTED doesn't always mean the app is placed and kept
+                        // in the stopped state, so don't put TRUE in the cache. Remove any existing
+                        // entry and rely on an explicit call to PackageManager's isStopped() API.
+                        mPackageStoppedState.delete(pkgUid, pkgName);
                         updateJobRestrictionsForUidLocked(pkgUid, false);
                     }
                 }
@@ -126,6 +130,7 @@ public final class BackgroundJobsController extends StateController {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void startTrackingLocked() {
         mAppStateTracker.addListener(mForceAppStandbyListener);
         final IntentFilter filter = new IntentFilter();
@@ -137,15 +142,18 @@ public final class BackgroundJobsController extends StateController {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void maybeStartTrackingJobLocked(JobStatus jobStatus, JobStatus lastJob) {
         updateSingleJobRestrictionLocked(jobStatus, sElapsedRealtimeClock.millis(), UNKNOWN);
     }
 
     @Override
+    @GuardedBy("mLock")
     public void maybeStopTrackingJobLocked(JobStatus jobStatus, JobStatus incomingJob) {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void evaluateStateLocked(JobStatus jobStatus) {
         if (jobStatus.isRequestedExpeditedJob()) {
             // Only requested-EJs could have their run-in-bg constraint change outside of something
@@ -155,11 +163,13 @@ public final class BackgroundJobsController extends StateController {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void onAppRemovedLocked(String packageName, int uid) {
         mPackageStoppedState.delete(uid, packageName);
     }
 
     @Override
+    @GuardedBy("mLock")
     public void onUserRemovedLocked(int userId) {
         for (int u = mPackageStoppedState.numMaps() - 1; u >= 0; --u) {
             final int uid = mPackageStoppedState.keyAt(u);
@@ -170,6 +180,7 @@ public final class BackgroundJobsController extends StateController {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void dumpControllerStateLocked(final IndentingPrintWriter pw,
             final Predicate<JobStatus> predicate) {
         pw.println("Aconfig flags:");
@@ -223,6 +234,7 @@ public final class BackgroundJobsController extends StateController {
     }
 
     @Override
+    @GuardedBy("mLock")
     public void dumpControllerStateLocked(ProtoOutputStream proto, long fieldId,
             Predicate<JobStatus> predicate) {
         final long token = proto.start(fieldId);
@@ -260,14 +272,17 @@ public final class BackgroundJobsController extends StateController {
         proto.end(token);
     }
 
+    @GuardedBy("mLock")
     private void updateAllJobRestrictionsLocked() {
         updateJobRestrictionsLocked(/*filterUid=*/ -1, UNKNOWN);
     }
 
+    @GuardedBy("mLock")
     private void updateJobRestrictionsForUidLocked(int uid, boolean isActive) {
         updateJobRestrictionsLocked(uid, (isActive) ? KNOWN_ACTIVE : KNOWN_INACTIVE);
     }
 
+    @GuardedBy("mLock")
     private void updateJobRestrictionsLocked(int filterUid, int newActiveState) {
         mUpdateJobFunctor.prepare(newActiveState);
 
@@ -295,28 +310,36 @@ public final class BackgroundJobsController extends StateController {
         }
     }
 
-    private boolean isPackageStopped(String packageName, int uid) {
+    @GuardedBy("mLock")
+    private boolean isPackageStoppedLocked(String packageName, int uid) {
         if (mPackageStoppedState.contains(uid, packageName)) {
             return mPackageStoppedState.get(uid, packageName);
         }
-        final boolean isStopped = mPackageManagerInternal.isPackageStopped(packageName, uid);
-        mPackageStoppedState.add(uid, packageName, isStopped);
-        return isStopped;
+
+        try {
+            final boolean isStopped = mPackageManagerInternal.isPackageStopped(packageName, uid);
+            mPackageStoppedState.add(uid, packageName, isStopped);
+            return isStopped;
+        } catch (PackageManager.NameNotFoundException e) {
+            Slog.e(TAG, "Couldn't determine stopped state for unknown package: " + packageName);
+            return false;
+        }
     }
 
+    @GuardedBy("mLock")
     boolean updateSingleJobRestrictionLocked(JobStatus jobStatus, final long nowElapsed,
             int activeState) {
         final int uid = jobStatus.getSourceUid();
         final String packageName = jobStatus.getSourcePackageName();
 
         final boolean isSourcePkgStopped =
-                isPackageStopped(jobStatus.getSourcePackageName(), jobStatus.getSourceUid());
+                isPackageStoppedLocked(jobStatus.getSourcePackageName(), jobStatus.getSourceUid());
         final boolean isCallingPkgStopped;
         if (!jobStatus.isProxyJob()) {
             isCallingPkgStopped = isSourcePkgStopped;
         } else {
             isCallingPkgStopped =
-                    isPackageStopped(jobStatus.getCallingPackageName(), jobStatus.getUid());
+                    isPackageStoppedLocked(jobStatus.getCallingPackageName(), jobStatus.getUid());
         }
         final boolean isStopped = android.content.pm.Flags.stayStopped()
                 && (isCallingPkgStopped || isSourcePkgStopped);

@@ -10,6 +10,13 @@ flag {
 }
 
 flag {
+    name: "a11y_qs_shortcut"
+    namespace: "accessibility"
+    description: "Add Quick Setting as one of the a11y shortcut options"
+    bug: "297554934"
+}
+
+flag {
     namespace: "accessibility"
     name: "allow_shortcut_chooser_on_lockscreen"
     description: "Allows the a11y shortcut disambig dialog to appear on the lockscreen"
@@ -32,6 +39,13 @@ flag {
 
 flag {
     namespace: "accessibility"
+    name: "copy_events_for_gesture_detection"
+    description: "Creates copies of MotionEvents and GestureEvents in GestureMatcher"
+    bug: "280130713"
+}
+
+flag {
+    namespace: "accessibility"
     name: "flash_notification_system_api"
     description: "Makes flash notification APIs as system APIs for calling from mainline module"
     bug: "303131332"
@@ -42,6 +56,13 @@ flag {
     name: "force_invert_color"
     description: "Enable force force-dark for smart inversion and dark theme everywhere"
     bug: "282821643"
+}
+
+flag {
+    name: "motion_event_observing"
+    namespace: "accessibility"
+    description: "Allows accessibility services to intercept but not consume motion events from specified sources."
+    bug: "297595990"
 }
 
 flag {

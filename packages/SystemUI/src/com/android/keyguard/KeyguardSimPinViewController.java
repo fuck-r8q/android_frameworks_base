@@ -16,6 +16,8 @@
 
 package com.android.keyguard;
 
+import static android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+
 import static com.android.systemui.util.PluralMessageFormaterKt.icuMessageFormat;
 
 import android.annotation.NonNull;
@@ -60,7 +62,7 @@ public class KeyguardSimPinViewController
     // When this is true and when SIM card is PIN locked state, on PIN lock screen, message would
     // be displayed to inform user about the number of remaining PIN attempts left.
     private boolean mShowDefaultMessage;
-    private int mSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+    private int mSubId = INVALID_SUBSCRIPTION_ID;
     private AlertDialog mRemainingAttemptsDialog;
     private ImageView mSimImageView;
     private int mSlotId;
@@ -70,6 +72,12 @@ public class KeyguardSimPinViewController
         public void onSimStateChanged(int subId, int slotId, int simState) {
             if (DEBUG) Log.v(TAG, "onSimStateChanged(subId=" + subId + ",slotId=" + slotId
                 + ",simState=" + simState + ")");
+
+            // If subId has gone to PUK required then we need to go to the PUK screen.
+            if (subId == mSubId && simState == TelephonyManager.SIM_STATE_PUK_REQUIRED) {
+                getKeyguardSecurityCallback().showCurrentSecurityScreen();
+                return;
+            }
 
             if ((simState == TelephonyManager.SIM_STATE_READY)
                 || (simState == TelephonyManager.SIM_STATE_LOADED)) {

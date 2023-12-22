@@ -731,7 +731,7 @@ public abstract class PackageManager {
          * @see VirtualDeviceManager.VirtualDevice#getPersistentDeviceId()
          * @see VirtualDeviceManager#PERSISTENT_DEVICE_ID_DEFAULT
          */
-        @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+        @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
         default void onPermissionsChanged(int uid, @NonNull String persistentDeviceId) {
             Objects.requireNonNull(persistentDeviceId);
             if (Objects.equals(persistentDeviceId,
@@ -918,6 +918,10 @@ public abstract class PackageManager {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstrumentationInfoFlags {}
+
+    //-------------------------------------------------------------------------
+    // Beginning of GET_ and MATCH_ flags
+    //-------------------------------------------------------------------------
 
     /**
      * {@link PackageInfo} flag: return information about
@@ -1216,28 +1220,17 @@ public abstract class PackageManager {
      */
     public static final int MATCH_DIRECT_BOOT_AUTO = 0x10000000;
 
-    /**
-     * {@link ResolveInfo} flag: allow matching components across clone profile
-     * <p>
-     * This flag is used only for query and not resolution, the default behaviour would be to
-     * restrict querying across clone profile. This flag would be honored only if caller have
-     * permission {@link Manifest.permission.QUERY_CLONED_APPS}.
-     *
-     *  @hide
-     * <p>
-     */
-    @SystemApi
-    public static final int MATCH_CLONE_PROFILE = 0x20000000;
-
-    /**
-     * @deprecated Use {@link #GET_ATTRIBUTIONS_LONG} to avoid unintended sign extension.
-     */
-    @Deprecated
-    public static final int GET_ATTRIBUTIONS = 0x80000000;
-
     /** @hide */
     @Deprecated
     public static final int MATCH_DEBUG_TRIAGED_MISSING = MATCH_DIRECT_BOOT_AUTO;
+
+    /**
+     * Use {@link #MATCH_CLONE_PROFILE_LONG} instead.
+     *
+     * @hide
+     */
+    @SystemApi
+    public static final int MATCH_CLONE_PROFILE = 0x20000000;
 
     /**
      * {@link PackageInfo} flag: include system apps that are in the uninstalled state and have
@@ -1255,6 +1248,12 @@ public abstract class PackageManager {
      * for activation at next reboot.
      */
     public static final int MATCH_APEX = 0x40000000;
+
+    /**
+     * @deprecated Use {@link #GET_ATTRIBUTIONS_LONG} to avoid unintended sign extension.
+     */
+    @Deprecated
+    public static final int GET_ATTRIBUTIONS = 0x80000000;
 
     /**
      * {@link PackageInfo} flag: return all attributions declared in the package manifest
@@ -1280,6 +1279,23 @@ public abstract class PackageManager {
      */
     @FlaggedApi(android.content.pm.Flags.FLAG_QUARANTINED_ENABLED)
     public static final long MATCH_QUARANTINED_COMPONENTS = 1L << 33;
+
+    /**
+     * {@link ResolveInfo} flag: allow matching components across clone profile
+     * <p>
+     * This flag is used only for query and not resolution, the default behaviour would be to
+     * restrict querying across clone profile. This flag would be honored only if caller have
+     * permission {@link Manifest.permission.QUERY_CLONED_APPS}.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.content.pm.Flags.FLAG_FIX_DUPLICATED_FLAGS)
+    @SystemApi
+    public static final long MATCH_CLONE_PROFILE_LONG = 1L << 34;
+
+    //-------------------------------------------------------------------------
+    // End of GET_ and MATCH_ flags
+    //-------------------------------------------------------------------------
 
     /**
      * Flag for {@link #addCrossProfileIntentFilter}: if this flag is set: when
@@ -1501,6 +1517,7 @@ public abstract class PackageManager {
             INSTALL_REQUEST_UPDATE_OWNERSHIP,
             INSTALL_IGNORE_DEXOPT_PROFILE,
             INSTALL_UNARCHIVE_DRAFT,
+            INSTALL_UNARCHIVE,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InstallFlags {}
@@ -1748,11 +1765,20 @@ public abstract class PackageManager {
      * If set, then the session is a draft session created for an upcoming unarchival by its
      * installer.
      *
-     * @see PackageInstaller#requestUnarchive(String)
+     * @see PackageInstaller#requestUnarchive
      *
      * @hide
      */
     public static final int INSTALL_UNARCHIVE_DRAFT = 1 << 29;
+
+    /**
+     * If set, then the {@link PackageInstaller.Session} is an unarchival.
+     *
+     * @see PackageInstaller#requestUnarchive
+     *
+     * @hide
+     */
+    public static final int INSTALL_UNARCHIVE = 1 << 30;
 
     /**
      * Flag parameter for {@link #installPackage} to force a non-staged update of an APEX. This is
@@ -4875,7 +4901,7 @@ public abstract class PackageManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+    @FlaggedApi(android.permission.flags.Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public static final String EXTRA_REQUEST_PERMISSIONS_DEVICE_ID =
             "android.content.pm.extra.REQUEST_PERMISSIONS_DEVICE_ID";
 
@@ -6284,6 +6310,11 @@ public abstract class PackageManager {
     /**
      * Check whether a particular package has been granted a particular
      * permission.
+     * <p>
+     * <strong>Note: </strong>This API returns the underlying permission state
+     * as-is and is mostly intended for permission managing system apps. To
+     * perform an access check for a certain app, please use the
+     * {@link Context#checkPermission} APIs instead.
      *
      * @param permName The name of the permission you are checking for.
      * @param packageName The name of the package you are checking against.
@@ -9969,6 +10000,9 @@ public abstract class PackageManager {
      * device administrators or apps holding {@link android.Manifest.permission#MANAGE_USERS} or
      * {@link android.Manifest.permission#SUSPEND_APPS}.
      *
+     * <p>
+     * <strong>Note:</strong>This API doesn't support cross user suspension and should only be used
+     * for testing.
      * @param suspendedPackage The package that has been suspended.
      * @return Name of the package that suspended the given package. Returns {@code null} if the
      * given package is not currently suspended and the platform package name - i.e.

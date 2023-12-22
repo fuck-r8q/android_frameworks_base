@@ -2,6 +2,7 @@
 package android {
 
   public static final class Manifest.permission {
+    field @FlaggedApi("com.android.server.accessibility.motion_event_observing") public static final String ACCESSIBILITY_MOTION_EVENT_OBSERVING = "android.permission.ACCESSIBILITY_MOTION_EVENT_OBSERVING";
     field public static final String ACCESS_NOTIFICATIONS = "android.permission.ACCESS_NOTIFICATIONS";
     field public static final String ACTIVITY_EMBEDDING = "android.permission.ACTIVITY_EMBEDDING";
     field public static final String ADJUST_RUNTIME_PERMISSIONS_POLICY = "android.permission.ADJUST_RUNTIME_PERMISSIONS_POLICY";
@@ -99,6 +100,8 @@ package android.accessibilityservice {
 
   public class AccessibilityServiceInfo implements android.os.Parcelable {
     method @NonNull public android.content.ComponentName getComponentName();
+    method @FlaggedApi("android.view.accessibility.motion_event_observing") public int getObservedMotionEventSources();
+    method @FlaggedApi("android.view.accessibility.motion_event_observing") public void setObservedMotionEventSources(int);
   }
 
 }
@@ -259,6 +262,7 @@ package android.app {
     field public static final String OPSTR_ACTIVITY_RECOGNITION_SOURCE = "android:activity_recognition_source";
     field public static final String OPSTR_MANAGE_ONGOING_CALLS = "android:manage_ongoing_calls";
     field public static final String OPSTR_RECORD_AUDIO_HOTWORD = "android:record_audio_hotword";
+    field public static final String OPSTR_RESERVED_FOR_TESTING = "android:reserved_for_testing";
     field public static final String OPSTR_USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER = "android:use_icc_auth_with_device_identifier";
     field public static final int OP_COARSE_LOCATION = 0; // 0x0
     field public static final int OP_RECORD_AUDIO = 27; // 0x1b
@@ -902,7 +906,7 @@ package android.content {
     ctor public AttributionSource(int, @Nullable String, @Nullable String, @NonNull android.os.IBinder);
     ctor public AttributionSource(int, @Nullable String, @Nullable String, @Nullable java.util.Set<java.lang.String>, @Nullable android.content.AttributionSource);
     ctor @FlaggedApi("android.permission.flags.attribution_source_constructor") public AttributionSource(int, int, @Nullable String, @Nullable String, @NonNull android.os.IBinder, @Nullable String[], @Nullable android.content.AttributionSource);
-    ctor @FlaggedApi("android.permission.flags.device_aware_permission_apis") public AttributionSource(int, int, @Nullable String, @Nullable String, @NonNull android.os.IBinder, @Nullable String[], int, @Nullable android.content.AttributionSource);
+    ctor @FlaggedApi("android.permission.flags.device_aware_permission_apis_enabled") public AttributionSource(int, int, @Nullable String, @Nullable String, @NonNull android.os.IBinder, @Nullable String[], int, @Nullable android.content.AttributionSource);
     method public void enforceCallingPid();
   }
 
@@ -1165,6 +1169,7 @@ package android.content.pm {
   public static final class UserProperties.Builder {
     ctor public UserProperties.Builder();
     method @NonNull public android.content.pm.UserProperties build();
+    method @NonNull public android.content.pm.UserProperties.Builder setCrossProfileContentSharingStrategy(int);
     method @NonNull public android.content.pm.UserProperties.Builder setShowInQuietMode(int);
     method @NonNull public android.content.pm.UserProperties.Builder setShowInSharingSurfaces(int);
   }
@@ -3617,9 +3622,6 @@ package android.view {
     method public default void setShouldShowWithInsecureKeyguard(int, boolean);
     method public default boolean shouldShowSystemDecors(int);
     method @Nullable public default android.graphics.Bitmap snapshotTaskForRecents(@IntRange(from=0) int);
-    field public static final int DISPLAY_IME_POLICY_FALLBACK_DISPLAY = 1; // 0x1
-    field public static final int DISPLAY_IME_POLICY_HIDE = 2; // 0x2
-    field public static final int DISPLAY_IME_POLICY_LOCAL = 0; // 0x0
     field public static final int LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP = 600; // 0x258
   }
 

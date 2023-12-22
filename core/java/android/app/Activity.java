@@ -5572,7 +5572,7 @@ public class Activity extends ContextThemeWrapper
      * @see #shouldShowRequestPermissionRationale
      * @see Context#DEVICE_ID_DEFAULT
      */
-    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public final void requestPermissions(@NonNull String[] permissions, int requestCode,
             int deviceId) {
         if (requestCode < 0) {
@@ -5645,7 +5645,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @see #requestPermissions
      */
-    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
             @NonNull int[] grantResults, int deviceId) {
         onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -5678,7 +5678,7 @@ public class Activity extends ContextThemeWrapper
      * @see #requestPermissions
      * @see #onRequestPermissionsResult
      */
-    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS)
+    @FlaggedApi(Flags.FLAG_DEVICE_AWARE_PERMISSION_APIS_ENABLED)
     public boolean shouldShowRequestPermissionRationale(@NonNull String permission, int deviceId) {
         final PackageManager packageManager = getDeviceId() == deviceId ? getPackageManager()
                 : createDeviceContext(deviceId).getPackageManager();
@@ -6884,8 +6884,8 @@ public class Activity extends ContextThemeWrapper
      * application package was involved.
      *
      * <p>If called while inside the handling of {@link #onNewIntent}, this function will
-     * return the referrer that submitted that new intent to the activity.  Otherwise, it
-     * always returns the referrer of the original Intent.</p>
+     * return the referrer that submitted that new intent to the activity only after
+     * {@link #setIntent(Intent)} is called with the provided intent.</p>
      *
      * <p>Note that this is <em>not</em> a security feature -- you can not trust the
      * referrer information, applications can spoof it.</p>
@@ -9387,6 +9387,7 @@ public class Activity extends ContextThemeWrapper
      * @param allowed {@code true} to disable the UID restrictions; {@code false} to revert back to
      *                            the default behaviour
      */
+    @FlaggedApi(android.security.Flags.FLAG_ASM_RESTRICTIONS_ENABLED)
     public void setAllowCrossUidActivitySwitchFromBelow(boolean allowed) {
         ActivityClient.getInstance().setAllowCrossUidActivitySwitchFromBelow(mToken, allowed);
     }

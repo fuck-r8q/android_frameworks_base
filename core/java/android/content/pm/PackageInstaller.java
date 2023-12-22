@@ -379,7 +379,8 @@ public class PackageInstaller {
 
     /**
      * If true, the requestor of the unarchival has specified that the app should be unarchived
-     * for all users.
+     * for all users. Sent as part of the {@link android.content.Intent#ACTION_UNARCHIVE_PACKAGE}
+     * intent.
      */
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final String EXTRA_UNARCHIVE_ALL_USERS =
@@ -395,6 +396,9 @@ public class PackageInstaller {
      * <p> If the status is not {@link #UNARCHIVAL_OK}, then {@link Intent#EXTRA_INTENT} will be set
      * with an intent for a corresponding follow-up action (e.g. storage clearing dialog) or a
      * failure dialog.
+     *
+     * <p> Used as part of {@link #requestUnarchive} to return the status of the unarchival through
+     * the {@link IntentSender}.
      *
      * @see #requestUnarchive
      */
@@ -704,7 +708,8 @@ public class PackageInstaller {
     /**
      * The installer responsible for the unarchival is disabled.
      *
-     * <p> Should only be used by the system.
+     * <p> The system will return this status if appropriate. Installers do not need to verify for
+     * this error.
      */
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final int UNARCHIVAL_ERROR_INSTALLER_DISABLED = 4;
@@ -712,7 +717,8 @@ public class PackageInstaller {
     /**
      * The installer responsible for the unarchival has been uninstalled
      *
-     * <p> Should only be used by the system.
+     * <p> The system will return this status if appropriate. Installers do not need to verify for
+     * this error.
      */
     @FlaggedApi(Flags.FLAG_ARCHIVING)
     public static final int UNARCHIVAL_ERROR_INSTALLER_UNINSTALLED = 5;
@@ -1238,7 +1244,7 @@ public class PackageInstaller {
      *                      {@code statusReceiver} if timeout happens before commit.
      * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
      *             {@link android.app.PendingIntent} when caller has a target SDK of API
-     *             {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
+     *             35 or above.
      */
     public void commitSessionAfterInstallConstraintsAreMet(int sessionId,
             @NonNull IntentSender statusReceiver, @NonNull InstallConstraints constraints,
@@ -1948,7 +1954,7 @@ public class PackageInstaller {
          *             {@link #openWrite(String, long, long)} are still open.
          * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
          *             {@link android.app.PendingIntent} when caller has a target SDK of API
-         *             version {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
+         *             version 35 or above.
          *
          * @see android.app.admin.DevicePolicyManager
          * @see #requestUserPreapproval
@@ -1979,7 +1985,7 @@ public class PackageInstaller {
          *                       individual status codes on how to handle them.
          * @throws IllegalArgumentException if the {@code statusReceiver} from an immutable
          *             {@link android.app.PendingIntent} when caller has a target SDK of API
-         *             {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM} or above.
+         *             35 or above.
          *
          * @hide
          */
@@ -4374,6 +4380,17 @@ public class PackageInstaller {
         public @UserActionReason int getPendingUserActionReason() {
             return pendingUserActionReason;
         }
+
+        /**
+         * Returns true if the session is an unarchival.
+         *
+         * @see PackageInstaller#requestUnarchive
+         */
+        @FlaggedApi(Flags.FLAG_ARCHIVING)
+        public boolean isUnarchival() {
+            return (installFlags & PackageManager.INSTALL_UNARCHIVE) != 0;
+        }
+
 
         @Override
         public int describeContents() {

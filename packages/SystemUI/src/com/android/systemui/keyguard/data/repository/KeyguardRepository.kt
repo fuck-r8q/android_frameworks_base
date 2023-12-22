@@ -160,6 +160,9 @@ interface KeyguardRepository {
     /** Last point that [KeyguardRootView] was tapped */
     val lastRootViewTapPosition: MutableStateFlow<Point?>
 
+    /** Is the ambient indication area visible? */
+    val ambientIndicationVisible: MutableStateFlow<Boolean>
+
     /** Observable for the [StatusBarState] */
     val statusBarState: StateFlow<StatusBarState>
 
@@ -188,6 +191,17 @@ interface KeyguardRepository {
 
     /** Observable updated when keyguardDone should be called either now or soon. */
     val keyguardDone: Flow<KeyguardDone>
+
+    /**
+     * Emits after the keyguard is done animating away.
+     *
+     * TODO(b/278086361): Remove once KEYGUARD_WM_STATE_REFACTOR flag is removed.
+     */
+    @Deprecated(
+        "Use KeyguardTransitionInteractor flows instead. The closest match for " +
+            "'keyguardDoneAnimationsFinished' is when the GONE transition is finished."
+    )
+    val keyguardDoneAnimationsFinished: Flow<Unit>
 
     /** Receive whether clock should be centered on lockscreen. */
     val clockShouldBeCentered: Flow<Boolean>
@@ -236,6 +250,17 @@ interface KeyguardRepository {
     suspend fun setKeyguardDone(keyguardDoneType: KeyguardDone)
 
     fun setClockShouldBeCentered(shouldBeCentered: Boolean)
+
+    /**
+     * Updates signal that the keyguard done animations are finished
+     *
+     * TODO(b/278086361): Remove once KEYGUARD_WM_STATE_REFACTOR flag is removed.
+     */
+    @Deprecated(
+        "Use KeyguardTransitionInteractor flows instead. The closest match for " +
+            "'keyguardDoneAnimationsFinished' is when the GONE transition is finished."
+    )
+    fun keyguardDoneAnimationsFinished()
 }
 
 /** Encapsulates application state for the keyguard. */
@@ -264,6 +289,11 @@ constructor(
     override val keyguardDone = _keyguardDone.asSharedFlow()
     override suspend fun setKeyguardDone(keyguardDoneType: KeyguardDone) {
         _keyguardDone.emit(keyguardDoneType)
+    }
+
+    override val keyguardDoneAnimationsFinished: MutableSharedFlow<Unit> = MutableSharedFlow()
+    override fun keyguardDoneAnimationsFinished() {
+        keyguardDoneAnimationsFinished.tryEmit(Unit)
     }
 
     private val _animateBottomAreaDozingTransitions = MutableStateFlow(false)
@@ -422,6 +452,8 @@ constructor(
     }
 
     override val lastRootViewTapPosition: MutableStateFlow<Point?> = MutableStateFlow(null)
+
+    override val ambientIndicationVisible: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
     override val isDreamingWithOverlay: Flow<Boolean> =
         conflatedCallbackFlow {

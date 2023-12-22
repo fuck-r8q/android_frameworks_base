@@ -1257,6 +1257,17 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
     private final FaceAuthenticationListener mFaceAuthenticationListener =
             new FaceAuthenticationListener() {
+                public void onAuthenticatedChanged(boolean isAuthenticated) {
+                    if (!isAuthenticated) {
+                        for (int i = 0; i < mCallbacks.size(); i++) {
+                            KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
+                            if (cb != null) {
+                                cb.onFacesCleared();
+                            }
+                        }
+                    }
+                }
+
                 @Override
                 public void onAuthEnrollmentStateChanged(boolean enrolled) {
                     notifyAboutEnrollmentChange(TYPE_FACE);
@@ -1943,7 +1954,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
 
     protected void handleStartedGoingToSleep(int arg1) {
         Assert.isMainThread();
-        clearBiometricRecognized();
+        clearFingerprintRecognized();
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {
@@ -2992,7 +3003,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
     void handleUserSwitching(int userId, Runnable resultCallback) {
         mLogger.logUserSwitching(userId, "from UserTracker");
         Assert.isMainThread();
-        clearBiometricRecognized();
+        clearFingerprintRecognized();
         boolean trustUsuallyManaged = mTrustManager.isTrustUsuallyManaged(userId);
         mLogger.logTrustUsuallyManagedUpdated(userId, mUserTrustIsUsuallyManaged.get(userId),
                 trustUsuallyManaged, "userSwitching");
@@ -3566,25 +3577,30 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, Dumpab
         return mServiceStates.get(subId);
     }
 
-    public void clearBiometricRecognized() {
-        clearBiometricRecognized(UserHandle.USER_NULL);
+    /**
+     * Resets the fingerprint authenticated state to false.
+     */
+    public void clearFingerprintRecognized() {
+        clearFingerprintRecognized(UserHandle.USER_NULL);
     }
 
-    public void clearBiometricRecognizedWhenKeyguardDone(int unlockedUser) {
-        clearBiometricRecognized(unlockedUser);
+    /**
+     * Resets the fingerprint authenticated state to false.
+     */
+    public void clearFingerprintRecognizedWhenKeyguardDone(int unlockedUser) {
+        clearFingerprintRecognized(unlockedUser);
     }
 
-    private void clearBiometricRecognized(int unlockedUser) {
+    private void clearFingerprintRecognized(int unlockedUser) {
         Assert.isMainThread();
         mUserFingerprintAuthenticated.clear();
         mTrustManager.clearAllBiometricRecognized(FINGERPRINT, unlockedUser);
-        mTrustManager.clearAllBiometricRecognized(FACE, unlockedUser);
-        mLogger.d("clearBiometricRecognized");
+        mLogger.d("clearFingerprintRecognized");
 
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
             if (cb != null) {
-                cb.onBiometricsCleared();
+                cb.onFingerprintsCleared();
             }
         }
     }

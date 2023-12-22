@@ -96,6 +96,7 @@ import android.content.pm.Signature;
 import android.content.pm.SigningDetails;
 import android.content.pm.SigningInfo;
 import android.content.pm.UserInfo;
+import android.content.pm.UserPackage;
 import android.content.pm.VersionedPackage;
 import android.os.Binder;
 import android.os.Build;
@@ -895,6 +896,9 @@ public class ComputerEngine implements Computer {
             @PackageManager.ResolveInfoFlagsBits long flags, int filterCallingUid, int userId) {
         ParsedActivity a = mComponentResolver.getActivity(component);
 
+        // Allow to match activities of quarantined packages.
+        flags |= PackageManager.MATCH_QUARANTINED_COMPONENTS;
+
         if (DEBUG_PACKAGE_INFO) Log.v(TAG, "getActivityInfo " + component + ": " + a);
 
         AndroidPackage pkg = a == null ? null : mPackages.get(a.getPackageName());
@@ -1500,14 +1504,15 @@ public class ComputerEngine implements Computer {
                     state.getFirstInstallTimeMillis(), ps.getLastUpdateTime(), installedPermissions,
                     grantedPermissions, state, userId, ps);
 
-            if (packageInfo != null) {
-                packageInfo.packageName = packageInfo.applicationInfo.packageName =
-                        resolveExternalPackageName(p);
-                return packageInfo;
+            if (packageInfo == null) {
+                return null;
             }
-        }
-        // TODO(b/314808978): Set ps.setPkg to null during install-archived.
-        if ((flags & (MATCH_UNINSTALLED_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0
+
+            packageInfo.packageName = packageInfo.applicationInfo.packageName =
+                    resolveExternalPackageName(p);
+
+            return packageInfo;
+        } else if ((flags & (MATCH_UNINSTALLED_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0
                 && PackageUserStateUtils.isAvailable(state, flags)) {
             PackageInfo pi = new PackageInfo();
             pi.packageName = ps.getPackageName();
@@ -1541,8 +1546,9 @@ public class ComputerEngine implements Computer {
                         + ps.getPackageName() + "]. Provides a minimum info.");
             }
             return pi;
+        } else {
+            return null;
         }
-        return null;
     }
 
     public final PackageInfo getPackageInfo(String packageName,
@@ -3859,17 +3865,15 @@ public class ComputerEngine implements Computer {
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
-
                 SharedLibraryInfo resLibInfo = new SharedLibraryInfo(libInfo.getPath(),
                         libInfo.getPackageName(), libInfo.getAllCodePaths(),
                         libInfo.getName(), libInfo.getLongVersion(),
                         libInfo.getType(), declaringPackage,
-                        getPackagesUsingSharedLibrary(libInfo, flags, callingUid, userId),
                         (libInfo.getDependencies() == null
                                 ? null
                                 : new ArrayList<>(libInfo.getDependencies())),
-                        libInfo.isNative());
-
+                        libInfo.isNative(),
+                        getPackagesUsingSharedLibrary(libInfo, flags, callingUid, userId));
                 if (result == null) {
                     result = new ArrayList<>();
                 }
@@ -3933,13 +3937,15 @@ public class ComputerEngine implements Computer {
         return false;
     }
 
+
     @Override
-    public List<VersionedPackage> getPackagesUsingSharedLibrary(@NonNull SharedLibraryInfo libInfo,
-            @PackageManager.PackageInfoFlagsBits long flags, int callingUid,
-            @UserIdInt int userId) {
+    public Pair<List<VersionedPackage>, List<Boolean>> getPackagesUsingSharedLibrary(
+            @NonNull SharedLibraryInfo libInfo, @PackageManager.PackageInfoFlagsBits long flags,
+            int callingUid, @UserIdInt int userId) {
         List<VersionedPackage> versionedPackages = null;
         final ArrayMap<String, ? extends PackageStateInternal> packageStates = getPackageStates();
         final int packageCount = packageStates.size();
+        List<Boolean> usesLibsOptional = null;
         for (int i = 0; i < packageCount; i++) {
             PackageStateInternal ps = packageStates.valueAt(i);
             if (ps == null) {
@@ -3956,12 +3962,15 @@ public class ComputerEngine implements Computer {
                         libInfo.isStatic() ? ps.getUsesStaticLibraries() : ps.getUsesSdkLibraries();
                 final long[] libsVersions = libInfo.isStatic() ? ps.getUsesStaticLibrariesVersions()
                         : ps.getUsesSdkLibrariesVersionsMajor();
+                final boolean[] libsOptional = libInfo.isSdk()
+                        ? ps.getUsesSdkLibrariesOptional() : null;
 
                 final int libIdx = ArrayUtils.indexOf(libs, libName);
                 if (libIdx < 0) {
                     continue;
                 }
                 if (libsVersions[libIdx] != libInfo.getLongVersion()) {
+                    // Not expected StaticLib/SdkLib version
                     continue;
                 }
                 if (shouldFilterApplication(ps, callingUid, userId)) {
@@ -3970,6 +3979,9 @@ public class ComputerEngine implements Computer {
                 if (versionedPackages == null) {
                     versionedPackages = new ArrayList<>();
                 }
+                if (usesLibsOptional == null) {
+                    usesLibsOptional = new ArrayList<>();
+                }
                 // If the dependent is a static shared lib, use the public package name
                 String dependentPackageName = ps.getPackageName();
                 if (ps.getPkg() != null && ps.getPkg().isStaticSharedLibrary()) {
@@ -3977,6 +3989,7 @@ public class ComputerEngine implements Computer {
                 }
                 versionedPackages.add(new VersionedPackage(dependentPackageName,
                         ps.getVersionCode()));
+                usesLibsOptional.add(libsOptional != null && libsOptional[libIdx]);
             } else if (ps.getPkg() != null) {
                 if (ArrayUtils.contains(ps.getPkg().getUsesLibraries(), libName)
                         || ArrayUtils.contains(ps.getPkg().getUsesOptionalLibraries(), libName)) {
@@ -3992,7 +4005,7 @@ public class ComputerEngine implements Computer {
             }
         }
 
-        return versionedPackages;
+        return new Pair<>(versionedPackages, usesLibsOptional);
     }
 
     @Nullable
@@ -4051,13 +4064,14 @@ public class ComputerEngine implements Computer {
                     Binder.restoreCallingIdentity(identity);
                 }
 
+                var usingSharedLibraryPair =
+                        getPackagesUsingSharedLibrary(libraryInfo, flags, callingUid, userId);
                 SharedLibraryInfo resultLibraryInfo = new SharedLibraryInfo(
                         libraryInfo.getPath(), libraryInfo.getPackageName(),
                         libraryInfo.getAllCodePaths(), libraryInfo.getName(),
                         libraryInfo.getLongVersion(), libraryInfo.getType(),
                         libraryInfo.getDeclaringPackage(),
-                        getPackagesUsingSharedLibrary(
-                                libraryInfo, flags, callingUid, userId),
+                        usingSharedLibraryPair.first,
                         libraryInfo.getDependencies() == null
                                 ? null : new ArrayList<>(libraryInfo.getDependencies()),
                         libraryInfo.isNative());
@@ -4623,7 +4637,7 @@ public class ComputerEngine implements Computer {
     @Override
     public List<ApplicationInfo> getInstalledApplications(
             @PackageManager.ApplicationInfoFlagsBits long flags, @UserIdInt int userId,
-            int callingUid) {
+            int callingUid, boolean forceAllowCrossUser) {
         if (getInstantAppPackageName(callingUid) != null) {
             return Collections.emptyList();
         }
@@ -4633,12 +4647,14 @@ public class ComputerEngine implements Computer {
         final boolean listApex = (flags & MATCH_APEX) != 0;
         final boolean listArchivedOnly = !listUninstalled && (flags & MATCH_ARCHIVED_PACKAGES) != 0;
 
-        enforceCrossUserPermission(
-                callingUid,
-                userId,
-                false /* requireFullPermission */,
-                false /* checkShell */,
-                "get installed application info");
+        if (!forceAllowCrossUser) {
+            enforceCrossUserPermission(
+                    callingUid,
+                    userId,
+                    false /* requireFullPermission */,
+                    false /* checkShell */,
+                    "get installed application info");
+        }
 
         ArrayList<ApplicationInfo> list;
         final ArrayMap<String, ? extends PackageStateInternal> packageStates =
@@ -4961,40 +4977,45 @@ public class ComputerEngine implements Computer {
         }
     }
 
-    private PackageUserStateInternal getUserStageOrDefaultForUser(@NonNull String packageName,
-            int userId) {
+    private PackageUserStateInternal getUserStateOrDefaultForUser(@NonNull String packageName,
+            int userId) throws PackageManager.NameNotFoundException {
         final int callingUid = Binder.getCallingUid();
         enforceCrossUserPermission(callingUid, userId, true /* requireFullPermission */,
                 false /* checkShell */, "when asking about packages for user " + userId);
         final PackageStateInternal ps = mSettings.getPackage(packageName);
         if (ps == null || shouldFilterApplicationIncludingUninstalled(ps, callingUid, userId)) {
-            throw new IllegalArgumentException("Unknown target package: " + packageName);
+            throw new PackageManager.NameNotFoundException(packageName);
         }
         return ps.getUserStateOrDefault(userId);
     }
 
     @Override
-    public boolean isPackageSuspendedForUser(@NonNull String packageName, int userId) {
-        return getUserStageOrDefaultForUser(packageName, userId).isSuspended();
+    public boolean isPackageSuspendedForUser(@NonNull String packageName, int userId)
+            throws PackageManager.NameNotFoundException {
+        return getUserStateOrDefaultForUser(packageName, userId).isSuspended();
     }
 
     @Override
-    public boolean isPackageQuarantinedForUser(@NonNull String packageName, @UserIdInt int userId) {
-        return getUserStageOrDefaultForUser(packageName, userId).isQuarantined();
+    public boolean isPackageQuarantinedForUser(@NonNull String packageName, @UserIdInt int userId)
+            throws PackageManager.NameNotFoundException {
+        return getUserStateOrDefaultForUser(packageName, userId).isQuarantined();
     }
 
     @Override
-    public boolean isPackageStoppedForUser(@NonNull String packageName, @UserIdInt int userId) {
-        return getUserStageOrDefaultForUser(packageName, userId).isStopped();
+    public boolean isPackageStoppedForUser(@NonNull String packageName, @UserIdInt int userId)
+            throws PackageManager.NameNotFoundException {
+        return getUserStateOrDefaultForUser(packageName, userId).isStopped();
     }
 
     @Override
     public boolean isSuspendingAnyPackages(@NonNull String suspendingPackage,
-            @UserIdInt int userId) {
+            @UserIdInt int suspendingUserId, int targetUserId) {
+        final UserPackage suspender = UserPackage.of(suspendingUserId, suspendingPackage);
         for (final PackageStateInternal packageState : getPackageStates().values()) {
-            final PackageUserStateInternal state = packageState.getUserStateOrDefault(userId);
+            final PackageUserStateInternal state =
+                    packageState.getUserStateOrDefault(targetUserId);
             if (state.getSuspendParams() != null
-                    && state.getSuspendParams().containsKey(suspendingPackage)) {
+                    && state.getSuspendParams().containsKey(suspender)) {
                 return true;
             }
         }
