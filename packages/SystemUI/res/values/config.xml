@@ -483,9 +483,6 @@
      This name is in the ComponentName flattened format (package/class)  -->
     <string name="config_remoteCopyPackage" translatable="false"></string>
 
-    <!-- On debuggable builds, alert the user if SystemUI PSS goes over this number (in kb) -->
-    <integer name="watch_heap_limit">256000</integer>
-
     <!-- SystemUI Plugins that can be loaded on user builds. -->
     <string-array name="config_pluginAllowlist" translatable="false">
         <item>com.android.systemui</item>
@@ -546,12 +543,16 @@
 
     <!--  ID for the camera of outer display that needs extra protection -->
     <string translatable="false" name="config_protectedCameraId"></string>
+    <!--  Physical ID for the camera of outer display that needs extra protection -->
+    <string translatable="false" name="config_protectedPhysicalCameraId"></string>
 
     <!-- Similar to config_frontBuiltInDisplayCutoutProtection but for inner display. -->
     <string translatable="false" name="config_innerBuiltInDisplayCutoutProtection"></string>
 
     <!-- ID for the camera of inner display that needs extra protection -->
     <string translatable="false" name="config_protectedInnerCameraId"></string>
+    <!-- Physical ID for the camera of inner display that needs extra protection -->
+    <string translatable="false" name="config_protectedInnerPhysicalCameraId"></string>
 
     <!-- Comma-separated list of packages to exclude from camera protection e.g.
     "com.android.systemui,com.android.xyz" -->
@@ -963,14 +964,6 @@
 
     <!-- Whether to show bottom sheets edge to edge -->
     <bool name="config_edgeToEdgeBottomSheetDialog">true</bool>
-
-    <!--
-    Whether the scene container framework is enabled.
-
-    The scene container framework is a newer (2023) way to organize the various "scenes" between the
-    bouncer, lockscreen, shade, and quick settings.
-    -->
-    <bool name="config_sceneContainerFrameworkEnabled">true</bool>
 
     <!--
     Time in milliseconds the user has to touch the side FPS sensor to successfully authenticate

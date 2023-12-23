@@ -133,7 +133,7 @@ public final class ApduServiceInfo implements Parcelable {
     /**
      * State of the service for CATEGORY_OTHER selection
      */
-    private boolean mOtherServiceEnabled;
+    private boolean mCategoryOtherServiceEnabled;
 
     /**
      * @hide
@@ -186,7 +186,7 @@ public final class ApduServiceInfo implements Parcelable {
         this.mBannerResourceId = bannerResource;
         this.mUid = uid;
         this.mSettingsActivityName = settingsActivityName;
-        this.mOtherServiceEnabled = isEnabled;
+        this.mCategoryOtherServiceEnabled = isEnabled;
 
     }
 
@@ -377,7 +377,7 @@ public final class ApduServiceInfo implements Parcelable {
         // Set uid
         mUid = si.applicationInfo.uid;
 
-        mOtherServiceEnabled = false;    // support other category
+        mCategoryOtherServiceEnabled = false;    // support other category
 
     }
 
@@ -749,7 +749,7 @@ public final class ApduServiceInfo implements Parcelable {
         dest.writeInt(mUid);
         dest.writeString(mSettingsActivityName);
 
-        dest.writeInt(mOtherServiceEnabled ? 1 : 0);
+        dest.writeInt(mCategoryOtherServiceEnabled ? 1 : 0);
     };
 
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
@@ -812,7 +812,7 @@ public final class ApduServiceInfo implements Parcelable {
         pw.println("    Static AID groups:");
         for (AidGroup group : mStaticAidGroups.values()) {
             pw.println("        Category: " + group.getCategory()
-                    + "(enabled: " + mOtherServiceEnabled + ")");
+                    + "(enabled: " + mCategoryOtherServiceEnabled + ")");
             for (String aid : group.getAids()) {
                 pw.println("            AID: " + aid);
             }
@@ -820,7 +820,7 @@ public final class ApduServiceInfo implements Parcelable {
         pw.println("    Dynamic AID groups:");
         for (AidGroup group : mDynamicAidGroups.values()) {
             pw.println("        Category: " + group.getCategory()
-                    + "(enabled: " + mOtherServiceEnabled + ")");
+                    + "(enabled: " + mCategoryOtherServiceEnabled + ")");
             for (String aid : group.getAids()) {
                 pw.println("            AID: " + aid);
             }
@@ -837,8 +837,8 @@ public final class ApduServiceInfo implements Parcelable {
      * @param enabled true to indicate if user has enabled this service
      */
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
-    public void setOtherServiceEnabled(boolean enabled) {
-        mOtherServiceEnabled = enabled;
+    public void setCategoryOtherServiceEnabled(boolean enabled) {
+        mCategoryOtherServiceEnabled = enabled;
     }
 
 
@@ -848,8 +848,8 @@ public final class ApduServiceInfo implements Parcelable {
      * @return true to indicate if user has enabled this service
      */
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
-    public boolean isOtherServiceEnabled() {
-        return mOtherServiceEnabled;
+    public boolean isCategoryOtherServiceEnabled() {
+        return mCategoryOtherServiceEnabled;
     }
 
     /**

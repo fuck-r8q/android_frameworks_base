@@ -183,6 +183,7 @@ public class ScreenDecorations implements CoreStartable, Dumpable {
     @VisibleForTesting
     protected DisplayInfo mDisplayInfo = new DisplayInfo();
     private DisplayCutout mDisplayCutout;
+    private boolean mPendingManualConfigUpdate;
 
     @VisibleForTesting
     protected void showCameraProtection(@NonNull Path protectionPath, @NonNull Rect bounds) {
@@ -574,6 +575,11 @@ public class ScreenDecorations implements CoreStartable, Dumpable {
                         removeAllOverlays();
                         setupDecorations();
                         return;
+                    }
+
+                    if (mPendingManualConfigUpdate) {
+                        mPendingManualConfigUpdate = false;
+                        onConfigurationChanged(mContext.getResources().getConfiguration());
                     }
                 }
             }
@@ -1068,6 +1074,15 @@ public class ScreenDecorations implements CoreStartable, Dumpable {
 
         mExecutor.execute(() -> {
             Trace.beginSection("ScreenDecorations#onConfigurationChanged");
+            mContext.getDisplay().getDisplayInfo(mDisplayInfo);
+            if (displaySizeChanged(mDisplaySize, mDisplayInfo)) {
+                // We expect the display change event to happen first, but in this case, we received
+                // onConfigurationChanged first.
+                // Return so that we handle the display change event first, and then manually
+                // trigger the config update.
+                mPendingManualConfigUpdate = true;
+                return;
+            }
             int oldRotation = mRotation;
             mPendingConfigChange = false;
             updateConfiguration();

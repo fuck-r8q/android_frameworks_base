@@ -547,6 +547,12 @@ public class CarrierConfigManager {
     public static final String KEY_PREFER_2G_BOOL = "prefer_2g_bool";
 
     /**
+     * Used in the Preferred Network Types menu to determine if the 3G option is displayed.
+     */
+    @FlaggedApi(Flags.FLAG_HIDE_PREFER_3G_ITEM)
+    public static final String KEY_PREFER_3G_VISIBILITY_BOOL = "prefer_3g_visibility_bool";
+
+    /**
      * Used in Cellular Network Settings for preferred network type to show 4G only mode.
      * @hide
      */
@@ -9649,14 +9655,20 @@ public class CarrierConfigManager {
             "satellite_attach_supported_bool";
 
     /**
-     * The carrier-enabled satellite connection hysteresis time in seconds to determine whether to
-     * recommend Dialer to prompt users to use satellite emergency messaging.
+     * The carrier-enabled satellite connection hysteresis time in seconds for which the device
+     * continues in satellite mode after it loses the connection with the satellite network.
      * <p>
-     * A timer is started when there is an ongoing emergency call, and the IMS is not registered,
-     * and cellular service is not available, and the device was connected to a satellite network
-     * within this time in the past. When the timer expires, Telephony will send the event
+     * If the device is in satellite mode, the following actions will be taken by the device:
+     * <ul>
+     * <li>System UI will continue showing the satellite icon.</li>
+     * <li>When there is an ongoing emergency call, and the IMS is not registered, and cellular
+     * service is not available, and the device is in satellite mode, a timer with a duration
+     * defined by the overlay config
+     * {@code config_emergency_call_wait_for_connection_timeout_millis} will be started. When the
+     * timer expires, Telephony will send the event
      * {@link TelephonyManager#EVENT_DISPLAY_EMERGENCY_MESSAGE} to Dialer, which will then prompt
-     * users to switch to using satellite emergency messaging.
+     * users to switch to using satellite emergency messaging.</li>
+     * </ul>
      * <p>
      * The default value is 300 seconds.
      */
@@ -10335,6 +10347,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_MDN_IS_ADDITIONAL_VOICEMAIL_NUMBER_BOOL, false);
         sDefaults.putBoolean(KEY_OPERATOR_SELECTION_EXPAND_BOOL, true);
         sDefaults.putBoolean(KEY_PREFER_2G_BOOL, false);
+        sDefaults.putBoolean(KEY_PREFER_3G_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_4G_ONLY_BOOL, false);
         sDefaults.putBoolean(KEY_SHOW_APN_SETTING_CDMA_BOOL, false);
         sDefaults.putBoolean(KEY_SHOW_CDMA_CHOICES_BOOL, false);

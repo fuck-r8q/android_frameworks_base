@@ -16,6 +16,7 @@
 
 package com.android.compose.animation.scene
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
@@ -30,16 +31,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.intermediateLayout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.compose.test.subjects.DpOffsetSubject
+import com.android.compose.test.subjects.assertThat
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -116,7 +122,13 @@ class ElementTest {
             toSceneContent = {
                 Box(Modifier.size(layoutSize)) {
                     // Shared element.
-                    Element(TestElements.Foo, elementSize, elementOffset)
+                    Element(
+                        TestElements.Foo,
+                        elementSize,
+                        elementOffset,
+                        onLayout = { fooLayouts++ },
+                        onPlacement = { fooPlacements++ },
+                    )
                 }
             },
             transition = {
@@ -127,21 +139,25 @@ class ElementTest {
                 scaleSize(TestElements.Bar, width = 1f, height = 1f)
             },
         ) {
-            var numberOfLayoutsAfterOneAnimationFrame = 0
-            var numberOfPlacementsAfterOneAnimationFrame = 0
+            var fooLayoutsAfterOneAnimationFrame = 0
+            var fooPlacementsAfterOneAnimationFrame = 0
+            var barLayoutsAfterOneAnimationFrame = 0
+            var barPlacementsAfterOneAnimationFrame = 0
 
             fun assertNumberOfLayoutsAndPlacements() {
-                assertThat(fooLayouts).isEqualTo(numberOfLayoutsAfterOneAnimationFrame)
-                assertThat(fooPlacements).isEqualTo(numberOfPlacementsAfterOneAnimationFrame)
-                assertThat(barLayouts).isEqualTo(numberOfLayoutsAfterOneAnimationFrame)
-                assertThat(barPlacements).isEqualTo(numberOfPlacementsAfterOneAnimationFrame)
+                assertThat(fooLayouts).isEqualTo(fooLayoutsAfterOneAnimationFrame)
+                assertThat(fooPlacements).isEqualTo(fooPlacementsAfterOneAnimationFrame)
+                assertThat(barLayouts).isEqualTo(barLayoutsAfterOneAnimationFrame)
+                assertThat(barPlacements).isEqualTo(barPlacementsAfterOneAnimationFrame)
             }
 
             at(16) {
                 // Capture the number of layouts and placements that happened after 1 animation
                 // frame.
-                numberOfLayoutsAfterOneAnimationFrame = fooLayouts
-                numberOfPlacementsAfterOneAnimationFrame = fooPlacements
+                fooLayoutsAfterOneAnimationFrame = fooLayouts
+                fooPlacementsAfterOneAnimationFrame = fooPlacements
+                barLayoutsAfterOneAnimationFrame = barLayouts
+                barPlacementsAfterOneAnimationFrame = barPlacements
             }
             repeat(nFrames - 2) { i ->
                 // Ensure that all animation frames (except the final one) don't relayout or replace
@@ -187,7 +203,13 @@ class ElementTest {
             toSceneContent = {
                 Box(Modifier.size(layoutSize)) {
                     // Shared element.
-                    Element(TestElements.Foo, elementSize, offset = 20.dp)
+                    Element(
+                        TestElements.Foo,
+                        elementSize,
+                        offset = 20.dp,
+                        onLayout = { fooLayouts++ },
+                        onPlacement = { fooPlacements++ },
+                    )
                 }
             },
             transition = {
@@ -198,25 +220,30 @@ class ElementTest {
                 scaleSize(TestElements.Bar, width = 1f, height = 1f)
             },
         ) {
-            var numberOfLayoutsAfterOneAnimationFrame = 0
-            var lastNumberOfPlacements = 0
+            var fooLayoutsAfterOneAnimationFrame = 0
+            var barLayoutsAfterOneAnimationFrame = 0
+            var lastFooPlacements = 0
+            var lastBarPlacements = 0
 
             fun assertNumberOfLayoutsAndPlacements() {
                 // The number of layouts have not changed.
-                assertThat(fooLayouts).isEqualTo(numberOfLayoutsAfterOneAnimationFrame)
-                assertThat(barLayouts).isEqualTo(numberOfLayoutsAfterOneAnimationFrame)
+                assertThat(fooLayouts).isEqualTo(fooLayoutsAfterOneAnimationFrame)
+                assertThat(barLayouts).isEqualTo(barLayoutsAfterOneAnimationFrame)
 
                 // The number of placements have increased.
-                assertThat(fooPlacements).isGreaterThan(lastNumberOfPlacements)
-                assertThat(barPlacements).isGreaterThan(lastNumberOfPlacements)
-                lastNumberOfPlacements = fooPlacements
+                assertThat(fooPlacements).isGreaterThan(lastFooPlacements)
+                assertThat(barPlacements).isGreaterThan(lastBarPlacements)
+                lastFooPlacements = fooPlacements
+                lastBarPlacements = barPlacements
             }
 
             at(16) {
                 // Capture the number of layouts and placements that happened after 1 animation
                 // frame.
-                numberOfLayoutsAfterOneAnimationFrame = fooLayouts
-                lastNumberOfPlacements = fooPlacements
+                fooLayoutsAfterOneAnimationFrame = fooLayouts
+                barLayoutsAfterOneAnimationFrame = barLayouts
+                lastFooPlacements = fooPlacements
+                lastBarPlacements = barPlacements
             }
             repeat(nFrames - 2) { i ->
                 // Ensure that all animation frames (except the final one) only replaced the
@@ -238,11 +265,6 @@ class ElementTest {
             SceneTransitionLayoutForTesting(
                 currentScene = currentScene,
                 onChangeScene = { currentScene = it },
-                transitions = remember { transitions {} },
-                state = remember { SceneTransitionLayoutState(currentScene) },
-                edgeDetector = DefaultEdgeDetector,
-                modifier = Modifier,
-                transitionInterceptionThreshold = 0f,
                 onLayoutImpl = { nullableLayoutImpl = it },
             ) {
                 scene(TestScenes.SceneA) { /* Nothing */}
@@ -408,11 +430,6 @@ class ElementTest {
             SceneTransitionLayoutForTesting(
                 currentScene = TestScenes.SceneA,
                 onChangeScene = {},
-                transitions = remember { transitions {} },
-                state = remember { SceneTransitionLayoutState(TestScenes.SceneA) },
-                edgeDetector = DefaultEdgeDetector,
-                modifier = Modifier,
-                transitionInterceptionThreshold = 0f,
                 onLayoutImpl = { nullableLayoutImpl = it },
             ) {
                 scene(TestScenes.SceneA) { Box(Modifier.element(key)) }
@@ -463,11 +480,6 @@ class ElementTest {
             SceneTransitionLayoutForTesting(
                 currentScene = TestScenes.SceneA,
                 onChangeScene = {},
-                transitions = remember { transitions {} },
-                state = remember { SceneTransitionLayoutState(TestScenes.SceneA) },
-                edgeDetector = DefaultEdgeDetector,
-                modifier = Modifier,
-                transitionInterceptionThreshold = 0f,
                 onLayoutImpl = { nullableLayoutImpl = it },
             ) {
                 scene(TestScenes.SceneA) {
@@ -551,6 +563,88 @@ class ElementTest {
             at(32) { assertThat(fooCompositions).isEqualTo(1) }
             at(48) { assertThat(fooCompositions).isEqualTo(1) }
             after { assertThat(fooCompositions).isEqualTo(1) }
+        }
+    }
+
+    @Test
+    fun sharedElementOffsetIsUpdatedEvenWhenNotPlaced() {
+        var nullableLayoutImpl: SceneTransitionLayoutImpl? = null
+        var density: Density? = null
+
+        fun layoutImpl() = nullableLayoutImpl ?: error("nullableLayoutImpl was not set")
+
+        fun density() = density ?: error("density was not set")
+
+        fun Offset.toDpOffset() = with(density()) { DpOffset(x.toDp(), y.toDp()) }
+
+        fun foo() = layoutImpl().elements[TestElements.Foo] ?: error("Foo not in elements map")
+
+        fun Element.lastSharedOffset() = lastSharedValues.offset.toDpOffset()
+
+        fun Element.lastOffsetIn(scene: SceneKey) =
+            (sceneValues[scene] ?: error("$scene not in sceneValues map"))
+                .lastValues
+                .offset
+                .toDpOffset()
+
+        rule.testTransition(
+            from = TestScenes.SceneA,
+            to = TestScenes.SceneB,
+            transitionLayout = { currentScene, onChangeScene ->
+                density = LocalDensity.current
+
+                SceneTransitionLayoutForTesting(
+                    currentScene = currentScene,
+                    onChangeScene = onChangeScene,
+                    onLayoutImpl = { nullableLayoutImpl = it },
+                    transitions =
+                        transitions {
+                            from(TestScenes.SceneA, to = TestScenes.SceneB) {
+                                spec = tween(durationMillis = 4 * 16, easing = LinearEasing)
+                            }
+                        }
+                ) {
+                    scene(TestScenes.SceneA) { Box(Modifier.element(TestElements.Foo)) }
+                    scene(TestScenes.SceneB) {
+                        Box(Modifier.offset(x = 40.dp, y = 80.dp).element(TestElements.Foo))
+                    }
+                }
+            }
+        ) {
+            val tolerance = DpOffsetSubject.DefaultTolerance
+
+            before {
+                val expected = DpOffset(0.dp, 0.dp)
+                assertThat(foo().lastSharedOffset()).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneA)).isWithin(tolerance).of(expected)
+            }
+
+            at(16) {
+                val expected = DpOffset(10.dp, 20.dp)
+                assertThat(foo().lastSharedOffset()).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneA)).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneB)).isWithin(tolerance).of(expected)
+            }
+
+            at(32) {
+                val expected = DpOffset(20.dp, 40.dp)
+                assertThat(foo().lastSharedOffset()).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneA)).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneB)).isWithin(tolerance).of(expected)
+            }
+
+            at(48) {
+                val expected = DpOffset(30.dp, 60.dp)
+                assertThat(foo().lastSharedOffset()).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneA)).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneB)).isWithin(tolerance).of(expected)
+            }
+
+            after {
+                val expected = DpOffset(40.dp, 80.dp)
+                assertThat(foo().lastSharedOffset()).isWithin(tolerance).of(expected)
+                assertThat(foo().lastOffsetIn(TestScenes.SceneB)).isWithin(tolerance).of(expected)
+            }
         }
     }
 }

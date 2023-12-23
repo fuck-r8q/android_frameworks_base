@@ -41,6 +41,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.Flags;
 import android.content.pm.IntentFilterVerificationInfo;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
@@ -1228,9 +1229,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             @Nullable boolean[] usesSdkLibrariesOptional,
             @Nullable String[] usesStaticLibraries, @Nullable long[] usesStaticLibrariesVersions,
             @Nullable Set<String> mimeGroupNames, @NonNull UUID domainSetId,
-            int targetSdkVersion, byte[] restrictUpdatedHash)
+            int targetSdkVersion, byte[] restrictUpdatedHash, boolean isDontKill)
                     throws PackageManagerException {
         final String pkgName = pkgSetting.getPackageName();
+        final File oldCodePath = pkgSetting.getPath();
         if (sharedUser != null) {
             if (!Objects.equals(existingSharedUserSetting, sharedUser)) {
                 PackageManagerService.reportSettingsProblem(Log.WARN,
@@ -1247,7 +1249,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             pkgSetting.setSharedUserAppId(INVALID_UID);
         }
 
-        if (!pkgSetting.getPath().equals(codePath)) {
+        if (!oldCodePath.equals(codePath)) {
             final boolean isSystem = pkgSetting.isSystem();
             Slog.i(PackageManagerService.TAG,
                     "Update" + (isSystem ? " system" : "")
@@ -1275,6 +1277,11 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 pkgSetting.setLegacyNativeLibraryPath(legacyNativeLibraryPath);
             }
             pkgSetting.setPath(codePath);
+            if (isDontKill && Flags.improveInstallDontKill()) {
+                // We retain old code paths for DONT_KILL installs. Keep a record of old paths until
+                // they are removed.
+                pkgSetting.addOldPath(oldCodePath);
+            }
         }
 
         pkgSetting.setPrimaryCpuAbi(primaryCpuAbi)
@@ -2570,7 +2577,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                     outPs.getUsesSdkLibraries(), libName));
             outPs.setUsesSdkLibrariesVersionsMajor(ArrayUtils.appendLong(
                     outPs.getUsesSdkLibrariesVersionsMajor(), libVersion));
-            outPs.setUsesSdkLibrariesOptional(PackageImpl.appendBoolean(
+            outPs.setUsesSdkLibrariesOptional(ArrayUtils.appendBoolean(
                     outPs.getUsesSdkLibrariesOptional(), optional));
         }
 
@@ -4969,6 +4976,11 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
         }
         pw.print(prefix); pw.print("  pkg="); pw.println(pkg);
         pw.print(prefix); pw.print("  codePath="); pw.println(ps.getPathString());
+        if (ps.getOldPaths() != null && ps.getOldPaths().size() > 0) {
+            for (File oldPath : ps.getOldPaths()) {
+                pw.print(prefix); pw.println("    oldCodePath=" + oldPath.getAbsolutePath());
+            }
+        }
         if (permissionNames == null) {
             pw.print(prefix); pw.print("  resourcePath="); pw.println(ps.getPathString());
             pw.print(prefix); pw.print("  legacyNativeLibraryDir=");

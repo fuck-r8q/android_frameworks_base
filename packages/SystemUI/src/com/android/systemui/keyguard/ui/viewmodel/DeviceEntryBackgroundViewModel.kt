@@ -19,11 +19,10 @@ package com.android.systemui.keyguard.ui.viewmodel
 
 import android.content.Context
 import com.android.settingslib.Utils
-import com.android.systemui.common.ui.data.repository.ConfigurationRepository
+import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -34,7 +33,7 @@ class DeviceEntryBackgroundViewModel
 @Inject
 constructor(
     val context: Context,
-    configurationRepository: ConfigurationRepository, // TODO (b/309655554): create & use interactor
+    configurationInteractor: ConfigurationInteractor,
     lockscreenToAodTransitionViewModel: LockscreenToAodTransitionViewModel,
     aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
     goneToAodTransitionViewModel: GoneToAodTransitionViewModel,
@@ -42,9 +41,10 @@ constructor(
     occludedToAodTransitionViewModel: OccludedToAodTransitionViewModel,
     occludedToLockscreenTransitionViewModel: OccludedToLockscreenTransitionViewModel,
     dreamingToLockscreenTransitionViewModel: DreamingToLockscreenTransitionViewModel,
+    alternateBouncerToAodTransitionViewModel: AlternateBouncerToAodTransitionViewModel,
 ) {
-    private val color: Flow<Int> =
-        configurationRepository.onAnyConfigurationChange
+    val color: Flow<Int> =
+        configurationInteractor.onAnyConfigurationChange
             .map {
                 Utils.getColorAttrDefaultColor(context, com.android.internal.R.attr.colorSurface)
             }
@@ -56,7 +56,7 @@ constructor(
                     )
                 )
             }
-    private val alpha: Flow<Float> =
+    val alpha: Flow<Float> =
         setOf(
                 lockscreenToAodTransitionViewModel.deviceEntryBackgroundViewAlpha,
                 aodToLockscreenTransitionViewModel.deviceEntryBackgroundViewAlpha,
@@ -65,19 +65,7 @@ constructor(
                 occludedToAodTransitionViewModel.deviceEntryBackgroundViewAlpha,
                 occludedToLockscreenTransitionViewModel.deviceEntryBackgroundViewAlpha,
                 dreamingToLockscreenTransitionViewModel.deviceEntryBackgroundViewAlpha,
+                alternateBouncerToAodTransitionViewModel.deviceEntryBackgroundViewAlpha,
             )
             .merge()
-
-    val viewModel: Flow<BackgroundViewModel> =
-        combine(color, alpha) { color, alpha ->
-            BackgroundViewModel(
-                alpha = alpha,
-                tint = color,
-            )
-        }
-
-    data class BackgroundViewModel(
-        val alpha: Float,
-        val tint: Int,
-    )
 }

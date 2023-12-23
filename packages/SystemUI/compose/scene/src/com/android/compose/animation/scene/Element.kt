@@ -16,6 +16,7 @@
 
 package com.android.compose.animation.scene
 
+import android.graphics.Picture
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -66,12 +67,21 @@ internal class Element(val key: ElementKey) {
      * The movable content of this element, if this element is composed using
      * [SceneScope.MovableElement].
      */
-    val movableContent by
-        // This is only accessed from the composition (main) thread, so no need to use the default
-        // lock of lazy {} to synchronize.
-        lazy(mode = LazyThreadSafetyMode.NONE) {
-            movableContentOf { content: @Composable () -> Unit -> content() }
-        }
+    private var _movableContent: (@Composable (@Composable () -> Unit) -> Unit)? = null
+    val movableContent: @Composable (@Composable () -> Unit) -> Unit
+        get() =
+            _movableContent
+                ?: movableContentOf { content: @Composable () -> Unit -> content() }
+                    .also { _movableContent = it }
+
+    /**
+     * The [Picture] to which we save the last drawing commands of this element, if it is movable.
+     * This is necessary because the content of this element might not be composed in the scene it
+     * should currently be drawn.
+     */
+    private var _picture: Picture? = null
+    val picture: Picture
+        get() = _picture ?: Picture().also { _picture = it }
 
     override fun toString(): String {
         return "Element(key=$key)"
@@ -235,18 +245,16 @@ internal class ElementNode(
     }
 
     override fun ContentDrawScope.draw() {
-        if (shouldDrawElement(layoutImpl, scene, element)) {
-            val drawScale = getDrawScale(layoutImpl, element, scene, sceneValues)
-            if (drawScale == Scale.Default) {
-                drawContent()
-            } else {
-                scale(
-                    drawScale.scaleX,
-                    drawScale.scaleY,
-                    if (drawScale.pivot.isUnspecified) center else drawScale.pivot,
-                ) {
-                    this@draw.drawContent()
-                }
+        val drawScale = getDrawScale(layoutImpl, element, scene, sceneValues)
+        if (drawScale == Scale.Default) {
+            drawContent()
+        } else {
+            scale(
+                drawScale.scaleX,
+                drawScale.scaleY,
+                if (drawScale.pivot.isUnspecified) center else drawScale.pivot,
+            ) {
+                this@draw.drawContent()
             }
         }
     }
@@ -516,7 +524,7 @@ private fun IntermediateMeasureScope.place(
     with(placementScope) {
         // Update the offset (relative to the SceneTransitionLayout) this element has in this scene
         // when idle.
-        val coords = coordinates!!
+        val coords = coordinates ?: error("Element ${element.key} does not have any coordinates")
         val targetOffsetInScene = lookaheadScopeCoordinates.localLookaheadPositionOf(coords)
         if (targetOffsetInScene != sceneValues.targetOffset) {
             // TODO(b/290930950): Better handle when this changes to avoid instant offset jumps.
@@ -544,6 +552,13 @@ private fun IntermediateMeasureScope.place(
 
         lastSharedValues.offset = targetOffset
         lastValues.offset = targetOffset
+
+        // No need to place the element in this scene if we don't want to draw it anyways. Note that
+        // it's still important to compute the target offset and update lastValues, otherwise it
+        // will be out of date.
+        if (!shouldDrawElement(layoutImpl, scene, element)) {
+            return
+        }
 
         val offset = (targetOffset - currentOffset).round()
         if (isElementOpaque(layoutImpl, element, scene, sceneValues)) {
