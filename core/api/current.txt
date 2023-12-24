@@ -429,6 +429,7 @@ package android {
     field public static final int activityCloseExitAnimation = 16842939; // 0x10100bb
     field public static final int activityOpenEnterAnimation = 16842936; // 0x10100b8
     field public static final int activityOpenExitAnimation = 16842937; // 0x10100b9
+    field @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public static final int adServiceTypes;
     field public static final int addPrintersActivity = 16843750; // 0x10103e6
     field public static final int addStatesFromChildren = 16842992; // 0x10100f0
     field public static final int adjustViewBounds = 16843038; // 0x101011e
@@ -13737,6 +13738,16 @@ package android.content.res {
     field public int smallestScreenWidthDp;
     field public int touchscreen;
     field public int uiMode;
+  }
+
+  @FlaggedApi("android.content.res.font_scale_converter_public") public interface FontScaleConverter {
+    method public float convertDpToSp(float);
+    method public float convertSpToDp(float);
+  }
+
+  @FlaggedApi("android.content.res.font_scale_converter_public") public class FontScaleConverterFactory {
+    method @FlaggedApi("android.content.res.font_scale_converter_public") @AnyThread @Nullable public static android.content.res.FontScaleConverter forScale(float);
+    method @FlaggedApi("android.content.res.font_scale_converter_public") @AnyThread public static boolean isNonLinearFontScalingActive(float);
   }
 
   public class ObbInfo implements android.os.Parcelable {
@@ -35947,19 +35958,19 @@ package android.provider {
     field public static final String NAMESPACE = "data2";
   }
 
-  public static final class ContactsContract.CommonDataKinds.Im implements android.provider.ContactsContract.CommonDataKinds.CommonColumns android.provider.ContactsContract.DataColumnsWithJoins {
-    method public static CharSequence getProtocolLabel(android.content.res.Resources, int, CharSequence);
-    method public static int getProtocolLabelResource(int);
-    method public static CharSequence getTypeLabel(android.content.res.Resources, int, @Nullable CharSequence);
-    method public static int getTypeLabelResource(int);
-    field public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/im";
-    field public static final String CUSTOM_PROTOCOL = "data6";
+  @Deprecated public static final class ContactsContract.CommonDataKinds.Im implements android.provider.ContactsContract.CommonDataKinds.CommonColumns android.provider.ContactsContract.DataColumnsWithJoins {
+    method @Deprecated public static CharSequence getProtocolLabel(android.content.res.Resources, int, CharSequence);
+    method @Deprecated public static int getProtocolLabelResource(int);
+    method @Deprecated public static CharSequence getTypeLabel(android.content.res.Resources, int, @Nullable CharSequence);
+    method @Deprecated public static int getTypeLabelResource(int);
+    field @Deprecated public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/im";
+    field @Deprecated public static final String CUSTOM_PROTOCOL = "data6";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX = "android.provider.extra.ADDRESS_BOOK_INDEX";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX_COUNTS = "android.provider.extra.ADDRESS_BOOK_INDEX_COUNTS";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX_TITLES = "android.provider.extra.ADDRESS_BOOK_INDEX_TITLES";
-    field public static final String PROTOCOL = "data5";
+    field @Deprecated public static final String PROTOCOL = "data5";
     field @Deprecated public static final int PROTOCOL_AIM = 0; // 0x0
-    field public static final int PROTOCOL_CUSTOM = -1; // 0xffffffff
+    field @Deprecated public static final int PROTOCOL_CUSTOM = -1; // 0xffffffff
     field @Deprecated public static final int PROTOCOL_GOOGLE_TALK = 5; // 0x5
     field @Deprecated public static final int PROTOCOL_ICQ = 6; // 0x6
     field @Deprecated public static final int PROTOCOL_JABBER = 7; // 0x7
@@ -35968,9 +35979,9 @@ package android.provider {
     field @Deprecated public static final int PROTOCOL_QQ = 4; // 0x4
     field @Deprecated public static final int PROTOCOL_SKYPE = 3; // 0x3
     field @Deprecated public static final int PROTOCOL_YAHOO = 2; // 0x2
-    field public static final int TYPE_HOME = 1; // 0x1
-    field public static final int TYPE_OTHER = 3; // 0x3
-    field public static final int TYPE_WORK = 2; // 0x2
+    field @Deprecated public static final int TYPE_HOME = 1; // 0x1
+    field @Deprecated public static final int TYPE_OTHER = 3; // 0x3
+    field @Deprecated public static final int TYPE_WORK = 2; // 0x2
   }
 
   public static final class ContactsContract.CommonDataKinds.Nickname implements android.provider.ContactsContract.CommonDataKinds.CommonColumns android.provider.ContactsContract.DataColumnsWithJoins {
@@ -36085,17 +36096,17 @@ package android.provider {
     field public static final int TYPE_SPOUSE = 14; // 0xe
   }
 
-  public static final class ContactsContract.CommonDataKinds.SipAddress implements android.provider.ContactsContract.CommonDataKinds.CommonColumns android.provider.ContactsContract.DataColumnsWithJoins {
-    method public static CharSequence getTypeLabel(android.content.res.Resources, int, @Nullable CharSequence);
-    method public static int getTypeLabelResource(int);
-    field public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/sip_address";
+  @Deprecated public static final class ContactsContract.CommonDataKinds.SipAddress implements android.provider.ContactsContract.CommonDataKinds.CommonColumns android.provider.ContactsContract.DataColumnsWithJoins {
+    method @Deprecated public static CharSequence getTypeLabel(android.content.res.Resources, int, @Nullable CharSequence);
+    method @Deprecated public static int getTypeLabelResource(int);
+    field @Deprecated public static final String CONTENT_ITEM_TYPE = "vnd.android.cursor.item/sip_address";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX = "android.provider.extra.ADDRESS_BOOK_INDEX";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX_COUNTS = "android.provider.extra.ADDRESS_BOOK_INDEX_COUNTS";
     field public static final String EXTRA_ADDRESS_BOOK_INDEX_TITLES = "android.provider.extra.ADDRESS_BOOK_INDEX_TITLES";
-    field public static final String SIP_ADDRESS = "data1";
-    field public static final int TYPE_HOME = 1; // 0x1
-    field public static final int TYPE_OTHER = 3; // 0x3
-    field public static final int TYPE_WORK = 2; // 0x2
+    field @Deprecated public static final String SIP_ADDRESS = "data1";
+    field @Deprecated public static final int TYPE_HOME = 1; // 0x1
+    field @Deprecated public static final int TYPE_OTHER = 3; // 0x3
+    field @Deprecated public static final int TYPE_WORK = 2; // 0x2
   }
 
   public static final class ContactsContract.CommonDataKinds.StructuredName implements android.provider.ContactsContract.DataColumnsWithJoins {
@@ -42874,6 +42885,7 @@ package android.telecom {
     method @Deprecated @RequiresPermission(android.Manifest.permission.ANSWER_PHONE_CALLS) public boolean endCall();
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public android.net.Uri getAdnUriForPhoneAccount(android.telecom.PhoneAccountHandle);
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public java.util.List<android.telecom.PhoneAccountHandle> getCallCapablePhoneAccounts();
+    method @FlaggedApi("com.android.internal.telephony.flags.work_profile_api_split") @NonNull @RequiresPermission(allOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.INTERACT_ACROSS_PROFILES}) public java.util.List<android.telecom.PhoneAccountHandle> getCallCapablePhoneAccountsAcrossProfiles();
     method public String getDefaultDialerPackage();
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public android.telecom.PhoneAccountHandle getDefaultOutgoingPhoneAccount(String);
     method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.READ_PHONE_STATE, android.Manifest.permission.READ_SMS, android.Manifest.permission.READ_PHONE_NUMBERS}, conditional=true) public String getLine1Number(android.telecom.PhoneAccountHandle);
@@ -43475,6 +43487,7 @@ package android.telephony {
     field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String KEY_PARAMETERS_USED_FOR_NTN_LTE_SIGNAL_BAR_INT = "parameters_used_for_ntn_lte_signal_bar_int";
     field public static final String KEY_PING_TEST_BEFORE_DATA_SWITCH_BOOL = "ping_test_before_data_switch_bool";
     field public static final String KEY_PREFER_2G_BOOL = "prefer_2g_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.hide_prefer_3g_item") public static final String KEY_PREFER_3G_VISIBILITY_BOOL = "prefer_3g_visibility_bool";
     field public static final String KEY_PREMIUM_CAPABILITY_MAXIMUM_DAILY_NOTIFICATION_COUNT_INT = "premium_capability_maximum_daily_notification_count_int";
     field public static final String KEY_PREMIUM_CAPABILITY_MAXIMUM_MONTHLY_NOTIFICATION_COUNT_INT = "premium_capability_maximum_monthly_notification_count_int";
     field public static final String KEY_PREMIUM_CAPABILITY_NETWORK_SETUP_TIME_MILLIS_LONG = "premium_capability_network_setup_time_millis_long";
@@ -46695,6 +46708,8 @@ package android.telephony.ims {
     method public int getTransportType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field public static final int ATTR_EPDG_OVER_CELL_INTERNET = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_REGISTRATION_TYPE_EMERGENCY = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.emergency_registration_state") public static final int ATTR_VIRTUAL_FOR_ANONYMOUS_EMERGENCY_CALL = 4; // 0x4
     field @NonNull public static final android.os.Parcelable.Creator<android.telephony.ims.ImsRegistrationAttributes> CREATOR;
   }
 
@@ -53980,6 +53995,7 @@ package android.view {
     field public static final String PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH = "android.window.PROPERTY_CAMERA_COMPAT_ALLOW_REFRESH";
     field public static final String PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE = "android.window.PROPERTY_CAMERA_COMPAT_ENABLE_REFRESH_VIA_PAUSE";
     field public static final String PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE";
+    field @FlaggedApi("com.android.window.flags.app_compat_properties_api") public static final String PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE";
     field public static final String PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE = "android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE";
     field public static final String PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS = "android.window.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_BOUNDS_APIS";
     field public static final String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";

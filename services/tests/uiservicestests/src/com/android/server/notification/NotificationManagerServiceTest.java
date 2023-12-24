@@ -24,6 +24,7 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.Notification.EXTRA_ALLOW_DURING_SETUP;
 import static android.app.Notification.EXTRA_PICTURE;
 import static android.app.Notification.EXTRA_PICTURE_ICON;
+import static android.app.Notification.EXTRA_TEXT;
 import static android.app.Notification.FLAG_AUTO_CANCEL;
 import static android.app.Notification.FLAG_BUBBLE;
 import static android.app.Notification.FLAG_CAN_COLORIZE;
@@ -74,9 +75,14 @@ import static android.os.UserHandle.USER_SYSTEM;
 import static android.os.UserManager.USER_TYPE_FULL_SECONDARY;
 import static android.os.UserManager.USER_TYPE_PROFILE_CLONE;
 import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
+import static android.platform.test.flag.junit.SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT;
 import static android.provider.Settings.Global.ZEN_MODE_IMPORTANT_INTERRUPTIONS;
 import static android.service.notification.Adjustment.KEY_IMPORTANCE;
 import static android.service.notification.Adjustment.KEY_USER_SENTIMENT;
+import static android.service.notification.Flags.FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS;
+import static android.service.notification.Condition.SOURCE_CONTEXT;
+import static android.service.notification.Condition.SOURCE_USER_ACTION;
+import static android.service.notification.Condition.STATE_TRUE;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_ALERTING;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_CONVERSATIONS;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_ONGOING;
@@ -210,6 +216,9 @@ import android.os.UserManager;
 import android.os.WorkSource;
 import android.permission.PermissionManager;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.platform.test.rule.DeniedDevices;
 import android.platform.test.rule.DeviceProduct;
@@ -218,8 +227,10 @@ import android.provider.DeviceConfig;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.service.notification.Adjustment;
+import android.service.notification.Condition;
 import android.service.notification.ConversationChannelWrapper;
 import android.service.notification.DeviceEffectsApplier;
+import android.service.notification.INotificationListener;
 import android.service.notification.NotificationListenerFilter;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.NotificationRankingUpdate;
@@ -333,6 +344,12 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
             NotificationManagerService.class.getSimpleName() + ".TIMEOUT";
     private static final String EXTRA_KEY = "key";
     private static final String SCHEME_TIMEOUT = "timeout";
+    private static final String REDACTED_TEXT = "redacted text";
+
+    private static final AutomaticZenRule SOME_ZEN_RULE =
+            new AutomaticZenRule.Builder("rule", Uri.parse("uri"))
+                    .setOwner(new ComponentName("pkg", "cls"))
+                    .build();
 
     private final int mUid = Binder.getCallingUid();
     private final @UserIdInt int mUserId = UserHandle.getUserId(mUid);
@@ -342,6 +359,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Rule
     public TestRule compatChangeRule = new PlatformCompatChangeRule();
+
+    @Rule
+    public CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
 
     private TestableNotificationManagerService mService;
     private INotificationManager mBinderService;
@@ -464,7 +484,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     TestableNotificationManagerService.StrongAuthTrackerFake mStrongAuthTracker;
 
     TestableFlagResolver mTestFlagResolver = new TestableFlagResolver();
-    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+    @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule(DEVICE_DEFAULT);
     private InstanceIdSequence mNotificationInstanceIdSequence = new InstanceIdSequenceFake(
             1 << 30);
     @Mock
@@ -630,6 +650,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 });
 
         // TODO (b/291907312): remove feature flag
+        // NOTE: Prefer using the @EnableFlag annotation where possible. Do not add any android.app
+        //  flags here.
         mSetFlagsRule.disableFlags(Flags.FLAG_REFACTOR_ATTENTION_HELPER,
                 Flags.FLAG_POLITE_NOTIFICATIONS);
         initNMS();
@@ -1015,7 +1037,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setSmallIcon(android.R.drawable.sym_def_app_icon);
         StatusBarNotification sbn = new StatusBarNotification(PKG, PKG, id, "tag", mUid, 0,
                 nb.build(), new UserHandle(userId), null, 0);
-        return new NotificationRecord(mContext, sbn, channel);
+        NotificationRecord r = new NotificationRecord(mContext, sbn, channel);
+        return r;
     }
 
     private NotificationRecord generateMessageBubbleNotifRecord(NotificationChannel channel,
@@ -1036,6 +1059,16 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 tag, mUid, 0,
                 nb.build(), UserHandle.getUserHandleForUid(mUid), null, 0);
         return new NotificationRecord(mContext, sbn, channel);
+    }
+
+    private StatusBarNotification generateRedactedSbn(NotificationChannel channel, int id,
+            int userId) {
+        Notification.Builder nb = new Notification.Builder(mContext, channel.getId())
+                .setContentTitle("foo")
+                .setSmallIcon(android.R.drawable.sym_def_app_icon)
+                .setContentText(REDACTED_TEXT);
+        return new StatusBarNotification(PKG, PKG, id, "tag", mUid, 0,
+                nb.build(), new UserHandle(userId), null, 0);
     }
 
     private Map<String, Answer> getSignalExtractorSideEffects() {
@@ -6295,15 +6328,22 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(visitor, times(1)).accept(eq(personIcon3.getUri()));
     }
 
+    private PendingIntent getPendingIntentWithUri(Uri uri) {
+        return PendingIntent.getActivity(mContext, 0,
+                new Intent("action", uri),
+                PendingIntent.FLAG_IMMUTABLE);
+    }
+
     @Test
-    public void testVisitUris_callStyle() {
+    @EnableFlags({android.app.Flags.FLAG_VISIT_RISKY_URIS})
+    public void testVisitUris_callStyle_ongoingCall() {
         Icon personIcon = Icon.createWithContentUri("content://media/person");
         Icon verificationIcon = Icon.createWithContentUri("content://media/verification");
         Person callingPerson = new Person.Builder().setName("Someone")
                 .setIcon(personIcon)
                 .build();
-        PendingIntent hangUpIntent = PendingIntent.getActivity(mContext, 0, new Intent(),
-                PendingIntent.FLAG_IMMUTABLE);
+        Uri hangUpUri = Uri.parse("content://intent/hangup");
+        PendingIntent hangUpIntent = getPendingIntentWithUri(hangUpUri);
         Notification n = new Notification.Builder(mContext, "a")
                 .setStyle(Notification.CallStyle.forOngoingCall(callingPerson, hangUpIntent)
                         .setVerificationIcon(verificationIcon))
@@ -6316,6 +6356,36 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         verify(visitor, times(1)).accept(eq(personIcon.getUri()));
         verify(visitor, times(1)).accept(eq(verificationIcon.getUri()));
+        verify(visitor, times(1)).accept(eq(hangUpUri));
+    }
+
+    @Test
+    @EnableFlags({android.app.Flags.FLAG_VISIT_RISKY_URIS})
+    public void testVisitUris_callStyle_incomingCall() {
+        Icon personIcon = Icon.createWithContentUri("content://media/person");
+        Icon verificationIcon = Icon.createWithContentUri("content://media/verification");
+        Person callingPerson = new Person.Builder().setName("Someone")
+                .setIcon(personIcon)
+                .build();
+        Uri answerUri = Uri.parse("content://intent/answer");
+        PendingIntent answerIntent = getPendingIntentWithUri(answerUri);
+        Uri declineUri = Uri.parse("content://intent/decline");
+        PendingIntent declineIntent = getPendingIntentWithUri(declineUri);
+        Notification n = new Notification.Builder(mContext, "a")
+                .setStyle(Notification.CallStyle.forIncomingCall(callingPerson, declineIntent,
+                                answerIntent)
+                        .setVerificationIcon(verificationIcon))
+                .setContentTitle("Calling...")
+                .setSmallIcon(android.R.drawable.sym_def_app_icon)
+                .build();
+
+        Consumer<Uri> visitor = (Consumer<Uri>) spy(Consumer.class);
+        n.visitUris(visitor);
+
+        verify(visitor, times(1)).accept(eq(personIcon.getUri()));
+        verify(visitor, times(1)).accept(eq(verificationIcon.getUri()));
+        verify(visitor, times(1)).accept(eq(answerIntent.getIntent().getData()));
+        verify(visitor, times(1)).accept(eq(declineUri));
     }
 
     @Test
@@ -6364,23 +6434,80 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @EnableFlags({android.app.Flags.FLAG_VISIT_RISKY_URIS})
     public void testVisitUris_wearableExtender() {
         Icon actionIcon = Icon.createWithContentUri("content://media/action");
         Icon wearActionIcon = Icon.createWithContentUri("content://media/wearAction");
-        PendingIntent intent = PendingIntent.getActivity(mContext, 0, new Intent(),
-                PendingIntent.FLAG_IMMUTABLE);
+        Uri displayIntentUri = Uri.parse("content://intent/display");
+        PendingIntent displayIntent = getPendingIntentWithUri(displayIntentUri);
+        Uri actionIntentUri = Uri.parse("content://intent/action");
+        PendingIntent actionIntent = getPendingIntentWithUri(actionIntentUri);
+        Uri wearActionIntentUri = Uri.parse("content://intent/wear");
+        PendingIntent wearActionIntent = getPendingIntentWithUri(wearActionIntentUri);
         Notification n = new Notification.Builder(mContext, "a")
                 .setSmallIcon(android.R.drawable.sym_def_app_icon)
-                .addAction(new Notification.Action.Builder(actionIcon, "Hey!", intent).build())
-                .extend(new Notification.WearableExtender().addAction(
-                        new Notification.Action.Builder(wearActionIcon, "Wear!", intent).build()))
+                .addAction(
+                        new Notification.Action.Builder(actionIcon, "Hey!", actionIntent).build())
+                .extend(new Notification.WearableExtender()
+                        .setDisplayIntent(displayIntent)
+                        .addAction(new Notification.Action.Builder(wearActionIcon, "Wear!",
+                                wearActionIntent)
+                                .build()))
                 .build();
 
         Consumer<Uri> visitor = (Consumer<Uri>) spy(Consumer.class);
         n.visitUris(visitor);
 
         verify(visitor).accept(eq(actionIcon.getUri()));
+        verify(visitor, times(1)).accept(eq(actionIntentUri));
         verify(visitor).accept(eq(wearActionIcon.getUri()));
+        verify(visitor, times(1)).accept(eq(wearActionIntentUri));
+    }
+
+    @Test
+    @EnableFlags({android.app.Flags.FLAG_VISIT_RISKY_URIS})
+    public void testVisitUris_tvExtender() {
+        Uri contentIntentUri = Uri.parse("content://intent/content");
+        PendingIntent contentIntent = getPendingIntentWithUri(contentIntentUri);
+        Uri deleteIntentUri = Uri.parse("content://intent/delete");
+        PendingIntent deleteIntent = getPendingIntentWithUri(deleteIntentUri);
+        Notification n = new Notification.Builder(mContext, "a")
+                .extend(
+                        new Notification.TvExtender()
+                                .setContentIntent(contentIntent)
+                                .setDeleteIntent(deleteIntent))
+                .build();
+
+        Consumer<Uri> visitor = (Consumer<Uri>) spy(Consumer.class);
+        n.visitUris(visitor);
+
+        verify(visitor, times(1)).accept(eq(contentIntentUri));
+        verify(visitor, times(1)).accept(eq(deleteIntentUri));
+    }
+
+    @Test
+    @EnableFlags({android.app.Flags.FLAG_VISIT_RISKY_URIS})
+    public void testVisitUris_carExtender() {
+        final String testParticipant = "testParticipant";
+        Uri readPendingIntentUri = Uri.parse("content://intent/read");
+        PendingIntent readPendingIntent = getPendingIntentWithUri(readPendingIntentUri);
+        Uri replyPendingIntentUri = Uri.parse("content://intent/reply");
+        PendingIntent replyPendingIntent = getPendingIntentWithUri(replyPendingIntentUri);
+        final RemoteInput testRemoteInput = new RemoteInput.Builder("key").build();
+
+        Notification n = new Notification.Builder(mContext, "a")
+                .extend(new Notification.CarExtender().setUnreadConversation(
+                        new Notification.CarExtender.Builder(testParticipant)
+                                .setReadPendingIntent(readPendingIntent)
+                                .setReplyAction(replyPendingIntent, testRemoteInput)
+                                .build()))
+                .build();
+
+        Consumer<Uri> visitor = (Consumer<Uri>) spy(Consumer.class);
+        n.visitUris(visitor);
+
+        verify(visitor, times(1)).accept(eq(readPendingIntentUri));
+        verify(visitor, times(1)).accept(eq(replyPendingIntentUri));
     }
 
     @Test
@@ -8930,7 +9057,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 zenPolicy, NotificationManager.INTERRUPTION_FILTER_NONE, isEnabled);
 
         try {
-            mBinderService.addAutomaticZenRule(rule, mContext.getPackageName());
+            mBinderService.addAutomaticZenRule(rule, mContext.getPackageName(), false);
             fail("Zen policy only applies to priority only mode");
         } catch (IllegalArgumentException e) {
             // yay
@@ -8938,11 +9065,11 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         rule = new AutomaticZenRule("test", owner, owner, mock(Uri.class),
                 zenPolicy, NotificationManager.INTERRUPTION_FILTER_PRIORITY, isEnabled);
-        mBinderService.addAutomaticZenRule(rule, mContext.getPackageName());
+        mBinderService.addAutomaticZenRule(rule, mContext.getPackageName(), false);
 
         rule = new AutomaticZenRule("test", owner, owner, mock(Uri.class),
                 null, NotificationManager.INTERRUPTION_FILTER_NONE, isEnabled);
-        mBinderService.addAutomaticZenRule(rule, mContext.getPackageName());
+        mBinderService.addAutomaticZenRule(rule, mContext.getPackageName(), false);
     }
 
     @Test
@@ -8957,7 +9084,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         boolean isEnabled = true;
         AutomaticZenRule rule = new AutomaticZenRule("test", owner, owner, mock(Uri.class),
                 zenPolicy, NotificationManager.INTERRUPTION_FILTER_PRIORITY, isEnabled);
-        mBinderService.addAutomaticZenRule(rule, "com.android.settings");
+        mBinderService.addAutomaticZenRule(rule, "com.android.settings", false);
 
         // verify that zen mode helper gets passed in a package name of "android"
         verify(mockZenModeHelper).addAutomaticZenRule(eq("android"), eq(rule),
@@ -8979,7 +9106,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         boolean isEnabled = true;
         AutomaticZenRule rule = new AutomaticZenRule("test", owner, owner, mock(Uri.class),
                 zenPolicy, NotificationManager.INTERRUPTION_FILTER_PRIORITY, isEnabled);
-        mBinderService.addAutomaticZenRule(rule, "com.android.settings");
+        mBinderService.addAutomaticZenRule(rule, "com.android.settings", false);
 
         // verify that zen mode helper gets passed in a package name of "android"
         verify(mockZenModeHelper).addAutomaticZenRule(eq("android"), eq(rule),
@@ -8999,7 +9126,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         boolean isEnabled = true;
         AutomaticZenRule rule = new AutomaticZenRule("test", owner, owner, mock(Uri.class),
                 zenPolicy, NotificationManager.INTERRUPTION_FILTER_PRIORITY, isEnabled);
-        mBinderService.addAutomaticZenRule(rule, "another.package");
+        mBinderService.addAutomaticZenRule(rule, "another.package", false);
 
         // verify that zen mode helper gets passed in the package name from the arg, not the owner
         verify(mockZenModeHelper).addAutomaticZenRule(
@@ -9010,10 +9137,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     @Test
     @EnableFlags(android.app.Flags.FLAG_MODES_API)
     public void testAddAutomaticZenRule_typeManagedCanBeUsedByDeviceOwners() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
         mService.setCallerIsNormalPackage();
-        mService.setZenHelper(mock(ZenModeHelper.class));
-        when(mConditionProviders.isPackageOrComponentAllowed(anyString(), anyInt()))
-                .thenReturn(true);
 
         AutomaticZenRule rule = new AutomaticZenRule.Builder("rule", Uri.parse("uri"))
                 .setType(AutomaticZenRule.TYPE_MANAGED)
@@ -9021,8 +9146,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .build();
         when(mDevicePolicyManager.isActiveDeviceOwner(anyInt())).thenReturn(true);
 
-        mBinderService.addAutomaticZenRule(rule, "pkg");
-        // No exception!
+        mBinderService.addAutomaticZenRule(rule, "pkg", /* fromUser= */ false);
+
+        verify(zenModeHelper).addAutomaticZenRule(eq("pkg"), eq(rule), anyInt(), any(), anyInt());
     }
 
     @Test
@@ -9040,7 +9166,144 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         when(mDevicePolicyManager.isActiveDeviceOwner(anyInt())).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
-                () -> mBinderService.addAutomaticZenRule(rule, "pkg"));
+                () -> mBinderService.addAutomaticZenRule(rule, "pkg", /* fromUser= */ false));
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void addAutomaticZenRule_fromUser_mappedToOriginUser() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.isSystemUid = true;
+
+        mBinderService.addAutomaticZenRule(SOME_ZEN_RULE, "pkg", /* fromUser= */ true);
+
+        verify(zenModeHelper).addAutomaticZenRule(eq("pkg"), eq(SOME_ZEN_RULE),
+                eq(ZenModeConfig.UPDATE_ORIGIN_USER), anyString(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void addAutomaticZenRule_fromSystemNotUser_mappedToOriginSystem() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.isSystemUid = true;
+
+        mBinderService.addAutomaticZenRule(SOME_ZEN_RULE, "pkg", /* fromUser= */ false);
+
+        verify(zenModeHelper).addAutomaticZenRule(eq("pkg"), eq(SOME_ZEN_RULE),
+                eq(ZenModeConfig.UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI), anyString(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void addAutomaticZenRule_fromApp_mappedToOriginApp() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        mBinderService.addAutomaticZenRule(SOME_ZEN_RULE, "pkg", /* fromUser= */ false);
+
+        verify(zenModeHelper).addAutomaticZenRule(eq("pkg"), eq(SOME_ZEN_RULE),
+                eq(ZenModeConfig.UPDATE_ORIGIN_APP), anyString(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void addAutomaticZenRule_fromAppFromUser_blocked() throws Exception {
+        setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        assertThrows(SecurityException.class, () ->
+                mBinderService.addAutomaticZenRule(SOME_ZEN_RULE, "pkg", /* fromUser= */ true));
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void updateAutomaticZenRule_fromUserFromSystem_allowed() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.isSystemUid = true;
+
+        mBinderService.updateAutomaticZenRule("id", SOME_ZEN_RULE, /* fromUser= */ true);
+
+        verify(zenModeHelper).updateAutomaticZenRule(eq("id"), eq(SOME_ZEN_RULE),
+                eq(ZenModeConfig.UPDATE_ORIGIN_USER), anyString(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void updateAutomaticZenRule_fromUserFromApp_blocked() throws Exception {
+        setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        assertThrows(SecurityException.class, () ->
+                mBinderService.addAutomaticZenRule(SOME_ZEN_RULE, "pkg", /* fromUser= */ true));
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void removeAutomaticZenRule_fromUserFromSystem_allowed() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.isSystemUid = true;
+
+        mBinderService.removeAutomaticZenRule("id", /* fromUser= */ true);
+
+        verify(zenModeHelper).removeAutomaticZenRule(eq("id"),
+                eq(ZenModeConfig.UPDATE_ORIGIN_USER), anyString(), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void removeAutomaticZenRule_fromUserFromApp_blocked() throws Exception {
+        setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        assertThrows(SecurityException.class, () ->
+                mBinderService.removeAutomaticZenRule("id", /* fromUser= */ true));
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void setAutomaticZenRuleState_fromUserMatchesConditionSource_okay() throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        Condition withSourceContext = new Condition(Uri.parse("uri"), "summary", STATE_TRUE,
+                SOURCE_CONTEXT);
+        mBinderService.setAutomaticZenRuleState("id", withSourceContext, /* fromUser= */ false);
+        verify(zenModeHelper).setAutomaticZenRuleState(eq("id"), eq(withSourceContext),
+                eq(ZenModeConfig.UPDATE_ORIGIN_APP), anyInt());
+
+        Condition withSourceUser = new Condition(Uri.parse("uri"), "summary", STATE_TRUE,
+                SOURCE_USER_ACTION);
+        mBinderService.setAutomaticZenRuleState("id", withSourceUser, /* fromUser= */ true);
+        verify(zenModeHelper).setAutomaticZenRuleState(eq("id"), eq(withSourceUser),
+                eq(ZenModeConfig.UPDATE_ORIGIN_USER), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void setAutomaticZenRuleState_fromUserDoesNotMatchConditionSource_blocked()
+            throws Exception {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        mService.setCallerIsNormalPackage();
+
+        Condition withSourceContext = new Condition(Uri.parse("uri"), "summary", STATE_TRUE,
+                SOURCE_CONTEXT);
+        assertThrows(IllegalArgumentException.class,
+                () -> mBinderService.setAutomaticZenRuleState("id", withSourceContext,
+                        /* fromUser= */ true));
+
+        Condition withSourceUser = new Condition(Uri.parse("uri"), "summary", STATE_TRUE,
+                SOURCE_USER_ACTION);
+        assertThrows(IllegalArgumentException.class,
+                () -> mBinderService.setAutomaticZenRuleState("id", withSourceUser,
+                        /* fromUser= */ false));
+    }
+
+    private ZenModeHelper setUpMockZenTest() {
+        ZenModeHelper zenModeHelper = mock(ZenModeHelper.class);
+        mService.setZenHelper(zenModeHelper);
+        when(mConditionProviders.isPackageOrComponentAllowed(anyString(), anyInt()))
+                .thenReturn(true);
+        return zenModeHelper;
     }
 
     @Test
@@ -9066,7 +9329,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         });
 
         mService.getBinderService().setZenMode(Settings.Global.ZEN_MODE_NO_INTERRUPTIONS, null,
-                "testing!");
+                "testing!", false);
         waitForIdle();
 
         InOrder inOrder = inOrder(mContext);
@@ -11514,6 +11777,67 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
+    @RequiresFlagsEnabled(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS)
+    public void testGetActiveNotificationsFromListener_redactNotification() throws Exception {
+        NotificationRecord r =
+                generateNotificationRecord(mTestNotificationChannel, 0, 0);
+        mService.addNotification(r);
+        when(mListeners.isUidTrusted(anyInt())).thenReturn(false);
+        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
+        StatusBarNotification redacted = generateRedactedSbn(mTestNotificationChannel, 1, 1);
+        when(mListeners.redactStatusBarNotification(any())).thenReturn(redacted);
+        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
+        info.userid = 0;
+        when(info.isSameUser(anyInt())).thenReturn(true);
+        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
+        when(mListeners.checkServiceTokenLocked(any())).thenReturn(info);
+        List<StatusBarNotification> notifications = mBinderService
+                .getActiveNotificationsFromListener(mock(INotificationListener.class), null, -1)
+                .getList();
+
+        boolean foundRedactedSbn = false;
+        for (StatusBarNotification sbn: notifications) {
+            String text = sbn.getNotification().extras.getCharSequence(EXTRA_TEXT).toString();
+            if (REDACTED_TEXT.equals(text)) {
+                foundRedactedSbn = true;
+                break;
+            }
+        }
+        assertTrue("expect to find a redacted notification", foundRedactedSbn);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS)
+    public void testGetSnoozedNotificationsFromListener_redactNotification() throws Exception {
+        NotificationRecord r =
+                generateNotificationRecord(mTestNotificationChannel, 0, 0);
+        mService.addNotification(r);
+        mService.snoozeNotificationInt(r.getKey(), 1000, null, mListener);
+        when(mListeners.isUidTrusted(anyInt())).thenReturn(false);
+        when(mListeners.hasSensitiveContent(any())).thenReturn(true);
+        StatusBarNotification redacted = generateRedactedSbn(mTestNotificationChannel, 1, 1);
+        when(mListeners.redactStatusBarNotification(any())).thenReturn(redacted);
+        ManagedServices.ManagedServiceInfo info = mock(ManagedServices.ManagedServiceInfo.class);
+        info.userid = 0;
+        when(info.isSameUser(anyInt())).thenReturn(true);
+        when(info.enabledAndUserMatches(anyInt())).thenReturn(true);
+        when(mListeners.checkServiceTokenLocked(any())).thenReturn(info);
+        List<StatusBarNotification> notifications = mBinderService
+                .getSnoozedNotificationsFromListener(mock(INotificationListener.class), -1)
+                .getList();
+
+        boolean foundRedactedSbn = false;
+        for (StatusBarNotification sbn: notifications) {
+            String text = sbn.getNotification().extras.getCharSequence(EXTRA_TEXT).toString();
+            if (REDACTED_TEXT.equals(text)) {
+                foundRedactedSbn = true;
+                break;
+            }
+        }
+        assertTrue("expect to find a redacted notification", foundRedactedSbn);
+    }
+
+    @Test
     public void testUngroupingOngoingAutoSummary() throws Exception {
         NotificationRecord nr0 =
                 generateNotificationRecord(mTestNotificationChannel, 0);
@@ -11978,7 +12302,9 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 /* isImageBitmap= */ true,
                 /* isExpired= */ true);
         addRecordAndRemoveBitmaps(record);
-        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE)).isFalse();
+        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE)).isTrue();
+        final Parcelable picture = record.getNotification().extras.getParcelable(EXTRA_PICTURE);
+        assertThat(picture).isNull();
     }
 
     @Test
@@ -12012,7 +12338,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 /* isImageBitmap= */ false,
                 /* isExpired= */ true);
         addRecordAndRemoveBitmaps(record);
-        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE_ICON)).isFalse();
+        assertThat(record.getNotification().extras.containsKey(EXTRA_PICTURE_ICON)).isTrue();
+        final Parcelable pictureIcon =
+                record.getNotification().extras.getParcelable(EXTRA_PICTURE_ICON);
+        assertThat(pictureIcon).isNull();
     }
 
     @Test
@@ -13262,9 +13591,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .thenReturn(true);
 
         NotificationManager.Policy policy = new NotificationManager.Policy(0, 0, 0);
-        mBinderService.setNotificationPolicy("package", policy);
+        mBinderService.setNotificationPolicy("package", policy, false);
 
-        verify(zenHelper).applyGlobalPolicyAsImplicitZenRule(eq("package"), anyInt(), eq(policy));
+        verify(zenHelper).applyGlobalPolicyAsImplicitZenRule(eq("package"), anyInt(), eq(policy),
+                eq(ZenModeConfig.UPDATE_ORIGIN_APP));
     }
 
     @Test
@@ -13278,7 +13608,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mService.isSystemUid = true;
 
         NotificationManager.Policy policy = new NotificationManager.Policy(0, 0, 0);
-        mBinderService.setNotificationPolicy("package", policy);
+        mBinderService.setNotificationPolicy("package", policy, false);
 
         verify(zenModeHelper).setNotificationPolicy(eq(policy), anyInt(), anyInt());
     }
@@ -13300,7 +13630,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                                 .build()));
 
         NotificationManager.Policy policy = new NotificationManager.Policy(0, 0, 0);
-        mBinderService.setNotificationPolicy("package", policy);
+        mBinderService.setNotificationPolicy("package", policy, false);
 
         verify(zenModeHelper).setNotificationPolicy(eq(policy), anyInt(), anyInt());
     }
@@ -13316,7 +13646,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .thenReturn(true);
 
         NotificationManager.Policy policy = new NotificationManager.Policy(0, 0, 0);
-        mBinderService.setNotificationPolicy("package", policy);
+        mBinderService.setNotificationPolicy("package", policy, false);
 
         verify(zenModeHelper).setNotificationPolicy(eq(policy), anyInt(), anyInt());
     }
@@ -13346,7 +13676,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         when(mConditionProviders.isPackageOrComponentAllowed(anyString(), anyInt()))
                 .thenReturn(true);
 
-        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY);
+        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY, false);
 
         verify(zenHelper).applyGlobalZenModeAsImplicitZenRule(eq("package"), anyInt(),
                 eq(ZEN_MODE_IMPORTANT_INTERRUPTIONS));
@@ -13363,7 +13693,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .thenReturn(true);
         mService.isSystemUid = true;
 
-        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY);
+        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY, false);
 
         verify(zenModeHelper).setManualZenMode(eq(ZEN_MODE_IMPORTANT_INTERRUPTIONS), eq(null),
                 eq(ZenModeConfig.UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI), anyString(), eq("package"),
@@ -13386,7 +13716,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                                 .setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH)
                                 .build()));
 
-        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY);
+        mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY, false);
 
         verify(zenModeHelper).setManualZenMode(eq(ZEN_MODE_IMPORTANT_INTERRUPTIONS), eq(null),
                 eq(ZenModeConfig.UPDATE_ORIGIN_APP), anyString(), eq("package"), anyInt());

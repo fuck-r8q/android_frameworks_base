@@ -35,7 +35,6 @@ import static android.content.Intent.FLAG_ACTIVITY_NEW_DOCUMENT;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_RETAIN_IN_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
-import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
 import static android.content.pm.ActivityInfo.FLAG_RELINQUISH_TASK_IDENTITY;
 import static android.content.pm.ActivityInfo.FLAG_RESUME_WHILE_PAUSING;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_FOR_ALL_USERS;
@@ -5956,22 +5955,6 @@ class Task extends TaskFragment {
             }
         }
         return activities;
-    }
-
-    ActivityRecord restartPackage(String packageName) {
-        ActivityRecord starting = topRunningActivity();
-
-        // All activities that came from the package must be
-        // restarted as if there was a config change.
-        forAllActivities(r -> {
-            if (!r.info.packageName.equals(packageName)) return;
-            r.forceNewConfig = true;
-            if (starting != null && r == starting && r.isVisibleRequested()) {
-                r.startFreezingScreenLocked(CONFIG_SCREEN_LAYOUT);
-            }
-        });
-
-        return starting;
     }
 
     Task reuseOrCreateTask(ActivityInfo info, Intent intent, boolean toTop) {

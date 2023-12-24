@@ -182,6 +182,7 @@ import static com.android.server.wm.ActivityRecordProto.PROVIDES_MAX_BOUNDS;
 import static com.android.server.wm.ActivityRecordProto.REPORTED_DRAWN;
 import static com.android.server.wm.ActivityRecordProto.REPORTED_VISIBLE;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
+import static com.android.server.wm.ActivityRecordProto.SHOULD_OVERRIDE_MIN_ASPECT_RATIO;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_FOR_CAMERA_COMPAT;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_SEND_COMPAT_FAKE_FOCUS;
@@ -357,6 +358,7 @@ import android.window.SplashScreenView.SplashScreenViewParcelable;
 import android.window.TaskSnapshot;
 import android.window.TransitionInfo.AnimationOptions;
 import android.window.WindowContainerToken;
+import android.window.WindowOnBackInvokedDispatcher;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -574,7 +576,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     boolean idle;           // has the activity gone idle?
     boolean hasBeenLaunched;// has this activity ever been launched?
     boolean immersive;      // immersive mode (don't interrupt if possible)
-    boolean forceNewConfig; // force re-create with new config next time
     boolean supportsEnterPipOnTaskSwitch;  // This flag is set by the system to indicate that the
         // activity can enter picture in picture while pausing (only when switching to another task)
     // The PiP params used when deferring the entering of picture-in-picture.
@@ -995,6 +996,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     int mAllowedTouchUid;
     // Whether client has requested a scene transition when exiting.
     final boolean mHasSceneTransition;
+    // Whether the app has opt-in enableOnBackInvokedCallback.
+    final boolean mOptInOnBackInvoked;
 
     // Whether the ActivityEmbedding is enabled on the app.
     private final boolean mAppActivityEmbeddingSplitsEnabled;
@@ -2254,6 +2257,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         if (mPerf == null)
             mPerf = new BoostFramework();
+
+        mOptInOnBackInvoked = WindowOnBackInvokedDispatcher
+                .isOnBackInvokedCallbackEnabled(info, info.applicationInfo,
+                        () -> ent != null ? ent.array : null, false);
     }
 
     /**
@@ -9769,7 +9776,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // configurations because there are cases (like moving a task to the root pinned task) where
         // the combine configurations are equal, but would otherwise differ in the override config
         mTmpConfig.setTo(mLastReportedConfiguration.getMergedConfiguration());
-        if (getConfiguration().equals(mTmpConfig) && !forceNewConfig && !displayChanged) {
+        if (getConfiguration().equals(mTmpConfig) && !displayChanged) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration & display "
                     + "unchanged in %s", this);
             return true;
@@ -9796,7 +9803,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return true;
         }
 
-        if (changes == 0 && !forceNewConfig) {
+        if (changes == 0) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration no differences in %s",
                     this);
             // There are no significant differences, so we won't relaunch but should still deliver
@@ -9818,7 +9825,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // pick that up next time it starts.
         if (!attachedToProcess()) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Configuration doesn't matter not running %s", this);
-            forceNewConfig = false;
             return true;
         }
 
@@ -9833,11 +9839,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             shouldRelaunchLocked &= !mAtmService.mRemoteTaskManager.shouldIgnoreRelaunch(task, displayChanged,
                     lastReportDisplayID, newDisplayId, changes);
         }
-        if (shouldRelaunchLocked || forceNewConfig) {
+        if (shouldRelaunchLocked) {
             // Aha, the activity isn't handling the change, so DIE DIE DIE.
             configChangeFlags |= changes;
             startFreezingScreenLocked(globalChanges);
-            forceNewConfig = false;
             // Do not preserve window if it is freezing screen because the original window won't be
             // able to update drawn state that causes freeze timeout.
             preserveWindow &= isResizeOnlyChange(changes) && !mFreezingScreen;
@@ -10057,7 +10062,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         try {
             ProtoLog.i(WM_DEBUG_STATES, "Moving to %s Relaunching %s callers=%s" ,
                     (andResume ? "RESUMED" : "PAUSED"), this, Debug.getCallers(6));
-            forceNewConfig = false;
             final ClientTransactionItem callbackItem = ActivityRelaunchItem.obtain(token,
                     pendingResults, pendingNewIntents, configChangeFlags,
                     new MergedConfiguration(getProcessGlobalConfiguration(),
@@ -10534,6 +10538,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 mLetterboxUiController.shouldRefreshActivityForCameraCompat());
         proto.write(SHOULD_REFRESH_ACTIVITY_VIA_PAUSE_FOR_CAMERA_COMPAT,
                 mLetterboxUiController.shouldRefreshActivityViaPauseForCameraCompat());
+        proto.write(SHOULD_OVERRIDE_MIN_ASPECT_RATIO,
+                mLetterboxUiController.shouldOverrideMinAspectRatio());
     }
 
     @Override

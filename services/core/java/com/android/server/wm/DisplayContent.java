@@ -513,7 +513,11 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     private final DisplayMetrics mCompatDisplayMetrics = new DisplayMetrics();
 
-    /** The desired scaling factor for compatible apps. */
+    /**
+     * The desired scaling factor for compatible apps. It limits the size of the window to be
+     * original size ([320x480] x density). Used to scale window for applications running under
+     * legacy compatibility mode.
+     */
     float mCompatibleScreenScale;
 
     /** @see #getCurrentOverrideConfigurationChanges */
@@ -4792,7 +4796,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             assignRelativeLayerForIme(getSyncTransaction(), true /* forceUpdate */);
             scheduleAnimation();
 
-            mWmService.mH.post(() -> InputMethodManagerInternal.get().onImeParentChanged());
+            mWmService.mH.post(
+                    () -> InputMethodManagerInternal.get().onImeParentChanged(getDisplayId()));
         } else if (mImeControlTarget != null && mImeControlTarget == mImeLayeringTarget) {
             // Even if the IME surface parent is not changed, the layer target belonging to the
             // parent may have changes. Then attempt to reassign if the IME control target is
@@ -7092,7 +7097,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
 
         @Override
-        public void notifyInsetsControlChanged() {
+        public void notifyInsetsControlChanged(int displayId) {
             final InsetsStateController stateController = getInsetsStateController();
             try {
                 mRemoteInsetsController.insetsControlChanged(stateController.getRawInsetsState(),

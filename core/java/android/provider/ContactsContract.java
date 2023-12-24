@@ -6918,7 +6918,11 @@ public final class ContactsContract {
          * <td></td>
          * </tr>
          * </table>
+         *
+         * @deprecated This field may not be well supported by some contacts apps and is discouraged
+         * to use.
          */
+        @Deprecated
         public static final class Im implements DataColumnsWithJoins, CommonColumns, ContactCounts {
             /**
              * This utility class cannot be instantiated
@@ -7728,7 +7732,11 @@ public final class ContactsContract {
          * <td></td>
          * </tr>
          * </table>
+         *
+         * @deprecated This field may not be well supported by some contacts apps and is discouraged
+         * to use.
          */
+        @Deprecated
         public static final class SipAddress implements DataColumnsWithJoins, CommonColumns,
                 ContactCounts {
             /**

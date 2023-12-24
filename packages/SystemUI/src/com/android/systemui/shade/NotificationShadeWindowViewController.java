@@ -42,9 +42,6 @@ import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.bouncer.ui.binder.KeyguardBouncerViewBinder;
 import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel;
 import com.android.systemui.classifier.FalsingCollector;
-import com.android.systemui.communal.data.repository.CommunalRepository;
-import com.android.systemui.communal.ui.viewmodel.CommunalViewModel;
-import com.android.systemui.compose.ComposeFacade;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.deviceentry.shared.DeviceEntryUdfpsRefactor;
 import com.android.systemui.dock.DockManager;
@@ -57,8 +54,13 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInterac
 import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl;
 import com.android.systemui.keyguard.shared.model.TransitionState;
 import com.android.systemui.keyguard.shared.model.TransitionStep;
+import com.android.systemui.keyguard.ui.SwipeUpAnywhereGestureHandler;
+import com.android.systemui.keyguard.ui.binder.AlternateBouncerViewBinder;
+import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerUdfpsIconViewModel;
+import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.log.BouncerLogger;
+import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.res.R;
 import com.android.systemui.shared.animation.DisableSubpixelTextTransitionListener;
 import com.android.systemui.statusbar.DragDownHelper;
@@ -67,6 +69,7 @@ import com.android.systemui.statusbar.NotificationInsetsController;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
+import com.android.systemui.statusbar.gesture.TapGestureDetector;
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationLaunchAnimationInteractor;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
@@ -79,13 +82,18 @@ import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
+import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.SystemClock;
+
+import dagger.Lazy;
 
 import java.io.PrintWriter;
 import java.util.Optional;
 import java.util.function.Consumer;
 
 import javax.inject.Inject;
+
+import kotlinx.coroutines.ExperimentalCoroutinesApi;
 
 /**
  * Controller for {@link NotificationShadeWindowView}.
@@ -108,14 +116,14 @@ public class NotificationShadeWindowViewController implements Dumpable {
     private final PulsingGestureListener mPulsingGestureListener;
     private final LockscreenHostedDreamGestureListener mLockscreenHostedDreamGestureListener;
     private final NotificationInsetsController mNotificationInsetsController;
-    private final CommunalViewModel mCommunalViewModel;
-    private final CommunalRepository mCommunalRepository;
     private final boolean mIsTrackpadCommonEnabled;
     private final FeatureFlagsClassic mFeatureFlagsClassic;
     private final SysUIKeyEventHandler mSysUIKeyEventHandler;
     private final PrimaryBouncerInteractor mPrimaryBouncerInteractor;
     private final AlternateBouncerInteractor mAlternateBouncerInteractor;
     private final QuickSettingsController mQuickSettingsController;
+    private final GlanceableHubContainerController
+            mGlanceableHubContainerController;
     private GestureDetector mPulsingWakeupGestureHandler;
     private GestureDetector mDreamingWakeupGestureHandler;
     private View mBrightnessMirror;
@@ -152,6 +160,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
             };
     private final SystemClock mClock;
 
+    @ExperimentalCoroutinesApi
     @Inject
     public NotificationShadeWindowViewController(
             LockscreenShadeTransitionController transitionController,
@@ -183,8 +192,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
             KeyguardMessageAreaController.Factory messageAreaControllerFactory,
             KeyguardTransitionInteractor keyguardTransitionInteractor,
             PrimaryBouncerToGoneTransitionViewModel primaryBouncerToGoneTransitionViewModel,
-            CommunalViewModel communalViewModel,
-            CommunalRepository communalRepository,
+            GlanceableHubContainerController glanceableHubContainerController,
             NotificationLaunchAnimationInteractor notificationLaunchAnimationInteractor,
             FeatureFlagsClassic featureFlagsClassic,
             SystemClock clock,
@@ -194,7 +202,13 @@ public class NotificationShadeWindowViewController implements Dumpable {
             QuickSettingsController quickSettingsController,
             PrimaryBouncerInteractor primaryBouncerInteractor,
             AlternateBouncerInteractor alternateBouncerInteractor,
-            SelectedUserInteractor selectedUserInteractor) {
+            SelectedUserInteractor selectedUserInteractor,
+            Lazy<JavaAdapter> javaAdapter,
+            Lazy<AlternateBouncerViewModel> alternateBouncerViewModel,
+            Lazy<FalsingManager> falsingManager,
+            Lazy<SwipeUpAnywhereGestureHandler> swipeUpAnywhereGestureHandler,
+            Lazy<TapGestureDetector> tapGestureDetector,
+            Lazy<AlternateBouncerUdfpsIconViewModel> alternateBouncerUdfpsIconViewModel) {
         mLockscreenShadeTransitionController = transitionController;
         mFalsingCollector = falsingCollector;
         mStatusBarStateController = statusBarStateController;
@@ -217,8 +231,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
         mPulsingGestureListener = pulsingGestureListener;
         mLockscreenHostedDreamGestureListener = lockscreenHostedDreamGestureListener;
         mNotificationInsetsController = notificationInsetsController;
-        mCommunalViewModel = communalViewModel;
-        mCommunalRepository = communalRepository;
+        mGlanceableHubContainerController = glanceableHubContainerController;
         mIsTrackpadCommonEnabled = featureFlagsClassic.isEnabled(TRACKPAD_GESTURE_COMMON);
         mFeatureFlagsClassic = featureFlagsClassic;
         mSysUIKeyEventHandler = sysUIKeyEventHandler;
@@ -239,6 +252,25 @@ public class NotificationShadeWindowViewController implements Dumpable {
                 bouncerLogger,
                 featureFlagsClassic,
                 selectedUserInteractor);
+
+        if (DeviceEntryUdfpsRefactor.isEnabled()) {
+            AlternateBouncerViewBinder.bind(
+                    mView.findViewById(R.id.alternate_bouncer),
+                    alternateBouncerViewModel.get(),
+                    falsingManager.get(),
+                    swipeUpAnywhereGestureHandler.get(),
+                    tapGestureDetector.get(),
+                    alternateBouncerUdfpsIconViewModel.get()
+            );
+            javaAdapter.get().alwaysCollectFlow(
+                    alternateBouncerViewModel.get().getForcePluginOpen(),
+                    forcePluginOpen ->
+                            mNotificationShadeWindowController.setForcePluginOpen(
+                                    forcePluginOpen,
+                                    alternateBouncerViewModel.get()
+                            )
+            );
+        }
 
         collectFlow(mView, keyguardTransitionInteractor.getLockscreenToDreamingTransition(),
                 mLockscreenToDreamingTransition);
@@ -347,6 +379,10 @@ public class NotificationShadeWindowViewController implements Dumpable {
 
                 mFalsingCollector.onTouchEvent(ev);
                 mPulsingWakeupGestureHandler.onTouchEvent(ev);
+
+                if (mGlanceableHubContainerController.onTouchEvent(ev)) {
+                    return logDownDispatch(ev, "dispatched to glanceable hub container", true);
+                }
                 if (mDreamingWakeupGestureHandler != null
                         && mDreamingWakeupGestureHandler.onTouchEvent(ev)) {
                     return logDownDispatch(ev, "dream wakeup gesture handled", true);
@@ -587,14 +623,13 @@ public class NotificationShadeWindowViewController implements Dumpable {
     }
 
     /**
-     * Sets up the communal hub UI if the {@link com.android.systemui.Flags#FLAG_COMMUNAL_HUB} flag
-     * is enabled.
+     * Sets up the glanceable hub UI if the {@link com.android.systemui.Flags#FLAG_COMMUNAL_HUB}
+     * flag is enabled.
      *
-     * The layout lives in {@link R.id.communal_ui_container}.
+     * The layout lives in {@link R.id.communal_ui_stub}.
      */
     public void setupCommunalHubLayout() {
-        if (!mCommunalRepository.isCommunalEnabled()
-                || !ComposeFacade.INSTANCE.isComposeAvailable()) {
+        if (!mGlanceableHubContainerController.isEnabled()) {
             return;
         }
 
@@ -602,8 +637,8 @@ public class NotificationShadeWindowViewController implements Dumpable {
         View communalPlaceholder = mView.findViewById(R.id.communal_ui_stub);
         int index = mView.indexOfChild(communalPlaceholder);
         mView.removeView(communalPlaceholder);
-        mView.addView(ComposeFacade.INSTANCE.createCommunalContainer(mView.getContext(),
-                mCommunalViewModel), index);
+
+        mView.addView(mGlanceableHubContainerController.initView(mView.getContext()), index);
     }
 
     private boolean didNotificationPanelInterceptEvent(MotionEvent ev) {

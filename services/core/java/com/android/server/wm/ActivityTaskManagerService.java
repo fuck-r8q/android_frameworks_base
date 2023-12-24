@@ -62,6 +62,7 @@ import static android.provider.Settings.Global.DEVELOPMENT_FORCE_RESIZABLE_ACTIV
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_RTL;
 import static android.provider.Settings.Global.HIDE_ERROR_DIALOGS;
 import static android.provider.Settings.System.FONT_SCALE;
+import static android.service.controls.flags.Flags.homePanelDream;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.TRANSIT_CHANGE;
@@ -1521,13 +1522,18 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         a.exported = true;
         a.name = DreamActivity.class.getName();
         a.enabled = true;
-        a.launchMode = ActivityInfo.LAUNCH_SINGLE_INSTANCE;
         a.persistableMode = ActivityInfo.PERSIST_NEVER;
         a.screenOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
         a.colorMode = ActivityInfo.COLOR_MODE_DEFAULT;
         a.flags |= ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS;
-        a.resizeMode = RESIZE_MODE_UNRESIZEABLE;
         a.configChanges = 0xffffffff;
+
+        if (homePanelDream()) {
+            a.launchMode = ActivityInfo.LAUNCH_SINGLE_TASK;
+        } else {
+            a.resizeMode = RESIZE_MODE_UNRESIZEABLE;
+            a.launchMode = ActivityInfo.LAUNCH_SINGLE_INSTANCE;
+        }
 
         final ActivityOptions options = ActivityOptions.makeBasic();
         options.setLaunchActivityType(ACTIVITY_TYPE_DREAM);
@@ -3715,6 +3721,21 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         boolean originallyFromClient = fromClient
                 && (!r.isState(PAUSING) || params.isAutoEnterEnabled());
 
+        // If PiP2 flag is on and client-request to enter PiP came via onUserLeaveHint(),
+        // we request a direct transition from Shell to TRANSIT_PIP_LEGACY to get the startWct
+        // with the right entry bounds.
+        if (isPip2ExperimentEnabled() && !originallyFromClient && !params.isAutoEnterEnabled()) {
+            final Transition legacyEnterPipTransition = new Transition(TRANSIT_PIP,
+                    0 /* flags */, getTransitionController(),
+                    mWindowManager.mSyncEngine);
+            legacyEnterPipTransition.setPipActivity(r);
+            getTransitionController().startCollectOrQueue(legacyEnterPipTransition, (deferred) -> {
+                getTransitionController().requestStartTransition(legacyEnterPipTransition,
+                        r.getTask(), null /* remoteTransition */, null /* displayChange */);
+            });
+            return true;
+        }
+
         // Create a transition only for this pip entry if it is coming from the app without the
         // system requesting that the app enter-pip. If the system requested it, that means it
         // should be part of that transition if possible.
@@ -4791,6 +4812,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         if (DEBUG_ALL && !mWindowManager.mWindowPlacerLocked.isLayoutDeferred()) {
             Slog.i(TAG, "continueWindowLayout reason=" + mLayoutReasons);
         }
+
+        // ClientTransactions is queued during #deferWindowLayout() for performance.
+        // Notify to continue.
+        mLifecycleManager.onLayoutContinued();
     }
 
     /**

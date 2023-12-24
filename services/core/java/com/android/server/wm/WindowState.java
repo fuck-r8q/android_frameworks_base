@@ -52,7 +52,6 @@ import static android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON;
 import static android.view.WindowManager.LayoutParams.LAST_SUB_WINDOW;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 import static android.view.WindowManager.LayoutParams.MATCH_PARENT;
-import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_COMPATIBLE_WINDOW;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_NOT_MAGNIFIABLE;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY;
@@ -312,7 +311,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     // mAttrs.flags is tested in animation without being locked. If the bits tested are ever
     // modified they will need to be locked.
     final WindowManager.LayoutParams mAttrs = new WindowManager.LayoutParams();
-    final DeathRecipient mDeathRecipient;
     private boolean mIsChildWindow;
     final int mBaseLayer;
     final int mSubLayer;
@@ -1110,7 +1108,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mViewVisibility = viewVisibility;
         mPolicy = mWmService.mPolicy;
         mContext = mWmService.mContext;
-        DeathRecipient deathRecipient = new DeathRecipient();
         mPowerManagerWrapper = powerManagerWrapper;
         // Device Integration: This is to make phone screen not show our black screen
         if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION) {
@@ -1135,22 +1132,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             Slog.v(TAG, "Window " + this + " client=" + c.asBinder()
                             + " token=" + token + " (" + mAttrs.token + ")" + " params=" + a);
         }
-        try {
-            c.asBinder().linkToDeath(deathRecipient, 0);
-        } catch (RemoteException e) {
-            mDeathRecipient = null;
-            mIsChildWindow = false;
-            mLayoutAttached = false;
-            mIsImWindow = false;
-            mIsWallpaper = false;
-            mIsFloatingLayer = false;
-            mBaseLayer = 0;
-            mSubLayer = 0;
-            mWinAnimator = null;
-            mOverrideScale = 1f;
-            return;
-        }
-        mDeathRecipient = deathRecipient;
 
         if (mAttrs.type >= FIRST_SUB_WINDOW && mAttrs.type <= LAST_SUB_WINDOW) {
             // The multiplier here is to reserve space for multiple
@@ -1245,11 +1226,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return TouchOcclusionMode.BLOCK_UNTRUSTED;
     }
 
-    void attach() {
-        if (DEBUG) Slog.v(TAG, "Attaching " + this + " token=" + mToken);
-        mSession.windowAddedLocked();
-    }
-
     void updateGlobalScale() {
         if (hasCompatScale()) {
             mCompatScale = (mOverrideScale == 1f || mToken.hasSizeCompatBounds())
@@ -1277,12 +1253,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * @see ActivityRecord#hasSizeCompatBounds()
      */
     boolean hasCompatScale() {
-        if ((mAttrs.privateFlags & PRIVATE_FLAG_COMPATIBLE_WINDOW) != 0) {
-            return true;
-        }
         if (mAttrs.type == TYPE_APPLICATION_STARTING) {
             // Exclude starting window because it is not displayed by the application.
             return false;
+        }
+        if (mWmService.mAtmService.mCompatModePackages.useLegacyScreenCompatMode(
+                mSession.mProcess.mInfo.packageName)) {
+            return true;
         }
         return mActivityRecord != null && mActivityRecord.hasSizeCompatBounds()
                 || mOverrideScale != 1f;
@@ -2405,14 +2382,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         disposeInputChannel();
         mOnBackInvokedCallbackInfo = null;
 
-        mSession.windowRemovedLocked();
-        try {
-            mClient.asBinder().unlinkToDeath(mDeathRecipient, 0);
-        } catch (RuntimeException e) {
-            // Ignore if it has already been removed (usually because
-            // we are doing this as part of processing a death note.)
-        }
-
+        mSession.onWindowRemoved(this);
         mWmService.postWindowRemoveCleanupLocked(this);
 
         mWmService.mTrustedPresentationListenerController.removeIgnoredWindowTokens(
@@ -2939,31 +2909,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     (mAttrs.height / (float)requestedHeight) : 1.0f;
         } else {
             mHScale = mVScale = 1;
-        }
-    }
-
-    private class DeathRecipient implements IBinder.DeathRecipient {
-        @Override
-        public void binderDied() {
-            try {
-                synchronized (mWmService.mGlobalLock) {
-                    final WindowState win = mWmService
-                            .windowForClientLocked(mSession, mClient, false);
-                    Slog.i(TAG, "WIN DEATH: " + win);
-                    if (win != null) {
-                        if (win.mActivityRecord != null
-                                && win.mActivityRecord.findMainWindow() == win) {
-                            mWmService.mSnapshotController.onAppDied(win.mActivityRecord);
-                        }
-                        win.removeIfPossible();
-                    } else if (mHasSurface) {
-                        Slog.e(TAG, "!!! LEAK !!! Window removed but surface still valid.");
-                        WindowState.this.removeIfPossible();
-                    }
-                }
-            } catch (IllegalArgumentException ex) {
-                // This will happen if the window has already been removed.
-            }
         }
     }
 
@@ -3837,7 +3782,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     }
 
     @Override
-    public void notifyInsetsControlChanged() {
+    public void notifyInsetsControlChanged(int displayId) {
         ProtoLog.d(WM_DEBUG_WINDOW_INSETS, "notifyInsetsControlChanged for %s ", this);
         if (mRemoved) {
             return;
