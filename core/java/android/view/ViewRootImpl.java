@@ -237,6 +237,7 @@ import com.android.internal.policy.PhoneFallbackEventHandler;
 import com.android.internal.view.BaseSurfaceHolder;
 import com.android.internal.view.RootViewSurfaceTaker;
 import com.android.internal.view.SurfaceCallbackHelper;
+import com.android.modules.expresslog.Counter;
 import com.android.window.flags.Flags;
 
 import java.io.IOException;
@@ -254,7 +255,6 @@ import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.function.Predicate;
-
 /**
  * The top of a view hierarchy, implementing the needed protocol between View
  * and the WindowManager.  This is for the most part an internal implementation
@@ -830,6 +830,8 @@ public final class ViewRootImpl implements ViewParent,
     private boolean mInsetsAnimationRunning;
 
     private long mPreviousFrameDrawnTime = -1;
+    // The largest view size percentage to the display size. Used on trace to collect metric.
+    private float mLargestChildPercentage = 0.0f;
 
     /**
      * The resolved pointer icon type requested by this window.
@@ -1069,6 +1071,7 @@ public final class ViewRootImpl implements ViewParent,
 
     private String mTag = TAG;
     private String mFpsTraceName;
+    private String mLargestViewTraceName;
 
     boolean mHaveMoveEvent = false;
 
@@ -1331,6 +1334,7 @@ public final class ViewRootImpl implements ViewParent,
                 attrs = mWindowAttributes;
                 setTag();
                 mFpsTraceName = "FPS of " + getTitle();
+                mLargestViewTraceName = "Largest view percentage(per hundred) of " + getTitle();
 
                 if (DEBUG_KEEP_SCREEN_ON && (mClientWindowLayoutFlags
                         & WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
@@ -4758,6 +4762,10 @@ public final class ViewRootImpl implements ViewParent,
         long fps = NANOS_PER_SEC / timeDiff;
         Trace.setCounter(mFpsTraceName, fps);
         mPreviousFrameDrawnTime = expectedDrawnTime;
+
+        long percentage = (long) (mLargestChildPercentage * 100);
+        Trace.setCounter(mLargestViewTraceName, percentage);
+        mLargestChildPercentage = 0.0f;
     }
 
     private void reportDrawFinished(@Nullable Transaction t, int seqId) {
@@ -5078,6 +5086,7 @@ public final class ViewRootImpl implements ViewParent,
         if (DEBUG_FPS) {
             trackFPS();
         }
+
         if (sToolkitMetricsForFrameRateDecisionFlagValue) {
             collectFrameRateDecisionMetrics();
         }
@@ -9723,11 +9732,27 @@ public final class ViewRootImpl implements ViewParent,
             } else {
                 q.mReceiver.finishInputEvent(q.mEvent, handled);
             }
+            if (q.mEvent instanceof KeyEvent) {
+                logHandledSystemKey((KeyEvent) q.mEvent, handled);
+            }
         } else {
             q.mEvent.recycleIfNeededAfterDispatch();
         }
 
         recycleQueuedInputEvent(q);
+    }
+
+    private void logHandledSystemKey(KeyEvent event, boolean handled) {
+        final int keyCode = event.getKeyCode();
+        if (keyCode != KeyEvent.KEYCODE_STEM_PRIMARY) {
+            return;
+        }
+        if (event.isDown() && event.getRepeatCount() == 0 && handled) {
+            // Initial DOWN event is handled. Log the stem primary key press.
+            Counter.logIncrementWithUid(
+                    "input.value_app_handled_stem_primary_key_gestures_count",
+                    Process.myUid());
+        }
     }
 
     static boolean isTerminalInputEvent(InputEvent event) {
@@ -12186,7 +12211,8 @@ public final class ViewRootImpl implements ViewParent,
                 || motionEventAction == MotionEvent.ACTION_UP;
         boolean undesiredType = windowType == TYPE_INPUT_METHOD;
         // use toolkitSetFrameRate flag to gate the change
-        return desiredAction && !undesiredType && sToolkitSetFrameRateReadOnlyFlagValue;
+        return desiredAction && !undesiredType && sToolkitSetFrameRateReadOnlyFlagValue
+                && getFrameRateBoostOnTouchEnabled();
     }
 
     /**
@@ -12261,6 +12287,15 @@ public final class ViewRootImpl implements ViewParent,
         return mIsFrameRateBoosting;
     }
 
+    /**
+     * Get the value of mFrameRateBoostOnTouchEnabled
+     * Can be used to checked if touch boost is enabled. The default value is true.
+     */
+    @VisibleForTesting
+    public boolean getFrameRateBoostOnTouchEnabled() {
+        return mWindowAttributes.getFrameRateBoostOnTouchEnabled();
+    }
+
     private void boostFrameRate(int boostTimeOut) {
         mIsFrameRateBoosting = true;
         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
@@ -12289,5 +12324,11 @@ public final class ViewRootImpl implements ViewParent,
      */
     void setBackKeyCallbackForWindowlessWindow(@NonNull Predicate<KeyEvent> callback) {
         mWindowlessBackKeyCallback = callback;
+    }
+
+    void recordViewPercentage(float percentage) {
+        if (!Trace.isEnabled()) return;
+        // Record the largest view of percentage to the display size.
+        mLargestChildPercentage = Math.max(percentage, mLargestChildPercentage);
     }
 }

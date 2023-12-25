@@ -69,3 +69,17 @@ flag {
     description: "Use BluetoothDevice.getAlias to populate the name of Bluetooth MediaRoute2Infos."
     bug: "314324170"
 }
+
+flag {
+     name: "enable_built_in_speaker_route_suitability_statuses"
+     namespace: "media_solutions"
+     description: "Make MediaRoute2Info provide information about routes suitability for transfer."
+     bug: "279555229"
+}
+
+flag {
+    name: "enable_notifying_activity_manager_with_media_session_status_change"
+    namespace: "media_solutions"
+    description: "Notify ActivityManager with the changes in playback state of the media session."
+    bug: "295518668"
+}

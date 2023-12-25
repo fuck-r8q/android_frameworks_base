@@ -105,6 +105,7 @@ import android.app.ActivityManager;
 import android.app.ActivityManager.RecentTaskInfo;
 import android.app.ActivityManagerInternal;
 import android.app.ActivityTaskManager;
+import android.app.ActivityTaskManager.RootTaskInfo;
 import android.app.AppOpsManager;
 import android.app.CrossDeviceManager;
 import android.app.IActivityManager;
@@ -588,6 +589,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private int mTriplePressOnStemPrimaryBehavior;
     private int mLongPressOnStemPrimaryBehavior;
     private RecentTaskInfo mBackgroundRecentTaskInfoOnStemPrimarySingleKeyUp;
+
+    // The focused task at the time when the first STEM_PRIMARY key was released. This can only
+    // be accessed from the looper thread.
+    private RootTaskInfo mFocusedTaskInfoOnStemPrimarySingleKeyUp;
 
     private boolean mHandleVolumeKeysInWM;
 
@@ -2161,12 +2166,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static class Injector {
         private final Context mContext;
         private final WindowManagerFuncs mWindowManagerFuncs;
-        private final Looper mLooper;
 
-        Injector(Context context, WindowManagerFuncs funcs, Looper looper) {
+        Injector(Context context, WindowManagerFuncs funcs) {
             mContext = context;
             mWindowManagerFuncs = funcs;
-            mLooper = looper;
         }
 
         Context getContext() {
@@ -2178,7 +2181,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
 
         Looper getLooper() {
-            return mLooper;
+            return Looper.myLooper();
         }
 
         AccessibilityShortcutController getAccessibilityShortcutController(
@@ -2221,7 +2224,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /** {@inheritDoc} */
     @Override
     public void init(Context context, WindowManagerFuncs funcs) {
-        init(new Injector(context, funcs, Looper.myLooper()));
+        init(new Injector(context, funcs));
     }
 
     @VisibleForTesting
@@ -2757,7 +2760,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         @Override
         void onPress(long downTime, int unusedDisplayId) {
-            if (mShouldEarlyShortPressOnStemPrimary) {
+            if (shouldHandleStemPrimaryEarlyShortPress()) {
                 return;
             }
             // Short-press should be triggered only if app doesn't handle it.
@@ -2781,11 +2784,37 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (count == 3
                     && mTriplePressOnStemPrimaryBehavior
                     == TRIPLE_PRESS_PRIMARY_TOGGLE_ACCESSIBILITY) {
+                // Cancel any queued actions for current key code to prevent them from being
+                // launched after a11y layer enabled. If the action happens early,
+                // undoEarlySinglePress will make sure the correct task is on top.
+                mDeferredKeyActionExecutor.cancelQueuedAction(KeyEvent.KEYCODE_STEM_PRIMARY);
+                undoEarlySinglePress();
                 stemPrimaryPress(count);
             } else {
                 // Other multi-press gestures should be triggered only if app doesn't handle it.
                 mDeferredKeyActionExecutor.queueKeyAction(
                         KeyEvent.KEYCODE_STEM_PRIMARY, downTime, () -> stemPrimaryPress(count));
+            }
+        }
+
+        /**
+         * This method undo the previously launched early-single-press action by bringing the
+         * focused task before launching early-single-press back to top.
+         */
+        private void undoEarlySinglePress() {
+            if (shouldHandleStemPrimaryEarlyShortPress()
+                    && mFocusedTaskInfoOnStemPrimarySingleKeyUp != null) {
+                try {
+                    mActivityManagerService.startActivityFromRecents(
+                            mFocusedTaskInfoOnStemPrimarySingleKeyUp.taskId, null);
+                } catch (RemoteException | IllegalArgumentException e) {
+                    Slog.e(
+                            TAG,
+                            "Failed to start task "
+                                    + mFocusedTaskInfoOnStemPrimarySingleKeyUp.taskId
+                                    + " from recents",
+                            e);
+                }
             }
         }
 
@@ -2797,14 +2826,48 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 // It is possible that we may navigate away from this task before the double
                 // press is detected, as a result of the first press, so we save the  current
                 // most recent task before that happens.
+                // TODO(b/311497918): guard this with DOUBLE_PRESS_PRIMARY_SWITCH_RECENT_APP
                 mBackgroundRecentTaskInfoOnStemPrimarySingleKeyUp =
                         mActivityTaskManagerInternal.getMostRecentTaskFromBackground();
-                if (mShouldEarlyShortPressOnStemPrimary) {
+
+                mFocusedTaskInfoOnStemPrimarySingleKeyUp = null;
+
+                if (shouldHandleStemPrimaryEarlyShortPress()) {
                     // Key-up gesture should be triggered only if app doesn't handle it.
                     mDeferredKeyActionExecutor.queueKeyAction(
-                            KeyEvent.KEYCODE_STEM_PRIMARY, eventTime, () -> stemPrimaryPress(1));
+                            KeyEvent.KEYCODE_STEM_PRIMARY,
+                            eventTime,
+                            () -> {
+                                // Save the info of the focused task on screen. This may be used
+                                // later to bring the current focused task back to top. For
+                                // example, stem primary triple press enables the A11y interface
+                                // on top of the current focused task. When early single press is
+                                // enabled for stem primary, the focused task could change to
+                                // something else upon first key up event. In that case, we will
+                                // bring the task recorded by this variable back to top. Then, start
+                                // A11y interface.
+                                try {
+                                    mFocusedTaskInfoOnStemPrimarySingleKeyUp =
+                                            mActivityManagerService.getFocusedRootTaskInfo();
+                                } catch (RemoteException e) {
+                                    Slog.e(
+                                            TAG,
+                                            "StemPrimaryKeyRule: onKeyUp: error while getting "
+                                                    + "focused task "
+                                                    + "info.",
+                                            e);
+                                }
+
+                                stemPrimaryPress(1);
+                            });
                 }
             }
+        }
+
+        // TODO(b/311497918): make a shouldHandlePowerEarlyShortPress for power button.
+        private boolean shouldHandleStemPrimaryEarlyShortPress() {
+            return mShouldEarlyShortPressOnStemPrimary
+                    && mShortPressOnStemPrimaryBehavior == SHORT_PRESS_PRIMARY_LAUNCH_ALL_APPS;
         }
     }
 
@@ -5180,8 +5243,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // TODO(b/117479243): handle it in InputPolicy
     /** {@inheritDoc} */
     @Override
-    public int interceptMotionBeforeQueueingNonInteractive(int displayId, long whenNanos,
-            int policyFlags) {
+    public int interceptMotionBeforeQueueingNonInteractive(int displayId, int source, int action,
+            long whenNanos, int policyFlags) {
         if ((policyFlags & FLAG_WAKE) != 0) {
             if (wakeUp(whenNanos / 1000000, mAllowTheaterModeWakeFromMotion,
                     PowerManager.WAKE_REASON_WAKE_MOTION, "android.policy:MOTION")) {

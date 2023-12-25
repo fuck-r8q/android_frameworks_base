@@ -366,6 +366,9 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     @GuardedBy("mLock")
     private SparseArray<FillResponse> mResponses;
 
+    @GuardedBy("mLock")
+    private SparseArray<FillResponse> mSecondaryResponses;
+
     /**
      * Contexts read from the app; they will be updated (sanitized, change values for save) before
      * sent to {@link AutofillService}. Ordered by the time they were read.
@@ -709,7 +712,14 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                         mPendingFillRequest.getDelayedFillIntentSender());
             }
             mLastFillRequest = mPendingFillRequest;
-            mRemoteFillService.onFillRequest(mPendingFillRequest);
+            if (shouldRequestSecondaryProvider(mPendingFillRequest.getFlags())
+                    && mSecondaryProviderHandler != null) {
+                Slog.v(TAG, "Requesting fill response to secondary provider.");
+                mSecondaryProviderHandler.onFillRequest(mPendingFillRequest,
+                        mPendingFillRequest.getFlags());
+            } else if (mRemoteFillService != null) {
+                mRemoteFillService.onFillRequest(mPendingFillRequest);
+            }
             mPendingInlineSuggestionsRequest = null;
             mWaitForInlineRequest = false;
             mPendingFillRequest = null;
@@ -1192,7 +1202,8 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     @GuardedBy("mLock")
     private void requestNewFillResponseLocked(@NonNull ViewState viewState, int newState,
             int flags) {
-        final FillResponse existingResponse = viewState.getResponse();
+        final FillResponse existingResponse = shouldRequestSecondaryProvider(flags)
+                ? viewState.getSecondaryResponse() : viewState.getResponse();
         mFillRequestEventLogger.startLogForNewRequest();
         mRequestCount++;
         mFillRequestEventLogger.maybeSetAppPackageUid(uid);
@@ -1800,6 +1811,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             return;
         }
         synchronized (mLock) {
+            if (mSecondaryResponses == null) {
+                mSecondaryResponses = new SparseArray<>(2);
+            }
+            mSecondaryResponses.put(fillResponse.getRequestId(), fillResponse);
             setViewStatesLocked(fillResponse, ViewState.STATE_FILLABLE, /* clearResponse= */ false,
                     /* isPrimary= */ false);
 
@@ -3964,7 +3979,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         }
 
         // If it's not, then check if it should start a partition.
-        if (shouldStartNewPartitionLocked(id)) {
+        if (shouldStartNewPartitionLocked(id, flags)) {
             if (sDebug) {
                 Slog.d(TAG, "Starting partition or augmented request for view id " + id + ": "
                         + viewState.getStateAsString());
@@ -3992,9 +4007,11 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
      * @return {@code true} if a new partition should be started
      */
     @GuardedBy("mLock")
-    private boolean shouldStartNewPartitionLocked(@NonNull AutofillId id) {
+    private boolean shouldStartNewPartitionLocked(@NonNull AutofillId id, int flags) {
         final ViewState currentView = mViewStates.get(id);
-        if (mResponses == null) {
+        SparseArray<FillResponse> responses = shouldRequestSecondaryProvider(flags)
+                ? mSecondaryResponses : mResponses;
+        if (responses == null) {
             return currentView != null && (currentView.getState()
                     & ViewState.STATE_PENDING_CREATE_INLINE_REQUEST) == 0;
         }
@@ -4006,7 +4023,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
             return true;
         }
 
-        final int numResponses = mResponses.size();
+        final int numResponses = responses.size();
         if (numResponses >= AutofillManagerService.getPartitionMaxCount()) {
             Slog.e(TAG, "Not starting a new partition on " + id + " because session " + this.id
                     + " reached maximum of " + AutofillManagerService.getPartitionMaxCount());
@@ -4014,7 +4031,7 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
         }
 
         for (int responseNum = 0; responseNum < numResponses; responseNum++) {
-            final FillResponse response = mResponses.valueAt(responseNum);
+            final FillResponse response = responses.valueAt(responseNum);
 
             if (ArrayUtils.contains(response.getIgnoredIds(), id)) {
                 return false;
@@ -4050,6 +4067,10 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
     }
 
     boolean shouldRequestSecondaryProvider(int flags) {
+        if (!mService.isAutofillCredmanIntegrationEnabled()
+                || mSecondaryProviderHandler == null) {
+            return false;
+        }
         if (mIsPrimaryCredential) {
             return (flags & FLAG_VIEW_REQUESTS_CREDMAN_SERVICE) == 0;
         } else {
@@ -4185,12 +4206,6 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 }
                 break;
             case ACTION_VIEW_ENTERED:
-                if (shouldRequestSecondaryProvider(flags)
-                        && mSecondaryProviderHandler != null
-                        && mAssistReceiver.mLastFillRequest != null) {
-                    mSecondaryProviderHandler.onFillRequest(mAssistReceiver.mLastFillRequest,
-                            flags);
-                }
                 mLatencyBaseTime = SystemClock.elapsedRealtime();
                 boolean wasPreviouslyFillDialog = mPreviouslyFillDialogPotentiallyStarted;
                 mPreviouslyFillDialogPotentiallyStarted = false;
@@ -4203,6 +4218,19 @@ final class Session implements RemoteFillService.FillServiceCallbacks, ViewState
                 mCurrentViewId = viewState.id;
                 if (value != null) {
                     viewState.setCurrentValue(value);
+                }
+
+                if (shouldRequestSecondaryProvider(flags)) {
+                    if (requestNewFillResponseOnViewEnteredIfNecessaryLocked(
+                            id, viewState, flags)) {
+                        Slog.v(TAG, "Started a new fill request for secondary provider.");
+                        return;
+                    }
+                    // If the ViewState is ready to be displayed, onReady() will be called.
+                    viewState.update(value, virtualBounds, flags);
+
+                    // return here because primary provider logic is not applicable.
+                    return;
                 }
 
                 if (mCompatMode && (viewState.getState() & ViewState.STATE_URL_BAR) != 0) {

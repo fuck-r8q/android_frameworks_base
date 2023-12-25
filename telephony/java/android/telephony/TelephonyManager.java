@@ -2207,6 +2207,20 @@ public class TelephonyManager {
     public static final String ACTION_REQUEST_OMADM_CONFIGURATION_UPDATE =
             "com.android.omadm.service.CONFIGURATION_UPDATE";
 
+    /**
+     * Activity action: Show setting to reset mobile networks.
+     *
+     * <p>On devices with a settings activity to reset mobile networks, the activity should be
+     * launched without additional permissions.
+     *
+     * <p>On some devices, this settings activity may not exist. Callers should ensure that this
+     * case is appropriately handled.
+     */
+    @FlaggedApi(Flags.FLAG_RESET_MOBILE_NETWORK_SETTINGS)
+    @SdkConstant(SdkConstant.SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_RESET_MOBILE_NETWORK_SETTINGS =
+            "android.telephony.action.RESET_MOBILE_NETWORK_SETTINGS";
+
     //
     //
     // Device Info
@@ -6781,12 +6795,38 @@ public class TelephonyManager {
      * PackageManager.FEATURE_TELEPHONY system feature, which is available
      * on any device with a telephony radio, even if the device is
      * data-only.
+     * @deprecated Replaced by {@link #isDeviceVoiceCapable()}
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CALLING)
+    @Deprecated
     public boolean isVoiceCapable() {
         if (mContext == null) return true;
         return mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_voice_capable);
+    }
+
+    /**
+     * @return true if the current device is "voice capable".
+     * <p>
+     * "Voice capable" means that this device supports circuit-switched or IMS packet switched
+     * (i.e. voice) phone calls over the telephony network, and is allowed to display the in-call
+     * UI while a cellular voice call is active. This will be false on "data only" devices which
+     * can't make voice calls and don't support any in-call UI.
+     * <p>
+     * Note: the meaning of this flag is subtly different from the PackageManager
+     * .FEATURE_TELEPHONY system feature, which is available on any device with a telephony
+     * radio, even if the device is data-only.
+     * <p>
+     * To check if a subscription is "voice capable", call method
+     * {@link SubscriptionInfo#getServiceCapabilities()} and compare  the result with
+     * bitmask {@link SubscriptionManager#SERVICE_CAPABILITY_VOICE}.
+     *
+     * @see SubscriptionInfo#getServiceCapabilities()
+     */
+    @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CALLING)
+    @FlaggedApi(Flags.FLAG_DATA_ONLY_CELLULAR_SERVICE)
+    public boolean isDeviceVoiceCapable() {
+        return isVoiceCapable();
     }
 
     /**
@@ -6797,12 +6837,34 @@ public class TelephonyManager {
      * <p>
      * Note: Voicemail waiting sms, cell broadcasting sms, and MMS are
      *       disabled when device doesn't support sms.
+     * @deprecated Replaced by {@link #isDeviceSmsCapable()}
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
     public boolean isSmsCapable() {
         if (mContext == null) return true;
         return mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_sms_capable);
+    }
+
+    /**
+     * @return true if the current device supports SMS service.
+     * <p>
+     * If true, this means that the device supports both sending and
+     * receiving SMS via the telephony network.
+     * <p>
+     * Note: Voicemail waiting SMS, cell broadcasting SMS, and MMS are
+     *       disabled when device doesn't support SMS.
+     * <p>
+     * To check if a subscription is "SMS capable", call method
+     * {@link SubscriptionInfo#getServiceCapabilities()} and compare result with
+     * bitmask {@link SubscriptionManager#SERVICE_CAPABILITY_SMS}.
+     *
+     * @see SubscriptionInfo#getServiceCapabilities()
+     */
+    @RequiresFeature(PackageManager.FEATURE_TELEPHONY_MESSAGING)
+    @FlaggedApi(Flags.FLAG_DATA_ONLY_CELLULAR_SERVICE)
+    public boolean isDeviceSmsCapable() {
+        return isSmsCapable();
     }
 
     /**

@@ -255,7 +255,6 @@ object KeyguardBottomAreaViewBinder {
                                 vibratorHelper?.vibrate(KeyguardBottomAreaVibrations.Activated)
                                 settingsMenu.setOnTouchListener(
                                     KeyguardSettingsButtonOnTouchListener(
-                                        view = settingsMenu,
                                         viewModel = viewModel.settingsMenuViewModel,
                                     )
                                 )

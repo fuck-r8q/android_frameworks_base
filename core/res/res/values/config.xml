@@ -2265,6 +2265,9 @@
     <!-- The default min volume for the alarm stream -->
     <integer name="config_audio_alarm_min_vol">1</integer>
 
+    <!-- Flag indicating if ringer mode affects alarm stream -->
+    <bool name="config_audio_ringer_mode_affects_alarm_stream">false</bool>
+
     <!-- The default value for whether head tracking for
          spatial audio is enabled for a newly connected audio device -->
     <bool name="config_spatial_audio_head_tracking_enabled_default">false</bool>
@@ -6886,4 +6889,8 @@
 
     <!-- Whether the media player is shown on the quick settings -->
     <bool name="config_quickSettingsShowMediaPlayer">true</bool>
+
+    <!-- Defines suitability of the built-in speaker route.
+         Refer to {@link MediaRoute2Info} to see supported values.  -->
+    <integer name="config_mediaRouter_builtInSpeakerSuitability">0</integer>
 </resources>

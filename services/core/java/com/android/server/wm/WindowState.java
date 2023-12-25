@@ -204,7 +204,6 @@ import android.os.Debug;
 import android.os.DeviceIntegrationUtils;
 import android.os.IBinder;
 import android.os.PowerManager;
-import android.os.PowerManager.WakeReason;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.SystemClock;
@@ -704,11 +703,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     private final Region mTapExcludeRegion = new Region();
 
-    /**
-     * Used for testing because the real PowerManager is final.
-     */
-    private PowerManagerWrapper mPowerManagerWrapper;
-
     private static final StringBuilder sTmpSB = new StringBuilder();
 
     /**
@@ -1063,34 +1057,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return mOnBackInvokedCallbackInfo;
     }
 
-    interface PowerManagerWrapper {
-        void wakeUp(long time, @WakeReason int reason, String details);
-
-        boolean isInteractive();
-
-    }
-
     WindowState(WindowManagerService service, Session s, IWindow c, WindowToken token,
             WindowState parentWindow, int appOp, WindowManager.LayoutParams a, int viewVisibility,
             int ownerId, int showUserId, boolean ownerCanAddInternalSystemWindow) {
-        this(service, s, c, token, parentWindow, appOp, a, viewVisibility, ownerId, showUserId,
-                ownerCanAddInternalSystemWindow, new PowerManagerWrapper() {
-                    @Override
-                    public void wakeUp(long time, @WakeReason int reason, String details) {
-                        service.mPowerManager.wakeUp(time, reason, details);
-                    }
-
-                    @Override
-                    public boolean isInteractive() {
-                        return service.mPowerManager.isInteractive();
-                    }
-                });
-    }
-
-    WindowState(WindowManagerService service, Session s, IWindow c, WindowToken token,
-            WindowState parentWindow, int appOp, WindowManager.LayoutParams a, int viewVisibility,
-            int ownerId, int showUserId, boolean ownerCanAddInternalSystemWindow,
-            PowerManagerWrapper powerManagerWrapper) {
         super(service);
         mTmpTransaction = service.mTransactionFactory.get();
         mSession = s;
@@ -1108,7 +1077,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mViewVisibility = viewVisibility;
         mPolicy = mWmService.mPolicy;
         mContext = mWmService.mContext;
-        mPowerManagerWrapper = powerManagerWrapper;
         // Device Integration: This is to make phone screen not show our black screen
         if (!DeviceIntegrationUtils.DISABLE_DEVICE_INTEGRATION) {
             mForceSeamlesslyRotate = token.mRoundedCornerOverlay || mAttrs.type == TYPE_SYSTEM_BLACKSCREEN_OVERLAY;
@@ -2838,12 +2806,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             boolean canTurnScreenOn = mActivityRecord == null || mActivityRecord.currentLaunchCanTurnScreenOn();
 
             if (allowTheaterMode && canTurnScreenOn
-                        && (mWmService.mAtmService.isDreaming()
-                        || !mPowerManagerWrapper.isInteractive())) {
+                    && (mWmService.mAtmService.isDreaming()
+                            || !mWmService.mPowerManager.isInteractive())) {
                 if (DEBUG_VISIBILITY || DEBUG_POWER) {
                     Slog.v(TAG, "Relayout window turning screen on: " + this);
                 }
-                mPowerManagerWrapper.wakeUp(SystemClock.uptimeMillis(),
+                mWmService.mPowerManager.wakeUp(SystemClock.uptimeMillis(),
                         PowerManager.WAKE_REASON_APPLICATION, "android.server.wm:SCREEN_ON_FLAG");
             }
 
@@ -5669,6 +5637,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mIsWallpaper) {
             // TODO(b/233286785): Add sync support to wallpaper.
             return true;
+        }
+        if (mActivityRecord != null && mViewVisibility != View.VISIBLE
+                && mWinAnimator.mAttrType != TYPE_BASE_APPLICATION
+                && mWinAnimator.mAttrType != TYPE_APPLICATION_STARTING) {
+            // Skip sync for invisible app windows which are not managed by activity lifecycle.
+            return false;
         }
         if (mActivityRecord != null && mViewVisibility != View.VISIBLE
                 && mWinAnimator.mAttrType != TYPE_BASE_APPLICATION

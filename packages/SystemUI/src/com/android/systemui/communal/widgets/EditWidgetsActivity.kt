@@ -16,8 +16,9 @@
 
 package com.android.systemui.communal.widgets
 
-import android.appwidget.AppWidgetProviderInfo
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.RemoteException
 import android.util.Log
@@ -39,10 +40,9 @@ constructor(
     private var windowManagerService: IWindowManager? = null,
 ) : ComponentActivity() {
     companion object {
-        /**
-         * Intent extra name for the {@link AppWidgetProviderInfo} of a widget to add to hub mode.
-         */
-        const val ADD_WIDGET_INFO = "add_widget_info"
+        private const val EXTRA_IS_PENDING_WIDGET_DRAG = "is_pending_widget_drag"
+        private const val EXTRA_FILTER_STRATEGY = "filter_strategy"
+        private const val FILTER_STRATEGY_GLANCEABLE_HUB = 1
         private const val TAG = "EditWidgetsActivity"
     }
 
@@ -50,15 +50,23 @@ constructor(
         registerForActivityResult(StartActivityForResult()) { result ->
             when (result.resultCode) {
                 RESULT_OK -> {
-                    result.data
-                        ?.let {
-                            it.getParcelableExtra(
-                                ADD_WIDGET_INFO,
-                                AppWidgetProviderInfo::class.java
-                            )
+                    result.data?.let { intent ->
+                        val isPendingWidgetDrag =
+                            intent.getBooleanExtra(EXTRA_IS_PENDING_WIDGET_DRAG, false)
+                        // Nothing to do when a widget is being dragged & dropped. The drop
+                        // target in the communal grid will receive the widget to be added (if
+                        // the user drops it over).
+                        if (!isPendingWidgetDrag) {
+                            intent
+                                .getParcelableExtra(
+                                    Intent.EXTRA_COMPONENT_NAME,
+                                    ComponentName::class.java
+                                )
+                                ?.let { communalInteractor.addWidget(it, 0) }
+                                ?: run { Log.w(TAG, "No AppWidgetProviderInfo found in result.") }
                         }
-                        ?.let { communalInteractor.addWidget(it.provider, 0) }
-                        ?: run { Log.w(TAG, "No AppWidgetProviderInfo found in result.") }
+                    }
+                        ?: run { Log.w(TAG, "No data in result.") }
                 }
                 else ->
                     Log.w(
@@ -75,9 +83,29 @@ constructor(
             activity = this,
             viewModel = communalViewModel,
             onOpenWidgetPicker = {
-                addWidgetActivityLauncher.launch(
-                    Intent(applicationContext, WidgetPickerActivity::class.java)
-                )
+                val localPackageManager: PackageManager = getPackageManager()
+                val intent =
+                    Intent(Intent.ACTION_MAIN).also { it.addCategory(Intent.CATEGORY_HOME) }
+                localPackageManager
+                    .resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                    ?.activityInfo
+                    ?.packageName
+                    ?.let { packageName ->
+                        try {
+                            addWidgetActivityLauncher.launch(
+                                Intent(Intent.ACTION_PICK).also {
+                                    it.setPackage(packageName)
+                                    it.putExtra(
+                                        EXTRA_FILTER_STRATEGY,
+                                        FILTER_STRATEGY_GLANCEABLE_HUB
+                                    )
+                                }
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to launch widget picker activity", e)
+                        }
+                    }
+                    ?: run { Log.e(TAG, "Couldn't resolve launcher package name") }
             },
             onEditDone = {
                 try {
