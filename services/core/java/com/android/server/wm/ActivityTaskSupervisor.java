@@ -1505,7 +1505,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                 }
                 mLaunchingActivityWakeLock.release();
             }
-            mRootWindowContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
+            mRootWindowContainer.ensureActivitiesVisible();
         }
 
         // Atomically retrieve all of the other things to do.
@@ -1656,7 +1656,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
          */
         rootTask.cancelAnimation();
         rootTask.setForceHidden(FLAG_FORCE_HIDDEN_FOR_PINNED_TASK, true /* set */);
-        rootTask.ensureActivitiesVisible(null, 0, PRESERVE_WINDOWS);
+        rootTask.ensureActivitiesVisible(null /* starting */);
         activityIdleInternal(null /* idleActivity */, false /* fromTimeout */,
                 true /* processPausingActivities */, null /* configuration */);
 
@@ -1675,7 +1675,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             // Follow on the workaround: activities are kept force hidden till the new windowing
             // mode is set.
             rootTask.setForceHidden(FLAG_FORCE_HIDDEN_FOR_PINNED_TASK, false /* set */);
-            mRootWindowContainer.ensureActivitiesVisible(null, 0, PRESERVE_WINDOWS);
+            mRootWindowContainer.ensureActivitiesVisible();
             mRootWindowContainer.resumeFocusedTasksTopActivities();
         } finally {
             mService.continueWindowLayout();
@@ -2172,7 +2172,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         final Task rootTask = r.getRootTask();
         if (rootTask.getDisplayArea().allResumedActivitiesComplete()) {
-            mRootWindowContainer.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
+            mRootWindowContainer.ensureActivitiesVisible();
             // Make sure activity & window visibility should be identical
             // for all displays in this stage.
             mRootWindowContainer.executeAppTransitionForAllDisplay();
@@ -2188,7 +2188,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         mRecentTasks.add(task);
         mService.getTaskChangeNotificationController().notifyTaskStackChanged();
-        rootTask.ensureActivitiesVisible(null, 0, !PRESERVE_WINDOWS);
+        rootTask.ensureActivitiesVisible(null /* starting */);
 
         // When launching tasks behind, update the last active time of the top task after the new
         // task has been shown briefly

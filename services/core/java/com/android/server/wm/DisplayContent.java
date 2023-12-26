@@ -780,7 +780,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     /**
      * Used to prevent recursions when calling
-     * {@link #ensureActivitiesVisible(ActivityRecord, int, boolean, boolean)}
+     * {@link #ensureActivitiesVisible(ActivityRecord, boolean)}
      */
     private boolean mInEnsureActivitiesVisible = false;
 
@@ -1714,7 +1714,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (handled && requestingContainer instanceof ActivityRecord) {
             final ActivityRecord activityRecord = (ActivityRecord) requestingContainer;
             final boolean kept = updateDisplayOverrideConfigurationLocked(config, activityRecord,
-                    false /* deferResume */, null /* result */);
+                    false /* deferResume */);
             if (!kept) {
                 mRootWindowContainer.resumeFocusedTasksTopActivities();
             }
@@ -1722,7 +1722,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             // We have a new configuration to push so we need to update ATMS for now.
             // TODO: Clean up display configuration push between ATMS and WMS after unification.
             updateDisplayOverrideConfigurationLocked(config, null /* starting */,
-                    false /* deferResume */, null);
+                    false /* deferResume */);
         }
         return handled;
     }
@@ -6331,7 +6331,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         Settings.System.clearConfiguration(values);
         updateDisplayOverrideConfigurationLocked(values, null /* starting */,
-                false /* deferResume */, mAtmService.mTmpUpdateConfigurationResult);
+                false /* deferResume */);
         return mAtmService.mTmpUpdateConfigurationResult.changes != 0;
     }
 
@@ -6340,8 +6340,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * new one will be computed in WM based on current display info.
      */
     boolean updateDisplayOverrideConfigurationLocked(Configuration values,
-            ActivityRecord starting, boolean deferResume,
-            ActivityTaskManagerService.UpdateConfigurationResult result) {
+            ActivityRecord starting, boolean deferResume) {
 
         int changes = 0;
         boolean kept = true;
@@ -6359,19 +6358,19 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 } else {
                     changes = performDisplayOverrideConfigUpdate(values);
                 }
+                mAtmService.mTmpUpdateConfigurationResult.changes = changes;
+                mAtmService.mTmpUpdateConfigurationResult.mIsUpdating = true;
             }
 
             if (!deferResume) {
                 kept = mAtmService.ensureConfigAndVisibilityAfterUpdate(starting, changes);
             }
         } finally {
+            mAtmService.mTmpUpdateConfigurationResult.mIsUpdating = false;
             mAtmService.continueWindowLayout();
         }
 
-        if (result != null) {
-            result.changes = changes;
-            result.activityRelaunched = !kept;
-        }
+        mAtmService.mTmpUpdateConfigurationResult.activityRelaunched = !kept;
         return kept;
     }
 
@@ -6567,8 +6566,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
 
-    void ensureActivitiesVisible(ActivityRecord starting, int configChanges,
-            boolean preserveWindows, boolean notifyClients) {
+    void ensureActivitiesVisible(ActivityRecord starting, boolean notifyClients) {
         if (mInEnsureActivitiesVisible) {
             // Don't do recursive work.
             return;
@@ -6577,8 +6575,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         try {
             mInEnsureActivitiesVisible = true;
             forAllRootTasks(rootTask -> {
-                rootTask.ensureActivitiesVisible(starting, configChanges, preserveWindows,
-                        notifyClients);
+                rootTask.ensureActivitiesVisible(starting, notifyClients);
             });
             if (mTransitionController.useShellTransitionsRotation()
                     && mTransitionController.isCollecting()
@@ -6617,7 +6614,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (!wasTransitionSet) {
             prepareAppTransition(TRANSIT_NONE);
         }
-        mRootWindowContainer.ensureActivitiesVisible(null, 0, false /* preserveWindows */);
+        mRootWindowContainer.ensureActivitiesVisible();
 
         // If there was a transition set already we don't want to interfere with it as we might be
         // starting it too early.

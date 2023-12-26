@@ -64,7 +64,6 @@ import static com.android.server.wm.ActivityTaskManagerService.TAG_SWITCH;
 import static com.android.server.wm.ActivityTaskManagerService.isPip2ExperimentEnabled;
 import static com.android.server.wm.ActivityTaskSupervisor.DEFER_RESUME;
 import static com.android.server.wm.ActivityTaskSupervisor.ON_TOP;
-import static com.android.server.wm.ActivityTaskSupervisor.PRESERVE_WINDOWS;
 import static com.android.server.wm.ActivityTaskSupervisor.dumpHistoryList;
 import static com.android.server.wm.ActivityTaskSupervisor.printThisActivity;
 import static com.android.server.wm.KeyguardController.KEYGUARD_SLEEP_TOKEN_TAG;
@@ -1762,8 +1761,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // activities are affecting configuration now.
         // Passing null here for 'starting' param value, so that visibility of actual starting
         // activity will be properly updated.
-        ensureActivitiesVisible(null /* starting */, 0 /* configChanges */,
-                false /* preserveWindows */, false /* notifyClients */);
+        ensureActivitiesVisible(null /* starting */, false /* notifyClients */);
 
         if (displayId == INVALID_DISPLAY) {
             // The caller didn't provide a valid display id, skip updating config.
@@ -1787,7 +1785,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (displayContent != null) {
             // Update the configuration of the activities on the display.
             return displayContent.updateDisplayOverrideConfigurationLocked(config, starting,
-                    deferResume, null /* result */);
+                    deferResume);
         } else {
             return true;
         }
@@ -1874,16 +1872,18 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * Make sure that all activities that need to be visible in the system actually are and update
      * their configuration.
      */
-    void ensureActivitiesVisible(ActivityRecord starting, int configChanges,
-            boolean preserveWindows) {
-        ensureActivitiesVisible(starting, configChanges, preserveWindows, true /* notifyClients */);
+    void ensureActivitiesVisible() {
+        ensureActivitiesVisible(null /* starting */);
+    }
+
+    void ensureActivitiesVisible(ActivityRecord starting) {
+        ensureActivitiesVisible(starting, true /* notifyClients */);
     }
 
     /**
-     * @see #ensureActivitiesVisible(ActivityRecord, int, boolean)
+     * @see #ensureActivitiesVisible()
      */
-    void ensureActivitiesVisible(ActivityRecord starting, int configChanges,
-            boolean preserveWindows, boolean notifyClients) {
+    void ensureActivitiesVisible(ActivityRecord starting, boolean notifyClients) {
         if (mTaskSupervisor.inActivityVisibilityUpdate()
                 || mTaskSupervisor.isRootVisibilityUpdateDeferred()) {
             // Don't do recursive work.
@@ -1894,8 +1894,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // First the front root tasks. In case any are not fullscreen and are in front of home.
             for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
                 final DisplayContent display = getChildAt(displayNdx);
-                display.ensureActivitiesVisible(starting, configChanges, preserveWindows,
-                        notifyClients);
+                display.ensureActivitiesVisible(starting, notifyClients);
             }
         } finally {
             mTaskSupervisor.endActivityVisibilityUpdate();
@@ -2246,7 +2245,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             try {
                 if (localVisibilityDeferred) {
                     mTaskSupervisor.setDeferRootVisibilityUpdate(false);
-                    ensureActivitiesVisible(null, 0, false /* preserveWindows */);
+                    ensureActivitiesVisible();
                 }
             } finally {
                 transitionController.continueTransitionReady();
@@ -2494,7 +2493,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // It may be nothing to resume because there are pausing activities or all the top
             // activities are resumed. Then it still needs to make sure all visible activities are
             // running in case the tasks were reordered or there are non-top visible activities.
-            ensureActivitiesVisible(null /* starting */, 0 /* configChanges */, !PRESERVE_WINDOWS);
+            ensureActivitiesVisible();
         }
     }
 
@@ -2666,8 +2665,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                     // display orientation can be updated first if needed. Otherwise there may
                     // have redundant configuration changes due to apply outdated display
                     // orientation (from keyguard) to activity.
-                    rootTask.ensureActivitiesVisible(null /* starting */, 0 /* configChanges */,
-                            false /* preserveWindows */);
+                    rootTask.ensureActivitiesVisible(null /* starting */);
                 }
             });
         }
@@ -3009,8 +3007,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (allowDelay) {
                 result[0] &= task.goToSleepIfPossible(shuttingDown);
             } else {
-                task.ensureActivitiesVisible(null /* starting */, 0 /* configChanges */,
-                        !PRESERVE_WINDOWS);
+                task.ensureActivitiesVisible(null /* starting */);
             }
         });
         return result[0];
@@ -3898,8 +3895,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 }
             }
             if (!mHasActivityStarted) {
-                ensureActivitiesVisible(null /* starting */, 0 /* configChanges */,
-                        false /* preserveWindows */);
+                ensureActivitiesVisible();
             }
             return mHasActivityStarted;
         }
