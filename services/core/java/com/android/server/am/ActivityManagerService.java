@@ -164,6 +164,7 @@ import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.am.MemoryStatUtil.hasMemcg;
 import static com.android.server.am.ProcessList.ProcStartHandler;
+import static com.android.server.flags.Flags.disableSystemCompaction;
 import static com.android.server.net.NetworkPolicyManagerInternal.updateBlockedReasonsWithProcState;
 import static com.android.server.pm.PackageManagerService.PLATFORM_PACKAGE_NAME;
 import static com.android.server.pm.UserManagerInternal.USER_START_MODE_BACKGROUND;
@@ -326,7 +327,6 @@ import android.os.Debug;
 import android.os.DropBoxManager;
 import android.os.FactoryTest;
 import android.os.FileUtils;
-import android.os.Flags;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IDeviceIdentifiersPolicyService;
@@ -8652,8 +8652,10 @@ public class ActivityManagerService extends IActivityManager.Stub
             final long now = SystemClock.uptimeMillis();
             final long timeSinceLastIdle = now - mLastIdleTime;
 
-            // Compact all non-zygote processes to freshen up the page cache.
-            mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
+            if (!disableSystemCompaction()) {
+                // Compact all non-zygote processes to freshen up the page cache.
+                mOomAdjuster.mCachedAppOptimizer.compactAllSystem();
+            }
 
             final long lowRamSinceLastIdle = mAppProfiler.getLowRamTimeSinceIdleLPr(now);
             mLastIdleTime = now;
@@ -8693,7 +8695,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         final long initialIdlePssOrRss, lastPssOrRss, lastSwapPss;
                         synchronized (mAppProfiler.mProfilerLock) {
                             initialIdlePssOrRss = pr.getInitialIdlePssOrRss();
-                            lastPssOrRss = !Flags.removeAppProfilerPssCollection()
+                            lastPssOrRss = mAppProfiler.isProfilingPss()
                                     ? pr.getLastPss() : pr.getLastRss();
                             lastSwapPss = pr.getLastSwapPss();
                         }
@@ -8703,14 +8705,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                             final StringBuilder sb2 = new StringBuilder(128);
                             sb2.append("Kill");
                             sb2.append(proc.processName);
-                            if (!Flags.removeAppProfilerPssCollection()) {
+                            if (mAppProfiler.isProfilingPss()) {
                                 sb2.append(" in idle maint: pss=");
                             } else {
                                 sb2.append(" in idle maint: rss=");
                             }
                             sb2.append(lastPssOrRss);
 
-                            if (!Flags.removeAppProfilerPssCollection()) {
+                            if (mAppProfiler.isProfilingPss()) {
                                 sb2.append(", swapPss=");
                                 sb2.append(lastSwapPss);
                                 sb2.append(", initialPss=");
@@ -8725,7 +8727,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                             Slog.wtfQuiet(TAG, sb2.toString());
                             mHandler.post(() -> {
                                 synchronized (ActivityManagerService.this) {
-                                    proc.killLocked(!Flags.removeAppProfilerPssCollection()
+                                    proc.killLocked(mAppProfiler.isProfilingPss()
                                             ? "idle maint (pss " : "idle maint (rss " + lastPssOrRss
                                             + " from " + initialIdlePssOrRss + ")",
                                             ApplicationExitInfo.REASON_OTHER,

@@ -16,36 +16,25 @@
 
 package com.android.systemui.keyguard.ui.composable.section
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.SceneScope
+import com.android.systemui.notifications.ui.composable.NotificationStack
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
 
-class NotificationSection @Inject constructor() {
+class NotificationSection
+@Inject
+constructor(
+    private val viewModel: NotificationsPlaceholderViewModel,
+) {
     @Composable
     fun SceneScope.Notifications(modifier: Modifier = Modifier) {
-        MovableElement(
-            key = NotificationsElementKey,
+        NotificationStack(
+            viewModel = viewModel,
+            isScrimVisible = false,
             modifier = modifier,
-        ) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Yellow),
-            ) {
-                Text(
-                    text = "TODO(b/316211368): Notifications",
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-        }
+        )
     }
 }
-
-private val NotificationsElementKey = ElementKey("Notifications")

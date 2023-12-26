@@ -202,8 +202,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAuthenticateButtonClicked_whenCorrect() =
         testScope.runTest {
-            val authResult by
-                collectLastValue(authenticationInteractor.authenticationChallengeResult)
+            val authResult by collectLastValue(authenticationInteractor.onAuthenticationResult)
             lockDeviceAndOpenPinBouncer()
 
             FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)
@@ -237,8 +236,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     @Test
     fun onAuthenticateButtonClicked_correctAfterWrong() =
         testScope.runTest {
-            val authResult by
-                collectLastValue(authenticationInteractor.authenticationChallengeResult)
+            val authResult by collectLastValue(authenticationInteractor.onAuthenticationResult)
             val message by collectLastValue(bouncerViewModel.message)
             val pin by collectLastValue(underTest.pinInput.map { it.getPin() })
             lockDeviceAndOpenPinBouncer()
@@ -266,8 +264,7 @@ class PinBouncerViewModelTest : SysuiTestCase() {
     fun onAutoConfirm_whenCorrect() =
         testScope.runTest {
             utils.authenticationRepository.setAutoConfirmFeatureEnabled(true)
-            val authResult by
-                collectLastValue(authenticationInteractor.authenticationChallengeResult)
+            val authResult by collectLastValue(authenticationInteractor.onAuthenticationResult)
             lockDeviceAndOpenPinBouncer()
 
             FakeAuthenticationRepository.DEFAULT_PIN.forEach(underTest::onPinButtonClicked)

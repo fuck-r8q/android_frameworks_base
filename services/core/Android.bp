@@ -230,6 +230,9 @@ java_library_static {
       "//packages/modules/AdServices/adservices/tests/unittest/service-core/adid",
       "//packages/modules/AdServices/shared/device-side/tests",
     ],
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 java_genrule {
@@ -248,6 +251,9 @@ java_genrule {
 java_library {
     name: "services.core",
     static_libs: ["services.core.priorityboosted"],
+    lint: {
+        baseline_filename: "lint-baseline.xml",
+    },
 }
 
 java_library_host {

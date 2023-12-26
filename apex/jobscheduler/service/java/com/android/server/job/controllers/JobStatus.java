@@ -122,7 +122,7 @@ public final class JobStatus {
     static final int CONSTRAINT_WITHIN_QUOTA = 1 << 24;      // Implicit constraint
     static final int CONSTRAINT_PREFETCH = 1 << 23;
     static final int CONSTRAINT_BACKGROUND_NOT_RESTRICTED = 1 << 22; // Implicit constraint
-    static final int CONSTRAINT_FLEXIBLE = 1 << 21; // Implicit constraint
+    public static final int CONSTRAINT_FLEXIBLE = 1 << 21; // Implicit constraint
 
     private static final int IMPLICIT_CONSTRAINTS = 0
             | CONSTRAINT_BACKGROUND_NOT_RESTRICTED
@@ -1531,7 +1531,7 @@ public final class JobStatus {
 
     /**
      * Returns the number of required flexible job constraints that have been dropped with time.
-     * The lower this number is the easier it is for the flexibility constraint to be satisfied.
+     * The higher this number is the easier it is for the flexibility constraint to be satisfied.
      */
     public int getNumDroppedFlexibleConstraints() {
         return mNumDroppedFlexibleConstraints;
@@ -1597,7 +1597,8 @@ public final class JobStatus {
         mTransportAffinitiesSatisfied = isSatisfied;
     }
 
-    boolean canApplyTransportAffinities() {
+    /** Whether transport affinities can be applied to the job in flex scheduling. */
+    public boolean canApplyTransportAffinities() {
         return mCanApplyTransportAffinities;
     }
 
@@ -2191,7 +2192,7 @@ public final class JobStatus {
      * @return Whether or not this job would be ready to run if it had the specified constraint
      * granted, based on its requirements.
      */
-    public boolean wouldBeReadyWithConstraint(int constraint) {
+    boolean wouldBeReadyWithConstraint(int constraint) {
         return readinessStatusWithConstraint(constraint, true);
     }
 
