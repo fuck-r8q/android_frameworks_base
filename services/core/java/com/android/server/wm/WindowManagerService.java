@@ -3122,7 +3122,7 @@ public class WindowManagerService extends IWindowManager.Stub
         try {
             synchronized (mGlobalLock) {
                 if (mAtmService.mKeyguardController.isKeyguardShowing(DEFAULT_DISPLAY)) {
-                    mRoot.ensureActivitiesVisible(null, 0, false /* preserveWindows */);
+                    mRoot.ensureActivitiesVisible();
                 }
             }
         } finally {

@@ -1779,13 +1779,11 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
         void onRootTaskOrderChanged(Task rootTask);
     }
 
-    void ensureActivitiesVisible(ActivityRecord starting, int configChanges,
-            boolean preserveWindows, boolean notifyClients) {
+    void ensureActivitiesVisible(ActivityRecord starting, boolean notifyClients) {
         mAtmService.mTaskSupervisor.beginActivityVisibilityUpdate();
         try {
             forAllRootTasks(rootTask -> {
-                rootTask.ensureActivitiesVisible(starting, configChanges, preserveWindows,
-                        notifyClients);
+                rootTask.ensureActivitiesVisible(starting, notifyClients);
             });
         } finally {
             mAtmService.mTaskSupervisor.endActivityVisibilityUpdate();
