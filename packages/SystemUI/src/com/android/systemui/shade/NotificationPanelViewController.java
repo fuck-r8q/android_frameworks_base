@@ -1168,9 +1168,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Occluded->Lockscreen
         collectFlow(mView, mKeyguardTransitionInteractor.getOccludedToLockscreenTransition(),
                 mOccludedToLockscreenTransition, mMainDispatcher);
-        if (!KeyguardShadeMigrationNssl.isEnabled()) {
-            collectFlow(mView, mOccludedToLockscreenTransitionViewModel.getLockscreenAlpha(),
+        collectFlow(mView, mOccludedToLockscreenTransitionViewModel.getLockscreenAlpha(),
                 setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
             collectFlow(mView,
                     mOccludedToLockscreenTransitionViewModel.getLockscreenTranslationY(),
                     setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
@@ -1200,8 +1200,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 mLockscreenToOccludedTransition, mMainDispatcher);
         collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenAlpha(),
                 setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
-        collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenTranslationY(),
-                setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenTranslationY(),
+                    setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
+        }
 
         // Primary bouncer->Gone (ensures lockscreen content is not visible on successful auth)
         collectFlow(mView, mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha(),
@@ -1471,6 +1473,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private void attachSplitShadeMediaPlayerContainer(FrameLayout container) {
+        if (migrateClocksToBlueprint()) {
+            return;
+        }
         mKeyguardMediaController.attachSplitShadeContainer(container);
     }
 
