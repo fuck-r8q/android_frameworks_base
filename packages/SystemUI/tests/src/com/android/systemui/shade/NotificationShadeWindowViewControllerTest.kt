@@ -48,10 +48,9 @@ import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.compose.ComposeFacade.isComposeAvailable
 import com.android.systemui.dock.DockManager
 import com.android.systemui.dump.DumpManager
-import com.android.systemui.dump.logcatLogBuffer
+import com.android.systemui.log.logcatLogBuffer
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.flags.Flags.LOCKSCREEN_WALLPAPER_DREAM_ENABLED
-import com.android.systemui.flags.Flags.REVAMPED_BOUNCER_MESSAGES
 import com.android.systemui.flags.Flags.SPLIT_SHADE_SUBPIXEL_OPTIMIZATION
 import com.android.systemui.flags.Flags.TRACKPAD_GESTURE_COMMON
 import com.android.systemui.flags.Flags.TRACKPAD_GESTURE_FEATURES
@@ -67,12 +66,9 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteracto
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.keyguard.shared.model.TransitionStep
-import com.android.systemui.keyguard.ui.SwipeUpAnywhereGestureHandler
-import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerUdfpsIconViewModel
-import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerViewModel
+import com.android.systemui.keyguard.ui.viewmodel.AlternateBouncerDependencies
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel
 import com.android.systemui.log.BouncerLogger
-import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
 import com.android.systemui.shade.NotificationShadeWindowView.InteractionEventHandler
 import com.android.systemui.statusbar.DragDownHelper
@@ -81,7 +77,6 @@ import com.android.systemui.statusbar.NotificationInsetsController
 import com.android.systemui.statusbar.NotificationShadeDepthController
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.SysuiStatusBarStateController
-import com.android.systemui.statusbar.gesture.TapGestureDetector
 import com.android.systemui.statusbar.notification.data.repository.NotificationLaunchAnimationRepository
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationLaunchAnimationInteractor
 import com.android.systemui.statusbar.notification.stack.AmbientState
@@ -101,7 +96,6 @@ import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.eq
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
-import java.util.Optional
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.TestScope
@@ -116,8 +110,9 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
+import java.util.Optional
+import org.mockito.Mockito.`when` as whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
@@ -197,9 +192,9 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
         featureFlagsClassic.set(TRACKPAD_GESTURE_COMMON, true)
         featureFlagsClassic.set(TRACKPAD_GESTURE_FEATURES, false)
         featureFlagsClassic.set(SPLIT_SHADE_SUBPIXEL_OPTIMIZATION, true)
-        featureFlagsClassic.set(REVAMPED_BOUNCER_MESSAGES, true)
         featureFlagsClassic.set(LOCKSCREEN_WALLPAPER_DREAM_ENABLED, false)
         mSetFlagsRule.disableFlags(Flags.FLAG_DEVICE_ENTRY_UDFPS_REFACTOR)
+        mSetFlagsRule.enableFlags(Flags.FLAG_REVAMPED_BOUNCER_MESSAGES)
 
         testScope = TestScope()
         fakeClock = FakeSystemClock()
@@ -242,7 +237,6 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
                     repository = BouncerMessageRepositoryImpl(),
                     userRepository = FakeUserRepository(),
                     countDownTimerUtil = mock(CountDownTimerUtil::class.java),
-                    featureFlags = featureFlagsClassic,
                     updateMonitor = mock(KeyguardUpdateMonitor::class.java),
                     biometricSettingsRepository = FakeBiometricSettingsRepository(),
                     applicationScope = testScope.backgroundScope,
@@ -278,11 +272,7 @@ class NotificationShadeWindowViewControllerTest : SysuiTestCase() {
                 alternateBouncerInteractor,
                 mSelectedUserInteractor,
                 { mock (JavaAdapter::class.java )},
-                { mock(AlternateBouncerViewModel::class.java) },
-                { mock(FalsingManager::class.java) },
-                { mock(SwipeUpAnywhereGestureHandler::class.java) },
-                { mock(TapGestureDetector::class.java) },
-                { mock(AlternateBouncerUdfpsIconViewModel::class.java) },
+                { mock(AlternateBouncerDependencies::class.java) },
             )
         underTest.setupExpandedStatusBar()
         underTest.setDragDownHelper(dragDownHelper)
