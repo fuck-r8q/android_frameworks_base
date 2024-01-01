@@ -134,6 +134,8 @@ public class ZenModeHelper {
     private static final int RULE_INSTANCE_GRACE_PERIOD = 1000 * 60 * 60 * 72;
     static final int RULE_LIMIT_PER_PACKAGE = 100;
 
+    private static final String IMPLICIT_RULE_ID_PREFIX = "implicit_"; // + pkg_name
+
     /**
      * Send new activation AutomaticZenRule statuses to apps with a min target SDK version
      */
@@ -653,7 +655,11 @@ public class ZenModeHelper {
     }
 
     private static String implicitRuleId(String forPackage) {
-        return "implicit_" + forPackage;
+        return IMPLICIT_RULE_ID_PREFIX + forPackage;
+    }
+
+    static boolean isImplicitRuleId(@NonNull String ruleId) {
+        return ruleId.startsWith(IMPLICIT_RULE_ID_PREFIX);
     }
 
     boolean removeAutomaticZenRule(String id, @ConfigChangeOrigin int origin, String reason,
@@ -1490,7 +1496,12 @@ public class ZenModeHelper {
 
             for (ZenRule automaticRule : mConfig.automaticRules.values()) {
                 if (automaticRule.isAutomaticActive()) {
-                    applyCustomPolicy(policy, automaticRule);
+                    // Active rules with INTERRUPTION_FILTER_ALL are not included in consolidated
+                    // policy. This is relevant in case some other active rule has a more
+                    // restrictive INTERRUPTION_FILTER but a more lenient ZenPolicy!
+                    if (!Flags.modesApi() || automaticRule.zenMode != Global.ZEN_MODE_OFF) {
+                        applyCustomPolicy(policy, automaticRule);
+                    }
                     if (Flags.modesApi()) {
                         deviceEffectsBuilder.add(automaticRule.zenDeviceEffects);
                     }

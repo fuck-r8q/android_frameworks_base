@@ -8241,7 +8241,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      */
     @Override
     int getOrientation(int candidate) {
-        if (shouldIgnoreOrientationRequests()) {
+        if (finishing || shouldIgnoreOrientationRequests()) {
             return SCREEN_ORIENTATION_UNSET;
         }
 

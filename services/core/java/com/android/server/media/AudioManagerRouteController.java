@@ -57,12 +57,10 @@ import java.util.Objects;
  *
  * <p>This implementation obtains and manages all routes via {@link AudioManager}, with the
  * exception of {@link AudioManager#handleBluetoothActiveDeviceChanged inactive bluetooth} routes
- * which are managed by {@link AudioPoliciesBluetoothRouteController}, which depends on the
- * bluetooth stack (for example {@link BluetoothAdapter}.
+ * which are managed by {@link BluetoothDeviceRoutesManager}, which depends on the
+ * bluetooth stack ({@link BluetoothAdapter} and related classes).
  */
-// TODO: b/305199571 - Rename this class to avoid the AudioPolicies prefix, which has been flagged
-// by the audio team as a confusing name.
-/* package */ final class AudioPoliciesDeviceRouteController implements DeviceRouteController {
+/* package */ final class AudioManagerRouteController implements DeviceRouteController {
     private static final String TAG = SystemMediaRoute2Provider.TAG;
 
     @NonNull
@@ -77,7 +75,7 @@ import java.util.Objects;
     @NonNull private final AudioManager mAudioManager;
     @NonNull private final Handler mHandler;
     @NonNull private final OnDeviceRouteChangedListener mOnDeviceRouteChangedListener;
-    @NonNull private final AudioPoliciesBluetoothRouteController mBluetoothRouteController;
+    @NonNull private final BluetoothDeviceRoutesManager mBluetoothRouteController;
 
     @NonNull
     private final Map<String, MediaRoute2InfoHolder> mRouteIdToAvailableDeviceRoutes =
@@ -103,7 +101,7 @@ import java.util.Objects;
                 Manifest.permission.MODIFY_AUDIO_ROUTING,
                 Manifest.permission.QUERY_AUDIO_STATE
             })
-    /* package */ AudioPoliciesDeviceRouteController(
+    /* package */ AudioManagerRouteController(
             @NonNull Context context,
             @NonNull AudioManager audioManager,
             @NonNull Looper looper,
@@ -120,7 +118,7 @@ import java.util.Objects;
                 DeviceRouteController.getBuiltInSpeakerSuitabilityStatus(mContext);
 
         mBluetoothRouteController =
-                new AudioPoliciesBluetoothRouteController(
+                new BluetoothDeviceRoutesManager(
                         mContext, btAdapter, this::rebuildAvailableRoutesAndNotify);
         // Just build routes but don't notify. The caller may not expect the listener to be invoked
         // before this constructor has finished executing.
