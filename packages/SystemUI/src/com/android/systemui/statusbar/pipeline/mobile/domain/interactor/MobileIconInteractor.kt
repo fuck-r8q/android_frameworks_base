@@ -489,11 +489,15 @@ class MobileIconInteractorImpl(
     /** Whether or not to show the error state of [SignalDrawable] */
     private val showExclamationMark: StateFlow<Boolean> =
         combine(
-                defaultSubscriptionHasDataEnabled,
-                isDefaultConnectionFailed,
+                isDataEnabled,
+                isDataConnected,
+                isConnectionFailed,
                 isInService,
-            ) { isDefaultDataEnabled, isDefaultConnectionFailed, isInService ->
-                !isDefaultDataEnabled || isDefaultConnectionFailed || !isInService
+                hideNoInternetState
+            ) { isDataEnabled, isDataConnected, isConnectionFailed, isInService,
+                        hideNoInternetState ->
+                !hideNoInternetState && (!isDataEnabled || (isDataConnected && isConnectionFailed)
+                        || !isInService)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), true)
 
