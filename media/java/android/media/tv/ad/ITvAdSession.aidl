@@ -17,9 +17,10 @@
 package android.media.tv.ad;
 
 /**
- * Sub-interface of ITvAdService which is created per session and has its own context.
+ * Sub-interface of ITvAdService.aidl which is created per session and has its own context.
  * @hide
  */
 oneway interface ITvAdSession {
+    void release();
     void startAdService();
 }
