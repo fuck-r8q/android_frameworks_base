@@ -1936,9 +1936,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * of a transition that has not yet been started.
      */
     boolean isReadyForDisplay() {
-        if (mToken.waitingToShow && getDisplayContent().mAppTransition.isTransitionSet()) {
-            return false;
-        }
         final boolean parentAndClientVisible = !isParentWindowHidden()
                 && mViewVisibility == View.VISIBLE && mToken.isVisible();
         return mHasSurface && isVisibleByPolicy() && !mDestroying
