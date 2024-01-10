@@ -1760,6 +1760,7 @@
 
     <!-- @SystemApi Allows camera access by Headless System User 0 when device is running in
             HSUM Mode.
+         @FlaggedApi("com.android.internal.camera.flags.camera_hsum_permission")
     @hide -->
     <permission android:name="android.permission.CAMERA_HEADLESS_SYSTEM_USER"
         android:permissionGroup="android.permission-group.UNDEFINED"
@@ -7746,6 +7747,13 @@
          <p>Not for use by third-party applications.
          @hide -->
     <permission android:name="android.permission.MONITOR_KEYBOARD_BACKLIGHT"
+                android:protectionLevel="signature" />
+
+    <!-- Allows low-level access to monitor sticky modifier state changes when A11Y Sticky keys
+         feature is enabled.
+         <p>Not for use by third-party applications.
+         @hide -->
+    <permission android:name="android.permission.MONITOR_STICKY_MODIFIER_STATE"
                 android:protectionLevel="signature" />
 
     <uses-permission android:name="android.permission.HANDLE_QUERY_PACKAGE_RESTART" />

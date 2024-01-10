@@ -87,6 +87,7 @@ import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.common.ui.view.LongPressHandlingView;
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
 import com.android.systemui.doze.DozeLog;
 import com.android.systemui.dump.DumpManager;
@@ -99,7 +100,6 @@ import com.android.systemui.keyguard.KeyguardViewConfigurator;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
 import com.android.systemui.keyguard.domain.interactor.KeyguardBottomAreaInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor;
-import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractorFactory;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
@@ -339,11 +339,11 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected ArgumentCaptor<NotificationStackScrollLayout.OnEmptySpaceClickListener>
             mEmptySpaceClickListenerCaptor;
     @Mock protected ActivityStarter mActivityStarter;
-    @Mock protected KeyguardFaceAuthInteractor mKeyguardFaceAuthInteractor;
+    @Mock protected DeviceEntryFaceAuthInteractor mDeviceEntryFaceAuthInteractor;
     @Mock private JavaAdapter mJavaAdapter;
     @Mock private CastController mCastController;
     @Mock private SharedNotificationContainerInteractor mSharedNotificationContainerInteractor;
-    @Mock private ActiveNotificationsInteractor mActiveNotificationsInteractor;
+    @Mock protected ActiveNotificationsInteractor mActiveNotificationsInteractor;
     @Mock private KeyguardClockPositionAlgorithm mKeyguardClockPositionAlgorithm;
     @Mock private NaturalScrollingSettingObserver mNaturalScrollingSettingObserver;
 
@@ -384,7 +384,6 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Before
     public void setup() {
         MockitoAnnotations.initMocks(this);
-        mFeatureFlags.set(Flags.WM_SHADE_ANIMATE_BACK_GESTURE, false);
         mFeatureFlags.set(Flags.TRACKPAD_GESTURE_FEATURES, false);
         mFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false);
         mFeatureFlags.set(Flags.QS_USER_DETAIL_SHORTCUT, false);
@@ -733,7 +732,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mEmergencyButtonControllerFactory,
                 mShadeAnimationInteractor,
                 mKeyguardViewConfigurator,
-                mKeyguardFaceAuthInteractor,
+                mDeviceEntryFaceAuthInteractor,
                 new ResourcesSplitShadeStateController(),
                 mPowerInteractor,
                 mKeyguardClockPositionAlgorithm,
@@ -803,7 +802,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mInteractionJankMonitor,
                 mShadeLog,
                 mDumpManager,
-                mKeyguardFaceAuthInteractor,
+                mDeviceEntryFaceAuthInteractor,
                 mShadeRepository,
                 mShadeInteractor,
                 mActiveNotificationsInteractor,
