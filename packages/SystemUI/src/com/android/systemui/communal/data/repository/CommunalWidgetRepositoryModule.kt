@@ -31,7 +31,6 @@ import com.android.systemui.res.R
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
-import java.util.Optional
 import javax.inject.Named
 
 @Module
@@ -42,8 +41,8 @@ interface CommunalWidgetRepositoryModule {
 
         @SysUISingleton
         @Provides
-        fun provideAppWidgetManager(@Application context: Context): Optional<AppWidgetManager> {
-            return Optional.ofNullable(AppWidgetManager.getInstance(context))
+        fun provideAppWidgetManager(@Application context: Context): AppWidgetManager {
+            return AppWidgetManager.getInstance(context)
         }
 
         @SysUISingleton
@@ -55,7 +54,7 @@ interface CommunalWidgetRepositoryModule {
         @SysUISingleton
         @Provides
         fun provideCommunalWidgetHost(
-            appWidgetManager: Optional<AppWidgetManager>,
+            appWidgetManager: AppWidgetManager,
             appWidgetHost: AppWidgetHost,
             @CommunalLog logBuffer: LogBuffer,
         ): CommunalWidgetHost {

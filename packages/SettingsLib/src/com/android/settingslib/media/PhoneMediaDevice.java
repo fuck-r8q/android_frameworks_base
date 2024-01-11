@@ -117,15 +117,16 @@ public class PhoneMediaDevice extends MediaDevice {
         return name.toString();
     }
 
-    PhoneMediaDevice(Context context, MediaRoute2Info info) {
-        this(context, info, null);
+    PhoneMediaDevice(Context context, MediaRoute2Info info, String packageName) {
+        this(context, info, packageName, null);
     }
 
     PhoneMediaDevice(
             Context context,
             MediaRoute2Info info,
+            String packageName,
             RouteListingPreference.Item item) {
-        super(context, info, item);
+        super(context, info, packageName, item);
         mDeviceIconUtil = new DeviceIconUtil(mContext);
         initDeviceRecord();
     }

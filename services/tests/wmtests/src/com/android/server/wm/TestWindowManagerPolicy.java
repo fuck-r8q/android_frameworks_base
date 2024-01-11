@@ -330,10 +330,6 @@ class TestWindowManagerPolicy implements WindowManagerPolicy {
     }
 
     @Override
-    public void showDismissibleKeyguard() {
-    }
-
-    @Override
     public void setPipVisibilityLw(boolean visible) {
     }
 

@@ -17,8 +17,6 @@
 #ifndef FORCEDARKUTILS_H
 #define FORCEDARKUTILS_H
 
-#include <stdint.h>
-
 namespace android {
 namespace uirenderer {
 
@@ -28,7 +26,7 @@ namespace uirenderer {
  * This should stay in sync with the java @IntDef in
  * frameworks/base/graphics/java/android/graphics/ForceDarkType.java
  */
-enum class ForceDarkType : uint8_t { NONE = 0, FORCE_DARK = 1, FORCE_INVERT_COLOR_DARK = 2 };
+enum class ForceDarkType : __uint8_t { NONE = 0, FORCE_DARK = 1, FORCE_INVERT_COLOR_DARK = 2 };
 
 } /* namespace uirenderer */
 } /* namespace android */

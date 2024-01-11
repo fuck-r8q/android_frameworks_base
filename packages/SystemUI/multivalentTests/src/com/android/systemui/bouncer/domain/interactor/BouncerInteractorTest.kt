@@ -25,7 +25,7 @@ import com.android.systemui.authentication.shared.model.AuthenticationMethodMode
 import com.android.systemui.authentication.shared.model.AuthenticationPatternCoordinate
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
-import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor
 import com.android.systemui.res.R
 import com.android.systemui.scene.SceneTestUtils
 import com.google.common.truth.Truth.assertThat
@@ -46,7 +46,7 @@ import org.mockito.MockitoAnnotations
 @RunWith(AndroidJUnit4::class)
 class BouncerInteractorTest : SysuiTestCase() {
 
-    @Mock private lateinit var mDeviceEntryFaceAuthInteractor: DeviceEntryFaceAuthInteractor
+    @Mock private lateinit var keyguardFaceAuthInteractor: KeyguardFaceAuthInteractor
 
     private val utils = SceneTestUtils(this)
     private val testScope = utils.testScope
@@ -67,7 +67,7 @@ class BouncerInteractorTest : SysuiTestCase() {
         underTest =
             utils.bouncerInteractor(
                 authenticationInteractor = authenticationInteractor,
-                deviceEntryFaceAuthInteractor = mDeviceEntryFaceAuthInteractor,
+                keyguardFaceAuthInteractor = keyguardFaceAuthInteractor,
             )
     }
 
@@ -306,7 +306,7 @@ class BouncerInteractorTest : SysuiTestCase() {
     fun intentionalUserInputEvent_notifiesFaceAuthInteractor() =
         testScope.runTest {
             underTest.onIntentionalUserInput()
-            verify(mDeviceEntryFaceAuthInteractor).onPrimaryBouncerUserInput()
+            verify(keyguardFaceAuthInteractor).onPrimaryBouncerUserInput()
         }
 
     companion object {

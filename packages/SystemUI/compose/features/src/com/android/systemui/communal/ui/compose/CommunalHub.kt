@@ -16,7 +16,6 @@
 
 package com.android.systemui.communal.ui.compose
 
-import android.appwidget.AppWidgetHostView
 import android.os.Bundle
 import android.util.SizeF
 import android.widget.FrameLayout
@@ -205,12 +204,8 @@ private fun BoxScope.CommunalHubLazyGrid(
                     list[index].size.dp().value,
                 )
             if (viewModel.isEditMode && dragDropState != null) {
-                DraggableItem(
-                    dragDropState = dragDropState,
-                    enabled = true,
-                    index = index,
-                    size = size
-                ) { isDragging ->
+                DraggableItem(dragDropState = dragDropState, enabled = true, index = index) {
+                    isDragging ->
                     val elevation by animateDpAsState(if (isDragging) 4.dp else 1.dp)
                     CommunalContent(
                         modifier = cardModifier,
@@ -330,7 +325,7 @@ private fun CommunalContent(
     elevation: Dp = 0.dp,
 ) {
     when (model) {
-        is CommunalContentModel.Widget -> WidgetContent(viewModel, model, size, elevation, modifier)
+        is CommunalContentModel.Widget -> WidgetContent(model, size, elevation, modifier)
         is CommunalContentModel.WidgetPlaceholder -> WidgetPlaceholderContent(size)
         is CommunalContentModel.Smartspace -> SmartspaceContent(model, modifier)
         is CommunalContentModel.Tutorial -> TutorialContent(modifier)
@@ -351,7 +346,6 @@ fun WidgetPlaceholderContent(size: SizeF) {
 
 @Composable
 private fun WidgetContent(
-    viewModel: BaseCommunalViewModel,
     model: CommunalContentModel.Widget,
     size: SizeF,
     elevation: Dp,
@@ -364,18 +358,9 @@ private fun WidgetContent(
         AndroidView(
             modifier = modifier,
             factory = { context ->
-                // The AppWidgetHostView will inherit the interaction handler from the
-                // AppWidgetHost. So set the interaction handler here before creating the view, and
-                // then clear it after the view is created. This is a workaround due to the fact
-                // that the interaction handler cannot be specified when creating the view,
-                // and there are race conditions if it is set after the view is created.
-                model.appWidgetHost.setInteractionHandler(viewModel.getInteractionHandler())
-                val view =
-                    model.appWidgetHost
-                        .createView(context, model.appWidgetId, model.providerInfo)
-                        .apply { updateAppWidgetSize(Bundle.EMPTY, listOf(size)) }
-                model.appWidgetHost.setInteractionHandler(null)
-                view
+                model.appWidgetHost
+                    .createView(context, model.appWidgetId, model.providerInfo)
+                    .apply { updateAppWidgetSize(Bundle.EMPTY, listOf(size)) }
             },
             // For reusing composition in lazy lists.
             onReset = {},
@@ -391,7 +376,7 @@ private fun SmartspaceContent(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            AppWidgetHostView(context).apply { updateAppWidget(model.remoteViews) }
+            FrameLayout(context).apply { addView(model.remoteViews.apply(context, this)) }
         },
         // For reusing composition in lazy lists.
         onReset = {},

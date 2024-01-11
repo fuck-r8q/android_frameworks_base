@@ -305,14 +305,6 @@ class CredentialAutofillService : AutofillService() {
         var i = 0
         var datasetAdded = false
 
-        val duplicateDisplayNames: MutableMap<String, Boolean> = mutableMapOf()
-        providerDisplayInfo.sortedUserNameToCredentialEntryList.forEach {
-            val credentialEntry = it.sortedCredentialEntryList.first()
-            credentialEntry.displayName?.let {displayName ->
-                val duplicateEntry = duplicateDisplayNames.contains(displayName)
-                duplicateDisplayNames[displayName] = duplicateEntry
-            }
-        }
         providerDisplayInfo.sortedUserNameToCredentialEntryList.forEach usernameLoop@{
             val primaryEntry = it.sortedCredentialEntryList.first()
             val pendingIntent = primaryEntry.pendingIntent
@@ -347,14 +339,10 @@ class CredentialAutofillService : AutofillService() {
                 } else {
                     spec = inlinePresentationSpecs[inlinePresentationSpecsCount - 1]
                 }
-                val displayName : String = primaryEntry.displayName ?: primaryEntry.userName
                 val sliceBuilder = InlineSuggestionUi
                         .newContentBuilder(pendingIntent)
-                        .setTitle(displayName)
+                        .setTitle(primaryEntry.userName)
                 sliceBuilder.setStartIcon(icon)
-                if (duplicateDisplayNames[displayName] == true) {
-                    sliceBuilder.setSubtitle(primaryEntry.userName)
-                }
                 inlinePresentation = InlinePresentation(
                         sliceBuilder.build().slice, spec, /* pinned= */ false)
             }
@@ -410,7 +398,7 @@ class CredentialAutofillService : AutofillService() {
         val sliceBuilder = InlineSuggestionUi
                 .newContentBuilder(bottomSheetPendingIntent)
                 .setStartIcon(Icon.createWithResource(this,
-                        com.android.credentialmanager.R.drawable.more_horiz_24px))
+                        com.android.credentialmanager.R.drawable.ic_other_sign_in_24))
         val presentationBuilder = Presentations.Builder()
                 .setInlinePresentation(InlinePresentation(
                         sliceBuilder.build().slice, spec, /* pinned= */ true))

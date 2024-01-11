@@ -16,6 +16,7 @@
 
 package com.android.systemui.communal.dagger
 
+import android.content.Context
 import com.android.systemui.communal.data.db.CommunalDatabaseModule
 import com.android.systemui.communal.data.repository.CommunalMediaRepositoryModule
 import com.android.systemui.communal.data.repository.CommunalRepositoryModule
@@ -23,8 +24,9 @@ import com.android.systemui.communal.data.repository.CommunalTutorialRepositoryM
 import com.android.systemui.communal.data.repository.CommunalWidgetRepositoryModule
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarterImpl
-import dagger.Binds
+import com.android.systemui.dagger.qualifiers.Application
 import dagger.Module
+import dagger.Provides
 
 @Module(
     includes =
@@ -36,9 +38,11 @@ import dagger.Module
             CommunalDatabaseModule::class,
         ]
 )
-interface CommunalModule {
-    @Binds
-    fun bindEditWidgetsActivityStarter(
-        starter: EditWidgetsActivityStarterImpl
-    ): EditWidgetsActivityStarter
+class CommunalModule {
+    @Provides
+    fun provideEditWidgetsActivityStarter(
+        @Application context: Context
+    ): EditWidgetsActivityStarter {
+        return EditWidgetsActivityStarterImpl(context)
+    }
 }

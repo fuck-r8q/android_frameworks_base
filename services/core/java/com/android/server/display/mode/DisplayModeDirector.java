@@ -154,9 +154,6 @@ public class DisplayModeDirector {
 
     private final VotesStorage mVotesStorage;
 
-    @Nullable
-    private final VotesStatsReporter mVotesStatsReporter;
-
     /**
      * The allowed refresh rate switching type. This is used by SurfaceFlinger.
      */
@@ -207,8 +204,6 @@ public class DisplayModeDirector {
         mContext = context;
         mHandler = new DisplayModeDirectorHandler(handler.getLooper());
         mInjector = injector;
-        mVotesStatsReporter = injector.getVotesStatsReporter(
-                displayManagerFlags.isRefreshRateVotingTelemetryEnabled());
         mSupportedModesByDisplay = new SparseArray<>();
         mDefaultModeByDisplay = new SparseArray<>();
         mAppRequestObserver = new AppRequestObserver();
@@ -219,8 +214,7 @@ public class DisplayModeDirector {
         mBrightnessObserver = new BrightnessObserver(context, handler, injector);
         mDefaultDisplayDeviceConfig = null;
         mUdfpsObserver = new UdfpsObserver();
-        mVotesStorage = new VotesStorage(this::notifyDesiredDisplayModeSpecsChangedLocked,
-                mVotesStatsReporter);
+        mVotesStorage = new VotesStorage(this::notifyDesiredDisplayModeSpecsChangedLocked);
         mDisplayObserver = new DisplayObserver(context, handler, mVotesStorage);
         mSensorObserver = new SensorObserver(context, mVotesStorage, injector);
         mSkinThermalStatusObserver = new SkinThermalStatusObserver(injector, mVotesStorage);
@@ -347,11 +341,6 @@ public class DisplayModeDirector {
             appRequestSummary.limitRefreshRanges(primarySummary);
 
             Display.Mode baseMode = primarySummary.selectBaseMode(availableModes, defaultMode);
-            if (mVotesStatsReporter != null) {
-                mVotesStatsReporter.reportVotesActivated(displayId, lowestConsideredPriority,
-                        baseMode, votes);
-            }
-
             if (baseMode == null) {
                 Slog.w(TAG, "Can't find a set of allowed modes which satisfies the votes. Falling"
                         + " back to the default mode. Display = " + displayId + ", votes = " + votes
@@ -981,14 +970,9 @@ public class DisplayModeDirector {
 
                 if (!mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled) {
                     // The flag had been turned off, we need to restore the original value
-                    Settings.System.putFloatForUser(cr, Settings.System.MIN_REFRESH_RATE,
-                            highestRefreshRate, cr.getUserId());
+                    Settings.System.putFloatForUser(cr,
+                            Settings.System.MIN_REFRESH_RATE, minRefreshRate, cr.getUserId());
                 }
-            } else if (mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled
-                    && Math.round(minRefreshRate) == Math.round(highestRefreshRate)) {
-                // The flag has been turned on, we need to upgrade the setting
-                Settings.System.putFloatForUser(cr, Settings.System.MIN_REFRESH_RATE,
-                        Float.POSITIVE_INFINITY, cr.getUserId());
             }
 
             float peakRefreshRate = Settings.System.getFloatForUser(cr,
@@ -999,14 +983,9 @@ public class DisplayModeDirector {
 
                 if (!mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled) {
                     // The flag had been turned off, we need to restore the original value
-                    Settings.System.putFloatForUser(cr, Settings.System.PEAK_REFRESH_RATE,
-                            highestRefreshRate, cr.getUserId());
+                    Settings.System.putFloatForUser(cr,
+                            Settings.System.PEAK_REFRESH_RATE, peakRefreshRate, cr.getUserId());
                 }
-            } else if (mIsBackUpSmoothDisplayAndForcePeakRefreshRateEnabled
-                    && Math.round(peakRefreshRate) == Math.round(highestRefreshRate)) {
-                // The flag has been turned on, we need to upgrade the setting
-                Settings.System.putFloatForUser(cr, Settings.System.PEAK_REFRESH_RATE,
-                        Float.POSITIVE_INFINITY, cr.getUserId());
             }
 
             updateRefreshRateSettingLocked(minRefreshRate, peakRefreshRate, mDefaultRefreshRate);
@@ -2830,9 +2809,6 @@ public class DisplayModeDirector {
         StatusBarManagerInternal getStatusBarManagerInternal();
 
         SensorManagerInternal getSensorManagerInternal();
-
-        @Nullable
-        VotesStatsReporter getVotesStatsReporter(boolean refreshRateVotingTelemetryEnabled);
     }
 
     @VisibleForTesting
@@ -2963,13 +2939,6 @@ public class DisplayModeDirector {
         @Override
         public SensorManagerInternal getSensorManagerInternal() {
             return LocalServices.getService(SensorManagerInternal.class);
-        }
-
-        @Override
-        public VotesStatsReporter getVotesStatsReporter(boolean refreshRateVotingTelemetryEnabled) {
-            // if frame rate override supported, renderRates will be ignored in mode selection
-            return new VotesStatsReporter(supportsFrameRateOverride(),
-                    refreshRateVotingTelemetryEnabled);
         }
 
         private DisplayManager getDisplayManager() {

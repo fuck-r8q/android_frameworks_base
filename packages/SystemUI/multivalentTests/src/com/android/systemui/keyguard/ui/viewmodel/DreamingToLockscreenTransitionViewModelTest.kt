@@ -55,28 +55,6 @@ class DreamingToLockscreenTransitionViewModelTest : SysuiTestCase() {
     private val underTest = kosmos.dreamingToLockscreenTransitionViewModel
 
     @Test
-    fun shortcutsAlpha_bothShortcutsReceiveLastValue() =
-        testScope.runTest {
-            val valuesLeft by collectValues(underTest.shortcutsAlpha)
-            val valuesRight by collectValues(underTest.shortcutsAlpha)
-
-            keyguardTransitionRepository.sendTransitionSteps(
-                listOf(
-                    step(0f, TransitionState.STARTED),
-                    step(0.3f),
-                    step(0.5f),
-                    step(0.6f),
-                    step(0.8f),
-                    step(1f),
-                ),
-                testScope,
-            )
-
-            assertThat(valuesLeft.last()).isEqualTo(1f)
-            assertThat(valuesRight.last()).isEqualTo(1f)
-        }
-
-    @Test
     fun dreamOverlayTranslationY() =
         testScope.runTest {
             val pixels = 100
@@ -95,7 +73,7 @@ class DreamingToLockscreenTransitionViewModelTest : SysuiTestCase() {
                 testScope,
             )
 
-            assertThat(values.size).isEqualTo(6)
+            assertThat(values.size).isEqualTo(7)
             values.forEach { assertThat(it).isIn(Range.closed(0f, 100f)) }
         }
 
@@ -117,7 +95,7 @@ class DreamingToLockscreenTransitionViewModelTest : SysuiTestCase() {
                 testScope,
             )
 
-            assertThat(values.size).isEqualTo(3)
+            assertThat(values.size).isEqualTo(4)
             values.forEach { assertThat(it).isIn(Range.closed(0f, 1f)) }
         }
 
@@ -232,7 +210,7 @@ class DreamingToLockscreenTransitionViewModelTest : SysuiTestCase() {
                 testScope,
             )
 
-            assertThat(values.size).isEqualTo(4)
+            assertThat(values.size).isEqualTo(5)
             values.forEach { assertThat(it).isIn(Range.closed(-100f, 0f)) }
         }
 

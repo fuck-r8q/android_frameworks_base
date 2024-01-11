@@ -567,7 +567,7 @@ public class LocalMediaManager implements BluetoothCallback {
                 final CachedBluetoothDevice cachedDevice =
                         cachedDeviceManager.findDevice(device);
                 if (isBondedMediaDevice(cachedDevice) && isMutingExpectedDevice(cachedDevice)) {
-                    return new BluetoothMediaDevice(mContext, cachedDevice, null);
+                    return new BluetoothMediaDevice(mContext, cachedDevice, null, mPackageName);
                 }
             }
             return null;
@@ -614,7 +614,7 @@ public class LocalMediaManager implements BluetoothCallback {
             mDisconnectedMediaDevices.clear();
             for (CachedBluetoothDevice cachedDevice : cachedBluetoothDeviceList) {
                 final MediaDevice mediaDevice =
-                        new BluetoothMediaDevice(mContext, cachedDevice, null);
+                        new BluetoothMediaDevice(mContext, cachedDevice, null, mPackageName);
                 if (!mMediaDevices.contains(mediaDevice)) {
                     cachedDevice.registerCallback(mDeviceAttributeChangeCallback);
                     mDisconnectedMediaDevices.add(mediaDevice);

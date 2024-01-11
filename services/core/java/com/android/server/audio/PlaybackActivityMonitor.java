@@ -84,8 +84,6 @@ public final class PlaybackActivityMonitor
     /*package*/ static final int VOLUME_SHAPER_SYSTEM_FADEOUT_ID = 2;
     /*package*/ static final int VOLUME_SHAPER_SYSTEM_MUTE_AWAIT_CONNECTION_ID = 3;
     /*package*/ static final int VOLUME_SHAPER_SYSTEM_STRONG_DUCK_ID = 4;
-    /*package*/ static final String EVENT_TYPE_FADE_OUT = "fading out";
-    /*package*/ static final String EVENT_TYPE_FADE_IN = "fading in";
 
     // ducking settings for a "normal duck" at -14dB
     private static final VolumeShaper.Configuration DUCK_VSHAPE =
@@ -1206,13 +1204,11 @@ public final class PlaybackActivityMonitor
                     return;
                 }
                 try {
-                    VolumeShaper.Configuration config =
-                            mUseStrongDuck ? STRONG_DUCK_VSHAPE : DUCK_VSHAPE;
-                    VolumeShaper.Operation operation =
-                            skipRamp ? PLAY_SKIP_RAMP : PLAY_CREATE_IF_NEEDED;
-                    sEventLogger.enqueue((new DuckEvent(apc, skipRamp, mUseStrongDuck, config,
-                            operation)).printLog(TAG));
-                    apc.getPlayerProxy().applyVolumeShaper(config, operation);
+                    sEventLogger.enqueue((new DuckEvent(apc, skipRamp, mUseStrongDuck))
+                            .printLog(TAG));
+                    apc.getPlayerProxy().applyVolumeShaper(
+                            mUseStrongDuck ? STRONG_DUCK_VSHAPE : DUCK_VSHAPE,
+                            skipRamp ? PLAY_SKIP_RAMP : PLAY_CREATE_IF_NEEDED);
                     mDuckedPlayers.add(piid);
                 } catch (Exception e) {
                     Log.e(TAG, "Error ducking player piid:" + piid + " uid:" + mUid, e);
@@ -1367,41 +1363,58 @@ public final class PlaybackActivityMonitor
         }
     }
 
+    static final class FadeEvent extends EventLogger.Event {
+        private final int mPlayerIId;
+        private final int mPlayerType;
+        private final int mClientUid;
+        private final int mClientPid;
+        private final AudioAttributes mPlayerAttr;
+        private final VolumeShaper.Configuration mVShaper;
+        private final VolumeShaper.Operation mVOperation;
+
+        FadeEvent(AudioPlaybackConfiguration apc, VolumeShaper.Configuration vShaper,
+                VolumeShaper.Operation vOperation) {
+            mPlayerIId = apc.getPlayerInterfaceId();
+            mClientUid = apc.getClientUid();
+            mClientPid = apc.getClientPid();
+            mPlayerAttr = apc.getAudioAttributes();
+            mPlayerType = apc.getPlayerType();
+            mVShaper = vShaper;
+            mVOperation = vOperation;
+        }
+
+        @Override
+        public String eventToString() {
+            return "Fade Event:" + " player piid:" + mPlayerIId
+                    + " uid/pid:" + mClientUid + "/" + mClientPid
+                    + " player type:"
+                    + AudioPlaybackConfiguration.toLogFriendlyPlayerType(mPlayerType)
+                    + " attr:" + mPlayerAttr
+                    + " volume shaper:" + mVShaper
+                    + " volume operation:" + mVOperation;
+        }
+    }
+
     private abstract static class VolumeShaperEvent extends EventLogger.Event {
         private final int mPlayerIId;
         private final boolean mSkipRamp;
         private final int mClientUid;
         private final int mClientPid;
-        private final int mPlayerType;
-        private final AudioAttributes mPlayerAttr;
-        private final VolumeShaper.Configuration mConfig;
-        private final VolumeShaper.Operation mOperation;
 
         abstract String getVSAction();
 
-        VolumeShaperEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp,
-                VolumeShaper.Configuration config, VolumeShaper.Operation operation) {
+        VolumeShaperEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp) {
             mPlayerIId = apc.getPlayerInterfaceId();
             mSkipRamp = skipRamp;
             mClientUid = apc.getClientUid();
             mClientPid = apc.getClientPid();
-            mPlayerAttr = apc.getAudioAttributes();
-            mPlayerType = apc.getPlayerType();
-            mConfig = config;
-            mOperation = operation;
         }
 
         @Override
         public String eventToString() {
-            return getVSAction()
-                    + " player piid:" + mPlayerIId
-                    + " uid/pid:" + mClientUid + "/" + mClientPid
-                    + " skip ramp:" + mSkipRamp
-                    + " player type:"
-                    + AudioPlaybackConfiguration.toLogFriendlyPlayerType(mPlayerType)
-                    + " attr:" + mPlayerAttr
-                    + " config:" + mConfig
-                    + " operation:" + mOperation;
+            return new StringBuilder(getVSAction()).append(" player piid:").append(mPlayerIId)
+                    .append(" uid/pid:").append(mClientUid).append("/").append(mClientPid)
+                    .append(" skip ramp:").append(mSkipRamp).toString();
         }
     }
 
@@ -1413,10 +1426,9 @@ public final class PlaybackActivityMonitor
             return mUseStrongDuck ? "ducking (strong)" : "ducking";
         }
 
-        DuckEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp, boolean useStrongDuck,
-                VolumeShaper.Configuration config, VolumeShaper.Operation operation)
+        DuckEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp, boolean useStrongDuck)
         {
-            super(apc, skipRamp, config, operation);
+            super(apc, skipRamp);
             mUseStrongDuck = useStrongDuck;
         }
     }
@@ -1424,24 +1436,11 @@ public final class PlaybackActivityMonitor
     static final class FadeOutEvent extends VolumeShaperEvent {
         @Override
         String getVSAction() {
-            return EVENT_TYPE_FADE_OUT;
+            return "fading out";
         }
 
-        FadeOutEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp,
-                VolumeShaper.Configuration config, VolumeShaper.Operation operation) {
-            super(apc, skipRamp, config, operation);
-        }
-    }
-
-    static final class FadeInEvent extends VolumeShaperEvent {
-        @Override
-        String getVSAction() {
-            return EVENT_TYPE_FADE_IN;
-        }
-
-        FadeInEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp,
-                VolumeShaper.Configuration config, VolumeShaper.Operation operation) {
-            super(apc, skipRamp, config, operation);
+        FadeOutEvent(@NonNull AudioPlaybackConfiguration apc, boolean skipRamp) {
+            super(apc, skipRamp);
         }
     }
 

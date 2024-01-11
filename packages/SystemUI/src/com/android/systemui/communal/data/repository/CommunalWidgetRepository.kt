@@ -38,7 +38,6 @@ import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.Logger
 import com.android.systemui.log.dagger.CommunalLog
 import com.android.systemui.settings.UserTracker
-import java.util.Optional
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +75,7 @@ interface CommunalWidgetRepository {
 class CommunalWidgetRepositoryImpl
 @Inject
 constructor(
-    private val appWidgetManager: Optional<AppWidgetManager>,
+    private val appWidgetManager: AppWidgetManager,
     private val appWidgetHost: AppWidgetHost,
     @Application private val applicationScope: CoroutineScope,
     @Background private val bgDispatcher: CoroutineDispatcher,
@@ -145,7 +144,7 @@ constructor(
 
     override val communalWidgets: Flow<List<CommunalWidgetContentModel>> =
         isHostActive.flatMapLatest { isHostActive ->
-            if (!isHostActive || !appWidgetManager.isPresent) {
+            if (!isHostActive) {
                 return@flatMapLatest flowOf(emptyList())
             }
             communalWidgetDao.getWidgets().map { it.map(::mapToContentModel) }
@@ -188,7 +187,7 @@ constructor(
         val (_, widgetId) = entry.value
         return CommunalWidgetContentModel(
             appWidgetId = widgetId,
-            providerInfo = appWidgetManager.get().getAppWidgetInfo(widgetId),
+            providerInfo = appWidgetManager.getAppWidgetInfo(widgetId),
             priority = entry.key.rank,
         )
     }

@@ -32,7 +32,7 @@ import android.os.PowerManager
 import android.os.PowerManager.WAKE_REASON_UNKNOWN
 import android.util.Log
 import com.android.internal.logging.UiEventLogger
-import com.android.systemui.deviceentry.shared.FaceAuthUiEvent
+import com.android.keyguard.FaceAuthUiEvent
 
 /**
  * Wrapper for [FaceAuthenticateOptions] to convert SystemUI values to their corresponding value in

@@ -819,20 +819,14 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             Log.e(TAG, "onTaskFragmentParentInfoChanged on empty Task id=" + taskId);
             return;
         }
-        // Checks if container should be updated before apply new parentInfo.
-        final boolean shouldUpdateContainer = taskContainer.shouldUpdateContainer(parentInfo);
         taskContainer.updateTaskFragmentParentInfo(parentInfo);
         if (!taskContainer.isVisible()) {
             // Don't update containers if the task is not visible. We only update containers when
             // parentInfo#isVisibleRequested is true.
             return;
         }
-
-        // If the last direct activity of the host task is dismissed and the overlay container is
-        // the only taskFragment, the overlay container should also be dismissed.
-        dismissOverlayContainerIfNeeded(wct, taskContainer);
-
-        if (!shouldUpdateContainer) {
+        if (isInPictureInPicture(parentInfo.getConfiguration())) {
+            // No need to update presentation in PIP until the Task exit PIP.
             return;
         }
         updateContainersInTask(wct, taskContainer);
@@ -1953,8 +1947,11 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     void updateOverlayContainer(@NonNull WindowContainerTransaction wct,
             @NonNull TaskFragmentContainer container) {
         final TaskContainer taskContainer = container.getTaskContainer();
-
-        if (dismissOverlayContainerIfNeeded(wct, taskContainer)) {
+        // Dismiss the overlay container if it's the only container in the task and there's no
+        // direct activity in the parent task.
+        if (taskContainer.getTaskFragmentContainers().size() == 1
+                && !taskContainer.hasDirectActivity()) {
+            container.finish(false /* shouldFinishDependent */, mPresenter, wct, this);
             return;
         }
 
@@ -1969,24 +1966,6 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                     .apply(params);
             mPresenter.applyActivityStackAttributes(wct, container, attributes);
         }
-    }
-
-    /** Dismisses the overlay container in the {@code taskContainer} if needed. */
-    @GuardedBy("mLock")
-    private boolean dismissOverlayContainerIfNeeded(@NonNull WindowContainerTransaction wct,
-            @NonNull TaskContainer taskContainer) {
-        final TaskFragmentContainer overlayContainer = taskContainer.getOverlayContainer();
-        if (overlayContainer == null) {
-            return false;
-        }
-        // Dismiss the overlay container if it's the only container in the task and there's no
-        // direct activity in the parent task.
-        if (taskContainer.getTaskFragmentContainers().size() == 1
-                && !taskContainer.hasDirectActivity()) {
-            mPresenter.cleanupContainer(wct, overlayContainer, false /* shouldFinishDependant */);
-            return true;
-        }
-        return false;
     }
 
     /**

@@ -35,7 +35,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
-import org.robolectric.annotation.LooperMode;
 import org.robolectric.shadows.ShadowLooper;
 
 import java.util.concurrent.CountDownLatch;
@@ -46,7 +45,6 @@ import java.util.concurrent.TimeUnit;
  */
 @RunWith(RobolectricTestRunner.class)
 @Presubmit
-@LooperMode(LooperMode.Mode.LEGACY)
 public class NtpNetworkTimeHelperTest {
 
     private static final long MOCK_NTP_TIME = 1519930775453L;

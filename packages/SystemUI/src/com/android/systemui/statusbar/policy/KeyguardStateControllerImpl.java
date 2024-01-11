@@ -41,14 +41,15 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.log.core.LogLevel;
 import com.android.systemui.res.R;
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor;
 
 import dagger.Lazy;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import javax.inject.Inject;
@@ -62,8 +63,7 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
     private static final boolean DEBUG_AUTH_WITH_ADB = false;
     private static final String AUTH_BROADCAST_KEY = "debug_trigger_auth";
 
-    private final ConcurrentHashMap.KeySetView<Callback, Boolean> mCallbacks =
-            ConcurrentHashMap.<Callback>newKeySet();
+    private final ArrayList<Callback> mCallbacks = new ArrayList<>();
     private final Context mContext;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     private final LockPatternUtils mLockPatternUtils;
@@ -157,7 +157,9 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
     @Override
     public void addCallback(@NonNull Callback callback) {
         Objects.requireNonNull(callback, "Callback must not be null. b/128895449");
-        mCallbacks.add(callback);
+        if (!mCallbacks.contains(callback)) {
+            mCallbacks.add(callback);
+        }
     }
 
     @Override
@@ -219,7 +221,18 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
     }
 
     private void invokeForEachCallback(Consumer<Callback> consumer) {
-        mCallbacks.forEach(consumer);
+        // Copy the list to allow removal during callback.
+        ArrayList<Callback> copyOfCallbacks = new ArrayList<>(mCallbacks);
+        for (int i = 0; i < copyOfCallbacks.size(); i++) {
+            Callback callback = copyOfCallbacks.get(i);
+            // Temporary fix for b/315731775, callback is null even though only non-null callbacks
+            // are added to the list by addCallback
+            if (callback != null) {
+                consumer.accept(callback);
+            } else {
+                mLogger.log("KeyguardStateController callback is null", LogLevel.DEBUG);
+            }
+        }
     }
 
     private void notifyUnlockedChanged() {
@@ -491,11 +504,6 @@ public class KeyguardStateControllerImpl implements KeyguardStateController, Dum
 
         @Override
         public void onEnabledTrustAgentsChanged(int userId) {
-            update(false /* updateAlways */);
-        }
-
-        @Override
-        public void onForceIsDismissibleChanged(boolean keepUnlockedOnFold) {
             update(false /* updateAlways */);
         }
     }

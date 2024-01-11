@@ -63,10 +63,6 @@ constructor(private val activityStarter: ActivityStarter) : QSTileIntentUserInpu
                     InteractionJankMonitor.CUJ_SHADE_APP_LAUNCH_FROM_QS_TILE,
                 )
             }
-        activityStarter.startPendingIntentMaybeDismissingKeyguard(
-            pendingIntent,
-            null,
-            animationController
-        )
+        activityStarter.postStartActivityDismissingKeyguard(pendingIntent, animationController)
     }
 }

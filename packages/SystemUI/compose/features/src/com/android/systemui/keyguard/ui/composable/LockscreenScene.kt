@@ -37,6 +37,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
+/** Set this to `true` to use the LockscreenContent replacement of KeyguardRootView. */
+private val UseLockscreenContent = false
+
 /** The lock screen scene shows when the device is locked. */
 @SysUISingleton
 class LockscreenScene
@@ -45,6 +48,7 @@ constructor(
     @Application private val applicationScope: CoroutineScope,
     private val viewModel: LockscreenSceneViewModel,
     private val lockscreenContent: Lazy<LockscreenContent>,
+    private val viewBasedLockscreenContent: Lazy<ViewBasedLockscreenContent>,
 ) : ComposableScene {
     override val key = SceneKey.Lockscreen
 
@@ -69,6 +73,7 @@ constructor(
     ) {
         LockscreenScene(
             lockscreenContent = lockscreenContent,
+            viewBasedLockscreenContent = viewBasedLockscreenContent,
             modifier = modifier,
         )
     }
@@ -88,13 +93,22 @@ constructor(
 }
 
 @Composable
-private fun LockscreenScene(
+private fun SceneScope.LockscreenScene(
     lockscreenContent: Lazy<LockscreenContent>,
+    viewBasedLockscreenContent: Lazy<ViewBasedLockscreenContent>,
     modifier: Modifier = Modifier,
 ) {
-    lockscreenContent
-        .get()
-        .Content(
-            modifier = modifier.fillMaxSize(),
-        )
+    if (UseLockscreenContent) {
+        lockscreenContent
+            .get()
+            .Content(
+                modifier = modifier.fillMaxSize(),
+            )
+    } else {
+        with(viewBasedLockscreenContent.get()) {
+            Content(
+                modifier = modifier.fillMaxSize(),
+            )
+        }
+    }
 }

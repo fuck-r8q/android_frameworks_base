@@ -19,7 +19,6 @@ package com.android.wm.shell.pip2.phone;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_PIP;
-import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import static com.android.wm.shell.transition.Transitions.TRANSIT_EXIT_PIP;
 
@@ -54,8 +53,6 @@ public class PipTransition extends PipTransitionController {
     private final PipScheduler mPipScheduler;
     @Nullable
     private WindowContainerToken mPipTaskToken;
-    @Nullable
-    private IBinder mEnterTransition;
     @Nullable
     private IBinder mAutoEnterButtonNavTransition;
     @Nullable
@@ -101,8 +98,11 @@ public class PipTransition extends PipTransitionController {
     @Override
     public WindowContainerTransaction handleRequest(@NonNull IBinder transition,
             @NonNull TransitionRequestInfo request) {
-        if (isAutoEnterInButtonNavigation(request) || isEnterPictureInPictureModeRequest(request)) {
-            mEnterTransition = transition;
+        if (isAutoEnterInButtonNavigation(request)) {
+            mAutoEnterButtonNavTransition = transition;
+            return getEnterPipTransaction(transition, request);
+        } else if (isLegacyEnter(request)) {
+            mLegacyEnterTransition = transition;
             return getEnterPipTransaction(transition, request);
         }
         return null;
@@ -111,9 +111,12 @@ public class PipTransition extends PipTransitionController {
     @Override
     public void augmentRequest(@NonNull IBinder transition, @NonNull TransitionRequestInfo request,
             @NonNull WindowContainerTransaction outWct) {
-        if (isAutoEnterInButtonNavigation(request) || isEnterPictureInPictureModeRequest(request)) {
+        if (isAutoEnterInButtonNavigation(request)) {
             outWct.merge(getEnterPipTransaction(transition, request), true /* transfer */);
-            mEnterTransition = transition;
+            mAutoEnterButtonNavTransition = transition;
+        } else if (isLegacyEnter(request)) {
+            outWct.merge(getEnterPipTransaction(transition, request), true /* transfer */);
+            mLegacyEnterTransition = transition;
         }
     }
 
@@ -159,7 +162,7 @@ public class PipTransition extends PipTransitionController {
                 && pipTask.pictureInPictureParams.isAutoEnterEnabled();
     }
 
-    private boolean isEnterPictureInPictureModeRequest(@NonNull TransitionRequestInfo requestInfo) {
+    private boolean isLegacyEnter(@NonNull TransitionRequestInfo requestInfo) {
         return requestInfo.getType() == TRANSIT_PIP;
     }
 
@@ -169,15 +172,13 @@ public class PipTransition extends PipTransitionController {
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
-        if (transition == mEnterTransition) {
-            mEnterTransition = null;
-            if (isLegacyEnter(info)) {
-                // If this is a legacy-enter-pip (auto-enter is off and PiP activity went to pause),
-                // then we should run an ALPHA type (cross-fade) animation.
-                return startAlphaTypeEnterAnimation(info, startTransaction, finishTransaction,
-                        finishCallback);
-            }
-            return startBoundsTypeEnterAnimation(info, startTransaction, finishTransaction,
+        if (transition == mAutoEnterButtonNavTransition) {
+            mAutoEnterButtonNavTransition = null;
+            return startAutoEnterButtonNavAnimation(info, startTransaction, finishTransaction,
+                    finishCallback);
+        } else if (transition == mLegacyEnterTransition) {
+            mLegacyEnterTransition = null;
+            return startLegacyEnterAnimation(info, startTransaction, finishTransaction,
                     finishCallback);
         } else if (transition == mExitViaExpandTransition) {
             mExitViaExpandTransition = null;
@@ -186,15 +187,7 @@ public class PipTransition extends PipTransitionController {
         return false;
     }
 
-    private boolean isLegacyEnter(@NonNull TransitionInfo info) {
-        TransitionInfo.Change pipChange = getPipChange(info);
-        // If the only change in the changes list is a TO_FRONT mode PiP task,
-        // then this is legacy-enter PiP.
-        return pipChange != null && pipChange.getMode() == TRANSIT_TO_FRONT
-                && info.getChanges().size() == 1;
-    }
-
-    private boolean startBoundsTypeEnterAnimation(@NonNull TransitionInfo info,
+    private boolean startAutoEnterButtonNavAnimation(@NonNull TransitionInfo info,
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
@@ -212,7 +205,7 @@ public class PipTransition extends PipTransitionController {
         return true;
     }
 
-    private boolean startAlphaTypeEnterAnimation(@NonNull TransitionInfo info,
+    private boolean startLegacyEnterAnimation(@NonNull TransitionInfo info,
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
