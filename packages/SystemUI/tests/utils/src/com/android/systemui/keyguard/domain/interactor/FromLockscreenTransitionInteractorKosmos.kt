@@ -37,6 +37,7 @@ val Kosmos.fromLockscreenTransitionInteractor by
             flags = featureFlagsClassic,
             shadeRepository = shadeRepository,
             powerInteractor = powerInteractor,
+            glanceableHubTransitions = glanceableHubTransitions,
             inWindowLauncherUnlockAnimationInteractor =
                 Lazy { inWindowLauncherUnlockAnimationInteractor },
         )
