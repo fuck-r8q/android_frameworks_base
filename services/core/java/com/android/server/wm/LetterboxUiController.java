@@ -513,6 +513,7 @@ final class LetterboxUiController {
      *     timer and activity is not letterboxed for fixed orientation
      * </ul>
      */
+    @VisibleForTesting
     boolean shouldIgnoreOrientationRequestLoop() {
         if (!shouldEnableWithOptInOverrideAndOptOutProperty(
                 /* gatingCondition */ mLetterboxConfiguration

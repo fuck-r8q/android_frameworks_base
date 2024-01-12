@@ -118,11 +118,6 @@ public interface DozeHost {
          * Called when the dozing state may have been updated.
          */
         default void onDozingChanged(boolean isDozing) {}
-
-        /**
-         * Called when fingerprint acquisition has started and screen state might need updating.
-         */
-        default void onSideFingerprintAcquisitionStarted() {}
     }
 
     interface PulseCallback {

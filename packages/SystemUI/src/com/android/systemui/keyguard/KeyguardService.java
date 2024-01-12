@@ -593,13 +593,6 @@ public class KeyguardService extends Service {
             mKeyguardViewMediator.doKeyguardTimeout(options);
         }
 
-        // Binder interface
-        public void showDismissibleKeyguard() {
-            trace("showDismissibleKeyguard");
-            checkPermission();
-            mKeyguardViewMediator.showDismissibleKeyguard();
-        }
-
         @Override // Binder interface
         public void setSwitchingUser(boolean switching) {
             trace("setSwitchingUser switching=" + switching);

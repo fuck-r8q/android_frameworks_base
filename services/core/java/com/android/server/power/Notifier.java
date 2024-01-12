@@ -411,11 +411,6 @@ public class Notifier {
         mWakeLockLog.onWakeLockReleased(tag, ownerUid);
     }
 
-    /** Shows the keyguard without requesting the device to immediately lock. */
-    public void showDismissibleKeyguard() {
-        mPolicy.showDismissibleKeyguard();
-    }
-
     private int getBatteryStatsWakeLockMonitorType(int flags) {
         switch (flags & PowerManager.WAKE_LOCK_LEVEL_MASK) {
             case PowerManager.PARTIAL_WAKE_LOCK:
@@ -963,8 +958,7 @@ public class Notifier {
             final boolean vibrate = Settings.Secure.getIntForUser(mContext.getContentResolver(),
                     Settings.Secure.CHARGING_VIBRATION_ENABLED, 1, userId) != 0;
             if (vibrate) {
-                mVibrator.vibrate(Process.SYSTEM_UID, mContext.getOpPackageName(),
-                        CHARGING_VIBRATION_EFFECT, /* reason= */ "Charging started",
+                mVibrator.vibrate(CHARGING_VIBRATION_EFFECT,
                         HARDWARE_FEEDBACK_VIBRATION_ATTRIBUTES);
             }
 

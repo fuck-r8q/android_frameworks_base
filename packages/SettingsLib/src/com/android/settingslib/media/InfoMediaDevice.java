@@ -45,13 +45,14 @@ public class InfoMediaDevice extends MediaDevice {
     InfoMediaDevice(
             Context context,
             MediaRoute2Info info,
+            String packageName,
             RouteListingPreference.Item item) {
-        super(context, info, item);
+        super(context, info, packageName, item);
         initDeviceRecord();
     }
 
-    InfoMediaDevice(Context context, MediaRoute2Info info) {
-        this(context, info, null);
+    InfoMediaDevice(Context context, MediaRoute2Info info, String packageName) {
+        this(context, info, packageName, null);
     }
 
     @Override
@@ -117,7 +118,7 @@ public class InfoMediaDevice extends MediaDevice {
 
     @Override
     public String getId() {
-        return mRouteInfo.getId();
+        return MediaDeviceUtils.getId(mRouteInfo);
     }
 
     public boolean isConnected() {

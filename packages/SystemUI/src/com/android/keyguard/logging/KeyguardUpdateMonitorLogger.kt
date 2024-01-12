@@ -639,12 +639,4 @@ constructor(@KeyguardUpdateMonitorLog private val logBuffer: LogBuffer) {
             { "fingerprint acquire message: $int1" }
         )
     }
-    fun logForceIsDismissibleKeyguard(keepUnlocked: Boolean) {
-        logBuffer.log(
-                TAG,
-                DEBUG,
-                { bool1 = keepUnlocked },
-                { "keepUnlockedOnFold changed to: $bool1" }
-        )
-    }
 }

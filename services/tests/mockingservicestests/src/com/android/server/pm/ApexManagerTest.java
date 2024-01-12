@@ -343,12 +343,10 @@ public class ApexManagerTest {
         List<ApexManager.ScanResult> scanResults = scanApexInfos(apexInfo);
         mApexManager.notifyScanResult(scanResults);
 
-        final String apexPackageName = mApexManager.getActivePackageNameForApexModuleName(
-                activeApex.apexModuleName);
-        assertThat(mApexManager.getApkInApexInstallError(apexPackageName)).isNull();
+        assertThat(mApexManager.getApkInApexInstallError(activeApex.apexModuleName)).isNull();
         mApexManager.reportErrorWithApkInApex(activeApex.apexDirectory.getAbsolutePath(),
                 "Some random error");
-        assertThat(mApexManager.getApkInApexInstallError(apexPackageName))
+        assertThat(mApexManager.getApkInApexInstallError(activeApex.apexModuleName))
                 .isEqualTo("Some random error");
     }
 
@@ -372,11 +370,9 @@ public class ApexManagerTest {
         List<ApexManager.ScanResult> scanResults = scanApexInfos(apexInfo);
         mApexManager.notifyScanResult(scanResults);
 
-        final String apexPackageName = mApexManager.getActivePackageNameForApexModuleName(
-                activeApex.apexModuleName);
-        assertThat(mApexManager.getApksInApex(apexPackageName)).isEmpty();
+        assertThat(mApexManager.getApksInApex(activeApex.apexModuleName)).isEmpty();
         mApexManager.registerApkInApex(fakeApkInApex);
-        assertThat(mApexManager.getApksInApex(apexPackageName)).isEmpty();
+        assertThat(mApexManager.getApksInApex(activeApex.apexModuleName)).isEmpty();
     }
 
     @Test

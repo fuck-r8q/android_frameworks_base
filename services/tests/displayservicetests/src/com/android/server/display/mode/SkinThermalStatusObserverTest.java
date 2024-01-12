@@ -58,7 +58,7 @@ public class SkinThermalStatusObserverTest {
     private RegisteringFakesInjector mInjector = new RegisteringFakesInjector();
 
     private final TestHandler mHandler = new TestHandler(null);
-    private final VotesStorage mStorage = new VotesStorage(() -> {}, null);
+    private final VotesStorage mStorage = new VotesStorage(() -> {});
 
     @Before
     public void setUp() {

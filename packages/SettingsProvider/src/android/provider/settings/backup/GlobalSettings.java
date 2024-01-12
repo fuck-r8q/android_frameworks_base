@@ -69,7 +69,6 @@ public class GlobalSettings {
         Settings.Global.PRIVATE_DNS_SPECIFIER,
         Settings.Global.SOFT_AP_TIMEOUT_ENABLED,
         Settings.Global.ZEN_DURATION,
-        Settings.Global.MUTE_ALARM_STREAM_WITH_RINGER_MODE_USER_PREFERENCE,
         Settings.Global.REVERSE_CHARGING_AUTO_ON,
         Settings.Global.CHARGING_VIBRATION_ENABLED,
         Settings.Global.AWARE_ALLOWED,

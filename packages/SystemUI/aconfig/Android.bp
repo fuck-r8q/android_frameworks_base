@@ -25,7 +25,6 @@ package {
         "//frameworks/base/packages/SystemUI:__subpackages__",
         "//frameworks/libs/systemui/tracinglib:__subpackages__",
         "//platform_testing:__subpackages__",
-        "//cts:__subpackages__",
     ],
 }
 

@@ -16,7 +16,6 @@
 
 package android.content.pm;
 
-import android.annotation.FlaggedApi;
 import android.annotation.FloatRange;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -43,7 +42,6 @@ import android.util.Printer;
 import android.window.OnBackInvokedCallback;
 
 import com.android.internal.util.Parcelling;
-import com.android.window.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -1101,8 +1099,6 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     @ChangeId
     @Overridable
     @Disabled
-    @TestApi
-    @FlaggedApi(Flags.FLAG_APP_COMPAT_PROPERTIES_API)
     public static final long OVERRIDE_ENABLE_COMPAT_IGNORE_ORIENTATION_REQUEST_WHEN_LOOP_DETECTED =
             273509367L; // buganizer id
 

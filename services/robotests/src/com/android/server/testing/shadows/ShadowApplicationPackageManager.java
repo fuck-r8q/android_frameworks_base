@@ -95,6 +95,7 @@ public class ShadowApplicationPackageManager
         sPackageAppEnabledStates.put(packageName, Integer.valueOf(newState));  // flags unused here.
     }
 
+    @Override
     protected PackageInfo getPackageInfoAsUser(String packageName, int flags, int userId)
             throws NameNotFoundException {
         if (!sPackageInfos.containsKey(packageName)) {

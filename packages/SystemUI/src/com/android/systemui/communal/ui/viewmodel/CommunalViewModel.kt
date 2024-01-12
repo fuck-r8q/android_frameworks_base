@@ -17,11 +17,9 @@
 package com.android.systemui.communal.ui.viewmodel
 
 import android.os.PowerManager
-import android.widget.RemoteViews
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.interactor.CommunalTutorialInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
-import com.android.systemui.communal.widgets.WidgetInteractionHandler
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.media.controls.ui.MediaHost
 import com.android.systemui.media.dagger.MediaModule
@@ -41,7 +39,6 @@ class CommunalViewModel
 @Inject
 constructor(
     private val communalInteractor: CommunalInteractor,
-    private val interactionHandler: WidgetInteractionHandler,
     tutorialInteractor: CommunalTutorialInteractor,
     shadeViewController: Provider<ShadeViewController>,
     powerManager: PowerManager,
@@ -63,6 +60,4 @@ constructor(
         }
 
     override fun onOpenWidgetEditor() = communalInteractor.showWidgetEditor()
-
-    override fun getInteractionHandler(): RemoteViews.InteractionHandler = interactionHandler
 }

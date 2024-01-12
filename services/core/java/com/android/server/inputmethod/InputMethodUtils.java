@@ -51,7 +51,6 @@ import com.android.server.textservices.TextServicesManagerInternal;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -215,7 +214,7 @@ final class InputMethodUtils {
         private final ArrayMap<String, InputMethodInfo> mMethodMap;
 
         @UserIdInt
-        private final int mCurrentUserId;
+        private int mCurrentUserId;
 
         private static void buildEnabledInputMethodsSettingString(
                 StringBuilder builder, Pair<String, ArrayList<String>> ime) {
@@ -229,13 +228,19 @@ final class InputMethodUtils {
 
         InputMethodSettings(ArrayMap<String, InputMethodInfo> methodMap, @UserIdInt int userId) {
             mMethodMap = methodMap;
-            mCurrentUserId = userId;
-            String ime = getSelectedInputMethod();
-            String defaultDeviceIme = getSelectedDefaultDeviceInputMethod();
-            if (defaultDeviceIme != null && !Objects.equals(ime, defaultDeviceIme)) {
-                putSelectedInputMethod(defaultDeviceIme);
-                putSelectedDefaultDeviceInputMethod(null);
+            switchCurrentUser(userId);
+        }
+
+        /**
+         * Must be called when the current user is changed.
+         *
+         * @param userId The user ID.
+         */
+        void switchCurrentUser(@UserIdInt int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "--- Switch the current user from " + mCurrentUserId + " to " + userId);
             }
+            mCurrentUserId = userId;
         }
 
         private void putString(@NonNull String key, @Nullable String str) {
@@ -629,24 +634,6 @@ final class InputMethodUtils {
                 Slog.d(TAG, "getSelectedInputMethodStr: " + imi);
             }
             return imi;
-        }
-
-        @Nullable
-        String getSelectedDefaultDeviceInputMethod() {
-            final String imi = getString(Settings.Secure.DEFAULT_DEVICE_INPUT_METHOD, null);
-            if (DEBUG) {
-                Slog.d(TAG, "getSelectedDefaultDeviceInputMethodStr: " + imi + ", "
-                        + mCurrentUserId);
-            }
-            return imi;
-        }
-
-        void putSelectedDefaultDeviceInputMethod(String imeId) {
-            if (DEBUG) {
-                Slog.d(TAG, "putSelectedDefaultDeviceInputMethodStr: " + imeId + ", "
-                        + mCurrentUserId);
-            }
-            putString(Settings.Secure.DEFAULT_DEVICE_INPUT_METHOD, imeId);
         }
 
         void putDefaultVoiceInputMethod(String imeId) {

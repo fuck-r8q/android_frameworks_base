@@ -180,9 +180,7 @@ final class InitAppsHelper {
         // priority of system overlays.
         final ArrayMap<String, File> apkInApexPreInstalledPaths = new ArrayMap<>();
         for (ApexManager.ActiveApexInfo apexInfo : mApexManager.getActiveApexInfos()) {
-            final String apexPackageName = mApexManager.getActivePackageNameForApexModuleName(
-                    apexInfo.apexModuleName);
-            for (String packageName : mApexManager.getApksInApex(apexPackageName)) {
+            for (String packageName : mApexManager.getApksInApex(apexInfo.apexModuleName)) {
                 apkInApexPreInstalledPaths.put(packageName, apexInfo.preInstalledApexPath);
             }
         }

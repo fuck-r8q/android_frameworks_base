@@ -19,10 +19,8 @@ package com.android.systemui.keyguard.data.repository
 
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.deviceentry.data.repository.DeviceEntryFaceAuthRepository
-import com.android.systemui.deviceentry.data.repository.DeviceEntryFaceAuthRepositoryImpl
-import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
-import com.android.systemui.deviceentry.domain.interactor.SystemUIDeviceEntryFaceAuthInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor
+import com.android.systemui.keyguard.domain.interactor.SystemUIKeyguardFaceAuthInteractor
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.TableLogBufferFactory
 import dagger.Binds
@@ -40,13 +38,13 @@ interface KeyguardFaceAuthModule {
 
     @Binds
     @IntoMap
-    @ClassKey(SystemUIDeviceEntryFaceAuthInteractor::class)
-    fun bind(impl: SystemUIDeviceEntryFaceAuthInteractor): CoreStartable
+    @ClassKey(SystemUIKeyguardFaceAuthInteractor::class)
+    fun bind(impl: SystemUIKeyguardFaceAuthInteractor): CoreStartable
 
     @Binds
     fun keyguardFaceAuthInteractor(
-        impl: SystemUIDeviceEntryFaceAuthInteractor
-    ): DeviceEntryFaceAuthInteractor
+        impl: SystemUIKeyguardFaceAuthInteractor
+    ): KeyguardFaceAuthInteractor
 
     companion object {
         @Provides

@@ -74,7 +74,6 @@ import android.view.IWindowManager;
 import android.view.WindowManagerGlobal;
 
 import com.android.internal.annotations.GuardedBy;
-import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.infra.AndroidFuture;
 import com.android.internal.util.DumpUtils;
@@ -1758,11 +1757,6 @@ public class TrustManagerService extends SystemService {
             }
         }
     };
-
-    @VisibleForTesting
-    void waitForIdle() {
-        mHandler.runWithScissors(() -> {}, 0);
-    }
 
     private boolean isTrustUsuallyManagedInternal(int userId) {
         synchronized (mTrustUsuallyManagedForUser) {

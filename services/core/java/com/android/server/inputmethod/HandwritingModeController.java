@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
-import java.util.function.IntConsumer;
 
 // TODO(b/210039666): See if we can make this class thread-safe.
 final class HandwritingModeController {
@@ -85,14 +84,14 @@ final class HandwritingModeController {
     private boolean mDelegatorFromDefaultHomePackage;
     private Runnable mDelegationIdleTimeoutRunnable;
     private Handler mDelegationIdleTimeoutHandler;
-    private IntConsumer mPointerToolTypeConsumer;
+
     private HandwritingEventReceiverSurface mHandwritingSurface;
 
     private int mCurrentRequestId;
 
     @AnyThread
     HandwritingModeController(Context context, Looper uiThreadLooper,
-            Runnable inkWindowInitRunnable, IntConsumer toolTypeConsumer) {
+            Runnable inkWindowInitRunnable) {
         mContext = context;
         mLooper = uiThreadLooper;
         mCurrentDisplayId = Display.INVALID_DISPLAY;
@@ -101,7 +100,6 @@ final class HandwritingModeController {
         mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
         mCurrentRequestId = 0;
         mInkWindowInitRunnable = inkWindowInitRunnable;
-        mPointerToolTypeConsumer = toolTypeConsumer;
     }
 
     /**
@@ -357,11 +355,6 @@ final class HandwritingModeController {
             return false;
         }
         final MotionEvent event = (MotionEvent) ev;
-        if (mPointerToolTypeConsumer != null && event.getAction() == MotionEvent.ACTION_DOWN) {
-            int toolType = event.getToolType(event.getActionIndex());
-            // notify IME of change in tool type.
-            mPointerToolTypeConsumer.accept(toolType);
-        }
         if (!event.isStylusPointer()) {
             return false;
         }

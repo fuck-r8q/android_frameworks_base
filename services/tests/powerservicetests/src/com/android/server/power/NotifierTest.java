@@ -26,7 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -114,8 +113,7 @@ public class NotifierTest {
         mTestExecutor.simulateAsyncExecutionOfLastCommand();
 
         // THEN the device vibrates once
-        verify(mVibrator, times(1)).vibrate(anyInt(), any(), any(), any(),
-                any(VibrationAttributes.class));
+        verify(mVibrator, times(1)).vibrate(any(), any(VibrationAttributes.class));
     }
 
     @Test
@@ -131,7 +129,7 @@ public class NotifierTest {
         mTestExecutor.simulateAsyncExecutionOfLastCommand();
 
         // THEN the device doesn't vibrate
-        verifyZeroInteractions(mVibrator);
+        verify(mVibrator, never()).vibrate(any(), any(VibrationAttributes.class));
     }
 
     @Test
@@ -147,15 +145,14 @@ public class NotifierTest {
         mTestExecutor.simulateAsyncExecutionOfLastCommand();
 
         // THEN the device vibrates once
-        verify(mVibrator, times(1)).vibrate(anyInt(), any(), any(), any(),
-                any(VibrationAttributes.class));
+        verify(mVibrator, times(1)).vibrate(any(), any(VibrationAttributes.class));
     }
 
     @Test
     public void testVibrateDisabled_wirelessCharging() {
         createNotifier();
 
-        // GIVEN the charging vibration is disabled
+        // GIVEN the charging vibration is disabeld
         enableChargingVibration(false);
 
         // WHEN wireless charging starts
@@ -164,7 +161,7 @@ public class NotifierTest {
         mTestExecutor.simulateAsyncExecutionOfLastCommand();
 
         // THEN the device doesn't vibrate
-        verifyZeroInteractions(mVibrator);
+        verify(mVibrator, never()).vibrate(any(), any(VibrationAttributes.class));
     }
 
     @Test

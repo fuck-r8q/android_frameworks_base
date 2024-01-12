@@ -275,12 +275,7 @@ public class NotificationLockscreenUserManagerImpl implements
 
                     updateLockscreenNotificationSetting();
                     updatePublicMode();
-                    if (mPresenter != null) {
-                        mPresenter.onUserSwitched(mCurrentUserId);
-                    } else {
-                        Log.w(TAG, "user switch before setup with presenter",
-                                new Exception());
-                    }
+                    mPresenter.onUserSwitched(mCurrentUserId);
 
                     for (UserChangedListener listener : mListeners) {
                         listener.onUserChanged(mCurrentUserId);

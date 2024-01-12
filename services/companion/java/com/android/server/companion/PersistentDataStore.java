@@ -28,7 +28,6 @@ import static com.android.internal.util.XmlUtils.writeStringAttribute;
 import static com.android.server.companion.CompanionDeviceManagerService.getFirstAssociationIdForUser;
 import static com.android.server.companion.CompanionDeviceManagerService.getLastAssociationIdForUser;
 import static com.android.server.companion.DataStoreUtils.createStorageFileForUser;
-import static com.android.server.companion.DataStoreUtils.fileToByteArray;
 import static com.android.server.companion.DataStoreUtils.isEndOfTag;
 import static com.android.server.companion.DataStoreUtils.isStartOfTag;
 import static com.android.server.companion.DataStoreUtils.writeToFileSafely;
@@ -56,11 +55,9 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -331,40 +328,32 @@ final class PersistentDataStore {
             @NonNull String rootTag, @Nullable Collection<AssociationInfo> associationsOut,
             @NonNull Map<String, Set<Integer>> previouslyUsedIdsPerPackageOut) {
         try (FileInputStream in = file.openRead()) {
-            return readStateFromInputStream(userId, in, rootTag, associationsOut,
-                    previouslyUsedIdsPerPackageOut);
+            final TypedXmlPullParser parser = Xml.resolvePullParser(in);
+
+            XmlUtils.beginDocument(parser, rootTag);
+            final int version = readIntAttribute(parser, XML_ATTR_PERSISTENCE_VERSION, 0);
+            switch (version) {
+                case 0:
+                    readAssociationsV0(parser, userId, associationsOut);
+                    break;
+                case 1:
+                    while (true) {
+                        parser.nextTag();
+                        if (isStartOfTag(parser, XML_TAG_ASSOCIATIONS)) {
+                            readAssociationsV1(parser, userId, associationsOut);
+                        } else if (isStartOfTag(parser, XML_TAG_PREVIOUSLY_USED_IDS)) {
+                            readPreviouslyUsedIdsV1(parser, previouslyUsedIdsPerPackageOut);
+                        } else if (isEndOfTag(parser, rootTag)) {
+                            break;
+                        }
+                    }
+                    break;
+            }
+            return version;
         } catch (XmlPullParserException | IOException e) {
             Slog.e(TAG, "Error while reading associations file", e);
             return -1;
         }
-    }
-
-    private int readStateFromInputStream(@UserIdInt int userId, @NonNull InputStream in,
-            @NonNull String rootTag, @Nullable Collection<AssociationInfo> associationsOut,
-            @NonNull Map<String, Set<Integer>> previouslyUsedIdsPerPackageOut)
-            throws XmlPullParserException, IOException {
-        final TypedXmlPullParser parser = Xml.resolvePullParser(in);
-
-        XmlUtils.beginDocument(parser, rootTag);
-        final int version = readIntAttribute(parser, XML_ATTR_PERSISTENCE_VERSION, 0);
-        switch (version) {
-            case 0:
-                readAssociationsV0(parser, userId, associationsOut);
-                break;
-            case 1:
-                while (true) {
-                    parser.nextTag();
-                    if (isStartOfTag(parser, XML_TAG_ASSOCIATIONS)) {
-                        readAssociationsV1(parser, userId, associationsOut);
-                    } else if (isStartOfTag(parser, XML_TAG_PREVIOUSLY_USED_IDS)) {
-                        readPreviouslyUsedIdsV1(parser, previouslyUsedIdsPerPackageOut);
-                    } else if (isEndOfTag(parser, rootTag)) {
-                        break;
-                    }
-                }
-                break;
-        }
-        return version;
     }
 
     private void persistStateToFileLocked(@NonNull AtomicFile file,
@@ -400,26 +389,6 @@ final class PersistentDataStore {
     private @NonNull AtomicFile getStorageFileForUser(@UserIdInt int userId) {
         return mUserIdToStorageFile.computeIfAbsent(userId,
                 u -> createStorageFileForUser(userId, FILE_NAME));
-    }
-
-    byte[] getBackupPayload(@UserIdInt int userId) {
-        Slog.i(TAG, "Fetching stored state data for user " + userId + " from disk");
-        final AtomicFile file = getStorageFileForUser(userId);
-
-        synchronized (file) {
-            return fileToByteArray(file);
-        }
-    }
-
-    void readStateFromPayload(byte[] payload, @UserIdInt int userId,
-                              @NonNull Set<AssociationInfo> associationsOut,
-                              @NonNull Map<String, Set<Integer>> previouslyUsedIdsPerPackageOut) {
-        try (ByteArrayInputStream in = new ByteArrayInputStream(payload)) {
-            readStateFromInputStream(userId, in, XML_TAG_STATE, associationsOut,
-                    previouslyUsedIdsPerPackageOut);
-        } catch (XmlPullParserException | IOException e) {
-            Slog.e(TAG, "Error while reading associations file", e);
-        }
     }
 
     private static @NonNull File getBaseLegacyStorageFileForUser(@UserIdInt int userId) {

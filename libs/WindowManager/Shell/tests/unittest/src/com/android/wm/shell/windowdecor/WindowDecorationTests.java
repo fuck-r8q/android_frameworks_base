@@ -772,13 +772,15 @@ public class WindowDecorationTests extends ShellTestCase {
 
         private WindowDecoration.AdditionalWindow addTestWindow() {
             final Resources resources = mDecorWindowContext.getResources();
+            int x = mRelayoutParams.mCaptionX;
+            int y = mRelayoutParams.mCaptionY;
             int width = loadDimensionPixelSize(resources, mCaptionMenuWidthId);
             int height = loadDimensionPixelSize(resources, mRelayoutParams.mCaptionHeightId);
             String name = "Test Window";
             WindowDecoration.AdditionalWindow additionalWindow =
                     addWindow(R.layout.desktop_mode_window_decor_handle_menu, name,
-                            mMockSurfaceControlAddWindowT, mMockSurfaceSyncGroup, 0 /* x */,
-                            0 /* y */, width, height);
+                            mMockSurfaceControlAddWindowT, mMockSurfaceSyncGroup, x, y,
+                            width, height);
             return additionalWindow;
         }
     }
