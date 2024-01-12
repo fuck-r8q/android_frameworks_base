@@ -234,21 +234,19 @@ public class LoudnessCodecConfigurator {
      * @param mediaCodec the codec to start receiving asynchronous loudness
      *                   updates. The codec has to be in a configured or started
      *                   state in order to add it for loudness updates.
-     * @throws IllegalArgumentException if the same {@code mediaCodec} was already
-     *                                  added before.
-     * @return {@code false} if the {@code mediaCodec} was not configured or does
-     *         not contain loudness metadata, {@code true} otherwise.
+     * @throws IllegalArgumentException if the {@code mediaCodec} was not configured,
+     *                                  does not contain loudness metadata or if it
+     *                                  was already added before
      */
     @FlaggedApi(FLAG_LOUDNESS_CONFIGURATOR_API)
-    public boolean addMediaCodec(@NonNull MediaCodec mediaCodec) {
+    public void addMediaCodec(@NonNull MediaCodec mediaCodec) {
         final MediaCodec mc = Objects.requireNonNull(mediaCodec,
                 "MediaCodec for addMediaCodec cannot be null");
         int piid = PLAYER_PIID_INVALID;
         final LoudnessCodecInfo mcInfo = getCodecInfo(mc);
 
         if (mcInfo == null) {
-            Log.v(TAG, "Could not extract codec loudness information");
-            return false;
+            throw new IllegalArgumentException("Could not extract codec loudness information");
         }
         synchronized (mConfiguratorLock) {
             final AtomicBoolean containsCodec = new AtomicBoolean(false);
@@ -273,8 +271,6 @@ public class LoudnessCodecConfigurator {
         if (piid != PLAYER_PIID_INVALID) {
             mLcDispatcher.addLoudnessCodecInfo(piid, mediaCodec.hashCode(), mcInfo);
         }
-
-        return true;
     }
 
     /**

@@ -26,7 +26,6 @@ import androidx.wear.compose.foundation.rememberSwipeToDismissBoxState
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavHostState
 import com.android.credentialmanager.CredentialSelectorUiState
-import com.android.credentialmanager.CredentialSelectorUiState.Get.SingleEntry
 import com.android.credentialmanager.CredentialSelectorViewModel
 import com.android.credentialmanager.ui.screens.LoadingScreen
 import com.android.credentialmanager.ui.screens.single.password.SinglePasswordScreen
@@ -58,7 +57,6 @@ fun WearApp(
 
         scrollable(Screen.SinglePasswordScreen.route) {
             SinglePasswordScreen(
-                state = viewModel.uiState.value as SingleEntry,
                 columnState = it.columnState,
                 onCloseApp = onCloseApp,
             )
@@ -102,7 +100,7 @@ private fun handleGetNavigation(
     onCloseApp: () -> Unit,
 ) {
     when (state) {
-        is SingleEntry -> {
+        is CredentialSelectorUiState.Get.SingleProviderSinglePassword -> {
             navController.navigateToSinglePasswordScreen()
         }
 

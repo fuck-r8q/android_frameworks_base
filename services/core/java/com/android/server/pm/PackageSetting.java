@@ -825,7 +825,7 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
         return changed;
     }
 
-    boolean isInstalledOnAnyOtherUser(int[] allUsers, int currentUser) {
+    boolean isInstalledOrHasDataOnAnyOtherUser(int[] allUsers, int currentUser) {
         for (int user: allUsers) {
             if (user == currentUser) {
                 continue;
@@ -834,16 +834,6 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
             if (userState.isInstalled()) {
                 return true;
             }
-        }
-        return false;
-    }
-
-    boolean hasDataOnAnyOtherUser(int[] allUsers, int currentUser) {
-        for (int user: allUsers) {
-            if (user == currentUser) {
-                continue;
-            }
-            final PackageUserStateInternal userState = readUserState(user);
             if (userState.dataExists()) {
                 return true;
             }

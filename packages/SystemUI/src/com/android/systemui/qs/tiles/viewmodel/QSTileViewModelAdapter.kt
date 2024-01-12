@@ -37,7 +37,6 @@ import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectIndexed
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -61,34 +60,27 @@ constructor(
     private val listeningClients: MutableCollection<Any> = mutableSetOf()
 
     // Cancels the jobs when the adapter is no longer alive
-    private var tileAdapterJob: Job? = null
+    private var availabilityJob: Job? = null
     // Cancels the jobs when clients stop listening
     private var stateJob: Job? = null
 
     init {
-        tileAdapterJob =
+        availabilityJob =
             applicationScope.launch {
-                launch {
-                    qsTileViewModel.isAvailable.collectIndexed { index, isAvailable ->
-                        if (!isAvailable) {
-                            qsHost.removeTile(tileSpec)
-                        }
-                        // qsTileViewModel.isAvailable flow often starts with isAvailable == true.
-                        // That's
-                        // why we only allow isAvailable == true once and throw an exception
-                        // afterwards.
-                        if (index > 0 && isAvailable) {
-                            // See com.android.systemui.qs.pipeline.domain.model.AutoAddable for
-                            // additional
-                            // guidance on how to auto add your tile
-                            throw UnsupportedOperationException(
-                                "Turning on tile is not supported now"
-                            )
-                        }
+                qsTileViewModel.isAvailable.collectIndexed { index, isAvailable ->
+                    if (!isAvailable) {
+                        qsHost.removeTile(tileSpec)
+                    }
+                    // qsTileViewModel.isAvailable flow often starts with isAvailable == true.
+                    // That's
+                    // why we only allow isAvailable == true once and throw an exception afterwards.
+                    if (index > 0 && isAvailable) {
+                        // See com.android.systemui.qs.pipeline.domain.model.AutoAddable for
+                        // additional
+                        // guidance on how to auto add your tile
+                        throw UnsupportedOperationException("Turning on tile is not supported now")
                     }
                 }
-                // Warm up tile with some initial state
-                launch { qsTileViewModel.state.first() }
             }
 
         // QSTileHost doesn't call this when userId is initialized
@@ -193,7 +185,7 @@ constructor(
 
     override fun destroy() {
         stateJob?.cancel()
-        tileAdapterJob?.cancel()
+        availabilityJob?.cancel()
         qsTileViewModel.destroy()
     }
 
@@ -230,9 +222,8 @@ constructor(
             QSTile.BooleanState().apply {
                 spec = config.tileSpec.spec
                 label = viewModelState.label
-                // This value is synthetic and doesn't have any meaning. It's only needed to satisfy
-                // CTS tests.
-                value = viewModelState.activationState == QSTileState.ActivationState.ACTIVE
+                // This value is synthetic and doesn't have any meaning
+                value = false
 
                 secondaryLabel = viewModelState.secondaryLabel
                 handlesLongClick =
@@ -242,7 +233,6 @@ constructor(
                     when (val stateIcon = viewModelState.icon()) {
                         is Icon.Loaded -> DrawableIcon(stateIcon.drawable)
                         is Icon.Resource -> ResourceIcon.get(stateIcon.res)
-                        null -> null
                     }
                 }
                 state = viewModelState.activationState.legacyState

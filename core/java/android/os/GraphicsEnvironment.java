@@ -673,7 +673,6 @@ public class GraphicsEnvironment {
         if (anglePkg.isEmpty()) {
             return;
         }
-        intent.setPackage(anglePkg);
 
         context.sendOrderedBroadcast(intent, null, new BroadcastReceiver() {
             @Override

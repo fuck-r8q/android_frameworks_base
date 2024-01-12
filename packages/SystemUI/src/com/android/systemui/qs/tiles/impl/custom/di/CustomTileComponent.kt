@@ -16,10 +16,7 @@
 
 package com.android.systemui.qs.tiles.impl.custom.di
 
-import com.android.systemui.qs.tiles.impl.custom.data.repository.CustomTilePackageUpdatesRepository
 import com.android.systemui.qs.tiles.impl.custom.domain.entity.CustomTileDataModel
-import com.android.systemui.qs.tiles.impl.custom.domain.interactor.CustomTileInteractor
-import com.android.systemui.qs.tiles.impl.custom.domain.interactor.CustomTileServiceInteractor
 import com.android.systemui.qs.tiles.impl.di.QSTileComponent
 import com.android.systemui.qs.tiles.impl.di.QSTileScope
 import dagger.Subcomponent
@@ -27,12 +24,6 @@ import dagger.Subcomponent
 @QSTileScope
 @Subcomponent(modules = [QSTileConfigModule::class, CustomTileModule::class])
 interface CustomTileComponent : QSTileComponent<CustomTileDataModel> {
-
-    fun customTileInterfaceInteractor(): CustomTileServiceInteractor
-
-    fun customTileInteractor(): CustomTileInteractor
-
-    fun customTilePackageUpdatesRepository(): CustomTilePackageUpdatesRepository
 
     @Subcomponent.Builder
     interface Builder {

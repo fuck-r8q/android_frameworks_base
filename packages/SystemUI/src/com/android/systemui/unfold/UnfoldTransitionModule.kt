@@ -27,8 +27,6 @@ import com.android.systemui.keyguard.LifecycleScreenStatusProvider
 import com.android.systemui.unfold.config.UnfoldTransitionConfig
 import com.android.systemui.unfold.dagger.UnfoldBgProgressFlag
 import com.android.systemui.unfold.dagger.UnfoldMain
-import com.android.systemui.unfold.data.repository.FoldStateRepository
-import com.android.systemui.unfold.data.repository.FoldStateRepositoryImpl
 import com.android.systemui.unfold.data.repository.UnfoldTransitionRepository
 import com.android.systemui.unfold.data.repository.UnfoldTransitionRepositoryImpl
 import com.android.systemui.unfold.domain.interactor.UnfoldTransitionInteractor
@@ -170,11 +168,6 @@ class UnfoldTransitionModule {
     @Provides
     fun screenStatusProvider(impl: LifecycleScreenStatusProvider): ScreenStatusProvider = impl
 
-    @Provides
-    @Singleton
-    fun provideDisplaySwitchLatencyLogger(): DisplaySwitchLatencyLogger =
-        DisplaySwitchLatencyLogger()
-
     @Module
     interface Bindings {
         @Binds
@@ -185,8 +178,6 @@ class UnfoldTransitionModule {
         @Binds fun bindRepository(impl: UnfoldTransitionRepositoryImpl): UnfoldTransitionRepository
 
         @Binds fun bindInteractor(impl: UnfoldTransitionInteractorImpl): UnfoldTransitionInteractor
-
-        @Binds fun bindFoldStateRepository(impl: FoldStateRepositoryImpl): FoldStateRepository
     }
 }
 

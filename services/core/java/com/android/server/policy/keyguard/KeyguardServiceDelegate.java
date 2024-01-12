@@ -410,15 +410,6 @@ public class KeyguardServiceDelegate {
         }
     }
 
-    /**
-     * Request to show the keyguard immediately without immediately locking the device.
-     */
-    public void showDismissibleKeyguard() {
-        if (mKeyguardService != null) {
-            mKeyguardService.showDismissibleKeyguard();
-        }
-    }
-
     public void setCurrentUser(int newUserId) {
         if (mKeyguardService != null) {
             mKeyguardService.setCurrentUser(newUserId);

@@ -317,7 +317,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         relayoutParams.mLayoutResId =
             getDesktopModeWindowDecorLayoutId(taskInfo.getWindowingMode());
         relayoutParams.mCaptionHeightId = getCaptionHeightIdStatic(taskInfo.getWindowingMode());
-        relayoutParams.mCaptionWidthId = getCaptionWidthId(relayoutParams.mLayoutResId);
         if (DesktopModeStatus.useWindowShadow(/* isFocusedWindow= */ taskInfo.isFocused)) {
             relayoutParams.mShadowRadiusId = taskInfo.isFocused
                     ? R.dimen.freeform_decor_shadow_focused_thickness
@@ -344,17 +343,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             relayoutParams.mCornerRadius =
                     (int) ScreenDecorationsUtils.getWindowCornerRadius(context);
         }
-    }
-
-    /**
-     * If task has focused window decor, return the caption id of the fullscreen caption size
-     * resource. Otherwise, return ID_NULL and caption width be set to task width.
-     */
-    private static int getCaptionWidthId(int layoutResId) {
-        if (layoutResId == R.layout.desktop_mode_focused_window_decor) {
-            return R.dimen.desktop_mode_fullscreen_decor_caption_width;
-        }
-        return Resources.ID_NULL;
     }
 
 
@@ -570,6 +558,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 .setOnClickListener(mOnCaptionButtonClickListener)
                 .setOnTouchListener(mOnCaptionTouchListener)
                 .setLayoutId(mRelayoutParams.mLayoutResId)
+                .setCaptionPosition(mRelayoutParams.mCaptionX, mRelayoutParams.mCaptionY)
                 .setWindowingButtonsVisible(DesktopModeStatus.isEnabled())
                 .setCaptionHeight(mResult.mCaptionHeight)
                 .build();
@@ -646,25 +635,35 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mTaskOrganizer.getRunningTaskInfo(mTaskInfo.taskId);
         if (taskInfo == null) return result;
         final Point positionInParent = taskInfo.positionInParent;
+        result.offset(-mRelayoutParams.mCaptionX, -mRelayoutParams.mCaptionY);
         result.offset(-positionInParent.x, -positionInParent.y);
         return result;
     }
 
     /**
-     * Checks if motion event occurs in the caption handle area. This should be used in cases where
-     * onTouchListener will not work (i.e. when caption is in status bar area).
+     * Determine if a passed MotionEvent is in a view in caption
      *
      * @param ev       the {@link MotionEvent} to check
+     * @param layoutId the id of the view
      * @return {@code true} if event is inside the specified view, {@code false} if not
      */
-    boolean checkTouchEventInCaptionHandle(MotionEvent ev) {
-        if (isHandleMenuActive() || !(mWindowDecorViewHolder
-                instanceof DesktopModeFocusedWindowDecorationViewHolder)) {
-            return false;
-        }
+    private boolean checkEventInCaptionView(MotionEvent ev, int layoutId) {
+        if (mResult.mRootView == null) return false;
         final PointF inputPoint = offsetCaptionLocation(ev);
-        return ((DesktopModeFocusedWindowDecorationViewHolder) mWindowDecorViewHolder)
-                .pointInCaption(inputPoint, mResult.mCaptionX);
+        final View view = mResult.mRootView.findViewById(layoutId);
+        return view != null && pointInView(view, inputPoint.x, inputPoint.y);
+    }
+
+    boolean checkTouchEventInHandle(MotionEvent ev) {
+        if (isHandleMenuActive()) return false;
+        return checkEventInCaptionView(ev, R.id.caption_handle);
+    }
+
+    /**
+     * Returns true if motion event is within the caption's root view's bounds.
+     */
+    boolean checkTouchEventInCaption(MotionEvent ev) {
+        return checkEventInCaptionView(ev, getCaptionViewId());
     }
 
     /**
@@ -677,19 +676,24 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     void checkClickEvent(MotionEvent ev) {
         if (mResult.mRootView == null) return;
         if (!isHandleMenuActive()) {
-            // Click if point in caption handle view
             final View caption = mResult.mRootView.findViewById(R.id.desktop_mode_caption);
             final View handle = caption.findViewById(R.id.caption_handle);
-            if (checkTouchEventInCaptionHandle(ev)) {
-                mOnCaptionButtonClickListener.onClick(handle);
-            }
+            clickIfPointInView(new PointF(ev.getX(), ev.getY()), handle);
         } else {
             mHandleMenu.checkClickEvent(ev);
             closeHandleMenuIfNeeded(ev);
         }
     }
 
-    private boolean pointInView(View v, float x, float y) {
+    private boolean clickIfPointInView(PointF inputPoint, View v) {
+        if (pointInView(v, inputPoint.x, inputPoint.y)) {
+            mOnCaptionButtonClickListener.onClick(v);
+            return true;
+        }
+        return false;
+    }
+
+    boolean pointInView(View v, float x, float y) {
         return v != null && v.getLeft() <= x && v.getRight() >= x
                 && v.getTop() <= y && v.getBottom() >= y;
     }

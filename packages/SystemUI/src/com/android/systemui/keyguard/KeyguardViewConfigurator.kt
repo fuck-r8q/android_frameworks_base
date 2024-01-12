@@ -46,7 +46,6 @@ import com.android.systemui.keyguard.ui.viewmodel.KeyguardRootViewModel
 import com.android.systemui.keyguard.ui.viewmodel.OccludingAppDeviceEntryMessageViewModel
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
-import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.shade.NotificationShadeWindowView
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.statusbar.KeyguardIndicationController
@@ -112,9 +111,7 @@ constructor(
         bindKeyguardRootView()
         initializeViews()
 
-        if (!SceneContainerFlag.isEnabled) {
-            KeyguardBlueprintViewBinder.bind(keyguardRootView, keyguardBlueprintViewModel)
-        }
+        KeyguardBlueprintViewBinder.bind(keyguardRootView, keyguardBlueprintViewModel)
         keyguardBlueprintCommandListener.start()
     }
 
@@ -147,10 +144,6 @@ constructor(
     }
 
     private fun bindKeyguardRootView() {
-        if (SceneContainerFlag.isEnabled) {
-            return
-        }
-
         rootViewHandle?.dispose()
         rootViewHandle =
             KeyguardRootViewBinder.bind(

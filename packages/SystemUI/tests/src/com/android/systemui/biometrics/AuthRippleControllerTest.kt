@@ -123,6 +123,7 @@ class AuthRippleControllerTest : SysuiTestCase() {
             udfpsControllerProvider,
             statusBarStateController,
             displayMetrics,
+            featureFlags,
             KeyguardLogger(logcatLogBuffer(AuthRippleController.TAG)),
             biometricUnlockController,
             lightRevealScrim,

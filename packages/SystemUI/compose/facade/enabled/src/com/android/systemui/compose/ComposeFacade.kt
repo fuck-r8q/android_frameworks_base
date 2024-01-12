@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.LifecycleOwner
 import com.android.compose.theme.PlatformTheme
-import com.android.compose.ui.platform.DensityAwareComposeView
 import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
 import com.android.systemui.common.ui.compose.windowinsets.DisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.DisplayCutoutProvider
@@ -85,7 +84,7 @@ object ComposeFacade : BaseComposeFacade {
         viewModel: FooterActionsViewModel,
         qsVisibilityLifecycleOwner: LifecycleOwner,
     ): View {
-        return DensityAwareComposeView(context).apply {
+        return ComposeView(context).apply {
             setContent { PlatformTheme { FooterActions(viewModel, qsVisibilityLifecycleOwner) } }
         }
     }

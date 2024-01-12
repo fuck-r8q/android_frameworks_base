@@ -38,7 +38,6 @@ import com.android.systemui.keyguard.ui.viewmodel.LockscreenContentViewModel
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.IntoSet
-import java.util.Optional
 import javax.inject.Inject
 
 /**
@@ -54,7 +53,7 @@ constructor(
     private val smartSpaceSection: SmartSpaceSection,
     private val notificationSection: NotificationSection,
     private val lockSection: LockSection,
-    private val ambientIndicationSectionOptional: Optional<AmbientIndicationSection>,
+    private val ambientIndicationSection: AmbientIndicationSection,
     private val bottomAreaSection: BottomAreaSection,
     private val settingsMenuSection: SettingsMenuSection,
     private val clockInteractor: KeyguardClockInteractor,
@@ -95,8 +94,8 @@ constructor(
                         with(notificationSection) {
                             Notifications(modifier = Modifier.fillMaxWidth().weight(1f))
                         }
-                        if (!isUdfpsVisible && ambientIndicationSectionOptional.isPresent) {
-                            with(ambientIndicationSectionOptional.get()) {
+                        if (!isUdfpsVisible) {
+                            with(ambientIndicationSection) {
                                 AmbientIndication(modifier = Modifier.fillMaxWidth())
                             }
                         }
@@ -112,8 +111,8 @@ constructor(
 
                     // Aligned to bottom and constrained to below the lock icon.
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        if (isUdfpsVisible && ambientIndicationSectionOptional.isPresent) {
-                            with(ambientIndicationSectionOptional.get()) {
+                        if (isUdfpsVisible) {
+                            with(ambientIndicationSection) {
                                 AmbientIndication(modifier = Modifier.fillMaxWidth())
                             }
                         }

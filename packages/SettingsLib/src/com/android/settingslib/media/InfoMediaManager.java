@@ -384,7 +384,7 @@ public abstract class InfoMediaManager extends MediaManager {
         for (MediaRoute2Info route : getSelectableRoutes(info)) {
             deviceList.add(
                     new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+                            mContext, route, mPackageName, mPreferenceItemMap.get(route.getId())));
         }
         return deviceList;
     }
@@ -411,7 +411,7 @@ public abstract class InfoMediaManager extends MediaManager {
         for (MediaRoute2Info route : getDeselectableRoutes(info)) {
             deviceList.add(
                     new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+                            mContext, route, mPackageName, mPreferenceItemMap.get(route.getId())));
             Log.d(TAG, route.getName() + " is deselectable for " + mPackageName);
         }
         return deviceList;
@@ -435,7 +435,7 @@ public abstract class InfoMediaManager extends MediaManager {
         for (MediaRoute2Info route : getSelectedRoutes(info)) {
             deviceList.add(
                     new InfoMediaDevice(
-                            mContext, route, mPreferenceItemMap.get(route.getId())));
+                            mContext, route, mPackageName, mPreferenceItemMap.get(route.getId())));
         }
         return deviceList;
     }
@@ -634,6 +634,7 @@ public abstract class InfoMediaManager extends MediaManager {
                         new InfoMediaDevice(
                                 mContext,
                                 route,
+                                mPackageName,
                                 mPreferenceItemMap.get(route.getId()));
                 break;
             case TYPE_BUILTIN_SPEAKER:
@@ -650,6 +651,7 @@ public abstract class InfoMediaManager extends MediaManager {
                         new PhoneMediaDevice(
                                 mContext,
                                 route,
+                                mPackageName,
                                 mPreferenceItemMap.getOrDefault(route.getId(), null));
                 break;
             case TYPE_HEARING_AID:
@@ -665,6 +667,7 @@ public abstract class InfoMediaManager extends MediaManager {
                                     mContext,
                                     cachedDevice,
                                     route,
+                                    mPackageName,
                                     mPreferenceItemMap.getOrDefault(route.getId(), null));
                 }
                 break;
@@ -673,6 +676,7 @@ public abstract class InfoMediaManager extends MediaManager {
                         new ComplexMediaDevice(
                                 mContext,
                                 route,
+                                mPackageName,
                                 mPreferenceItemMap.get(route.getId()));
                 break;
             default:

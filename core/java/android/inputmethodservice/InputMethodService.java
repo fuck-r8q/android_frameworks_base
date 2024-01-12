@@ -127,7 +127,6 @@ import android.view.inputmethod.CursorAnchorInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
-import android.view.inputmethod.Flags;
 import android.view.inputmethod.ImeTracker;
 import android.view.inputmethod.InlineSuggestionsRequest;
 import android.view.inputmethod.InlineSuggestionsResponse;
@@ -389,9 +388,6 @@ public class InputMethodService extends AbstractInputMethodService {
     private long mStylusHwSessionsTimeout = STYLUS_HANDWRITING_IDLE_TIMEOUT_MS;
     private Runnable mStylusWindowIdleTimeoutRunnable;
     private long mStylusWindowIdleTimeoutForTest;
-    /** Tracks last {@link MotionEvent#getToolType(int)} used for {@link MotionEvent#ACTION_DOWN}.
-     **/
-    private int mLastUsedToolType;
 
     /**
      * Returns whether {@link InputMethodService} is responsible for rendering the back button and
@@ -1009,7 +1005,7 @@ public class InputMethodService extends AbstractInputMethodService {
          */
         @Override
         public void updateEditorToolType(@ToolType int toolType) {
-            updateEditorToolTypeInternal(toolType);
+            onUpdateEditorToolType(toolType);
         }
 
         /**
@@ -1251,14 +1247,6 @@ public class InputMethodService extends AbstractInputMethodService {
                 rootView.getWidth(),
                 rootView.getHeight()));
         rootView.setSystemGestureExclusionRects(exclusionRects);
-    }
-
-    private void updateEditorToolTypeInternal(int toolType) {
-        if (Flags.useHandwritingListenerForTooltype()) {
-            mLastUsedToolType = toolType;
-            mInputEditorInfo.setInitialToolType(toolType);
-        }
-        onUpdateEditorToolType(toolType);
     }
 
     /**
@@ -3122,9 +3110,6 @@ public class InputMethodService extends AbstractInputMethodService {
                 null /* icProto */);
         mInputStarted = true;
         mStartedInputConnection = ic;
-        if (Flags.useHandwritingListenerForTooltype()) {
-            editorInfo.setInitialToolType(mLastUsedToolType);
-        }
         mInputEditorInfo = editorInfo;
         initialize();
         mInlineSuggestionSessionController.notifyOnStartInput(
@@ -3369,10 +3354,6 @@ public class InputMethodService extends AbstractInputMethodService {
      *         had not seen the event at all.
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (Flags.useHandwritingListenerForTooltype()) {
-            // any KeyEvent keyDown should reset last toolType.
-            updateEditorToolTypeInternal(MotionEvent.TOOL_TYPE_UNKNOWN);
-        }
         if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
             final ExtractEditText eet = getExtractEditTextIfVisible();
             if (eet != null && eet.handleBackInTextActionModeIfNeeded(event)) {

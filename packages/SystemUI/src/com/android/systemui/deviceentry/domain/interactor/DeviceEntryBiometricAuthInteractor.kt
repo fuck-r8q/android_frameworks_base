@@ -18,14 +18,13 @@ package com.android.systemui.deviceentry.domain.interactor
 
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.deviceentry.shared.DeviceEntryBiometricMode
-import com.android.systemui.deviceentry.shared.model.FailedFaceAuthenticationStatus
 import com.android.systemui.keyguard.data.repository.BiometricSettingsRepository
+import com.android.systemui.keyguard.shared.model.FailedFaceAuthenticationStatus
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 
@@ -63,9 +62,7 @@ constructor(
     val faceOnlyFaceFailure: Flow<FailedFaceAuthenticationStatus> =
         faceOnly.flatMapLatest { faceOnly ->
             if (faceOnly) {
-                deviceEntryFaceAuthInteractor.authenticationStatus.filterIsInstance<
-                    FailedFaceAuthenticationStatus
-                >()
+                deviceEntryFaceAuthInteractor.faceFailure
             } else {
                 emptyFlow()
             }

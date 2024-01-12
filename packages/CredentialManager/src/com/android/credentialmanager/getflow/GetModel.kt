@@ -26,12 +26,10 @@ import com.android.credentialmanager.model.get.RemoteEntryInfo
 import com.android.internal.util.Preconditions
 
 data class GetCredentialUiState(
-        val isRequestForAllOptions: Boolean,
     val providerInfoList: List<ProviderInfo>,
     val requestDisplayInfo: RequestDisplayInfo,
     val providerDisplayInfo: ProviderDisplayInfo = toProviderDisplayInfo(providerInfoList),
-    val currentScreenState: GetScreenState = toGetScreenState(
-            providerDisplayInfo, isRequestForAllOptions),
+    val currentScreenState: GetScreenState = toGetScreenState(providerDisplayInfo),
     val activeEntry: EntryInfo? = toActiveEntry(providerDisplayInfo),
     val isNoAccount: Boolean = false,
 )
@@ -186,8 +184,7 @@ private fun toActiveEntry(
 }
 
 private fun toGetScreenState(
-    providerDisplayInfo: ProviderDisplayInfo,
-    isRequestForAllOptions: Boolean
+    providerDisplayInfo: ProviderDisplayInfo
 ): GetScreenState {
     return if (providerDisplayInfo.sortedUserNameToCredentialEntryList.isEmpty() &&
         providerDisplayInfo.remoteEntry == null &&
@@ -197,8 +194,6 @@ private fun toGetScreenState(
         providerDisplayInfo.authenticationEntryList.isEmpty() &&
         providerDisplayInfo.remoteEntry != null)
         GetScreenState.REMOTE_ONLY
-    else if (isRequestForAllOptions)
-        GetScreenState.ALL_SIGN_IN_OPTIONS
     else GetScreenState.PRIMARY_SELECTION
 }
 

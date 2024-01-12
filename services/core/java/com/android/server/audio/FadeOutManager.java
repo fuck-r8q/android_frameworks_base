@@ -29,7 +29,6 @@ import android.util.Slog;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
-import com.android.server.utils.EventLogger;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -346,8 +345,7 @@ public final class FadeOutManager {
             }
             if (apc.getPlayerProxy() != null) {
                 applyVolumeShaperInternal(apc, piid, volShaper,
-                        skipRamp ? PLAY_SKIP_RAMP : PLAY_CREATE_IF_NEEDED, skipRamp,
-                        PlaybackActivityMonitor.EVENT_TYPE_FADE_OUT);
+                        skipRamp ? PLAY_SKIP_RAMP : PLAY_CREATE_IF_NEEDED);
                 mFadedPlayers.put(piid, volShaper);
             } else {
                 if (DEBUG) {
@@ -363,8 +361,7 @@ public final class FadeOutManager {
                 final AudioPlaybackConfiguration apc = players.get(piid);
                 if ((apc != null) && (apc.getPlayerProxy() != null)) {
                     applyVolumeShaperInternal(apc, piid, /* volShaperConfig= */ null,
-                            VolumeShaper.Operation.REVERSE, /* skipRamp= */ false,
-                            PlaybackActivityMonitor.EVENT_TYPE_FADE_IN);
+                            VolumeShaper.Operation.REVERSE);
                 } else {
                     // this piid was in the list of faded players, but wasn't found
                     if (DEBUG) {
@@ -376,7 +373,6 @@ public final class FadeOutManager {
             mFadedPlayers.clear();
         }
 
-        @GuardedBy("mLock")
         void fadeInPlayer(@NonNull AudioPlaybackConfiguration apc,
                 @Nullable VolumeShaper.Configuration config) {
             int piid = Integer.valueOf(apc.getPlayerInterfaceId());
@@ -389,17 +385,10 @@ public final class FadeOutManager {
                 return;
             }
 
-            VolumeShaper.Operation operation = VolumeShaper.Operation.REVERSE;
-            if (config != null) {
-                // replace and join the volumeshapers with (possibly) in progress fade out operation
-                // for a smoother fade in
-                operation = new VolumeShaper.Operation.Builder()
-                        .replace(mFadedPlayers.get(piid).getId(), /* join= */ true).build();
-            }
             mFadedPlayers.remove(piid);
             if (apc.getPlayerProxy() != null) {
-                applyVolumeShaperInternal(apc, piid, config, operation, /* skipRamp= */ false,
-                        PlaybackActivityMonitor.EVENT_TYPE_FADE_IN);
+                applyVolumeShaperInternal(apc, piid, config,
+                        config != null ? PLAY_CREATE_IF_NEEDED : VolumeShaper.Operation.REVERSE);
             } else {
                 if (DEBUG) {
                     Slog.v(TAG, "Error fading in player piid:" + piid
@@ -408,7 +397,6 @@ public final class FadeOutManager {
             }
         }
 
-        @GuardedBy("mLock")
         void clear() {
             if (mFadedPlayers.size() > 0) {
                 if (DEBUG) {
@@ -425,40 +413,21 @@ public final class FadeOutManager {
         }
 
         private void applyVolumeShaperInternal(AudioPlaybackConfiguration apc, int piid,
-                VolumeShaper.Configuration volShaperConfig, VolumeShaper.Operation operation,
-                boolean skipRamp, String eventType) {
+                VolumeShaper.Configuration volShaperConfig, VolumeShaper.Operation operation) {
             VolumeShaper.Configuration config = volShaperConfig;
             // when operation is reverse, use the fade out volume shaper config instead
             if (operation.equals(VolumeShaper.Operation.REVERSE)) {
                 config = mFadedPlayers.get(piid);
             }
             try {
-                logFadeEvent(apc, piid, volShaperConfig, operation, skipRamp, eventType);
+                PlaybackActivityMonitor.sEventLogger.enqueue(
+                        (new PlaybackActivityMonitor.FadeEvent(apc, config, operation))
+                                .printLog(TAG));
                 apc.getPlayerProxy().applyVolumeShaper(config, operation);
             } catch (Exception e) {
-                Slog.e(TAG, "Error " + eventType + " piid:" + piid + " uid:" + mUid, e);
+                Slog.e(TAG, "Error fading player piid:" + piid + " uid:" + mUid
+                        + " operation:" + operation, e);
             }
-        }
-
-        private void logFadeEvent(AudioPlaybackConfiguration apc, int piid,
-                VolumeShaper.Configuration config, VolumeShaper.Operation operation,
-                boolean skipRamp, String eventType) {
-            if (eventType.equals(PlaybackActivityMonitor.EVENT_TYPE_FADE_OUT)) {
-                PlaybackActivityMonitor.sEventLogger.enqueue(
-                        (new PlaybackActivityMonitor.FadeOutEvent(apc, skipRamp, config, operation))
-                                .printLog(TAG));
-                return;
-            }
-
-            if (eventType.equals(PlaybackActivityMonitor.EVENT_TYPE_FADE_IN)) {
-                PlaybackActivityMonitor.sEventLogger.enqueue(
-                        (new PlaybackActivityMonitor.FadeInEvent(apc, skipRamp, config, operation))
-                                .printLog(TAG));
-                return;
-            }
-
-            PlaybackActivityMonitor.sEventLogger.enqueue(
-                    (new EventLogger.StringEvent(eventType + " piid:" + piid)).printLog(TAG));
         }
     }
 }

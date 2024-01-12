@@ -1757,9 +1757,6 @@ public class SubscriptionManager {
      *
      * @param subId The unique SubscriptionInfo key in database.
      * @return SubscriptionInfo, maybe null if its not active.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
@@ -1793,8 +1790,6 @@ public class SubscriptionManager {
      * @param iccId the IccId of SIM card
      * @return SubscriptionInfo, maybe null if its not active
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
@@ -1831,9 +1826,6 @@ public class SubscriptionManager {
      *
      * @param slotIndex the slot which the subscription is inserted
      * @return SubscriptionInfo, maybe null if its not active
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
@@ -1878,8 +1870,6 @@ public class SubscriptionManager {
      * {@link SubscriptionInfo#getSubscriptionId()}.
      *
      * @throws SecurityException if callers do not hold the required permission.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @NonNull
     @RequiresPermission(anyOf = {
@@ -1939,9 +1929,6 @@ public class SubscriptionManager {
      * then by {@link SubscriptionInfo#getSubscriptionId}.
      * </li>
      * </ul>
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     // @RequiresPermission(TODO(b/308809058))
@@ -1985,8 +1972,6 @@ public class SubscriptionManager {
      * This is similar to {@link #getActiveSubscriptionInfoList} except that it will return
      * both active and hidden SubscriptionInfos.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     public @NonNull List<SubscriptionInfo> getCompleteActiveSubscriptionInfoList() {
         List<SubscriptionInfo> completeList = getActiveSubscriptionInfoList(
@@ -2071,9 +2056,6 @@ public class SubscriptionManager {
      * <p>
      * Permissions android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE is required
      * for #getAvailableSubscriptionInfoList to be invoked.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -2115,9 +2097,6 @@ public class SubscriptionManager {
      * if the list is non-empty the list is sorted by {@link SubscriptionInfo#getSimSlotIndex}
      * then by {@link SubscriptionInfo#getSubscriptionId}.
      * </ul>
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
      */
     public List<SubscriptionInfo> getAccessibleSubscriptionInfoList() {
         List<SubscriptionInfo> result = null;
@@ -2146,8 +2125,6 @@ public class SubscriptionManager {
      *
      * @see TelephonyManager#getCardIdForDefaultEuicc() for more information on the card ID.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
      * @hide
      */
     @SystemApi
@@ -2178,8 +2155,6 @@ public class SubscriptionManager {
      *
      * @see TelephonyManager#getCardIdForDefaultEuicc() for more information on the card ID.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
      * @hide
      */
     @SystemApi
@@ -2202,9 +2177,6 @@ public class SubscriptionManager {
      * @return The current number of active subscriptions.
      *
      * @see #getActiveSubscriptionInfoList()
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     // @RequiresPermission(TODO(b/308809058))
@@ -2275,9 +2247,6 @@ public class SubscriptionManager {
      * @param slotIndex the slot assigned to this subscription. It is ignored for subscriptionType
      *                  of {@link #SUBSCRIPTION_TYPE_REMOTE_SIM}.
      * @param subscriptionType the {@link #SUBSCRIPTION_TYPE}
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
@@ -2320,8 +2289,6 @@ public class SubscriptionManager {
      * @throws NullPointerException if {@code uniqueId} is {@code null}.
      * @throws SecurityException if callers do not hold the required permission.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
@@ -2468,7 +2435,6 @@ public class SubscriptionManager {
      * @deprecated Use {@link #getSubscriptionId(int)} instead.
      * @hide
      */
-    @Deprecated
     public static int[] getSubId(int slotIndex) {
         if (!isValidSlotIndex(slotIndex)) {
             return null;
@@ -2523,9 +2489,6 @@ public class SubscriptionManager {
      * On a data only device or on error, will return INVALID_SUBSCRIPTION_ID.
      *
      * @return the default voice subscription Id.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     public static int getDefaultVoiceSubscriptionId() {
         int subId = INVALID_SUBSCRIPTION_ID;
@@ -2553,9 +2516,6 @@ public class SubscriptionManager {
      *
      * @param subscriptionId A valid subscription ID to set as the system default, or
      *                       {@link SubscriptionManager#INVALID_SUBSCRIPTION_ID}
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -2575,9 +2535,6 @@ public class SubscriptionManager {
     /**
      * Same as {@link #setDefaultVoiceSubscriptionId(int)}, but preserved for backwards
      * compatibility.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     public void setDefaultVoiceSubId(int subId) {
@@ -2621,8 +2578,6 @@ public class SubscriptionManager {
      *
      * @param subscriptionId the supplied subscription ID
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -2657,8 +2612,6 @@ public class SubscriptionManager {
      *
      * @param subscriptionId the supplied subscription ID
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -2681,9 +2634,6 @@ public class SubscriptionManager {
      * Will return null on voice only devices, or on error.
      *
      * @return the SubscriptionInfo for the default data subscription.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @UnsupportedAppUsage
@@ -2770,9 +2720,6 @@ public class SubscriptionManager {
      *
      * @return the list of subId's that are active,
      *         is never null but the length may be 0.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -2791,9 +2738,6 @@ public class SubscriptionManager {
      *
      * @return the list of subId's that are active,
      *         is never null but the length may be 0.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -3043,9 +2987,6 @@ public class SubscriptionManager {
      * @param context Context object
      * @param subId Subscription Id of Subscription whose resources are required
      * @return Resources associated with Subscription.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @NonNull
@@ -3128,9 +3069,6 @@ public class SubscriptionManager {
      * @return {@code true} if the supplied subscription ID corresponds to an active subscription;
      * {@code false} if it does not correspond to an active subscription; or throw a
      * SecurityException if the caller hasn't got the right permission.
-     *i
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
     public boolean isActiveSubscriptionId(int subscriptionId) {
@@ -3439,8 +3377,6 @@ public class SubscriptionManager {
      *
      * @throws IllegalStateException when subscription manager service is not available.
      * @throws SecurityException when clients do not have MODIFY_PHONE_STATE permission.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -3518,9 +3454,6 @@ public class SubscriptionManager {
      * {@link TelephonyManager#hasCarrierPrivileges}).
      *
      * @return the list of opportunistic subscription info. If none exists, an empty list.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE)
@@ -3556,12 +3489,8 @@ public class SubscriptionManager {
      *  PendingIntent)} and does not support Multiple Enabled Profile(MEP). Apps should use
      *  {@link EuiccManager#switchToSubscription(int, PendingIntent)} or
      *  {@link EuiccManager#switchToSubscription(int, int, PendingIntent)} instead.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
      */
     @RequiresPermission(android.Manifest.permission.WRITE_EMBEDDED_SUBSCRIPTIONS)
-    @RequiresFeature(PackageManager.FEATURE_TELEPHONY_EUICC)
     @Deprecated
     public void switchToSubscription(int subId, @NonNull PendingIntent callbackIntent) {
         Preconditions.checkNotNull(callbackIntent, "callbackIntent cannot be null");
@@ -3589,9 +3518,6 @@ public class SubscriptionManager {
      * @param opportunistic whether it’s opportunistic subscription.
      * @param subId the unique SubscriptionInfo index in database
      * @return {@code true} if the operation is succeed, {@code false} otherwise.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -3628,8 +3554,6 @@ public class SubscriptionManager {
      *             outlined above.
      * @throws IllegalArgumentException if any of the subscriptions in the list doesn't exist.
      * @throws IllegalStateException if Telephony service is in bad state.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @param subIdList list of subId that will be in the same group
      * @return groupUUID a UUID assigned to the subscription group.
@@ -3674,8 +3598,6 @@ public class SubscriptionManager {
      *             outlined above.
      * @throws IllegalArgumentException if the some subscriptions in the list doesn't exist.
      * @throws IllegalStateException if Telephony service is in bad state.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @param subIdList list of subId that need adding into the group
      * @param groupUuid the groupUuid the subscriptions are being added to.
@@ -3725,8 +3647,6 @@ public class SubscriptionManager {
      * @throws IllegalArgumentException if the some subscriptions in the list doesn't belong the
      * specified group.
      * @throws IllegalStateException if Telephony service is in bad state.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @see #createSubscriptionGroup(List)
      */
@@ -3776,8 +3696,6 @@ public class SubscriptionManager {
      * @throws IllegalStateException if Telephony service is in bad state.
      * @throws SecurityException if the caller doesn't meet the requirements
      *             outlined above.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @param groupUuid of which list of subInfo will be returned.
      * @return list of subscriptionInfo that belong to the same group, including the given
@@ -3867,9 +3785,9 @@ public class SubscriptionManager {
             Map<ParcelUuid, SubscriptionInfo> groupMap = new HashMap<>();
 
             for (SubscriptionInfo info : availableList) {
-                // Grouped opportunistic subscriptions are considered invisible
+                // Opportunistic subscriptions are considered invisible
                 // to users so they should never be returned.
-                if (info.getGroupUuid() != null && info.isOpportunistic()) continue;
+                if (!isSubscriptionVisible(info)) continue;
 
                 ParcelUuid groupUuid = info.getGroupUuid();
                 if (groupUuid == null) {
@@ -3899,8 +3817,6 @@ public class SubscriptionManager {
      *
      * @return whether the operation is successful.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -3928,9 +3844,6 @@ public class SubscriptionManager {
      *
      * @param subscriptionId which subscription to operate on.
      * @param enabled whether uicc applications are enabled or disabled.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -3959,8 +3872,6 @@ public class SubscriptionManager {
      *
      * @return whether can disable subscriptions on physical SIMs.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -3986,8 +3897,6 @@ public class SubscriptionManager {
      *
      * @param subscriptionId The subscription id.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -4014,8 +3923,6 @@ public class SubscriptionManager {
      * @param sharing The status sharing preference.
      *
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void setDeviceToDeviceStatusSharingPreference(int subscriptionId,
@@ -4034,8 +3941,6 @@ public class SubscriptionManager {
      * @return The device to device status sharing preference
      *
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     public @DeviceToDeviceStatusSharingPreference int getDeviceToDeviceStatusSharingPreference(
             int subscriptionId) {
@@ -4055,8 +3960,6 @@ public class SubscriptionManager {
      * @param contacts The list of contacts that allow device to device status sharing.
      *
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void setDeviceToDeviceStatusSharingContacts(int subscriptionId,
@@ -4077,9 +3980,6 @@ public class SubscriptionManager {
      * @param subscriptionId Subscription id.
      *
      * @return The list of contacts that allow device to device status sharing.
-     *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     public @NonNull List<Uri> getDeviceToDeviceStatusSharingContacts(int subscriptionId) {
         String result = getStringSubscriptionProperty(mContext, subscriptionId,
@@ -4112,8 +4012,6 @@ public class SubscriptionManager {
      *
      * @throws IllegalArgumentException if the provided slot index is invalid.
      * @throws SecurityException if callers do not hold the required permission.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @hide
      */
@@ -4254,8 +4152,6 @@ public class SubscriptionManager {
      *
      * @param data with the sim specific configs to be backed up.
      *
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -4310,8 +4206,6 @@ public class SubscriptionManager {
      * @throws IllegalArgumentException if {@code source} is invalid.
      * @throws IllegalStateException if the telephony process is not currently available.
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @see #PHONE_NUMBER_SOURCE_UICC
      * @see #PHONE_NUMBER_SOURCE_CARRIER
@@ -4372,8 +4266,6 @@ public class SubscriptionManager {
      *
      * @throws IllegalStateException if the telephony process is not currently available.
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      *
      * @see #getPhoneNumber(int, int)
      */
@@ -4417,8 +4309,6 @@ public class SubscriptionManager {
      * @throws IllegalStateException if the telephony process is not currently available.
      * @throws NullPointerException if {@code number} is {@code null}.
      * @throws SecurityException if the caller doesn't have permissions required.
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission("carrier privileges")
     public void setCarrierPhoneNumber(int subscriptionId, @NonNull String number) {

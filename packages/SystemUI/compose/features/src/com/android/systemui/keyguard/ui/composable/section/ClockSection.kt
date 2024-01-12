@@ -16,57 +16,33 @@
 
 package com.android.systemui.keyguard.ui.composable.section
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.graphics.Color
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.SceneScope
-import com.android.compose.modifiers.padding
-import com.android.keyguard.KeyguardClockSwitch
-import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.ui.composable.modifier.onTopPlacementChanged
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
-import com.android.systemui.res.R
 import javax.inject.Inject
 
 class ClockSection
 @Inject
 constructor(
     private val viewModel: KeyguardClockViewModel,
-    private val clockInteractor: KeyguardClockInteractor,
 ) {
-
     @Composable
     fun SceneScope.SmallClock(
         onTopChanged: (top: Float?) -> Unit,
         modifier: Modifier = Modifier,
     ) {
-        val clockSize by viewModel.clockSize.collectAsState()
-        val currentClock by viewModel.currentClock.collectAsState()
-        viewModel.clock = currentClock
-
-        if (clockSize != KeyguardClockSwitch.SMALL) {
+        if (viewModel.useLargeClock) {
             onTopChanged(null)
             return
-        }
-
-        if (currentClock?.smallClock?.view == null) {
-            return
-        }
-
-        val view = LocalView.current
-
-        DisposableEffect(view) {
-            clockInteractor.clockEventController.registerListeners(view)
-
-            onDispose { clockInteractor.clockEventController.unregisterListeners() }
         }
 
         MovableElement(
@@ -74,40 +50,26 @@ constructor(
             modifier = modifier,
         ) {
             content {
-                AndroidView(
-                    factory = { checkNotNull(currentClock).smallClock.view },
+                Box(
                     modifier =
-                        Modifier.padding(
-                                horizontal =
-                                    dimensionResource(R.dimen.keyguard_affordance_horizontal_offset)
-                            )
-                            .padding(top = { viewModel.getSmallClockTopMargin(view.context) })
-                            .onTopPlacementChanged(onTopChanged),
-                )
+                        Modifier.fillMaxWidth()
+                            .background(Color.Magenta)
+                            .onTopPlacementChanged(onTopChanged)
+                ) {
+                    Text(
+                        text = "TODO(b/316211368): Small clock",
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             }
         }
     }
 
     @Composable
     fun SceneScope.LargeClock(modifier: Modifier = Modifier) {
-        val clockSize by viewModel.clockSize.collectAsState()
-        val currentClock by viewModel.currentClock.collectAsState()
-        viewModel.clock = currentClock
-
-        if (clockSize != KeyguardClockSwitch.LARGE) {
+        if (!viewModel.useLargeClock) {
             return
-        }
-
-        if (currentClock?.largeClock?.view == null) {
-            return
-        }
-
-        val view = LocalView.current
-
-        DisposableEffect(view) {
-            clockInteractor.clockEventController.registerListeners(view)
-
-            onDispose { clockInteractor.clockEventController.unregisterListeners() }
         }
 
         MovableElement(
@@ -115,12 +77,15 @@ constructor(
             modifier = modifier,
         ) {
             content {
-                AndroidView(
-                    factory = { checkNotNull(currentClock).largeClock.view },
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .padding(top = { viewModel.getLargeClockTopMargin(view.context) })
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth().background(Color.Blue),
+                ) {
+                    Text(
+                        text = "TODO(b/316211368): Large clock",
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             }
         }
     }

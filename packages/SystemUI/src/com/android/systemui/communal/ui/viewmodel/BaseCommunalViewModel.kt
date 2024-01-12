@@ -20,7 +20,6 @@ import android.content.ComponentName
 import android.os.PowerManager
 import android.os.SystemClock
 import android.view.MotionEvent
-import android.widget.RemoteViews
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.model.CommunalSceneKey
@@ -102,7 +101,4 @@ abstract class BaseCommunalViewModel(
 
     /** Called as the UI requests opening the widget editor. */
     open fun onOpenWidgetEditor() {}
-
-    /** Gets the interaction handler used to handle taps on a remote view */
-    abstract fun getInteractionHandler(): RemoteViews.InteractionHandler
 }

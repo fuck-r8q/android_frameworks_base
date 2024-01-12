@@ -279,12 +279,9 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         }
 
         outResult.mCaptionHeight = loadDimensionPixelSize(resources, params.mCaptionHeightId);
-        final int captionWidth = params.mCaptionWidthId != Resources.ID_NULL
-                ? loadDimensionPixelSize(resources, params.mCaptionWidthId) : taskBounds.width();
-        outResult.mCaptionX = (outResult.mWidth - captionWidth) / 2;
+        final int captionWidth = taskBounds.width();
 
         startT.setWindowCrop(mCaptionContainerSurface, captionWidth, outResult.mCaptionHeight)
-                .setPosition(mCaptionContainerSurface, outResult.mCaptionX, 0 /* y */)
                 .setLayer(mCaptionContainerSurface, CAPTION_LAYER_Z_ORDER)
                 .show(mCaptionContainerSurface);
 
@@ -295,7 +292,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
             mCaptionInsetsRect.set(taskBounds);
             if (mIsCaptionVisible) {
                 mCaptionInsetsRect.bottom =
-                        mCaptionInsetsRect.top + outResult.mCaptionHeight;
+                        mCaptionInsetsRect.top + outResult.mCaptionHeight + params.mCaptionY;
                 wct.addInsetsSource(mTaskInfo.token,
                         mOwner, 0 /* index */, WindowInsets.Type.captionBar(), mCaptionInsetsRect);
                 wct.addInsetsSource(mTaskInfo.token,
@@ -557,6 +554,9 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
         int mCornerRadius;
 
+        int mCaptionX;
+        int mCaptionY;
+
         Configuration mWindowDecorConfig;
 
         boolean mApplyStartTransactionOnDraw;
@@ -570,6 +570,9 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
             mCornerRadius = 0;
 
+            mCaptionX = 0;
+            mCaptionY = 0;
+
             mApplyStartTransactionOnDraw = false;
             mSetTaskPositionAndCrop = false;
             mWindowDecorConfig = null;
@@ -578,7 +581,6 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
 
     static class RelayoutResult<T extends View & TaskFocusStateConsumer> {
         int mCaptionHeight;
-        int mCaptionX;
         int mWidth;
         int mHeight;
         T mRootView;
@@ -587,7 +589,6 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
             mWidth = 0;
             mHeight = 0;
             mCaptionHeight = 0;
-            mCaptionX = 0;
             mRootView = null;
         }
     }
