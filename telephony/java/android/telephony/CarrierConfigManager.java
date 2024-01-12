@@ -880,6 +880,17 @@ public class CarrierConfigManager {
             "carrier_cross_sim_ims_available_bool";
 
     /**
+     * Flag specifying whether Cross SIM signal strength should be displayed on status bar.
+     * When {@code true} DDS signal strength should be used to display non-DDS signal strength
+     * over status bar if non-DDS is C_IWLAN registered.
+     * When {@code false} non-DDS signal strength reported by modem should be used to display
+     * non-DDS signal strength on status bar.
+     * @hide
+     */
+    public static final String KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL =
+            "carrier_cross_sim_display_signal_strength";
+
+    /**
      * Flag specifying whether cross sim calling on opportunistic data is supported for carrier.
      * When {@code false} the carrier does not support cross sim calling on opportunistic data.
      * When {@code true} the carrier does support cross sim calling on opportunistic data.
@@ -10322,6 +10333,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, false);
+        sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL, true);
         sDefaults.putBoolean(KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL, false);
