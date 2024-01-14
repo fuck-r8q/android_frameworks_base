@@ -57,13 +57,13 @@ import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerCallbackInte
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.bouncer.ui.BouncerView
 import com.android.systemui.classifier.FalsingCollector
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.display.data.repository.FakeDisplayRepository
 import com.android.systemui.keyguard.DismissCallbackRegistry
 import com.android.systemui.keyguard.data.repository.FakeBiometricSettingsRepository
 import com.android.systemui.keyguard.data.repository.FakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.FakeTrustRepository
 import com.android.systemui.keyguard.domain.interactor.DeviceEntrySideFpsOverlayInteractor
-import com.android.systemui.keyguard.domain.interactor.KeyguardFaceAuthInteractor
 import com.android.systemui.keyguard.ui.viewmodel.SideFpsProgressBarViewModel
 import com.android.systemui.log.SideFpsLogger
 import com.android.systemui.log.logcatLogBuffer
@@ -75,6 +75,7 @@ import com.android.systemui.unfold.compat.ScreenSizeFoldProvider
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.mockito.eq
+import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.time.FakeSystemClock
 import java.util.Optional
@@ -82,6 +83,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -108,7 +110,7 @@ class SideFpsOverlayViewBinderTest : SysuiTestCase() {
     @JvmField @Rule var mockitoRule: MockitoRule = MockitoJUnit.rule()
     @Mock private lateinit var activityTaskManager: ActivityTaskManager
     @Mock private lateinit var displayManager: DisplayManager
-    @Mock private lateinit var faceAuthInteractor: KeyguardFaceAuthInteractor
+    @Mock private lateinit var faceAuthInteractor: DeviceEntryFaceAuthInteractor
     @Mock
     private lateinit var fingerprintInteractiveToAuthProvider: FingerprintInteractiveToAuthProvider
     @Mock private lateinit var fpsUnlockTracker: FpsUnlockTracker
@@ -235,15 +237,18 @@ class SideFpsOverlayViewBinderTest : SysuiTestCase() {
                 windowManager,
                 displayStateInteractor,
                 Optional.of(fingerprintInteractiveToAuthProvider),
+                mock(),
                 SideFpsLogger(logcatLogBuffer("SfpsLogger"))
             )
 
         sideFpsProgressBarViewModel =
             SideFpsProgressBarViewModel(
                 mContext,
-                deviceEntryFingerprintAuthRepository,
+                mock(),
                 sfpsSensorInteractor,
+                mock(),
                 displayStateInteractor,
+                UnconfinedTestDispatcher(),
                 testScope.backgroundScope,
             )
 

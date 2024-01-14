@@ -18,7 +18,9 @@ package com.android.systemui.log.dagger;
 
 import android.os.Build;
 
+import com.android.systemui.common.data.repository.PackageChangeRepository;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.deviceentry.data.repository.DeviceEntryFaceAuthRepositoryImpl;
 import com.android.systemui.log.LogBuffer;
 import com.android.systemui.log.LogBufferFactory;
 import com.android.systemui.log.LogcatEchoTracker;
@@ -461,7 +463,7 @@ public class LogModule {
 
     /**
      * Provides a {@link LogBuffer} for use by
-     * {@link com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthRepositoryImpl}.
+     * {@link DeviceEntryFaceAuthRepositoryImpl}.
      */
     @Provides
     @SysUISingleton
@@ -599,5 +601,13 @@ public class LogModule {
     @BluetoothTileDialogLog
     public static LogBuffer provideQBluetoothTileDialogLogBuffer(LogBufferFactory factory) {
         return factory.create("BluetoothTileDialogLog", 50);
+    }
+
+    /** Provides a {@link LogBuffer} for {@link PackageChangeRepository} */
+    @Provides
+    @SysUISingleton
+    @PackageChangeRepoLog
+    public static LogBuffer providePackageChangeRepoLogBuffer(LogBufferFactory factory) {
+        return factory.create("PackageChangeRepo", 50);
     }
 }
