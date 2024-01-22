@@ -109,6 +109,7 @@ import android.graphics.Region;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemProperties;
@@ -1260,7 +1261,7 @@ public interface WindowManager extends ViewManager {
      * <p>When this compat override is enabled the min aspect ratio given in the app's manifest can
      * be overridden by the device manufacturer using their discretion to improve display
      * compatibility unless the app's manifest value is higher. This treatment will also apply if
-     * no min aspect ratio value is provided in the manifest. These treatments can apply only in
+     * no min aspect ratio value is provided in the manifest. These treatments can apply either in
      * specific cases (e.g. device is in portrait) or each time the app is displayed on screen.
      *
      * <p>Setting this property to {@code false} informs the system that the app must be
@@ -1358,9 +1359,8 @@ public interface WindowManager extends ViewManager {
      *     android:value="false"/&gt;
      * &lt;/application&gt;
      * </pre>
-     * @hide
      */
-    // TODO(b/294227289): Make this public API
+    @FlaggedApi(Flags.FLAG_APP_COMPAT_PROPERTIES_API)
     String PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE =
             "android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE";
 
@@ -1402,9 +1402,8 @@ public interface WindowManager extends ViewManager {
      *     android:value="false"/&gt;
      * &lt;/application&gt;
      * </pre>
-     * @hide
      */
-    // TODO(b/294227289): Make this public API
+    @FlaggedApi(Flags.FLAG_APP_COMPAT_PROPERTIES_API)
     String PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE =
             "android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_FULLSCREEN_OVERRIDE";
 
@@ -1492,6 +1491,30 @@ public interface WindowManager extends ViewManager {
      */
     String PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED =
             "android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED";
+
+    /**
+     * Activity or Application level {@link android.content.pm.PackageManager.Property
+     * PackageManager.Property} for an app to declare that System UI should be shown for this
+     * app/component to allow it to be launched as multiple instances.  This property only affects
+     * SystemUI behavior and does _not_ affect whether a component can actually be launched into
+     * multiple instances, which is determined by the Activity's {@code launchMode} or the launching
+     * Intent's flags.  If the property is set on the Application, then all components within that
+     * application will use that value unless specified per component.
+     *
+     * The value must be a boolean string.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;activity&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"
+     *     android:value="true|false"/&gt;
+     * &lt;/activity&gt;
+     * </pre>
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI)
+    public static final String PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI =
+            "android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI";
 
     /**
      * Request for app's keyboard shortcuts to be retrieved asynchronously.
@@ -3175,6 +3198,12 @@ public interface WindowManager extends ViewManager {
         public static final int PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS = 1 << 10;
 
         /**
+         * Flag to indicate that the window is forcibly to go edge-to-edge.
+         * @hide
+         */
+        public static final int PRIVATE_FLAG_EDGE_TO_EDGE_ENFORCED = 1 << 11;
+
+        /**
          * Flag to indicate that the window frame should be the requested frame adding the display
          * cutout frame. This will only be applied if a specific size smaller than the parent frame
          * is given, and the window is covering the display cutout. The extended frame will not be
@@ -3350,6 +3379,7 @@ public interface WindowManager extends ViewManager {
                 PRIVATE_FLAG_SYSTEM_ERROR,
                 PRIVATE_FLAG_OPTIMIZE_MEASURE,
                 PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
+                PRIVATE_FLAG_EDGE_TO_EDGE_ENFORCED,
                 PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT,
                 PRIVATE_FLAG_FORCE_DECOR_VIEW_VISIBILITY,
                 PRIVATE_FLAG_LAYOUT_CHILD_WINDOW_IN_PARENT_FRAME,
@@ -3411,6 +3441,10 @@ public interface WindowManager extends ViewManager {
                         mask = PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
                         equals = PRIVATE_FLAG_DISABLE_WALLPAPER_TOUCH_EVENTS,
                         name = "DISABLE_WALLPAPER_TOUCH_EVENTS"),
+                @ViewDebug.FlagToString(
+                        mask = PRIVATE_FLAG_EDGE_TO_EDGE_ENFORCED,
+                        equals = PRIVATE_FLAG_EDGE_TO_EDGE_ENFORCED,
+                        name = "EDGE_TO_EDGE_ENFORCED"),
                 @ViewDebug.FlagToString(
                         mask = PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT,
                         equals = PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT,
@@ -5991,5 +6025,95 @@ public interface WindowManager extends ViewManager {
     @FlaggedApi(Flags.FLAG_TRUSTED_PRESENTATION_LISTENER_FOR_WINDOW)
     default void unregisterTrustedPresentationListener(@NonNull Consumer<Boolean> listener) {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Registers a {@link SurfaceControlInputReceiver} for a {@link SurfaceControl} that will
+     * receive batched input event. For those events that are batched, the invocation will happen
+     * once per {@link Choreographer} frame, and other input events will be delivered immediately.
+     * This is different from
+     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
+     * SurfaceControlInputReceiver)} in that the input events are received batched. The caller must
+     * invoke {@link #unregisterSurfaceControlInputReceiver(IBinder)} to clean up the resources when
+     * no longer needing to use the {@link SurfaceControlInputReceiver}
+     *
+     * @param displayId      The display that the SurfaceControl will be placed on. Input will
+     *                       only work
+     *                       if SurfaceControl is on that display and that display was touched.
+     * @param surfaceControl The SurfaceControl to register the InputChannel for
+     * @param hostToken      The host token to link the InputChannel for. This is primarily for ANRs
+     *                       to ensure the host receives the ANR if any issues with touch on the
+     *                       InputChannel
+     * @param choreographer  The Choreographer used for batching. This should match the rendering
+     *                       Choreographer.
+     * @param receiver       The SurfaceControlInputReceiver that will receive the input events
+     * @return an {@link IBinder} token that is used to unregister the input receiver via
+     * {@link #unregisterSurfaceControlInputReceiver(IBinder)}.
+     * @see #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
+     * SurfaceControlInputReceiver)
+     */
+    @FlaggedApi(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
+    @NonNull
+    default IBinder registerBatchedSurfaceControlInputReceiver(int displayId,
+            @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
+            @NonNull Choreographer choreographer, @NonNull SurfaceControlInputReceiver receiver) {
+        throw new UnsupportedOperationException(
+                "registerBatchedSurfaceControlInputReceiver is not implemented");
+    }
+
+    /**
+     * Registers a {@link SurfaceControlInputReceiver} for a {@link SurfaceControl} that will
+     * receive every input event. This is different than calling @link
+     * #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Choreographer,
+     * SurfaceControlInputReceiver)} in that the input events are received unbatched. The caller
+     * must invoke {@link #unregisterSurfaceControlInputReceiver(IBinder)} to clean up the resources
+     * when no longer needing to use the {@link SurfaceControlInputReceiver}
+     *
+     * @param displayId      The display that the SurfaceControl will be placed on. Input will only
+     *                       work if SurfaceControl is on that display and that display was
+     *                       touched.
+     * @param hostToken      The host token to link the InputChannel for. This is primarily for ANRs
+     *                       to ensure the host receives the ANR if any issues with touch on the
+     *                       InputChannel
+     * @param surfaceControl The SurfaceControl to register the InputChannel for
+     * @param looper         The looper to use when invoking callbacks.
+     * @param receiver       The SurfaceControlInputReceiver that will receive the input events
+     * @return an {@link IBinder} token that is used to unregister the input receiver via
+     * {@link #unregisterSurfaceControlInputReceiver(IBinder)}.
+     * @see #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Choreographer,
+     * SurfaceControlInputReceiver)
+     **/
+    @FlaggedApi(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
+    @NonNull
+    default IBinder registerUnbatchedSurfaceControlInputReceiver(int displayId,
+            @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
+            @NonNull Looper looper, @NonNull SurfaceControlInputReceiver receiver) {
+        throw new UnsupportedOperationException(
+                "registerUnbatchedSurfaceControlInputReceiver is not implemented");
+    }
+
+    /**
+     * Unregisters and cleans up the registered {@link SurfaceControlInputReceiver} for the
+     * specified token.
+     * <p>
+     * Must be called on the same {@link Looper} thread to which was passed to the
+     * {@link #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl,
+     * Choreographer,
+     * SurfaceControlInputReceiver)} or
+     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
+     * SurfaceControlInputReceiver)}
+     *
+     * @param token The token that was returned via
+     *              {@link #registerBatchedSurfaceControlInputReceiver(int, IBinder,
+     *              SurfaceControl,
+     *              Choreographer, SurfaceControlInputReceiver)} or
+     *              {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder,
+     *              SurfaceControl,
+     *              Looper, SurfaceControlInputReceiver)}
+     */
+    @FlaggedApi(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
+    default void unregisterSurfaceControlInputReceiver(@NonNull IBinder token) {
+        throw new UnsupportedOperationException(
+                "unregisterSurfaceControlInputReceiver is not implemented");
     }
 }

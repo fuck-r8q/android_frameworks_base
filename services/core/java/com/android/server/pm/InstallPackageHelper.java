@@ -176,6 +176,7 @@ import com.android.server.SystemConfig;
 import com.android.server.art.model.ArtFlags;
 import com.android.server.art.model.DexoptParams;
 import com.android.server.art.model.DexoptResult;
+import com.android.server.criticalevents.CriticalEventLog;
 import com.android.server.pm.Installer.LegacyDexoptDisabledException;
 import com.android.server.pm.dex.ArtManagerService;
 import com.android.server.pm.dex.DexManager;
@@ -698,7 +699,7 @@ final class InstallPackageHelper {
                     pkgSetting.setUninstallReason(PackageManager.UNINSTALL_REASON_UNKNOWN, userId);
                     pkgSetting.setFirstInstallTime(System.currentTimeMillis(), userId);
                     // Clear any existing archive state.
-                    pkgSetting.setArchiveState(null, userId);
+                    mPm.mInstallerService.mPackageArchiver.clearArchiveState(packageName, userId);
                     mPm.mSettings.writePackageRestrictionsLPr(userId);
                     mPm.mSettings.writeKernelMappingLPr(pkgSetting);
                     installed = true;
@@ -958,6 +959,7 @@ final class InstallPackageHelper {
         final Set<String> scannedPackages = new ArraySet<>(requests.size());
         final Map<String, Settings.VersionInfo> versionInfos = new ArrayMap<>(requests.size());
         final Map<String, Boolean> createdAppId = new ArrayMap<>(requests.size());
+        CriticalEventLog.getInstance().logInstallPackagesStarted();
         boolean success = false;
         try {
             Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "installPackagesLI");
@@ -2301,7 +2303,7 @@ final class InstallPackageHelper {
                                 installerPackageName);
                     }
                     // Clear any existing archive state.
-                    ps.setArchiveState(null, userId);
+                    mPm.mInstallerService.mPackageArchiver.clearArchiveState(pkgName, userId);
                 } else if (allUsers != null) {
                     // The caller explicitly specified INSTALL_ALL_USERS flag.
                     // Thus, updating the settings to install the app for all users.
@@ -2325,7 +2327,8 @@ final class InstallPackageHelper {
                                         installerPackageName);
                             }
                             // Clear any existing archive state.
-                            ps.setArchiveState(null, currentUserId);
+                            mPm.mInstallerService.mPackageArchiver.clearArchiveState(pkgName,
+                                    currentUserId);
                         } else {
                             ps.setInstalled(false, currentUserId);
                         }

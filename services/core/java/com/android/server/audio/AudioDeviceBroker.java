@@ -1841,6 +1841,7 @@ public class AudioDeviceBroker {
                                         "msg: MSG_L_SET_BT_ACTIVE_DEVICE "
                                             + "received with null profile proxy: "
                                             + btInfo)).printLog(TAG));
+                                sendMsg(MSG_CHECK_MUTE_MUSIC, SENDMSG_REPLACE, 0 /*delay*/);
                                 return;
                             }
                             @AudioSystem.AudioFormatNativeEnumForBtCodec final int codec =

@@ -55,6 +55,8 @@ import android.hardware.input.VirtualMouse;
 import android.hardware.input.VirtualMouseConfig;
 import android.hardware.input.VirtualNavigationTouchpad;
 import android.hardware.input.VirtualNavigationTouchpadConfig;
+import android.hardware.input.VirtualStylus;
+import android.hardware.input.VirtualStylusConfig;
 import android.hardware.input.VirtualTouchscreen;
 import android.hardware.input.VirtualTouchscreenConfig;
 import android.media.AudioManager;
@@ -859,6 +861,19 @@ public final class VirtualDeviceManager {
         }
 
         /**
+         * Creates a virtual stylus.
+         *
+         * @param config the touchscreen configurations for the virtual stylus.
+         */
+        @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
+        @NonNull
+        @FlaggedApi(Flags.FLAG_VIRTUAL_STYLUS)
+        public VirtualStylus createVirtualStylus(
+                @NonNull VirtualStylusConfig config) {
+            return mVirtualDeviceInternal.createVirtualStylus(config);
+        }
+
+        /**
          * Creates a VirtualAudioDevice, capable of recording audio emanating from this device,
          * or injecting audio from another device.
          *
@@ -886,11 +901,14 @@ public final class VirtualDeviceManager {
         }
 
         /**
-         * Creates a new virtual camera. If a virtual camera was already created, it will be closed.
+         * Creates a new virtual camera with the given {@link VirtualCameraConfig}. A virtual device
+         * can create a virtual camera only if it has
+         * {@link VirtualDeviceParams#DEVICE_POLICY_CUSTOM} as its
+         * {@link VirtualDeviceParams#POLICY_TYPE_CAMERA}.
          *
-         * @param config camera config.
-         * @return newly created camera;
-         * @hide
+         * @param config camera configuration.
+         * @return newly created camera.
+         * @see VirtualDeviceParams#POLICY_TYPE_CAMERA
          */
         @RequiresPermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
         @NonNull

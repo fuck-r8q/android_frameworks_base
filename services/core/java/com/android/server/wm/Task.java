@@ -214,6 +214,7 @@ import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -1434,12 +1435,13 @@ class Task extends TaskFragment {
         return isUidPresent;
     }
 
+    WindowState topStartingWindow() {
+        return getWindow(w -> w.mAttrs.type == TYPE_APPLICATION_STARTING);
+    }
+
     ActivityRecord topActivityContainsStartingWindow() {
-        if (getParent() == null) {
-            return null;
-        }
-        return getActivity((r) -> r.getWindow(window ->
-                window.getBaseType() == TYPE_APPLICATION_STARTING) != null);
+        final WindowState startingWindow = topStartingWindow();
+        return startingWindow != null ? startingWindow.mActivityRecord : null;
     }
 
     /**
@@ -1724,6 +1726,8 @@ class Task extends TaskFragment {
         final ActivityRecord r = findActivityInHistory(newR.mActivityComponent, newR.mUserId);
         if (r == null) return null;
 
+        moveTaskFragmentsToBottomIfNeeded(r, finishCount);
+
         final PooledPredicate f = PooledLambda.obtainPredicate(
                 (ActivityRecord ar, ActivityRecord boundaryActivity) ->
                         finishActivityAbove(ar, boundaryActivity, finishCount),
@@ -1742,6 +1746,50 @@ class Task extends TaskFragment {
         }
 
         return r;
+    }
+
+    /**
+     * Moves {@link TaskFragment}s to the bottom if the flag
+     * {@link TaskFragment#isMoveToBottomIfClearWhenLaunch} is {@code true}.
+     */
+    @VisibleForTesting
+    void moveTaskFragmentsToBottomIfNeeded(@NonNull ActivityRecord r, @NonNull int[] finishCount) {
+        final int activityIndex = mChildren.indexOf(r);
+        if (activityIndex < 0) {
+            return;
+        }
+
+        List<TaskFragment> taskFragmentsToMove = null;
+
+        // Find the TaskFragments that need to be moved
+        for (int i = mChildren.size() - 1; i > activityIndex; i--) {
+            final TaskFragment taskFragment = mChildren.get(i).asTaskFragment();
+            if (taskFragment != null && taskFragment.isMoveToBottomIfClearWhenLaunch()) {
+                if (taskFragmentsToMove == null) {
+                    taskFragmentsToMove = new ArrayList<>();
+                }
+                taskFragmentsToMove.add(taskFragment);
+            }
+        }
+        if (taskFragmentsToMove == null) {
+            return;
+        }
+
+        // Move the TaskFragments to the bottom of the Task. Their relative orders are preserved.
+        final int size = taskFragmentsToMove.size();
+        for (int i = 0; i < size; i++) {
+            final TaskFragment taskFragment = taskFragmentsToMove.get(i);
+
+            // The visibility of the TaskFragment may change. Collect it in the transition so that
+            // transition animation can be properly played.
+            mTransitionController.collect(taskFragment);
+
+            positionChildAt(POSITION_BOTTOM, taskFragment, false /* includeParents */);
+        }
+
+        // Treat it as if the TaskFragments are finished so that a transition animation can be
+        // played to send the TaskFragments back and bring the activity to front.
+        finishCount[0] += size;
     }
 
     private static boolean finishActivityAbove(ActivityRecord r, ActivityRecord boundaryActivity,
@@ -3737,6 +3785,16 @@ class Task extends TaskFragment {
                 }
                 wc.assignLayer(t, layer++);
 
+                // Boost the adjacent TaskFragment for dimmer if needed.
+                final TaskFragment taskFragment = wc.asTaskFragment();
+                if (taskFragment != null && taskFragment.isEmbedded()
+                        && taskFragment.isVisibleRequested()) {
+                    final TaskFragment adjacentTf = taskFragment.getAdjacentTaskFragment();
+                    if (adjacentTf != null && adjacentTf.shouldBoostDimmer()) {
+                        adjacentTf.assignLayer(t, layer++);
+                    }
+                }
+
                 // Place the decor surface just above the owner TaskFragment.
                 if (mDecorSurfaceContainer != null && !decorSurfacePlaced
                         && wc == mDecorSurfaceContainer.mOwnerTaskFragment) {
@@ -4823,6 +4881,7 @@ class Task extends TaskFragment {
         }
         if (top.isAttached()) {
             top.setWindowingMode(WINDOWING_MODE_UNDEFINED);
+            top.mWaitForEnteringPinnedMode = false;
         }
     }
 

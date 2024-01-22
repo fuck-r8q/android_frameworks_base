@@ -80,10 +80,13 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
+import android.app.ApplicationExitInfo;
 import android.app.IApplicationThread;
 import android.app.IServiceConnection;
 import android.content.ComponentName;
@@ -94,9 +97,11 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManagerInternal;
+import android.os.Process;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.util.ArrayMap;
 import android.util.SparseArray;
 
@@ -107,7 +112,9 @@ import com.android.server.wm.WindowProcessController;
 
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
 
 import java.io.File;
@@ -148,11 +155,17 @@ public class MockingOomAdjusterTests {
     private static final String MOCKAPP5_PROCESSNAME = "test #5";
     private static final String MOCKAPP5_PACKAGENAME = "com.android.test.test5";
     private static final int MOCKAPP2_UID_OTHER = MOCKAPP2_UID + UserHandle.PER_USER_RANGE;
+    private static final int MOCKAPP_ISOLATED_UID = Process.FIRST_ISOLATED_UID + 321;
+    private static final String MOCKAPP_ISOLATED_PROCESSNAME = "isolated test #1";
+
     private static int sFirstCachedAdj = ProcessList.CACHED_APP_MIN_ADJ
                                           + ProcessList.CACHED_APP_IMPORTANCE_LEVELS;
     private static Context sContext;
     private static PackageManagerInternal sPackageManagerInternal;
     private static ActivityManagerService sService;
+
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     @SuppressWarnings("GuardedBy")
     @BeforeClass
@@ -220,6 +233,11 @@ public class MockingOomAdjusterTests {
         }
     }
 
+    @Before
+    public void setUp() {
+        mSetFlagsRule.enableFlags(Flags.FLAG_NEW_FGS_RESTRICTION_LOGIC);
+    }
+
     @AfterClass
     public static void tearDownOnce() {
         LocalServices.removeServiceForTest(PackageManagerInternal.class);
@@ -283,6 +301,20 @@ public class MockingOomAdjusterTests {
                 sService.mProcessList.getLruProcessesLOSP().clear();
             }
         }
+    }
+
+    /**
+     * Run updateOomAdjPendingTargetsLocked().
+     * - enqueues all provided processes to the pending list and lru before running
+     */
+    @SuppressWarnings("GuardedBy")
+    private void updateOomAdjPending(ProcessRecord... apps) {
+        setProcessesToLru(apps);
+        for (ProcessRecord app : apps) {
+            sService.mOomAdjuster.enqueueOomAdjTargetLocked(app);
+        }
+        sService.mOomAdjuster.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_NONE);
+        sService.mProcessList.getLruProcessesLOSP().clear();
     }
 
     /**
@@ -519,6 +551,7 @@ public class MockingOomAdjusterTests {
         sService.mConstants.mShortFgsProcStateExtraWaitDuration = 200_000;
 
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(sService);
+        s.appInfo = new ApplicationInfo();
         s.startRequested = true;
         s.isForeground = true;
         s.foregroundServiceType = FOREGROUND_SERVICE_TYPE_SHORT_SERVICE;
@@ -561,6 +594,7 @@ public class MockingOomAdjusterTests {
 
         // SHORT_SERVICE, timed out already.
         s = ServiceRecord.newEmptyInstanceForTest(sService);
+        s.appInfo = new ApplicationInfo();
         s.startRequested = true;
         s.isForeground = true;
         s.foregroundServiceType = FOREGROUND_SERVICE_TYPE_SHORT_SERVICE;
@@ -1079,6 +1113,7 @@ public class MockingOomAdjusterTests {
 
         // In order to trick OomAdjuster to think it has a short-service, we need this logic.
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(sService);
+        s.appInfo = new ApplicationInfo();
         s.startRequested = true;
         s.isForeground = true;
         s.foregroundServiceType = FOREGROUND_SERVICE_TYPE_SHORT_SERVICE;
@@ -1109,6 +1144,7 @@ public class MockingOomAdjusterTests {
 
         // In order to trick OomAdjuster to think it has a short-service, we need this logic.
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(sService);
+        s.appInfo = new ApplicationInfo();
         s.startRequested = true;
         s.isForeground = true;
         s.foregroundServiceType = FOREGROUND_SERVICE_TYPE_SHORT_SERVICE;
@@ -1400,6 +1436,7 @@ public class MockingOomAdjusterTests {
 
         // In order to trick OomAdjuster to think it has a short-service, we need this logic.
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(sService);
+        s.appInfo = new ApplicationInfo();
         s.startRequested = true;
         s.isForeground = true;
         s.foregroundServiceType = FOREGROUND_SERVICE_TYPE_SHORT_SERVICE;
@@ -2649,6 +2686,90 @@ public class MockingOomAdjusterTests {
         updateOomAdj(app);
         assertTrue(app.mServices.hasAboveClient());
         assertNotEquals(FOREGROUND_APP_ADJ, app.mState.getSetAdj());
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoAll_Isolated_stopService() {
+        ProcessRecord app = spy(makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_ISOLATED_UID,
+                MOCKAPP_ISOLATED_PROCESSNAME, MOCKAPP_PACKAGENAME, false));
+
+        setProcessesToLru(app);
+        ServiceRecord s = makeServiceRecord(app);
+        s.startRequested = true;
+        s.lastActivity = SystemClock.uptimeMillis();
+        sService.mWakefulness.set(PowerManagerInternal.WAKEFULNESS_AWAKE);
+        updateOomAdj();
+        assertProcStates(app, PROCESS_STATE_SERVICE, SERVICE_ADJ, SCHED_GROUP_BACKGROUND);
+
+        app.mServices.stopService(s);
+        updateOomAdj();
+        // isolated process should be killed immediately after service stop.
+        verify(app).killLocked("isolated not needed", ApplicationExitInfo.REASON_OTHER,
+                ApplicationExitInfo.SUBREASON_ISOLATED_NOT_NEEDED, true);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoPending_Isolated_stopService() {
+        ProcessRecord app = spy(makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_ISOLATED_UID,
+                MOCKAPP_ISOLATED_PROCESSNAME, MOCKAPP_PACKAGENAME, false));
+
+        ServiceRecord s = makeServiceRecord(app);
+        s.startRequested = true;
+        s.lastActivity = SystemClock.uptimeMillis();
+        sService.mWakefulness.set(PowerManagerInternal.WAKEFULNESS_AWAKE);
+        updateOomAdjPending(app);
+        assertProcStates(app, PROCESS_STATE_SERVICE, SERVICE_ADJ, SCHED_GROUP_BACKGROUND);
+
+        app.mServices.stopService(s);
+        updateOomAdjPending(app);
+        // isolated process should be killed immediately after service stop.
+        verify(app).killLocked("isolated not needed", ApplicationExitInfo.REASON_OTHER,
+                ApplicationExitInfo.SUBREASON_ISOLATED_NOT_NEEDED, true);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoAll_Isolated_stopServiceWithEntryPoint() {
+        ProcessRecord app = spy(makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_ISOLATED_UID,
+                MOCKAPP_ISOLATED_PROCESSNAME, MOCKAPP_PACKAGENAME, false));
+        app.setIsolatedEntryPoint("test");
+
+        setProcessesToLru(app);
+        ServiceRecord s = makeServiceRecord(app);
+        s.startRequested = true;
+        s.lastActivity = SystemClock.uptimeMillis();
+        sService.mWakefulness.set(PowerManagerInternal.WAKEFULNESS_AWAKE);
+        updateOomAdj();
+        assertProcStates(app, PROCESS_STATE_SERVICE, SERVICE_ADJ, SCHED_GROUP_BACKGROUND);
+
+        app.mServices.stopService(s);
+        updateOomAdj();
+        // isolated process with entry point should not be killed
+        verify(app, never()).killLocked("isolated not needed", ApplicationExitInfo.REASON_OTHER,
+                ApplicationExitInfo.SUBREASON_ISOLATED_NOT_NEEDED, true);
+    }
+
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoPending_Isolated_stopServiceWithEntryPoint() {
+        ProcessRecord app = spy(makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_ISOLATED_UID,
+                MOCKAPP_ISOLATED_PROCESSNAME, MOCKAPP_PACKAGENAME, false));
+        app.setIsolatedEntryPoint("test");
+
+        ServiceRecord s = makeServiceRecord(app);
+        s.startRequested = true;
+        s.lastActivity = SystemClock.uptimeMillis();
+        sService.mWakefulness.set(PowerManagerInternal.WAKEFULNESS_AWAKE);
+        updateOomAdjPending(app);
+        assertProcStates(app, PROCESS_STATE_SERVICE, SERVICE_ADJ, SCHED_GROUP_BACKGROUND);
+
+        app.mServices.stopService(s);
+        updateOomAdjPending(app);
+        // isolated process with entry point should not be killed
+        verify(app, never()).killLocked("isolated not needed", ApplicationExitInfo.REASON_OTHER,
+                ApplicationExitInfo.SUBREASON_ISOLATED_NOT_NEEDED, true);
     }
 
     private ProcessRecord makeDefaultProcessRecord(int pid, int uid, String processName,

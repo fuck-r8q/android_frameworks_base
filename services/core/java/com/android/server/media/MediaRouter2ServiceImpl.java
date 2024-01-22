@@ -16,7 +16,7 @@
 
 package com.android.server.media;
 
-import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
+import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
 import static android.content.Intent.ACTION_SCREEN_OFF;
 import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.media.MediaRoute2ProviderService.REASON_UNKNOWN_ERROR;
@@ -24,7 +24,6 @@ import static android.media.MediaRouter2Utils.getOriginalId;
 import static android.media.MediaRouter2Utils.getProviderId;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
-import static com.android.server.media.MediaFeatureFlagManager.FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -55,7 +54,6 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.provider.DeviceConfig;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -97,11 +95,7 @@ class MediaRouter2ServiceImpl {
     //       in MediaRouter2, remove this constant and replace the usages with the real request IDs.
     private static final long DUMMY_REQUEST_ID = -1;
 
-    private static int sPackageImportanceForScanning =
-            MediaFeatureFlagManager.getInstance()
-                    .getInt(
-                            FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE,
-                            IMPORTANCE_FOREGROUND_SERVICE);
+    private static final int REQUIRED_PACKAGE_IMPORTANCE_FOR_SCANNING = IMPORTANCE_FOREGROUND;
 
     /**
      * Contains the list of bluetooth permissions that are required to do system routing.
@@ -159,7 +153,7 @@ class MediaRouter2ServiceImpl {
         mContext = context;
         mActivityManager = mContext.getSystemService(ActivityManager.class);
         mActivityManager.addOnUidImportanceListener(mOnUidImportanceListener,
-                sPackageImportanceForScanning);
+                REQUIRED_PACKAGE_IMPORTANCE_FOR_SCANNING);
         mPowerManager = mContext.getSystemService(PowerManager.class);
         mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
 
@@ -171,9 +165,6 @@ class MediaRouter2ServiceImpl {
         }
 
         mContext.getPackageManager().addOnPermissionsChangeListener(this::onPermissionsChanged);
-
-        MediaFeatureFlagManager.getInstance()
-                .addOnPropertiesChangedListener(this::onDeviceConfigChange);
     }
 
     /**
@@ -774,7 +765,7 @@ class MediaRouter2ServiceImpl {
                                 .generateDeviceRouteSelectedSessionInfo(packageName);
                     } else {
                         sessionInfos = userRecord.mHandler.mSystemProvider.getSessionInfos();
-                        if (sessionInfos != null && !sessionInfos.isEmpty()) {
+                        if (!sessionInfos.isEmpty()) {
                             // Return a copy of the current system session with no modification,
                             // except setting the client package name.
                             return new RoutingSessionInfo.Builder(sessionInfos.get(0))
@@ -1158,14 +1149,7 @@ class MediaRouter2ServiceImpl {
         } else {
             if (route.isSystemRoute()
                     && !routerRecord.hasSystemRoutingPermission()
-                    && !TextUtils.equals(
-                            route.getId(),
-                            routerRecord
-                                    .mUserRecord
-                                    .mHandler
-                                    .mSystemProvider
-                                    .getDefaultRoute()
-                                    .getId())) {
+                    && !TextUtils.equals(route.getId(), MediaRoute2Info.ROUTE_ID_DEFAULT)) {
                 Slog.w(TAG, "MODIFY_AUDIO_ROUTING permission is required to transfer to"
                         + route);
                 routerRecord.mUserRecord.mHandler.notifySessionCreationFailedToRouter(
@@ -1252,11 +1236,9 @@ class MediaRouter2ServiceImpl {
                         "transferToRouteWithRouter2 | router: %s(id: %d), route: %s",
                         routerRecord.mPackageName, routerRecord.mRouterId, route.getId()));
 
-        String defaultRouteId =
-                routerRecord.mUserRecord.mHandler.mSystemProvider.getDefaultRoute().getId();
         if (route.isSystemRoute()
                 && !routerRecord.hasSystemRoutingPermission()
-                && !TextUtils.equals(route.getId(), defaultRouteId)) {
+                && !TextUtils.equals(route.getId(), MediaRoute2Info.ROUTE_ID_DEFAULT)) {
             routerRecord.mUserRecord.mHandler.sendMessage(
                     obtainMessage(UserHandler::notifySessionCreationFailedToRouter,
                             routerRecord.mUserRecord.mHandler,
@@ -1452,8 +1434,13 @@ class MediaRouter2ServiceImpl {
             return;
         }
 
-        Slog.i(TAG, TextUtils.formatSimple(
-                "startScan | manager: %d", managerRecord.mManagerId));
+        Slog.i(
+                TAG,
+                TextUtils.formatSimple(
+                        "startScan | manager: %d, ownerPackageName: %s, targetPackageName: %s",
+                        managerRecord.mManagerId,
+                        managerRecord.mOwnerPackageName,
+                        managerRecord.mTargetPackageName));
 
         managerRecord.startScan();
     }
@@ -1466,8 +1453,13 @@ class MediaRouter2ServiceImpl {
             return;
         }
 
-        Slog.i(TAG, TextUtils.formatSimple(
-                "stopScan | manager: %d", managerRecord.mManagerId));
+        Slog.i(
+                TAG,
+                TextUtils.formatSimple(
+                        "stopScan | manager: %d, ownerPackageName: %s, targetPackageName: %s",
+                        managerRecord.mManagerId,
+                        managerRecord.mOwnerPackageName,
+                        managerRecord.mTargetPackageName));
 
         managerRecord.stopScan();
     }
@@ -1733,13 +1725,6 @@ class MediaRouter2ServiceImpl {
     }
 
     // End of locked methods that are used by both MediaRouter2 and MediaRouter2Manager.
-
-    private void onDeviceConfigChange(@NonNull DeviceConfig.Properties properties) {
-        sPackageImportanceForScanning =
-                properties.getInt(
-                        /* name */ FEATURE_SCANNING_MINIMUM_PACKAGE_IMPORTANCE,
-                        /* defaultValue */ IMPORTANCE_FOREGROUND_SERVICE);
-    }
 
     static long toUniqueRequestId(int requesterId, int originalRequestId) {
         return ((long) requesterId << 32) | originalRequestId;
@@ -2761,11 +2746,10 @@ class MediaRouter2ServiceImpl {
             if (manager != null) {
                 notifyRequestFailedToManager(
                         manager.mManager, toOriginalRequestId(uniqueRequestId), reason);
-                return;
             }
 
-            // Currently, only the manager can get notified of failures.
-            // TODO: Notify router too when the related callback is introduced.
+            // Currently, only manager records can get notified of failures.
+            // TODO(b/282936553): Notify regular routers of request failures.
         }
 
         private boolean handleSessionCreationRequestFailed(@NonNull MediaRoute2Provider provider,
@@ -2909,11 +2893,9 @@ class MediaRouter2ServiceImpl {
                 currentSystemSessionInfo = mSystemProvider.getDefaultSessionInfo();
             }
 
-            if (currentRoutes.size() == 0) {
-                return;
+            if (!currentRoutes.isEmpty()) {
+                routerRecord.notifyRegistered(currentRoutes, currentSystemSessionInfo);
             }
-
-            routerRecord.notifyRegistered(currentRoutes, currentSystemSessionInfo);
         }
 
         private static void notifyRoutesUpdatedToRouterRecords(
@@ -3182,7 +3164,7 @@ class MediaRouter2ServiceImpl {
                             record ->
                                     service.mActivityManager.getPackageImportance(
                                                     record.mPackageName)
-                                            <= sPackageImportanceForScanning)
+                                            <= REQUIRED_PACKAGE_IMPORTANCE_FOR_SCANNING)
                     .collect(Collectors.toList());
         }
 
@@ -3199,7 +3181,7 @@ class MediaRouter2ServiceImpl {
                                     manager.mIsScanning
                                             && service.mActivityManager.getPackageImportance(
                                                             manager.mOwnerPackageName)
-                                                    <= sPackageImportanceForScanning);
+                                                    <= REQUIRED_PACKAGE_IMPORTANCE_FOR_SCANNING);
         }
 
         private MediaRoute2Provider findProvider(@Nullable String providerId) {

@@ -454,11 +454,11 @@
     <!-- Content description after successful auth when confirmation required -->
     <string name="fingerprint_dialog_authenticated_confirmation">Press the unlock icon to continue</string>
     <!-- Message shown to inform the user a face cannot be recognized and fingerprint should instead be used.[CHAR LIMIT=50] -->
-    <string name="fingerprint_dialog_use_fingerprint_instead">Can\u2019t recognize face. Use fingerprint instead.</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead">Face not recognized. Use fingerprint instead.</string>
     <!-- Message shown to inform the user a face cannot be recognized and fingerprint should instead be used.[CHAR LIMIT=50] -->
     <string name="keyguard_face_failed_use_fp">@string/fingerprint_dialog_use_fingerprint_instead</string>
     <!-- Message shown to inform the user a face cannot be recognized. [CHAR LIMIT=25] -->
-    <string name="keyguard_face_failed">Can\u2019t recognize face</string>
+    <string name="keyguard_face_failed">Face not recognized</string>
     <!-- Message shown to suggest using fingerprint sensor to authenticate after another biometric failed. [CHAR LIMIT=25] -->
     <string name="keyguard_suggest_fingerprint">Use fingerprint instead</string>
     <!-- Message shown to inform the user that face unlock is not available. [CHAR LIMIT=59] -->
@@ -1084,6 +1084,16 @@
 
     <!-- Description for the button that opens the widget editor on click. [CHAR LIMIT=50] -->
     <string name="button_to_open_widget_editor">Open the widget editor</string>
+    <!-- Text for CTA button that launches the hub mode widget editor on click. [CHAR LIMIT=50] -->
+    <string name="cta_tile_button_to_open_widget_editor">Customize</string>
+    <!-- Text for CTA button that dismisses the tile on click. [CHAR LIMIT=50] -->
+    <string name="cta_tile_button_to_dismiss">Dismiss</string>
+    <!-- Label for CTA tile to edit the glanceable hub [CHAR LIMIT=100] -->
+    <string name="cta_label_to_edit_widget">Add, remove, and reorder your widgets in this space</string>
+    <!-- Label for CTA tile that opens widget picker on click in edit mode [CHAR LIMIT=50] -->
+    <string name="cta_label_to_open_widget_picker">Add more widgets</string>
+    <!-- Text for the popup to be displayed after dismissing the CTA tile. [CHAR LIMIT=50] -->
+    <string name="popup_on_dismiss_cta_tile_text">Long press to customize widgets</string>
     <!-- Description for the button that removes a widget on click. [CHAR LIMIT=50] -->
     <string name="button_to_remove_widget">Remove</string>
     <!-- Text for the button that launches the hub mode widget picker. [CHAR LIMIT=50] -->
@@ -1607,36 +1617,8 @@
     <!-- Bluetooth enablement ok text [CHAR LIMIT=40] -->
     <string name="enable_bluetooth_confirmation_ok">Turn on</string>
 
-    <!-- [CHAR LIMIT=NONE] Importance Tuner setting title -->
-    <string name="tuner_full_importance_settings">Power notification controls</string>
-
     <!-- [CHAR LIMIT=NONE] Notification camera based rotation enabled description -->
     <string name="rotation_lock_camera_rotation_on">On - Face-based</string>
-
-    <string name="power_notification_controls_description">With power notification controls, you can set an importance level from 0 to 5 for an app\'s notifications.
-        \n\n<b>Level 5</b>
-        \n- Show at the top of the notification list
-        \n- Allow full screen interruption
-        \n- Always peek
-        \n\n<b>Level 4</b>
-        \n- Prevent full screen interruption
-        \n- Always peek
-        \n\n<b>Level 3</b>
-        \n- Prevent full screen interruption
-        \n- Never peek
-        \n\n<b>Level 2</b>
-        \n- Prevent full screen interruption
-        \n- Never peek
-        \n- Never make sound and vibration
-        \n\n<b>Level 1</b>
-        \n- Prevent full screen interruption
-        \n- Never peek
-        \n- Never make sound or vibrate
-        \n- Hide from lock screen and status bar
-        \n- Show at the bottom of the notification list
-        \n\n<b>Level 0</b>
-        \n- Block all notifications from the app
-    </string>
 
     <!-- Notification Inline controls: button to dismiss the blocking helper [CHAR_LIMIT=20] -->
     <string name="inline_done_button">Done</string>
@@ -2279,6 +2261,8 @@
     <string name="notification_channel_storage">Storage</string>
     <!-- Title for the notification channel for hints and suggestions. [CHAR LIMIT=NONE] -->
     <string name="notification_channel_hints">Hints</string>
+    <!-- Title for the notification channel for accessibility related (i.e. accessibility floating menu). [CHAR LIMIT=NONE] -->
+    <string name="notification_channel_accessibility">Accessibility</string>
 
     <!-- App label of the instant apps notification [CHAR LIMIT=60] -->
     <string name="instant_apps">Instant Apps</string>
@@ -2560,6 +2544,11 @@
     <string name="accessibility_floating_button_docking_tooltip">Move button to the edge to hide it temporarily</string>
     <!-- Text for the undo action button of the message view of the accessibility floating menu to perform undo operation. [CHAR LIMIT=30]-->
     <string name="accessibility_floating_button_undo">Undo</string>
+    <!-- Notification title shown when accessibility floating button is in hidden state. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_floating_button_hidden_notification_title">Accessibility button hidden</string>
+    <!-- Notification content text to explain user can tap notification to bring back accessibility floating button. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_floating_button_hidden_notification_text">Tap to show accessibility button</string>
+
     <!-- Text for the message view with undo action of the accessibility floating menu to show which feature shortcut was removed. [CHAR LIMIT=30]-->
     <string name="accessibility_floating_button_undo_message_label_text"><xliff:g id="feature name" example="Magnification">%s</xliff:g> shortcut removed</string>
     <!-- Text for the message view with undo action of the accessibility floating menu to show how many features shortcuts were removed. [CHAR LIMIT=30]-->

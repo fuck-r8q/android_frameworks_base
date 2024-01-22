@@ -464,9 +464,10 @@ public class BackNavigationControllerTests extends WindowTestsBase {
         // Simulate ActivityOptions#makeSceneTransitionAnimation
         final Bundle myBundle = new Bundle();
         myBundle.putInt(ActivityOptions.KEY_ANIM_TYPE, ANIM_SCENE_TRANSITION);
-        myBundle.putParcelable("android:activity.transitionCompleteListener",
-                mock(android.os.ResultReceiver.class));
         final ActivityOptions options = new ActivityOptions(myBundle);
+        final ActivityOptions.SceneTransitionInfo info = new ActivityOptions.SceneTransitionInfo();
+        info.setResultReceiver(mock(android.os.ResultReceiver.class));
+        options.setSceneTransitionInfo(info);
 
         final ActivityRecord testActivity = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
@@ -741,7 +742,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
 
         MockitoSession mockitoSession = mockitoSession().mockStatic(BackNavigationController.class)
                 .strictness(Strictness.LENIENT).startMocking();
-        doReturn(taskSnapshot).when(() -> BackNavigationController.getSnapshot(any()));
+        doReturn(taskSnapshot).when(() -> BackNavigationController.getSnapshot(any(), any()));
         when(resourcesSpy.getBoolean(
                 com.android.internal.R.bool.config_predictShowStartingSurface))
                 .thenReturn(preferWindowlessSurface);

@@ -36,7 +36,6 @@ import android.graphics.Rect;
 import android.graphics.Region;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.MotionEvent;
@@ -62,8 +61,6 @@ import com.android.wm.shell.windowdecor.viewholder.DesktopModeAppControlsWindowD
 import com.android.wm.shell.windowdecor.viewholder.DesktopModeFocusedWindowDecorationViewHolder;
 import com.android.wm.shell.windowdecor.viewholder.DesktopModeWindowDecorationViewHolder;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -104,8 +101,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
 
     private ExclusionRegionListener mExclusionRegionListener;
 
-    private final Set<IBinder> mTransitionsPausingRelayout = new HashSet<>();
-    private int mRelayoutBlock;
     private final RootTaskDisplayAreaOrganizer mRootTaskDisplayAreaOrganizer;
 
     DesktopModeWindowDecoration(
@@ -179,13 +174,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
 
     @Override
     void relayout(ActivityManager.RunningTaskInfo taskInfo) {
-        // TaskListener callbacks and shell transitions aren't synchronized, so starting a shell
-        // transition can trigger an onTaskInfoChanged call that updates the task's SurfaceControl
-        // and interferes with the transition animation that is playing at the same time.
-        if (mRelayoutBlock > 0) {
-            return;
-        }
-
         final SurfaceControl.Transaction t = mSurfaceControlTransactionSupplier.get();
         // The crop and position of the task should only be set when a task is fluid resizing. In
         // all other cases, it is expected that the transition handler positions and crops the task
@@ -624,8 +612,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     void closeMaximizeMenuIfNeeded(MotionEvent ev) {
         if (!isMaximizeMenuActive()) return;
 
-        final PointF inputPoint = offsetCaptionLocation(ev);
-        if (!mMaximizeMenu.isValidMenuInput(inputPoint)) {
+        if (!mMaximizeMenu.isValidMenuInput(ev)) {
             closeMaximizeMenu();
         }
     }
@@ -651,20 +638,34 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     }
 
     /**
-     * Checks if motion event occurs in the caption handle area. This should be used in cases where
+     * Checks if motion event occurs in the caption handle area of a focused caption (the caption on
+     * a task in fullscreen or in multi-windowing mode). This should be used in cases where
      * onTouchListener will not work (i.e. when caption is in status bar area).
      *
      * @param ev       the {@link MotionEvent} to check
-     * @return {@code true} if event is inside the specified view, {@code false} if not
+     * @return {@code true} if event is inside caption handle view, {@code false} if not
      */
-    boolean checkTouchEventInCaptionHandle(MotionEvent ev) {
+    boolean checkTouchEventInFocusedCaptionHandle(MotionEvent ev) {
         if (isHandleMenuActive() || !(mWindowDecorViewHolder
                 instanceof DesktopModeFocusedWindowDecorationViewHolder)) {
             return false;
         }
+
+        return checkTouchEventInCaption(ev);
+    }
+
+    /**
+     * Checks if touch event occurs in caption.
+     *
+     * @param ev       the {@link MotionEvent} to check
+     * @return {@code true} if event is inside caption view, {@code false} if not
+     */
+    boolean checkTouchEventInCaption(MotionEvent ev) {
         final PointF inputPoint = offsetCaptionLocation(ev);
-        return ((DesktopModeFocusedWindowDecorationViewHolder) mWindowDecorViewHolder)
-                .pointInCaption(inputPoint, mResult.mCaptionX);
+        return inputPoint.x >= mResult.mCaptionX
+                && inputPoint.x <= mResult.mCaptionX + mResult.mCaptionWidth
+                && inputPoint.y >= 0
+                && inputPoint.y <= mResult.mCaptionHeight;
     }
 
     /**
@@ -680,7 +681,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             // Click if point in caption handle view
             final View caption = mResult.mRootView.findViewById(R.id.desktop_mode_caption);
             final View handle = caption.findViewById(R.id.caption_handle);
-            if (checkTouchEventInCaptionHandle(ev)) {
+            if (checkTouchEventInFocusedCaptionHandle(ev)) {
                 mOnCaptionButtonClickListener.onClick(handle);
             }
         } else {
@@ -737,16 +738,6 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         return exclusionRegion;
     }
 
-    /**
-     * If transition exists in mTransitionsPausingRelayout, remove the transition and decrement
-     * mRelayoutBlock
-     */
-    void removeTransitionPausingRelayout(IBinder transition) {
-        if (mTransitionsPausingRelayout.remove(transition)) {
-            mRelayoutBlock--;
-        }
-    }
-
     @Override
     int getCaptionHeightId(@WindowingMode int windowingMode) {
         return getCaptionHeightIdStatic(windowingMode);
@@ -767,35 +758,10 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         return R.id.desktop_mode_caption;
     }
 
-    /**
-     * Add transition to mTransitionsPausingRelayout
-     */
-    void addTransitionPausingRelayout(IBinder transition) {
-        mTransitionsPausingRelayout.add(transition);
-    }
-
-    /**
-     * If two transitions merge and the merged transition is in mTransitionsPausingRelayout,
-     * remove the merged transition from the set and add the transition it was merged into.
-     */
-    public void mergeTransitionPausingRelayout(IBinder merged, IBinder playing) {
-        if (mTransitionsPausingRelayout.remove(merged)) {
-            mTransitionsPausingRelayout.add(playing);
-        }
-    }
-
-    /**
-     * Increase mRelayoutBlock, stopping relayout if mRelayoutBlock is now greater than 0.
-     */
-    public void incrementRelayoutBlock() {
-        mRelayoutBlock++;
-    }
-
     @Override
     public String toString() {
         return "{"
                 + "mPositionInParent=" + mPositionInParent + ", "
-                + "mRelayoutBlock=" + mRelayoutBlock + ", "
                 + "taskId=" + mTaskInfo.taskId + ", "
                 + "windowingMode=" + windowingModeToString(mTaskInfo.getWindowingMode()) + ", "
                 + "isFocused=" + isFocused()

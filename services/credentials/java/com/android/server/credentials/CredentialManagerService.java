@@ -63,7 +63,6 @@ import android.text.TextUtils;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
-import android.view.autofill.IAutoFillManagerClient;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.credentials.metrics.ApiName;
@@ -484,7 +483,7 @@ public final class CredentialManagerService
         public ICancellationSignal getCandidateCredentials(
                 GetCredentialRequest request,
                 IGetCandidateCredentialsCallback callback,
-                IAutoFillManagerClient clientCallback,
+                IBinder clientBinder,
                 final String callingPackage) {
             Slog.i(TAG, "starting getCandidateCredentials with callingPackage: "
                     + callingPackage);
@@ -506,7 +505,7 @@ public final class CredentialManagerService
                             constructCallingAppInfo(callingPackage, userId, request.getOrigin()),
                             getEnabledProvidersForUser(userId),
                             CancellationSignal.fromTransport(cancelTransport),
-                            clientCallback
+                            clientBinder
                     );
             addSessionLocked(userId, session);
 
@@ -516,6 +515,8 @@ public final class CredentialManagerService
                             request.getCredentialOptions().stream()
                                     .map(CredentialOption::getType)
                                     .collect(Collectors.toList()));
+
+            finalizeAndEmitInitialPhaseMetric(session);
 
             if (providerSessions.isEmpty()) {
                 try {
@@ -774,6 +775,13 @@ public final class CredentialManagerService
             finalizeAndEmitInitialPhaseMetric(session);
             // Iterate over all provider sessions and invoke the request
             providerSessions.forEach(ProviderSession::invokeSession);
+        }
+
+        private void finalizeAndEmitInitialPhaseMetric(GetCandidateRequestSession session) {
+            var initMetric = session.mRequestSessionMetric.getInitialPhaseMetric();
+            initMetric.setAutofillSessionId(session.getAutofillSessionId());
+            initMetric.setAutofillRequestId(session.getAutofillRequestId());
+            finalizeAndEmitInitialPhaseMetric((RequestSession) session);
         }
 
         private void finalizeAndEmitInitialPhaseMetric(RequestSession session) {

@@ -168,6 +168,7 @@ import static com.android.server.wm.ActivityRecordProto.FILLS_PARENT;
 import static com.android.server.wm.ActivityRecordProto.FRONT_OF_TASK;
 import static com.android.server.wm.ActivityRecordProto.IN_SIZE_COMPAT_MODE;
 import static com.android.server.wm.ActivityRecordProto.IS_ANIMATING;
+import static com.android.server.wm.ActivityRecordProto.IS_USER_FULLSCREEN_OVERRIDE_ENABLED;
 import static com.android.server.wm.ActivityRecordProto.IS_WAITING_FOR_TRANSITION_START;
 import static com.android.server.wm.ActivityRecordProto.LAST_ALL_DRAWN;
 import static com.android.server.wm.ActivityRecordProto.LAST_DROP_INPUT_MODE;
@@ -182,6 +183,7 @@ import static com.android.server.wm.ActivityRecordProto.PROC_ID;
 import static com.android.server.wm.ActivityRecordProto.PROVIDES_MAX_BOUNDS;
 import static com.android.server.wm.ActivityRecordProto.REPORTED_DRAWN;
 import static com.android.server.wm.ActivityRecordProto.REPORTED_VISIBLE;
+import static com.android.server.wm.ActivityRecordProto.SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_FORCE_ROTATE_FOR_CAMERA_COMPAT;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_IGNORE_ORIENTATION_REQUEST_LOOP;
 import static com.android.server.wm.ActivityRecordProto.SHOULD_OVERRIDE_FORCE_RESIZE_APP;
@@ -2201,7 +2203,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             // The result receiver is the transition receiver, which will handle the shared element
             // exit transition.
             mHasSceneTransition = options.getAnimationType() == ANIM_SCENE_TRANSITION
-                    && options.getResultReceiver() != null;
+                    && options.getSceneTransitionInfo() != null
+                    && options.getSceneTransitionInfo().getResultReceiver() != null;
             final PendingIntent usageReport = options.getUsageTimeReport();
             if (usageReport != null) {
                 appTimeTracker = new AppTimeTracker(usageReport);
@@ -2518,7 +2521,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         ProtoLog.v(WM_DEBUG_STARTING_WINDOW, "Creating SnapshotStartingData");
         mStartingData = new SnapshotStartingData(mWmService, snapshot, typeParams);
-        if (task.forAllLeafTaskFragments(TaskFragment::isEmbedded)) {
+        if ((!mStyleFillsParent && task.getChildCount() > 1)
+                || task.forAllLeafTaskFragments(TaskFragment::isEmbedded)) {
+            // Case 1:
+            // If it is moving a Task{[0]=main activity, [1]=translucent activity} to front, use
+            // shared starting window so that the transition doesn't need to wait for the activity
+            // behind the translucent activity. Also, onFirstWindowDrawn will check all visible
+            // activities are drawn in the task to remove the snapshot starting window.
+            // Case 2:
             // Associate with the task so if this activity is resized by task fragment later, the
             // starting window can keep the same bounds as the task.
             associateStartingDataWithTask();
@@ -5211,16 +5221,15 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         return mPendingOptions;
     }
 
-    ActivityOptions takeOptions() {
-        if (DEBUG_TRANSITION) Slog.i(TAG, "Taking options for " + this + " callers="
-                + Debug.getCallers(6));
+    ActivityOptions.SceneTransitionInfo takeSceneTransitionInfo() {
+        if (DEBUG_TRANSITION) {
+            Slog.i(TAG, "Taking SceneTransitionInfo for " + this + " callers="
+                    + Debug.getCallers(6));
+        }
         if (mPendingOptions == null) return null;
         final ActivityOptions opts = mPendingOptions;
         mPendingOptions = null;
-        // Strip sensitive information from options before sending it to app.
-        opts.setRemoteTransition(null);
-        opts.setRemoteAnimationAdapter(null);
-        return opts;
+        return opts.getSceneTransitionInfo();
     }
 
     RemoteTransition takeRemoteTransition() {
@@ -6263,7 +6272,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             acquireActivityBoost();
             try {
                 mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(),
-                        StartActivityItem.obtain(token, takeOptions()));
+                        StartActivityItem.obtain(token, takeSceneTransitionInfo()));
             } catch (Exception e) {
                 Slog.w(TAG, "Exception thrown sending start: " + intent.getComponent(), e);
                 releaseActivityBoost();
@@ -6369,8 +6378,11 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     void handleAlreadyVisible() {
         try {
-            if (returningOptions != null) {
-                app.getThread().scheduleOnNewActivityOptions(token, returningOptions.toBundle());
+            if (returningOptions != null
+                    && returningOptions.getAnimationType() == ANIM_SCENE_TRANSITION
+                    && returningOptions.getSceneTransitionInfo() != null) {
+                app.getThread().scheduleOnNewSceneTransitionInfo(token,
+                        returningOptions.getSceneTransitionInfo());
             }
         } catch(RemoteException e) {
         }
@@ -6727,10 +6739,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // In any other case, we can't count on getting the screen unfrozen,
         // so it is best to leave as-is.
         return hasProcess() && !app.isCrashing() && !app.isNotResponding();
-    }
-
-    void startFreezingScreenLocked(int configChanges) {
-        startFreezingScreenLocked(app, configChanges);
     }
 
     void startFreezingScreenLocked(WindowProcessController app, int configChanges) {
@@ -8271,12 +8279,8 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      * Set the last reported configuration to the client. Should be called whenever
      * a new merged configuration is sent to the client for this activity.
      */
-    void setLastReportedConfiguration(@NonNull MergedConfiguration config) {
-        setLastReportedConfiguration(config.getGlobalConfiguration(),
-            config.getOverrideConfiguration());
-    }
-
-    private void setLastReportedConfiguration(Configuration global, Configuration override) {
+    void setLastReportedConfiguration(@NonNull Configuration global,
+            @NonNull Configuration override) {
         mLastReportedConfiguration.setConfiguration(global, override);
     }
 
@@ -9816,7 +9820,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             configChangeFlags |= changes;
             if (mVisible && mAtmService.mTmpUpdateConfigurationResult.mIsUpdating
                     && !mTransitionController.isShellTransitionsEnabled()) {
-                startFreezingScreenLocked(mAtmService.mTmpUpdateConfigurationResult.changes);
+                startFreezingScreenLocked(app, mAtmService.mTmpUpdateConfigurationResult.changes);
             }
             final boolean displayMayChange = mTmpConfig.windowConfiguration.getDisplayRotation()
                     != getWindowConfiguration().getDisplayRotation()
@@ -10520,6 +10524,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                 mLetterboxUiController.shouldIgnoreOrientationRequestLoop());
         proto.write(SHOULD_OVERRIDE_FORCE_RESIZE_APP,
                 mLetterboxUiController.shouldOverrideForceResizeApp());
+        proto.write(SHOULD_ENABLE_USER_ASPECT_RATIO_SETTINGS,
+                mLetterboxUiController.shouldEnableUserAspectRatioSettings());
+        proto.write(IS_USER_FULLSCREEN_OVERRIDE_ENABLED,
+                mLetterboxUiController.isUserFullscreenOverrideEnabled());
     }
 
     @Override
@@ -10805,6 +10813,14 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
     @Override
     boolean isSyncFinished(BLASTSyncEngine.SyncGroup group) {
+        if (task != null && task.mSharedStartingData != null) {
+            final WindowState startingWin = task.topStartingWindow();
+            if (startingWin != null && startingWin.mSyncState == SYNC_STATE_READY
+                    && mDisplayContent.mUnknownAppVisibilityController.allResolved()) {
+                // The sync is ready if a drawn starting window covered the task.
+                return true;
+            }
+        }
         if (!super.isSyncFinished(group)) return false;
         if (mDisplayContent != null && mDisplayContent.mUnknownAppVisibilityController
                 .isVisibilityUnknown(this)) {

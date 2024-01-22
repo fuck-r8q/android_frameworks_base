@@ -1250,6 +1250,11 @@
     <string name="permdesc_foregroundServiceFileManagement">Allows the app to make use of foreground services with the type \"fileManagement\"</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permlab_foregroundServiceMediaProcessing">run foreground service with the type \"mediaProcessing\"</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+    <string name="permdesc_foregroundServiceMediaProcessing">Allows the app to make use of foreground services with the type \"mediaProcessing\"</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permlab_foregroundServiceSpecialUse">run foreground service with the type \"specialUse\"</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
     <string name="permdesc_foregroundServiceSpecialUse">Allows the app to make use of foreground services with the type \"specialUse\"</string>
@@ -1822,7 +1827,7 @@
     <!-- Message shown during fingerprint acquisision when the fingerprint cannot be recognized -->
     <string name="fingerprint_acquired_partial">Press firmly on the sensor</string>
     <!-- Message shown during fingerprint acquisision when the fingerprint cannot be recognized -->
-    <string name="fingerprint_acquired_insufficient">Can\u2019t recognize fingerprint. Try again.</string>
+    <string name="fingerprint_acquired_insufficient">Fingerprint not recognized. Try again.</string>
     <!-- Message shown during fingerprint acquisision when the fingerprint sensor needs cleaning -->
     <string name="fingerprint_acquired_imager_dirty">Clean fingerprint sensor and try again</string>
     <string name="fingerprint_acquired_imager_dirty_alt">Clean sensor and try again</string>
@@ -1956,7 +1961,7 @@
     <!-- Message shown during face acquisition when the sensor needs to be recalibrated [CHAR LIMIT=50] -->
     <string name="face_acquired_recalibrate">Please re-enroll your face.</string>
     <!-- Message shown during face enrollment when a different person's face is detected [CHAR LIMIT=50] -->
-    <string name="face_acquired_too_different">Can\u2019t recognize face. Try again.</string>
+    <string name="face_acquired_too_different">Face not recognized. Try again.</string>
     <!-- Message shown during face enrollment when the face is too similar to a previous acquisition [CHAR LIMIT=50] -->
     <string name="face_acquired_too_similar">Change the position of your head slightly</string>
     <!-- Message shown during acqusition when the user's face is turned too far left or right [CHAR LIMIT=50] -->

@@ -118,6 +118,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
@@ -273,12 +274,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private final RefactorFlag mInlineReplyAnimation =
             RefactorFlag.forView(Flags.NOTIFICATION_INLINE_REPLY_ANIMATION);
 
-    private static final boolean mSimulateSlowMeasure = Compile.IS_DEBUG && RefactorFlag.forView(
-            Flags.ENABLE_NOTIFICATIONS_SIMULATE_SLOW_MEASURE).isEnabled();
+    private static boolean shouldSimulateSlowMeasure() {
+        return Compile.IS_DEBUG && RefactorFlag.forView(
+                Flags.ENABLE_NOTIFICATIONS_SIMULATE_SLOW_MEASURE).isEnabled();
+    }
+
     private static final String SLOW_MEASURE_SIMULATE_DELAY_PROPERTY =
             "persist.notifications.extra_measure_delay_ms";
-    private static final int SLOW_MEASURE_SIMULATE_DELAY_MS = mSimulateSlowMeasure ?
-            SystemProperties.getInt(SLOW_MEASURE_SIMULATE_DELAY_PROPERTY, 150) : 0;
+    private static final int SLOW_MEASURE_SIMULATE_DELAY_MS =
+            SystemProperties.getInt(SLOW_MEASURE_SIMULATE_DELAY_PROPERTY, 150);
 
     // Listener will be called when receiving a long click event.
     // Use #setLongPressPosition to optionally assign positional data with the long press.
@@ -985,6 +989,25 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     /**
+     * Recursively collects the [{@link ExpandableViewState#location}]s populating the provided
+     * map.
+     * The visibility of each child is determined by the {@link View#getVisibility()}.
+     * Locations are added to the provided map including locations from child views, that are
+     * visible.
+     */
+    public void collectVisibleLocations(Map<String, Integer> locationsMap) {
+        if (getVisibility() == View.VISIBLE) {
+            locationsMap.put(getEntry().getKey(), getViewState().location);
+            if (mChildrenContainer != null) {
+                List<ExpandableNotificationRow> children = mChildrenContainer.getAttachedChildren();
+                for (int i = 0; i < children.size(); i++) {
+                    children.get(i).collectVisibleLocations(locationsMap);
+                }
+            }
+        }
+    }
+
+    /**
      * Updates states of all children.
      */
     public void updateChildrenStates() {
@@ -1612,7 +1635,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         /**
          * Called when the notification is expanded / collapsed.
          */
-        void logNotificationExpansion(String key, boolean userAction, boolean expanded);
+        void logNotificationExpansion(String key, int location, boolean userAction,
+                boolean expanded);
 
         /**
          * Called when a notification which was previously kept in its parent for the
@@ -1886,7 +1910,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        if (Compile.IS_DEBUG && mSimulateSlowMeasure) {
+        if (shouldSimulateSlowMeasure()) {
             simulateExtraMeasureDelay();
         }
         Trace.endSection();
@@ -3309,7 +3333,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (nowExpanded != wasExpanded) {
             updateShelfIconColor();
             if (mLogger != null) {
-                mLogger.logNotificationExpansion(mLoggingKey, userAction, nowExpanded);
+                mLogger.logNotificationExpansion(mLoggingKey, getViewState().location, userAction,
+                        nowExpanded);
             }
             if (mIsSummaryWithChildren) {
                 mChildrenContainer.onExpansionChanged();

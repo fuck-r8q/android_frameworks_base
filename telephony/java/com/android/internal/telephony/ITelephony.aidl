@@ -72,7 +72,7 @@ import android.telephony.satellite.ISatelliteCapabilitiesCallback;
 import android.telephony.satellite.ISatelliteDatagramCallback;
 import android.telephony.satellite.ISatelliteTransmissionUpdateCallback;
 import android.telephony.satellite.ISatelliteProvisionStateCallback;
-import android.telephony.satellite.ISatelliteStateCallback;
+import android.telephony.satellite.ISatelliteModemStateCallback;
 import android.telephony.satellite.NtnSignalStrength;
 import android.telephony.satellite.SatelliteCapabilities;
 import android.telephony.satellite.SatelliteDatagram;
@@ -2896,7 +2896,7 @@ interface ITelephony {
      */
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
             + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
-    int registerForSatelliteModemStateChanged(int subId, ISatelliteStateCallback callback);
+    int registerForSatelliteModemStateChanged(int subId, ISatelliteModemStateCallback callback);
 
     /**
      * Unregisters for modem state changed from satellite modem.
@@ -2907,7 +2907,7 @@ interface ITelephony {
      */
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
             + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
-    void unregisterForSatelliteModemStateChanged(int subId, ISatelliteStateCallback callback);
+    void unregisterForSatelliteModemStateChanged(int subId, ISatelliteModemStateCallback callback);
 
    /**
      * Register to receive incoming datagrams over satellite.
@@ -3053,6 +3053,29 @@ interface ITelephony {
      * @return {@code true} if the handover type is set successfully, {@code false} otherwise.
      */
     boolean setEmergencyCallToSatelliteHandoverType(int handoverType, int delaySeconds);
+
+    /**
+     * This API should be used by only CTS tests to forcefully set the country codes.
+     *
+     * @param reset {@code true} mean the overridden country codes should not be used, {@code false}
+     *              otherwise.
+     * @return {@code true} if the country code is set successfully, {@code false} otherwise.
+     */
+    boolean setCountryCodes(in boolean reset, in List<String> currentNetworkCountryCodes,
+            in Map cachedNetworkCountryCodes, in String locationCountryCode,
+            in long locationCountryCodeTimestampNanos);
+
+    /**
+     * This API should be used by only CTS tests to override the overlay configs of satellite
+     * access controller.
+     *
+     * @param reset {@code true} mean the overridden configs should not be used, {@code false}
+     *              otherwise.
+     * @return {@code true} if the overlay configs are set successfully, {@code false} otherwise.
+     */
+    boolean setSatelliteAccessControlOverlayConfigs(in boolean reset, in boolean isAllowed,
+            in String s2CellFile, in long locationFreshDurationNanos,
+            in List<String> satelliteCountryCodes);
 
     /**
      * Test method to confirm the file contents are not altered.
@@ -3207,4 +3230,45 @@ interface ITelephony {
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
         + "android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)")
     boolean isCellularIdentifierDisclosureNotificationsEnabled();
+
+    /**
+     * Enables or disables notifications sent when cellular null cipher or integrity algorithms
+     * are in use by the cellular modem.
+     *
+     * @throws IllegalStateException if the Telephony process is not currently available
+     * @throws SecurityException if the caller does not have the required privileges
+     * @throws UnsupportedOperationException if the modem does not support reporting on ciphering
+     * and integrity algorithms in use
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+        + "android.Manifest.permission.MODIFY_PHONE_STATE)")
+    void setEnableNullCipherNotifications(boolean enable);
+
+    /**
+     * Get whether notifications are enabled for null cipher or integrity algorithms in use by the
+     * cellular modem.
+     *
+     * @throws IllegalStateException if the Telephony process is not currently available
+     * @throws SecurityException if the caller does not have the required privileges
+     * @throws UnsupportedOperationException if the modem does not support reporting on ciphering
+     * and integrity algorithms in use
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+        + "android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)")
+    boolean isNullCipherNotificationsEnabled();
+
+    /**
+     * Get the aggregated satellite plmn list. This API collects plmn data from multiple sources,
+     * including carrier config, entitlement server, and config update.
+     *
+     * @param subId subId The subscription ID of the carrier.
+     *
+     * @return List of plmns for carrier satellite service. If no plmn is available, empty list will
+     * be returned.
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+            + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    List<String> getAllSatellitePlmnsForCarrier(int subId);
 }

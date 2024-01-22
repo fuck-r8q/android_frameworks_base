@@ -9766,6 +9766,17 @@ public class CarrierConfigManager {
             "parameters_used_for_ntn_lte_signal_bar_int";
 
     /**
+     * Indicating whether plmns associated with carrier satellite can be exposed to user when
+     * manually scanning available cellular network.
+     * If key is {@code true}, satellite plmn should not be exposed to user and should be
+     * automatically set, {@code false} otherwise. Default value is {@code true}.
+     *
+     * @hide
+     */
+    public static final String KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL =
+            "remove_satellite_plmn_in_manual_network_scan_bool";
+
+    /**
      * Indicating whether DUN APN should be disabled when the device is roaming. In that case,
      * the default APN (i.e. internet) will be used for tethering.
      *
@@ -11009,6 +11020,7 @@ public class CarrierConfigManager {
                 });
         sDefaults.putInt(KEY_PARAMETERS_USED_FOR_NTN_LTE_SIGNAL_BAR_INT,
                 CellSignalStrengthLte.USE_RSRP);
+        sDefaults.putBoolean(KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL, true);
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);
         sDefaults.putString(KEY_DEFAULT_PREFERRED_APN_NAME_STRING, "");
         sDefaults.putBoolean(KEY_SUPPORTS_CALL_COMPOSER_BOOL, false);
@@ -11198,6 +11210,9 @@ public class CarrierConfigManager {
      * @return A {@link PersistableBundle} containing the config for the given subId, or default
      *         values for an invalid subId.
      *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     *
      * @deprecated Use {@link #getConfigForSubId(int, String...)} instead.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
@@ -11245,6 +11260,9 @@ public class CarrierConfigManager {
      * @return A {@link PersistableBundle} with key/value mapping for the specified configuration
      * on success, or an empty (but never null) bundle on failure (for example, when the calling app
      * has no permission).
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(anyOf = {
             Manifest.permission.READ_PHONE_STATE,
@@ -11290,6 +11308,9 @@ public class CarrierConfigManager {
      * @param overrideValues Key-value pairs of the values that are to be overridden. If set to
      *                       {@code null}, this will remove all previous overrides and set the
      *                       carrier configuration back to production values.
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
@@ -11347,6 +11368,10 @@ public class CarrierConfigManager {
      *
      * @see #getConfigForSubId
      * @see #getConfig(String...)
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     *
      * @deprecated use {@link #getConfig(String...)} instead.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
@@ -11381,6 +11406,9 @@ public class CarrierConfigManager {
      * configs on success, or an empty (but never null) bundle on failure.
      * @see #getConfigForSubId(int, String...)
      * @see SubscriptionManager#getDefaultSubscriptionId()
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @RequiresPermission(anyOf = {
             Manifest.permission.READ_PHONE_STATE,
@@ -11432,6 +11460,9 @@ public class CarrierConfigManager {
      *
      * <p>This method returns before the reload has completed, and {@link
      * android.service.carrier.CarrierService#onLoadConfig} will be called from an arbitrary thread.
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -11455,6 +11486,8 @@ public class CarrierConfigManager {
      * <p>Depending on simState, the config may be cleared or loaded from config app. This is only
      * used by SubscriptionInfoUpdater.
      *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @SystemApi
@@ -11477,6 +11510,8 @@ public class CarrierConfigManager {
      * Gets the package name for a default carrier service.
      * @return the package name for a default carrier service; empty string if not available.
      *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      * @hide
      */
     @NonNull
@@ -11530,6 +11565,9 @@ public class CarrierConfigManager {
      * @param subId the subscription ID, normally obtained from {@link SubscriptionManager}.
      *
      * @see #getConfigForSubId
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(Manifest.permission.READ_PHONE_STATE)

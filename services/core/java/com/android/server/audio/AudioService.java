@@ -8913,6 +8913,8 @@ public class AudioService extends IAudioService.Stub
                 synchronized (VolumeStreamState.class) {
                     oldIndex = getIndex(device);
                     index = getValidIndex(index, hasModifyAudioSettings);
+                    // for STREAM_SYSTEM_ENFORCED, do not sync aliased streams on the enforced index
+                    int aliasIndex = index;
                     if ((mStreamType == AudioSystem.STREAM_SYSTEM_ENFORCED) && mCameraSoundForced) {
                         index = mIndexMax;
                     }
@@ -8931,7 +8933,8 @@ public class AudioService extends IAudioService.Stub
                         if (streamType != mStreamType &&
                                 mStreamVolumeAlias[streamType] == mStreamType &&
                                 (changed || !aliasStreamState.hasIndexForDevice(device))) {
-                            final int scaledIndex = rescaleIndex(index, mStreamType, streamType);
+                            final int scaledIndex =
+                                    rescaleIndex(aliasIndex, mStreamType, streamType);
                             aliasStreamState.setIndex(scaledIndex, device, caller,
                                     hasModifyAudioSettings);
                             if (isCurrentDevice) {
@@ -9451,6 +9454,14 @@ public class AudioService extends IAudioService.Stub
                 return;
             }
             if (mIsSingleVolume && (streamState.mStreamType != AudioSystem.STREAM_MUSIC)) {
+                return;
+            }
+
+            // Persisting STREAM_SYSTEM_ENFORCED index is not needed as its alias (STREAM_RING)
+            // is persisted. This can also be problematic when the enforcement is active as it will
+            // override current SYSTEM_RING persisted value given they share the same settings name
+            // (due to aliasing).
+            if (streamState.mStreamType == AudioSystem.STREAM_SYSTEM_ENFORCED) {
                 return;
             }
             if (streamState.hasValidSettingsName()) {
@@ -13668,6 +13679,46 @@ public class AudioService extends IAudioService.Stub
             }
             return status;
         }
+    }
+
+
+    /**
+     * @see AudioManager#shouldNotificationSoundPlay(AudioAttributes)
+     */
+    @android.annotation.EnforcePermission(
+            android.Manifest.permission.QUERY_AUDIO_STATE)
+    public boolean shouldNotificationSoundPlay(@NonNull final AudioAttributes aa) {
+        super.shouldNotificationSoundPlay_enforcePermission();
+        Objects.requireNonNull(aa);
+
+        // don't play notifications if the stream volume associated with the
+        // AudioAttributes of the notification record is 0 (non-zero volume implies
+        // not silenced by SILENT or VIBRATE ringer mode)
+        final int stream = AudioAttributes.toLegacyStreamType(aa);
+        final boolean mutingFromVolume = getStreamVolume(stream) == 0;
+        if (mutingFromVolume) {
+            if (DEBUG_VOL) {
+                Slog.d(TAG, "notification should not play due to muted stream " + stream);
+            }
+            return false;
+        }
+
+        // don't play notifications if there is a user of GAIN_TRANSIENT_EXCLUSIVE audio focus
+        // and the focus owner is recording
+        final int uid = mMediaFocusControl.getExclusiveFocusOwnerUid();
+        if (uid == -1) { // return value is -1 if focus isn't GAIN_TRANSIENT_EXCLUSIVE
+            return true;
+        }
+        // is the owner of GAIN_TRANSIENT_EXCLUSIVE focus also recording?
+        final boolean mutingFromFocusAndRecording = mRecordMonitor.isRecordingActiveForUid(uid);
+        if (mutingFromFocusAndRecording) {
+            if (DEBUG_VOL) {
+                Slog.d(TAG, "notification should not play due to exclusive focus owner recording "
+                        + " uid:" + uid);
+            }
+            return false;
+        }
+        return true;
     }
 
     //======================

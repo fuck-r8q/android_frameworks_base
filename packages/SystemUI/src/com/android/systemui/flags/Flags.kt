@@ -122,11 +122,6 @@ object Flags {
     val NEW_UNLOCK_SWIPE_ANIMATION = releasedFlag("new_unlock_swipe_animation")
     val CHARGING_RIPPLE = resourceBooleanFlag(R.bool.flag_charging_ripple, "charging_ripple")
 
-    // TODO(b/254512281): Tracking Bug
-    @JvmField
-    val BOUNCER_USER_SWITCHER =
-        resourceBooleanFlag(R.bool.config_enableBouncerUserSwitcher, "bouncer_user_switcher")
-
     // TODO(b/254512676): Tracking Bug
     @JvmField
     val LOCKSCREEN_CUSTOM_CLOCKS =
@@ -353,12 +348,6 @@ object Flags {
     // TODO(b/254512673): Tracking Bug
     @JvmField val DREAM_MEDIA_TAP_TO_OPEN = unreleasedFlag("dream_media_tap_to_open")
 
-    // TODO(b/254513168): Tracking Bug
-    @JvmField val UMO_SURFACE_RIPPLE = releasedFlag("umo_surface_ripple")
-
-    // TODO(b/261734857): Tracking Bug
-    @JvmField val UMO_TURBULENCE_NOISE = releasedFlag("umo_turbulence_noise")
-
     // TODO(b/263272731): Tracking Bug
     val MEDIA_TTT_RECEIVER_SUCCESS_RIPPLE = releasedFlag("media_ttt_receiver_success_ripple")
 
@@ -376,9 +365,6 @@ object Flags {
 
     // 1000 - dock
     val SIMULATE_DOCK_THROUGH_CHARGING = releasedFlag("simulate_dock_through_charging")
-
-    // TODO(b/254512758): Tracking Bug
-    @JvmField val ROUNDED_BOX_RIPPLE = releasedFlag("rounded_box_ripple")
 
     // TODO(b/273509374): Tracking Bug
     @JvmField
@@ -448,11 +434,6 @@ object Flags {
     // TODO(b/270987164): Tracking Bug
     @JvmField val TRACKPAD_GESTURE_FEATURES = releasedFlag("trackpad_gesture_features")
 
-    // TODO(b/265639042): Tracking Bug
-    @JvmField
-    val WM_ENABLE_PREDICTIVE_BACK_QS_DIALOG_ANIM =
-        unreleasedFlag("persist.wm.debug.predictive_back_qs_dialog_anim", teamfood = true)
-
     // TODO(b/273800936): Tracking Bug
     @JvmField val TRACKPAD_GESTURE_COMMON = releasedFlag("trackpad_gesture_common")
 
@@ -494,6 +475,13 @@ object Flags {
      */
     // TODO(b/283300105): Tracking Bug
     @JvmField val SCENE_CONTAINER_ENABLED = false
+
+    /**
+     * Whether the compose bouncer is enabled. This ensures ProGuard can
+     * remove unused code from our APK at compile time.
+     */
+    // TODO(b/280877228): Tracking Bug
+    @JvmField val COMPOSE_BOUNCER_ENABLED = false
 
     // 1900
     @JvmField val NOTE_TASKS = releasedFlag("keycode_flag")

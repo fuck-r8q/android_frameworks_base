@@ -388,6 +388,7 @@ class SplitScreenTransitions {
 
     IBinder startResizeTransition(WindowContainerTransaction wct,
             Transitions.TransitionHandler handler,
+            @Nullable TransitionConsumedCallback consumedCallback,
             @Nullable TransitionFinishedCallback finishCallback) {
         if (mPendingResize != null) {
             mPendingResize.cancel(null);
@@ -396,13 +397,14 @@ class SplitScreenTransitions {
         }
 
         IBinder transition = mTransitions.startTransition(TRANSIT_CHANGE, wct, handler);
-        setResizeTransition(transition, finishCallback);
+        setResizeTransition(transition, consumedCallback, finishCallback);
         return transition;
     }
 
     void setResizeTransition(@NonNull IBinder transition,
+            @Nullable TransitionConsumedCallback consumedCallback,
             @Nullable TransitionFinishedCallback finishCallback) {
-        mPendingResize = new TransitSession(transition, null /* consumedCb */, finishCallback);
+        mPendingResize = new TransitSession(transition, consumedCallback, finishCallback);
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, "  splitTransition "
                 + " deduced Resize split screen");
     }
@@ -479,18 +481,20 @@ class SplitScreenTransitions {
     private void startFadeAnimation(@NonNull SurfaceControl leash, boolean show) {
         final float end = show ? 1.f : 0.f;
         final float start = 1.f - end;
-        final SurfaceControl.Transaction transaction = mTransactionPool.acquire();
         final ValueAnimator va = ValueAnimator.ofFloat(start, end);
         va.setDuration(FADE_DURATION);
         va.setInterpolator(show ? ALPHA_IN : ALPHA_OUT);
         va.addUpdateListener(animation -> {
             float fraction = animation.getAnimatedFraction();
+            final SurfaceControl.Transaction transaction = mTransactionPool.acquire();
             transaction.setAlpha(leash, start * (1.f - fraction) + end * fraction);
             transaction.apply();
+            mTransactionPool.release(transaction);
         });
         va.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                final SurfaceControl.Transaction transaction = mTransactionPool.acquire();
                 transaction.setAlpha(leash, end);
                 transaction.apply();
                 mTransactionPool.release(transaction);

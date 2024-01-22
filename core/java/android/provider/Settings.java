@@ -111,6 +111,7 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -1930,9 +1931,7 @@ public final class Settings {
      * A matching Activity will only be found if
      * {@link NotificationManager#areAutomaticZenRulesUserManaged()} is true.
      * <p>
-     * Input: Intent's data URI set with an application name, using the "package" schema (like
-     * "package:com.my.app").
-     * Input: The id of the rule, provided in {@link #EXTRA_AUTOMATIC_ZEN_RULE_ID}.
+     * Input: The id of the rule, provided in the {@link #EXTRA_AUTOMATIC_ZEN_RULE_ID} extra.
      * <p>
      * Output: Nothing.
      */
@@ -3602,12 +3601,17 @@ public final class Settings {
                                     + " type:" + mUri.getPath()
                                     + " in package:" + cr.getPackageName());
                         }
+                        // When a generation number changes, remove cached values, remove the old
+                        // generation tracker and request a new one
+                        generationTracker.destroy();
+                        mGenerationTrackers.remove(prefix);
                         for (int i = mValues.size() - 1; i >= 0; i--) {
                             String key = mValues.keyAt(i);
                             if (key.startsWith(prefix)) {
                                 mValues.remove(key);
                             }
                         }
+                        needsGenerationTracker = true;
                     } else {
                         boolean prefixCached = mValues.containsKey(prefix);
                         if (prefixCached) {
@@ -3616,6 +3620,7 @@ public final class Settings {
                             }
                             if (names.length > 0) {
                                 for (String name : names) {
+                                    // mValues can contain "null" values, need to use containsKey.
                                     if (mValues.containsKey(name)) {
                                         keyValues.put(
                                                 name.substring(substringLength),
@@ -3628,9 +3633,10 @@ public final class Settings {
                                     // Explicitly exclude the prefix as it is only there to
                                     // signal that the prefix has been cached.
                                     if (key.startsWith(prefix) && !key.equals(prefix)) {
+                                        String value = mValues.valueAt(i);
                                         keyValues.put(
                                                 key.substring(substringLength),
-                                                mValues.get(key));
+                                                value);
                                     }
                                 }
                             }
@@ -3692,11 +3698,11 @@ public final class Settings {
                 // Only the flags requested by the caller
                 if (names.length > 0) {
                     for (String name : names) {
-                        String value = flagsToValues.get(name);
-                        if (value != null) {
+                        // flagsToValues can contain "null" values, need to use containsKey.
+                        if (flagsToValues.containsKey(name)) {
                             keyValues.put(
                                     name.substring(substringLength),
-                                    value);
+                                    flagsToValues.get(name));
                         }
                     }
                 } else {
@@ -10161,8 +10167,12 @@ public final class Settings {
 
         /**
          * The default NFC payment component
+         *
+         * @deprecated please use {@link android.app.role.RoleManager#getRoleHolders(String)}
+         * with {@link android.app.role.RoleManager#ROLE_WALLET} parameter.
          * @hide
          */
+        @Deprecated
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
         public static final String NFC_PAYMENT_DEFAULT_COMPONENT = "nfc_payment_default_component";
 
@@ -12179,6 +12189,36 @@ public final class Settings {
          */
         public static final String HIDE_PRIVATESPACE_ENTRY_POINT = "hide_privatespace_entry_point";
 
+        /** @hide */
+        public static final int PRIVATE_SPACE_AUTO_LOCK_ON_DEVICE_LOCK = 0;
+        /** @hide */
+        public static final int PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY = 1;
+        /** @hide */
+        public static final int PRIVATE_SPACE_AUTO_LOCK_NEVER = 2;
+
+        /**
+         * The different auto lock options for private space.
+         *
+         * @hide
+         */
+        @IntDef(prefix = {"PRIVATE_SPACE_AUTO_LOCK_"}, value = {
+                PRIVATE_SPACE_AUTO_LOCK_ON_DEVICE_LOCK,
+                PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY,
+                PRIVATE_SPACE_AUTO_LOCK_NEVER,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface PrivateSpaceAutoLockOption {
+        }
+
+
+        /**
+         *  Store auto lock value for private space.
+         *  The possible values are defined in {@link PrivateSpaceAutoLockOption}.
+         *
+         * @hide
+         */
+        public static final String PRIVATE_SPACE_AUTO_LOCK = "private_space_auto_lock";
+
         /**
          * These entries are considered common between the personal and the managed profile,
          * since the managed profile doesn't get to change them.
@@ -12196,6 +12236,7 @@ public final class Settings {
             CLONE_TO_MANAGED_PROFILE.add(SHOW_IME_WITH_HARD_KEYBOARD);
             CLONE_TO_MANAGED_PROFILE.add(ACCESSIBILITY_BOUNCE_KEYS);
             CLONE_TO_MANAGED_PROFILE.add(NOTIFICATION_BUBBLES);
+            CLONE_TO_MANAGED_PROFILE.add(NOTIFICATION_HISTORY_ENABLED);
         }
 
         /** @hide */
@@ -13455,6 +13496,16 @@ public final class Settings {
         @SystemApi
         @Readable
         public static final String OTA_DISABLE_AUTOMATIC_UPDATE = "ota_disable_automatic_update";
+
+
+        /**
+         * Whether to boot with 16K page size compatible kernel
+         * 1 = Boot with 16K kernel
+         * 0 = Boot with 4K kernel (default)
+         * @hide
+         */
+        @Readable
+        public static final String ENABLE_16K_PAGES = "enable_16k_pages";
 
         /** Timeout for package verification.
         * @hide */
@@ -19718,6 +19769,15 @@ public final class Settings {
             @Readable
             public static final String WRIST_DETECTION_AUTO_LOCKING_ENABLED =
                     "wear_wrist_detection_auto_locking_enabled";
+
+            /**
+             * Whether consistent notification blocking experience is enabled.
+             *
+             * @hide
+             */
+            @Readable
+            public static final String CONSISTENT_NOTIFICATION_BLOCKING_ENABLED =
+                    "consistent_notification_blocking_enabled";
         }
     }
 
@@ -20212,12 +20272,13 @@ public final class Settings {
         private static String createCompositeName(@NonNull String namespace, @NonNull String name) {
             Preconditions.checkNotNull(namespace);
             Preconditions.checkNotNull(name);
-            return createPrefix(namespace) + name;
+            var sb = new StringBuilder(namespace.length() + 1 + name.length());
+            return sb.append(namespace).append('/').append(name).toString();
         }
 
         private static String createPrefix(@NonNull String namespace) {
             Preconditions.checkNotNull(namespace);
-            return namespace + "/";
+            return namespace + '/';
         }
 
         private static Uri createNamespaceUri(@NonNull String namespace) {

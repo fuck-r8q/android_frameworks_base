@@ -149,13 +149,48 @@ public final class PerformanceHintManager {
         @TestApi
         public static final int CPU_LOAD_RESUME = 3;
 
+        /**
+         * This hint indicates an increase in GPU workload intensity. It means that
+         * this hint session needs extra GPU resources to meet the target duration.
+         * This hint must be sent before reporting the actual duration to the session.
+         *
+         * @hide
+         */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_ADPF_GPU_REPORT_ACTUAL_WORK_DURATION)
+        public static final int GPU_LOAD_UP = 5;
+
+        /**
+         * This hint indicates a decrease in GPU workload intensity. It means that
+         * this hint session can reduce GPU resources and still meet the target duration.
+         *
+         * @hide
+         */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_ADPF_GPU_REPORT_ACTUAL_WORK_DURATION)
+        public static final int GPU_LOAD_DOWN = 6;
+
+        /**
+        * This hint indicates an upcoming GPU workload that is completely changed and
+        * unknown. It means that the hint session should reset GPU resources to a known
+        * baseline to prepare for an arbitrary load, and must wake up if inactive.
+         *
+         * @hide
+         */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_ADPF_GPU_REPORT_ACTUAL_WORK_DURATION)
+        public static final int GPU_LOAD_RESET = 7;
+
         /** @hide */
         @Retention(RetentionPolicy.SOURCE)
-        @IntDef(prefix = {"CPU_LOAD_"}, value = {
+        @IntDef(prefix = {"CPU_LOAD_", "GPU_LOAD_"}, value = {
             CPU_LOAD_UP,
             CPU_LOAD_DOWN,
             CPU_LOAD_RESET,
-            CPU_LOAD_RESUME
+            CPU_LOAD_RESUME,
+            GPU_LOAD_UP,
+            GPU_LOAD_DOWN,
+            GPU_LOAD_RESET
         })
         public @interface Hint {}
 
@@ -170,7 +205,7 @@ public final class PerformanceHintManager {
         }
 
         /**
-         * Updates this session's target duration for each cycle of work.
+         * Updates this session's target total duration for each cycle of work.
          *
          * @param targetDurationNanos the new desired duration in nanoseconds
          */
