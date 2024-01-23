@@ -57,6 +57,7 @@ import com.android.credentialmanager.common.ui.RemoteViewsFactory
 import com.android.credentialmanager.getflow.ProviderDisplayInfo
 import com.android.credentialmanager.getflow.toProviderDisplayInfo
 import com.android.credentialmanager.ktx.credentialEntry
+import com.android.credentialmanager.model.CredentialType
 import com.android.credentialmanager.model.get.CredentialEntryInfo
 import com.android.credentialmanager.model.get.ProviderInfo
 import org.json.JSONException
@@ -69,7 +70,8 @@ class CredentialAutofillService : AutofillService() {
     companion object {
         private const val TAG = "CredAutofill"
 
-        private const val SESSION_ID_KEY = "session_id"
+        private const val SESSION_ID_KEY = "autofill_session_id"
+        private const val REQUEST_ID_KEY = "autofill_request_id"
         private const val CRED_HINT_PREFIX = "credential="
         private const val REQUEST_DATA_KEY = "requestData"
         private const val CANDIDATE_DATA_KEY = "candidateQueryData"
@@ -97,16 +99,23 @@ class CredentialAutofillService : AutofillService() {
         val callingPackage = structure.activityComponent.packageName
         Log.i(TAG, "onFillCredentialRequest called for $callingPackage")
 
-        var sessionId = request.clientState?.getInt(SESSION_ID_KEY)
-
-        Log.i(TAG, "Autofill sessionId: " + sessionId)
-        if (sessionId == null) {
-            Log.i(TAG, "Session Id not found")
-            callback.onFailure("Session Id not found")
+        val clientState = request.clientState
+        if (clientState == null) {
+            Log.i(TAG, "Client state not found")
+            callback.onFailure("Client state not found")
+            return
+        }
+        val sessionId = clientState.getInt(SESSION_ID_KEY)
+        val requestId = clientState.getInt(REQUEST_ID_KEY)
+        Log.i(TAG, "Autofill sessionId: $sessionId, autofill requestId: $requestId")
+        if (sessionId == 0 || requestId == 0) {
+            Log.i(TAG, "Session Id or request Id not found")
+            callback.onFailure("Session Id or request Id not found")
             return
         }
 
-        val getCredRequest: GetCredentialRequest? = getCredManRequest(structure)
+        val getCredRequest: GetCredentialRequest? = getCredManRequest(structure, sessionId,
+            requestId)
         if (getCredRequest == null) {
             Log.i(TAG, "No credential manager request found")
             callback.onFailure("No credential manager request found")
@@ -164,7 +173,7 @@ class CredentialAutofillService : AutofillService() {
                 CancellationSignal(),
                 Executors.newSingleThreadExecutor(),
                 outcome,
-                autofillCallback
+                autofillCallback.asBinder()
         )
     }
 
@@ -305,12 +314,14 @@ class CredentialAutofillService : AutofillService() {
         var i = 0
         var datasetAdded = false
 
-        val duplicateDisplayNames: MutableMap<String, Boolean> = mutableMapOf()
+        val duplicateDisplayNamesForPasskeys: MutableMap<String, Boolean> = mutableMapOf()
         providerDisplayInfo.sortedUserNameToCredentialEntryList.forEach {
             val credentialEntry = it.sortedCredentialEntryList.first()
-            credentialEntry.displayName?.let {displayName ->
-                val duplicateEntry = duplicateDisplayNames.contains(displayName)
-                duplicateDisplayNames[displayName] = duplicateEntry
+            if (credentialEntry.credentialType == CredentialType.PASSKEY) {
+                credentialEntry.displayName?.let { displayName ->
+                    val duplicateEntry = duplicateDisplayNamesForPasskeys.contains(displayName)
+                    duplicateDisplayNamesForPasskeys[displayName] = duplicateEntry
+                }
             }
         }
         providerDisplayInfo.sortedUserNameToCredentialEntryList.forEach usernameLoop@{
@@ -347,12 +358,19 @@ class CredentialAutofillService : AutofillService() {
                 } else {
                     spec = inlinePresentationSpecs[inlinePresentationSpecsCount - 1]
                 }
-                val displayName : String = primaryEntry.displayName ?: primaryEntry.userName
+                val displayName: String = if (primaryEntry.credentialType ==
+                        CredentialType.PASSKEY && primaryEntry.displayName != null) {
+                    primaryEntry.displayName!!
+                } else {
+                    primaryEntry.userName
+                }
                 val sliceBuilder = InlineSuggestionUi
                         .newContentBuilder(pendingIntent)
                         .setTitle(displayName)
                 sliceBuilder.setStartIcon(icon)
-                if (duplicateDisplayNames[displayName] == true) {
+                if (primaryEntry.credentialType ==
+                        CredentialType.PASSKEY && duplicateDisplayNamesForPasskeys[displayName]
+                        == true) {
                     sliceBuilder.setSubtitle(primaryEntry.userName)
                 }
                 inlinePresentation = InlinePresentation(
@@ -515,12 +533,19 @@ class CredentialAutofillService : AutofillService() {
         TODO("Not yet implemented")
     }
 
-    private fun getCredManRequest(structure: AssistStructure): GetCredentialRequest? {
+    private fun getCredManRequest(
+        structure: AssistStructure,
+        sessionId: Int,
+        requestId: Int
+    ): GetCredentialRequest? {
         val credentialOptions: MutableList<CredentialOption> = mutableListOf()
         traverseStructure(structure, credentialOptions)
 
         if (credentialOptions.isNotEmpty()) {
-            return GetCredentialRequest.Builder(Bundle.EMPTY)
+            val dataBundle = Bundle()
+            dataBundle.putInt(SESSION_ID_KEY, sessionId)
+            dataBundle.putInt(REQUEST_ID_KEY, requestId)
+            return GetCredentialRequest.Builder(dataBundle)
                     .setCredentialOptions(credentialOptions)
                     .build()
         }

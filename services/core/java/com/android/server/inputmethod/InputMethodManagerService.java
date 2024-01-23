@@ -183,7 +183,6 @@ import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal.InputMethodListListener;
 import com.android.server.inputmethod.InputMethodSubtypeSwitchingController.ImeSubtypeListItem;
-import com.android.server.inputmethod.InputMethodUtils.InputMethodSettings;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.utils.PriorityDump;
@@ -479,7 +478,6 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
     /**
      * The client that is currently bound to an input method.
      */
-    // TODO(b/314150112): Move this to ClientController.
     @Nullable
     private ClientState mCurClient;
 
@@ -1677,7 +1675,11 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
         mVisibilityStateComputer = new ImeVisibilityStateComputer(this);
         mVisibilityApplier = new DefaultImeVisibilityApplier(this);
+
         mClientController = new ClientController(mPackageManagerInternal);
+        synchronized (ImfLock.class) {
+            mClientController.addClientControllerCallback(c -> onClientRemoved(c));
+        }
 
         mPreventImeStartupUnlessTextEditor = mRes.getBoolean(
                 com.android.internal.R.bool.config_preventImeStartupUnlessTextEditor);
@@ -2169,47 +2171,41 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         // actually running.
         final int callerUid = Binder.getCallingUid();
         final int callerPid = Binder.getCallingPid();
-
-        // TODO(b/314150112): Move the death recipient logic to ClientController when moving
-        //     removeClient method.
-        final IBinder.DeathRecipient deathRecipient = () -> removeClient(client);
         final IInputMethodClientInvoker clientInvoker =
                 IInputMethodClientInvoker.create(client, mHandler);
         synchronized (ImfLock.class) {
             mClientController.addClient(clientInvoker, inputConnection, selfReportedDisplayId,
-                    deathRecipient, callerUid, callerPid);
+                    callerUid, callerPid);
         }
     }
 
-    // TODO(b/314150112): Move this to ClientController.
-    void removeClient(IInputMethodClient client) {
+    // TODO(b/314150112): Move this method to InputMethodBindingController
+    /**
+     * Hide the IME if the removed user is the current user.
+     */
+    private void onClientRemoved(ClientController.ClientState client) {
         synchronized (ImfLock.class) {
-            ClientState cs = mClientController.mClients.remove(client.asBinder());
-            if (cs != null) {
-                client.asBinder().unlinkToDeath(cs.mClientDeathRecipient, 0 /* flags */);
-                clearClientSessionLocked(cs);
-                clearClientSessionForAccessibilityLocked(cs);
-
-                if (mCurClient == cs) {
-                    hideCurrentInputLocked(mCurFocusedWindow, null /* statsToken */, 0 /* flags */,
-                            null /* resultReceiver */, SoftInputShowHideReason.HIDE_REMOVE_CLIENT);
-                    if (mBoundToMethod) {
-                        mBoundToMethod = false;
-                        IInputMethodInvoker curMethod = getCurMethodLocked();
-                        if (curMethod != null) {
-                            // When we unbind input, we are unbinding the client, so we always
-                            // unbind ime and a11y together.
-                            curMethod.unbindInput();
-                            AccessibilityManagerInternal.get().unbindInput();
-                        }
+            clearClientSessionLocked(client);
+            clearClientSessionForAccessibilityLocked(client);
+            if (mCurClient == client) {
+                hideCurrentInputLocked(mCurFocusedWindow, null /* statsToken */, 0 /* flags */,
+                        null /* resultReceiver */, SoftInputShowHideReason.HIDE_REMOVE_CLIENT);
+                if (mBoundToMethod) {
+                    mBoundToMethod = false;
+                    IInputMethodInvoker curMethod = getCurMethodLocked();
+                    if (curMethod != null) {
+                        // When we unbind input, we are unbinding the client, so we always
+                        // unbind ime and a11y together.
+                        curMethod.unbindInput();
+                        AccessibilityManagerInternal.get().unbindInput();
                     }
-                    mBoundToAccessibility = false;
-                    mCurClient = null;
                 }
-                if (mCurFocusedWindowClient == cs) {
-                    mCurFocusedWindowClient = null;
-                    mCurFocusedWindowEditorInfo = null;
-                }
+                mBoundToAccessibility = false;
+                mCurClient = null;
+            }
+            if (mCurFocusedWindowClient == client) {
+                mCurFocusedWindowClient = null;
+                mCurFocusedWindowEditorInfo = null;
             }
         }
     }
@@ -2219,8 +2215,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
     void unbindCurrentClientLocked(@UnbindReason int unbindClientReason) {
         if (mCurClient != null) {
             if (DEBUG) {
-                Slog.v(TAG, "unbindCurrentInputLocked: client="
-                        + mCurClient.mClient.asBinder());
+                Slog.v(TAG, "unbindCurrentInputLocked: client=" + mCurClient.mClient.asBinder());
             }
             if (mBoundToMethod) {
                 mBoundToMethod = false;
@@ -2313,7 +2308,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         final StartInputInfo info = new StartInputInfo(mSettings.getCurrentUserId(),
                 getCurTokenLocked(),
                 mCurTokenDisplayId, getCurIdLocked(), startInputReason, restarting,
-                UserHandle.getUserId(mCurClient.mUid), mCurClient.mSelfReportedDisplayId,
+                UserHandle.getUserId(mCurClient.mUid),
+                mCurClient.mSelfReportedDisplayId,
                 mCurFocusedWindow, mCurEditorInfo, mCurFocusedWindowSoftInputMode,
                 getSequenceNumberLocked());
         mImeTargetWindowMap.put(startInputToken, mCurFocusedWindow);
@@ -2324,14 +2320,14 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         // same-user scenarios.
         // That said ignoring cross-user scenario will never affect IMEs that do not have
         // INTERACT_ACROSS_USERS(_FULL) permissions, which is actually almost always the case.
-        if (mSettings.getCurrentUserId() == UserHandle.getUserId(mCurClient.mUid)) {
+        if (mSettings.getCurrentUserId() == UserHandle.getUserId(
+                mCurClient.mUid)) {
             mPackageManagerInternal.grantImplicitAccess(mSettings.getCurrentUserId(),
                     null /* intent */, UserHandle.getAppId(getCurMethodUidLocked()),
                     mCurClient.mUid, true /* direct */);
         }
 
-        @InputMethodNavButtonFlags
-        final int navButtonFlags = getInputMethodNavButtonFlagsLocked();
+        @InputMethodNavButtonFlags final int navButtonFlags = getInputMethodNavButtonFlagsLocked();
         final SessionState session = mCurClient.mCurSession;
         setEnabledSessionLocked(session);
         session.mMethod.startInput(startInputToken, mCurInputConnection, mCurEditorInfo, restarting,
@@ -2751,8 +2747,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                         && curMethod.asBinder() == method.asBinder()) {
                     if (mCurClient != null) {
                         clearClientSessionLocked(mCurClient);
-                        mCurClient.mCurSession = new SessionState(mCurClient,
-                                method, session, channel);
+                        mCurClient.mCurSession = new SessionState(
+                                mCurClient, method, session, channel);
                         InputBindResult res = attachNewInputLocked(
                                 StartInputReason.SESSION_CREATED_BY_IME, true);
                         attachNewAccessibilityLocked(StartInputReason.SESSION_CREATED_BY_IME, true);
@@ -4869,8 +4865,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
                     final List<ImeSubtypeListItem> imList = InputMethodSubtypeSwitchingController
                             .getSortedInputMethodAndSubtypeList(
-                                    showAuxSubtypes, isScreenLocked, false, mContext,
-                                    mMethodMap, mSettings.getCurrentUserId());
+                                    showAuxSubtypes, isScreenLocked, true /* forImeMenu */,
+                                    mContext, mMethodMap, mSettings.getCurrentUserId());
                     mMenuController.showInputMethodMenuLocked(showAuxSubtypes, displayId,
                             lastInputMethodId, lastInputMethodSubtypeId, imList);
                 }
@@ -5777,8 +5773,10 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                 // TODO(b/305829876): Implement user ID verification
                 if (mCurClient != null) {
                     clearClientSessionForAccessibilityLocked(mCurClient, accessibilityConnectionId);
-                    mCurClient.mAccessibilitySessions.put(accessibilityConnectionId,
-                            new AccessibilitySessionState(mCurClient, accessibilityConnectionId,
+                    mCurClient.mAccessibilitySessions.put(
+                            accessibilityConnectionId,
+                            new AccessibilitySessionState(mCurClient,
+                                    accessibilityConnectionId,
                                     session));
 
                     attachNewAccessibilityLocked(StartInputReason.SESSION_CREATED_BY_ACCESSIBILITY,
@@ -5812,7 +5810,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                     }
                     // A11yManagerService unbinds the disabled accessibility service. We don't need
                     // to do it here.
-                    mCurClient.mClient.onUnbindAccessibilityService(getSequenceNumberLocked(),
+                    mCurClient.mClient.onUnbindAccessibilityService(
+                            getSequenceNumberLocked(),
                             accessibilityConnectionId);
                 }
                 // We only have sessions when we bound to an input method. Remove this session

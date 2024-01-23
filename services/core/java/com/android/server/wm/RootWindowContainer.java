@@ -817,7 +817,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mWmService.mAtmService.mTaskOrganizerController.dispatchPendingEvents();
         mWmService.mAtmService.mTaskFragmentOrganizerController.dispatchPendingEvents();
         mWmService.mSyncEngine.onSurfacePlacement();
-        mWmService.mAnimator.executeAfterPrepareSurfacesRunnables();
 
         checkAppTransitionReady(surfacePlacer);
 

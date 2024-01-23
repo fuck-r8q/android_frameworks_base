@@ -39,6 +39,7 @@ import static android.os.Process.INVALID_UID;
 import static android.os.Process.SYSTEM_UID;
 import static android.os.UserHandle.USER_NULL;
 import static android.view.Display.INVALID_DISPLAY;
+import static android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_OPEN_BEHIND;
 import static android.view.WindowManager.TRANSIT_NONE;
@@ -367,6 +368,12 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      * Note that only an embedded TaskFragment can be isolated.
      */
     private boolean mIsolatedNav;
+
+    /**
+     * Whether the TaskFragment should move to bottom of task when any activity below it is
+     * launched in clear top mode.
+     */
+    private boolean mMoveToBottomIfClearWhenLaunch;
 
     /** When set, will force the task to report as invisible. */
     static final int FLAG_FORCE_HIDDEN_FOR_PINNED_TASK = 1;
@@ -3040,6 +3047,30 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         }, false /* traverseTopToBottom */);
     }
 
+    boolean shouldBoostDimmer() {
+        if (asTask() != null || !isDimmingOnParentTask()) {
+            // early return if not embedded or should not dim on parent Task.
+            return false;
+        }
+
+        final TaskFragment adjacentTf = getAdjacentTaskFragment();
+        if (adjacentTf == null) {
+            // early return if no adjacent TF.
+            return false;
+        }
+
+        if (getParent().mChildren.indexOf(adjacentTf) < getParent().mChildren.indexOf(this)) {
+            // early return if this TF already has higher z-ordering.
+            return false;
+        }
+
+        // boost if there's an Activity window that has FLAG_DIM_BEHIND flag.
+        return forAllWindows(
+                (w) -> (w.mAttrs.flags & FLAG_DIM_BEHIND) != 0 && w.mActivityRecord != null
+                        && w.mActivityRecord.isEmbedded() && (w.mActivityRecord.isVisibleRequested()
+                        || w.mActivityRecord.isVisible()), true);
+    }
+
     @Override
     Dimmer getDimmer() {
         // If this is in an embedded TaskFragment and we want the dim applies on the TaskFragment.
@@ -3063,6 +3094,14 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
     void setEmbeddedDimArea(@EmbeddedDimArea int embeddedDimArea) {
         mEmbeddedDimArea = embeddedDimArea;
+    }
+
+    void setMoveToBottomIfClearWhenLaunch(boolean moveToBottomIfClearWhenLaunch) {
+        mMoveToBottomIfClearWhenLaunch = moveToBottomIfClearWhenLaunch;
+    }
+
+    boolean isMoveToBottomIfClearWhenLaunch() {
+        return mMoveToBottomIfClearWhenLaunch;
     }
 
     @VisibleForTesting

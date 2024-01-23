@@ -25,28 +25,16 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import android.content.ContentResolver;
 import android.content.Context;
-import android.content.ContextWrapper;
-import android.content.IContentProvider;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.os.Build;
 import android.os.LocaleList;
 import android.os.Parcel;
-import android.os.UserHandle;
-import android.provider.Settings;
-import android.test.mock.MockContentResolver;
-import android.text.TextUtils;
 import android.util.ArrayMap;
-import android.util.IntArray;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodSubtype;
 import android.view.inputmethod.InputMethodSubtype.InputMethodSubtypeBuilder;
@@ -1221,85 +1209,6 @@ public class InputMethodUtilsTest {
                 StartInputFlags.VIEW_HAS_FOCUS | StartInputFlags.IS_TEXT_EDITOR));
     }
 
-    private static IntArray createSubtypeHashCodeArrayFromStr(String subtypeHashCodesStr) {
-        final IntArray subtypes = new IntArray();
-        final TextUtils.SimpleStringSplitter imeSubtypeSplitter =
-                new TextUtils.SimpleStringSplitter(';');
-        if (TextUtils.isEmpty(subtypeHashCodesStr)) {
-            return subtypes;
-        }
-        imeSubtypeSplitter.setString(subtypeHashCodesStr);
-        while (imeSubtypeSplitter.hasNext()) {
-            subtypes.add(Integer.parseInt(imeSubtypeSplitter.next()));
-        }
-        return subtypes;
-    }
-
-    private static void verifyUpdateEnabledImeString(@NonNull String expectedEnabledImeStr,
-            @NonNull String initialEnabledImeStr, @NonNull String imeId,
-            @NonNull String enabledSubtypeHashCodesStr) {
-        assertEquals(expectedEnabledImeStr,
-                InputMethodUtils.InputMethodSettings.updateEnabledImeString(initialEnabledImeStr,
-                        imeId, createSubtypeHashCodeArrayFromStr(enabledSubtypeHashCodesStr)));
-    }
-
-    private static TestContext createMockContext(int userId) {
-        return new TestContext(InstrumentationRegistry.getInstrumentation()
-                .getTargetContext(), userId);
-    }
-
-    private static class TestContext extends ContextWrapper {
-        private int mUserId;
-        private ContentResolver mResolver;
-        private Resources mResources;
-
-        private static TestContext sSecondaryUserContext;
-
-        TestContext(@NonNull Context context, int userId) {
-            super(context);
-            mUserId = userId;
-            mResolver = mock(MockContentResolver.class);
-            when(mResolver.acquireProvider(Settings.Secure.CONTENT_URI)).thenReturn(
-                    mock(IContentProvider.class));
-            mResources = mock(Resources.class);
-
-            final Configuration configuration = new Configuration();
-            if (userId == 0) {
-                configuration.setLocale(LOCALE_EN_US);
-            } else {
-                configuration.setLocale(LOCALE_FR_CA);
-            }
-            doReturn(configuration).when(mResources).getConfiguration();
-        }
-
-        @Override
-        public Context createContextAsUser(UserHandle user, int flags) {
-            if (user.getIdentifier() != UserHandle.USER_SYSTEM) {
-                return sSecondaryUserContext = new TestContext(this, user.getIdentifier());
-            }
-            return this;
-        }
-
-        @Override
-        public int getUserId() {
-            return mUserId;
-        }
-
-        @Override
-        public ContentResolver getContentResolver() {
-            return mResolver;
-        }
-
-        @Override
-        public Resources getResources() {
-            return mResources;
-        }
-
-        static Context getSecondaryUserContext() {
-            return sSecondaryUserContext;
-        }
-    }
-
     private static void verifySplitEnabledImeStr(@NonNull String enabledImeStr,
             @NonNull String... expected) {
         final ArrayList<String> actual = new ArrayList<>();
@@ -1346,58 +1255,5 @@ public class InputMethodUtilsTest {
         Truth.assertThat(InputMethodUtils.concatEnabledImeIds(
                         "com.android/.ime1:com.android/.ime2", "com.android/.ime3"))
                 .isEqualTo("com.android/.ime1:com.android/.ime2:com.android/.ime3");
-    }
-
-    @Test
-    public void updateEnabledImeStringTest() {
-        // No change cases
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1",
-                "com.android/.ime1", "com.android/.ime1", "");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1",
-                "com.android/.ime1", "com.android/.ime2", "");
-
-        // To enable subtypes
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1",
-                "com.android/.ime1", "com.android/.ime2", "");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1;1",
-                "com.android/.ime1", "com.android/.ime1", "1");
-
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1;1;2;3",
-                "com.android/.ime1", "com.android/.ime1", "1;2;3");
-
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1;1;2;3:com.android/.ime2",
-                "com.android/.ime1:com.android/.ime2", "com.android/.ime1", "1;2;3");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime0:com.android/.ime1;1;2;3",
-                "com.android/.ime0:com.android/.ime1", "com.android/.ime1", "1;2;3");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime0:com.android/.ime1;1;2;3:com.android/.ime2",
-                "com.android/.ime0:com.android/.ime1:com.android/.ime2", "com.android/.ime1",
-                "1;2;3");
-
-        // To reset enabled subtypes
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1",
-                "com.android/.ime1;1", "com.android/.ime1", "");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1",
-                "com.android/.ime1;1;2;3", "com.android/.ime1", "");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime1:com.android/.ime2",
-                "com.android/.ime1;1;2;3:com.android/.ime2", "com.android/.ime1", "");
-
-        verifyUpdateEnabledImeString(
-                "com.android/.ime0:com.android/.ime1",
-                "com.android/.ime0:com.android/.ime1;1;2;3", "com.android/.ime1", "");
-        verifyUpdateEnabledImeString(
-                "com.android/.ime0:com.android/.ime1:com.android/.ime2",
-                "com.android/.ime0:com.android/.ime1;1;2;3:com.android/.ime2", "com.android/.ime1",
-                "");
     }
 }

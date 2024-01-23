@@ -231,6 +231,7 @@ public class SettingsBackupTest {
                     Settings.Global.ENABLE_ADB_INCREMENTAL_INSTALL_DEFAULT,
                     Settings.Global.ENABLE_MULTI_SLOT_TIMEOUT_MILLIS,
                     Settings.Global.ENHANCED_4G_MODE_ENABLED,
+                    Settings.Global.ENABLE_16K_PAGES, // Added for 16K developer option
                     Settings.Global.EPHEMERAL_COOKIE_MAX_SIZE_BYTES,
                     Settings.Global.ERROR_LOGCAT_PREFIX,
                     Settings.Global.EUICC_PROVISIONED,
@@ -867,6 +868,7 @@ public class SettingsBackupTest {
                         Settings.Secure.NEARBY_SHARING_SLICE_URI,
                         Settings.Secure.NOTIFIED_NON_ACCESSIBILITY_CATEGORY_SERVICES,
                         Settings.Secure.ONE_HANDED_TUTORIAL_SHOW_COUNT,
+                        Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
                         Settings.Secure.RELEASE_COMPRESS_BLOCKS_ON_INSTALL,
                         Settings.Secure.SCREENSAVER_COMPLICATIONS_ENABLED,
                         Settings.Secure.SHOW_QR_CODE_SCANNER_SETTING,

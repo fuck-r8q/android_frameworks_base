@@ -1311,7 +1311,7 @@ class BackNavigationController {
                 Rect insets;
                 if (mainWindow != null) {
                     insets = mainWindow.getInsetsStateWithVisibilityOverride().calculateInsets(
-                            mBounds, WindowInsets.Type.systemBars(),
+                            mBounds, WindowInsets.Type.tappableElement(),
                             false /* ignoreVisibility */).toRect();
                     InsetUtils.addInsets(insets, mainWindow.mActivityRecord.getLetterboxInsets());
                 } else {
@@ -1327,7 +1327,8 @@ class BackNavigationController {
                 return mAnimationTarget;
             }
 
-            void createStartingSurface(@NonNull WindowContainer closeWindow) {
+            void createStartingSurface(@NonNull WindowContainer closeWindow,
+                    @NonNull ActivityRecord[] visibleOpenActivities) {
                 if (!mIsOpen) {
                     return;
                 }
@@ -1346,7 +1347,7 @@ class BackNavigationController {
                 if (mainActivity == null) {
                     return;
                 }
-                final TaskSnapshot snapshot = getSnapshot(mTarget);
+                final TaskSnapshot snapshot = getSnapshot(mTarget, visibleOpenActivities);
                 mRequestedStartingSurfaceId = openTask.mAtmService.mTaskOrganizerController
                         .addWindowlessStartingSurface(openTask, mainActivity,
                                 // Choose configuration from closeWindow, because the configuration
@@ -1489,7 +1490,8 @@ class BackNavigationController {
                         // Try to draw two snapshot within a WindowlessStartingWindow, or find
                         // another key for StartingWindowRecordManager.
                         && openAnimationAdaptor.length == 1) {
-                    openAnimationAdaptor[0].createStartingSurface(closeWindow);
+                    openAnimationAdaptor[0].createStartingSurface(closeWindow,
+                            visibleOpenActivities);
                 } else {
                     for (int i = visibleOpenActivities.length - 1; i >= 0; --i) {
                         setLaunchBehind(visibleOpenActivities[i]);
@@ -1589,12 +1591,13 @@ class BackNavigationController {
 
     private static void setLaunchBehind(@NonNull ActivityRecord activity) {
         if (!activity.isVisibleRequested()) {
-            activity.setVisibility(true);
             // The transition could commit the visibility and in the finishing state, that could
             // skip commitVisibility call in setVisibility cause the activity won't visible here.
             // Call it again to make sure the activity could be visible while handling the pending
             // animation.
-            activity.commitVisibility(true, true);
+            // Do not performLayout during prepare animation, because it could cause focus window
+            // change. Let that happen after the BackNavigationInfo has returned to shell.
+            activity.commitVisibility(true, false /* performLayout */);
             activity.mTransitionController.mSnapshotController
                     .mActivitySnapshotController.addOnBackPressedActivity(activity);
         }
@@ -1665,13 +1668,18 @@ class BackNavigationController {
         ProtoLog.d(WM_DEBUG_BACK_PREVIEW, "onBackNavigationDone backType=%s, "
                 + "triggerBack=%b", backType, triggerBack);
 
-        mNavigationMonitor.stopMonitorForRemote();
-        mBackAnimationInProgress = false;
-        mShowWallpaper = false;
-        mPendingAnimationBuilder = null;
+        synchronized (mWindowManagerService.mGlobalLock) {
+            mNavigationMonitor.stopMonitorForRemote();
+            mBackAnimationInProgress = false;
+            mShowWallpaper = false;
+            // All animation should be done, clear any un-send animation.
+            mPendingAnimation = null;
+            mPendingAnimationBuilder = null;
+        }
     }
 
-    static TaskSnapshot getSnapshot(@NonNull WindowContainer w) {
+    static TaskSnapshot getSnapshot(@NonNull WindowContainer w,
+            ActivityRecord[] visibleOpenActivities) {
         if (w.asTask() != null) {
             final Task task = w.asTask();
             return task.mRootWindowContainer.mWindowManager.mTaskSnapshotController.getSnapshot(
@@ -1681,7 +1689,8 @@ class BackNavigationController {
 
         if (w.asActivityRecord() != null) {
             final ActivityRecord ar = w.asActivityRecord();
-            return ar.mWmService.mSnapshotController.mActivitySnapshotController.getSnapshot(ar);
+            return ar.mWmService.mSnapshotController.mActivitySnapshotController
+                    .getSnapshot(visibleOpenActivities);
         }
         return null;
     }

@@ -341,7 +341,8 @@ public class VirtualDeviceManagerServiceTest {
         mSetFlagsRule.initAllFlagsToReleaseConfigDefault();
 
         doReturn(true).when(mInputManagerInternalMock).setVirtualMousePointerDisplayId(anyInt());
-        doNothing().when(mInputManagerInternalMock).setPointerAcceleration(anyFloat(), anyInt());
+        doNothing().when(mInputManagerInternalMock)
+                .setMousePointerAccelerationEnabled(anyBoolean(), anyInt());
         doNothing().when(mInputManagerInternalMock).setPointerIconVisible(anyBoolean(), anyInt());
         LocalServices.removeServiceForTest(InputManagerInternal.class);
         LocalServices.addService(InputManagerInternal.class, mInputManagerInternalMock);
@@ -604,6 +605,20 @@ public class VirtualDeviceManagerServiceTest {
         assertThat(sensor.getDeviceId()).isEqualTo(VIRTUAL_DEVICE_ID_1);
         assertThat(sensor.getHandle()).isEqualTo(SENSOR_HANDLE);
         assertThat(sensor.getType()).isEqualTo(Sensor.TYPE_ACCELEROMETER);
+    }
+
+    @Test
+    public void testIsInputDeviceOwnedByVirtualDevice() {
+        assertThat(mLocalService.isInputDeviceOwnedByVirtualDevice(INPUT_DEVICE_ID)).isFalse();
+
+        final int fd = 1;
+        mInputController.addDeviceForTesting(BINDER, fd,
+                InputController.InputDeviceDescriptor.TYPE_KEYBOARD, DISPLAY_ID_1, PHYS,
+                DEVICE_NAME_1, INPUT_DEVICE_ID);
+        assertThat(mLocalService.isInputDeviceOwnedByVirtualDevice(INPUT_DEVICE_ID)).isTrue();
+
+        mInputController.unregisterInputDevice(BINDER);
+        assertThat(mLocalService.isInputDeviceOwnedByVirtualDevice(INPUT_DEVICE_ID)).isFalse();
     }
 
     @Test
@@ -1956,7 +1971,7 @@ public class VirtualDeviceManagerServiceTest {
                         mRunningAppsChangedCallback,
                         params,
                         new DisplayManagerGlobal(mIDisplayManager),
-                        new VirtualCameraController());
+                        new VirtualCameraController(DEVICE_POLICY_DEFAULT));
         mVdms.addVirtualDevice(virtualDeviceImpl);
         assertThat(virtualDeviceImpl.getAssociationId()).isEqualTo(mAssociationInfo.getId());
         assertThat(virtualDeviceImpl.getPersistentDeviceId())
@@ -1982,8 +1997,8 @@ public class VirtualDeviceManagerServiceTest {
         return new AssociationInfo(associationId, /* userId= */ 0, /* packageName=*/ null,
                 /* tag= */ null, MacAddress.BROADCAST_ADDRESS, /* displayName= */ "", deviceProfile,
                 /* associatedDevice= */ null, /* selfManaged= */ true,
-                /* notifyOnDeviceNearby= */ false, /* revoked= */false,  /* timeApprovedMs= */0,
-                /* lastTimeConnectedMs= */0, /* systemDataSyncFlags= */ -1);
+                /* notifyOnDeviceNearby= */ false, /* revoked= */ false, /* pending= */ false,
+                /* timeApprovedMs= */0, /* lastTimeConnectedMs= */0, /* systemDataSyncFlags= */ -1);
     }
 
     /** Helper class to drop permissions temporarily and restore them at the end of a test. */

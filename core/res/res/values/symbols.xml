@@ -3122,8 +3122,6 @@
   <java-symbol type="bool" name="config_navBarDefaultTransparent" />
   <java-symbol type="color" name="navigation_bar_default"/>
   <java-symbol type="color" name="navigation_bar_compatible"/>
-  <java-symbol type="color" name="status_bar_default"/>
-  <java-symbol type="color" name="status_bar_compatible"/>
 
   <!-- EditText suggestion popup. -->
   <java-symbol type="id" name="suggestionWindowContainer" />
@@ -3227,6 +3225,7 @@
   <java-symbol type="string" name="status_bar_camera" />
   <java-symbol type="string" name="status_bar_sensors_off" />
   <java-symbol type="string" name="status_bar_screen_record" />
+  <java-symbol type="string" name="status_bar_oem_satellite" />
 
   <!-- Locale picker -->
   <java-symbol type="id" name="locale_search_menu" />

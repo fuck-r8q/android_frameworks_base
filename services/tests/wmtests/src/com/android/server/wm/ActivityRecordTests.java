@@ -143,7 +143,6 @@ import android.os.Process;
 import android.os.RemoteException;
 import android.platform.test.annotations.Presubmit;
 import android.provider.DeviceConfig;
-import android.util.MergedConfiguration;
 import android.util.MutableBoolean;
 import android.view.DisplayInfo;
 import android.view.IRemoteAnimationFinishedCallback;
@@ -395,8 +394,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.setState(RESUMED, "Testing");
 
         task.onRequestedOverrideConfigurationChanged(task.getConfiguration());
-        activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                activity.getConfiguration()));
+        activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
         activity.info.configChanges &= ~CONFIG_ORIENTATION;
         final Configuration newConfig = new Configuration(task.getConfiguration());
@@ -420,8 +418,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.setState(RESUMED, "Testing");
 
         task.onRequestedOverrideConfigurationChanged(task.getConfiguration());
-        activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                activity.getConfiguration()));
+        activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
         activity.info.configChanges &= ~CONFIG_ORIENTATION;
         final Configuration newConfig = new Configuration(task.getConfiguration());
@@ -447,8 +444,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.setState(RESUMED, "Testing");
 
         task.onRequestedOverrideConfigurationChanged(task.getConfiguration());
-        activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                activity.getConfiguration()));
+        activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
         activity.info.configChanges &= ~CONFIG_ORIENTATION;
         final Configuration newConfig = new Configuration(task.getConfiguration());
@@ -468,8 +464,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         activity.setState(RESUMED, "Testing");
 
         task.onRequestedOverrideConfigurationChanged(task.getConfiguration());
-        activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                activity.getConfiguration()));
+        activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
         activity.info.configChanges &= ~ActivityInfo.CONFIG_FONT_SCALE;
         final Configuration newConfig = new Configuration(task.getConfiguration());
@@ -571,8 +566,7 @@ public class ActivityRecordTests extends WindowTestsBase {
                 .build();
         activity.setState(RESUMED, "Testing");
 
-        activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                activity.getConfiguration()));
+        activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
         clearInvocations(mClientLifecycleManager);
 
@@ -799,8 +793,7 @@ public class ActivityRecordTests extends WindowTestsBase {
             doReturn(false).when(stack).isTranslucent(any());
             assertTrue(task.shouldBeVisible(null /* starting */));
 
-            activity.setLastReportedConfiguration(new MergedConfiguration(new Configuration(),
-                    activity.getConfiguration()));
+            activity.setLastReportedConfiguration(new Configuration(), activity.getConfiguration());
 
             final Configuration newConfig = new Configuration(activity.getConfiguration());
             final int shortSide = newConfig.screenWidthDp == newConfig.screenHeightDp
@@ -846,7 +839,7 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    public void testTakeOptions() {
+    public void testTakeSceneTransitionInfo() {
         final ActivityRecord activity = createActivityWithTask();
         ActivityOptions opts = ActivityOptions.makeRemoteAnimation(
                 new RemoteAnimationAdapter(new Stub() {
@@ -864,7 +857,9 @@ public class ActivityRecordTests extends WindowTestsBase {
                     }
                 }, 0, 0));
         activity.updateOptionsLocked(opts);
-        assertNotNull(activity.takeOptions());
+        // Ensure the SceneTransitionInfo is null (since the ActivityOptions is for remote
+        // animation and AR#takeSceneTransitionInfo also clear the AR#mPendingOptions
+        assertNull(activity.takeSceneTransitionInfo());
         assertNull(activity.getOptions());
 
         final AppTransition appTransition = activity.mDisplayContent.mAppTransition;
@@ -3314,7 +3309,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         // keyguard to back to the app, expect IME insets is not frozen
         app.mActivityRecord.commitVisibility(true, false);
         mDisplayContent.updateImeInputAndControlTarget(app);
-        mDisplayContent.mWmService.mRoot.performSurfacePlacement();
+        performSurfacePlacementAndWaitForWindowAnimator();
 
         assertFalse(app.mActivityRecord.mImeInsetsFrozenUntilStartInput);
 
@@ -3363,14 +3358,14 @@ public class ActivityRecordTests extends WindowTestsBase {
         mDisplayContent.setImeLayeringTarget(app2);
         app2.mActivityRecord.commitVisibility(true, false);
         mDisplayContent.updateImeInputAndControlTarget(app2);
-        mDisplayContent.mWmService.mRoot.performSurfacePlacement();
+        performSurfacePlacementAndWaitForWindowAnimator();
 
         // Verify after unfreezing app2's IME insets state, we won't dispatch visible IME insets
         // to client if the app didn't request IME visible.
         assertFalse(app2.mActivityRecord.mImeInsetsFrozenUntilStartInput);
 
         if (Flags.bundleClientTransactionFlag()) {
-            verify(app2.getProcess()).scheduleClientTransactionItem(
+            verify(app2.getProcess(), atLeastOnce()).scheduleClientTransactionItem(
                     isA(WindowStateResizeItem.class));
         } else {
             verify(app2.mClient, atLeastOnce()).resized(any(), anyBoolean(), any(),
@@ -3417,7 +3412,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         // frozen until the input started.
         mDisplayContent.setImeLayeringTarget(app1);
         mDisplayContent.updateImeInputAndControlTarget(app1);
-        mDisplayContent.mWmService.mRoot.performSurfacePlacement();
+        performSurfacePlacementAndWaitForWindowAnimator();
 
         assertEquals(app1, mDisplayContent.getImeInputTarget());
         assertFalse(activity1.mImeInsetsFrozenUntilStartInput);

@@ -68,6 +68,7 @@ import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.systemui.Dumpable;
 import com.android.systemui.animation.ActivityLaunchAnimator;
 import com.android.systemui.biometrics.dagger.BiometricsBackground;
+import com.android.systemui.biometrics.domain.interactor.UdfpsOverlayInteractor;
 import com.android.systemui.biometrics.shared.model.UdfpsOverlayParams;
 import com.android.systemui.biometrics.udfps.InteractionEvent;
 import com.android.systemui.biometrics.udfps.NormalizedTouchData;
@@ -171,6 +172,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     @NonNull private final Lazy<DefaultUdfpsTouchOverlayViewModel>
             mDefaultUdfpsTouchOverlayViewModel;
     @NonNull private final AlternateBouncerInteractor mAlternateBouncerInteractor;
+    @NonNull private final UdfpsOverlayInteractor mUdfpsOverlayInteractor;
     @NonNull private final InputManager mInputManager;
     @NonNull private final UdfpsKeyguardAccessibilityDelegate mUdfpsKeyguardAccessibilityDelegate;
     @NonNull private final SelectedUserInteractor mSelectedUserInteractor;
@@ -187,7 +189,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
     @Nullable private UdfpsDisplayModeProvider mUdfpsDisplayMode;
 
     // The ID of the pointer for which ACTION_DOWN has occurred. -1 means no pointer is active.
-    private int mActivePointerId = -1;
+    private int mActivePointerId = MotionEvent.INVALID_POINTER_ID;
     // Whether a pointer has been pilfered for current gesture
     private boolean mPointerPilfered = false;
     // The timestamp of the most recent touch log.
@@ -293,7 +295,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                         mSelectedUserInteractor,
                         mDeviceEntryUdfpsTouchOverlayViewModel,
                         mDefaultUdfpsTouchOverlayViewModel,
-                        mShadeInteractor
+                        mShadeInteractor,
+                        mUdfpsOverlayInteractor
                     )));
         }
 
@@ -510,18 +513,22 @@ public class UdfpsController implements DozeReceiver, Dumpable {
                     + mOverlay.getRequestId());
             return false;
         }
-        if (!DeviceEntryUdfpsRefactor.isEnabled()) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN
+                || event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
+            // Reset on ACTION_DOWN, start of new gesture
+            mPointerPilfered = false;
+            if (mActivePointerId != MotionEvent.INVALID_POINTER_ID) {
+                Log.w(TAG, "onTouch down received without a preceding up");
+            }
+            mActivePointerId = MotionEvent.INVALID_POINTER_ID;
+            mOnFingerDown = false;
+        } else if (!DeviceEntryUdfpsRefactor.isEnabled()) {
             if ((mLockscreenShadeTransitionController.getQSDragProgress() != 0f
                     && !mAlternateBouncerInteractor.isVisibleState())
                     || mPrimaryBouncerInteractor.isInTransit()) {
                 Log.w(TAG, "ignoring touch due to qsDragProcess or primaryBouncerInteractor");
                 return false;
             }
-        }
-        if (event.getAction() == MotionEvent.ACTION_DOWN
-                || event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
-            // Reset on ACTION_DOWN, start of new gesture
-            mPointerPilfered = false;
         }
 
         final TouchProcessorResult result = mTouchProcessor.processTouch(event, mActivePointerId,
@@ -670,7 +677,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             @NonNull FpsUnlockTracker fpsUnlockTracker,
             @NonNull KeyguardTransitionInteractor keyguardTransitionInteractor,
             Lazy<DeviceEntryUdfpsTouchOverlayViewModel> deviceEntryUdfpsTouchOverlayViewModel,
-            Lazy<DefaultUdfpsTouchOverlayViewModel> defaultUdfpsTouchOverlayViewModel) {
+            Lazy<DefaultUdfpsTouchOverlayViewModel> defaultUdfpsTouchOverlayViewModel,
+            @NonNull UdfpsOverlayInteractor udfpsOverlayInteractor) {
         mContext = context;
         mExecution = execution;
         mVibrator = vibrator;
@@ -711,6 +719,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mPrimaryBouncerInteractor = primaryBouncerInteractor;
         mShadeInteractor = shadeInteractor;
         mAlternateBouncerInteractor = alternateBouncerInteractor;
+        mUdfpsOverlayInteractor = udfpsOverlayInteractor;
         mInputManager = inputManager;
         mUdfpsKeyguardAccessibilityDelegate = udfpsKeyguardAccessibilityDelegate;
         mSelectedUserInteractor = selectedUserInteractor;
@@ -1080,7 +1089,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
             long gestureStart,
             boolean isAod) {
         mExecution.assertIsMainThread();
-        mActivePointerId = -1;
+        mActivePointerId = MotionEvent.INVALID_POINTER_ID;
         mAcquiredReceived = false;
         if (mOnFingerDown) {
             mFingerprintManager.onPointerUp(requestId, mSensorProps.sensorId, pointerId, x,

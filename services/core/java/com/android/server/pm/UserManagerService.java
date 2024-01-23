@@ -2337,8 +2337,18 @@ public class UserManagerService extends IUserManager.Stub {
         final long identity = Binder.clearCallingIdentity();
         try {
             final TelecomManager telecomManager = mContext.getSystemService(TelecomManager.class);
-            if (telecomManager != null && telecomManager.isInCall()) {
-                flags |= UserManager.SWITCHABILITY_STATUS_USER_IN_CALL;
+            if (com.android.internal.telephony.flags
+                    .Flags.enforceTelephonyFeatureMappingForPublicApis()) {
+                if (mContext.getPackageManager().hasSystemFeature(
+                        PackageManager.FEATURE_TELECOM)) {
+                    if (telecomManager != null && telecomManager.isInCall()) {
+                        flags |= UserManager.SWITCHABILITY_STATUS_USER_IN_CALL;
+                    }
+                }
+            } else {
+                if (telecomManager != null && telecomManager.isInCall()) {
+                    flags |= UserManager.SWITCHABILITY_STATUS_USER_IN_CALL;
+                }
             }
         } finally {
             Binder.restoreCallingIdentity(identity);
@@ -5136,7 +5146,7 @@ public class UserManagerService extends IUserManager.Stub {
 
             t.traceBegin("createUserStorageKeys");
             final StorageManager storage = mContext.getSystemService(StorageManager.class);
-            storage.createUserStorageKeys(userId, userInfo.serialNumber, userInfo.isEphemeral());
+            storage.createUserStorageKeys(userId, userInfo.isEphemeral());
             t.traceEnd();
 
             // Only prepare DE storage here.  CE storage will be prepared later, when the user is

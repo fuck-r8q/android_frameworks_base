@@ -207,7 +207,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             @NonNull Handler handler, DisplayManagerFlags flags) {
         this(context, foldSettingProvider, repo, listener, syncRoot, handler,
                 new DeviceStateToLayoutMap((isDefault) -> isDefault ? DEFAULT_DISPLAY
-                        : sNextNonDefaultDisplayId++), flags);
+                        : sNextNonDefaultDisplayId++, flags), flags);
     }
 
     LogicalDisplayMapper(@NonNull Context context, FoldSettingProvider foldSettingProvider,
@@ -1096,8 +1096,8 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             final DisplayAddress address = displayLayout.getAddress();
             final DisplayDevice device = mDisplayDeviceRepo.getByAddressLocked(address);
             if (device == null) {
-                Slog.w(TAG, "The display device (" + address + "), is not available"
-                        + " for the display state " + mDeviceState);
+                Slog.w(TAG, "applyLayoutLocked: The display device (" + address + "), is not "
+                        + "available for the display state " + mDeviceState);
                 continue;
             }
 

@@ -153,7 +153,9 @@ import com.android.systemui.statusbar.notification.ConversationNotificationManag
 import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinatorLogger;
+import com.android.systemui.statusbar.notification.data.repository.NotificationsKeyguardViewStateRepository;
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor;
+import com.android.systemui.statusbar.notification.domain.interactor.NotificationsKeyguardInteractor;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationListContainer;
@@ -180,7 +182,6 @@ import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
 import com.android.systemui.statusbar.phone.StatusBarTouchableRegionManager;
 import com.android.systemui.statusbar.phone.TapAgainViewController;
 import com.android.systemui.statusbar.phone.UnlockedScreenOffAnimationController;
-import com.android.systemui.statusbar.pipeline.mobile.data.repository.FakeUserSetupRepository;
 import com.android.systemui.statusbar.policy.CastController;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
@@ -190,6 +191,7 @@ import com.android.systemui.statusbar.policy.KeyguardUserSwitcherController;
 import com.android.systemui.statusbar.policy.KeyguardUserSwitcherView;
 import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController;
 import com.android.systemui.statusbar.policy.data.repository.FakeDeviceProvisioningRepository;
+import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.unfold.SysUIUnfoldComponent;
 import com.android.systemui.user.domain.interactor.UserSwitcherInteractor;
@@ -346,6 +348,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     @Mock protected ActiveNotificationsInteractor mActiveNotificationsInteractor;
     @Mock private KeyguardClockPositionAlgorithm mKeyguardClockPositionAlgorithm;
     @Mock private NaturalScrollingSettingObserver mNaturalScrollingSettingObserver;
+    @Mock private LargeScreenHeaderHelper mLargeScreenHeaderHelper;
 
     protected final int mMaxUdfpsBurnInOffsetY = 5;
     protected FakeFeatureFlagsClassic mFeatureFlags = new FakeFeatureFlagsClassic();
@@ -426,7 +429,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                                 mContext,
                                 new ResourcesSplitShadeStateController(),
                                 mKeyguardInteractor,
-                                deviceEntryUdfpsInteractor
+                                deviceEntryUdfpsInteractor,
+                                () -> mLargeScreenHeaderHelper
                         ),
                         mShadeRepository
                 )
@@ -588,6 +592,10 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
         when(mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha())
                 .thenReturn(emptyFlow());
 
+        NotificationsKeyguardViewStateRepository notifsKeyguardViewStateRepository =
+                new NotificationsKeyguardViewStateRepository();
+        NotificationsKeyguardInteractor notifsKeyguardInteractor =
+                new NotificationsKeyguardInteractor(notifsKeyguardViewStateRepository);
         NotificationWakeUpCoordinator coordinator =
                 new NotificationWakeUpCoordinator(
                         mDumpManager,
@@ -598,7 +606,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                         mKeyguardBypassController,
                         mDozeParameters,
                         mScreenOffAnimationController,
-                        new NotificationWakeUpCoordinatorLogger(logcatLogBuffer()));
+                        new NotificationWakeUpCoordinatorLogger(logcatLogBuffer()),
+                        notifsKeyguardInteractor);
         mConfigurationController = new ConfigurationControllerImpl(mContext);
         PulseExpansionHandler expansionHandler = new PulseExpansionHandler(
                 mContext,
@@ -808,7 +817,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 mActiveNotificationsInteractor,
                 mJavaAdapter,
                 mCastController,
-                new ResourcesSplitShadeStateController()
+                new ResourcesSplitShadeStateController(),
+                () -> mLargeScreenHeaderHelper
         );
     }
 

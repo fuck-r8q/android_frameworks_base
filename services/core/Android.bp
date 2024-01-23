@@ -207,6 +207,7 @@ java_library_static {
         "com_android_wm_shell_flags_lib",
         "com.android.server.utils_aconfig-java",
         "service-jobscheduler-deviceidle.flags-aconfig-java",
+        "policy_flags_lib",
     ],
     javac_shard_size: 50,
     javacflags: [
@@ -251,9 +252,6 @@ java_genrule {
 java_library {
     name: "services.core",
     static_libs: ["services.core.priorityboosted"],
-    lint: {
-        baseline_filename: "lint-baseline.xml",
-    },
 }
 
 java_library_host {

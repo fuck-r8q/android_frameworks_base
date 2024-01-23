@@ -1181,11 +1181,12 @@ class ActivityClientController extends IActivityClientController.Stub {
             transition.abort();
             return;
         }
-        transition.collect(topFocusedRootTask);
-        executeMultiWindowFullscreenRequest(fullscreenRequest, topFocusedRootTask);
-        r.mTransitionController.requestStartTransition(transition, topFocusedRootTask,
+        final Task requestingTask = r.getTask();
+        transition.collect(requestingTask);
+        executeMultiWindowFullscreenRequest(fullscreenRequest, requestingTask);
+        r.mTransitionController.requestStartTransition(transition, requestingTask,
                 null /* remoteTransition */, null /* displayChange */);
-        transition.setReady(topFocusedRootTask, true);
+        transition.setReady(requestingTask, true);
     }
 
     private static void reportMultiwindowFullscreenRequestValidatingResult(IRemoteCallback callback,

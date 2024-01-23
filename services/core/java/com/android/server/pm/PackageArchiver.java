@@ -27,6 +27,7 @@ import static android.content.pm.ArchivedActivityInfo.drawableToBitmap;
 import static android.content.pm.PackageInstaller.EXTRA_UNARCHIVE_STATUS;
 import static android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION;
 import static android.content.pm.PackageInstaller.UNARCHIVAL_OK;
+import static android.content.pm.PackageInstaller.UNARCHIVAL_STATUS_UNSET;
 import static android.content.pm.PackageManager.DELETE_ARCHIVE;
 import static android.content.pm.PackageManager.DELETE_KEEP_DATA;
 import static android.content.pm.PackageManager.INSTALL_UNARCHIVE_DRAFT;
@@ -70,6 +71,7 @@ import android.graphics.drawable.LayerDrawable;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.FileUtils;
 import android.os.IBinder;
 import android.os.ParcelableException;
 import android.os.Process;
@@ -100,6 +102,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -210,7 +213,6 @@ public class PackageArchiver {
                                 return;
                             }
 
-                            // TODO(b/278553670) Add special strings for the delete dialog
                             mPm.mInstallerService.uninstall(
                                     new VersionedPackage(packageName,
                                             PackageManager.VERSION_CODE_HIGHEST),
@@ -264,7 +266,7 @@ public class PackageArchiver {
         try {
             // TODO(b/311709794) Make showUnarchivalConfirmation dependent on the compat options.
             requestUnarchive(packageName, callerPackageName,
-                    getOrCreateUnarchiveIntentSender(userId, packageName),
+                    getOrCreateLauncherListener(userId, packageName),
                     UserHandle.of(userId),
                     false /* showUnarchivalConfirmation= */);
         } catch (Throwable t) {
@@ -308,6 +310,26 @@ public class PackageArchiver {
         return false;
     }
 
+    void clearArchiveState(String packageName, int userId) {
+        synchronized (mPm.mLock) {
+            PackageSetting ps = mPm.mSettings.getPackageLPr(packageName);
+            if (ps != null) {
+                ps.setArchiveState(/* archiveState= */ null, userId);
+            }
+        }
+        mPm.mBackgroundHandler.post(
+                () -> {
+                    File iconsDir = getIconsDir(packageName, userId);
+                    if (!iconsDir.exists()) {
+                        return;
+                    }
+                    // TODO(b/319238030) Move this into installd.
+                    if (!FileUtils.deleteContentsAndDir(iconsDir)) {
+                        Slog.e(TAG, "Failed to clean up archive files for " + packageName);
+                    }
+                });
+    }
+
     @Nullable
     private String getCurrentLauncherPackageName(int userId) {
         ComponentName defaultLauncherComponent = mPm.snapshotComputer().getDefaultHomeActivity(
@@ -329,7 +351,7 @@ public class PackageArchiver {
         return true;
     }
 
-    private IntentSender getOrCreateUnarchiveIntentSender(int userId, String packageName) {
+    private IntentSender getOrCreateLauncherListener(int userId, String packageName) {
         Pair<Integer, String> key = Pair.create(userId, packageName);
         synchronized (mLauncherIntentSenders) {
             IntentSender intentSender = mLauncherIntentSenders.get(key);
@@ -436,8 +458,8 @@ public class PackageArchiver {
         if (mainActivity.iconBitmap == null) {
             return null;
         }
-        File iconsDir = createIconsDir(userId);
-        File iconFile = new File(iconsDir, packageName + "-" + index + ".png");
+        File iconsDir = createIconsDir(packageName, userId);
+        File iconFile = new File(iconsDir, index + ".png");
         try (FileOutputStream out = new FileOutputStream(iconFile)) {
             out.write(mainActivity.iconBitmap);
             out.flush();
@@ -453,14 +475,14 @@ public class PackageArchiver {
             // The app doesn't define an icon. No need to store anything.
             return null;
         }
-        File iconsDir = createIconsDir(userId);
-        File iconFile = new File(iconsDir, packageName + "-" + index + ".png");
+        File iconsDir = createIconsDir(packageName, userId);
+        File iconFile = new File(iconsDir, index + ".png");
         Bitmap icon = drawableToBitmap(mainActivity.getIcon(/* density= */ 0), iconSize);
         try (FileOutputStream out = new FileOutputStream(iconFile)) {
             // Note: Quality is ignored for PNGs.
             if (!icon.compress(Bitmap.CompressFormat.PNG, /* quality= */ 100, out)) {
                 throw new IOException(TextUtils.formatSimple("Failure to store icon file %s",
-                        iconFile.getName()));
+                        iconFile.getAbsolutePath()));
             }
             out.flush();
         }
@@ -515,7 +537,6 @@ public class PackageArchiver {
     /**
      * Returns true if the app is archivable.
      */
-    // TODO(b/299299569) Exclude system apps
     public boolean isAppArchivable(@NonNull String packageName, @NonNull UserHandle user) {
         Objects.requireNonNull(packageName);
         Objects.requireNonNull(user);
@@ -685,15 +706,14 @@ public class PackageArchiver {
                 PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         sessionParams.setAppPackageName(packageName);
         sessionParams.installFlags = INSTALL_UNARCHIVE_DRAFT;
-        sessionParams.unarchiveIntentSender = statusReceiver;
 
         int installerUid = mPm.snapshotComputer().getPackageUid(installerPackage, 0, userId);
         // Handles case of repeated unarchival calls for the same package.
-        // TODO(b/316881759) Allow attaching multiple intentSenders to one session.
         int existingSessionId = mPm.mInstallerService.getExistingDraftSessionId(installerUid,
                 sessionParams,
                 userId);
         if (existingSessionId != PackageInstaller.SessionInfo.INVALID_ID) {
+            attachListenerToSession(statusReceiver, existingSessionId, userId);
             return existingSessionId;
         }
 
@@ -702,10 +722,32 @@ public class PackageArchiver {
                 installerPackage, mContext.getAttributionTag(),
                 installerUid,
                 userId);
+        attachListenerToSession(statusReceiver, sessionId, userId);
+
         // TODO(b/297358628) Also cleanup sessions upon device restart.
         mPm.mHandler.postDelayed(() -> mPm.mInstallerService.cleanupDraftIfUnclaimed(sessionId),
                 getUnarchiveForegroundTimeout());
         return sessionId;
+    }
+
+    private void attachListenerToSession(IntentSender statusReceiver, int existingSessionId,
+            int userId) {
+        PackageInstallerSession session = mPm.mInstallerService.getSession(existingSessionId);
+        int status = session.getUnarchivalStatus();
+        // Here we handle a race condition that might happen when an installer reports UNARCHIVAL_OK
+        // but hasn't created a session yet. Without this the listener would never receive a success
+        // response.
+        if (status == UNARCHIVAL_OK) {
+            notifyUnarchivalListener(UNARCHIVAL_OK, session.getInstallerPackageName(),
+                    session.params.appPackageName, /* requiredStorageBytes= */ 0,
+                    /* userActionIntent= */ null, Set.of(statusReceiver), userId);
+            return;
+        } else if (status != UNARCHIVAL_STATUS_UNSET) {
+            throw new IllegalStateException(TextUtils.formatSimple("Session %s has unarchive status"
+                    + "%s but is still active.", session.sessionId, status));
+        }
+
+        session.registerUnarchivalListener(statusReceiver);
     }
 
     /**
@@ -772,8 +814,20 @@ public class PackageArchiver {
     }
 
     @VisibleForTesting
-    Bitmap decodeIcon(ArchiveActivityInfo archiveActivityInfo) {
-        return BitmapFactory.decodeFile(archiveActivityInfo.getIconBitmap().toString());
+    @Nullable
+    Bitmap decodeIcon(ArchiveActivityInfo activityInfo) {
+        Path iconBitmap = activityInfo.getIconBitmap();
+        if (iconBitmap == null) {
+            return null;
+        }
+        Bitmap bitmap = BitmapFactory.decodeFile(iconBitmap.toString());
+        // TODO(b/278553670) We should throw here after some time. Failing graciously now because
+        // we've just changed the place where we store icons.
+        if (bitmap == null) {
+            Slog.e(TAG, "Archived icon cannot be decoded " + iconBitmap.toAbsolutePath());
+            return null;
+        }
+        return bitmap;
     }
 
     Bitmap includeCloudOverlay(Bitmap bitmap) {
@@ -883,13 +937,7 @@ public class PackageArchiver {
 
     void notifyUnarchivalListener(int status, String installerPackageName, String appPackageName,
             long requiredStorageBytes, @Nullable PendingIntent userActionIntent,
-            @Nullable IntentSender unarchiveIntentSender, int userId) {
-        if (unarchiveIntentSender == null) {
-            // Maybe this can happen if the installer calls reportUnarchivalStatus twice in quick
-            // succession.
-            return;
-        }
-
+            Set<IntentSender> unarchiveIntentSenders, int userId) {
         final Intent broadcastIntent = new Intent();
         broadcastIntent.putExtra(PackageInstaller.EXTRA_PACKAGE_NAME, appPackageName);
         broadcastIntent.putExtra(EXTRA_UNARCHIVE_STATUS, status);
@@ -909,15 +957,16 @@ public class PackageArchiver {
         final BroadcastOptions options = BroadcastOptions.makeBasic();
         options.setPendingIntentBackgroundActivityStartMode(
                 MODE_BACKGROUND_ACTIVITY_START_DENIED);
-        try {
-            unarchiveIntentSender.sendIntent(mContext, 0, broadcastIntent, /* onFinished= */ null,
-                    /* handler= */ null, /* requiredPermission= */ null,
-                    options.toBundle());
-        } catch (IntentSender.SendIntentException e) {
-            Slog.e(TAG, TextUtils.formatSimple("Failed to send unarchive intent"), e);
-        } finally {
-            synchronized (mLauncherIntentSenders) {
-                mLauncherIntentSenders.remove(Pair.create(userId, appPackageName));
+        for (IntentSender intentSender : unarchiveIntentSenders) {
+            try {
+                intentSender.sendIntent(mContext, 0, broadcastIntent, /* onFinished= */ null,
+                        /* handler= */ null, /* requiredPermission= */ null, options.toBundle());
+            } catch (IntentSender.SendIntentException e) {
+                Slog.e(TAG, TextUtils.formatSimple("Failed to send unarchive intent"), e);
+            } finally {
+                synchronized (mLauncherIntentSenders) {
+                    mLauncherIntentSenders.remove(Pair.create(userId, appPackageName));
+                }
             }
         }
     }
@@ -1059,8 +1108,9 @@ public class PackageArchiver {
         }
     }
 
-    private static File createIconsDir(@UserIdInt int userId) throws IOException {
-        File iconsDir = getIconsDir(userId);
+    private static File createIconsDir(String packageName, @UserIdInt int userId)
+            throws IOException {
+        File iconsDir = getIconsDir(packageName, userId);
         if (!iconsDir.isDirectory()) {
             iconsDir.delete();
             iconsDir.mkdirs();
@@ -1072,8 +1122,10 @@ public class PackageArchiver {
         return iconsDir;
     }
 
-    private static File getIconsDir(int userId) {
-        return new File(Environment.getDataSystemCeDirectory(userId), ARCHIVE_ICONS_DIR);
+    private static File getIconsDir(String packageName, int userId) {
+        return new File(
+                new File(Environment.getDataSystemCeDirectory(userId), ARCHIVE_ICONS_DIR),
+                packageName);
     }
 
     private static byte[] bytesFromBitmapFile(Path path) throws IOException {
@@ -1179,7 +1231,7 @@ public class PackageArchiver {
             UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER, UserHandle.class);
             if (extraIntent != null && user != null
                     && mAppStateHelper.isAppTopVisible(
-                            getCurrentLauncherPackageName(user.getIdentifier()))) {
+                    getCurrentLauncherPackageName(user.getIdentifier()))) {
                 extraIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 mContext.startActivityAsUser(extraIntent, user);
             }

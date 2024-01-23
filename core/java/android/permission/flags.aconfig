@@ -64,3 +64,24 @@ flag {
   description: "enable Permission PREPARE_FACTORY_RESET."
   bug: "302016478"
 }
+
+flag {
+    name: "retail_demo_role_enabled"
+    namespace: "permissions"
+    description: "default retail demo role holder"
+    bug: "274132354"
+}
+
+flag {
+    name: "server_side_attribution_registration"
+    namespace: "permissions"
+    description: "controls whether the binder representing an AttributionSource is created in the system server, or client process"
+    bug: "310953959"
+}
+
+flag {
+    name: "wallet_role_enabled"
+    namespace: "wallet_integration"
+    description: "This flag is used to enabled the Wallet Role for all users on the device"
+    bug: "283989236"
+}

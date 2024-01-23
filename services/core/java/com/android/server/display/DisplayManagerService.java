@@ -1632,6 +1632,10 @@ public final class DisplayManagerService extends SystemService {
                 if ((flags & VIRTUAL_DISPLAY_FLAG_TRUSTED) == 0) {
                     Slog.w(TAG, "Display created with home support but lacks "
                             + "VIRTUAL_DISPLAY_FLAG_TRUSTED, ignoring the home support request.");
+                } else if ((flags & VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR) != 0) {
+                    Slog.w(TAG, "Display created with home support but has "
+                            + "VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, ignoring the home support "
+                            + "request.");
                 } else {
                     mWindowManagerInternal.setHomeSupportedOnDisplay(displayUniqueId,
                             Display.TYPE_VIRTUAL, true);
@@ -3414,17 +3418,10 @@ public final class DisplayManagerService extends SystemService {
         // with the corresponding displaydevice.
         HighBrightnessModeMetadata hbmMetadata =
                 mHighBrightnessModeMetadataMapper.getHighBrightnessModeMetadataLocked(display);
-        if (mConfigParameterProvider.isNewPowerControllerFeatureEnabled()) {
-            displayPowerController = new DisplayPowerController2(
-                    mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,
-                    mSensorManager, mDisplayBlanker, display, mBrightnessTracker, brightnessSetting,
-                    () -> handleBrightnessChange(display), hbmMetadata, mBootCompleted, mFlags);
-        } else {
-            displayPowerController = new DisplayPowerController(
-                    mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,
-                    mSensorManager, mDisplayBlanker, display, mBrightnessTracker, brightnessSetting,
-                    () -> handleBrightnessChange(display), hbmMetadata, mBootCompleted, mFlags);
-        }
+        displayPowerController = new DisplayPowerController(
+                mContext, /* injector= */ null, mDisplayPowerCallbacks, mPowerHandler,
+                mSensorManager, mDisplayBlanker, display, mBrightnessTracker, brightnessSetting,
+                () -> handleBrightnessChange(display), hbmMetadata, mBootCompleted, mFlags);
         mDisplayPowerControllers.append(display.getDisplayIdLocked(), displayPowerController);
         return displayPowerController;
     }
