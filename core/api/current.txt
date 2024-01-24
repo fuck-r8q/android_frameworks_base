@@ -12319,7 +12319,6 @@ package android.content.pm {
     method public void registerCallback(android.content.pm.LauncherApps.Callback, android.os.Handler);
     method public void registerPackageInstallerSessionCallback(@NonNull java.util.concurrent.Executor, @NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public android.content.pm.LauncherActivityInfo resolveActivity(android.content.Intent, android.os.UserHandle);
-    method @FlaggedApi("android.content.pm.archiving") public void setArchiveCompatibilityOptions(boolean, boolean);
     method public boolean shouldHideFromSuggestions(@NonNull String, @NonNull android.os.UserHandle);
     method public void startAppDetailsActivity(android.content.ComponentName, android.os.UserHandle, android.graphics.Rect, android.os.Bundle);
     method public void startMainActivity(android.content.ComponentName, android.os.UserHandle, android.graphics.Rect, android.os.Bundle);
@@ -12448,6 +12447,7 @@ package android.content.pm {
     method @NonNull public android.content.pm.PackageInstaller.Session openSession(int) throws java.io.IOException;
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public void registerSessionCallback(@NonNull android.content.pm.PackageInstaller.SessionCallback, @NonNull android.os.Handler);
+    method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public void reportUnarchivalState(@NonNull android.content.pm.PackageInstaller.UnarchivalState) throws android.content.pm.PackageManager.NameNotFoundException;
     method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public void reportUnarchivalStatus(int, int, long, @Nullable android.app.PendingIntent) throws android.content.pm.PackageManager.NameNotFoundException;
     method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(anyOf={android.Manifest.permission.DELETE_PACKAGES, android.Manifest.permission.REQUEST_DELETE_PACKAGES}) public void requestArchive(@NonNull String, @NonNull android.content.IntentSender) throws android.content.pm.PackageManager.NameNotFoundException;
     method @FlaggedApi("android.content.pm.archiving") @RequiresPermission(anyOf={android.Manifest.permission.INSTALL_PACKAGES, android.Manifest.permission.REQUEST_INSTALL_PACKAGES}) public void requestUnarchive(@NonNull String, @NonNull android.content.IntentSender) throws java.io.IOException, android.content.pm.PackageManager.NameNotFoundException;
@@ -12675,6 +12675,14 @@ package android.content.pm {
     field public static final int USER_ACTION_NOT_REQUIRED = 2; // 0x2
     field public static final int USER_ACTION_REQUIRED = 1; // 0x1
     field public static final int USER_ACTION_UNSPECIFIED = 0; // 0x0
+  }
+
+  @FlaggedApi("android.content.pm.archiving") public static final class PackageInstaller.UnarchivalState {
+    method @NonNull public static android.content.pm.PackageInstaller.UnarchivalState createGenericErrorState(int);
+    method @NonNull public static android.content.pm.PackageInstaller.UnarchivalState createInsufficientStorageState(int, long, @Nullable android.app.PendingIntent);
+    method @NonNull public static android.content.pm.PackageInstaller.UnarchivalState createNoConnectivityState(int);
+    method @NonNull public static android.content.pm.PackageInstaller.UnarchivalState createOkState(int);
+    method @NonNull public static android.content.pm.PackageInstaller.UnarchivalState createUserActionRequiredState(int, @NonNull android.app.PendingIntent);
   }
 
   public class PackageItemInfo {
@@ -24262,7 +24270,7 @@ package android.media {
     method @Nullable public android.media.MediaRouter2.RoutingController getController(@NonNull String);
     method @NonNull public java.util.List<android.media.MediaRouter2.RoutingController> getControllers();
     method @NonNull public static android.media.MediaRouter2 getInstance(@NonNull android.content.Context);
-    method @FlaggedApi("com.android.media.flags.enable_cross_user_routing_in_media_router2") @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MEDIA_CONTENT_CONTROL, android.Manifest.permission.MEDIA_ROUTING_CONTROL}) public static android.media.MediaRouter2 getInstance(@NonNull android.content.Context, @NonNull android.os.Looper, @NonNull String, @NonNull android.os.UserHandle);
+    method @FlaggedApi("com.android.media.flags.enable_cross_user_routing_in_media_router2") @NonNull @RequiresPermission(anyOf={android.Manifest.permission.MEDIA_CONTENT_CONTROL, android.Manifest.permission.MEDIA_ROUTING_CONTROL}) public static android.media.MediaRouter2 getInstance(@NonNull android.content.Context, @NonNull String, @NonNull android.os.UserHandle);
     method @FlaggedApi("com.android.media.flags.enable_rlp_callbacks_in_media_router2") @Nullable public android.media.RouteListingPreference getRouteListingPreference();
     method @NonNull public java.util.List<android.media.MediaRoute2Info> getRoutes();
     method @NonNull public android.media.MediaRouter2.RoutingController getSystemController();
@@ -44954,7 +44962,7 @@ package android.telephony {
     method public void addOnSubscriptionsChangedListener(@NonNull java.util.concurrent.Executor, @NonNull android.telephony.SubscriptionManager.OnSubscriptionsChangedListener);
     method @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public void addSubscriptionsIntoGroup(@NonNull java.util.List<java.lang.Integer>, @NonNull android.os.ParcelUuid);
     method public boolean canManageSubscription(android.telephony.SubscriptionInfo);
-    method @FlaggedApi("com.android.internal.telephony.flags.enforce_subscription_user_filter") @NonNull public android.telephony.SubscriptionManager createForAllUserProfiles();
+    method @FlaggedApi("com.android.internal.telephony.flags.enforce_subscription_user_filter") @NonNull @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_PROFILES) public android.telephony.SubscriptionManager createForAllUserProfiles();
     method @NonNull @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public android.os.ParcelUuid createSubscriptionGroup(@NonNull java.util.List<java.lang.Integer>);
     method @Deprecated public static android.telephony.SubscriptionManager from(android.content.Context);
     method public java.util.List<android.telephony.SubscriptionInfo> getAccessibleSubscriptionInfoList();
