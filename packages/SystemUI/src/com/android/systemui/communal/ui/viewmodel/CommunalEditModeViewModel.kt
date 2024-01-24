@@ -20,7 +20,6 @@ import android.app.Activity
 import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
 import android.app.ActivityOptions
-import android.appwidget.AppWidgetHost
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.widget.RemoteViews
@@ -28,6 +27,7 @@ import com.android.internal.logging.UiEventLogger
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.log.CommunalUiEvent
+import com.android.systemui.communal.widgets.CommunalAppWidgetHost
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.media.controls.ui.MediaHost
 import com.android.systemui.media.dagger.MediaModule
@@ -37,7 +37,10 @@ import javax.inject.Named
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 
 /** The view model for communal hub in edit mode. */
 @SysUISingleton
@@ -45,7 +48,7 @@ class CommunalEditModeViewModel
 @Inject
 constructor(
     private val communalInteractor: CommunalInteractor,
-    private val appWidgetHost: AppWidgetHost,
+    private val appWidgetHost: CommunalAppWidgetHost,
     @Named(MediaModule.COMMUNAL_HUB) mediaHost: MediaHost,
     private val uiEventLogger: UiEventLogger,
 ) : BaseCommunalViewModel(communalInteractor, mediaHost) {
@@ -69,9 +72,15 @@ constructor(
 
     // Only widgets are editable. The CTA tile comes last in the list and remains visible.
     override val communalContent: Flow<List<CommunalContentModel>> =
-        communalInteractor.widgetContent.map { widgets ->
-            widgets + listOf(CommunalContentModel.CtaTileInEditMode())
-        }
+        communalInteractor.widgetContent
+            // Clear the selected index when the list is updated.
+            .onEach { setSelectedIndex(null) }
+            .map { widgets -> widgets + listOf(CommunalContentModel.CtaTileInEditMode()) }
+
+    private val _reorderingWidgets = MutableStateFlow(false)
+
+    override val reorderingWidgets: StateFlow<Boolean>
+        get() = _reorderingWidgets
 
     override fun onDeleteWidget(id: Int) = communalInteractor.deleteWidget(id)
 
@@ -135,14 +144,19 @@ constructor(
     }
 
     override fun onReorderWidgetStart() {
+        // Clear selection status
+        setSelectedIndex(null)
+        _reorderingWidgets.value = true
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_REORDER_WIDGET_START)
     }
 
     override fun onReorderWidgetEnd() {
+        _reorderingWidgets.value = false
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_REORDER_WIDGET_FINISH)
     }
 
     override fun onReorderWidgetCancel() {
+        _reorderingWidgets.value = false
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_REORDER_WIDGET_CANCEL)
     }
 }

@@ -17,11 +17,12 @@
 
 package com.android.systemui.communal.domain.interactor
 
-import android.appwidget.AppWidgetHost
 import com.android.systemui.communal.data.repository.FakeCommunalMediaRepository
+import com.android.systemui.communal.data.repository.FakeCommunalPrefsRepository
 import com.android.systemui.communal.data.repository.FakeCommunalRepository
 import com.android.systemui.communal.data.repository.FakeCommunalTutorialRepository
 import com.android.systemui.communal.data.repository.FakeCommunalWidgetRepository
+import com.android.systemui.communal.widgets.CommunalAppWidgetHost
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
@@ -42,7 +43,8 @@ object CommunalInteractorFactory {
         mediaRepository: FakeCommunalMediaRepository = FakeCommunalMediaRepository(),
         smartspaceRepository: FakeSmartspaceRepository = FakeSmartspaceRepository(),
         tutorialRepository: FakeCommunalTutorialRepository = FakeCommunalTutorialRepository(),
-        appWidgetHost: AppWidgetHost = mock(),
+        communalPrefsRepository: FakeCommunalPrefsRepository = FakeCommunalPrefsRepository(),
+        appWidgetHost: CommunalAppWidgetHost = mock(),
         editWidgetsActivityStarter: EditWidgetsActivityStarter = mock(),
     ): WithDependencies {
         val withDeps =
@@ -55,6 +57,7 @@ object CommunalInteractorFactory {
             testScope,
             communalRepository,
             widgetRepository,
+            communalPrefsRepository,
             mediaRepository,
             smartspaceRepository,
             tutorialRepository,
@@ -64,8 +67,10 @@ object CommunalInteractorFactory {
             appWidgetHost,
             editWidgetsActivityStarter,
             CommunalInteractor(
+                testScope.backgroundScope,
                 communalRepository,
                 widgetRepository,
+                communalPrefsRepository,
                 mediaRepository,
                 smartspaceRepository,
                 withDeps.keyguardInteractor,
@@ -79,13 +84,14 @@ object CommunalInteractorFactory {
         val testScope: TestScope,
         val communalRepository: FakeCommunalRepository,
         val widgetRepository: FakeCommunalWidgetRepository,
+        val communalPrefsRepository: FakeCommunalPrefsRepository,
         val mediaRepository: FakeCommunalMediaRepository,
         val smartspaceRepository: FakeSmartspaceRepository,
         val tutorialRepository: FakeCommunalTutorialRepository,
         val keyguardRepository: FakeKeyguardRepository,
         val keyguardInteractor: KeyguardInteractor,
         val tutorialInteractor: CommunalTutorialInteractor,
-        val appWidgetHost: AppWidgetHost,
+        val appWidgetHost: CommunalAppWidgetHost,
         val editWidgetsActivityStarter: EditWidgetsActivityStarter,
         val communalInteractor: CommunalInteractor,
     )

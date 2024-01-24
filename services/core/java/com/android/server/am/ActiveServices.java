@@ -5656,13 +5656,13 @@ public final class ActiveServices {
                 return msg;
             }
             mAm.mProcessList.getAppStartInfoTracker().handleProcessServiceStart(startTimeNs, app, r,
-                    hostingRecord, true);
+                    true);
             if (isolated) {
                 r.isolationHostProc = app;
             }
         } else {
             mAm.mProcessList.getAppStartInfoTracker().handleProcessServiceStart(startTimeNs, app, r,
-                    hostingRecord, false);
+                    false);
         }
 
         if (r.fgRequired) {

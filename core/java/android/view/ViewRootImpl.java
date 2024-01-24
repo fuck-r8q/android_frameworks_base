@@ -26,6 +26,7 @@ import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InputDevice.SOURCE_CLASS_NONE;
 import static android.view.InsetsSource.ID_IME;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
+import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH_HINT;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.View.PFLAG_DRAW_ANIMATION;
 import static android.view.View.SYSTEM_UI_FLAG_FULLSCREEN;
@@ -87,6 +88,7 @@ import static android.view.WindowManager.PROPERTY_COMPAT_ALLOW_SANDBOXING_VIEW_B
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CANCEL_AND_REDRAW;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CONSUME_ALWAYS_SYSTEM_BARS;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
+import static android.view.accessibility.Flags.fixMergedContentChangeEvent;
 import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
@@ -287,6 +289,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final boolean DEBUG_TOUCH_NAVIGATION = false || LOCAL_LOGV;
     private static final boolean DEBUG_BLAST = false || LOCAL_LOGV;
     private static final int LOGTAG_INPUT_FOCUS = 62001;
+    private static final int LOGTAG_VIEWROOT_DRAW_EVENT = 60004;
 
     /**
      * Set to false if we do not want to use the multi threaded renderer even though
@@ -1011,8 +1014,10 @@ public final class ViewRootImpl implements ViewParent,
     // Used to check if there were any view invalidations in
     // the previous time frame (FRAME_RATE_IDLENESS_REEVALUATE_TIME).
     private boolean mHasInvalidation = false;
-    // Used to check if it is in the touch boosting period.
+    // Used to check if it is in the frame rate boosting period.
     private boolean mIsFrameRateBoosting = false;
+    // Used to check if it is in touch boosting period.
+    private boolean mIsTouchBoosting = false;
     // Used to check if there is a message in the message queue
     // for idleness handling.
     private boolean mHasIdledMessage = false;
@@ -4768,13 +4773,7 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private void reportDrawFinished(@Nullable Transaction t, int seqId) {
-        if (DEBUG_BLAST) {
-            Log.d(mTag, "reportDrawFinished");
-        }
-
-        if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
-            Trace.instant(Trace.TRACE_TAG_VIEW, "reportDrawFinished " + mTag + " seqId=" + seqId);
-        }
+        logAndTrace("reportDrawFinished seqId=" + seqId);
         try {
             mWindowSession.finishDrawing(mWindow, t, seqId);
         } catch (RemoteException e) {
@@ -6444,11 +6443,12 @@ public final class ViewRootImpl implements ViewParent,
                      * Lower the frame rate after the boosting period (FRAME_RATE_TOUCH_BOOST_TIME).
                      */
                     mIsFrameRateBoosting = false;
+                    mIsTouchBoosting = false;
                     setPreferredFrameRateCategory(Math.max(mPreferredFrameRateCategory,
                             mLastPreferredFrameRateCategory));
                     break;
                 case MSG_CHECK_INVALIDATION_IDLE:
-                    if (!mHasInvalidation && !mIsFrameRateBoosting) {
+                    if (!mHasInvalidation && !mIsFrameRateBoosting && !mIsTouchBoosting) {
                         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
                         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
                         mHasIdledMessage = false;
@@ -7474,7 +7474,7 @@ public final class ViewRootImpl implements ViewParent,
             // For the variable refresh rate project
             if (handled && shouldTouchBoost(action, mWindowAttributes.type)) {
                 // set the frame rate to the maximum value.
-                mIsFrameRateBoosting = true;
+                mIsTouchBoosting = true;
                 setPreferredFrameRateCategory(mPreferredFrameRateCategory);
             }
             /**
@@ -11547,6 +11547,15 @@ public final class ViewRootImpl implements ViewParent,
                 event.setContentChangeTypes(mChangeTypes);
                 if (mAction.isPresent()) event.setAction(mAction.getAsInt());
                 if (AccessibilityEvent.DEBUG_ORIGIN) event.originStackTrace = mOrigin;
+
+                if (fixMergedContentChangeEvent()) {
+                    if ((mChangeTypes & AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE) != 0) {
+                        final View importantParent = source.getSelfOrParentImportantForA11y();
+                        if (importantParent != null) {
+                            source = importantParent;
+                        }
+                    }
+                }
                 source.sendAccessibilityEventUnchecked(event);
             } else {
                 mLastEventTimeMillis = 0;
@@ -11581,14 +11590,29 @@ public final class ViewRootImpl implements ViewParent,
             }
 
             if (mSource != null) {
-                // If there is no common predecessor, then mSource points to
-                // a removed view, hence in this case always prefer the source.
-                View predecessor = getCommonPredecessor(mSource, source);
-                if (predecessor != null) {
-                    predecessor = predecessor.getSelfOrParentImportantForA11y();
+                if (fixMergedContentChangeEvent()) {
+                    View newSource = getCommonPredecessor(mSource, source);
+                    if (newSource == null) {
+                        // If there is no common predecessor, then mSource points to
+                        // a removed view, hence in this case always prefer the source.
+                        newSource = source;
+                    }
+
+                    mChangeTypes |= changeType;
+                    if (mSource != newSource) {
+                        mChangeTypes |= AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE;
+                        mSource = newSource;
+                    }
+                } else {
+                    // If there is no common predecessor, then mSource points to
+                    // a removed view, hence in this case always prefer the source.
+                    View predecessor = getCommonPredecessor(mSource, source);
+                    if (predecessor != null) {
+                        predecessor = predecessor.getSelfOrParentImportantForA11y();
+                    }
+                    mSource = (predecessor != null) ? predecessor : source;
+                    mChangeTypes |= changeType;
                 }
-                mSource = (predecessor != null) ? predecessor : source;
-                mChangeTypes |= changeType;
 
                 final int performingAction = mAccessibilityManager.getPerformingAction();
                 if (performingAction != 0) {
@@ -12207,7 +12231,10 @@ public final class ViewRootImpl implements ViewParent,
         if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
             Trace.instant(Trace.TRACE_TAG_VIEW, mTag + "-" + msg);
         }
-        Log.d(mTag, msg);
+        if (DEBUG_BLAST) {
+            Log.d(mTag, msg);
+        }
+        EventLog.writeEvent(LOGTAG_VIEWROOT_DRAW_EVENT, mTag, msg);
     }
 
     private void setPreferredFrameRateCategory(int preferredFrameRateCategory) {
@@ -12215,8 +12242,16 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
-        int frameRateCategory = mIsFrameRateBoosting || mInsetsAnimationRunning
-                ? FRAME_RATE_CATEGORY_HIGH : preferredFrameRateCategory;
+        int frameRateCategory = mIsTouchBoosting
+                ? FRAME_RATE_CATEGORY_HIGH_HINT : preferredFrameRateCategory;
+
+        // FRAME_RATE_CATEGORY_HIGH has a higher precedence than FRAME_RATE_CATEGORY_HIGH_HINT
+        // For now, FRAME_RATE_CATEGORY_HIGH_HINT is used for boosting with user interaction.
+        // FRAME_RATE_CATEGORY_HIGH is for boosting without user interaction
+        // (e.g., Window Initialization).
+        if (mIsFrameRateBoosting || mInsetsAnimationRunning) {
+            frameRateCategory = FRAME_RATE_CATEGORY_HIGH;
+        }
 
         try {
             if (mLastPreferredFrameRateCategory != frameRateCategory) {

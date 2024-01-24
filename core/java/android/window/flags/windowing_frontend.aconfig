@@ -69,11 +69,10 @@ flag {
 }
 
 flag {
-    name: "predictive_back_system_animations"
+    name: "predictive_back_system_anims"
     namespace: "systemui"
     description: "Predictive back for system animations"
-    bug: "319421778"
-    is_fixed_read_only: true
+    bug: "320510464"
 }
 
 flag {
@@ -90,4 +89,12 @@ flag {
     description: "Feature flag to enable a multi-instance system ui component property."
     bug: "262864589"
     is_fixed_read_only: true
+}
+
+flag {
+  name: "insets_decoupled_configuration"
+  namespace: "windowing_frontend"
+  description: "Configuration decoupled from insets"
+  bug: "151861875"
+  is_fixed_read_only: true
 }

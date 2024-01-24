@@ -15,6 +15,13 @@ flag {
 }
 
 flag {
+    name: "notification_async_group_header_inflation"
+    namespace: "systemui"
+    description: "Inflates the notification group summary header views from the background thread."
+    bug: "217799515"
+}
+
+flag {
     name: "notification_async_hybrid_view_inflation"
     namespace: "systemui"
     description: "Inflates hybrid (single-line) notification views from the background thread."
@@ -342,4 +349,11 @@ flag {
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
    bug: "316212788"
+}
+
+flag {
+   name: "pin_input_field_styled_focus_state"
+   namespace: "systemui"
+   description: "Enables styled focus states on pin input field if keyboard is connected"
+   bug: "316106516"
 }

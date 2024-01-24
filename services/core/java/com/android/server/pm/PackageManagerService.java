@@ -4687,8 +4687,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     mPreferredActivityHelper, mResolveIntentHelper, mDomainVerificationManager,
                     mDomainVerificationConnection, mInstallerService, mPackageProperty,
                     mResolveComponentName, mInstantAppResolverSettingsComponent,
-                    mRequiredSdkSandboxPackage, mServicesExtensionPackageName,
-                    mSharedSystemSharedLibraryPackageName);
+                    mServicesExtensionPackageName, mSharedSystemSharedLibraryPackageName);
         }
 
         @Override

@@ -15021,6 +15021,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /** @hide */
+    @Nullable
     View getSelfOrParentImportantForA11y() {
         if (isImportantForAccessibility()) return this;
         ViewParent parent = getParentForAccessibility();
