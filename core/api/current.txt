@@ -274,6 +274,7 @@ package android {
     field public static final String REQUEST_IGNORE_BATTERY_OPTIMIZATIONS = "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS";
     field public static final String REQUEST_INSTALL_PACKAGES = "android.permission.REQUEST_INSTALL_PACKAGES";
     field public static final String REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE = "android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE";
+    field @FlaggedApi("android.companion.flags.device_presence") public static final String REQUEST_OBSERVE_DEVICE_UUID_PRESENCE = "android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE";
     field public static final String REQUEST_PASSWORD_COMPLEXITY = "android.permission.REQUEST_PASSWORD_COMPLEXITY";
     field @Deprecated public static final String RESTART_PACKAGES = "android.permission.RESTART_PACKAGES";
     field public static final String RUN_USER_INITIATED_JOBS = "android.permission.RUN_USER_INITIATED_JOBS";
@@ -1603,6 +1604,7 @@ package android {
     field public static final int switchTextOff = 16843628; // 0x101036c
     field public static final int switchTextOn = 16843627; // 0x101036b
     field public static final int syncable = 16842777; // 0x1010019
+    field @FlaggedApi("android.multiuser.enable_system_user_only_for_services_and_providers") public static final int systemUserOnly;
     field public static final int tabStripEnabled = 16843453; // 0x10102bd
     field public static final int tabStripLeft = 16843451; // 0x10102bb
     field public static final int tabStripRight = 16843452; // 0x10102bc
@@ -7699,7 +7701,7 @@ package android.app {
     method @Nullable public android.app.WallpaperColors getWallpaperColors(int);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_EXTERNAL_STORAGE, "android.permission.READ_WALLPAPER_INTERNAL"}) public android.os.ParcelFileDescriptor getWallpaperFile(int);
     method public int getWallpaperId(int);
-    method public android.app.WallpaperInfo getWallpaperInfo();
+    method @RequiresPermission(value="QUERY_ALL_PACKAGES", conditional=true) public android.app.WallpaperInfo getWallpaperInfo();
     method @Nullable public android.app.WallpaperInfo getWallpaperInfo(int);
     method public boolean hasResourceWallpaper(@RawRes int);
     method public boolean isSetWallpaperAllowed();
@@ -9696,8 +9698,10 @@ package android.companion {
     method public void requestNotificationAccess(android.content.ComponentName);
     method @FlaggedApi("android.companion.association_tag") public void setAssociationTag(int, @NonNull String);
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
+    method @FlaggedApi("android.companion.device_presence") @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void startObservingDevicePresence(@NonNull android.companion.ObservingDevicePresenceRequest);
     method public void startSystemDataTransfer(int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,android.companion.CompanionException>) throws android.companion.DeviceNotAssociatedException;
     method @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void stopObservingDevicePresence(@NonNull String) throws android.companion.DeviceNotAssociatedException;
+    method @FlaggedApi("android.companion.device_presence") @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE) public void stopObservingDevicePresence(@NonNull android.companion.ObservingDevicePresenceRequest);
     field public static final String EXTRA_ASSOCIATION = "android.companion.extra.ASSOCIATION";
     field @Deprecated public static final String EXTRA_DEVICE = "android.companion.extra.DEVICE";
     field public static final int FLAG_CALL_METADATA = 1; // 0x1
@@ -9725,13 +9729,7 @@ package android.companion {
     method @MainThread public void onDeviceAppeared(@NonNull android.companion.AssociationInfo);
     method @Deprecated @MainThread public void onDeviceDisappeared(@NonNull String);
     method @MainThread public void onDeviceDisappeared(@NonNull android.companion.AssociationInfo);
-    method @FlaggedApi("android.companion.device_presence") @MainThread public void onDeviceEvent(@NonNull android.companion.AssociationInfo, int);
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_APPEARED = 0; // 0x0
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BLE_DISAPPEARED = 1; // 0x1
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_CONNECTED = 2; // 0x2
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_BT_DISCONNECTED = 3; // 0x3
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
-    field @FlaggedApi("android.companion.device_presence") public static final int DEVICE_EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
+    method @FlaggedApi("android.companion.device_presence") @MainThread public void onDevicePresenceEvent(@NonNull android.companion.DevicePresenceEvent);
     field public static final String SERVICE_INTERFACE = "android.companion.CompanionDeviceService";
   }
 
@@ -9742,6 +9740,38 @@ package android.companion {
   }
 
   public class DeviceNotAssociatedException extends java.lang.RuntimeException {
+  }
+
+  @FlaggedApi("android.companion.device_presence") public final class DevicePresenceEvent implements android.os.Parcelable {
+    ctor public DevicePresenceEvent(int, int, @Nullable android.os.ParcelUuid);
+    method public int describeContents();
+    method public int getAssociationId();
+    method public int getEvent();
+    method @Nullable public android.os.ParcelUuid getUuid();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.companion.DevicePresenceEvent> CREATOR;
+    field public static final int EVENT_BLE_APPEARED = 0; // 0x0
+    field public static final int EVENT_BLE_DISAPPEARED = 1; // 0x1
+    field public static final int EVENT_BT_CONNECTED = 2; // 0x2
+    field public static final int EVENT_BT_DISCONNECTED = 3; // 0x3
+    field public static final int EVENT_SELF_MANAGED_APPEARED = 4; // 0x4
+    field public static final int EVENT_SELF_MANAGED_DISAPPEARED = 5; // 0x5
+    field public static final int NO_ASSOCIATION = -1; // 0xffffffff
+  }
+
+  @FlaggedApi("android.companion.device_presence") public final class ObservingDevicePresenceRequest implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getAssociationId();
+    method @Nullable public android.os.ParcelUuid getUuid();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.companion.ObservingDevicePresenceRequest> CREATOR;
+  }
+
+  public static final class ObservingDevicePresenceRequest.Builder {
+    ctor public ObservingDevicePresenceRequest.Builder();
+    method @NonNull public android.companion.ObservingDevicePresenceRequest build();
+    method @NonNull public android.companion.ObservingDevicePresenceRequest.Builder setAssociationId(int);
+    method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE) public android.companion.ObservingDevicePresenceRequest.Builder setUuid(@NonNull android.os.ParcelUuid);
   }
 
   public final class WifiDeviceFilter implements android.companion.DeviceFilter<android.net.wifi.ScanResult> {
@@ -18339,8 +18369,8 @@ package android.hardware {
     field public static final int RGBX_8888 = 2; // 0x2
     field public static final int RGB_565 = 4; // 0x4
     field public static final int RGB_888 = 3; // 0x3
-    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RG_1616_UINT = 58; // 0x3a
-    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_16_UINT = 57; // 0x39
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int RG_1616 = 58; // 0x3a
+    field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_16 = 57; // 0x39
     field @FlaggedApi("com.android.graphics.hwui.flags.requested_formats_v") public static final int R_8 = 56; // 0x38
     field public static final int S_UI8 = 53; // 0x35
     field public static final long USAGE_COMPOSER_OVERLAY = 2048L; // 0x800L
@@ -22166,11 +22196,10 @@ package android.media {
 
   @FlaggedApi("android.media.audio.loudness_configurator_api") public class LoudnessCodecController implements java.lang.AutoCloseable {
     method @FlaggedApi("android.media.audio.loudness_configurator_api") public boolean addMediaCodec(@NonNull android.media.MediaCodec);
-    method public void close();
+    method @FlaggedApi("android.media.audio.loudness_configurator_api") public void close();
     method @FlaggedApi("android.media.audio.loudness_configurator_api") @NonNull public static android.media.LoudnessCodecController create(int);
     method @FlaggedApi("android.media.audio.loudness_configurator_api") @NonNull public static android.media.LoudnessCodecController create(int, @NonNull java.util.concurrent.Executor, @NonNull android.media.LoudnessCodecController.OnLoudnessCodecUpdateListener);
     method @FlaggedApi("android.media.audio.loudness_configurator_api") @NonNull public android.os.Bundle getLoudnessCodecParams(@NonNull android.media.MediaCodec);
-    method @FlaggedApi("android.media.audio.loudness_configurator_api") public void release();
     method @FlaggedApi("android.media.audio.loudness_configurator_api") public void removeMediaCodec(@NonNull android.media.MediaCodec);
   }
 
@@ -36593,6 +36622,7 @@ package android.provider {
     field @FlaggedApi("com.android.media.flags.enable_privileged_routing_for_media_routing_control") public static final String ACTION_REQUEST_MEDIA_ROUTING_CONTROL = "android.settings.REQUEST_MEDIA_ROUTING_CONTROL";
     field public static final String ACTION_REQUEST_SCHEDULE_EXACT_ALARM = "android.settings.REQUEST_SCHEDULE_EXACT_ALARM";
     field public static final String ACTION_REQUEST_SET_AUTOFILL_SERVICE = "android.settings.REQUEST_SET_AUTOFILL_SERVICE";
+    field @FlaggedApi("com.android.internal.telephony.flags.carrier_enabled_satellite_flag") public static final String ACTION_SATELLITE_SETTING = "android.settings.SATELLITE_SETTING";
     field public static final String ACTION_SEARCH_SETTINGS = "android.search.action.SEARCH_SETTINGS";
     field public static final String ACTION_SECURITY_SETTINGS = "android.settings.SECURITY_SETTINGS";
     field public static final String ACTION_SETTINGS = "android.settings.SETTINGS";
@@ -52434,9 +52464,9 @@ package android.view {
     field protected static final int[] PRESSED_STATE_SET;
     field protected static final int[] PRESSED_WINDOW_FOCUSED_STATE_SET;
     field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = 0.0f;
-    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -120.0f;
-    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -30.0f;
-    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -60.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -4.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -2.0f;
+    field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -3.0f;
     field @FlaggedApi("android.view.flags.toolkit_set_frame_rate_read_only") public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1.0f;
     field public static final android.util.Property<android.view.View,java.lang.Float> ROTATION;
     field public static final android.util.Property<android.view.View,java.lang.Float> ROTATION_X;
@@ -57090,7 +57120,7 @@ package android.webkit {
     method public abstract boolean getBuiltInZoomControls();
     method public abstract int getCacheMode();
     method public abstract String getCursiveFontFamily();
-    method @Deprecated public abstract boolean getDatabaseEnabled();
+    method public abstract boolean getDatabaseEnabled();
     method @Deprecated public abstract String getDatabasePath();
     method public abstract int getDefaultFixedFontSize();
     method public abstract int getDefaultFontSize();
@@ -57136,7 +57166,7 @@ package android.webkit {
     method public abstract void setBuiltInZoomControls(boolean);
     method public abstract void setCacheMode(int);
     method public abstract void setCursiveFontFamily(String);
-    method @Deprecated public abstract void setDatabaseEnabled(boolean);
+    method public abstract void setDatabaseEnabled(boolean);
     method @Deprecated public abstract void setDatabasePath(String);
     method public abstract void setDefaultFixedFontSize(int);
     method public abstract void setDefaultFontSize(int);
@@ -59267,6 +59297,7 @@ package android.widget {
     ctor public RemoteViews(@NonNull java.util.Map<android.util.SizeF,android.widget.RemoteViews>);
     ctor public RemoteViews(android.widget.RemoteViews);
     ctor public RemoteViews(android.os.Parcel);
+    ctor @FlaggedApi("android.appwidget.flags.draw_data_parcel") public RemoteViews(@NonNull android.widget.RemoteViews.DrawInstructions);
     method public void addStableView(@IdRes int, @NonNull android.widget.RemoteViews, int);
     method public void addView(@IdRes int, android.widget.RemoteViews);
     method public android.view.View apply(android.content.Context, android.view.ViewGroup);
@@ -59373,6 +59404,15 @@ package android.widget {
   public static class RemoteViews.ActionException extends java.lang.RuntimeException {
     ctor public RemoteViews.ActionException(Exception);
     ctor public RemoteViews.ActionException(String);
+  }
+
+  @FlaggedApi("android.appwidget.flags.draw_data_parcel") public static final class RemoteViews.DrawInstructions {
+    method @FlaggedApi("android.appwidget.flags.draw_data_parcel") public void appendInstructions(@NonNull byte[]);
+  }
+
+  @FlaggedApi("android.appwidget.flags.draw_data_parcel") public static final class RemoteViews.DrawInstructions.Builder {
+    ctor @FlaggedApi("android.appwidget.flags.draw_data_parcel") public RemoteViews.DrawInstructions.Builder(@NonNull java.util.List<byte[]>);
+    method @FlaggedApi("android.appwidget.flags.draw_data_parcel") @NonNull public android.widget.RemoteViews.DrawInstructions build();
   }
 
   public static final class RemoteViews.RemoteCollectionItems implements android.os.Parcelable {
