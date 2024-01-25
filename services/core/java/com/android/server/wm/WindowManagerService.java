@@ -305,6 +305,7 @@ import android.view.displayhash.VerifiedDisplayHash;
 import android.view.inputmethod.ImeTracker;
 import android.window.AddToSurfaceSyncGroupResult;
 import android.window.ClientWindowFrames;
+import android.window.IScreenRecordingCallback;
 import android.window.ISurfaceSyncGroupCompletedListener;
 import android.window.ITaskFpsCallback;
 import android.window.ITrustedPresentationListener;
@@ -371,7 +372,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -1110,6 +1110,8 @@ public class WindowManagerService extends IWindowManager.Stub
         void onAppFreezeTimeout();
     }
 
+    private final ScreenRecordingCallbackController mScreenRecordingCallbackController;
+
     public static WindowManagerService main(final Context context, final InputManagerService im,
             final boolean showBootMsgs, WindowManagerPolicy policy,
             ActivityTaskManagerService atm) {
@@ -1351,6 +1353,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mBlurController = new BlurController(mContext, mPowerManager);
         mTaskFpsCallbackController = new TaskFpsCallbackController(mContext);
         mAccessibilityController = new AccessibilityController(this);
+        mScreenRecordingCallbackController = new ScreenRecordingCallbackController(this);
         mSystemPerformanceHinter = new SystemPerformanceHinter(mContext, displayId -> {
             synchronized (mGlobalLock) {
                 DisplayContent dc = mRoot.getDisplayContent(displayId);
@@ -7230,6 +7233,7 @@ public class WindowManagerService extends IWindowManager.Stub
             mSystemPerformanceHinter.dump(pw, "");
             mTrustedPresentationListenerController.dump(pw);
             mSensitiveContentPackages.dump(pw);
+            mScreenRecordingCallbackController.dump(pw);
         }
     }
 
@@ -8613,10 +8617,23 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public void setShouldBlockScreenCaptureForApp(Set<PackageInfo> packageInfos) {
+        public void addBlockScreenCaptureForApps(ArraySet<PackageInfo> packageInfos) {
             synchronized (mGlobalLock) {
-                mSensitiveContentPackages.setShouldBlockScreenCaptureForApp(packageInfos);
-                WindowManagerService.this.refreshScreenCaptureDisabled();
+                boolean modified =
+                        mSensitiveContentPackages.addBlockScreenCaptureForApps(packageInfos);
+                if (modified) {
+                    WindowManagerService.this.refreshScreenCaptureDisabled();
+                }
+            }
+        }
+
+        @Override
+        public void clearBlockedApps() {
+            synchronized (mGlobalLock) {
+                boolean modified = mSensitiveContentPackages.clearBlockedApps();
+                if (modified) {
+                    WindowManagerService.this.refreshScreenCaptureDisabled();
+                }
             }
         }
     }
@@ -9930,5 +9947,19 @@ public class WindowManagerService extends IWindowManager.Stub
     public void unregisterTrustedPresentationListener(ITrustedPresentationListener listener,
             int id) {
         mTrustedPresentationListenerController.unregisterListener(listener, id);
+    }
+
+    @Override
+    public boolean registerScreenRecordingCallback(IScreenRecordingCallback callback) {
+        return mScreenRecordingCallbackController.register(callback);
+    }
+
+    @Override
+    public void unregisterScreenRecordingCallback(IScreenRecordingCallback callback) {
+        mScreenRecordingCallbackController.unregister(callback);
+    }
+
+    void onProcessActivityVisibilityChanged(int uid, boolean visible) {
+        mScreenRecordingCallbackController.onProcessActivityVisibilityChanged(uid, visible);
     }
 }

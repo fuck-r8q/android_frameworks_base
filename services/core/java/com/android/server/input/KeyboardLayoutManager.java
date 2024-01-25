@@ -1372,7 +1372,7 @@ class KeyboardLayoutManager implements InputManager.InputDeviceListener {
     public boolean isVirtualDevice(int deviceId) {
         VirtualDeviceManagerInternal vdm = LocalServices.getService(
                 VirtualDeviceManagerInternal.class);
-        return vdm == null || vdm.isInputDeviceOwnedByVirtualDevice(deviceId);
+        return vdm != null && vdm.isInputDeviceOwnedByVirtualDevice(deviceId);
     }
 
     private static int[] getScriptCodes(@Nullable Locale locale) {

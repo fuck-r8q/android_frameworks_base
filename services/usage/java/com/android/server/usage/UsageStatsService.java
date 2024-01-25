@@ -2439,7 +2439,7 @@ public class UsageStatsService extends SystemService implements
             }
 
             return queryEventsHelper(userId, query.getBeginTimeMillis(),
-                    query.getEndTimeMillis(), callingPackage, query.getEventTypeFilter());
+                    query.getEndTimeMillis(), callingPackage, query.getEventTypes());
         }
 
         @Override

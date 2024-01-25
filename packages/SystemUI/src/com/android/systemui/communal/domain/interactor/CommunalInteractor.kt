@@ -17,9 +17,9 @@
 package com.android.systemui.communal.domain.interactor
 
 import android.app.smartspace.SmartspaceTarget
-import android.appwidget.AppWidgetHost
 import android.content.ComponentName
 import com.android.systemui.communal.data.repository.CommunalMediaRepository
+import com.android.systemui.communal.data.repository.CommunalPrefsRepository
 import com.android.systemui.communal.data.repository.CommunalRepository
 import com.android.systemui.communal.data.repository.CommunalWidgetRepository
 import com.android.systemui.communal.domain.model.CommunalContentModel
@@ -29,36 +29,60 @@ import com.android.systemui.communal.shared.model.CommunalContentSize.HALF
 import com.android.systemui.communal.shared.model.CommunalContentSize.THIRD
 import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
+import com.android.systemui.communal.widgets.CommunalAppWidgetHost
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.smartspace.data.repository.SmartspaceRepository
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 
 /** Encapsulates business-logic related to communal mode. */
+@OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
 class CommunalInteractor
 @Inject
 constructor(
+    @Application private val applicationScope: CoroutineScope,
     private val communalRepository: CommunalRepository,
     private val widgetRepository: CommunalWidgetRepository,
+    private val communalPrefsRepository: CommunalPrefsRepository,
     mediaRepository: CommunalMediaRepository,
     smartspaceRepository: SmartspaceRepository,
     keyguardInteractor: KeyguardInteractor,
-    private val appWidgetHost: AppWidgetHost,
+    private val appWidgetHost: CommunalAppWidgetHost,
     private val editWidgetsActivityStarter: EditWidgetsActivityStarter
 ) {
 
     /** Whether communal features are enabled. */
     val isCommunalEnabled: Boolean
         get() = communalRepository.isCommunalEnabled
+
+    /** Whether communal features are enabled and available. */
+    val isCommunalAvailable: StateFlow<Boolean> =
+        flowOf(isCommunalEnabled)
+            .flatMapLatest { enabled ->
+                if (enabled) keyguardInteractor.isEncryptedOrLockdown.map { !it } else flowOf(false)
+            }
+            .distinctUntilChanged()
+            .onEach { available -> widgetRepository.updateAppWidgetHostActive(available) }
+            .stateIn(
+                scope = applicationScope,
+                started = SharingStarted.WhileSubscribed(),
+                initialValue = false,
+            )
 
     /**
      * Target scene as requested by the underlying [SceneTransitionLayout] or through
@@ -122,7 +146,7 @@ constructor(
     }
 
     /** Dismiss the CTA tile from the hub in view mode. */
-    fun dismissCtaTile() = communalRepository.setCtaTileInViewModeVisibility(isVisible = false)
+    suspend fun dismissCtaTile() = communalPrefsRepository.setCtaDismissedForCurrentUser()
 
     /**
      * Add a widget at the specified position.
@@ -174,8 +198,8 @@ constructor(
 
     /** CTA tile to be displayed in the glanceable hub (view mode). */
     val ctaTileContent: Flow<List<CommunalContentModel.CtaTileInViewMode>> =
-        communalRepository.isCtaTileInViewModeVisible.map { visible ->
-            if (visible) listOf(CommunalContentModel.CtaTileInViewMode()) else emptyList()
+        communalPrefsRepository.isCtaDismissed.map { isDismissed ->
+            if (isDismissed) emptyList() else listOf(CommunalContentModel.CtaTileInViewMode())
         }
 
     /** A list of tutorial content to be displayed in the communal hub in tutorial mode. */

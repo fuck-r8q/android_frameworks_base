@@ -114,6 +114,7 @@ import com.android.systemui.keyguard.ui.viewmodel.LockscreenToDreamingTransition
 import com.android.systemui.keyguard.ui.viewmodel.LockscreenToOccludedTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.OccludedToLockscreenTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
+import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.media.controls.pipeline.MediaDataManager;
 import com.android.systemui.media.controls.ui.KeyguardMediaController;
 import com.android.systemui.media.controls.ui.MediaHierarchyManager;
@@ -126,7 +127,6 @@ import com.android.systemui.plugins.qs.QS;
 import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.qs.QSFragmentLegacy;
 import com.android.systemui.res.R;
-import com.android.systemui.scene.SceneTestUtils;
 import com.android.systemui.screenrecord.RecordingController;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.data.repository.ShadeAnimationRepository;
@@ -357,8 +357,8 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
     protected FakeKeyguardRepository mFakeKeyguardRepository;
     protected KeyguardInteractor mKeyguardInteractor;
     protected ShadeAnimationInteractor mShadeAnimationInteractor;
-    protected SceneTestUtils mUtils = new SceneTestUtils(this);
-    protected TestScope mTestScope = mUtils.getTestScope();
+    protected KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
+    protected TestScope mTestScope = mKosmos.getTestScope();
     protected ShadeInteractor mShadeInteractor;
     protected PowerInteractor mPowerInteractor;
     protected NotificationPanelViewController.TouchHandler mTouchHandler;

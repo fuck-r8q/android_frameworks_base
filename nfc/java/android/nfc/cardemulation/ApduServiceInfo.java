@@ -55,6 +55,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -104,6 +105,8 @@ public final class ApduServiceInfo implements Parcelable {
      * Mapping from category to dynamic AID group
      */
     final  HashMap<String, AidGroup> mDynamicAidGroups;
+
+    private final ArrayList<String> mPollingLoopFilters;
 
     /**
      * Whether this service should only be started when the device is unlocked.
@@ -172,6 +175,7 @@ public final class ApduServiceInfo implements Parcelable {
         this.mDescription = description;
         this.mStaticAidGroups = new HashMap<String, AidGroup>();
         this.mDynamicAidGroups = new HashMap<String, AidGroup>();
+        this.mPollingLoopFilters = new ArrayList<String>();
         this.mOffHostName = offHost;
         this.mStaticOffHostName = staticOffHost;
         this.mOnHost = onHost;
@@ -285,6 +289,7 @@ public final class ApduServiceInfo implements Parcelable {
 
             mStaticAidGroups = new HashMap<String, AidGroup>();
             mDynamicAidGroups = new HashMap<String, AidGroup>();
+            mPollingLoopFilters = new ArrayList<String>();
             mOnHost = onHost;
 
             final int depth = parser.getDepth();
@@ -367,6 +372,15 @@ public final class ApduServiceInfo implements Parcelable {
                         Log.e(TAG, "Ignoring invalid or duplicate aid: " + aid);
                     }
                     a.recycle();
+                } else if (eventType == XmlPullParser.START_TAG
+                        && "polling-loop-filter".equals(tagName) && currentGroup == null) {
+                    final TypedArray a = res.obtainAttributes(attrs,
+                            com.android.internal.R.styleable.PollingLoopFilter);
+                    String plf =
+                            a.getString(com.android.internal.R.styleable.PollingLoopFilter_name)
+                            .toUpperCase(Locale.ROOT);
+                    mPollingLoopFilters.add(plf);
+                    a.recycle();
                 }
             }
         } catch (NameNotFoundException e) {
@@ -420,6 +434,16 @@ public final class ApduServiceInfo implements Parcelable {
             aids.addAll(group.getAids());
         }
         return aids;
+    }
+
+    /**
+     * Returns the current polling loop filters for this service.
+     * @return List of polling loop filters.
+     */
+    @FlaggedApi(Flags.FLAG_NFC_READ_POLLING_LOOP)
+    @NonNull
+    public List<String> getPollingLoopFilters() {
+        return mPollingLoopFilters;
     }
 
     /**
@@ -596,6 +620,26 @@ public final class ApduServiceInfo implements Parcelable {
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
     public void setDynamicAidGroup(@NonNull AidGroup aidGroup) {
         mDynamicAidGroups.put(aidGroup.getCategory(), aidGroup);
+    }
+
+    /**
+     * Add a Polling Loop Filter. Custom NFC polling frames that match this filter will be
+     * delivered to {@link HostApduService#processPollingFrames(List)}.
+     * @param pollingLoopFilter this polling loop filter to add.
+     */
+    @FlaggedApi(Flags.FLAG_NFC_READ_POLLING_LOOP)
+    public void addPollingLoopFilter(@NonNull String pollingLoopFilter) {
+        mPollingLoopFilters.add(pollingLoopFilter.toUpperCase(Locale.ROOT));
+    }
+
+    /**
+     * Remove a Polling Loop Filter. Custom NFC polling frames that match this filter will no
+     * longer be delivered to {@link HostApduService#processPollingFrames(List)}.
+     * @param pollingLoopFilter this polling loop filter to add.
+     */
+    @FlaggedApi(Flags.FLAG_NFC_READ_POLLING_LOOP)
+    public void removePollingLoopFilter(@NonNull String pollingLoopFilter) {
+        mPollingLoopFilters.remove(pollingLoopFilter.toUpperCase(Locale.ROOT));
     }
 
     /**
