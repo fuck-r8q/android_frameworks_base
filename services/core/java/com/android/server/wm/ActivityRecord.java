@@ -3117,7 +3117,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         final boolean changed = occludesParent != mOccludesParent;
         mOccludesParent = occludesParent;
         setMainWindowOpaque(occludesParent);
-        mWmService.mWindowPlacerLocked.requestTraversal();
 
         if (changed && task != null && !occludesParent) {
             getRootTask().convertActivityToTranslucent(this);
