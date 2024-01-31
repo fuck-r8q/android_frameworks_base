@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
+import android.telephony.SubscriptionManager
 import androidx.annotation.VisibleForTesting
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -26,6 +27,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIc
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.VerboseMobileViewLogger
+import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import javax.inject.Inject
@@ -62,6 +64,20 @@ constructor(
     @VisibleForTesting
     val mobileIconInteractorSubIdCache = mutableMapOf<Int, MobileIconInteractor>()
 
+    private val ddsIcon: StateFlow<SignalIconModel?> =
+        interactor.defaultDataSubId
+            .mapLatest { subId ->
+                if (subId > SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                    commonViewModelForSub(subId)
+                } else {
+                    null
+                }
+            }
+            .flatMapLatest { viewModel ->
+                viewModel?.icon ?: flowOf(null)
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
+
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
             .mapLatest { subscriptions ->
@@ -94,6 +110,7 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
     init {
+        interactor.setDdsIconFLow(ddsIcon)
         scope.launch { subscriptionIdsFlow.collect { invalidateCaches(it) } }
     }
 

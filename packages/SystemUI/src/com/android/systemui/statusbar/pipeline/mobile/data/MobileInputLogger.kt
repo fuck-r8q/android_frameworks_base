@@ -148,6 +148,18 @@ constructor(
         )
     }
 
+    fun logOnCiwlanAvailableChanged(available: Boolean, subId: Int) {
+        buffer.log(
+            TAG,
+            LogLevel.INFO,
+            {
+                int1 = subId
+                bool1 = available
+            },
+            { "logOnCiwlanAvailableChanged: subId=$int1 CiwlanAvailable=$bool1" },
+        )
+    }
+
     fun logActionCarrierConfigChanged() {
         buffer.log(TAG, LogLevel.INFO, {}, { "Intent received: ACTION_CARRIER_CONFIG_CHANGED" })
     }

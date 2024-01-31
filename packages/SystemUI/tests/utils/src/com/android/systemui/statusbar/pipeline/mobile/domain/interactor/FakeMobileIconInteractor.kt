@@ -93,6 +93,9 @@ class FakeMobileIconInteractor(
     private val _voWifiAvailable = MutableStateFlow(false)
     override val voWifiAvailable = _voWifiAvailable
 
+    private val _customizedIcon = MutableStateFlow(null)
+    override val customizedIcon = _customizedIcon
+
     private val _isConnectionFailed = MutableStateFlow(false)
     override val isConnectionFailed = _isConnectionFailed
 

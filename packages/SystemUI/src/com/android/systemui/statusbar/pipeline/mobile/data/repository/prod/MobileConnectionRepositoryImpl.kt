@@ -230,6 +230,11 @@ class MobileConnectionRepositoryImpl(
                             logger.logOnNrIconTypeChanged(serviceState.nrIconType, subId)
                             trySend(CallbackEvent.OnNrIconTypeChanged(serviceState.nrIconType))
                         }
+
+                        override fun onCiwlanAvailableChanged(available: Boolean) {
+                            logger.logOnCiwlanAvailableChanged(available, subId)
+                            trySend(CallbackEvent.OnCiwlanAvailableChanged(available))
+                        }
                     }
 
                 val imsStateCallback =
@@ -617,6 +622,12 @@ class MobileConnectionRepositoryImpl(
     override val imsRegistrationTech: MutableStateFlow<Int> =
         MutableStateFlow<Int>(REGISTRATION_TECH_NONE)
 
+    override val ciwlanAvailable: StateFlow<Boolean> =
+        callbackEvents
+            .mapNotNull {it.onCiwlanAvailableChanged }
+            .map { it.available}
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
     override val isConnectionFailed: StateFlow<Boolean> = conflatedCallbackFlow {
         val callback =
             object : NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
@@ -769,7 +780,10 @@ sealed interface CallbackEvent {
     data class OnServiceStateChanged(val serviceState: ServiceState) : CallbackEvent
 
     data class OnSignalStrengthChanged(val signalStrength: SignalStrength) : CallbackEvent
+
     data class OnNrIconTypeChanged(val nrIconType: Int) : CallbackEvent
+
+    data class OnCiwlanAvailableChanged(val available: Boolean): CallbackEvent
 }
 
 /**
@@ -785,6 +799,7 @@ data class TelephonyCallbackState(
     val onServiceStateChanged: CallbackEvent.OnServiceStateChanged? = null,
     val onSignalStrengthChanged: CallbackEvent.OnSignalStrengthChanged? = null,
     val onNrIconTypeChanged: CallbackEvent.OnNrIconTypeChanged? = null,
+    val onCiwlanAvailableChanged: CallbackEvent.OnCiwlanAvailableChanged? = null,
 ) {
     fun applyEvent(event: CallbackEvent): TelephonyCallbackState {
         return when (event) {
@@ -799,6 +814,7 @@ data class TelephonyCallbackState(
             }
             is CallbackEvent.OnSignalStrengthChanged -> copy(onSignalStrengthChanged = event)
             is CallbackEvent.OnNrIconTypeChanged -> copy(onNrIconTypeChanged = event)
+            is CallbackEvent.OnCiwlanAvailableChanged -> copy(onCiwlanAvailableChanged = event)
         }
     }
 }

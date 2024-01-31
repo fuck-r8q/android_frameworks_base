@@ -455,6 +455,20 @@ class FullMobileConnectionRepository(
                 activeRepo.value.isConnectionFailed.value
             )
 
+    override val ciwlanAvailable =
+        activeRepo.flatMapLatest { it.ciwlanAvailable }
+            .logDiffsForTable(
+                tableLogBuffer,
+                columnPrefix = "",
+                columnName = "ciwlanAvailable",
+                initialValue = activeRepo.value.ciwlanAvailable.value,
+            )
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(),
+                activeRepo.value.ciwlanAvailable.value
+            )
+
     override val isAllowedDuringAirplaneMode =
         activeRepo
             .flatMapLatest { it.isAllowedDuringAirplaneMode }

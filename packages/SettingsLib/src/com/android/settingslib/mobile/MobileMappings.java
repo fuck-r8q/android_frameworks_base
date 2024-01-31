@@ -226,6 +226,7 @@ public class MobileMappings {
         public boolean enableRatIconEnhancement = false;
         public boolean showVowifiIcon = false;
         public boolean enableDdsRatIconEnhancement = false;
+        public boolean crossSimdisplaySingnalLevel = false;
 
         /**
          * Reads the latest configs.
@@ -257,6 +258,8 @@ public class MobileMappings {
                         CarrierConfigManager.KEY_SHOW_4G_FOR_3G_DATA_ICON_BOOL);
                 config.hideLtePlus = b.getBoolean(
                         CarrierConfigManager.KEY_HIDE_LTE_PLUS_DATA_ICON_BOOL);
+                config.crossSimdisplaySingnalLevel = b.getBoolean(
+                        CarrierConfigManager.KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL);
             }
 
             config.alwaysShowNetworkTypeIcon = res.getBoolean(R.bool.config_alwaysShowTypeIcon);

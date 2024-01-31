@@ -77,6 +77,7 @@ class FakeMobileConnectionRepository(
     override val imsRegistered = MutableStateFlow(false)
     override val imsRegistrationTech = MutableStateFlow(REGISTRATION_TECH_NONE)
     override val isConnectionFailed = MutableStateFlow(false)
+    override val ciwlanAvailable = MutableStateFlow(false)
     override val isAllowedDuringAirplaneMode = MutableStateFlow(false)
 
     override val hasPrioritizedNetworkCapabilities = MutableStateFlow(false)

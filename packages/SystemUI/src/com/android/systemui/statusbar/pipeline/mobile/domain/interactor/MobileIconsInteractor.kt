@@ -40,6 +40,7 @@ import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConn
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
 import com.android.systemui.statusbar.pipeline.shared.data.model.ConnectivitySlot
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
@@ -60,6 +61,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Business layer logic for the set of mobile subscription icons.
@@ -134,6 +136,10 @@ interface MobileIconsInteractor {
     val showVolteIcon: StateFlow<Boolean>
 
     val showVowifiIcon: StateFlow<Boolean>
+
+    val defaultDataSubId: StateFlow<Int>
+
+    fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {}
 }
 
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
@@ -154,6 +160,13 @@ constructor(
 
     // Weak reference lookup for created interactors
     private val reuseCache = mutableMapOf<Int, WeakReference<MobileIconInteractor>>()
+    private var ddsIcon: StateFlow<SignalIconModel?> = MutableStateFlow(null)
+
+    override fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {
+        ddsIcon = iconFlow
+    }
+
+    override val defaultDataSubId: StateFlow<Int> = mobileConnectionsRepo.defaultDataSubId
 
     override val mobileIsDefault =
         combine(
@@ -424,6 +437,11 @@ constructor(
             .mapLatest { it.showVowifiIcon }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+    private val crossSimdisplaySingnalLevel: StateFlow<Boolean> =
+        mobileConnectionsRepo.defaultDataSubRatConfig
+            .mapLatest { it.crossSimdisplaySingnalLevel }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
     /** Vends out new [MobileIconInteractor] for a particular subId */
     override fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor =
         reuseCache[subId]?.get() ?: createMobileConnectionInteractorForSubId(subId)
@@ -448,6 +466,8 @@ constructor(
                 showVowifiIcon,
                 context,
                 mobileConnectionsRepo.defaultDataSubId,
+                ddsIcon,
+                crossSimdisplaySingnalLevel,
             )
             .also { reuseCache[subId] = WeakReference(it) }
 
