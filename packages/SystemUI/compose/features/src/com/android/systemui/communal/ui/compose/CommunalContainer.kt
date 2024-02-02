@@ -64,15 +64,6 @@ fun CommunalContainer(
             transitions = sceneTransitions,
         )
 
-    // Don't show hub mode UI if keyguard is not present. This is important since we're in the
-    // shade, which can be opened from many locations.
-    val isKeyguardShowing by viewModel.isKeyguardVisible.collectAsState(initial = false)
-    val isCommunalAvailable by viewModel.isCommunalAvailable.collectAsState()
-
-    if (!isKeyguardShowing || !isCommunalAvailable) {
-        return
-    }
-
     // This effect exposes the SceneTransitionLayout's observable transition state to the rest of
     // the system, and unsets it when the view is disposed to avoid a memory leak.
     DisposableEffect(viewModel, sceneTransitionLayoutState) {
@@ -85,13 +76,14 @@ fun CommunalContainer(
     SceneTransitionLayout(
         state = sceneTransitionLayoutState,
         modifier = modifier.fillMaxSize(),
-        edgeDetector = FixedSizeEdgeDetector(ContainerDimensions.EdgeSwipeSize),
+        swipeSourceDetector = FixedSizeEdgeDetector(ContainerDimensions.EdgeSwipeSize),
     ) {
         scene(
             TransitionSceneKey.Blank,
             userActions =
                 mapOf(
-                    Swipe(SwipeDirection.Left, fromEdge = Edge.Right) to TransitionSceneKey.Communal
+                    Swipe(SwipeDirection.Left, fromSource = Edge.Right) to
+                        TransitionSceneKey.Communal
                 )
         ) {
             // This scene shows nothing only allowing for transitions to the communal scene.
@@ -102,7 +94,7 @@ fun CommunalContainer(
             TransitionSceneKey.Communal,
             userActions =
                 mapOf(
-                    Swipe(SwipeDirection.Right, fromEdge = Edge.Left) to TransitionSceneKey.Blank
+                    Swipe(SwipeDirection.Right, fromSource = Edge.Left) to TransitionSceneKey.Blank
                 ),
         ) {
             CommunalScene(viewModel, modifier = modifier)

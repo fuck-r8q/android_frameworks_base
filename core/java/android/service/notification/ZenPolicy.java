@@ -570,7 +570,7 @@ public final class ZenPolicy implements Parcelable {
      * with {@link NotificationChannel#canBypassDnd()} will be intercepted.
      */
     @FlaggedApi(Flags.FLAG_MODES_API)
-    public @State int getPriorityChannels() {
+    public @State int getPriorityChannelsAllowed() {
         switch (mAllowChannels) {
             case CHANNEL_POLICY_PRIORITY:
                 return STATE_ALLOW;
@@ -1422,6 +1422,54 @@ public final class ZenPolicy implements Parcelable {
     }
 
     /**
+     * Overwrites any policy values in this ZenPolicy with set values from newPolicy and
+     * returns a copy of the resulting ZenPolicy.
+     * Unlike apply(), values set in newPolicy will always be kept over pre-existing
+     * fields. Any values in newPolicy that are not set keep their currently set values.
+     *
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_MODES_API)
+    public @NonNull ZenPolicy overwrittenWith(@Nullable ZenPolicy newPolicy) {
+        ZenPolicy result = this.copy();
+
+        if (newPolicy == null) {
+            return result;
+        }
+
+        // set priority categories
+        for (int category = 0; category < mPriorityCategories.size(); category++) {
+            @State int newState = newPolicy.mPriorityCategories.get(category);
+            if (newState != STATE_UNSET) {
+                result.mPriorityCategories.set(category, newState);
+
+                if (category == PRIORITY_CATEGORY_MESSAGES) {
+                    result.mPriorityMessages = newPolicy.mPriorityMessages;
+                } else if (category == PRIORITY_CATEGORY_CALLS) {
+                    result.mPriorityCalls = newPolicy.mPriorityCalls;
+                } else if (category == PRIORITY_CATEGORY_CONVERSATIONS) {
+                    result.mConversationSenders = newPolicy.mConversationSenders;
+                }
+            }
+        }
+
+        // set visual effects
+        for (int visualEffect = 0; visualEffect < mVisualEffects.size(); visualEffect++) {
+            if (newPolicy.mVisualEffects.get(visualEffect) != STATE_UNSET) {
+                result.mVisualEffects.set(visualEffect, newPolicy.mVisualEffects.get(visualEffect));
+            }
+        }
+
+        // set allowed channels
+        if (newPolicy.mAllowChannels != CHANNEL_POLICY_UNSET) {
+            result.mAllowChannels = newPolicy.mAllowChannels;
+        }
+
+        return result;
+    }
+
+    /**
      * @hide
      */
     public void dumpDebug(ProtoOutputStream proto, long fieldId) {
@@ -1481,7 +1529,7 @@ public final class ZenPolicy implements Parcelable {
         proto.write(DNDPolicyProto.ALLOW_CONVERSATIONS_FROM, getPriorityConversationSenders());
 
         if (Flags.modesApi()) {
-            proto.write(DNDPolicyProto.ALLOW_CHANNELS, getPriorityChannels());
+            proto.write(DNDPolicyProto.ALLOW_CHANNELS, getPriorityChannelsAllowed());
         }
 
         proto.flush();

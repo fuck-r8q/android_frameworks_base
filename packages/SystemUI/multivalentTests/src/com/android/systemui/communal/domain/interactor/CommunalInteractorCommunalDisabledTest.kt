@@ -27,7 +27,6 @@ import com.android.systemui.communal.data.repository.fakeCommunalWidgetRepositor
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
-import com.android.systemui.keyguard.domain.interactor.communalInteractor
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
@@ -80,16 +79,5 @@ class CommunalInteractorCommunalDisabledTest : SysuiTestCase() {
             runCurrent()
 
             assertThat(isCommunalAvailable).isFalse()
-        }
-
-    @Test
-    fun updateAppWidgetHostActive_whenStorageUnlock_false() =
-        testScope.runTest {
-            assertThat(widgetRepository.isHostActive()).isFalse()
-
-            keyguardRepository.setIsEncryptedOrLockdown(false)
-            runCurrent()
-
-            assertThat(widgetRepository.isHostActive()).isFalse()
         }
 }

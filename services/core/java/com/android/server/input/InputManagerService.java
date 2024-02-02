@@ -411,6 +411,40 @@ public class InputManagerService extends IInputManager.Stub
     private boolean mShowKeyPresses = false;
     private boolean mShowRotaryInput = false;
 
+    @GuardedBy("mLoadedPointerIconsByDisplayAndType")
+    final SparseArray<SparseArray<PointerIcon>> mLoadedPointerIconsByDisplayAndType =
+            new SparseArray<>();
+    @GuardedBy("mLoadedPointerIconsByDisplayAndType")
+    boolean mUseLargePointerIcons = false;
+
+    final DisplayManager.DisplayListener mDisplayListener = new DisplayManager.DisplayListener() {
+        @Override
+        public void onDisplayAdded(int displayId) {
+
+        }
+
+        @Override
+        public void onDisplayRemoved(int displayId) {
+            synchronized (mLoadedPointerIconsByDisplayAndType) {
+                mLoadedPointerIconsByDisplayAndType.remove(displayId);
+            }
+        }
+
+        @Override
+        public void onDisplayChanged(int displayId) {
+            synchronized (mLoadedPointerIconsByDisplayAndType) {
+                // The display density could have changed, so force all cached pointer icons to be
+                // reloaded for the display.
+                var iconsByType = mLoadedPointerIconsByDisplayAndType.get(displayId);
+                if (iconsByType == null) {
+                    return;
+                }
+                iconsByType.clear();
+            }
+            mNative.reloadPointerIcons();
+        }
+    };
+
     /** Point of injection for test dependencies. */
     @VisibleForTesting
     static class Injector {
@@ -577,6 +611,10 @@ public class InputManagerService extends IInputManager.Stub
         if (mWiredAccessoryCallbacks != null) {
             mWiredAccessoryCallbacks.systemReady();
         }
+
+        Objects.requireNonNull(
+                mContext.getSystemService(DisplayManager.class)).registerDisplayListener(
+                mDisplayListener, mHandler);
 
         mKeyboardLayoutManager.systemRunning();
         mBatteryController.systemRunning();
@@ -1292,6 +1330,8 @@ public class InputManagerService extends IInputManager.Stub
 
         updateAdditionalDisplayInputProperties(displayId, AdditionalDisplayInputProperties::reset);
 
+        // TODO(b/320763728): Rely on WindowInfosListener to determine when a display has been
+        //  removed in InputDispatcher instead of this callback.
         mNative.displayRemoved(displayId);
     }
 
@@ -1408,6 +1448,10 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     private boolean setVirtualMousePointerDisplayIdBlocking(int overrideDisplayId) {
+        if (com.android.input.flags.Flags.enablePointerChoreographer()) {
+            throw new IllegalStateException(
+                    "This must not be used when PointerChoreographer is enabled");
+        }
         final boolean isRemovingOverride = overrideDisplayId == Display.INVALID_DISPLAY;
 
         // Take care to not make calls to window manager while holding internal locks.
@@ -1446,6 +1490,10 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     private int getVirtualMousePointerDisplayId() {
+        if (com.android.input.flags.Flags.enablePointerChoreographer()) {
+            throw new IllegalStateException(
+                    "This must not be used when PointerChoreographer is enabled");
+        }
         synchronized (mAdditionalDisplayInputPropertiesLock) {
             return mOverriddenPointerDisplayId;
         }
@@ -1770,8 +1818,6 @@ public class InputManagerService extends IInputManager.Stub
         synchronized (mAdditionalDisplayInputPropertiesLock) {
             mPointerIconType = icon.getType();
             mPointerIcon = mPointerIconType == PointerIcon.TYPE_CUSTOM ? icon : null;
-
-            if (!mCurrentDisplayProperties.pointerIconVisible) return false;
 
             return mNative.setPointerIcon(icon, displayId, deviceId, pointerId, inputToken);
         }
@@ -2721,8 +2767,22 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback.
     @SuppressWarnings("unused")
-    private PointerIcon getPointerIcon(int displayId) {
-        return PointerIcon.getDefaultIcon(getContextForPointerIcon(displayId));
+    private @NonNull PointerIcon getLoadedPointerIcon(int displayId, int type) {
+        synchronized (mLoadedPointerIconsByDisplayAndType) {
+            SparseArray<PointerIcon> iconsByType = mLoadedPointerIconsByDisplayAndType.get(
+                    displayId);
+            if (iconsByType == null) {
+                iconsByType = new SparseArray<>();
+                mLoadedPointerIconsByDisplayAndType.put(displayId, iconsByType);
+            }
+            PointerIcon icon = iconsByType.get(type);
+            if (icon == null) {
+                icon = PointerIcon.getLoadedSystemIcon(getContextForPointerIcon(displayId), type,
+                        mUseLargePointerIcons);
+                iconsByType.put(type, icon);
+            }
+            return Objects.requireNonNull(icon);
+        }
     }
 
     // Native callback.
@@ -3280,8 +3340,8 @@ public class InputManagerService extends IInputManager.Stub
         }
 
         @Override
-        public PointF getCursorPosition() {
-            final float[] p = mNative.getMouseCursorPosition();
+        public PointF getCursorPosition(int displayId) {
+            final float[] p = mNative.getMouseCursorPosition(displayId);
             if (p == null || p.length != 2) {
                 throw new IllegalStateException("Failed to get mouse cursor position");
             }
@@ -3423,6 +3483,10 @@ public class InputManagerService extends IInputManager.Stub
     private void applyAdditionalDisplayInputPropertiesLocked(
             AdditionalDisplayInputProperties properties) {
         // Handle changes to each of the individual properties.
+        // TODO(b/293587049): This approach for updating pointer display properties is only for when
+        //  PointerChoreographer is disabled. Remove this logic when PointerChoreographer is
+        //  permanently enabled.
+
         if (properties.pointerIconVisible != mCurrentDisplayProperties.pointerIconVisible) {
             mCurrentDisplayProperties.pointerIconVisible = properties.pointerIconVisible;
             if (properties.pointerIconVisible) {
@@ -3441,7 +3505,6 @@ public class InputManagerService extends IInputManager.Stub
                 != mCurrentDisplayProperties.mousePointerAccelerationEnabled) {
             mCurrentDisplayProperties.mousePointerAccelerationEnabled =
                     properties.mousePointerAccelerationEnabled;
-            mNative.setMousePointerAccelerationEnabled(properties.mousePointerAccelerationEnabled);
         }
     }
 
@@ -3454,7 +3517,16 @@ public class InputManagerService extends IInputManager.Stub
                 properties = new AdditionalDisplayInputProperties();
                 mAdditionalDisplayInputProperties.put(displayId, properties);
             }
+            final boolean oldPointerIconVisible = properties.pointerIconVisible;
+            final boolean oldMouseAccelerationEnabled = properties.mousePointerAccelerationEnabled;
             updater.accept(properties);
+            if (oldPointerIconVisible != properties.pointerIconVisible) {
+                mNative.setPointerIconVisibility(displayId, properties.pointerIconVisible);
+            }
+            if (oldMouseAccelerationEnabled != properties.mousePointerAccelerationEnabled) {
+                mNative.setMousePointerAccelerationEnabled(displayId,
+                        properties.mousePointerAccelerationEnabled);
+            }
             if (properties.allDefaults()) {
                 mAdditionalDisplayInputProperties.remove(displayId);
             }
@@ -3550,10 +3622,29 @@ public class InputManagerService extends IInputManager.Stub
     }
 
     /**
+     * Sets Accessibility slow keys threshold in milliseconds.
+     */
+    public void setAccessibilitySlowKeysThreshold(int thresholdTimeMs) {
+        mNative.setAccessibilitySlowKeysThreshold(thresholdTimeMs);
+    }
+
+    /**
      * Sets whether Accessibility sticky keys is enabled.
      */
     public void setAccessibilityStickyKeysEnabled(boolean enabled) {
         mNative.setAccessibilityStickyKeysEnabled(enabled);
+    }
+
+    void setUseLargePointerIcons(boolean useLargeIcons) {
+        synchronized (mLoadedPointerIconsByDisplayAndType) {
+            if (mUseLargePointerIcons == useLargeIcons) {
+                return;
+            }
+            mUseLargePointerIcons = useLargeIcons;
+            // Clear all cached icons on all displays.
+            mLoadedPointerIconsByDisplayAndType.clear();
+        }
+        mNative.reloadPointerIcons();
     }
 
     interface KeyboardBacklightControllerInterface {

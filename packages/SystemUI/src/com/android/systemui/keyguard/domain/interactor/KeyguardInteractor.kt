@@ -32,6 +32,7 @@ import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
+import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.keyguard.shared.model.CameraLaunchSourceModel
 import com.android.systemui.keyguard.shared.model.DozeStateModel
 import com.android.systemui.keyguard.shared.model.DozeStateModel.Companion.isDozeOff
@@ -98,7 +99,7 @@ constructor(
     val dozeAmount: Flow<Float> = repository.linearDozeAmount
 
     /** Whether the system is in doze mode. */
-    val isDozing: Flow<Boolean> = repository.isDozing
+    val isDozing: StateFlow<Boolean> = repository.isDozing
 
     /** Receive an event for doze time tick */
     val dozeTimeTick: Flow<Long> = repository.dozeTimeTick
@@ -162,14 +163,22 @@ constructor(
     /** Whether the keyguard is showing or not. */
     val isKeyguardShowing: Flow<Boolean> = repository.isKeyguardShowing
 
-    /** Whether the keyguard is unlocked or not. */
-    val isKeyguardUnlocked: Flow<Boolean> = repository.isKeyguardUnlocked
+    /** Whether the keyguard is dismissible or not. */
+    val isKeyguardDismissible: Flow<Boolean> = repository.isKeyguardDismissible
 
     /** Whether the keyguard is occluded (covered by an activity). */
     val isKeyguardOccluded: Flow<Boolean> = repository.isKeyguardOccluded
 
     /** Whether the keyguard is going away. */
     val isKeyguardGoingAway: Flow<Boolean> = repository.isKeyguardGoingAway
+
+    /** Keyguard can be clipped at the top as the shade is dragged */
+    val topClippingBounds: Flow<Int?> =
+        combine(configurationInteractor.onAnyConfigurationChange, repository.topClippingBounds) {
+            _,
+            topClippingBounds ->
+            topClippingBounds
+        }
 
     /** Last point that [KeyguardRootView] view was tapped */
     val lastRootViewTapPosition: Flow<Point?> = repository.lastRootViewTapPosition.asStateFlow()
@@ -185,6 +194,9 @@ constructor(
 
     /** Observable for the [StatusBarState] */
     val statusBarState: Flow<StatusBarState> = repository.statusBarState
+
+    /** Source of the most recent biometric unlock, such as fingerprint or face. */
+    val biometricUnlockSource: Flow<BiometricUnlockSource?> = repository.biometricUnlockSource
 
     /**
      * Observable for [BiometricUnlockModel] when biometrics like face or any fingerprint (rear,
@@ -326,6 +338,10 @@ constructor(
 
     fun keyguardDoneAnimationsFinished() {
         repository.keyguardDoneAnimationsFinished()
+    }
+
+    fun setTopClippingBounds(top: Int?) {
+        repository.topClippingBounds.value = top
     }
 
     companion object {

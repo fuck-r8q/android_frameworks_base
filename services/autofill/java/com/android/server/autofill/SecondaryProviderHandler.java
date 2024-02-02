@@ -25,6 +25,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.IntentSender;
 import android.os.Bundle;
+import android.service.autofill.ConvertCredentialResponse;
 import android.service.autofill.FillRequest;
 import android.service.autofill.FillResponse;
 import android.util.Slog;
@@ -98,6 +99,12 @@ final class SecondaryProviderHandler implements RemoteFillService.FillServiceCal
 
     }
 
+    @Override
+    public void  onConvertCredentialRequestSuccess(@NonNull ConvertCredentialResponse
+            convertCredentialResponse) {
+
+    }
+
     /**
      * Requests a new fill response.
      */
@@ -108,9 +115,9 @@ final class SecondaryProviderHandler implements RemoteFillService.FillServiceCal
         mLastFlag = flag;
         if (mRemoteFillService != null && mRemoteFillService.isCredentialAutofillService()) {
             Slog.v(TAG, "About to call CredAutofill service as secondary provider");
-            addSessionIdAndRequestIdToClientState(pendingFillRequest,
+            FillRequest request = addSessionIdAndRequestIdToClientState(pendingFillRequest,
                     pendingInlineSuggestionsRequest, id);
-            mRemoteFillService.onFillCredentialRequest(pendingFillRequest, client);
+            mRemoteFillService.onFillCredentialRequest(request, client);
         } else {
             mRemoteFillService.onFillRequest(pendingFillRequest);
         }

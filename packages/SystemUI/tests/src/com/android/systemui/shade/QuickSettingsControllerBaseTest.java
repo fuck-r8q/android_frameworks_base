@@ -43,7 +43,6 @@ import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepositor
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor;
 import com.android.systemui.communal.domain.interactor.CommunalInteractor;
-import com.android.systemui.communal.domain.interactor.CommunalInteractorFactory;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
 import com.android.systemui.dump.DumpManager;
@@ -220,7 +219,8 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                         mTestScope.getBackgroundScope(),
                         mKosmos.getFakeSceneContainerConfig()),
                 powerInteractor,
-                mock(SceneLogger.class));
+                mock(SceneLogger.class),
+                mKosmos.getDeviceUnlockedInteractor());
 
         FakeSceneContainerFlags sceneContainerFlags = new FakeSceneContainerFlags();
         KeyguardInteractor keyguardInteractor = new KeyguardInteractor(
@@ -232,8 +232,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 new ConfigurationInteractor(configurationRepository),
                 mShadeRepository,
                 () -> sceneInteractor);
-        CommunalInteractor communalInteractor =
-                CommunalInteractorFactory.create().getCommunalInteractor();
+        CommunalInteractor communalInteractor = mKosmos.getCommunalInteractor();
 
         FakeKeyguardTransitionRepository keyguardTransitionRepository =
                 new FakeKeyguardTransitionRepository();
@@ -258,6 +257,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 powerInteractor,
                 new GlanceableHubTransitions(
                         mTestScope,
+                        mKosmos.getTestDispatcher(),
                         keyguardTransitionInteractor,
                         keyguardTransitionRepository,
                         communalInteractor
@@ -279,6 +279,7 @@ public class QuickSettingsControllerBaseTest extends SysuiTestCase {
                 mKosmos.getTestDispatcher(),
                 mKosmos.getTestDispatcher(),
                 keyguardInteractor,
+                communalInteractor,
                 featureFlags,
                 mock(KeyguardSecurityModel.class),
                 mSelectedUserInteractor,

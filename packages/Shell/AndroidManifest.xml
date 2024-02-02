@@ -343,6 +343,7 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_GLASSES" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
     <uses-permission android:name="android.permission.USE_COMPANION_TRANSPORTS" />
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE" />
 
     <uses-permission android:name="android.permission.MANAGE_APPOPS" />
     <uses-permission android:name="android.permission.WATCH_APPOPS" />
@@ -560,7 +561,10 @@
     <uses-permission android:name="android.permission.TEST_BIOMETRIC" />
 
     <!-- Permission required for CTS test - android.server.biometrics -->
-    <uses-permission android:name="android.permission.MANAGE_BIOMETRIC_DIALOG" />
+    <uses-permission android:name="android.permission.SET_BIOMETRIC_DIALOG_LOGO" />
+
+    <!-- Permission required for CTS test - android.server.biometrics -->
+    <uses-permission android:name="android.permission.USE_BACKGROUND_FACE_AUTHENTICATION" />
 
     <!-- Permissions required for CTS test - NotificationManagerTest -->
     <uses-permission android:name="android.permission.MANAGE_NOTIFICATION_LISTENERS" />
@@ -897,6 +901,9 @@
 
     <!-- Permission required for BinaryTransparencyService shell API and host test -->
     <uses-permission android:name="android.permission.GET_BACKGROUND_INSTALLED_PACKAGES" />
+
+    <!-- Permissions required for CTS test - CtsPermissionUiTestCases -->
+    <uses-permission android:name="android.permission.MANAGE_ENHANCED_CONFIRMATION_STATES" />
 
     <application
         android:label="@string/app_label"

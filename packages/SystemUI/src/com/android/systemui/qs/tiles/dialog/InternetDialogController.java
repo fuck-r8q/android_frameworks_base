@@ -210,6 +210,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private DialogLaunchAnimator mDialogLaunchAnimator;
     private boolean mHasWifiEntries;
     private WifiStateWorker mWifiStateWorker;
+    private boolean mHasActiveSubId;
     private int mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
     private int mActiveDataSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
 
@@ -356,6 +357,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                 mExecutor);
         // Listen the subscription changes
         mOnSubscriptionsChangedListener = new InternetOnSubscriptionChangedListener();
+        refreshHasActiveSubId();
         mSubscriptionManager.addOnSubscriptionsChangedListener(mExecutor,
                 mOnSubscriptionsChangedListener);
         mDefaultDataSubId = getDefaultDataSubscriptionId();
@@ -975,18 +977,22 @@ public class InternetDialogController implements AccessPointController.AccessPoi
      * @return whether there is the carrier item in the slice.
      */
     boolean hasActiveSubId() {
-        if (mSubscriptionManager == null) {
-            if (DEBUG) {
-                Log.d(TAG, "SubscriptionManager is null, can not check carrier.");
-            }
+        if (isAirplaneModeEnabled() || mTelephonyManager == null) {
             return false;
         }
 
-        if (isAirplaneModeEnabled() || mTelephonyManager == null
-                || mSubscriptionManager.getActiveSubscriptionIdList().length <= 0) {
-            return false;
+        return mHasActiveSubId;
+    }
+
+    private void refreshHasActiveSubId() {
+        if (mSubscriptionManager == null) {
+            mHasActiveSubId = false;
+            Log.e(TAG, "SubscriptionManager is null, set mHasActiveSubId = false");
+            return;
         }
-        return true;
+
+        mHasActiveSubId = mSubscriptionManager.getActiveSubscriptionIdList().length > 0;
+        Log.i(TAG, "mHasActiveSubId:" + mHasActiveSubId);
     }
 
     /**
@@ -1384,6 +1390,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
                 mNonDdsCallState = TelephonyManager.CALL_STATE_IDLE;
             }
 
+            refreshHasActiveSubId();
             updateListener();
         }
     }

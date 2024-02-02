@@ -295,8 +295,6 @@ public class UserManagerService extends IUserManager.Stub {
 
     private static final int USER_VERSION = 11;
 
-    private static final int MAX_USER_STRING_LENGTH = 500;
-
     private static final long EPOCH_PLUS_30_YEARS = 30L * 365 * 24 * 60 * 60 * 1000L; // ms
 
     static final int WRITE_USER_MSG = 1;
@@ -712,15 +710,20 @@ public class UserManagerService extends IUserManager.Stub {
             boolean isAutoLockOnDeviceLockSelected =
                     autoLockPreference == Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_ON_DEVICE_LOCK;
             if (isKeyguardLocked && isAutoLockOnDeviceLockSelected) {
-                int privateProfileUserId = getPrivateProfileUserId();
-                if (privateProfileUserId != UserHandle.USER_NULL) {
-                    Slog.i(LOG_TAG, "Auto-locking private space with user-id "
-                            + privateProfileUserId);
-                    setQuietModeEnabledAsync(privateProfileUserId,
-                            /* enableQuietMode */true, /* target */ null,
-                            mContext.getPackageName());
-                }
+                autoLockPrivateSpace();
             }
+        }
+    }
+
+    @VisibleForTesting
+    void autoLockPrivateSpace() {
+        int privateProfileUserId = getPrivateProfileUserId();
+        if (privateProfileUserId != UserHandle.USER_NULL) {
+            Slog.i(LOG_TAG, "Auto-locking private space with user-id "
+                    + privateProfileUserId);
+            setQuietModeEnabledAsync(privateProfileUserId,
+                    /* enableQuietMode */true, /* target */ null,
+                    mContext.getPackageName());
         }
     }
 
@@ -1023,18 +1026,29 @@ public class UserManagerService extends IUserManager.Stub {
         if (isAutoLockForPrivateSpaceEnabled()) {
 
             int mainUserId = getMainUserIdUnchecked();
+            if (mainUserId != UserHandle.USER_NULL) {
+                mContext.getContentResolver().registerContentObserverAsUser(
+                        Settings.Secure.getUriFor(
+                                Settings.Secure.PRIVATE_SPACE_AUTO_LOCK), false,
+                        mPrivateSpaceAutoLockSettingsObserver, UserHandle.of(mainUserId));
 
-            mContext.getContentResolver().registerContentObserverAsUser(Settings.Secure.getUriFor(
-                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK), false,
-                    mPrivateSpaceAutoLockSettingsObserver, UserHandle.of(mainUserId));
+                setOrUpdateAutoLockPreferenceForPrivateProfile(
+                        Settings.Secure.getIntForUser(mContext.getContentResolver(),
+                                Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
+                                Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER, mainUserId));
+            }
+        }
 
-            setOrUpdateAutoLockPreferenceForPrivateProfile(
-                    Settings.Secure.getIntForUser(mContext.getContentResolver(),
-                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK,
-                    Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_NEVER, mainUserId));
+        if (isAutoLockingPrivateSpaceOnRestartsEnabled()) {
+            autoLockPrivateSpace();
         }
 
         markEphemeralUsersForRemoval();
+    }
+
+    private boolean isAutoLockingPrivateSpaceOnRestartsEnabled() {
+        return android.os.Flags.allowPrivateProfile()
+                && android.multiuser.Flags.enablePrivateSpaceAutolockOnRestarts();
     }
 
     /**
@@ -4676,16 +4690,18 @@ public class UserManagerService extends IUserManager.Stub {
         if (userData.persistSeedData) {
             if (userData.seedAccountName != null) {
                 serializer.attribute(null, ATTR_SEED_ACCOUNT_NAME,
-                        truncateString(userData.seedAccountName));
+                        truncateString(userData.seedAccountName,
+                                UserManager.MAX_ACCOUNT_STRING_LENGTH));
             }
             if (userData.seedAccountType != null) {
                 serializer.attribute(null, ATTR_SEED_ACCOUNT_TYPE,
-                        truncateString(userData.seedAccountType));
+                        truncateString(userData.seedAccountType,
+                                UserManager.MAX_ACCOUNT_STRING_LENGTH));
             }
         }
         if (userInfo.name != null) {
             serializer.startTag(null, TAG_NAME);
-            serializer.text(truncateString(userInfo.name));
+            serializer.text(truncateString(userInfo.name, UserManager.MAX_USER_NAME_LENGTH));
             serializer.endTag(null, TAG_NAME);
         }
         synchronized (mRestrictionsLock) {
@@ -4749,11 +4765,11 @@ public class UserManagerService extends IUserManager.Stub {
         serializer.endDocument();
     }
 
-    private String truncateString(String original) {
-        if (original == null || original.length() <= MAX_USER_STRING_LENGTH) {
+    private String truncateString(String original, int limit) {
+        if (original == null || original.length() <= limit) {
             return original;
         }
-        return original.substring(0, MAX_USER_STRING_LENGTH);
+        return original.substring(0, limit);
     }
 
     /*
@@ -5220,7 +5236,7 @@ public class UserManagerService extends IUserManager.Stub {
             @UserIdInt int parentId, boolean preCreate, @Nullable String[] disallowedPackages,
             @NonNull TimingsTraceAndSlog t, @Nullable Object token)
             throws UserManager.CheckedUserOperationException {
-        String truncatedName = truncateString(name);
+        String truncatedName = truncateString(name, UserManager.MAX_USER_NAME_LENGTH);
         final UserTypeDetails userTypeDetails = mUserTypes.get(userType);
         if (userTypeDetails == null) {
             throwCheckedUserOperationException(
@@ -6805,9 +6821,14 @@ public class UserManagerService extends IUserManager.Stub {
                     Slog.e(LOG_TAG, "No such user for settings seed data u=" + userId);
                     return;
                 }
-                userData.seedAccountName = truncateString(accountName);
-                userData.seedAccountType = truncateString(accountType);
-                userData.seedAccountOptions = accountOptions;
+                userData.seedAccountName = truncateString(accountName,
+                        UserManager.MAX_ACCOUNT_STRING_LENGTH);
+                userData.seedAccountType = truncateString(accountType,
+                        UserManager.MAX_ACCOUNT_STRING_LENGTH);
+                if (accountOptions != null && accountOptions.isBundleContentsWithinLengthLimit(
+                        UserManager.MAX_ACCOUNT_OPTIONS_LENGTH)) {
+                    userData.seedAccountOptions = accountOptions;
+                }
                 userData.persistSeedData = persist;
             }
             if (persist) {

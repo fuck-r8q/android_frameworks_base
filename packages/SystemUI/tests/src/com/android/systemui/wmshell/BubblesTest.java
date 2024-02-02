@@ -100,7 +100,6 @@ import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository;
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor;
 import com.android.systemui.communal.domain.interactor.CommunalInteractor;
-import com.android.systemui.communal.domain.interactor.CommunalInteractorFactory;
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
@@ -419,7 +418,8 @@ public class BubblesTest extends SysuiTestCase {
                         mTestScope.getBackgroundScope(),
                         mKosmos.getFakeSceneContainerConfig()),
                 powerInteractor,
-                mock(SceneLogger.class));
+                mock(SceneLogger.class),
+                mKosmos.getDeviceUnlockedInteractor());
 
         FakeSceneContainerFlags sceneContainerFlags = new FakeSceneContainerFlags();
         KeyguardInteractor keyguardInteractor = new KeyguardInteractor(
@@ -442,8 +442,7 @@ public class BubblesTest extends SysuiTestCase {
                         () -> keyguardInteractor,
                         () -> mFromLockscreenTransitionInteractor,
                         () -> mFromPrimaryBouncerTransitionInteractor);
-        CommunalInteractor communalInteractor =
-                CommunalInteractorFactory.create().getCommunalInteractor();
+        CommunalInteractor communalInteractor = mKosmos.getCommunalInteractor();
 
         mFromLockscreenTransitionInteractor = new FromLockscreenTransitionInteractor(
                 keyguardTransitionRepository,
@@ -457,6 +456,7 @@ public class BubblesTest extends SysuiTestCase {
                 powerInteractor,
                 new GlanceableHubTransitions(
                         mTestScope,
+                        mKosmos.getTestDispatcher(),
                         keyguardTransitionInteractor,
                         keyguardTransitionRepository,
                         communalInteractor
@@ -478,6 +478,7 @@ public class BubblesTest extends SysuiTestCase {
                 mKosmos.getTestDispatcher(),
                 mKosmos.getTestDispatcher(),
                 keyguardInteractor,
+                communalInteractor,
                 featureFlags,
                 mock(KeyguardSecurityModel.class),
                 mSelectedUserInteractor,
@@ -535,7 +536,8 @@ public class BubblesTest extends SysuiTestCase {
                 mShadeWindowLogger,
                 () -> mSelectedUserInteractor,
                 mUserTracker,
-                mSceneContainerFlags
+                mSceneContainerFlags,
+                mKosmos::getCommunalInteractor
         );
         mNotificationShadeWindowController.fetchWindowRootView();
         mNotificationShadeWindowController.attach();

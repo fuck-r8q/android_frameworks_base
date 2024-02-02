@@ -16,6 +16,7 @@
 
 package com.android.systemui.communal.domain.interactor
 
+import android.content.pm.UserInfo
 import android.provider.Settings.Secure.HUB_MODE_TUTORIAL_COMPLETED
 import android.provider.Settings.Secure.HUB_MODE_TUTORIAL_NOT_STARTED
 import android.provider.Settings.Secure.HUB_MODE_TUTORIAL_STARTED
@@ -24,52 +25,52 @@ import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.communal.data.repository.FakeCommunalRepository
 import com.android.systemui.communal.data.repository.FakeCommunalTutorialRepository
+import com.android.systemui.communal.data.repository.fakeCommunalRepository
+import com.android.systemui.communal.data.repository.fakeCommunalTutorialRepository
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
-import com.android.systemui.settings.UserTracker
-import com.android.systemui.util.mockito.mock
-import com.android.systemui.util.mockito.whenever
+import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
+import com.android.systemui.kosmos.testScope
+import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mock
-import org.mockito.MockitoAnnotations
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class CommunalTutorialInteractorTest : SysuiTestCase() {
+    private val kosmos = testKosmos()
+    private val testScope = kosmos.testScope
 
-    @Mock private lateinit var userTracker: UserTracker
-
-    private lateinit var testScope: TestScope
     private lateinit var underTest: CommunalTutorialInteractor
     private lateinit var keyguardRepository: FakeKeyguardRepository
     private lateinit var communalTutorialRepository: FakeCommunalTutorialRepository
     private lateinit var communalRepository: FakeCommunalRepository
+    private lateinit var communalInteractor: CommunalInteractor
+    private lateinit var userRepository: FakeUserRepository
 
     @Before
     fun setUp() {
-        MockitoAnnotations.initMocks(this)
+        keyguardRepository = kosmos.fakeKeyguardRepository
+        communalTutorialRepository = kosmos.fakeCommunalTutorialRepository
+        communalRepository = kosmos.fakeCommunalRepository
+        communalInteractor = kosmos.communalInteractor
+        userRepository = kosmos.fakeUserRepository
 
-        testScope = TestScope()
+        userRepository.setUserInfos(listOf(MAIN_USER_INFO))
 
-        val withDeps = CommunalTutorialInteractorFactory.create(testScope)
-        keyguardRepository = withDeps.keyguardRepository
-        communalTutorialRepository = withDeps.communalTutorialRepository
-        communalRepository = withDeps.communalRepository
-
-        underTest = withDeps.communalTutorialInteractor
-
-        whenever(userTracker.userHandle).thenReturn(mock())
+        underTest = kosmos.communalTutorialInteractor
     }
 
     @Test
     fun tutorialUnavailable_whenKeyguardNotVisible() =
         testScope.runTest {
             val isTutorialAvailable by collectLastValue(underTest.isTutorialAvailable)
+            setCommunalAvailable(true)
             communalTutorialRepository.setTutorialSettingState(HUB_MODE_TUTORIAL_NOT_STARTED)
             keyguardRepository.setKeyguardShowing(false)
             assertThat(isTutorialAvailable).isFalse()
@@ -79,6 +80,7 @@ class CommunalTutorialInteractorTest : SysuiTestCase() {
     fun tutorialUnavailable_whenTutorialIsCompleted() =
         testScope.runTest {
             val isTutorialAvailable by collectLastValue(underTest.isTutorialAvailable)
+            setCommunalAvailable(true)
             keyguardRepository.setKeyguardShowing(true)
             keyguardRepository.setKeyguardOccluded(false)
             communalRepository.setIsCommunalHubShowing(false)
@@ -87,9 +89,20 @@ class CommunalTutorialInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun tutorialUnavailable_whenCommunalNotAvailable() =
+        testScope.runTest {
+            val isTutorialAvailable by collectLastValue(underTest.isTutorialAvailable)
+            setCommunalAvailable(false)
+            communalTutorialRepository.setTutorialSettingState(HUB_MODE_TUTORIAL_NOT_STARTED)
+            keyguardRepository.setKeyguardShowing(true)
+            assertThat(isTutorialAvailable).isFalse()
+        }
+
+    @Test
     fun tutorialAvailable_whenTutorialNotStarted() =
         testScope.runTest {
             val isTutorialAvailable by collectLastValue(underTest.isTutorialAvailable)
+            setCommunalAvailable(true)
             keyguardRepository.setKeyguardShowing(true)
             keyguardRepository.setKeyguardOccluded(false)
             communalRepository.setIsCommunalHubShowing(false)
@@ -101,6 +114,7 @@ class CommunalTutorialInteractorTest : SysuiTestCase() {
     fun tutorialAvailable_whenTutorialIsStarted() =
         testScope.runTest {
             val isTutorialAvailable by collectLastValue(underTest.isTutorialAvailable)
+            setCommunalAvailable(true)
             keyguardRepository.setKeyguardShowing(true)
             keyguardRepository.setKeyguardOccluded(false)
             communalRepository.setIsCommunalHubShowing(true)
@@ -181,4 +195,21 @@ class CommunalTutorialInteractorTest : SysuiTestCase() {
 
             assertThat(tutorialSettingState).isEqualTo(HUB_MODE_TUTORIAL_COMPLETED)
         }
+
+    private suspend fun setCommunalAvailable(available: Boolean) {
+        if (available) {
+            communalRepository.setIsCommunalEnabled(true)
+            communalRepository.setCommunalEnabledState(true)
+            keyguardRepository.setIsEncryptedOrLockdown(false)
+            userRepository.setSelectedUserInfo(MAIN_USER_INFO)
+            keyguardRepository.setKeyguardShowing(true)
+        } else {
+            communalRepository.setIsCommunalEnabled(false)
+            communalRepository.setCommunalEnabledState(false)
+        }
+    }
+
+    private companion object {
+        val MAIN_USER_INFO = UserInfo(0, "primary", UserInfo.FLAG_MAIN)
+    }
 }

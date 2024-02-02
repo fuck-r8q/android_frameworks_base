@@ -45,6 +45,7 @@ import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants
 import com.android.systemui.classifier.FalsingA11yDelegate
 import com.android.systemui.classifier.FalsingCollector
+import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
@@ -202,11 +203,17 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
         whenever(deviceProvisionedController.isUserSetup(anyInt())).thenReturn(true)
 
         featureFlags = FakeFeatureFlags()
-        featureFlags.set(Flags.KEYGUARD_WM_STATE_REFACTOR, false)
         featureFlags.set(Flags.REFACTOR_KEYGUARD_DISMISS_INTENT, false)
         featureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false)
 
-        mSetFlagsRule.enableFlags(AConfigFlags.FLAG_REVAMPED_BOUNCER_MESSAGES)
+        mSetFlagsRule.enableFlags(
+            AConfigFlags.FLAG_REVAMPED_BOUNCER_MESSAGES,
+        )
+        mSetFlagsRule.disableFlags(
+            FLAG_SIDEFPS_CONTROLLER_REFACTOR,
+            AConfigFlags.FLAG_KEYGUARD_WM_STATE_REFACTOR
+        )
+
         keyguardPasswordViewController =
             KeyguardPasswordViewController(
                 keyguardPasswordView,
@@ -237,7 +244,6 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
         sceneInteractor.setTransitionState(sceneTransitionStateFlow)
         deviceEntryInteractor = kosmos.deviceEntryInteractor
 
-        mSetFlagsRule.disableFlags(FLAG_SIDEFPS_CONTROLLER_REFACTOR)
         underTest =
             KeyguardSecurityContainerController(
                 view,
@@ -819,6 +825,8 @@ class KeyguardSecurityContainerControllerTest : SysuiTestCase() {
 
             // While listening, going from the bouncer scene to the gone scene, does dismiss the
             // keyguard.
+            kosmos.fakeDeviceEntryRepository.setUnlocked(true)
+            runCurrent()
             sceneInteractor.changeScene(SceneModel(SceneKey.Gone, null), "reason")
             sceneTransitionStateFlow.value =
                 ObservableTransitionState.Transition(

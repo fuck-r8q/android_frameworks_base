@@ -17,6 +17,7 @@
 package androidx.window.extensions.embedding;
 
 import static android.app.ActivityManager.START_SUCCESS;
+import static android.app.ActivityOptions.KEY_LAUNCH_TASK_FRAGMENT_TOKEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -41,10 +42,10 @@ import static androidx.window.extensions.embedding.SplitContainer.isStickyPlaceh
 import static androidx.window.extensions.embedding.SplitContainer.shouldFinishAssociatedContainerWhenAdjacent;
 import static androidx.window.extensions.embedding.SplitContainer.shouldFinishAssociatedContainerWhenStacked;
 import static androidx.window.extensions.embedding.SplitPresenter.RESULT_EXPAND_FAILED_NO_TF_INFO;
-import static androidx.window.extensions.embedding.SplitPresenter.boundsSmallerThanMinDimensions;
 import static androidx.window.extensions.embedding.SplitPresenter.getActivitiesMinDimensionsPair;
 import static androidx.window.extensions.embedding.SplitPresenter.getActivityIntentMinDimensionsPair;
 import static androidx.window.extensions.embedding.SplitPresenter.getMinDimensions;
+import static androidx.window.extensions.embedding.SplitPresenter.sanitizeBounds;
 import static androidx.window.extensions.embedding.SplitPresenter.shouldShowSplit;
 
 import android.annotation.CallbackExecutor;
@@ -109,6 +110,10 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     static final String TAG = "SplitController";
     static final boolean ENABLE_SHELL_TRANSITIONS =
             SystemProperties.getBoolean("persist.wm.debug.shell_transit", true);
+
+    // TODO(b/295993745): remove after prebuilt library is updated.
+    private static final String KEY_ACTIVITY_STACK_TOKEN =
+            "androidx.window.extensions.embedding.ActivityStackToken";
 
     @VisibleForTesting
     @GuardedBy("mLock")
@@ -569,7 +574,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
 
             final TransactionRecord transactionRecord = mTransactionManager.startNewTransaction();
             final WindowContainerTransaction wct = transactionRecord.getTransaction();
-            mPresenter.applyActivityStackAttributes(wct, container, attributes);
+            mPresenter.applyActivityStackAttributes(wct, container, attributes,
+                    container.getMinDimensions());
             transactionRecord.apply(false /* shouldApplyIndependently */);
         }
     }
@@ -1562,7 +1568,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     private TaskFragmentContainer createEmptyExpandedContainer(
             @NonNull WindowContainerTransaction wct, @NonNull Intent intent, int taskId,
             @Nullable Activity launchingActivity) {
-        return createEmptyContainer(wct, intent, taskId, new Rect(), launchingActivity,
+        return createEmptyContainer(wct, intent, taskId,
+                new ActivityStackAttributes.Builder().build(), launchingActivity,
                 null /* overlayTag */, null /* launchOptions */);
     }
 
@@ -1576,8 +1583,9 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
     @Nullable
     TaskFragmentContainer createEmptyContainer(
             @NonNull WindowContainerTransaction wct, @NonNull Intent intent, int taskId,
-            @NonNull Rect bounds, @Nullable Activity launchingActivity,
-            @Nullable String overlayTag, @Nullable Bundle launchOptions) {
+            @NonNull ActivityStackAttributes activityStackAttributes,
+            @Nullable Activity launchingActivity, @Nullable String overlayTag,
+            @Nullable Bundle launchOptions) {
         // We need an activity in the organizer process in the same Task to use as the owner
         // activity, as well as to get the Task window info.
         final Activity activityInTask;
@@ -1600,40 +1608,18 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
         // Note that taskContainer will not exist before calling #newContainer if the container
         // is the first embedded TF in the task.
         final TaskContainer taskContainer = container.getTaskContainer();
-        final Rect taskBounds = taskContainer.getTaskProperties().getTaskMetrics().getBounds();
-        final Rect sanitizedBounds = sanitizeBounds(bounds, intent, taskBounds);
+        // TODO(b/265271880): remove redundant logic after all TF operations take fragmentToken.
+        final Rect taskBounds = taskContainer.getBounds();
+        final Rect sanitizedBounds = sanitizeBounds(activityStackAttributes.getRelativeBounds(),
+                getMinDimensions(intent), taskBounds);
         final int windowingMode = taskContainer
                 .getWindowingModeForTaskFragment(sanitizedBounds);
         mPresenter.createTaskFragment(wct, taskFragmentToken, activityInTask.getActivityToken(),
                 sanitizedBounds, windowingMode);
-        mPresenter.updateAnimationParams(wct, taskFragmentToken,
-                TaskFragmentAnimationParams.DEFAULT);
-        mPresenter.setTaskFragmentIsolatedNavigation(wct, taskFragmentToken,
-                overlayTag != null && !sanitizedBounds.isEmpty());
+        mPresenter.applyActivityStackAttributes(wct, container, activityStackAttributes,
+                getMinDimensions(intent));
 
         return container;
-    }
-
-    /**
-     * Returns the expanded bounds if the {@code bounds} violate minimum dimension or are not fully
-     * covered by the task bounds. Otherwise, returns {@code bounds}.
-     */
-    @NonNull
-    private static Rect sanitizeBounds(@NonNull Rect bounds, @NonNull Intent intent,
-            @NonNull Rect taskBounds) {
-        if (bounds.isEmpty()) {
-            // Don't need to check if the bounds follows the task bounds.
-            return bounds;
-        }
-        if (boundsSmallerThanMinDimensions(bounds, getMinDimensions(intent))) {
-            // Expand the bounds if the bounds are smaller than minimum dimensions.
-            return new Rect();
-        }
-        if (!taskBounds.contains(bounds)) {
-            // Expand the bounds if the bounds exceed the task bounds.
-            return new Rect();
-        }
-        return bounds;
     }
 
     /**
@@ -1953,6 +1939,12 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             return;
         }
 
+        if (mActivityStackAttributesCalculator == null) {
+            Log.e(TAG, "ActivityStackAttributesCalculator is not set. Thus the overlay container"
+                    + " can not be updated.");
+            return;
+        }
+
         if (mActivityStackAttributesCalculator != null) {
             final ActivityStackAttributesCalculatorParams params =
                     new ActivityStackAttributesCalculatorParams(
@@ -1962,7 +1954,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                             container.getLaunchOptions());
             final ActivityStackAttributes attributes = mActivityStackAttributesCalculator
                     .apply(params);
-            mPresenter.applyActivityStackAttributes(wct, container, attributes);
+            mPresenter.applyActivityStackAttributes(wct, container, attributes,
+                    container.getMinDimensions());
         }
     }
 
@@ -2598,15 +2591,15 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                         mPresenter.createParentContainerInfoFromTaskProperties(
                                 mPresenter.getTaskProperties(launchActivity)), overlayTag, options);
         // Fallback to expand the bounds if there's no activityStackAttributes calculator.
-        final Rect relativeBounds = mActivityStackAttributesCalculator != null
-                ? new Rect(mActivityStackAttributesCalculator.apply(params).getRelativeBounds())
-                : new Rect();
-        final boolean shouldExpandContainer = boundsSmallerThanMinDimensions(relativeBounds,
-                getMinDimensions(intent));
-        // Expand the bounds if the requested bounds are smaller than minimum dimensions.
-        if (shouldExpandContainer) {
-            relativeBounds.setEmpty();
+        final ActivityStackAttributes attrs;
+        if (mActivityStackAttributesCalculator != null) {
+            attrs = mActivityStackAttributesCalculator.apply(params);
+        } else {
+            attrs = new ActivityStackAttributes.Builder().build();
+            Log.e(TAG, "ActivityStackAttributesCalculator isn't set. Fallback to set overlay "
+                    + "container as expected.");
         }
+
         final int taskId = getTaskId(launchActivity);
         if (!overlayContainers.isEmpty()) {
             for (final TaskFragmentContainer overlayContainer : overlayContainers) {
@@ -2626,20 +2619,8 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                 }
                 if (overlayTag.equals(overlayContainer.getOverlayTag())
                         && taskId == overlayContainer.getTaskId()) {
-                    // If there's an overlay container with the same tag and task ID, we treat
-                    // the OverlayCreateParams as the update to the container.
-                    final IBinder overlayToken = overlayContainer.getTaskFragmentToken();
-                    final TaskContainer taskContainer = overlayContainer.getTaskContainer();
-                    final Rect taskBounds = taskContainer.getTaskProperties().getTaskMetrics()
-                            .getBounds();
-                    final Rect sanitizedBounds = sanitizeBounds(relativeBounds, intent, taskBounds);
-
-                    mPresenter.resizeTaskFragment(wct, overlayToken, sanitizedBounds);
-                    final int windowingMode = taskContainer
-                            .getWindowingModeForTaskFragment(sanitizedBounds);
-                    mPresenter.updateWindowingMode(wct, overlayToken, windowingMode);
-                    mPresenter.setTaskFragmentIsolatedNavigation(wct, overlayContainer,
-                            !sanitizedBounds.isEmpty());
+                    mPresenter.applyActivityStackAttributes(wct, overlayContainer, attrs,
+                            getMinDimensions(intent));
                     // We can just return the updated overlay container and don't need to
                     // check other condition since we only have one OverlayCreateParams, and
                     // if the tag and task are matched, it's impossible to match another task
@@ -2649,7 +2630,7 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             }
         }
         // Launch the overlay container to the task with taskId.
-        return createEmptyContainer(wct, intent, taskId, relativeBounds, launchActivity, overlayTag,
+        return createEmptyContainer(wct, intent, taskId, attrs, launchActivity, overlayTag,
                 options);
     }
 
@@ -2779,8 +2760,17 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
             // TODO(b/232042367): Consolidate the activity create handling so that we can handle
             // cross-process the same as normal.
 
+            IBinder activityStackToken = options.getBinder(KEY_ACTIVITY_STACK_TOKEN);
+            if (activityStackToken != null) {
+                // Put activityStack token to #KEY_LAUNCH_TASK_FRAGMENT_TOKEN to launch the activity
+                // into the taskFragment associated with the token.
+                options.putBinder(KEY_LAUNCH_TASK_FRAGMENT_TOKEN, activityStackToken);
+            }
+
             // Early return if the launching taskfragment is already been set.
-            if (options.getBinder(ActivityOptions.KEY_LAUNCH_TASK_FRAGMENT_TOKEN) != null) {
+            // TODO(b/295993745): Use KEY_LAUNCH_TASK_FRAGMENT_TOKEN after WM Jetpack migrates to
+            // bundle. This is still needed to support #setLaunchingActivityStack.
+            if (options.getBinder(KEY_LAUNCH_TASK_FRAGMENT_TOKEN) != null) {
                 synchronized (mLock) {
                     mCurrentIntent = intent;
                 }
@@ -2837,7 +2827,7 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                     // Amend the request to let the WM know that the activity should be placed in
                     // the dedicated container.
                     // TODO(b/229680885): skip override launching TaskFragment token by split-rule
-                    options.putBinder(ActivityOptions.KEY_LAUNCH_TASK_FRAGMENT_TOKEN,
+                    options.putBinder(KEY_LAUNCH_TASK_FRAGMENT_TOKEN,
                             launchedInTaskFragment.getTaskFragmentToken());
                     mCurrentIntent = intent;
                 } else {
@@ -2855,8 +2845,7 @@ public class SplitController implements JetpackTaskFragmentOrganizer.TaskFragmen
                 if (mCurrentIntent != null && result != START_SUCCESS) {
                     // Clear the pending appeared intent if the activity was not started
                     // successfully.
-                    final IBinder token = bOptions.getBinder(
-                            ActivityOptions.KEY_LAUNCH_TASK_FRAGMENT_TOKEN);
+                    final IBinder token = bOptions.getBinder(KEY_LAUNCH_TASK_FRAGMENT_TOKEN);
                     if (token != null) {
                         final TaskFragmentContainer container = getContainer(token);
                         if (container != null) {

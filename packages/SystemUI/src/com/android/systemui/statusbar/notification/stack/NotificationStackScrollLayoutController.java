@@ -22,6 +22,7 @@ import static android.service.notification.NotificationStats.DISMISS_SENTIMENT_N
 import static com.android.app.animation.Interpolators.STANDARD;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_NOTIFICATION_SHADE_SCROLL_FLING;
 import static com.android.systemui.Dependency.ALLOW_NOTIFICATION_LONG_PRESS_NAME;
+import static com.android.systemui.Flags.screenshareNotificationHiding;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.OnEmptySpaceClickListener;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.OnOverscrollTopChangedListener;
@@ -135,6 +136,7 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.OnHeadsUpChangedListener;
+import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionController;
 import com.android.systemui.statusbar.policy.SplitShadeStateController;
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.tuner.TunerService;
@@ -218,6 +220,8 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     private final SecureSettings mSecureSettings;
     private final NotificationDismissibilityProvider mDismissibilityProvider;
     private final ActivityStarter mActivityStarter;
+    private final SensitiveNotificationProtectionController
+            mSensitiveNotificationProtectionController;
 
     private View mLongPressedView;
 
@@ -295,6 +299,15 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                 }
             };
 
+    private final Runnable mSensitiveStateChangedListener = new Runnable() {
+        @Override
+        public void run() {
+            // Animate false to protect against screen recording capturing content
+            // during the animation
+            updateSensitivenessWithAnimation(false);
+        }
+    };
+
     private final DynamicPrivacyController.Listener mDynamicPrivacyControllerListener = () -> {
         if (mView.isExpanded()) {
             // The bottom might change because we're using the final actual height of the view
@@ -341,6 +354,12 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     private NotifStats mNotifStats = NotifStats.getEmpty();
     private float mMaxAlphaForExpansion = 1.0f;
     private float mMaxAlphaForUnhide = 1.0f;
+
+    /**
+     * Maximum alpha when to and from or sitting idle on the glanceable hub. Will be 1.0f when the
+     * hub is not visible or transitioning.
+     */
+    private float mMaxAlphaForGlanceableHub = 1.0f;
 
     private final NotificationListViewBinder mViewBinder;
 
@@ -399,7 +418,20 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     }
 
     private void updateSensitivenessWithAnimation(boolean animate) {
-        mView.updateSensitiveness(animate, mLockscreenUserManager.isAnyProfilePublicMode());
+        Trace.beginSection("NSSLC.updateSensitivenessWithAnimation");
+        if (screenshareNotificationHiding()) {
+            boolean isAnyProfilePublic = mLockscreenUserManager.isAnyProfilePublicMode();
+            boolean isSensitiveContentProtectionActive =
+                    mSensitiveNotificationProtectionController.isSensitiveStateActive();
+            boolean isSensitive = isAnyProfilePublic || isSensitiveContentProtectionActive;
+
+            // Only animate if in a non-sensitive state (not screen sharing)
+            boolean shouldAnimate = animate && !isSensitiveContentProtectionActive;
+            mView.updateSensitiveness(shouldAnimate, isSensitive);
+        } else {
+            mView.updateSensitiveness(animate, mLockscreenUserManager.isAnyProfilePublicMode());
+        }
+        Trace.endSection();
     }
 
     /**
@@ -708,7 +740,8 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             SecureSettings secureSettings,
             NotificationDismissibilityProvider dismissibilityProvider,
             ActivityStarter activityStarter,
-            SplitShadeStateController splitShadeStateController) {
+            SplitShadeStateController splitShadeStateController,
+            SensitiveNotificationProtectionController sensitiveNotificationProtectionController) {
         mView = view;
         mKeyguardTransitionRepo = keyguardTransitionRepo;
         mViewBinder = viewBinder;
@@ -756,6 +789,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         mSecureSettings = secureSettings;
         mDismissibilityProvider = dismissibilityProvider;
         mActivityStarter = activityStarter;
+        mSensitiveNotificationProtectionController = sensitiveNotificationProtectionController;
         mView.passSplitShadeStateController(splitShadeStateController);
         mDumpManager.registerDumpable(this);
         updateResources();
@@ -859,6 +893,11 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         // attach callback, and then call it to update mView immediately
         mDeviceProvisionedController.addCallback(mDeviceProvisionedListener);
         mDeviceProvisionedListener.onDeviceProvisionedChanged();
+
+        if (screenshareNotificationHiding()) {
+            mSensitiveNotificationProtectionController
+                    .registerSensitiveStateListener(mSensitiveStateChangedListener);
+        }
 
         if (mView.isAttachedToWindow()) {
             mOnAttachStateChangeListener.onViewAttachedToWindow(mView);
@@ -1252,9 +1291,19 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         updateAlpha();
     }
 
+    /**
+     * Sets the max alpha value for notifications when idle on the glanceable hub or when
+     * transitioning to/from the glanceable hub.
+     */
+    public void setMaxAlphaForGlanceableHub(float alpha) {
+        mMaxAlphaForGlanceableHub = alpha;
+        updateAlpha();
+    }
+
     private void updateAlpha() {
         if (mView != null) {
-            mView.setAlpha(Math.min(mMaxAlphaForExpansion, mMaxAlphaForUnhide));
+            mView.setAlpha(Math.min(mMaxAlphaForExpansion,
+                    Math.min(mMaxAlphaForUnhide, mMaxAlphaForGlanceableHub)));
         }
     }
 
@@ -1746,6 +1795,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     public void dump(@NonNull PrintWriter pw, @NonNull String[] args) {
         pw.println("mMaxAlphaForExpansion=" + mMaxAlphaForExpansion);
         pw.println("mMaxAlphaForUnhide=" + mMaxAlphaForUnhide);
+        pw.println("mMaxAlphaForGlanceableHub=" + mMaxAlphaForGlanceableHub);
     }
 
     /**
@@ -2087,6 +2137,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
 
             if (!FooterViewRefactor.isEnabled()) {
                 updateShowEmptyShadeView();
+                updateImportantForAccessibility();
             }
         }
     }

@@ -19,6 +19,7 @@ package com.android.server.pm;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
 import static org.testng.Assert.assertEquals;
@@ -33,10 +34,12 @@ import android.content.pm.UserProperties;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.platform.test.annotations.Postsubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.test.suitebuilder.annotation.LargeTest;
 import android.test.suitebuilder.annotation.MediumTest;
@@ -53,6 +56,7 @@ import com.google.common.collect.Range;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -95,6 +99,8 @@ public final class UserManagerTest {
     private UserSwitchWaiter mUserSwitchWaiter;
     private UserRemovalWaiter mUserRemovalWaiter;
     private int mOriginalCurrentUserId;
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     @Before
     public void setUp() throws Exception {
@@ -166,6 +172,7 @@ public final class UserManagerTest {
 
     @Test
     public void testCloneUser() throws Exception {
+        mSetFlagsRule.enableFlags(android.multiuser.Flags.FLAG_SUPPORT_HIDING_PROFILES);
         assumeCloneEnabled();
         UserHandle mainUser = mUserManager.getMainUser();
         assumeTrue("Main user is null", mainUser != null);
@@ -222,6 +229,7 @@ public final class UserManagerTest {
                 .isEqualTo(cloneUserProperties.getCrossProfileContentSharingStrategy());
         assertThrows(SecurityException.class, cloneUserProperties::getDeleteAppWithParent);
         assertThrows(SecurityException.class, cloneUserProperties::getAlwaysVisible);
+        assertThrows(SecurityException.class, cloneUserProperties::getProfileApiVisibility);
         compareDrawables(mUserManager.getUserBadge(),
                 Resources.getSystem().getDrawable(userTypeDetails.getBadgePlain()));
 
@@ -303,6 +311,7 @@ public final class UserManagerTest {
 
     @Test
     public void testPrivateProfile() throws Exception {
+        mSetFlagsRule.enableFlags(android.multiuser.Flags.FLAG_SUPPORT_HIDING_PROFILES);
         UserHandle mainUser = mUserManager.getMainUser();
         assumeTrue("Main user is null", mainUser != null);
         // Get the default properties for private profile user type.
@@ -344,7 +353,8 @@ public final class UserManagerTest {
         assertThrows(SecurityException.class, privateProfileUserProperties::getDeleteAppWithParent);
         assertThrows(SecurityException.class,
                 privateProfileUserProperties::getAllowStoppingUserWithDelayedLocking);
-
+        assertThrows(SecurityException.class,
+                privateProfileUserProperties::getProfileApiVisibility);
         compareDrawables(mUserManager.getUserBadge(),
                 Resources.getSystem().getDrawable(userTypeDetails.getBadgePlain()));
 
@@ -1630,6 +1640,106 @@ public final class UserManagerTest {
             }
         }
         assertThat(mainUserCount).isEqualTo(1);
+    }
+
+    @Test
+    public void testAddUserAccountData_validStringValuesAreSaved_validBundleIsSaved() {
+        assumeManagedUsersSupported();
+
+        String userName = "User";
+        String accountName = "accountName";
+        String accountType = "accountType";
+        String arrayKey = "StringArrayKey";
+        String stringKey = "StringKey";
+        String intKey = "IntKey";
+        String nestedBundleKey = "PersistableBundleKey";
+        String value1 = "Value 1";
+        String value2 = "Value 2";
+        String value3 = "Value 3";
+
+        UserInfo userInfo = mUserManager.createUser(userName,
+                UserManager.USER_TYPE_FULL_SECONDARY, 0);
+
+        PersistableBundle accountOptions = new PersistableBundle();
+        String[] stringArray = {value1, value2};
+        accountOptions.putInt(intKey, 1234);
+        PersistableBundle nested = new PersistableBundle();
+        nested.putString(stringKey, value3);
+        accountOptions.putPersistableBundle(nestedBundleKey, nested);
+        accountOptions.putStringArray(arrayKey, stringArray);
+
+        mUserManager.clearSeedAccountData();
+        mUserManager.setSeedAccountData(mContext.getUserId(), accountName,
+                accountType, accountOptions);
+
+        //assert userName accountName and accountType were saved correctly
+        assertTrue(mUserManager.getUserInfo(userInfo.id).name.equals(userName));
+        assertTrue(mUserManager.getSeedAccountName().equals(accountName));
+        assertTrue(mUserManager.getSeedAccountType().equals(accountType));
+
+        //assert bundle with correct values was added
+        assertThat(mUserManager.getSeedAccountOptions().containsKey(arrayKey)).isTrue();
+        assertThat(mUserManager.getSeedAccountOptions().getPersistableBundle(nestedBundleKey)
+                .getString(stringKey)).isEqualTo(value3);
+        assertThat(mUserManager.getSeedAccountOptions().getStringArray(arrayKey)[0])
+                .isEqualTo(value1);
+
+        mUserManager.removeUser(userInfo.id);
+    }
+
+    @Test
+    public void testAddUserAccountData_invalidStringValuesAreTruncated_invalidBundleIsDropped() {
+        assumeManagedUsersSupported();
+
+        String tooLongString = generateLongString();
+        String userName = "User " + tooLongString;
+        String accountType = "Account Type " + tooLongString;
+        String accountName = "accountName " + tooLongString;
+        String arrayKey = "StringArrayKey";
+        String stringKey = "StringKey";
+        String intKey = "IntKey";
+        String nestedBundleKey = "PersistableBundleKey";
+        String value1 = "Value 1";
+        String value2 = "Value 2";
+
+        UserInfo userInfo = mUserManager.createUser(userName,
+                UserManager.USER_TYPE_FULL_SECONDARY, 0);
+
+        PersistableBundle accountOptions = new PersistableBundle();
+        String[] stringArray = {value1, value2};
+        accountOptions.putInt(intKey, 1234);
+        PersistableBundle nested = new PersistableBundle();
+        nested.putString(stringKey, tooLongString);
+        accountOptions.putPersistableBundle(nestedBundleKey, nested);
+        accountOptions.putStringArray(arrayKey, stringArray);
+        mUserManager.clearSeedAccountData();
+        mUserManager.setSeedAccountData(mContext.getUserId(), accountName,
+                accountType, accountOptions);
+
+        //assert userName was truncated
+        assertTrue(mUserManager.getUserInfo(userInfo.id).name.length()
+                == UserManager.MAX_USER_NAME_LENGTH);
+
+        //assert accountName and accountType got truncated
+        assertTrue(mUserManager.getSeedAccountName().length()
+                == UserManager.MAX_ACCOUNT_STRING_LENGTH);
+        assertTrue(mUserManager.getSeedAccountType().length()
+                == UserManager.MAX_ACCOUNT_STRING_LENGTH);
+
+        //assert bundle with invalid values was dropped
+        assertThat(mUserManager.getSeedAccountOptions() == null).isTrue();
+
+        mUserManager.removeUser(userInfo.id);
+    }
+
+    private String generateLongString() {
+        String partialString = "Test Name Test Name Test Name Test Name Test Name Test Name Test "
+                + "Name Test Name Test Name Test Name "; //String of length 100
+        StringBuilder resultString = new StringBuilder();
+        for (int i = 0; i < 600; i++) {
+            resultString.append(partialString);
+        }
+        return resultString.toString();
     }
 
     private boolean isPackageInstalledForUser(String packageName, int userId) {

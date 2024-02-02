@@ -789,6 +789,24 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
             }
         }
 
+        if (Flags.recoverabilityDetection()) {
+            if (params.rollbackImpactLevel == PackageManager.ROLLBACK_USER_IMPACT_HIGH
+                    || params.rollbackImpactLevel
+                    == PackageManager.ROLLBACK_USER_IMPACT_ONLY_MANUAL) {
+                if ((params.installFlags & PackageManager.INSTALL_ENABLE_ROLLBACK) == 0) {
+                    throw new IllegalArgumentException(
+                            "Can't set rollbackImpactLevel when rollback is not enabled");
+                }
+                if (mContext.checkCallingOrSelfPermission(Manifest.permission.MANAGE_ROLLBACKS)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    throw new SecurityException(
+                            "Setting rollbackImpactLevel requires the MANAGE_ROLLBACKS permission");
+                }
+            } else if (params.rollbackImpactLevel < 0) {
+                throw new IllegalArgumentException("rollbackImpactLevel can't be negative.");
+            }
+        }
+
         boolean isApex = (params.installFlags & PackageManager.INSTALL_APEX) != 0;
         if (isApex) {
             if (mContext.checkCallingOrSelfPermission(Manifest.permission.INSTALL_PACKAGE_UPDATES)
@@ -1388,11 +1406,12 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
                 flags,
                 statusReceiver,
                 userId,
-                Binder.getCallingUid());
+                Binder.getCallingUid(),
+                Binder.getCallingPid());
     }
 
     void uninstall(VersionedPackage versionedPackage, String callerPackageName, int flags,
-            IntentSender statusReceiver, int userId, int callingUid) {
+            IntentSender statusReceiver, int userId, int callingUid, int callingPid) {
         final Computer snapshot = mPm.snapshotComputer();
         snapshot.enforceCrossUserPermission(callingUid, userId, true, true, "uninstall");
         if (!PackageManagerServiceUtils.isRootOrShell(callingUid)) {
@@ -1409,7 +1428,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         final PackageDeleteObserverAdapter adapter = new PackageDeleteObserverAdapter(mContext,
                 statusReceiver, versionedPackage.getPackageName(),
                 canSilentlyInstallPackage, userId, mPackageArchiver, flags);
-        if (mContext.checkCallingOrSelfPermission(Manifest.permission.DELETE_PACKAGES)
+        if (mContext.checkPermission(Manifest.permission.DELETE_PACKAGES, callingPid, callingUid)
                 == PackageManager.PERMISSION_GRANTED) {
             // Sweet, call straight through!
             mPm.deletePackageVersioned(versionedPackage, adapter.getBinder(), userId, flags);
@@ -1429,8 +1448,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         } else {
             ApplicationInfo appInfo = snapshot.getApplicationInfo(callerPackageName, 0, userId);
             if (appInfo.targetSdkVersion >= Build.VERSION_CODES.P) {
-                mContext.enforceCallingOrSelfPermission(Manifest.permission.REQUEST_DELETE_PACKAGES,
-                        null);
+                mContext.enforcePermission(Manifest.permission.REQUEST_DELETE_PACKAGES, callingPid,
+                        callingUid, null);
             }
 
             // Take a short detour to confirm with user

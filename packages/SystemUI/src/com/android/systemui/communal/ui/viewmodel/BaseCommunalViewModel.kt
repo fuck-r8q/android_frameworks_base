@@ -17,11 +17,11 @@
 package com.android.systemui.communal.ui.viewmodel
 
 import android.content.ComponentName
-import android.widget.RemoteViews
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
+import com.android.systemui.communal.widgets.WidgetConfigurator
 import com.android.systemui.media.controls.ui.MediaHost
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,20 +33,16 @@ abstract class BaseCommunalViewModel(
     private val communalInteractor: CommunalInteractor,
     val mediaHost: MediaHost,
 ) {
-    val isCommunalAvailable: StateFlow<Boolean> = communalInteractor.isCommunalAvailable
-
-    val isKeyguardVisible: Flow<Boolean> = communalInteractor.isKeyguardVisible
-
     val currentScene: StateFlow<CommunalSceneKey> = communalInteractor.desiredScene
 
     /** Whether widgets are currently being re-ordered. */
     open val reorderingWidgets: StateFlow<Boolean> = MutableStateFlow(false)
 
-    private val _selectedIndex: MutableStateFlow<Int?> = MutableStateFlow(null)
+    private val _selectedKey: MutableStateFlow<String?> = MutableStateFlow(null)
 
-    /** The index of the currently selected item, or null if no item selected. */
-    val selectedIndex: StateFlow<Int?>
-        get() = _selectedIndex
+    /** The key of the currently selected item, or null if no item selected. */
+    val selectedKey: StateFlow<String?>
+        get() = _selectedKey
 
     fun onSceneChanged(scene: CommunalSceneKey) {
         communalInteractor.onSceneChanged(scene)
@@ -64,16 +60,12 @@ abstract class BaseCommunalViewModel(
     /**
      * Called when a widget is added via drag and drop from the widget picker into the communal hub.
      */
-    open fun onAddWidget(componentName: ComponentName, priority: Int) {
-        communalInteractor.addWidget(componentName, priority, ::configureWidget)
-    }
-
-    /**
-     * Called when a widget needs to be configured, with the id of the widget. The return value
-     * should represent whether configuring the widget was successful.
-     */
-    protected open suspend fun configureWidget(widgetId: Int): Boolean {
-        return true
+    open fun onAddWidget(
+        componentName: ComponentName,
+        priority: Int,
+        configurator: WidgetConfigurator? = null
+    ) {
+        communalInteractor.addWidget(componentName, priority, configurator)
     }
 
     /** A list of all the communal content to be displayed in the communal hub. */
@@ -100,14 +92,11 @@ abstract class BaseCommunalViewModel(
      */
     open fun onReorderWidgets(widgetIdToPriorityMap: Map<Int, Int>) {}
 
-    /** Called as the UI requests opening the widget editor. */
-    open fun onOpenWidgetEditor() {}
+    /** Called as the UI requests opening the widget editor with an optional preselected widget. */
+    open fun onOpenWidgetEditor(preselectedKey: String? = null) {}
 
     /** Called as the UI requests to dismiss the CTA tile. */
     open fun onDismissCtaTile() {}
-
-    /** Gets the interaction handler used to handle taps on a remote view */
-    abstract fun getInteractionHandler(): RemoteViews.InteractionHandler
 
     /** Called as the user starts dragging a widget to reorder. */
     open fun onReorderWidgetStart() {}
@@ -118,8 +107,8 @@ abstract class BaseCommunalViewModel(
     /** Called as the user cancels dragging a widget to reorder. */
     open fun onReorderWidgetCancel() {}
 
-    /** Set the index of the currently selected item */
-    fun setSelectedIndex(index: Int?) {
-        _selectedIndex.value = index
+    /** Set the key of the currently selected item */
+    fun setSelectedKey(key: String?) {
+        _selectedKey.value = key
     }
 }

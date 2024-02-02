@@ -452,6 +452,17 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
     }
 
     /**
+     * Performs previous child eviction and such to prepare for the pip task expending into one of
+     * the split stages
+     *
+     * @param taskInfo TaskInfo of the pip task
+     */
+    public void onPipExpandToSplit(WindowContainerTransaction wct,
+            ActivityManager.RunningTaskInfo taskInfo) {
+        mStageCoordinator.onPipExpandToSplit(wct, taskInfo);
+    }
+
+    /**
      * Doing necessary window transaction for other transition handler need to exit split in
      * transition.
      */
@@ -1098,6 +1109,12 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
         mStageCoordinator.onDroppedToSplit(position, dragSessionId);
     }
 
+    void switchSplitPosition(String reason) {
+        if (isSplitScreenVisible()) {
+            mStageCoordinator.switchSplitPosition(reason);
+        }
+    }
+
     /**
      * Return the {@param exitReason} as a string.
      */
@@ -1461,6 +1478,12 @@ public class SplitScreenController implements DragAndDropPolicy.Starter,
                     (controller) -> out[0] = controller.onStartingSplitLegacy(apps),
                     true /* blocking */);
             return out[0];
+        }
+
+        @Override
+        public void switchSplitPosition() {
+            executeRemoteCallWithTaskPermission(mController, "switchSplitPosition",
+                    (controller) -> controller.switchSplitPosition("remoteCall"));
         }
     }
 }

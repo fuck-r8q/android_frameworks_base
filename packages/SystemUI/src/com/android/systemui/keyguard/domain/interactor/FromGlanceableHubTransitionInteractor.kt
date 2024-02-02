@@ -18,6 +18,7 @@ package com.android.systemui.keyguard.domain.interactor
 
 import android.animation.ValueAnimator
 import com.android.app.animation.Interpolators
+import com.android.app.tracing.coroutines.launch
 import com.android.systemui.Flags
 import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.dagger.SysUISingleton
@@ -25,19 +26,27 @@ import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.TransitionModeOnCanceled
+import com.android.systemui.power.domain.interactor.PowerInteractor
+import com.android.systemui.util.kotlin.sample
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @SysUISingleton
 class FromGlanceableHubTransitionInteractor
 @Inject
 constructor(
-    private val glanceableHubTransitions: GlanceableHubTransitions,
-    override val transitionRepository: KeyguardTransitionRepository,
-    transitionInteractor: KeyguardTransitionInteractor,
+    @Background private val scope: CoroutineScope,
     @Main mainDispatcher: CoroutineDispatcher,
     @Background bgDispatcher: CoroutineDispatcher,
+    private val glanceableHubTransitions: GlanceableHubTransitions,
+    private val keyguardInteractor: KeyguardInteractor,
+    override val transitionRepository: KeyguardTransitionRepository,
+    transitionInteractor: KeyguardTransitionInteractor,
+    private val powerInteractor: PowerInteractor,
 ) :
     TransitionInteractor(
         fromState = KeyguardState.GLANCEABLE_HUB,
@@ -50,6 +59,11 @@ constructor(
             return
         }
         listenForHubToLockscreen()
+        listenForHubToDozing()
+        listenForHubToPrimaryBouncer()
+        listenForHubToAlternateBouncer()
+        listenForHubToOccluded()
+        listenForHubToGone()
     }
 
     override fun getDefaultAnimatorForTransitionsToState(toState: KeyguardState): ValueAnimator {
@@ -67,12 +81,82 @@ constructor(
         glanceableHubTransitions.listenForLockscreenAndHubTransition(
             transitionName = "listenForHubToLockscreen",
             transitionOwnerName = TAG,
-            toScene = CommunalSceneKey.Blank
+            toScene = CommunalSceneKey.Blank,
         )
+    }
+
+    private fun listenForHubToPrimaryBouncer() {
+        scope.launch("$TAG#listenForHubToPrimaryBouncer") {
+            keyguardInteractor.primaryBouncerShowing
+                .sample(startedKeyguardTransitionStep, ::Pair)
+                .collect { pair ->
+                    val (isBouncerShowing, lastStartedTransitionStep) = pair
+                    if (
+                        isBouncerShowing &&
+                            lastStartedTransitionStep.to == KeyguardState.GLANCEABLE_HUB
+                    ) {
+                        startTransitionTo(KeyguardState.PRIMARY_BOUNCER)
+                    }
+                }
+        }
+    }
+
+    private fun listenForHubToAlternateBouncer() {
+        scope.launch("$TAG#listenForHubToAlternateBouncer") {
+            keyguardInteractor.alternateBouncerShowing
+                .sample(startedKeyguardTransitionStep, ::Pair)
+                .collect { pair ->
+                    val (isAlternateBouncerShowing, lastStartedTransitionStep) = pair
+                    if (
+                        isAlternateBouncerShowing &&
+                            lastStartedTransitionStep.to == KeyguardState.GLANCEABLE_HUB
+                    ) {
+                        startTransitionTo(KeyguardState.ALTERNATE_BOUNCER)
+                    }
+                }
+        }
+    }
+
+    private fun listenForHubToDozing() {
+        scope.launch {
+            powerInteractor.isAsleep.sample(startedKeyguardTransitionStep, ::Pair).collect {
+                (isAsleep, lastStartedStep) ->
+                if (lastStartedStep.to == fromState && isAsleep) {
+                    startTransitionTo(
+                        toState = KeyguardState.DOZING,
+                        modeOnCanceled = TransitionModeOnCanceled.LAST_VALUE,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun listenForHubToOccluded() {
+        scope.launch {
+            keyguardInteractor.isKeyguardOccluded.sample(startedKeyguardState, ::Pair).collect {
+                (isOccluded, keyguardState) ->
+                if (isOccluded && keyguardState == fromState) {
+                    startTransitionTo(KeyguardState.OCCLUDED)
+                }
+            }
+        }
+    }
+
+    private fun listenForHubToGone() {
+        scope.launch {
+            keyguardInteractor.isKeyguardGoingAway
+                .sample(startedKeyguardTransitionStep, ::Pair)
+                .collect { (isKeyguardGoingAway, lastStartedStep) ->
+                    if (isKeyguardGoingAway && lastStartedStep.to == fromState) {
+                        startTransitionTo(KeyguardState.GONE)
+                    }
+                }
+        }
     }
 
     companion object {
         const val TAG = "FromGlanceableHubTransitionInteractor"
-        val DEFAULT_DURATION = 500.milliseconds
+        val DEFAULT_DURATION = 400.milliseconds
+        val TO_LOCKSCREEN_DURATION = DEFAULT_DURATION
     }
 }

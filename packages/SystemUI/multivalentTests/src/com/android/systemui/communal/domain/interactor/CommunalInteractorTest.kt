@@ -18,6 +18,7 @@
 package com.android.systemui.communal.domain.interactor
 
 import android.app.smartspace.SmartspaceTarget
+import android.content.pm.UserInfo
 import android.provider.Settings.Secure.HUB_MODE_TUTORIAL_COMPLETED
 import android.widget.RemoteViews
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,12 +43,12 @@ import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
-import com.android.systemui.keyguard.domain.interactor.communalInteractor
-import com.android.systemui.keyguard.domain.interactor.editWidgetsActivityStarter
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.smartspace.data.repository.FakeSmartspaceRepository
 import com.android.systemui.smartspace.data.repository.fakeSmartspaceRepository
 import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.android.systemui.util.mockito.mock
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
@@ -59,8 +60,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mock
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.MockitoAnnotations
 
 /**
  * This class of test cases assume that communal is enabled. For disabled cases, see
@@ -70,6 +73,9 @@ import org.mockito.Mockito.verify
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class CommunalInteractorTest : SysuiTestCase() {
+    @Mock private lateinit var mainUser: UserInfo
+    @Mock private lateinit var secondaryUser: UserInfo
+
     private val kosmos = testKosmos()
     private val testScope = kosmos.testScope
 
@@ -78,6 +84,7 @@ class CommunalInteractorTest : SysuiTestCase() {
     private lateinit var mediaRepository: FakeCommunalMediaRepository
     private lateinit var widgetRepository: FakeCommunalWidgetRepository
     private lateinit var smartspaceRepository: FakeSmartspaceRepository
+    private lateinit var userRepository: FakeUserRepository
     private lateinit var keyguardRepository: FakeKeyguardRepository
     private lateinit var communalPrefsRepository: FakeCommunalPrefsRepository
     private lateinit var editWidgetsActivityStarter: EditWidgetsActivityStarter
@@ -86,14 +93,21 @@ class CommunalInteractorTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
+        MockitoAnnotations.initMocks(this)
+
         tutorialRepository = kosmos.fakeCommunalTutorialRepository
         communalRepository = kosmos.fakeCommunalRepository
         mediaRepository = kosmos.fakeCommunalMediaRepository
         widgetRepository = kosmos.fakeCommunalWidgetRepository
         smartspaceRepository = kosmos.fakeSmartspaceRepository
+        userRepository = kosmos.fakeUserRepository
         keyguardRepository = kosmos.fakeKeyguardRepository
         editWidgetsActivityStarter = kosmos.editWidgetsActivityStarter
         communalPrefsRepository = kosmos.fakeCommunalPrefsRepository
+
+        whenever(mainUser.isMain).thenReturn(true)
+        whenever(secondaryUser.isMain).thenReturn(false)
+        userRepository.setUserInfos(listOf(mainUser, secondaryUser))
 
         underTest = kosmos.communalInteractor
     }
@@ -103,39 +117,73 @@ class CommunalInteractorTest : SysuiTestCase() {
         testScope.runTest { assertThat(underTest.isCommunalEnabled).isTrue() }
 
     @Test
-    fun isCommunalAvailable_trueWhenStorageUnlock() =
+    fun isCommunalAvailable_storageUnlockedAndMainUser_true() =
         testScope.runTest {
             val isAvailable by collectLastValue(underTest.isCommunalAvailable)
             assertThat(isAvailable).isFalse()
 
             keyguardRepository.setIsEncryptedOrLockdown(false)
-            runCurrent()
+            userRepository.setSelectedUserInfo(mainUser)
+            keyguardRepository.setKeyguardShowing(true)
+            communalRepository.setCommunalEnabledState(true)
 
             assertThat(isAvailable).isTrue()
         }
 
     @Test
-    fun isCommunalAvailable_whenStorageUnlock_true() =
+    fun isCommunalAvailable_storageLockedAndMainUser_false() =
+        testScope.runTest {
+            val isAvailable by collectLastValue(underTest.isCommunalAvailable)
+            assertThat(isAvailable).isFalse()
+
+            keyguardRepository.setIsEncryptedOrLockdown(true)
+            userRepository.setSelectedUserInfo(mainUser)
+            keyguardRepository.setKeyguardShowing(true)
+            communalRepository.setCommunalEnabledState(true)
+
+            assertThat(isAvailable).isFalse()
+        }
+
+    @Test
+    fun isCommunalAvailable_storageUnlockedAndSecondaryUser_false() =
         testScope.runTest {
             val isAvailable by collectLastValue(underTest.isCommunalAvailable)
             assertThat(isAvailable).isFalse()
 
             keyguardRepository.setIsEncryptedOrLockdown(false)
-            runCurrent()
+            userRepository.setSelectedUserInfo(secondaryUser)
+            keyguardRepository.setKeyguardShowing(true)
+            communalRepository.setCommunalEnabledState(true)
+
+            assertThat(isAvailable).isFalse()
+        }
+
+    @Test
+    fun isCommunalAvailable_whenDreaming_true() =
+        testScope.runTest {
+            val isAvailable by collectLastValue(underTest.isCommunalAvailable)
+            assertThat(isAvailable).isFalse()
+
+            keyguardRepository.setIsEncryptedOrLockdown(false)
+            userRepository.setSelectedUserInfo(mainUser)
+            keyguardRepository.setDreaming(true)
+            communalRepository.setCommunalEnabledState(true)
 
             assertThat(isAvailable).isTrue()
         }
 
     @Test
-    fun updateAppWidgetHostActive_uponStorageUnlock_true() =
+    fun isCommunalAvailable_communalDisabled_false() =
         testScope.runTest {
-            collectLastValue(underTest.isCommunalAvailable)
-            assertThat(widgetRepository.isHostActive()).isFalse()
+            val isAvailable by collectLastValue(underTest.isCommunalAvailable)
+            assertThat(isAvailable).isFalse()
 
             keyguardRepository.setIsEncryptedOrLockdown(false)
-            runCurrent()
+            userRepository.setSelectedUserInfo(mainUser)
+            keyguardRepository.setKeyguardShowing(true)
+            communalRepository.setCommunalEnabledState(false)
 
-            assertThat(widgetRepository.isHostActive()).isTrue()
+            assertThat(isAvailable).isFalse()
         }
 
     @Test
@@ -557,10 +605,55 @@ class CommunalInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun isIdleOnCommunal() =
+        testScope.runTest {
+            val transitionState =
+                MutableStateFlow<ObservableCommunalTransitionState>(
+                    ObservableCommunalTransitionState.Idle(CommunalSceneKey.Blank)
+                )
+            communalRepository.setTransitionState(transitionState)
+
+            // isIdleOnCommunal is false when not on communal.
+            val isIdleOnCommunal by collectLastValue(underTest.isIdleOnCommunal)
+            runCurrent()
+            assertThat(isIdleOnCommunal).isEqualTo(false)
+
+            // Transition to communal.
+            transitionState.value =
+                ObservableCommunalTransitionState.Idle(CommunalSceneKey.Communal)
+            runCurrent()
+
+            // isIdleOnCommunal is now true since we're on communal.
+            assertThat(isIdleOnCommunal).isEqualTo(true)
+
+            // Start transition away from communal.
+            transitionState.value =
+                ObservableCommunalTransitionState.Transition(
+                    fromScene = CommunalSceneKey.Communal,
+                    toScene = CommunalSceneKey.Blank,
+                    progress = flowOf(0f),
+                    isInitiatedByUserInput = false,
+                    isUserInputOngoing = flowOf(false),
+                )
+            runCurrent()
+
+            // isIdleOnCommunal turns false as soon as transition away starts.
+            assertThat(isIdleOnCommunal).isEqualTo(false)
+        }
+
+    @Test
     fun testShowWidgetEditorStartsActivity() =
         testScope.runTest {
             underTest.showWidgetEditor()
             verify(editWidgetsActivityStarter).startActivity()
+        }
+
+    @Test
+    fun showWidgetEditor_withPreselectedKey_startsActivity() =
+        testScope.runTest {
+            val widgetKey = CommunalContentModel.KEY.widget(123)
+            underTest.showWidgetEditor(preselectedKey = widgetKey)
+            verify(editWidgetsActivityStarter).startActivity(widgetKey)
         }
 
     private fun smartspaceTimer(id: String, timestamp: Long = 0L): SmartspaceTarget {

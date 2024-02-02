@@ -475,6 +475,8 @@ import com.android.server.pm.pkg.SELinuxUtil;
 import com.android.server.pm.snapshot.PackageDataSnapshot;
 import com.android.server.power.stats.BatteryStatsImpl;
 import com.android.server.sdksandbox.SdkSandboxManagerLocal;
+import com.android.server.stats.pull.StatsPullAtomService;
+import com.android.server.stats.pull.StatsPullAtomServiceInternal;
 import com.android.server.uri.GrantUri;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
@@ -1330,6 +1332,8 @@ public class ActivityManagerService extends IActivityManager.Stub
      */
     final BatteryStatsService mBatteryStatsService;
 
+    StatsPullAtomServiceInternal mStatsPullAtomServiceInternal;
+
     /**
      * Information about component usage
      */
@@ -1769,7 +1773,7 @@ public class ActivityManagerService extends IActivityManager.Stub
     @GuardedBy("mProcLock")
     private long mLastBinderHeavyHitterAutoSamplerStart = 0L;
 
-    final AppProfiler mAppProfiler;
+    AppProfiler mAppProfiler;
 
     private static final int INDEX_NATIVE_PSS = 0;
     private static final int INDEX_NATIVE_SWAP_PSS = 1;
@@ -2514,7 +2518,7 @@ public class ActivityManagerService extends IActivityManager.Stub
         mInjector = injector;
         mContext = mInjector.getContext();
         mUiContext = null;
-        mAppErrors = null;
+        mAppErrors = injector.getAppErrors();
         mPackageWatchdog = null;
         mAppOpsService = mInjector.getAppOpsService(null /* recentAccessesFile */,
             null /* storageFile */, null /* handler */);
@@ -2532,7 +2536,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 ? new OomAdjusterModernImpl(this, mProcessList, activeUids, handlerThread)
                 : new OomAdjuster(this, mProcessList, activeUids, handlerThread);
 
-        mIntentFirewall = null;
+        mIntentFirewall = injector.getIntentFirewall();
         mProcessStats = new ProcessStatsService(this, mContext.getCacheDir());
         mCpHelper = new ContentProviderHelper(this, false);
         mServices = mInjector.getActiveServices(this);
@@ -4917,11 +4921,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (!mConstants.mEnableWaitForFinishAttachApplication) {
                 finishAttachApplicationInner(startSeq, callingUid, pid);
             }
-
-            // Temporarily disable sending BOOT_COMPLETED to see if this was impacting perf tests
-            if (false) {
-                maybeSendBootCompletedLocked(app);
-            }
+            maybeSendBootCompletedLocked(app);
         } catch (Exception e) {
             // We need kill the process group here. (b/148588589)
             Slog.wtf(TAG, "Exception thrown during bind of " + app, e);
@@ -5178,13 +5178,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         intent.addFlags(Intent.FLAG_RECEIVER_NO_ABORT
                 | Intent.FLAG_RECEIVER_INCLUDE_BACKGROUND
                 | Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
-        final BroadcastOptions bOptions = mUserController.getTemporaryAppAllowlistBroadcastOptions(
-                reason);
 
         broadcastIntentLocked(null, null, null, intent, null, null, 0, null, null,
                 new String[]{android.Manifest.permission.RECEIVE_BOOT_COMPLETED},
                 null, null, AppOpsManager.OP_NONE,
-                bOptions.toBundle(), true,
+                null, true,
                 false, MY_PID, SYSTEM_UID,
                 SYSTEM_UID, MY_PID, app.userId);
     }
@@ -13877,6 +13875,11 @@ public class ActivityManagerService extends IActivityManager.Stub
         return result;
     }
 
+    boolean isSystemUserOnly(int flags) {
+        return android.multiuser.Flags.enableSystemUserOnlyForServicesAndProviders()
+                && (flags & ServiceInfo.FLAG_SYSTEM_USER_ONLY) != 0;
+    }
+
     /**
      * Checks to see if the caller is in the same app as the singleton
      * component, or the component is in a special app. It allows special apps
@@ -13996,13 +13999,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         }
     }
 
-    public void serviceDoneExecuting(IBinder token, int type, int startId, int res) {
+    @Override
+    public void serviceDoneExecuting(IBinder token, int type, int startId, int res, Intent intent) {
         synchronized(this) {
             if (!(token instanceof ServiceRecord)) {
                 Slog.e(TAG, "serviceDoneExecuting: Invalid service token=" + token);
                 throw new IllegalArgumentException("Invalid service token");
             }
-            mServices.serviceDoneExecutingLocked((ServiceRecord) token, type, startId, res, false);
+            mServices.serviceDoneExecutingLocked((ServiceRecord) token, type, startId, res, false,
+                    intent);
         }
     }
 
@@ -16665,6 +16670,21 @@ public class ActivityManagerService extends IActivityManager.Stub
                 final @ProcessCapability int capability) {
         mBatteryStatsService.noteUidProcessState(uid, state);
         mAppOpsService.updateUidProcState(uid, state, capability);
+        if (StatsPullAtomService.ENABLE_MOBILE_DATA_STATS_AGGREGATED_PULLER) {
+            try {
+                if (mStatsPullAtomServiceInternal == null) {
+                    mStatsPullAtomServiceInternal = LocalServices.getService(
+                            StatsPullAtomServiceInternal.class);
+                }
+                if (mStatsPullAtomServiceInternal != null) {
+                    mStatsPullAtomServiceInternal.noteUidProcessState(uid, state);
+                } else {
+                    Slog.d(TAG, "StatsPullAtomService not ready yet");
+                }
+            } catch (Exception e) {
+                Slog.e(TAG, "Exception during logging uid proc state change event", e);
+            }
+        }
         if (mTrackingAssociations) {
             for (int i1=0, N1=mAssociations.size(); i1<N1; i1++) {
                 ArrayMap<ComponentName, SparseArray<ArrayMap<String, Association>>> targetComponents
@@ -20332,6 +20352,36 @@ public class ActivityManagerService extends IActivityManager.Stub
                         ProcessList.SCHED_GROUP_BACKGROUND);
             }
             return broadcastQueues;
+        }
+
+        /** @see Binder#getCallingUid */
+        public int getCallingUid() {
+            return Binder.getCallingUid();
+        }
+
+        /** @see Binder#getCallingPid */
+        public int getCallingPid() {
+            return Binder.getCallingUid();
+        }
+
+        /** @see Binder#clearCallingIdentity */
+        public long clearCallingIdentity() {
+            return Binder.clearCallingIdentity();
+        }
+
+        /** @see Binder#clearCallingIdentity */
+        public void restoreCallingIdentity(long ident) {
+            Binder.restoreCallingIdentity(ident);
+        }
+
+        /** @return the default instance of AppErrors */
+        public AppErrors getAppErrors() {
+            return null;
+        }
+
+        /** @return the default instance of intent firewall */
+        public IntentFirewall getIntentFirewall() {
+            return null;
         }
     }
 

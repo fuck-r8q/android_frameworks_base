@@ -17,6 +17,7 @@
 
 package com.android.systemui.compose
 
+import android.app.Dialog
 import android.content.Context
 import android.view.View
 import android.view.WindowInsets
@@ -25,11 +26,15 @@ import androidx.lifecycle.LifecycleOwner
 import com.android.systemui.bouncer.ui.BouncerDialogFactory
 import com.android.systemui.bouncer.ui.viewmodel.BouncerViewModel
 import com.android.systemui.communal.ui.viewmodel.BaseCommunalViewModel
+import com.android.systemui.communal.widgets.WidgetConfigurator
+import com.android.systemui.keyboard.stickykeys.ui.viewmodel.StickyKeysIndicatorViewModel
 import com.android.systemui.people.ui.viewmodel.PeopleViewModel
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.scene.shared.model.Scene
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.statusbar.phone.SystemUIDialogFactory
+import com.android.systemui.volume.panel.ui.viewmodel.VolumePanelViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -64,8 +69,15 @@ interface BaseComposeFacade {
     fun setCommunalEditWidgetActivityContent(
         activity: ComponentActivity,
         viewModel: BaseCommunalViewModel,
+        widgetConfigurator: WidgetConfigurator,
         onOpenWidgetPicker: () -> Unit,
         onEditDone: () -> Unit,
+    )
+
+    fun setVolumePanelActivityContent(
+        activity: ComponentActivity,
+        viewModel: VolumePanelViewModel,
+        onDismissAnimationFinished: () -> Unit,
     )
 
     /** Create a [View] to represent [viewModel] on screen. */
@@ -83,6 +95,12 @@ interface BaseComposeFacade {
         windowInsets: StateFlow<WindowInsets?>,
         sceneByKey: Map<SceneKey, Scene>,
     ): View
+
+    /** Creates sticky key dialog presenting provided [viewModel] */
+    fun createStickyKeysDialog(
+        dialogFactory: SystemUIDialogFactory,
+        viewModel: StickyKeysIndicatorViewModel
+    ): Dialog
 
     /** Create a [View] to represent [viewModel] on screen. */
     fun createCommunalView(

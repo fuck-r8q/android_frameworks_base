@@ -153,6 +153,7 @@ import static com.android.server.wm.WindowManagerServiceDumpProto.INPUT_METHOD_W
 import static com.android.server.wm.WindowManagerServiceDumpProto.POLICY;
 import static com.android.server.wm.WindowManagerServiceDumpProto.ROOT_WINDOW_CONTAINER;
 import static com.android.server.wm.WindowManagerServiceDumpProto.WINDOW_FRAMES_VALID;
+import static com.android.window.flags.Flags.multiCrop;
 
 import android.Manifest;
 import android.Manifest.permission;
@@ -240,6 +241,7 @@ import android.util.EventLog;
 import android.util.MergedConfiguration;
 import android.util.Pair;
 import android.util.Slog;
+import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 import android.util.TimeUtils;
@@ -344,6 +346,7 @@ import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.utils.PriorityDump;
+import com.android.server.wallpaper.WallpaperCropper.WallpaperCropUtils;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -4117,7 +4120,7 @@ public class WindowManagerService extends IWindowManager.Stub
             throw new SecurityException("Requires READ_FRAME_BUFFER permission");
         }
 
-        final Bitmap bm;
+        ScreenCapture.LayerCaptureArgs captureArgs;
         synchronized (mGlobalLock) {
             final DisplayContent displayContent = mRoot.getDisplayContent(DEFAULT_DISPLAY);
             if (displayContent == null) {
@@ -4125,10 +4128,28 @@ public class WindowManagerService extends IWindowManager.Stub
                     Slog.i(TAG_WM, "Screenshot returning null. No Display for displayId="
                             + DEFAULT_DISPLAY);
                 }
-                bm = null;
+                captureArgs = null;
             } else {
-                bm = displayContent.screenshotDisplayLocked();
+                captureArgs = displayContent.getLayerCaptureArgs();
             }
+        }
+
+        final Bitmap bm;
+        if (captureArgs != null) {
+            ScreenCapture.SynchronousScreenCaptureListener syncScreenCapture =
+                    ScreenCapture.createSyncCaptureListener();
+
+            ScreenCapture.captureLayers(captureArgs, syncScreenCapture);
+
+            final ScreenCapture.ScreenshotHardwareBuffer screenshotBuffer =
+                    syncScreenCapture.getBuffer();
+            bm = screenshotBuffer == null ? null : screenshotBuffer.asBitmap();
+        } else {
+            bm = null;
+        }
+
+        if (bm == null) {
+            Slog.w(TAG_WM, "Failed to take screenshot");
         }
 
         FgThread.getHandler().post(() -> {
@@ -8170,6 +8191,25 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public void setWallpaperCropHints(IBinder binder, SparseArray<Rect> cropHints) {
+            synchronized (mGlobalLock) {
+                final WindowToken token = mRoot.getWindowToken(binder);
+                if (token == null || token.asWallpaperToken() == null) {
+                    ProtoLog.w(WM_ERROR,
+                            "setWallpaperCropHints: non-existent wallpaper token: %s", binder);
+                    return;
+                }
+                token.asWallpaperToken().setCropHints(cropHints);
+            }
+        }
+
+        @Override
+        public void setWallpaperCropUtils(WallpaperCropUtils wallpaperCropUtils) {
+            mRoot.getDisplayContent(DEFAULT_DISPLAY).mWallpaperController
+                    .setWallpaperCropUtils(wallpaperCropUtils);
+        }
+
+        @Override
         public boolean isUidFocused(int uid) {
             synchronized (mGlobalLock) {
                 for (int i = mRoot.getChildCount() - 1; i >= 0; i--) {
@@ -9176,55 +9216,63 @@ public class WindowManagerService extends IWindowManager.Stub
             if (fromWin == null || !fromWin.isFocused()) {
                 return false;
             }
-            final TaskFragment fromFragment = fromWin.getTaskFragment();
-            if (fromFragment == null) {
-                return false;
-            }
-            final TaskFragment adjacentFragment = fromFragment.getAdjacentTaskFragment();
-            if (adjacentFragment == null || adjacentFragment.asTask() != null) {
-                // Don't move the focus to another task.
-                return false;
-            }
-            final Rect fromBounds = fromFragment.getBounds();
-            final Rect adjacentBounds = adjacentFragment.getBounds();
-            switch (direction) {
-                case View.FOCUS_LEFT:
-                    if (adjacentBounds.left >= fromBounds.left) {
-                        return false;
-                    }
-                    break;
-                case View.FOCUS_UP:
-                    if (adjacentBounds.top >= fromBounds.top) {
-                        return false;
-                    }
-                    break;
-                case View.FOCUS_RIGHT:
-                    if (adjacentBounds.right <= fromBounds.right) {
-                        return false;
-                    }
-                    break;
-                case View.FOCUS_DOWN:
-                    if (adjacentBounds.bottom <= fromBounds.bottom) {
-                        return false;
-                    }
-                    break;
-                case View.FOCUS_BACKWARD:
-                case View.FOCUS_FORWARD:
-                    // These are not absolute directions. Skip checking the bounds.
-                    break;
-                default:
+            return moveFocusToAdjacentWindow(fromWin, direction);
+        }
+    }
+
+    boolean moveFocusToAdjacentWindow(WindowState fromWin, @FocusDirection int direction) {
+        final TaskFragment fromFragment = fromWin.getTaskFragment();
+        if (fromFragment == null) {
+            return false;
+        }
+        final TaskFragment adjacentFragment = fromFragment.getAdjacentTaskFragment();
+        if (adjacentFragment == null || adjacentFragment.asTask() != null) {
+            // Don't move the focus to another task.
+            return false;
+        }
+        if (adjacentFragment.isIsolatedNav()) {
+            // Don't move the focus if the adjacent TF is isolated navigation.
+            return false;
+        }
+        final Rect fromBounds = fromFragment.getBounds();
+        final Rect adjacentBounds = adjacentFragment.getBounds();
+        switch (direction) {
+            case View.FOCUS_LEFT:
+                if (adjacentBounds.left >= fromBounds.left) {
                     return false;
-            }
-            final ActivityRecord topRunningActivity = adjacentFragment.topRunningActivity(
-                    true /* focusableOnly */);
-            if (topRunningActivity == null) {
+                }
+                break;
+            case View.FOCUS_UP:
+                if (adjacentBounds.top >= fromBounds.top) {
+                    return false;
+                }
+                break;
+            case View.FOCUS_RIGHT:
+                if (adjacentBounds.right <= fromBounds.right) {
+                    return false;
+                }
+                break;
+            case View.FOCUS_DOWN:
+                if (adjacentBounds.bottom <= fromBounds.bottom) {
+                    return false;
+                }
+                break;
+            case View.FOCUS_BACKWARD:
+            case View.FOCUS_FORWARD:
+                // These are not absolute directions. Skip checking the bounds.
+                break;
+            default:
                 return false;
-            }
-            moveDisplayToTopInternal(topRunningActivity.getDisplayId());
-            handleTaskFocusChange(topRunningActivity.getTask(), topRunningActivity);
-            if (fromWin.isFocused()) {
-                return false;
-            }
+        }
+        final ActivityRecord topRunningActivity = adjacentFragment.topRunningActivity(
+                true /* focusableOnly */);
+        if (topRunningActivity == null) {
+            return false;
+        }
+        moveDisplayToTopInternal(topRunningActivity.getDisplayId());
+        handleTaskFocusChange(topRunningActivity.getTask(), topRunningActivity);
+        if (fromWin.isFocused()) {
+            return false;
         }
         return true;
     }
@@ -9408,7 +9456,8 @@ public class WindowManagerService extends IWindowManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                if (!mAtmService.isCallerRecents(callingUid)) {
+                if (!mAtmService.isCallerRecents(callingUid)
+                        && (!multiCrop() || callingUid != SYSTEM_UID)) {
                     Slog.e(TAG, "Unable to verify uid for getPossibleDisplayInfo"
                             + " on uid " + callingUid);
                     return new ArrayList<>();

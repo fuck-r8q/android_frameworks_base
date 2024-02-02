@@ -128,6 +128,7 @@ import java.util.function.Function;
  * <a href="/training/basics/intents/package-visibility">manage package visibility</a>.
  * </p>
  */
+@android.ravenwood.annotation.RavenwoodKeepPartialClass
 public abstract class PackageManager {
     private static final String TAG = "PackageManager";
 
@@ -1499,6 +1500,44 @@ public abstract class PackageManager {
      */
     @SystemApi
     public static final int ROLLBACK_DATA_POLICY_RETAIN = 2;
+
+    /** @hide */
+    @IntDef(prefix = {"ROLLBACK_USER_IMPACT_"}, value = {
+            ROLLBACK_USER_IMPACT_LOW,
+            ROLLBACK_USER_IMPACT_HIGH,
+            ROLLBACK_USER_IMPACT_ONLY_MANUAL,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface RollbackImpactLevel {}
+
+    /**
+     * Rollback will be performed automatically in response to native crashes on startup or
+     * persistent service crashes. More suitable for apps that do not store any user data.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.content.pm.Flags.FLAG_RECOVERABILITY_DETECTION)
+    public static final int ROLLBACK_USER_IMPACT_LOW = 0;
+
+    /**
+     * Rollback will be performed automatically only when the device is found to be unrecoverable.
+     * More suitable for apps that store user data and have higher impact on user.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.content.pm.Flags.FLAG_RECOVERABILITY_DETECTION)
+    public static final int ROLLBACK_USER_IMPACT_HIGH = 1;
+
+    /**
+     * Rollback will not be performed automatically. It can be triggered externally.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.content.pm.Flags.FLAG_RECOVERABILITY_DETECTION)
+    public static final int ROLLBACK_USER_IMPACT_ONLY_MANUAL = 2;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "INSTALL_" }, value = {
@@ -5454,6 +5493,7 @@ public abstract class PackageManager {
      * application info.
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodKeepWholeClass
     public static class Flags {
         final long mValue;
         protected Flags(long value) {
@@ -5468,6 +5508,7 @@ public abstract class PackageManager {
      * Specific flags used for retrieving package info. Example:
      * {@code PackageManager.getPackageInfo(packageName, PackageInfoFlags.of(0)}
      */
+    @android.ravenwood.annotation.RavenwoodKeepWholeClass
     public final static class PackageInfoFlags extends Flags {
         private PackageInfoFlags(@PackageInfoFlagsBits long value) {
             super(value);
@@ -5481,6 +5522,7 @@ public abstract class PackageManager {
     /**
      * Specific flags used for retrieving application info.
      */
+    @android.ravenwood.annotation.RavenwoodKeepWholeClass
     public final static class ApplicationInfoFlags extends Flags {
         private ApplicationInfoFlags(@ApplicationInfoFlagsBits long value) {
             super(value);
@@ -5494,6 +5536,7 @@ public abstract class PackageManager {
     /**
      * Specific flags used for retrieving component info.
      */
+    @android.ravenwood.annotation.RavenwoodKeepWholeClass
     public final static class ComponentInfoFlags extends Flags {
         private ComponentInfoFlags(@ComponentInfoFlagsBits long value) {
             super(value);
@@ -5507,6 +5550,7 @@ public abstract class PackageManager {
     /**
      * Specific flags used for retrieving resolve info.
      */
+    @android.ravenwood.annotation.RavenwoodKeepWholeClass
     public final static class ResolveInfoFlags extends Flags {
         private ResolveInfoFlags(@ResolveInfoFlagsBits long value) {
             super(value);

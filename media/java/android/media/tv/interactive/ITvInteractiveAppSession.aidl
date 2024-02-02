@@ -49,6 +49,7 @@ oneway interface ITvInteractiveAppSession {
     void sendTimeShiftMode(int mode);
     void sendAvailableSpeeds(in float[] speeds);
     void sendSigningResult(in String signingId, in byte[] result);
+    void sendCertificate(in String host, int port, in Bundle certBundle);
     void sendTvRecordingInfo(in TvRecordingInfo recordingInfo);
     void sendTvRecordingInfoList(in List<TvRecordingInfo> recordingInfoList);
     void notifyError(in String errMsg, in Bundle params);
@@ -67,6 +68,7 @@ oneway interface ITvInteractiveAppSession {
     void notifyTracksChanged(in List<TvTrackInfo> tracks);
     void notifyVideoAvailable();
     void notifyVideoUnavailable(int reason);
+    void notifyVideoFreezeUpdated(boolean isFrozen);
     void notifyContentAllowed();
     void notifyContentBlocked(in String rating);
     void notifySignalStrength(int strength);

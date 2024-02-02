@@ -333,11 +333,17 @@ public class LockPatternUtils {
 
     @UnsupportedAppUsage
     public LockPatternUtils(Context context) {
+        this(context, null);
+    }
+
+    @VisibleForTesting
+    public LockPatternUtils(Context context, ILockSettings lockSettings) {
         mContext = context;
         mContentResolver = context.getContentResolver();
 
         Looper looper = Looper.myLooper();
         mHandler = looper != null ? new Handler(looper) : null;
+        mLockSettingsService = lockSettings;
     }
 
     @UnsupportedAppUsage
@@ -1395,8 +1401,8 @@ public class LockPatternUtils {
     }
 
     public boolean isUserInLockdown(int userId) {
-        return getStrongAuthForUser(userId)
-                == StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
+        return (getStrongAuthForUser(userId)
+                & StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN) != 0;
     }
 
     private static class WrappedCallback extends ICheckCredentialProgressCallback.Stub {

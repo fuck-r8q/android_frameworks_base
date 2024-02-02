@@ -722,6 +722,11 @@ class ProcessRecord implements WindowProcessListener {
         return mState.getSetProcState();
     }
 
+    @GuardedBy(anyOf = {"mService", "mProcLock"})
+    int getSetCapability() {
+        return mState.getSetCapability();
+    }
+
     @GuardedBy({"mService", "mProcLock"})
     public void makeActive(IApplicationThread thread, ProcessStatsService tracker) {
         // TODO(b/180501180): Add back this logging message.
@@ -1449,8 +1454,12 @@ class ProcessRecord implements WindowProcessListener {
 
     void onProcessUnfrozen() {
         mProfile.onProcessUnfrozen();
+        mServices.onProcessUnfrozen();
     }
 
+    void onProcessFrozenCancelled() {
+        mServices.onProcessFrozenCancelled();
+    }
 
     /*
      *  Delete all packages from list except the package indicated in info
@@ -1690,6 +1699,13 @@ class ProcessRecord implements WindowProcessListener {
 
     public boolean wasForceStopped() {
         return mWasForceStopped;
+    }
+
+    boolean isFreezable() {
+        return mService.mOomAdjuster.mCachedAppOptimizer.useFreezer()
+                && !mOptRecord.isFreezeExempt()
+                && !mOptRecord.shouldNotFreeze()
+                && mState.getCurAdj() >= ProcessList.FREEZER_CUTOFF_ADJ;
     }
 
     /**

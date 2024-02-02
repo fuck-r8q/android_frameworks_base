@@ -57,6 +57,7 @@
         <item><xliff:g id="id">@string/status_bar_screen_record</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_cast</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_ethernet</xliff:g></item>
+        <item><xliff:g id="id">@string/status_bar_oem_satellite</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_wifi</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_hotspot</xliff:g></item>
         <item><xliff:g id="id">@string/status_bar_mobile</xliff:g></item>
@@ -102,6 +103,7 @@
     <string translatable="false" name="status_bar_call_strength">call_strength</string>
     <string translatable="false" name="status_bar_sensors_off">sensors_off</string>
     <string translatable="false" name="status_bar_screen_record">screen_record</string>
+    <string translatable="false" name="status_bar_oem_satellite">satellite</string>
 
     <!-- Flag indicating whether the surface flinger has limited
          alpha compositing functionality in hardware.  If set, the window
@@ -4501,6 +4503,16 @@
     <!-- URI for default Accessibility notification sound when to enable accessibility shortcut. -->
     <string name="config_defaultAccessibilityNotificationSound" translatable="false"></string>
 
+    <!-- Array of component names, each flattened to a string, for accessibility services that
+         can be enabled by the user without showing a warning prompt. These services must be
+         preinstalled. -->
+    <string-array translatable="false" name="config_trustedAccessibilityServices">
+        <!--
+        <item>com.example.package.first/com.example.class.FirstService</item>
+        <item>com.example.package.second/com.example.class.SecondService</item>
+        -->
+    </string-array>
+
     <!-- Warning: This API can be dangerous when not implemented properly. In particular,
          escrow token must NOT be retrievable from device storage. In other words, either
          escrow token is not stored on device or its ciphertext is stored on device while
@@ -5353,20 +5365,19 @@
      and a second time clipped to the fill level to indicate charge -->
     <bool name="config_batterymeterDualTone">false</bool>
 
-    <!-- The default refresh rate for a given device. Change this value to set a higher default
-         refresh rate. If the hardware composer on the device supports display modes with a higher
-         refresh rate than the default value specified here, the framework may use those higher
-         refresh rate modes if an app chooses one by setting preferredDisplayModeId or calling
-         setFrameRate().
-         If a non-zero value is set for config_defaultPeakRefreshRate, then
-         config_defaultRefreshRate may be set to 0, in which case the value set for
-         config_defaultPeakRefreshRate will act as the default frame rate. -->
-    <integer name="config_defaultRefreshRate">60</integer>
+    <!-- The default refresh rate for a given device. This value is used to set the
+         global refresh rate vote, and when set to zero it has no effect on the vote.
+         If this value is non-zero but the hardware composer on the device supports
+         display modes with higher refresh rates, the framework may use those higher
+         refresh rate modes if an app chooses one by setting preferredDisplayModeId
+         or calling setFrameRate().-->
+    <integer name="config_defaultRefreshRate">0</integer>
 
-    <!-- The default peak refresh rate for a given device. Change this value if you want to prevent
-         the framework from using higher refresh rates, even if display modes with higher refresh
-         rates are available from hardware composer. Only has an effect if the value is
-         non-zero. -->
+    <!-- The default peak refresh rate for a given device. This value is used to set the
+         global peak refresh rate vote, and when set to zero it has no effect on the vote.
+         Change this value to non-zero if you want to prevent the framework from using higher
+         refresh rates, even if display modes with higher refresh rates are available from
+         hardware composer. -->
     <integer name="config_defaultPeakRefreshRate">0</integer>
 
     <!-- External display peak refresh rate for the given device. Change this value if you want to
@@ -6619,7 +6630,7 @@
     </string-array>
 
     <!-- Whether or not the monitoring on the apps' background battery drain is enabled -->
-    <bool name="config_bg_current_drain_monitor_enabled">true</bool>
+    <bool name="config_bg_current_drain_monitor_enabled">false</bool>
 
     <!-- The threshold of the background current drain (in percentage) to the restricted
          standby bucket.
@@ -6914,4 +6925,11 @@
     <!-- Defines suitability of the built-in speaker route.
          Refer to {@link MediaRoute2Info} to see supported values.  -->
     <integer name="config_mediaRouter_builtInSpeakerSuitability">0</integer>
+
+    <!-- Whether to show a percentage text next to the progressbar while preparing to update the
+         device -->
+    <bool name="config_showPercentageTextDuringRebootToUpdate">true</bool>
+
+    <!-- Defines the minimum interval (in ms) between two input-based user-activity poke events. -->
+    <integer name="config_minMillisBetweenInputUserActivityEvents">100</integer>
 </resources>

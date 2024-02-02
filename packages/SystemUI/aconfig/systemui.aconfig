@@ -89,6 +89,13 @@ flag {
 }
 
 flag {
+    name: "notification_avalanche_suppression"
+    namespace: "systemui"
+    description: "After notification avalanche floodgate event, suppress HUNs completely."
+    bug: "321089634"
+}
+
+flag {
     name: "notification_background_tint_optimization"
     namespace: "systemui"
     description: "Re-enable the codepath that removed tinting of notifications when the"
@@ -356,4 +363,11 @@ flag {
    namespace: "systemui"
    description: "Enables styled focus states on pin input field if keyboard is connected"
    bug: "316106516"
+}
+
+flag {
+    name: "keyguard_wm_state_refactor"
+    namespace: "systemui"
+    description: "Enables refactored logic for SysUI+WM unlock/occlusion code paths"
+    bug: "278086361"
 }

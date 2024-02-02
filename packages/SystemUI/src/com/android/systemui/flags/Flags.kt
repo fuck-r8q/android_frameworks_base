@@ -44,11 +44,11 @@ object Flags {
     // 100 - notification
     // TODO(b/297792660): Tracking Bug
     @JvmField val UNCLEARED_TRANSIENT_HUN_FIX =
-        unreleasedFlag("uncleared_transient_hun_fix", teamfood = true)
+        releasedFlag("uncleared_transient_hun_fix")
 
     // TODO(b/298308067): Tracking Bug
     @JvmField val SWIPE_UNCLEARED_TRANSIENT_VIEW_FIX =
-        unreleasedFlag("swipe_uncleared_transient_view_fix", teamfood = true)
+        releasedFlag("swipe_uncleared_transient_view_fix")
 
     // TODO(b/254512751): Tracking Bug
     val NOTIFICATION_PIPELINE_DEVELOPER_LOGGING =
@@ -219,19 +219,6 @@ object Flags {
     // TODO(b/274443705): Tracking Bug
     @JvmField
     val WALLPAPER_PICKER_PREVIEW_ANIMATION = releasedFlag("wallpaper_picker_preview_animation")
-
-    /**
-     * TODO(b/278086361): Tracking bug
-     * Complete rewrite of the interactions between System UI and Window Manager involving keyguard
-     * state. When enabled, calls to ActivityTaskManagerService from System UI will exclusively
-     * occur from [WmLockscreenVisibilityManager] rather than the legacy KeyguardViewMediator.
-     *
-     * This flag is under development; some types of unlock may not animate properly if you enable
-     * it.
-     */
-    @JvmField
-    val KEYGUARD_WM_STATE_REFACTOR: UnreleasedFlag =
-            unreleasedFlag("keyguard_wm_state_refactor")
 
     // 300 - power menu
     // TODO(b/254512600): Tracking Bug
@@ -567,9 +554,6 @@ object Flags {
     // TODO(b/283740863): Tracking Bug
     @JvmField
     val ENABLE_NEW_PRIVACY_DIALOG = releasedFlag("enable_new_privacy_dialog")
-
-    // TODO(b/289573946): Tracking Bug
-    @JvmField val PRECOMPUTED_TEXT = releasedFlag("precomputed_text")
 
     // TODO(b/302087895): Tracking Bug
     @JvmField val CALL_LAYOUT_ASYNC_SET_DATA =

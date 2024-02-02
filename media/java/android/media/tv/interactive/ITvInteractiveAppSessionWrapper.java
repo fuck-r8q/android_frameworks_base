@@ -103,6 +103,8 @@ public class ITvInteractiveAppSessionWrapper
     private static final int DO_SEND_TIME_SHIFT_MODE = 46;
     private static final int DO_SEND_AVAILABLE_SPEEDS = 47;
     private static final int DO_SEND_SELECTED_TRACK_INFO = 48;
+    private static final int DO_NOTIFY_VIDEO_FREEZE_UPDATED = 49;
+    private static final int DO_SEND_CERTIFICATE = 50;
 
     private final HandlerCaller mCaller;
     private Session mSessionImpl;
@@ -364,6 +366,17 @@ public class ITvInteractiveAppSessionWrapper
                 args.recycle();
                 break;
             }
+            case DO_NOTIFY_VIDEO_FREEZE_UPDATED: {
+                mSessionImpl.notifyVideoFreezeUpdated((Boolean) msg.obj);
+                break;
+            }
+            case DO_SEND_CERTIFICATE: {
+                SomeArgs args = (SomeArgs) msg.obj;
+                mSessionImpl.sendCertificate((String) args.arg1, (Integer) args.arg2,
+                        (Bundle) args.arg3);
+                args.recycle();
+                break;
+            }
             default: {
                 Log.w(TAG, "Unhandled message code: " + msg.what);
                 break;
@@ -478,6 +491,12 @@ public class ITvInteractiveAppSessionWrapper
     }
 
     @Override
+    public void sendCertificate(@NonNull String host, int port, @NonNull Bundle certBundle) {
+        mCaller.executeOrSendMessage(
+                mCaller.obtainMessageOOO(DO_SEND_CERTIFICATE, host, port, certBundle));
+    }
+
+    @Override
     public void notifyError(@NonNull String errMsg, @NonNull Bundle params) {
         mCaller.executeOrSendMessage(
                 mCaller.obtainMessageOO(DO_NOTIFY_ERROR, errMsg, params));
@@ -549,6 +568,12 @@ public class ITvInteractiveAppSessionWrapper
     @Override
     public void notifyVideoUnavailable(int reason) {
         mCaller.executeOrSendMessage(mCaller.obtainMessageO(DO_NOTIFY_VIDEO_UNAVAILABLE, reason));
+    }
+
+    @Override
+    public void notifyVideoFreezeUpdated(boolean isFrozen) {
+        mCaller.executeOrSendMessage(mCaller.obtainMessageO(DO_NOTIFY_VIDEO_FREEZE_UPDATED,
+                isFrozen));
     }
 
     @Override
