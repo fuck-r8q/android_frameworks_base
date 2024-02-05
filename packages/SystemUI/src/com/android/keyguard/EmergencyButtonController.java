@@ -73,7 +73,6 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
     private final SelectedUserInteractor mSelectedUserInteractor;
 
     private EmergencyButtonCallback mEmergencyButtonCallback;
-    private boolean mIsCellAvailable;
     private ServiceState mServiceState;
 
     private final KeyguardUpdateMonitorCallback mInfoCallback =
@@ -81,20 +80,17 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
         @Override
         public void onSimStateChanged(int subId, int slotId, int simState) {
             updateEmergencyCallButton();
-            requestCellInfoUpdate();
         }
 
         @Override
         public void onPhoneStateChanged(int phoneState) {
             updateEmergencyCallButton();
-            requestCellInfoUpdate();
         }
 
         @Override
         public void onServiceStateChanged(int subId, ServiceState state) {
             mServiceState = state;
             updateEmergencyCallButton();
-            requestCellInfoUpdate();
         }
     };
 
@@ -219,38 +215,8 @@ public class EmergencyButtonController extends ViewController<EmergencyButton> {
         });
     }
 
-    private void requestCellInfoUpdate(){
-        // if(!getContext().getResources().getBoolean(com.android.settingslib.R.bool.kg_hide_emgcy_btn_when_oos)) {
-        //     return;
-        // }
-        // TelephonyManager tmWithoutSim = mTelephonyManager
-        //         .createForSubscriptionId(SubscriptionManager.INVALID_SUBSCRIPTION_ID);
-        // try {
-        //     tmWithoutSim.requestCellInfoUpdate(getContext().getMainExecutor(),
-        //             new TelephonyManager.CellInfoCallback() {
-        //                 @Override
-        //                 public void onCellInfo(List<CellInfo> cellInfo) {
-        //                     if (KeyguardConstants.DEBUG_SIM_STATES) {
-        //                         Log.d(LOG_TAG, "requestCellInfoUpdate.onCellInfo cellInfoList.size="
-        //                                 + (cellInfo == null ? 0 : cellInfo.size()));
-        //                     }
-        //                     if (cellInfo == null || cellInfo.isEmpty()) {
-        //                         mIsCellAvailable = false;
-        //                     } else {
-        //                         mIsCellAvailable = true;
-        //                     }
-        //                     updateEmergencyCallButton();
-        //                 }
-        //             });
-        // } catch (Exception exception) {
-        //     Log.e(LOG_TAG, "Fail to call TelephonyManager.requestCellInfoUpdate ", exception);
-        // }
-        return;
-    }
-
     private boolean isEmergencyCapable() {
         return (!mKeyguardUpdateMonitor.isOOS()
-                || mIsCellAvailable
                 || (mServiceState !=null && mServiceState.isEmergencyOnly()));
     }
 
