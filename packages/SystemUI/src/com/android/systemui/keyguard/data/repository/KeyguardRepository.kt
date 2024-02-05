@@ -101,7 +101,7 @@ interface KeyguardRepository {
      * Whether the device is locked or unlocked right now. This is true when keyguard has been
      * dismissed or can be dismissed by a swipe
      */
-    val isKeyguardUnlocked: StateFlow<Boolean>
+    val isKeyguardDismissible: StateFlow<Boolean>
 
     /**
      * Observable for the signal that keyguard is about to go away.
@@ -131,6 +131,9 @@ interface KeyguardRepository {
      * [linearDozeAmount] flow to check if it's greater than `0`
      */
     val isDozing: StateFlow<Boolean>
+
+    /** Keyguard can be clipped at the top as the shade is dragged */
+    val topClippingBounds: MutableStateFlow<Int?>
 
     /**
      * Observable for whether the device is dreaming.
@@ -326,6 +329,8 @@ constructor(
     private val _clockShouldBeCentered = MutableStateFlow(true)
     override val clockShouldBeCentered: Flow<Boolean> = _clockShouldBeCentered.asStateFlow()
 
+    override val topClippingBounds = MutableStateFlow<Int?>(null)
+
     override val isKeyguardShowing: Flow<Boolean> =
         conflatedCallbackFlow {
                 val callback =
@@ -383,7 +388,7 @@ constructor(
             }
             .distinctUntilChanged()
 
-    override val isKeyguardUnlocked: StateFlow<Boolean> =
+    override val isKeyguardDismissible: StateFlow<Boolean> =
         conflatedCallbackFlow {
                 val callback =
                     object : KeyguardStateController.Callback {
@@ -391,7 +396,7 @@ constructor(
                             trySendWithFailureLogging(
                                 keyguardStateController.isUnlocked,
                                 TAG,
-                                "updated isKeyguardUnlocked due to onUnlockedChanged"
+                                "updated isKeyguardDismissible due to onUnlockedChanged"
                             )
                         }
 
@@ -399,7 +404,7 @@ constructor(
                             trySendWithFailureLogging(
                                 keyguardStateController.isUnlocked,
                                 TAG,
-                                "updated isKeyguardUnlocked due to onKeyguardShowingChanged"
+                                "updated isKeyguardDismissible due to onKeyguardShowingChanged"
                             )
                         }
                     }
@@ -562,17 +567,17 @@ constructor(
                 val callback =
                     object : KeyguardUpdateMonitorCallback() {
                         override fun onStrongAuthStateChanged(userId: Int) {
-                            trySend(userId)
+                            trySendWithFailureLogging(userId, TAG, "strong auth state change")
                         }
                     }
-
                 keyguardUpdateMonitor.registerCallback(callback)
-
                 awaitClose { keyguardUpdateMonitor.removeCallback(callback) }
             }
             .filter { userId -> userId == userTracker.userId }
             .onStart { emit(userTracker.userId) }
             .mapLatest { userId -> keyguardUpdateMonitor.isEncryptedOrLockdown(userId) }
+            // KeyguardUpdateMonitor#registerCallback needs to be called on the main thread.
+            .flowOn(mainDispatcher)
 
     override fun isKeyguardShowing(): Boolean {
         return keyguardStateController.isShowing

@@ -18,19 +18,20 @@ package com.android.systemui.keyguard.domain.interactor
 
 import android.animation.ValueAnimator
 import com.android.keyguard.KeyguardSecurityModel
+import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flags.FeatureFlags
-import com.android.systemui.flags.Flags
+import com.android.systemui.keyguard.KeyguardWmStateRefactor
 import com.android.systemui.keyguard.data.repository.KeyguardTransitionRepository
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.KeyguardSurfaceBehindModel
 import com.android.systemui.keyguard.shared.model.TransitionModeOnCanceled
 import com.android.systemui.power.domain.interactor.PowerInteractor
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
+import com.android.systemui.util.kotlin.Utils.Companion.sample
 import com.android.systemui.util.kotlin.Utils.Companion.toQuad
-import com.android.systemui.util.kotlin.Utils.Companion.toQuint
 import com.android.systemui.util.kotlin.Utils.Companion.toTriple
 import com.android.systemui.util.kotlin.sample
 import com.android.wm.shell.animation.Interpolators
@@ -54,6 +55,7 @@ constructor(
     @Background bgDispatcher: CoroutineDispatcher,
     @Main mainDispatcher: CoroutineDispatcher,
     private val keyguardInteractor: KeyguardInteractor,
+    private val communalInteractor: CommunalInteractor,
     private val flags: FeatureFlags,
     private val keyguardSecurityModel: KeyguardSecurityModel,
     private val selectedUserInteractor: SelectedUserInteractor,
@@ -69,7 +71,7 @@ constructor(
     override fun start() {
         listenForPrimaryBouncerToGone()
         listenForPrimaryBouncerToAodOrDozing()
-        listenForPrimaryBouncerToLockscreenOrOccluded()
+        listenForPrimaryBouncerToLockscreenHubOrOccluded()
         listenForPrimaryBouncerToDreamingLockscreenHosted()
         listenForTransitionToCamera(scope, keyguardInteractor)
     }
@@ -125,18 +127,15 @@ constructor(
         scope.launch { startTransitionTo(KeyguardState.GONE) }
     }
 
-    private fun listenForPrimaryBouncerToLockscreenOrOccluded() {
+    private fun listenForPrimaryBouncerToLockscreenHubOrOccluded() {
         scope.launch {
             keyguardInteractor.primaryBouncerShowing
                 .sample(
-                    combine(
-                        powerInteractor.isAwake,
-                        startedKeyguardTransitionStep,
-                        keyguardInteractor.isKeyguardOccluded,
-                        keyguardInteractor.isActiveDreamLockscreenHosted,
-                        ::toQuad
-                    ),
-                    ::toQuint
+                    powerInteractor.isAwake,
+                    startedKeyguardTransitionStep,
+                    keyguardInteractor.isKeyguardOccluded,
+                    keyguardInteractor.isActiveDreamLockscreenHosted,
+                    communalInteractor.isIdleOnCommunal
                 )
                 .collect {
                     (
@@ -144,16 +143,23 @@ constructor(
                         isAwake,
                         lastStartedTransitionStep,
                         occluded,
-                        isActiveDreamLockscreenHosted) ->
+                        isActiveDreamLockscreenHosted,
+                        isIdleOnCommunal) ->
                     if (
                         !isBouncerShowing &&
                             lastStartedTransitionStep.to == KeyguardState.PRIMARY_BOUNCER &&
                             isAwake &&
                             !isActiveDreamLockscreenHosted
                     ) {
-                        startTransitionTo(
-                            if (occluded) KeyguardState.OCCLUDED else KeyguardState.LOCKSCREEN
-                        )
+                        val toState =
+                            if (occluded) {
+                                KeyguardState.OCCLUDED
+                            } else if (isIdleOnCommunal) {
+                                KeyguardState.GLANCEABLE_HUB
+                            } else {
+                                KeyguardState.LOCKSCREEN
+                            }
+                        startTransitionTo(toState)
                     }
                 }
         }
@@ -211,7 +217,7 @@ constructor(
     }
 
     private fun listenForPrimaryBouncerToGone() {
-        if (flags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR)) {
+        if (KeyguardWmStateRefactor.isEnabled) {
             // This is handled in KeyguardSecurityContainerController and
             // StatusBarKeyguardViewManager, which calls the transition interactor to kick off a
             // transition vs. listening to legacy state flags.

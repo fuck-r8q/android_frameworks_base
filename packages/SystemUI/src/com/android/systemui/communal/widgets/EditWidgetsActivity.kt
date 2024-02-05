@@ -27,15 +27,11 @@ import android.view.WindowInsets
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.android.internal.logging.UiEventLogger
 import com.android.systemui.communal.shared.log.CommunalUiEvent
 import com.android.systemui.communal.ui.viewmodel.CommunalEditModeViewModel
 import com.android.systemui.compose.ComposeFacade.setCommunalEditWidgetActivityContent
 import javax.inject.Inject
-import kotlinx.coroutines.launch
 
 /** An Activity for editing the widgets that appear in hub mode. */
 class EditWidgetsActivity
@@ -44,14 +40,17 @@ constructor(
     private val communalViewModel: CommunalEditModeViewModel,
     private var windowManagerService: IWindowManager? = null,
     private val uiEventLogger: UiEventLogger,
+    private val widgetConfiguratorFactory: WidgetConfigurationController.Factory
 ) : ComponentActivity() {
     companion object {
         private const val EXTRA_IS_PENDING_WIDGET_DRAG = "is_pending_widget_drag"
         private const val EXTRA_FILTER_STRATEGY = "filter_strategy"
         private const val FILTER_STRATEGY_GLANCEABLE_HUB = 1
-        private const val REQUEST_CODE_CONFIGURE_WIDGET = 1
         private const val TAG = "EditWidgetsActivity"
+        const val EXTRA_PRESELECTED_KEY = "preselected_key"
     }
+
+    private val widgetConfigurator by lazy { widgetConfiguratorFactory.create(this) }
 
     private val addWidgetActivityLauncher: ActivityResultLauncher<Intent> =
         registerForActivityResult(StartActivityForResult()) { result ->
@@ -71,7 +70,7 @@ constructor(
                                     Intent.EXTRA_COMPONENT_NAME,
                                     ComponentName::class.java
                                 )
-                                ?.let { communalViewModel.onAddWidget(it, 0) }
+                                ?.let { communalViewModel.onAddWidget(it, 0, widgetConfigurator) }
                                 ?: run { Log.w(TAG, "No AppWidgetProviderInfo found in result.") }
                         }
                     }
@@ -88,26 +87,19 @@ constructor(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        communalViewModel.setEditModeOpen(true)
+
         val windowInsetsController = window.decorView.windowInsetsController
         windowInsetsController?.hide(WindowInsets.Type.systemBars())
         window.setDecorFitsSystemWindows(false)
 
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Start the configuration activity when new widgets are added.
-                communalViewModel.widgetsToConfigure.collect { widgetId ->
-                    communalViewModel.startConfigurationActivity(
-                        activity = this@EditWidgetsActivity,
-                        widgetId = widgetId,
-                        requestCode = REQUEST_CODE_CONFIGURE_WIDGET
-                    )
-                }
-            }
-        }
+        val preselectedKey = intent.getStringExtra(EXTRA_PRESELECTED_KEY)
+        communalViewModel.setSelectedKey(preselectedKey)
 
         setCommunalEditWidgetActivityContent(
             activity = this,
             viewModel = communalViewModel,
+            widgetConfigurator = widgetConfigurator,
             onOpenWidgetPicker = {
                 val intent =
                     Intent(Intent.ACTION_MAIN).also { it.addCategory(Intent.CATEGORY_HOME) }
@@ -145,20 +137,23 @@ constructor(
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_CODE_CONFIGURE_WIDGET) {
-            communalViewModel.setConfigurationResult(resultCode)
+        if (requestCode == WidgetConfigurationController.REQUEST_CODE) {
+            widgetConfigurator.setConfigurationResult(resultCode)
         }
     }
 
     override fun onStart() {
         super.onStart()
-
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_EDIT_MODE_SHOWN)
     }
 
     override fun onStop() {
         super.onStop()
-
         uiEventLogger.log(CommunalUiEvent.COMMUNAL_HUB_EDIT_MODE_GONE)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        communalViewModel.setEditModeOpen(false)
     }
 }

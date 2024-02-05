@@ -16,6 +16,7 @@
 
 package com.android.server.wm;
 
+import static android.app.WallpaperManager.COMMAND_DISPLAY_SWITCH;
 import static android.app.WallpaperManager.COMMAND_FREEZE;
 import static android.app.WallpaperManager.COMMAND_UNFREEZE;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
@@ -34,6 +35,7 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_WALLPAPER;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WALLPAPER_DRAW_PENDING_TIMEOUT;
+import static com.android.window.flags.Flags.multiCrop;
 
 import android.annotation.Nullable;
 import android.content.res.Resources;
@@ -48,6 +50,7 @@ import android.os.SystemClock;
 import android.util.ArraySet;
 import android.util.MathUtils;
 import android.util.Slog;
+import android.util.SparseArray;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
@@ -60,6 +63,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLogImpl;
 import com.android.internal.protolog.common.ProtoLog;
 import com.android.internal.util.ToBooleanFunction;
+import com.android.server.wallpaper.WallpaperCropper.WallpaperCropUtils;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -73,6 +77,7 @@ import java.util.function.Consumer;
 class WallpaperController {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "WallpaperController" : TAG_WM;
     private WindowManagerService mService;
+    private WallpaperCropUtils mWallpaperCropUtils = null;
     private DisplayContent mDisplayContent;
 
     private final ArrayList<WallpaperWindowToken> mWallpaperTokens = new ArrayList<>();
@@ -115,6 +120,11 @@ class WallpaperController {
     private final FindWallpaperTargetResult mFindResults = new FindWallpaperTargetResult();
 
     private boolean mShouldOffsetWallpaperCenter;
+
+    /**
+     * Whether the wallpaper has been notified about a physical display switch event is started.
+     */
+    private volatile boolean mIsWallpaperNotifiedOnDisplaySwitch;
 
     private final Consumer<WindowState> mFindWallpapers = w -> {
         if (w.mAttrs.type == TYPE_WALLPAPER) {
@@ -240,9 +250,8 @@ class WallpaperController {
         mMinWallpaperScale =
                 resources.getFloat(com.android.internal.R.dimen.config_wallpaperMinScale);
         mMaxWallpaperScale = resources.getFloat(R.dimen.config_wallpaperMaxScale);
-        mShouldOffsetWallpaperCenter =
-                resources.getBoolean(
-                        com.android.internal.R.bool.config_offsetWallpaperToCenterOfLargestDisplay);
+        mShouldOffsetWallpaperCenter = resources.getBoolean(
+                com.android.internal.R.bool.config_offsetWallpaperToCenterOfLargestDisplay);
     }
 
     void resetLargestDisplay(Display display) {
@@ -266,22 +275,27 @@ class WallpaperController {
     }
 
     @Nullable private Point findLargestDisplaySize() {
-        if (!mShouldOffsetWallpaperCenter) {
+        if (!mShouldOffsetWallpaperCenter || multiCrop()) {
             return null;
         }
         Point largestDisplaySize = new Point();
+        float largestWidth = 0;
         List<DisplayInfo> possibleDisplayInfo =
                 mService.getPossibleDisplayInfoLocked(DEFAULT_DISPLAY);
         for (int i = 0; i < possibleDisplayInfo.size(); i++) {
             DisplayInfo displayInfo = possibleDisplayInfo.get(i);
-            if (displayInfo.type == Display.TYPE_INTERNAL
-                    && Math.max(displayInfo.logicalWidth, displayInfo.logicalHeight)
-                    > Math.max(largestDisplaySize.x, largestDisplaySize.y)) {
+            float width = (float) displayInfo.logicalWidth / displayInfo.physicalXDpi;
+            if (displayInfo.type == Display.TYPE_INTERNAL && width > largestWidth) {
+                largestWidth = width;
                 largestDisplaySize.set(displayInfo.logicalWidth,
                         displayInfo.logicalHeight);
             }
         }
         return largestDisplaySize;
+    }
+
+    void setWallpaperCropUtils(WallpaperCropUtils wallpaperCropUtils) {
+        mWallpaperCropUtils = wallpaperCropUtils;
     }
 
     WindowState getWallpaperTarget() {
@@ -357,26 +371,92 @@ class WallpaperController {
     boolean updateWallpaperOffset(WindowState wallpaperWin, boolean sync) {
         // Size of the display the wallpaper is rendered on.
         final Rect lastWallpaperBounds = wallpaperWin.getParentFrame();
-        // Full size of the wallpaper (usually larger than bounds above to parallax scroll when
-        // swiping through Launcher pages).
-        final Rect wallpaperFrame = wallpaperWin.getFrame();
+        int screenWidth = lastWallpaperBounds.width();
+        int screenHeight = lastWallpaperBounds.height();
+        float screenRatio = ((float) screenWidth) / screenHeight;
+        Point screenSize = new Point(screenWidth, screenHeight);
+
         WallpaperWindowToken token = wallpaperWin.mToken.asWallpaperToken();
 
-        final int diffWidth = wallpaperFrame.width() - lastWallpaperBounds.width();
-        final int diffHeight = wallpaperFrame.height() - lastWallpaperBounds.height();
-        if ((wallpaperWin.mAttrs.flags & WindowManager.LayoutParams.FLAG_SCALED) != 0
-                && Math.abs(diffWidth) > 1 && Math.abs(diffHeight) > 1) {
-            Slog.d(TAG, "Skip wallpaper offset with inconsistent orientation, bounds="
-                    + lastWallpaperBounds + " frame=" + wallpaperFrame);
-            // With FLAG_SCALED, the requested size should at least make the frame match one of
-            // side. If both sides contain differences, the client side may not have updated the
-            // latest size according to the current orientation. So skip calculating the offset to
-            // avoid the wallpaper not filling the screen.
-            return false;
+        /*
+         * TODO(b/270726737) adapt comments once flag gets removed and multiCrop is always true
+         * Size of the wallpaper. May have more width/height ratio than the screen for parallax.
+         *
+         * If multiCrop is true, we use a map, cropHints, defining which sub-area of the wallpaper
+         * to show for a given screen orientation. In this case, wallpaperFrame represents the
+         * sub-area of WallpaperWin to show for the current screen size.
+         *
+         * If multiCrop is false, don't show a custom sub-area of the wallpaper. Just show the
+         * whole wallpaperWin if possible, and center and zoom if necessary.
+         */
+        final Rect wallpaperFrame;
+
+        /*
+         * The values cropZoom, cropOffsetX and cropOffsetY are only used if multiCrop is true.
+         * Zoom and offsets to be applied in order to show wallpaperFrame on screen.
+         */
+        final float cropZoom;
+        final int cropOffsetX;
+        final int cropOffsetY;
+
+        /*
+         * Difference of width/height between the wallpaper and the screen.
+         * This is the additional room that we have to apply offsets (i.e. parallax).
+         */
+        final int diffWidth;
+        final int diffHeight;
+
+        /*
+         * zoom, offsetX and offsetY are not related to cropping the wallpaper:
+         *  - zoom is used to apply an additional zoom (e.g. for launcher animations).
+         *  - offsetX, offsetY are used to apply an offset to the wallpaper (e.g. parallax effect).
+         */
+        final float zoom;
+        int offsetX;
+        int offsetY;
+
+        if (multiCrop()) {
+            if (mWallpaperCropUtils == null) {
+                Slog.e(TAG, "Update wallpaper offsets before the system is ready. Aborting");
+                return false;
+            }
+            Point bitmapSize = new Point(
+                    wallpaperWin.mRequestedWidth, wallpaperWin.mRequestedHeight);
+            SparseArray<Rect> cropHints = token.getCropHints();
+            wallpaperFrame = mWallpaperCropUtils.getCrop(
+                    screenSize, bitmapSize, cropHints, wallpaperWin.isRtl());
+
+            cropZoom = wallpaperFrame.isEmpty() ? 1f
+                    : ((float) screenHeight) / wallpaperFrame.height() / wallpaperWin.mVScale;
+
+            // A positive x / y offset shifts the wallpaper to the right / bottom respectively.
+            cropOffsetX = -wallpaperFrame.left
+                    + (int) ((cropZoom - 1f) * wallpaperFrame.height() * screenRatio / 2f);
+            cropOffsetY = -wallpaperFrame.top
+                    + (int) ((cropZoom - 1f) * wallpaperFrame.height() / 2f);
+
+            diffWidth = (int) (wallpaperFrame.width() * wallpaperWin.mHScale) - screenWidth;
+            diffHeight = (int) (wallpaperFrame.height() * wallpaperWin.mVScale) - screenHeight;
+        } else {
+            wallpaperFrame = wallpaperWin.getFrame();
+            cropZoom = 1f;
+            cropOffsetX = 0;
+            cropOffsetY = 0;
+            diffWidth = wallpaperFrame.width() - screenWidth;
+            diffHeight = wallpaperFrame.height() - screenHeight;
+
+            if ((wallpaperWin.mAttrs.flags & WindowManager.LayoutParams.FLAG_SCALED) != 0
+                    && Math.abs(diffWidth) > 1 && Math.abs(diffHeight) > 1) {
+                Slog.d(TAG, "Skip wallpaper offset with inconsistent orientation, bounds="
+                        + lastWallpaperBounds + " frame=" + wallpaperFrame);
+                // With FLAG_SCALED, the requested size should at least make the frame match one of
+                // side. If both sides contain differences, the client side may not have updated the
+                // latest size according to the current orientation. So skip calculating the offset
+                // to avoid the wallpaper not filling the screen.
+                return false;
+            }
         }
 
-        int newXOffset = 0;
-        int newYOffset = 0;
         boolean rawChanged = false;
         // Set the default wallpaper x-offset to either edge of the screen (depending on RTL), to
         // match the behavior of most Launchers
@@ -396,17 +476,17 @@ class WallpaperController {
         int displayOffset = getDisplayWidthOffset(availw, lastWallpaperBounds,
                 wallpaperWin.isRtl());
         availw -= displayOffset;
-        int offset = availw > 0 ? -(int)(availw * wpx + .5f) : 0;
+        offsetX = availw > 0 ? -(int) (availw * wpx + .5f) : 0;
         if (token.mWallpaperDisplayOffsetX != Integer.MIN_VALUE) {
             // if device is LTR, then offset wallpaper to the left (the wallpaper is drawn
             // always starting from the left of the screen).
-            offset += token.mWallpaperDisplayOffsetX;
+            offsetX += token.mWallpaperDisplayOffsetX;
         } else if (!wallpaperWin.isRtl()) {
             // In RTL the offset is calculated so that the wallpaper ends up right aligned (see
             // offset above).
-            offset -= displayOffset;
+            offsetX -= displayOffset;
         }
-        newXOffset = offset;
+        offsetX += cropOffsetX * wallpaperWin.mHScale;
 
         if (wallpaperWin.mWallpaperX != wpx || wallpaperWin.mWallpaperXStep != wpxs) {
             wallpaperWin.mWallpaperX = wpx;
@@ -416,11 +496,11 @@ class WallpaperController {
 
         float wpy = token.mWallpaperY >= 0 ? token.mWallpaperY : 0.5f;
         float wpys = token.mWallpaperYStep >= 0 ? token.mWallpaperYStep : -1.0f;
-        offset = diffHeight > 0 ? -(int) (diffHeight * wpy + .5f) : 0;
+        offsetY = diffHeight > 0 ? -(int) (diffHeight * wpy + .5f) : 0;
         if (token.mWallpaperDisplayOffsetY != Integer.MIN_VALUE) {
-            offset += token.mWallpaperDisplayOffsetY;
+            offsetY += token.mWallpaperDisplayOffsetY;
         }
-        newYOffset = offset;
+        offsetY += cropOffsetY * wallpaperWin.mVScale;
 
         if (wallpaperWin.mWallpaperY != wpy || wallpaperWin.mWallpaperYStep != wpys) {
             wallpaperWin.mWallpaperY = wpy;
@@ -432,10 +512,10 @@ class WallpaperController {
             wallpaperWin.mWallpaperZoomOut = mLastWallpaperZoomOut;
             rawChanged = true;
         }
-
-        boolean changed = wallpaperWin.setWallpaperOffset(newXOffset, newYOffset,
-                wallpaperWin.mShouldScaleWallpaper
-                        ? zoomOutToScale(wallpaperWin.mWallpaperZoomOut) : 1);
+        zoom = wallpaperWin.mShouldScaleWallpaper
+                ? zoomOutToScale(wallpaperWin.mWallpaperZoomOut) : 1f;
+        final float totalZoom = zoom * cropZoom;
+        boolean changed = wallpaperWin.setWallpaperOffset(offsetX, offsetY, totalZoom);
 
         if (rawChanged && (wallpaperWin.mAttrs.privateFlags &
                 WindowManager.LayoutParams.PRIVATE_FLAG_WANTS_OFFSET_NOTIFICATIONS) != 0) {
@@ -496,7 +576,7 @@ class WallpaperController {
      * display).
      */
     private int getDisplayWidthOffset(int availWidth, Rect displayFrame, boolean isRtl) {
-        if (!mShouldOffsetWallpaperCenter) {
+        if (!mShouldOffsetWallpaperCenter || multiCrop()) {
             return 0;
         }
         if (mLargestDisplaySize == null) {
@@ -562,11 +642,10 @@ class WallpaperController {
         }
     }
 
-    Bundle sendWindowWallpaperCommandUnchecked(
+    void sendWindowWallpaperCommandUnchecked(
             WindowState window, String action, int x, int y, int z,
             Bundle extras, boolean sync) {
         sendWindowWallpaperCommand(action, x, y, z, extras, sync);
-        return null;
     }
 
     private void sendWindowWallpaperCommand(
@@ -1007,6 +1086,52 @@ class WallpaperController {
             }
         }
         return null;
+    }
+
+    /**
+     * Notifies the wallpaper that the display turns off when switching physical device. If the
+     * wallpaper is currently visible, its client visibility will be preserved until the display is
+     * confirmed to be off or on.
+     */
+    void onDisplaySwitchStarted() {
+        mIsWallpaperNotifiedOnDisplaySwitch = notifyDisplaySwitch(true /* start */);
+    }
+
+    /**
+     * Called when the screen has finished turning on or the device goes to sleep. This is no-op if
+     * the operation is not part of a display switch.
+     */
+    void onDisplaySwitchFinished() {
+        // The method can be called outside WM lock (turned on), so only acquire lock if needed.
+        // This is to optimize the common cases that regular devices don't have display switch.
+        if (mIsWallpaperNotifiedOnDisplaySwitch) {
+            synchronized (mService.mGlobalLock) {
+                mIsWallpaperNotifiedOnDisplaySwitch = false;
+                notifyDisplaySwitch(false /* start */);
+            }
+        }
+    }
+
+    private boolean notifyDisplaySwitch(boolean start) {
+        boolean notified = false;
+        for (int curTokenNdx = mWallpaperTokens.size() - 1; curTokenNdx >= 0; curTokenNdx--) {
+            final WallpaperWindowToken token = mWallpaperTokens.get(curTokenNdx);
+            for (int i = token.getChildCount() - 1; i >= 0; i--) {
+                final WindowState w = token.getChildAt(i);
+                if (start && !w.mWinAnimator.getShown()) {
+                    continue;
+                }
+                try {
+                    w.mClient.dispatchWallpaperCommand(COMMAND_DISPLAY_SWITCH, 0 /* x */, 0 /* y */,
+                            start ? 1 : 0 /* use z as start or finish */,
+                            null /* bundle */, false /* sync */);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "Failed to dispatch COMMAND_DISPLAY_SWITCH " + e);
+                }
+                notified = true;
+            }
+        }
+        return notified;
     }
 
     /**

@@ -1082,8 +1082,6 @@
     <!-- Indicator on keyguard to start the communal tutorial. [CHAR LIMIT=100] -->
     <string name="communal_tutorial_indicator_text">Swipe left to start the communal tutorial</string>
 
-    <!-- Description for the button that opens the widget editor on click. [CHAR LIMIT=50] -->
-    <string name="button_to_open_widget_editor">Open the widget editor</string>
     <!-- Text for CTA button that launches the hub mode widget editor on click. [CHAR LIMIT=50] -->
     <string name="cta_tile_button_to_open_widget_editor">Customize</string>
     <!-- Text for CTA button that dismisses the tile on click. [CHAR LIMIT=50] -->
@@ -1094,6 +1092,10 @@
     <string name="cta_label_to_open_widget_picker">Add more widgets</string>
     <!-- Text for the popup to be displayed after dismissing the CTA tile. [CHAR LIMIT=50] -->
     <string name="popup_on_dismiss_cta_tile_text">Long press to customize widgets</string>
+    <!-- Text for the button to configure widgets after long press. [CHAR LIMIT=50] -->
+    <string name="button_to_configure_widgets_text">Customize widgets</string>
+    <!-- Label for the button which configures widgets [CHAR LIMIT=NONE] -->
+    <string name="edit_widget">Edit widget</string>
     <!-- Description for the button that removes a widget on click. [CHAR LIMIT=50] -->
     <string name="button_to_remove_widget">Remove</string>
     <!-- Text for the button that launches the hub mode widget picker. [CHAR LIMIT=50] -->
@@ -2572,6 +2574,8 @@
     <string name="accessibility_floating_button_action_remove_menu">Remove</string>
     <!-- Action in accessibility menu to toggle on/off the accessibility feature. [CHAR LIMIT=30]-->
     <string name="accessibility_floating_button_action_double_tap_to_toggle">toggle</string>
+    <!-- Action in accessibility menu to open the shortcut edit menu" [CHAR LIMIT=30]-->
+    <string name="accessibility_floating_button_action_edit">Edit</string>
 
     <!-- Device Controls strings -->
     <!-- Device Controls, Quick Settings tile title [CHAR LIMIT=30] -->
@@ -3268,7 +3272,7 @@
     <string name="install_app">Install app</string>
 
     <!-- Instructions informing the user they can swipe up on the lockscreen to dismiss [CHAR LIMIT=48]-->
-    <string name="dismissible_keyguard_swipe">Swipe to continue</string>
+    <string name="dismissible_keyguard_swipe">Swipe up to continue</string>
 
     <!--- Title of the dialog appearing when an external display is connected, asking whether to start mirroring [CHAR LIMIT=NONE]-->
     <string name="connected_display_dialog_start_mirroring">Mirror to external display?</string>

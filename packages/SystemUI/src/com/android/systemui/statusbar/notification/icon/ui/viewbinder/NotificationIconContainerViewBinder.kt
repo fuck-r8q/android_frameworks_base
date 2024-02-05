@@ -142,7 +142,7 @@ object NotificationIconContainerViewBinder {
 
     /** Binds to [NotificationIconContainer.setAnimationsEnabled] */
     private suspend fun Flow<Boolean>.bindAnimationsEnabled(view: NotificationIconContainer) {
-        collect(view::setAnimationsEnabled)
+        collectTracingEach("NIC#bindAnimationsEnabled", view::setAnimationsEnabled)
     }
 
     private suspend fun NotificationIconContainerStatusBarViewModel.bindIsolatedIcon(
@@ -151,12 +151,12 @@ object NotificationIconContainerViewBinder {
     ) {
         coroutineScope {
             launch {
-                isolatedIconLocation.collect { location ->
+                isolatedIconLocation.collectTracingEach("NIC#isolatedIconLocation") { location ->
                     view.setIsolatedIconLocation(location, true)
                 }
             }
             launch {
-                isolatedIcon.collect { iconInfo ->
+                isolatedIcon.collectTracingEach("NIC#showIconIsolated") { iconInfo ->
                     val iconView = iconInfo.value?.let { viewStore.iconView(it.notifKey) }
                     if (iconInfo.isAnimating) {
                         view.showIconIsolatedAnimated(iconView, iconInfo::stopAnimating)
@@ -187,7 +187,7 @@ object NotificationIconContainerViewBinder {
             configuration.getDimensionPixelSize(RInternal.dimen.status_bar_icon_size_sp)
         val iconHorizontalPaddingFlow: Flow<Int> =
             configuration.getDimensionPixelSize(R.dimen.status_bar_icon_horizontal_margin)
-        val layoutParams: Flow<FrameLayout.LayoutParams> =
+        val layoutParams: StateFlow<FrameLayout.LayoutParams> =
             combine(iconSizeFlow, iconHorizontalPaddingFlow, systemBarUtilsState.statusBarHeight) {
                     iconSize,
                     iconHPadding,
@@ -206,7 +206,7 @@ object NotificationIconContainerViewBinder {
 
     private suspend fun Flow<NotificationIconsViewData>.bindIcons(
         view: NotificationIconContainer,
-        layoutParams: Flow<FrameLayout.LayoutParams>,
+        layoutParams: StateFlow<FrameLayout.LayoutParams>,
         notifyBindingFailures: (Collection<String>) -> Unit,
         viewStore: IconViewStore,
         bindIcon: suspend (iconKey: String, view: StatusBarIconView) -> Unit,
@@ -214,7 +214,7 @@ object NotificationIconContainerViewBinder {
         val failedBindings = mutableSetOf<String>()
         val boundViewsByNotifKey = ArrayMap<String, Pair<StatusBarIconView, Job>>()
         var prevIcons = NotificationIconsViewData()
-        collectTracingEach("NotifIconContainer#bindIcons") { iconsData: NotificationIconsViewData ->
+        collectTracingEach("NIC#bindIcons") { iconsData: NotificationIconsViewData ->
             val iconsDiff = NotificationIconsViewData.computeDifference(iconsData, prevIcons)
             prevIcons = iconsData
 
@@ -259,13 +259,19 @@ object NotificationIconContainerViewBinder {
                             // added again.
                             removeTransientView(sbiv)
                         }
-                        view.addView(sbiv)
+                        view.addView(sbiv, layoutParams.value)
                         boundViewsByNotifKey.remove(notifKey)?.second?.cancel()
                         boundViewsByNotifKey[notifKey] =
                             Pair(
                                 sbiv,
                                 launch {
-                                    launch { layoutParams.collect { sbiv.layoutParams = it } }
+                                    launch {
+                                        layoutParams.collectTracingEach("SBIV#bindLayoutParams") {
+                                            if (it != sbiv.layoutParams) {
+                                                sbiv.layoutParams = it
+                                            }
+                                        }
+                                    }
                                     bindIcon(notifKey, sbiv)
                                 },
                             )
@@ -369,6 +375,7 @@ private val View.viewBounds: Rect
         )
     }
 
-private suspend fun <T> Flow<T>.collectTracingEach(tag: String, collector: (T) -> Unit) {
-    collect { traceSection(tag) { collector(it) } }
-}
+private suspend inline fun <T> Flow<T>.collectTracingEach(
+    tag: String,
+    crossinline collector: (T) -> Unit,
+) = collect { traceSection(tag) { collector(it) } }

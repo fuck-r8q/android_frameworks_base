@@ -31,23 +31,25 @@ import com.android.systemui.communal.shared.model.CommunalSceneKey
 import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
 import com.android.systemui.communal.widgets.CommunalAppWidgetHost
 import com.android.systemui.communal.widgets.EditWidgetsActivityStarter
+import com.android.systemui.communal.widgets.WidgetConfigurator
 import com.android.systemui.dagger.SysUISingleton
-import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.smartspace.data.repository.SmartspaceRepository
+import com.android.systemui.user.data.repository.UserRepository
+import com.android.systemui.util.kotlin.BooleanFlowOperators.and
+import com.android.systemui.util.kotlin.BooleanFlowOperators.not
+import com.android.systemui.util.kotlin.BooleanFlowOperators.or
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
 
 /** Encapsulates business-logic related to communal mode. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -55,34 +57,34 @@ import kotlinx.coroutines.flow.stateIn
 class CommunalInteractor
 @Inject
 constructor(
-    @Application private val applicationScope: CoroutineScope,
     private val communalRepository: CommunalRepository,
     private val widgetRepository: CommunalWidgetRepository,
     private val communalPrefsRepository: CommunalPrefsRepository,
     mediaRepository: CommunalMediaRepository,
     smartspaceRepository: SmartspaceRepository,
+    userRepository: UserRepository,
     keyguardInteractor: KeyguardInteractor,
     private val appWidgetHost: CommunalAppWidgetHost,
     private val editWidgetsActivityStarter: EditWidgetsActivityStarter
 ) {
+    private val _editModeOpen = MutableStateFlow(false)
+
+    /** Whether edit mode is currently open. */
+    val editModeOpen: StateFlow<Boolean> = _editModeOpen.asStateFlow()
 
     /** Whether communal features are enabled. */
     val isCommunalEnabled: Boolean
         get() = communalRepository.isCommunalEnabled
 
     /** Whether communal features are enabled and available. */
-    val isCommunalAvailable: StateFlow<Boolean> =
-        flowOf(isCommunalEnabled)
-            .flatMapLatest { enabled ->
-                if (enabled) keyguardInteractor.isEncryptedOrLockdown.map { !it } else flowOf(false)
-            }
-            .distinctUntilChanged()
-            .onEach { available -> widgetRepository.updateAppWidgetHostActive(available) }
-            .stateIn(
-                scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
-                initialValue = false,
+    val isCommunalAvailable: Flow<Boolean> =
+        and(
+                communalRepository.communalEnabledState,
+                userRepository.selectedUserInfo.map { it.isMain },
+                not(keyguardInteractor.isEncryptedOrLockdown),
+                or(keyguardInteractor.isKeyguardVisible, keyguardInteractor.isDreaming)
             )
+            .distinctUntilChanged()
 
     /**
      * Target scene as requested by the underlying [SceneTransitionLayout] or through
@@ -133,32 +135,40 @@ constructor(
     val isCommunalShowing: Flow<Boolean> =
         communalRepository.desiredScene.map { it == CommunalSceneKey.Communal }
 
-    val isKeyguardVisible: Flow<Boolean> = keyguardInteractor.isKeyguardVisible
+    /**
+     * Flow that emits a boolean if the communal UI is fully visible and not in transition.
+     *
+     * This will not be true while transitioning to the hub and will turn false immediately when a
+     * swipe to exit the hub starts.
+     */
+    val isIdleOnCommunal: Flow<Boolean> =
+        communalRepository.transitionState.map {
+            it is ObservableCommunalTransitionState.Idle && it.scene == CommunalSceneKey.Communal
+        }
 
     /** Callback received whenever the [SceneTransitionLayout] finishes a scene transition. */
     fun onSceneChanged(newScene: CommunalSceneKey) {
         communalRepository.setDesiredScene(newScene)
     }
 
+    fun setEditModeOpen(isOpen: Boolean) {
+        _editModeOpen.value = isOpen
+    }
+
     /** Show the widget editor Activity. */
-    fun showWidgetEditor() {
-        editWidgetsActivityStarter.startActivity()
+    fun showWidgetEditor(preselectedKey: String? = null) {
+        editWidgetsActivityStarter.startActivity(preselectedKey)
     }
 
     /** Dismiss the CTA tile from the hub in view mode. */
     suspend fun dismissCtaTile() = communalPrefsRepository.setCtaDismissedForCurrentUser()
 
-    /**
-     * Add a widget at the specified position.
-     *
-     * @param configureWidget The callback to trigger if widget configuration is needed. Should
-     *   return whether configuration was successful.
-     */
+    /** Add a widget at the specified position. */
     fun addWidget(
         componentName: ComponentName,
         priority: Int,
-        configureWidget: suspend (id: Int) -> Boolean
-    ) = widgetRepository.addWidget(componentName, priority, configureWidget)
+        configurator: WidgetConfigurator?,
+    ) = widgetRepository.addWidget(componentName, priority, configurator)
 
     /** Delete a widget by id. */
     fun deleteWidget(id: Int) = widgetRepository.deleteWidget(id)
@@ -255,6 +265,12 @@ constructor(
         }
 
     companion object {
+        /**
+         * The user activity timeout which should be used when the communal hub is opened. A value
+         * of -1 means that the user's chosen screen timeout will be used instead.
+         */
+        const val AWAKE_INTERVAL_MS = -1
+
         /**
          * Calculates the content size dynamically based on the total number of contents of that
          * type.

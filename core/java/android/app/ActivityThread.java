@@ -320,6 +320,10 @@ public final class ActivityThread extends ClientTransactionHandler
     public static final int SERVICE_DONE_EXECUTING_START = 1;
     /** Type for IActivityManager.serviceDoneExecuting: done stopping (destroying) service */
     public static final int SERVICE_DONE_EXECUTING_STOP = 2;
+    /** Type for IActivityManager.serviceDoneExecuting: done with an onRebind call */
+    public static final int SERVICE_DONE_EXECUTING_REBIND = 3;
+    /** Type for IActivityManager.serviceDoneExecuting: done with an onUnbind call */
+    public static final int SERVICE_DONE_EXECUTING_UNBIND = 4;
 
     /** Use foreground GC policy (less pause time) and higher JIT weight. */
     private static final int VM_PROCESS_STATE_JANK_PERCEPTIBLE = 0;
@@ -4883,7 +4887,7 @@ public final class ActivityThread extends ClientTransactionHandler
             mServices.put(data.token, service);
             try {
                 ActivityManager.getService().serviceDoneExecuting(
-                        data.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
+                        data.token, SERVICE_DONE_EXECUTING_ANON, 0, 0, null);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -4914,7 +4918,7 @@ public final class ActivityThread extends ClientTransactionHandler
                     } else {
                         s.onRebind(data.intent);
                         ActivityManager.getService().serviceDoneExecuting(
-                                data.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
+                                data.token, SERVICE_DONE_EXECUTING_REBIND, 0, 0, data.intent);
                     }
                 } catch (RemoteException ex) {
                     throw ex.rethrowFromSystemServer();
@@ -4944,7 +4948,7 @@ public final class ActivityThread extends ClientTransactionHandler
                                 data.token, data.intent, doRebind);
                     } else {
                         ActivityManager.getService().serviceDoneExecuting(
-                                data.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
+                                data.token, SERVICE_DONE_EXECUTING_UNBIND, 0, 0, data.intent);
                     }
                 } catch (RemoteException ex) {
                     throw ex.rethrowFromSystemServer();
@@ -5058,7 +5062,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
                 try {
                     ActivityManager.getService().serviceDoneExecuting(
-                            data.token, SERVICE_DONE_EXECUTING_START, data.startId, res);
+                            data.token, SERVICE_DONE_EXECUTING_START, data.startId, res, null);
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
@@ -5090,7 +5094,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
                 try {
                     ActivityManager.getService().serviceDoneExecuting(
-                            token, SERVICE_DONE_EXECUTING_STOP, 0, 0);
+                            token, SERVICE_DONE_EXECUTING_STOP, 0, 0, null);
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
@@ -6793,6 +6797,7 @@ public final class ActivityThread extends ClientTransactionHandler
                             }
                         }
                         if (killApp) {
+                            // Keep in sync with "perhaps it was removed" case below.
                             mPackages.remove(packages[i]);
                             mResourcePackages.remove(packages[i]);
                         }
@@ -6835,23 +6840,24 @@ public final class ActivityThread extends ClientTransactionHandler
                                                 PackageManager.GET_SHARED_LIBRARY_FILES,
                                                 UserHandle.myUserId());
 
-                                if (mActivities.size() > 0) {
-                                    for (ActivityClientRecord ar : mActivities.values()) {
-                                        if (ar.activityInfo.applicationInfo.packageName
-                                                .equals(packageName)) {
-                                            ar.activityInfo.applicationInfo = aInfo;
-                                            ar.packageInfo = pkgInfo;
+                                if (aInfo != null) {
+                                    if (mActivities.size() > 0) {
+                                        for (ActivityClientRecord ar : mActivities.values()) {
+                                            if (ar.activityInfo.applicationInfo.packageName
+                                                    .equals(packageName)) {
+                                                ar.activityInfo.applicationInfo = aInfo;
+                                                ar.packageInfo = pkgInfo;
+                                            }
                                         }
                                     }
-                                }
 
-                                final String[] oldResDirs = { pkgInfo.getResDir() };
+                                    final String[] oldResDirs = {pkgInfo.getResDir()};
 
-                                final ArrayList<String> oldPaths = new ArrayList<>();
-                                LoadedApk.makePaths(this, pkgInfo.getApplicationInfo(), oldPaths);
-                                pkgInfo.updateApplicationInfo(aInfo, oldPaths);
+                                    final ArrayList<String> oldPaths = new ArrayList<>();
+                                    LoadedApk.makePaths(
+                                            this, pkgInfo.getApplicationInfo(), oldPaths);
+                                    pkgInfo.updateApplicationInfo(aInfo, oldPaths);
 
-                                synchronized (mResourcesManager) {
                                     // Update affected Resources objects to use new ResourcesImpl
                                     mResourcesManager.appendPendingAppInfoUpdate(oldResDirs,
                                             aInfo);
@@ -6859,6 +6865,12 @@ public final class ActivityThread extends ClientTransactionHandler
                                 }
                             } catch (RemoteException e) {
                             }
+                        } else {
+                            // No package, perhaps it was removed?
+                            Slog.e(TAG, "Package [" + packages[i] + "] reported as REPLACED,"
+                                    + " but missing application info. Assuming REMOVED.");
+                            mPackages.remove(packages[i]);
+                            mResourcePackages.remove(packages[i]);
                         }
                     }
                 }

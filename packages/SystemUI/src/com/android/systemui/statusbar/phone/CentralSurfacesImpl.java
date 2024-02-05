@@ -80,6 +80,7 @@ import android.util.Log;
 import android.view.Display;
 import android.view.IRemoteAnimationRunner;
 import android.view.IWindowManager;
+import android.view.MotionEvent;
 import android.view.ThreadedRenderer;
 import android.view.View;
 import android.view.WindowInsets;
@@ -2601,8 +2602,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 // So if AOD is off or unsupported we need to trigger these updates at screen on
                 // when the keyguard is occluded.
                 mLockscreenUserManager.updatePublicMode();
-                mShadeSurface.getNotificationStackScrollLayoutController()
-                        .updateSensitivenessForOccludedWakeup();
+                mStackScrollerController.updateSensitivenessForOccludedWakeup();
             }
             if (mLaunchCameraWhenFinishedWaking) {
                 mCameraLauncherLazy.get().launchCamera(mLastCameraLaunchSource,
@@ -2917,6 +2917,11 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             }
         }
     };
+
+    @Override
+    public void handleDreamTouch(MotionEvent event) {
+        getNotificationShadeWindowViewController().handleDreamTouch(event);
+    }
 
     @Override
     public void awakenDreams() {

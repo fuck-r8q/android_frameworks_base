@@ -2895,7 +2895,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     private void onTrackingStarted() {
         endClosing();
         mShadeRepository.setLegacyShadeTracking(true);
-        mTrackingStartedListener.onTrackingStarted();
+        if (mTrackingStartedListener != null) {
+            mTrackingStartedListener.onTrackingStarted();
+        }
         notifyExpandingStarted();
         updateExpansionAndVisibility();
         mScrimController.onTrackingStarted();
@@ -3583,11 +3585,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     @VisibleForTesting
     TouchHandler getTouchHandler() {
         return mTouchHandler;
-    }
-
-    @Override
-    public NotificationStackScrollLayoutController getNotificationStackScrollLayoutController() {
-        return mNotificationStackScrollLayoutController;
     }
 
     @Override

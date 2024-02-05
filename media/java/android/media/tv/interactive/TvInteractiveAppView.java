@@ -34,6 +34,7 @@ import android.media.tv.interactive.TvInteractiveAppManager.Session;
 import android.media.tv.interactive.TvInteractiveAppManager.Session.FinishedInputEventCallback;
 import android.media.tv.interactive.TvInteractiveAppManager.SessionCallback;
 import android.net.Uri;
+import android.net.http.SslCertificate;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.AttributeSet;
@@ -719,6 +720,22 @@ public class TvInteractiveAppView extends ViewGroup {
     }
 
     /**
+     * Alerts the TV Interactive app that the video freeze state has been updated.
+     * If {@code true}, the video is frozen on the last frame while audio playback continues.
+     *
+     * @param isFrozen Whether the video is frozen.
+     * @hide
+     */
+    public void notifyVideoFreezeUpdated(boolean isFrozen) {
+        if (DEBUG) {
+            Log.d(TAG, "notifyVideoFreezeUpdated");
+        }
+        if (mSession != null) {
+            mSession.notifyVideoFreezeUpdated(isFrozen);
+        }
+    }
+
+    /**
      * Sends signing result to related TV interactive app.
      *
      * <p>This is used when the corresponding server of the broadcast-independent interactive
@@ -736,6 +753,22 @@ public class TvInteractiveAppView extends ViewGroup {
         }
         if (mSession != null) {
             mSession.sendSigningResult(signingId, result);
+        }
+    }
+
+    /**
+     * Send the requested SSL certificate to the TV Interactive App
+     * @param host the host name of the SSL authentication server.
+     * @param port the port of the SSL authentication server. E.g., 443
+     * @param cert the SSL certificate requested
+     * @hide
+     */
+    public void sendCertificate(@NonNull String host, int port, @NonNull SslCertificate cert) {
+        if (DEBUG) {
+            Log.d(TAG, "sendCertificate");
+        }
+        if (mSession != null) {
+            mSession.sendCertificate(host, port, cert);
         }
     }
 

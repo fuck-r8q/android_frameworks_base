@@ -556,7 +556,7 @@ public final class UserManagerServiceTest {
     @Test
     public void testCreateUserWithLongName_TruncatesName() {
         UserInfo user = mUms.createUserWithThrow(generateLongString(), USER_TYPE_FULL_SECONDARY, 0);
-        assertThat(user.name.length()).isEqualTo(500);
+        assertThat(user.name.length()).isEqualTo(UserManager.MAX_USER_NAME_LENGTH);
         UserInfo user1 = mUms.createUserWithThrow("Test", USER_TYPE_FULL_SECONDARY, 0);
         assertThat(user1.name.length()).isEqualTo(4);
     }
@@ -566,6 +566,23 @@ public final class UserManagerServiceTest {
             throws IOException, XmlPullParserException {
         UserInfo user = mUms.createUserWithThrow("Test", USER_TYPE_FULL_SECONDARY, 0);
         assertTrue(hasRestrictionsInUserXMLFile(user.id));
+    }
+
+    @Test
+    public void testAutoLockPrivateProfile() {
+        UserManagerService mSpiedUms = spy(mUms);
+        UserInfo privateProfileUser =
+                mSpiedUms.createProfileForUserEvenWhenDisallowedWithThrow("TestPrivateProfile",
+                        USER_TYPE_PROFILE_PRIVATE, 0, 0, null);
+        Mockito.doNothing().when(mSpiedUms).setQuietModeEnabledAsync(
+                eq(privateProfileUser.getUserHandle().getIdentifier()), eq(true), any(),
+                any());
+
+        mSpiedUms.autoLockPrivateSpace();
+
+        Mockito.verify(mSpiedUms).setQuietModeEnabledAsync(
+                eq(privateProfileUser.getUserHandle().getIdentifier()), eq(true),
+                any(), any());
     }
 
     @Test

@@ -137,7 +137,7 @@ import java.util.function.IntConsumer;
  * The controller manages addition, removal, and visible state of bubbles on screen.
  */
 public class BubbleController implements ConfigurationChangeListener,
-        RemoteCallable<BubbleController> {
+        RemoteCallable<BubbleController>, Bubbles.SysuiProxy.Provider {
 
     private static final String TAG = TAG_WITH_CLASS_NAME ? "BubbleController" : TAG_BUBBLES;
 
@@ -706,6 +706,7 @@ public class BubbleController implements ConfigurationChangeListener,
         return mBubbleIconFactory;
     }
 
+    @Override
     public Bubbles.SysuiProxy getSysuiProxy() {
         return mSysuiProxy;
     }
@@ -732,8 +733,7 @@ public class BubbleController implements ConfigurationChangeListener,
             if (mStackView == null) {
                 mStackView = new BubbleStackView(
                         mContext, this, mBubbleData, mSurfaceSynchronizer,
-                        mFloatingContentCoordinator,
-                        mMainExecutor);
+                        mFloatingContentCoordinator, this, mMainExecutor);
                 mStackView.onOrientationChanged();
                 if (mExpandListener != null) {
                     mStackView.setExpandListener(mExpandListener);
@@ -1249,7 +1249,7 @@ public class BubbleController implements ConfigurationChangeListener,
         }
 
         String appBubbleKey = Bubble.getAppBubbleKeyForApp(intent.getPackage(), user);
-        Log.v(TAG, "showOrHideAppBubble, with key: " + appBubbleKey);
+        Log.i(TAG, "showOrHideAppBubble, with key: " + appBubbleKey);
         PackageManager packageManager = getPackageManagerForUser(mContext, user.getIdentifier());
         if (!isResizableActivity(intent, packageManager, appBubbleKey)) return;
 
@@ -1259,22 +1259,22 @@ public class BubbleController implements ConfigurationChangeListener,
             if (isStackExpanded()) {
                 if (selectedBubble != null && appBubbleKey.equals(selectedBubble.getKey())) {
                     // App bubble is expanded, lets collapse
-                    Log.v(TAG, "  showOrHideAppBubble, selected bubble is app bubble, collapsing");
+                    Log.i(TAG, "  showOrHideAppBubble, selected bubble is app bubble, collapsing");
                     collapseStack();
                 } else {
                     // App bubble is not selected, select it
-                    Log.v(TAG, "  showOrHideAppBubble, expanded, selecting existing app bubble");
+                    Log.i(TAG, "  showOrHideAppBubble, expanded, selecting existing app bubble");
                     mBubbleData.setSelectedBubble(existingAppBubble);
                 }
             } else {
                 // App bubble is not selected, select it & expand
-                Log.v(TAG, "  showOrHideAppBubble, expand and select existing app bubble");
+                Log.i(TAG, "  showOrHideAppBubble, expand and select existing app bubble");
                 mBubbleData.setSelectedBubble(existingAppBubble);
                 mBubbleData.setExpanded(true);
             }
         } else {
             // App bubble does not exist, lets add and expand it
-            Log.v(TAG, "  showOrHideAppBubble, creating and expanding app bubble");
+            Log.i(TAG, "  showOrHideAppBubble, creating and expanding app bubble");
             Bubble b = Bubble.createAppBubble(intent, user, icon, mMainExecutor);
             b.setShouldAutoExpand(true);
             inflateAndAdd(b, /* suppressFlyout= */ true, /* showInShade= */ false);

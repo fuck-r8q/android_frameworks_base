@@ -67,6 +67,8 @@ class FakeMobileIconInteractor(
 
     override val isInService = MutableStateFlow(true)
 
+    override val isNonTerrestrial = MutableStateFlow(false)
+
     private val _isDataEnabled = MutableStateFlow(true)
     override val isDataEnabled = _isDataEnabled
 
@@ -103,7 +105,7 @@ class FakeMobileIconInteractor(
 
     override val signalLevelIcon: MutableStateFlow<SignalIconModel> =
         MutableStateFlow(
-            SignalIconModel(
+            SignalIconModel.Cellular(
                 level = 0,
                 numberOfLevels = 4,
                 showExclamationMark = false,

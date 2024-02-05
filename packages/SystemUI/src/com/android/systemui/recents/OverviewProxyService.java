@@ -16,6 +16,7 @@
 
 package com.android.systemui.recents;
 
+import static android.app.Flags.keyguardPrivateNotifications;
 import static android.content.Intent.ACTION_PACKAGE_ADDED;
 import static android.content.Intent.EXTRA_CHANGED_COMPONENT_NAME_LIST;
 import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
@@ -81,12 +82,13 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.util.ScreenshotRequest;
 import com.android.systemui.Dumpable;
+import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FeatureFlags;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.KeyguardWmStateRefactor;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.keyguard.ui.view.InWindowLauncherUnlockAnimationManager;
 import com.android.systemui.model.SysUiState;
@@ -167,14 +169,16 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     private final Optional<UnfoldTransitionProgressForwarder> mUnfoldTransitionProgressForwarder;
     private final UiEventLogger mUiEventLogger;
     private final DisplayTracker mDisplayTracker;
-
     private Region mActiveNavBarRegion;
-    private SurfaceControl mNavigationBarSurface;
+
+    private final BroadcastDispatcher mBroadcastDispatcher;
 
     private IOverviewProxy mOverviewProxy;
     private int mConnectionBackoffAttempts;
     private boolean mBound;
     private boolean mIsEnabled;
+
+    private boolean mIsNonPrimaryUser;
     private int mCurrentBoundedUserId = -1;
     private boolean mInputFocusTransferStarted;
     private float mInputFocusTransferStartY;
@@ -420,6 +424,21 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         retryConnectionWithBackoff();
     };
 
+    private final BroadcastReceiver mUserEventReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Objects.equals(intent.getAction(), Intent.ACTION_USER_UNLOCKED)) {
+                if (keyguardPrivateNotifications()) {
+                    // Start the overview connection to the launcher service
+                    // Connect if user hasn't connected yet
+                    if (getProxy() == null) {
+                        startConnectionToCurrentUser();
+                    }
+                }
+            }
+        }
+    };
+
     private final BroadcastReceiver mLauncherStateChangedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -488,7 +507,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                 Log.e(TAG_OPS, "Failed to call onInitialize()", e);
             }
             dispatchNavButtonBounds();
-            dispatchNavigationBarSurface();
 
             // Force-update the systemui state flags
             updateSystemUiStateFlags();
@@ -588,11 +606,13 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
             FeatureFlags featureFlags,
             SceneContainerFlags sceneContainerFlags,
             DumpManager dumpManager,
-            Optional<UnfoldTransitionProgressForwarder> unfoldTransitionProgressForwarder
+            Optional<UnfoldTransitionProgressForwarder> unfoldTransitionProgressForwarder,
+            BroadcastDispatcher broadcastDispatcher
     ) {
         // b/241601880: This component shouldn't be running for a non-primary user
-        if (!Process.myUserHandle().equals(UserHandle.SYSTEM)) {
-            Log.e(TAG_OPS, "Unexpected initialization for non-primary user", new Throwable());
+        mIsNonPrimaryUser = !Process.myUserHandle().equals(UserHandle.SYSTEM);
+        if (mIsNonPrimaryUser) {
+            Log.wtf(TAG_OPS, "Unexpected initialization for non-primary user", new Throwable());
         }
 
         mContext = context;
@@ -617,8 +637,9 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         mUiEventLogger = uiEventLogger;
         mDisplayTracker = displayTracker;
         mUnfoldTransitionProgressForwarder = unfoldTransitionProgressForwarder;
+        mBroadcastDispatcher = broadcastDispatcher;
 
-        if (!featureFlags.isEnabled(Flags.KEYGUARD_WM_STATE_REFACTOR)) {
+        if (!KeyguardWmStateRefactor.isEnabled()) {
             mSysuiUnlockAnimationController = sysuiUnlockAnimationController;
         } else {
             mSysuiUnlockAnimationController = inWindowLauncherUnlockAnimationManager;
@@ -636,6 +657,12 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
                 PatternMatcher.PATTERN_LITERAL);
         filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
         mContext.registerReceiver(mLauncherStateChangedReceiver, filter);
+
+        if (keyguardPrivateNotifications()) {
+            mBroadcastDispatcher.registerReceiver(mUserEventReceiver,
+                    new IntentFilter(Intent.ACTION_USER_UNLOCKED),
+                    null /* executor */, UserHandle.ALL);
+        }
 
         // Listen for status bar state changes
         statusBarWinController.registerCallback(mStatusBarWindowCallback);
@@ -677,28 +704,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     public void onVoiceSessionWindowVisibilityChanged(boolean visible) {
         mSysUiState.setFlag(SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING, visible)
                 .commitUpdate(mContext.getDisplayId());
-    }
-
-    /**
-     * Called when the navigation bar surface is created or changed
-     */
-    public void onNavigationBarSurfaceChanged(SurfaceControl navbarSurface) {
-        mNavigationBarSurface = navbarSurface;
-        dispatchNavigationBarSurface();
-    }
-
-    private void dispatchNavigationBarSurface() {
-        try {
-            if (mOverviewProxy != null) {
-                // Catch all for cases where the surface is no longer valid
-                if (mNavigationBarSurface != null && !mNavigationBarSurface.isValid()) {
-                    mNavigationBarSurface = null;
-                }
-                mOverviewProxy.onNavigationBarSurface(mNavigationBarSurface);
-            }
-        } catch (RemoteException e) {
-            Log.e(TAG_OPS, "Failed to notify back action", e);
-        }
     }
 
     private void updateEnabledAndBinding() {
@@ -796,6 +801,13 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
     }
 
     private void internalConnectToCurrentUser(String reason) {
+        if (mIsNonPrimaryUser) {
+            // This should not happen, but if any per-user SysUI component has a dependency on OPS,
+            // then this could get triggered
+            Log.w(TAG_OPS, "Skipping connection to overview service due to non-primary user "
+                    + "caller");
+            return;
+        }
         disconnectFromLauncherService(reason);
 
         // If user has not setup yet or already connected, do not try to connect
@@ -1075,7 +1087,6 @@ public class OverviewProxyService implements CallbackController<OverviewProxyLis
         pw.print("  mInputFocusTransferStartY="); pw.println(mInputFocusTransferStartY);
         pw.print("  mInputFocusTransferStartMillis="); pw.println(mInputFocusTransferStartMillis);
         pw.print("  mActiveNavBarRegion="); pw.println(mActiveNavBarRegion);
-        pw.print("  mNavigationBarSurface="); pw.println(mNavigationBarSurface);
         pw.print("  mNavBarMode="); pw.println(mNavBarMode);
         mSysUiState.dump(pw, args);
     }

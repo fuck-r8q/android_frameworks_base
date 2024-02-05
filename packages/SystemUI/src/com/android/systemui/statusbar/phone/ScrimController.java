@@ -60,6 +60,7 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.keyguard.shared.model.ScrimAlpha;
 import com.android.systemui.keyguard.shared.model.TransitionState;
@@ -217,6 +218,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
     private final ScreenOffAnimationController mScreenOffAnimationController;
     private final KeyguardUnlockAnimationController mKeyguardUnlockAnimationController;
     private final StatusBarKeyguardViewManager mStatusBarKeyguardViewManager;
+    private final KeyguardInteractor mKeyguardInteractor;
 
     private GradientColors mColors;
     private boolean mNeedsDrawableColorUpdate;
@@ -298,7 +300,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             DozeParameters dozeParameters,
             AlarmManager alarmManager,
             KeyguardStateController keyguardStateController,
-            DelayedWakeLock.Builder delayedWakeLockBuilder,
+            DelayedWakeLock.Factory delayedWakeLockFactory,
             Handler handler,
             KeyguardUpdateMonitor keyguardUpdateMonitor,
             DockManager dockManager,
@@ -311,6 +313,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             PrimaryBouncerToGoneTransitionViewModel primaryBouncerToGoneTransitionViewModel,
             AlternateBouncerToGoneTransitionViewModel alternateBouncerToGoneTransitionViewModel,
             KeyguardTransitionInteractor keyguardTransitionInteractor,
+            KeyguardInteractor keyguardInteractor,
             WallpaperRepository wallpaperRepository,
             @Main CoroutineDispatcher mainDispatcher,
             LargeScreenShadeInterpolator largeScreenShadeInterpolator) {
@@ -328,7 +331,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         mScreenOffAnimationController = screenOffAnimationController;
         mTimeTicker = new AlarmTimeout(alarmManager, this::onHideWallpaperTimeout,
                 "hide_aod_wallpaper", mHandler);
-        mWakeLock = delayedWakeLockBuilder.setHandler(mHandler).setTag("Scrims").build();
+        mWakeLock = delayedWakeLockFactory.create("Scrims");
         // Scrim alpha is initially set to the value on the resource but might be changed
         // to make sure that text on top of it is legible.
         mDozeParameters = dozeParameters;
@@ -357,6 +360,7 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         mPrimaryBouncerToGoneTransitionViewModel = primaryBouncerToGoneTransitionViewModel;
         mAlternateBouncerToGoneTransitionViewModel = alternateBouncerToGoneTransitionViewModel;
         mKeyguardTransitionInteractor = keyguardTransitionInteractor;
+        mKeyguardInteractor = keyguardInteractor;
         mWallpaperRepository = wallpaperRepository;
         mMainDispatcher = mainDispatcher;
     }
@@ -761,6 +765,13 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
             mScrimBehind.setBottomEdgePosition((int) top);
         } else {
             mNotificationsScrim.setDrawableBounds(left, top, right, bottom);
+        }
+
+        // Only clip if the notif scrim is visible
+        if (mNotificationsAlpha > 0f) {
+            mKeyguardInteractor.setTopClippingBounds((int) top);
+        } else {
+            mKeyguardInteractor.setTopClippingBounds(null);
         }
     }
 

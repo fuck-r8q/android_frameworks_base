@@ -229,15 +229,6 @@ filegroup {
     path: "apex/java",
 }
 
-java_api_contribution {
-    name: "framework-graphics-public-stubs",
-    api_surface: "public",
-    api_file: "api/current.txt",
-    visibility: [
-        "//build/orchestrator/apis",
-    ],
-}
-
 // ------------------------
 // APEX
 // ------------------------
@@ -637,14 +628,6 @@ cc_defaults {
 
             // Allow implicit fallthroughs in HardwareBitmapUploader.cpp until they are fixed.
             cflags: ["-Wno-implicit-fallthrough"],
-        },
-        host: {
-            srcs: [
-                "utils/HostColorSpace.cpp",
-            ],
-            export_static_lib_headers: [
-                "libarect",
-            ],
         },
     },
 }

@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -48,7 +49,6 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Color;
-import android.os.Handler;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.util.MathUtils;
@@ -66,6 +66,7 @@ import com.android.systemui.animation.ShadeInterpolation;
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
+import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.keyguard.shared.model.KeyguardState;
 import com.android.systemui.keyguard.shared.model.TransitionState;
@@ -134,7 +135,7 @@ public class ScrimControllerTest extends SysuiTestCase {
     @Mock private AlarmManager mAlarmManager;
     @Mock private DozeParameters mDozeParameters;
     @Mock private LightBarController mLightBarController;
-    @Mock private DelayedWakeLock.Builder mDelayedWakeLockBuilder;
+    @Mock private DelayedWakeLock.Factory mDelayedWakeLockFactory;
     @Mock private DelayedWakeLock mWakeLock;
     @Mock private KeyguardStateController mKeyguardStateController;
     @Mock private KeyguardUpdateMonitor mKeyguardUpdateMonitor;
@@ -145,6 +146,7 @@ public class ScrimControllerTest extends SysuiTestCase {
     @Mock private AlternateBouncerToGoneTransitionViewModel
             mAlternateBouncerToGoneTransitionViewModel;
     @Mock private KeyguardTransitionInteractor mKeyguardTransitionInteractor;
+    @Mock private KeyguardInteractor mKeyguardInteractor;
     private final FakeWallpaperRepository mWallpaperRepository = new FakeWallpaperRepository();
     @Mock private CoroutineDispatcher mMainDispatcher;
     @Mock private TypedArray mMockTypedArray;
@@ -260,11 +262,7 @@ public class ScrimControllerTest extends SysuiTestCase {
         }).when(mLightBarController).setScrimState(
                 any(ScrimState.class), anyFloat(), any(GradientColors.class));
 
-        when(mDelayedWakeLockBuilder.setHandler(any(Handler.class)))
-                .thenReturn(mDelayedWakeLockBuilder);
-        when(mDelayedWakeLockBuilder.setTag(any(String.class)))
-                .thenReturn(mDelayedWakeLockBuilder);
-        when(mDelayedWakeLockBuilder.build()).thenReturn(mWakeLock);
+        when(mDelayedWakeLockFactory.create(any(String.class))).thenReturn(mWakeLock);
         when(mDockManager.isDocked()).thenReturn(false);
 
         when(mKeyguardTransitionInteractor.transition(any(), any()))
@@ -279,7 +277,7 @@ public class ScrimControllerTest extends SysuiTestCase {
                 mDozeParameters,
                 mAlarmManager,
                 mKeyguardStateController,
-                mDelayedWakeLockBuilder,
+                mDelayedWakeLockFactory,
                 new FakeHandler(mLooper.getLooper()),
                 mKeyguardUpdateMonitor,
                 mDockManager,
@@ -292,6 +290,7 @@ public class ScrimControllerTest extends SysuiTestCase {
                 mPrimaryBouncerToGoneTransitionViewModel,
                 mAlternateBouncerToGoneTransitionViewModel,
                 mKeyguardTransitionInteractor,
+                mKeyguardInteractor,
                 mWallpaperRepository,
                 mMainDispatcher,
                 mLinearLargeScreenShadeInterpolator);
@@ -987,7 +986,7 @@ public class ScrimControllerTest extends SysuiTestCase {
                 mDozeParameters,
                 mAlarmManager,
                 mKeyguardStateController,
-                mDelayedWakeLockBuilder,
+                mDelayedWakeLockFactory,
                 new FakeHandler(mLooper.getLooper()),
                 mKeyguardUpdateMonitor,
                 mDockManager,
@@ -1000,6 +999,7 @@ public class ScrimControllerTest extends SysuiTestCase {
                 mPrimaryBouncerToGoneTransitionViewModel,
                 mAlternateBouncerToGoneTransitionViewModel,
                 mKeyguardTransitionInteractor,
+                mKeyguardInteractor,
                 mWallpaperRepository,
                 mMainDispatcher,
                 mLinearLargeScreenShadeInterpolator);
@@ -1681,6 +1681,26 @@ public class ScrimControllerTest extends SysuiTestCase {
         mScrimController.setNotificationsOverScrollAmount(overScrollAmount);
 
         assertThat(mScrimInFront.getTranslationY()).isEqualTo(0);
+    }
+
+    @Test
+    public void notificationBoundsTopGetsPassedToKeyguard() {
+        mScrimController.transitionTo(SHADE_LOCKED);
+        mScrimController.setQsPosition(1f, 0);
+        finishAnimationsImmediately();
+
+        mScrimController.setNotificationsBounds(0f, 100f, 0f, 0f);
+        verify(mKeyguardInteractor).setTopClippingBounds(eq(100));
+    }
+
+    @Test
+    public void notificationBoundsTopDoesNotGetPassedToKeyguardWhenNotifScrimIsNotVisible() {
+        mScrimController.setKeyguardOccluded(true);
+        mScrimController.transitionTo(ScrimState.KEYGUARD);
+        finishAnimationsImmediately();
+
+        mScrimController.setNotificationsBounds(0f, 100f, 0f, 0f);
+        verify(mKeyguardInteractor).setTopClippingBounds(eq(null));
     }
 
     @Test

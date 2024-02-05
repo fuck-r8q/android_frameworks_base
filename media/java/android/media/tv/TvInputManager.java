@@ -33,6 +33,7 @@ import android.media.AudioDeviceInfo;
 import android.media.AudioFormat.Encoding;
 import android.media.AudioPresentation;
 import android.media.PlaybackParams;
+import android.media.tv.ad.TvAdManager;
 import android.media.tv.interactive.TvInteractiveAppManager;
 import android.net.Uri;
 import android.os.Binder;
@@ -740,6 +741,15 @@ public final class TvInputManager {
         }
 
         /**
+         * This is called when the video freeze state has been updated.
+         * If {@code true}, the video is frozen on the last frame while audio playback continues.
+         * @param session A {@link TvInputManager.Session} associated with this callback.
+         * @param isFrozen Whether the video is frozen
+         */
+        public void onVideoFreezeUpdated(Session session, boolean isFrozen) {
+        }
+
+        /**
          * This is called when the current program content turns out to be allowed to watch since
          * its content rating is not blocked by parental controls.
          *
@@ -1025,6 +1035,19 @@ public final class TvInputManager {
                     if (mSession.mIAppNotificationEnabled
                             && mSession.getInteractiveAppSession() != null) {
                         mSession.getInteractiveAppSession().notifyVideoUnavailable(reason);
+                    }
+                }
+            });
+        }
+
+        void postVideoFreezeUpdated(boolean isFrozen) {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mSessionCallback.onVideoFreezeUpdated(mSession, isFrozen);
+                    if (mSession.mIAppNotificationEnabled
+                            && mSession.getInteractiveAppSession() != null) {
+                        mSession.getInteractiveAppSession().notifyVideoFreezeUpdated(isFrozen);
                     }
                 }
             });
@@ -1542,6 +1565,18 @@ public final class TvInputManager {
                         return;
                     }
                     record.postVideoUnavailable(reason);
+                }
+            }
+
+            @Override
+            public void onVideoFreezeUpdated(boolean isFrozen, int seq) {
+                synchronized (mSessionCallbackRecordMap) {
+                    SessionCallbackRecord record = mSessionCallbackRecordMap.get(seq);
+                    if (record == null) {
+                        Log.e(TAG, "Callback not found for seq " + seq);
+                        return;
+                    }
+                    record.postVideoFreezeUpdated(isFrozen);
                 }
             }
 
@@ -2710,6 +2745,7 @@ public final class TvInputManager {
         private int mVideoHeight;
 
         private TvInteractiveAppManager.Session mIAppSession;
+        private TvAdManager.Session mAdSession;
         private boolean mIAppNotificationEnabled = false;
 
         private Session(IBinder token, InputChannel channel, ITvInputManager service, int userId,
@@ -2728,6 +2764,14 @@ public final class TvInputManager {
 
         public void setInteractiveAppSession(TvInteractiveAppManager.Session iAppSession) {
             this.mIAppSession = iAppSession;
+        }
+
+        public TvAdManager.Session getAdSession() {
+            return mAdSession;
+        }
+
+        public void setAdSession(TvAdManager.Session adSession) {
+            this.mAdSession = adSession;
         }
 
         /**

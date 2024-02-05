@@ -32,6 +32,7 @@ import static junit.framework.Assert.assertTrue;
 
 import static org.junit.Assume.assumeNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -63,15 +64,16 @@ import androidx.test.filters.SmallTest;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.testing.UiEventLoggerFake;
+import com.android.keyguard.TestScopeProvider;
 import com.android.systemui.Prefs;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.AnimatorTestRule;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.media.dialog.MediaOutputDialogFactory;
-import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.plugins.VolumeDialogController.State;
 import com.android.systemui.res.R;
+import com.android.systemui.statusbar.VibratorHelper;
 import com.android.systemui.statusbar.policy.AccessibilityManagerWrapper;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DevicePostureController;
@@ -79,6 +81,9 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.FakeConfigurationController;
 import com.android.systemui.util.settings.FakeSettings;
 import com.android.systemui.util.settings.SecureSettings;
+import com.android.systemui.util.time.FakeSystemClock;
+import com.android.systemui.volume.domain.interactor.VolumePanelNavigationInteractor;
+import com.android.systemui.volume.ui.navigation.VolumeNavigator;
 
 import dagger.Lazy;
 
@@ -96,6 +101,8 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.Arrays;
 import java.util.function.Predicate;
+
+import kotlinx.coroutines.Dispatchers;
 
 @SmallTest
 @RunWith(AndroidTestingRunner.class)
@@ -126,10 +133,6 @@ public class VolumeDialogImplTest extends SysuiTestCase {
     @Mock
     MediaOutputDialogFactory mMediaOutputDialogFactory;
     @Mock
-    VolumePanelFactory mVolumePanelFactory;
-    @Mock
-    ActivityStarter mActivityStarter;
-    @Mock
     InteractionJankMonitor mInteractionJankMonitor;
     @Mock
     private DumpManager mDumpManager;
@@ -138,6 +141,10 @@ public class VolumeDialogImplTest extends SysuiTestCase {
     DevicePostureController mPostureController;
     @Mock
     private Lazy<SecureSettings> mLazySecureSettings;
+    @Mock
+    private VolumePanelNavigationInteractor mVolumePanelNavigationInteractor;
+    @Mock
+    private VolumeNavigator mVolumeNavigator;
 
     private final CsdWarningDialog.Factory mCsdWarningDialogFactory =
             new CsdWarningDialog.Factory() {
@@ -146,6 +153,8 @@ public class VolumeDialogImplTest extends SysuiTestCase {
             return mCsdWarningDialog;
         }
     };
+    @Mock
+    private VibratorHelper mVibratorHelper;
 
     private int mLongestHideShowAnimationDuration = 250;
     private FakeSettings mSecureSettings;
@@ -180,6 +189,8 @@ public class VolumeDialogImplTest extends SysuiTestCase {
 
         when(mLazySecureSettings.get()).thenReturn(mSecureSettings);
 
+        when(mVibratorHelper.getPrimitiveDurations(anyInt())).thenReturn(new int[]{0});
+
         mDialog = new VolumeDialogImpl(
                 getContext(),
                 mVolumeDialogController,
@@ -187,15 +198,19 @@ public class VolumeDialogImplTest extends SysuiTestCase {
                 mDeviceProvisionedController,
                 mConfigurationController,
                 mMediaOutputDialogFactory,
-                mVolumePanelFactory,
-                mActivityStarter,
                 mInteractionJankMonitor,
+                mVolumePanelNavigationInteractor,
+                mVolumeNavigator,
                 false,
                 mCsdWarningDialogFactory,
                 mPostureController,
                 mTestableLooper.getLooper(),
                 mDumpManager,
-                mLazySecureSettings);
+                mLazySecureSettings,
+                mVibratorHelper,
+                Dispatchers.getUnconfined(),
+                TestScopeProvider.getTestScope(),
+                new FakeSystemClock());
         mDialog.init(0, null);
         State state = createShellState();
         mDialog.onStateChangedH(state);

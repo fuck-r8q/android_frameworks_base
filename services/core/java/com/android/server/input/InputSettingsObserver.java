@@ -16,6 +16,8 @@
 
 package com.android.server.input;
 
+import static com.android.input.flags.Flags.rateLimitUserActivityPokeInDispatcher;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -28,7 +30,6 @@ import android.os.UserHandle;
 import android.provider.DeviceConfig;
 import android.provider.Settings;
 import android.util.Log;
-import android.view.PointerIcon;
 import android.view.ViewConfiguration;
 
 import java.util.Map;
@@ -88,6 +89,8 @@ class InputSettingsObserver extends ContentObserver {
                         (reason) -> updateShowRotaryInput()),
                 Map.entry(Settings.Secure.getUriFor(Settings.Secure.ACCESSIBILITY_BOUNCE_KEYS),
                         (reason) -> updateAccessibilityBounceKeys()),
+                Map.entry(Settings.Secure.getUriFor(Settings.Secure.ACCESSIBILITY_SLOW_KEYS),
+                        (reason) -> updateAccessibilitySlowKeys()),
                 Map.entry(Settings.Secure.getUriFor(Settings.Secure.ACCESSIBILITY_STICKY_KEYS),
                         (reason) -> updateAccessibilityStickyKeys()));
     }
@@ -114,6 +117,8 @@ class InputSettingsObserver extends ContentObserver {
         for (Consumer<String> observer : mObservers.values()) {
             observer.accept("just booted");
         }
+
+        configureUserActivityPokeInterval();
     }
 
     @Override
@@ -178,8 +183,7 @@ class InputSettingsObserver extends ContentObserver {
         final int accessibilityConfig = Settings.Secure.getIntForUser(
                 mContext.getContentResolver(), Settings.Secure.ACCESSIBILITY_LARGE_POINTER_ICON,
                 0, UserHandle.USER_CURRENT);
-        PointerIcon.setUseLargeIcons(accessibilityConfig == 1);
-        mNative.reloadPointerIcons();
+        mService.setUseLargePointerIcons(accessibilityConfig == 1);
     }
 
     private void updateLongPressTimeout(String reason) {
@@ -226,8 +230,22 @@ class InputSettingsObserver extends ContentObserver {
                 InputSettings.getAccessibilityBounceKeysThreshold(mContext));
     }
 
+    private void updateAccessibilitySlowKeys() {
+        mService.setAccessibilitySlowKeysThreshold(
+                InputSettings.getAccessibilitySlowKeysThreshold(mContext));
+    }
+
     private void updateAccessibilityStickyKeys() {
         mService.setAccessibilityStickyKeysEnabled(
                 InputSettings.isAccessibilityStickyKeysEnabled(mContext));
+    }
+
+    private void configureUserActivityPokeInterval() {
+        if (rateLimitUserActivityPokeInDispatcher()) {
+            final int intervalMillis = mContext.getResources().getInteger(
+                    com.android.internal.R.integer.config_minMillisBetweenInputUserActivityEvents);
+            Log.i(TAG, "Setting user activity interval (ms) of " + intervalMillis);
+            mNative.setMinTimeBetweenUserActivityPokes(intervalMillis);
+        }
     }
 }

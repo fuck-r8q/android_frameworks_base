@@ -577,6 +577,12 @@ final class InstallPackageHelper {
                 mApexManager.registerApkInApex(pkg);
             }
 
+            if ((mPm.isDeviceUpgrading() && pkgSetting.isSystem()) || isReplace) {
+                for (int userId : mPm.mUserManager.getUserIds()) {
+                    pkgSetting.restoreComponentSettings(userId);
+                }
+            }
+
             // Don't add keysets for APEX as their package settings are not persisted and will
             // result in orphaned keysets.
             if ((scanFlags & SCAN_AS_APEX) == 0) {
@@ -2916,6 +2922,12 @@ final class InstallPackageHelper {
                     // code is loaded by a new Activity before ApplicationInfo changes have
                     // propagated to all application threads.
                     mPm.scheduleDeferredNoKillPostDelete(args);
+                    if (Flags.improveInstallDontKill()) {
+                        synchronized (mPm.mInstallLock) {
+                            PackageManagerServiceUtils.linkSplitsToOldDirs(mPm.mInstaller,
+                                    packageName, pkgSetting.getPath(), pkgSetting.getOldPaths());
+                        }
+                    }
                 } else {
                     mRemovePackageHelper.cleanUpResources(packageName, args.getCodeFile(),
                             args.getInstructionSets());
@@ -4227,8 +4239,10 @@ final class InstallPackageHelper {
             }
         }
 
+        final long firstInstallTime = Flags.fixSystemAppsFirstInstallTime()
+                ? System.currentTimeMillis() : 0;
         final ScanResult scanResult = scanPackageNewLI(parsedPackage, parseFlags,
-                scanFlags | SCAN_UPDATE_SIGNATURE, 0 /* currentTime */, user, null);
+                scanFlags | SCAN_UPDATE_SIGNATURE, firstInstallTime, user, null);
         return new Pair<>(scanResult, shouldHideSystemApp);
     }
 

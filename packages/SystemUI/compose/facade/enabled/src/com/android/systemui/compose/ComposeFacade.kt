@@ -16,6 +16,7 @@
 
 package com.android.systemui.compose
 
+import android.app.Dialog
 import android.content.Context
 import android.graphics.Point
 import android.view.View
@@ -37,6 +38,9 @@ import com.android.systemui.common.ui.compose.windowinsets.DisplayCutoutProvider
 import com.android.systemui.communal.ui.compose.CommunalContainer
 import com.android.systemui.communal.ui.compose.CommunalHub
 import com.android.systemui.communal.ui.viewmodel.BaseCommunalViewModel
+import com.android.systemui.communal.widgets.WidgetConfigurator
+import com.android.systemui.keyboard.stickykeys.ui.view.StickyKeysIndicator
+import com.android.systemui.keyboard.stickykeys.ui.viewmodel.StickyKeysIndicatorViewModel
 import com.android.systemui.people.ui.compose.PeopleScreen
 import com.android.systemui.people.ui.viewmodel.PeopleViewModel
 import com.android.systemui.qs.footer.ui.compose.FooterActions
@@ -46,6 +50,10 @@ import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.ui.composable.ComposableScene
 import com.android.systemui.scene.ui.composable.SceneContainer
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.statusbar.phone.SystemUIDialogFactory
+import com.android.systemui.statusbar.phone.create
+import com.android.systemui.volume.panel.ui.composable.VolumePanelRoot
+import com.android.systemui.volume.panel.ui.viewmodel.VolumePanelViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +77,7 @@ object ComposeFacade : BaseComposeFacade {
     override fun setCommunalEditWidgetActivityContent(
         activity: ComponentActivity,
         viewModel: BaseCommunalViewModel,
+        widgetConfigurator: WidgetConfigurator,
         onOpenWidgetPicker: () -> Unit,
         onEditDone: () -> Unit,
     ) {
@@ -77,9 +86,23 @@ object ComposeFacade : BaseComposeFacade {
                 CommunalHub(
                     viewModel = viewModel,
                     onOpenWidgetPicker = onOpenWidgetPicker,
+                    widgetConfigurator = widgetConfigurator,
                     onEditDone = onEditDone,
                 )
             }
+        }
+    }
+
+    override fun setVolumePanelActivityContent(
+        activity: ComponentActivity,
+        viewModel: VolumePanelViewModel,
+        onDismissAnimationFinished: () -> Unit,
+    ) {
+        activity.setContent {
+            VolumePanelRoot(
+                viewModel = viewModel,
+                onDismissAnimationFinished = onDismissAnimationFinished,
+            )
         }
     }
 
@@ -115,6 +138,13 @@ object ComposeFacade : BaseComposeFacade {
                 }
             }
         }
+    }
+
+    override fun createStickyKeysDialog(
+        dialogFactory: SystemUIDialogFactory,
+        viewModel: StickyKeysIndicatorViewModel
+    ): Dialog {
+        return dialogFactory.create { StickyKeysIndicator(viewModel) }
     }
 
     override fun createCommunalView(

@@ -25,6 +25,9 @@ import com.android.systemui.Flags.FLAG_CENTRALIZED_STATUS_BAR_DIMENS_REFACTOR
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
+import com.android.systemui.communal.domain.interactor.communalInteractor
+import com.android.systemui.communal.shared.model.CommunalSceneKey
+import com.android.systemui.communal.shared.model.ObservableCommunalTransitionState
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.Flags
 import com.android.systemui.flags.fakeFeatureFlagsClassic
@@ -33,50 +36,64 @@ import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepos
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.StatusBarState
-import com.android.systemui.keyguard.shared.model.StatusBarState.SHADE_LOCKED
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.keyguard.shared.model.TransitionStep
+import com.android.systemui.keyguard.ui.viewmodel.AodBurnInViewModel
+import com.android.systemui.keyguard.ui.viewmodel.BurnInParameters
+import com.android.systemui.keyguard.ui.viewmodel.aodBurnInViewModel
 import com.android.systemui.keyguard.ui.viewmodel.keyguardRootViewModel
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.res.R
 import com.android.systemui.shade.data.repository.shadeRepository
-import com.android.systemui.shade.largeScreenHeaderHelper
 import com.android.systemui.shade.mockLargeScreenHeaderHelper
 import com.android.systemui.statusbar.notification.stack.domain.interactor.sharedNotificationContainerInteractor
 import com.android.systemui.testKosmos
+import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.mock
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class SharedNotificationContainerViewModelTest : SysuiTestCase() {
+    val aodBurnInViewModel = mock(AodBurnInViewModel::class.java)
+    lateinit var translationYFlow: MutableStateFlow<Float>
 
     val kosmos =
         testKosmos().apply {
             fakeFeatureFlagsClassic.apply { set(Flags.FULL_SCREEN_USER_SWITCHER, false) }
         }
+
+    init {
+        kosmos.aodBurnInViewModel = aodBurnInViewModel
+    }
     val testScope = kosmos.testScope
     val configurationRepository = kosmos.fakeConfigurationRepository
     val keyguardRepository = kosmos.fakeKeyguardRepository
     val keyguardInteractor = kosmos.keyguardInteractor
     val keyguardRootViewModel = kosmos.keyguardRootViewModel
     val keyguardTransitionRepository = kosmos.fakeKeyguardTransitionRepository
+    val communalInteractor = kosmos.communalInteractor
     val shadeRepository = kosmos.shadeRepository
     val sharedNotificationContainerInteractor = kosmos.sharedNotificationContainerInteractor
     val largeScreenHeaderHelper = kosmos.mockLargeScreenHeaderHelper
 
-    val underTest = kosmos.sharedNotificationContainerViewModel
+    lateinit var underTest: SharedNotificationContainerViewModel
 
     @Before
     fun setUp() {
         overrideResource(R.bool.config_use_split_notification_shade, false)
+        translationYFlow = MutableStateFlow(0f)
+        whenever(aodBurnInViewModel.translationY(any())).thenReturn(translationYFlow)
+        underTest = kosmos.sharedNotificationContainerViewModel
     }
 
     @Test
@@ -214,6 +231,61 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun glanceableHubAlpha() =
+        testScope.runTest {
+            val alpha by collectLastValue(underTest.glanceableHubAlpha)
+
+            // Start on lockscreen
+            showLockscreen()
+            assertThat(alpha).isEqualTo(1f)
+
+            // Start transitioning to glanceable hub
+            val progress = 0.6f
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.STARTED,
+                    from = KeyguardState.LOCKSCREEN,
+                    to = KeyguardState.GLANCEABLE_HUB,
+                    value = 0f,
+                )
+            )
+            runCurrent()
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.RUNNING,
+                    from = KeyguardState.LOCKSCREEN,
+                    to = KeyguardState.GLANCEABLE_HUB,
+                    value = progress,
+                )
+            )
+            runCurrent()
+            // Expected alpha is inverse of progress as notifications are fading away
+            assertThat(alpha).isEqualTo(1 - progress)
+
+            // Finish transition to glanceable hub
+            keyguardTransitionRepository.sendTransitionStep(
+                TransitionStep(
+                    transitionState = TransitionState.FINISHED,
+                    from = KeyguardState.LOCKSCREEN,
+                    to = KeyguardState.GLANCEABLE_HUB,
+                    value = 1f,
+                )
+            )
+            val idleTransitionState =
+                MutableStateFlow<ObservableCommunalTransitionState>(
+                    ObservableCommunalTransitionState.Idle(CommunalSceneKey.Communal)
+                )
+            communalInteractor.setTransitionState(idleTransitionState)
+            runCurrent()
+            assertThat(alpha).isEqualTo(0f)
+
+            // While state is GLANCEABLE_HUB, verify alpha is restored to full if glanceable hub is
+            // not fully visible.
+            shadeRepository.setLockscreenShadeExpansion(0.1f)
+            assertThat(alpha).isEqualTo(1f)
+        }
+
+    @Test
     fun validateMarginTop() =
         testScope.runTest {
             overrideResource(R.bool.config_use_large_screen_shade_header, false)
@@ -299,6 +371,43 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
             shadeRepository.setLockscreenShadeExpansion(0f)
             shadeRepository.setQsExpansion(0f)
             assertThat(isOnLockscreenWithoutShade).isTrue()
+        }
+
+    @Test
+    fun isOnGlanceableHubWithoutShade() =
+        testScope.runTest {
+            val isOnGlanceableHubWithoutShade by
+                collectLastValue(underTest.isOnGlanceableHubWithoutShade)
+
+            // Start on lockscreen
+            showLockscreen()
+            assertThat(isOnGlanceableHubWithoutShade).isFalse()
+
+            // Move to glanceable hub
+            val idleTransitionState =
+                MutableStateFlow<ObservableCommunalTransitionState>(
+                    ObservableCommunalTransitionState.Idle(CommunalSceneKey.Communal)
+                )
+            communalInteractor.setTransitionState(idleTransitionState)
+            runCurrent()
+            assertThat(isOnGlanceableHubWithoutShade).isTrue()
+
+            // While state is GLANCEABLE_HUB, validate variations of both shade and qs expansion
+            shadeRepository.setLockscreenShadeExpansion(0.1f)
+            shadeRepository.setQsExpansion(0f)
+            assertThat(isOnGlanceableHubWithoutShade).isFalse()
+
+            shadeRepository.setLockscreenShadeExpansion(0.1f)
+            shadeRepository.setQsExpansion(0.1f)
+            assertThat(isOnGlanceableHubWithoutShade).isFalse()
+
+            shadeRepository.setLockscreenShadeExpansion(0f)
+            shadeRepository.setQsExpansion(0.1f)
+            assertThat(isOnGlanceableHubWithoutShade).isFalse()
+
+            shadeRepository.setLockscreenShadeExpansion(0f)
+            shadeRepository.setQsExpansion(0f)
+            assertThat(isOnGlanceableHubWithoutShade).isTrue()
         }
 
     @Test
@@ -484,9 +593,21 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun translationYUpdatesOnKeyguardForBurnIn() =
+        testScope.runTest {
+            val translationY by collectLastValue(underTest.translationY(BurnInParameters()))
+
+            showLockscreen()
+            assertThat(translationY).isEqualTo(0)
+
+            translationYFlow.value = 150f
+            assertThat(translationY).isEqualTo(150f)
+        }
+
+    @Test
     fun translationYUpdatesOnKeyguard() =
         testScope.runTest {
-            val translationY by collectLastValue(underTest.translationY)
+            val translationY by collectLastValue(underTest.translationY(BurnInParameters()))
 
             configurationRepository.setDimensionPixelSize(
                 R.dimen.keyguard_translate_distance_on_swipe_up,
@@ -506,7 +627,7 @@ class SharedNotificationContainerViewModelTest : SysuiTestCase() {
     @Test
     fun translationYDoesNotUpdateWhenShadeIsExpanded() =
         testScope.runTest {
-            val translationY by collectLastValue(underTest.translationY)
+            val translationY by collectLastValue(underTest.translationY(BurnInParameters()))
 
             configurationRepository.setDimensionPixelSize(
                 R.dimen.keyguard_translate_distance_on_swipe_up,

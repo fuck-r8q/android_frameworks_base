@@ -53,6 +53,7 @@ import static android.app.WindowConfiguration.activityTypeToString;
 import static android.app.admin.DevicePolicyResources.Drawables.Source.PROFILE_SWITCH_ANIMATION;
 import static android.app.admin.DevicePolicyResources.Drawables.Style.OUTLINE;
 import static android.app.admin.DevicePolicyResources.Drawables.WORK_PROFILE_ICON;
+import static android.content.Context.CONTEXT_RESTRICTED;
 import static android.content.Intent.ACTION_MAIN;
 import static android.content.Intent.CATEGORY_HOME;
 import static android.content.Intent.CATEGORY_LAUNCHER;
@@ -141,6 +142,7 @@ import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_ORIENTATION;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_STARTING_WINDOW;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_STATES;
 import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_SWITCH;
+import static com.android.internal.protolog.ProtoLogGroup.WM_DEBUG_WINDOW_TRANSITIONS_MIN;
 import static com.android.internal.util.FrameworkStatsLog.APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_ASPECT_RATIO;
 import static com.android.internal.util.FrameworkStatsLog.APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_FIXED_ORIENTATION;
 import static com.android.internal.util.FrameworkStatsLog.APP_COMPAT_STATE_CHANGED__STATE__LETTERBOXED_FOR_SIZE_COMPAT_MODE;
@@ -1007,6 +1009,9 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
     // Records whether client has overridden the WindowAnimation_(Open/Close)(Enter/Exit)Animation.
     private CustomAppTransition mCustomOpenTransition;
     private CustomAppTransition mCustomCloseTransition;
+
+    /** Non-zero to pause dispatching configuration changes to the client. */
+    int mPauseConfigurationDispatchCount = 0;
 
     private final Runnable mPauseTimeoutRunnable = new Runnable() {
         @Override
@@ -2250,7 +2255,17 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
 
         mOptInOnBackInvoked = WindowOnBackInvokedDispatcher
                 .isOnBackInvokedCallbackEnabled(info, info.applicationInfo,
-                        () -> ent != null ? ent.array : null, false);
+                        () -> {
+                            Context appContext = null;
+                            try {
+                                appContext = mAtmService.mContext.createPackageContextAsUser(
+                                        info.packageName, CONTEXT_RESTRICTED,
+                                        UserHandle.of(mUserId));
+                                appContext.setTheme(theme);
+                            } catch (PackageManager.NameNotFoundException ignore) {
+                            }
+                            return appContext;
+                        });
     }
 
     /**
@@ -2655,10 +2670,20 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (snapshot == null) {
             return false;
         }
-        if (!snapshot.getTopActivityComponent().equals(mActivityComponent)) {
-            // Obsoleted snapshot.
-            return false;
-        }
+        return isSnapshotComponentCompatible(snapshot) && isSnapshotOrientationCompatible(snapshot);
+    }
+
+    /**
+     * Returns {@code true} if the top activity component of task snapshot equals to this activity.
+     */
+    boolean isSnapshotComponentCompatible(@NonNull TaskSnapshot snapshot) {
+        return snapshot.getTopActivityComponent().equals(mActivityComponent);
+    }
+
+    /**
+     * Returns {@code true} if the orientation of task snapshot is compatible with this activity.
+     */
+    boolean isSnapshotOrientationCompatible(@NonNull TaskSnapshot snapshot) {
         final int rotation = mDisplayContent.rotationForActivityInDifferentOrientation(this);
         final int currentRotation = task.getWindowConfiguration().getRotation();
         final int targetRotation = rotation != ROTATION_UNDEFINED
@@ -3996,20 +4021,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         return removedFromHistory;
     }
 
-    boolean safelyDestroy(String reason) {
-        if (isDestroyable()) {
-            if (DEBUG_SWITCH) {
-                final Task task = getTask();
-                Slog.v(TAG_SWITCH, "Safely destroying " + this + " in state " + getState()
-                        + " resumed=" + task.getTopResumedActivity()
-                        + " pausing=" + task.getTopPausingActivity()
-                        + " for reason " + reason);
-            }
-            return destroyImmediately(reason);
-        }
-        return false;
-    }
-
     /** Note: call {@link #cleanUp(boolean, boolean)} before this method. */
     void removeFromHistory(String reason) {
         finishActivityResults(Activity.RESULT_CANCELED,
@@ -4077,10 +4088,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mDisplayContent != null) {
             mDisplayContent.mUnknownAppVisibilityController.appRemovedOrHidden(this);
         }
-    }
-
-    boolean isFinishing() {
-        return finishing;
     }
 
     /**
@@ -8154,6 +8161,7 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         if (mLetterboxUiController.shouldIgnoreRequestedOrientation(requestedOrientation)) {
             return;
         }
+        final int originalRelaunchingCount = mPendingRelaunchCount;
         // This is necessary in order to avoid going into size compat mode when the orientation
         // change request comes from the app
         if (getRequestedConfigurationOrientation(false, requestedOrientation)
@@ -8171,8 +8179,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         // the request is handled at task level with letterbox.
         if (!getMergedOverrideConfiguration().equals(
                 mLastReportedConfiguration.getMergedConfiguration())) {
-            ensureActivityConfiguration(
-                    false /* ignoreVisibility */, true /* isRequestedOrientationChanged */);
+            ensureActivityConfiguration(false /* ignoreVisibility */);
+            if (mPendingRelaunchCount > originalRelaunchingCount) {
+                mLetterboxUiController.setRelaunchingAfterRequestedOrientationChanged(true);
+            }
             if (mTransitionController.inPlayingTransition(this)) {
                 mTransitionController.mValidateActivityCompat.add(this);
             }
@@ -9467,6 +9477,59 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         }
     }
 
+    @Override
+    void dispatchConfigurationToChild(WindowState child, Configuration config) {
+        if (isConfigurationDispatchPaused()) {
+            return;
+        }
+        super.dispatchConfigurationToChild(child, config);
+    }
+
+    /**
+     * Pauses dispatch of configuration changes to the client. This includes any
+     * configuration-triggered lifecycle changes, WindowState configs, and surface changes. If
+     * a lifecycle change comes from another source (eg. stop), it will still run but will use the
+     * paused configuration.
+     *
+     * The main way this works is by blocking calls to {@link #updateReportedConfigurationAndSend}.
+     * That method is responsible for evaluating whether the activity needs to be relaunched and
+     * sending configurations.
+     */
+    void pauseConfigurationDispatch() {
+        ++mPauseConfigurationDispatchCount;
+        if (mPauseConfigurationDispatchCount == 1) {
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Pausing configuration dispatch for "
+                    + " %s", this);
+        }
+    }
+
+    /** @return `true` if configuration actually changed. */
+    boolean resumeConfigurationDispatch() {
+        --mPauseConfigurationDispatchCount;
+        if (mPauseConfigurationDispatchCount > 0) {
+            return false;
+        }
+        ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Resuming configuration dispatch for %s", this);
+        if (mPauseConfigurationDispatchCount < 0) {
+            Slog.wtf(TAG, "Trying to resume non-paused configuration dispatch");
+            mPauseConfigurationDispatchCount = 0;
+            return false;
+        }
+        if (mLastReportedDisplayId == getDisplayId()
+                && getConfiguration().equals(mLastReportedConfiguration.getMergedConfiguration())) {
+            return false;
+        }
+        for (int i = getChildCount() - 1; i >= 0; --i) {
+            dispatchConfigurationToChild(getChildAt(i), getConfiguration());
+        }
+        updateReportedConfigurationAndSend();
+        return true;
+    }
+
+    boolean isConfigurationDispatchPaused() {
+        return mPauseConfigurationDispatchCount > 0;
+    }
+
     private boolean applyAspectRatio(Rect outBounds, Rect containingAppBounds,
             Rect containingBounds) {
         return applyAspectRatio(outBounds, containingAppBounds, containingBounds,
@@ -9678,11 +9741,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
         return ensureActivityConfiguration(false /* ignoreVisibility */);
     }
 
-    boolean ensureActivityConfiguration(boolean ignoreVisibility) {
-        return ensureActivityConfiguration(ignoreVisibility,
-                false /* isRequestedOrientationChanged */);
-    }
-
     /**
      * Make sure the given activity matches the current configuration. Ensures the HistoryRecord
      * is updated with the correct configuration and all other bookkeeping is handled.
@@ -9691,13 +9749,10 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
      *                         (stopped state). This is useful for the case where we know the
      *                         activity will be visible soon and we want to ensure its configuration
      *                         before we make it visible.
-     * @param isRequestedOrientationChanged whether this is triggered in response to an app calling
-     *                                      {@link android.app.Activity#setRequestedOrientation}.
      * @return False if the activity was relaunched and true if it wasn't relaunched because we
      *         can't or the app handles the specific configuration that is changing.
      */
-    boolean ensureActivityConfiguration(boolean ignoreVisibility,
-            boolean isRequestedOrientationChanged) {
+    boolean ensureActivityConfiguration(boolean ignoreVisibility) {
         final Task rootTask = getRootTask();
         if (rootTask.mConfigWillChange) {
             ProtoLog.v(WM_DEBUG_CONFIGURATION, "Skipping config check "
@@ -9724,6 +9779,17 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
             return true;
         }
 
+        if (isConfigurationDispatchPaused()) {
+            return true;
+        }
+
+        return updateReportedConfigurationAndSend();
+    }
+
+    boolean updateReportedConfigurationAndSend() {
+        if (isConfigurationDispatchPaused()) {
+            Slog.wtf(TAG, "trying to update reported(client) config while dispatch is paused");
+        }
         ProtoLog.v(WM_DEBUG_CONFIGURATION, "Ensuring correct "
                 + "configuration: %s", this);
 
@@ -9839,9 +9905,6 @@ public final class ActivityRecord extends WindowToken implements WindowManagerSe
                         : RELAUNCH_REASON_WINDOWING_MODE_RESIZE;
             } else {
                 mRelaunchReason = RELAUNCH_REASON_NONE;
-            }
-            if (isRequestedOrientationChanged) {
-                mLetterboxUiController.setRelaunchingAfterRequestedOrientationChanged(true);
             }
             if (mState == PAUSING) {
                 // A little annoying: we are waiting for this activity to finish pausing. Let's not
