@@ -206,12 +206,12 @@ private class CellularIconViewModel(
                     iconInteractor.isForceHidden,
                     iconInteractor.voWifiAvailable,
                 ) { isAirplaneMode, isAllowedDuringAirplaneMode, isForceHidden, voWifiAvailable ->
-                    if (isForceHidden) {
+                    if (voWifiAvailable) {
+                        true
+                    } else if (isForceHidden) {
                         false
                     } else if (isAirplaneMode) {
                         isAllowedDuringAirplaneMode
-                    } else if (voWifiAvailable) {
-                        voWifiAvailable
                     } else {
                         true
                     }
