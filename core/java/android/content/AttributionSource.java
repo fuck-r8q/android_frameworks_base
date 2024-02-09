@@ -409,9 +409,10 @@ public final class AttributionSource implements Parcelable {
                     "packageName = " + mAttributionSourceState.packageName + ", " +
                     "attributionTag = " + mAttributionSourceState.attributionTag + ", " +
                     "token = " + mAttributionSourceState.token + ", " +
+                    "deviceId = " + mAttributionSourceState.deviceId + ", " +
                     "next = " + (mAttributionSourceState.next != null
-                                    && mAttributionSourceState.next.length > 0
-                            ? mAttributionSourceState.next[0] : null) +
+                    && mAttributionSourceState.next.length > 0
+                    ? new AttributionSource(mAttributionSourceState.next[0]).toString() : null) +
                     " }";
         }
         return super.toString();

@@ -52,6 +52,7 @@ import com.android.systemui.keyguard.ui.viewmodel.LockscreenSceneViewModel
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.controls.pipeline.MediaDataManager
 import com.android.systemui.model.SysUiState
+import com.android.systemui.model.sceneContainerPlugin
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAsleepForTest
 import com.android.systemui.power.domain.interactor.PowerInteractor.Companion.setAwakeForTest
 import com.android.systemui.power.domain.interactor.powerInteractor
@@ -75,6 +76,8 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.FakeMobi
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.util.FakeMobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
+import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
+import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.telephony.data.repository.fakeTelephonyRepository
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.any
@@ -244,7 +247,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         kosmos.fakeDeviceEntryRepository.setUnlocked(false)
 
         val displayTracker = FakeDisplayTracker(context)
-        val sysUiState = SysUiState(displayTracker)
+        val sysUiState = SysUiState(displayTracker, kosmos.sceneContainerPlugin)
         val startable =
             SceneContainerStartable(
                 applicationScope = testScope.backgroundScope,
@@ -261,6 +264,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
                 simBouncerInteractor = dagger.Lazy { kosmos.simBouncerInteractor },
                 authenticationInteractor = dagger.Lazy { kosmos.authenticationInteractor },
                 windowController = mock(),
+                deviceProvisioningInteractor = kosmos.deviceProvisioningInteractor,
             )
         startable.start()
 
@@ -515,6 +519,21 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             emulateUiSceneTransition(expectedVisible = true)
             enterSimPin(authMethodAfterSimUnlock = AuthenticationMethodModel.Pin)
             assertCurrentScene(SceneKey.Lockscreen)
+        }
+
+    @Test
+    fun deviceProvisioningAndFactoryResetProtection() =
+        testScope.runTest {
+            val isVisible by collectLastValue(sceneContainerViewModel.isVisible)
+            kosmos.fakeDeviceProvisioningRepository.setDeviceProvisioned(false)
+            kosmos.fakeDeviceProvisioningRepository.setFactoryResetProtectionActive(true)
+            assertThat(isVisible).isFalse()
+
+            kosmos.fakeDeviceProvisioningRepository.setFactoryResetProtectionActive(false)
+            assertThat(isVisible).isFalse()
+
+            kosmos.fakeDeviceProvisioningRepository.setDeviceProvisioned(true)
+            assertThat(isVisible).isTrue()
         }
 
     /**
@@ -775,14 +794,9 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
     }
 
     /** Emulates the dismissal of the IME (soft keyboard). */
-    private suspend fun TestScope.dismissIme(
-        showImeBeforeDismissing: Boolean = true,
-    ) {
+    private fun TestScope.dismissIme() {
         (bouncerViewModel.authMethodViewModel.value as? PasswordBouncerViewModel)?.let {
-            if (showImeBeforeDismissing) {
-                it.onImeVisibilityChanged(true)
-            }
-            it.onImeVisibilityChanged(false)
+            it.onImeDismissed()
             runCurrent()
         }
     }

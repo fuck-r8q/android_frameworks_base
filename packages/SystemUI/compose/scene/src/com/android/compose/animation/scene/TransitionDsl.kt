@@ -17,6 +17,7 @@
 package com.android.compose.animation.scene
 
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -31,14 +32,24 @@ fun transitions(builder: SceneTransitionsBuilder.() -> Unit): SceneTransitions {
 @TransitionDsl
 interface SceneTransitionsBuilder {
     /**
+     * The default [AnimationSpec] used when after the user lifts their finger after starting a
+     * swipe to transition, to animate back into one of the 2 scenes we are transitioning to.
+     */
+    var defaultSwipeSpec: SpringSpec<Float>
+
+    /**
      * Define the default animation to be played when transitioning [to] the specified scene, from
      * any scene. For the animation specification to apply only when transitioning between two
      * specific scenes, use [from] instead.
+     *
+     * If [key] is not `null`, then this transition will only be used if the same key is specified
+     * when triggering the transition.
      *
      * @see from
      */
     fun to(
         to: SceneKey,
+        key: TransitionKey? = null,
         builder: TransitionBuilder.() -> Unit = {},
     ): TransitionSpec
 
@@ -48,7 +59,8 @@ interface SceneTransitionsBuilder {
      * the destination scene via the [to] argument.
      *
      * When looking up which transition should be used when animating from scene A to scene B, we
-     * pick the single transition matching one of these predicates (in order of importance):
+     * pick the single transition with the given [key] and matching one of these predicates (in
+     * order of importance):
      * 1. from == A && to == B
      * 2. to == A && from == B, which is then treated in reverse.
      * 3. (from == A && to == null) || (from == null && to == B)
@@ -57,6 +69,7 @@ interface SceneTransitionsBuilder {
     fun from(
         from: SceneKey,
         to: SceneKey? = null,
+        key: TransitionKey? = null,
         builder: TransitionBuilder.() -> Unit = {},
     ): TransitionSpec
 }
@@ -64,10 +77,18 @@ interface SceneTransitionsBuilder {
 @TransitionDsl
 interface TransitionBuilder : PropertyTransformationBuilder {
     /**
-     * The [AnimationSpec] used to animate the progress of this transition from `0` to `1` when
-     * performing programmatic (not input pointer tracking) animations.
+     * The [AnimationSpec] used to animate the associated transition progress from `0` to `1` when
+     * the transition is triggered (i.e. it is not gesture-based).
      */
     var spec: AnimationSpec<Float>
+
+    /**
+     * The [SpringSpec] used to animate the associated transition progress when the transition was
+     * started by a swipe and is now animating back to a scene because the user lifted their finger.
+     *
+     * If `null`, then the [SceneTransitionsBuilder.defaultSwipeSpec] will be used.
+     */
+    var swipeSpec: SpringSpec<Float>?
 
     /**
      * Define a progress-based range for the transformations inside [builder].

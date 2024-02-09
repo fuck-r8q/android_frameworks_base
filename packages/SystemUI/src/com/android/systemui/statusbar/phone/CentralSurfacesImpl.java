@@ -28,10 +28,10 @@ import static androidx.lifecycle.Lifecycle.State.RESUMED;
 
 import static com.android.systemui.Dependency.TIME_TICK_HANDLER_NAME;
 import static com.android.systemui.Flags.lightRevealMigration;
+import static com.android.systemui.Flags.predictiveBackSysui;
 import static com.android.systemui.charging.WirelessChargingAnimation.UNKNOWN_BATTERY_LEVEL;
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.PERMISSION_SELF;
 import static com.android.systemui.statusbar.StatusBarState.SHADE;
-import static com.android.systemui.Flags.predictiveBackSysui;
 
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
@@ -95,7 +95,6 @@ import androidx.lifecycle.LifecycleRegistry;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.colorextraction.ColorExtractor;
-import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.UiEvent;
 import com.android.internal.logging.UiEventLogger;
@@ -126,6 +125,7 @@ import com.android.systemui.charging.WiredChargingRippleController;
 import com.android.systemui.charging.WirelessChargingAnimation;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
+import com.android.systemui.communal.domain.interactor.CommunalInteractor;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
@@ -202,12 +202,10 @@ import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.core.StatusBarInitializer;
 import com.android.systemui.statusbar.data.model.StatusBarMode;
 import com.android.systemui.statusbar.data.repository.StatusBarModeRepositoryStore;
-import com.android.systemui.statusbar.notification.DynamicPrivacyController;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.notification.NotificationLaunchAnimatorControllerProvider;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
 import com.android.systemui.statusbar.notification.init.NotificationsController;
-import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.NotificationGutsManager;
 import com.android.systemui.statusbar.notification.shared.NotificationIconContainerRefactor;
@@ -225,7 +223,6 @@ import com.android.systemui.statusbar.policy.ExtensionController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
-import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.surfaceeffects.ripple.RippleShader.RippleShape;
@@ -249,6 +246,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -278,18 +276,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private static final String BANNER_ACTION_SETUP =
             "com.android.systemui.statusbar.banner_action_setup";
 
-    private static final int MSG_OPEN_SETTINGS_PANEL = 1002;
     private static final int MSG_LAUNCH_TRANSITION_TIMEOUT = 1003;
     // 1020-1040 reserved for BaseStatusBar
-
-    /**
-     * TODO(b/249277686) delete this
-     * The delay to reset the hint text when the hint animation is finished running.
-     */
-    private static final int HINT_RESET_DELAY_MS = 1200;
-
-    /** If true, the lockscreen will show a distinct wallpaper */
-    public static final boolean ENABLE_LOCKSCREEN_WALLPAPER = true;
 
     private static final UiEventLogger sUiEventLogger = new UiEventLoggerImpl();
 
@@ -300,7 +288,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private CentralSurfacesCommandQueueCallbacks mCommandQueueCallbacks;
     private float mTransitionToFullShadeProgress = 0f;
     private final NotificationListContainer mNotifListContainer;
-    private boolean mIsShortcutListSearchEnabled;
+    private final boolean mIsShortcutListSearchEnabled;
 
     private final KeyguardStateController.Callback mKeyguardStateControllerCallback =
             new KeyguardStateController.Callback() {
@@ -459,7 +447,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationGutsManager mGutsManager;
     private final ShadeExpansionStateManager mShadeExpansionStateManager;
     private final KeyguardViewMediator mKeyguardViewMediator;
-    private final VisualInterruptionDecisionProvider mVisualInterruptionDecisionProvider;
     private final BrightnessSliderController.Factory mBrightnessSliderFactory;
     private final FeatureFlags mFeatureFlags;
     private final FragmentService mFragmentService;
@@ -555,7 +542,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private int mLastLoggedStateFingerprint;
     private boolean mIsLaunchingActivityOverLockscreen;
 
-    private final UserSwitcherController mUserSwitcherController;
     private final LifecycleRegistry mLifecycle = new LifecycleRegistry(this);
     protected final BatteryController mBatteryController;
     private UiModeManager mUiModeManager;
@@ -566,6 +552,25 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final ScreenLifecycle mScreenLifecycle;
     private final WakefulnessLifecycle mWakefulnessLifecycle;
     protected final PowerInteractor mPowerInteractor;
+
+    private final CommunalInteractor mCommunalInteractor;
+
+    /**
+     * True if the device is showing the glanceable hub. See
+     * {@link CommunalInteractor#isIdleOnCommunal()} for more details.
+     */
+    private boolean mIsIdleOnCommunal = false;
+    private final Consumer<Boolean> mIdleOnCommunalConsumer = (Boolean idleOnCommunal) -> {
+        if (idleOnCommunal == mIsIdleOnCommunal) {
+            // Ignore initial value coming through the flow.
+            return;
+        }
+
+        mIsIdleOnCommunal = idleOnCommunal;
+        // Trigger an update for the scrim state when we enter or exit glanceable hub, so that we
+        // can transition to/from ScrimState.GLANCEABLE_HUB if needed.
+        updateScrimController();
+    };
 
     private boolean mNoAnimationOnNextBarModeChange;
     private final SysuiStatusBarStateController mStatusBarStateController;
@@ -585,8 +590,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     private final ColorExtractor.OnColorsChangedListener mOnColorsChangedListener =
             (extractor, which) -> updateTheme();
-
-    private final InteractionJankMonitor mJankMonitor;
 
     private final SceneContainerFlags mSceneContainerFlags;
 
@@ -615,12 +618,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             KeyguardBypassController keyguardBypassController,
             KeyguardStateController keyguardStateController,
             HeadsUpManager headsUpManager,
-            DynamicPrivacyController dynamicPrivacyController,
             FalsingManager falsingManager,
             FalsingCollector falsingCollector,
             BroadcastDispatcher broadcastDispatcher,
             NotificationGutsManager notificationGutsManager,
-            VisualInterruptionDecisionProvider visualInterruptionDecisionProvider,
             ShadeExpansionStateManager shadeExpansionStateManager,
             KeyguardViewMediator keyguardViewMediator,
             DisplayMetrics displayMetrics,
@@ -633,12 +634,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             NotificationLockscreenUserManager lockScreenUserManager,
             NotificationRemoteInputManager remoteInputManager,
             QuickSettingsController quickSettingsController,
-            UserSwitcherController userSwitcherController,
             BatteryController batteryController,
             SysuiColorExtractor colorExtractor,
             ScreenLifecycle screenLifecycle,
             WakefulnessLifecycle wakefulnessLifecycle,
             PowerInteractor powerInteractor,
+            CommunalInteractor communalInteractor,
             SysuiStatusBarStateController statusBarStateController,
             Optional<Bubbles> bubblesOptional,
             Lazy<NoteTaskController> noteTaskControllerLazy,
@@ -693,7 +694,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             WallpaperManager wallpaperManager,
             Optional<StartingSurface> startingSurfaceOptional,
             ActivityLaunchAnimator activityLaunchAnimator,
-            InteractionJankMonitor jankMonitor,
             DeviceStateManager deviceStateManager,
             WiredChargingRippleController wiredChargingRippleController,
             IDreamManager dreamManager,
@@ -727,7 +727,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mFalsingManager = falsingManager;
         mBroadcastDispatcher = broadcastDispatcher;
         mGutsManager = notificationGutsManager;
-        mVisualInterruptionDecisionProvider = visualInterruptionDecisionProvider;
         mShadeExpansionStateManager = shadeExpansionStateManager;
         mKeyguardViewMediator = keyguardViewMediator;
         mDisplayMetrics = displayMetrics;
@@ -740,12 +739,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mLockscreenUserManager = lockScreenUserManager;
         mRemoteInputManager = remoteInputManager;
         mQsController = quickSettingsController;
-        mUserSwitcherController = userSwitcherController;
         mBatteryController = batteryController;
         mColorExtractor = colorExtractor;
         mScreenLifecycle = screenLifecycle;
         mWakefulnessLifecycle = wakefulnessLifecycle;
         mPowerInteractor = powerInteractor;
+        mCommunalInteractor = communalInteractor;
         mStatusBarStateController = statusBarStateController;
         mBubblesOptional = bubblesOptional;
         mNoteTaskControllerLazy = noteTaskControllerLazy;
@@ -795,7 +794,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mMainExecutor = delayableExecutor;
         mMessageRouter = messageRouter;
         mWallpaperManager = wallpaperManager;
-        mJankMonitor = jankMonitor;
         mCameraLauncherLazy = cameraLauncherLazy;
         mAlternateBouncerInteractor = alternateBouncerInteractor;
         mUserTracker = userTracker;
@@ -1076,6 +1074,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         //TODO(b/264502026) move the rest of the listeners here.
         mDeviceStateManager.registerCallback(mMainExecutor,
                 new FoldStateListener(mContext, this::onFoldedStateChanged));
+
+        mJavaAdapter.alwaysCollectFlow(
+                mCommunalInteractor.isIdleOnCommunal(),
+                mIdleOnCommunalConsumer);
     }
 
     /**
@@ -1801,10 +1803,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         }
 
         pw.println("Camera gesture intents:");
-        pw.println("   Insecure camera: " + CameraIntents.getInsecureCameraIntent(mContext));
-        pw.println("   Secure camera: " + CameraIntents.getSecureCameraIntent(mContext));
+        pw.println("   Insecure camera: " + CameraIntents.getInsecureCameraIntent(mContext, mUserTracker.getUserId()));
+        pw.println("   Secure camera: " + CameraIntents.getSecureCameraIntent(mContext, mUserTracker.getUserId()));
         pw.println("   Override package: "
-                + CameraIntents.getOverrideCameraPackage(mContext));
+                + CameraIntents.getOverrideCameraPackage(mContext, mUserTracker.getUserId()));
     }
 
     private void createAndAddWindows(@Nullable RegisterStatusBarResult result) {
@@ -2836,6 +2838,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             // This will cancel the keyguardFadingAway animation if it is running. We need to do
             // this as otherwise it can remain pending and leave keyguard in a weird state.
             mUnlockScrimCallback.onCancelled();
+        } else if (mIsIdleOnCommunal) {
+            mScrimController.transitionTo(ScrimState.GLANCEABLE_HUB);
         } else if (mKeyguardStateController.isShowing()
                 && !mKeyguardStateController.isOccluded()
                 && !unlocking) {
@@ -3103,7 +3107,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         }
     };
 
-    private StatusBarStateController.StateListener mStateListener =
+    private final StatusBarStateController.StateListener mStateListener =
             new StatusBarStateController.StateListener() {
                 @Override
                 public void onStatePreChange(int oldState, int newState) {

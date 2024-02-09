@@ -16,6 +16,7 @@
 
 package android.media.tv;
 
+import android.annotation.FlaggedApi;
 import android.annotation.FloatRange;
 import android.annotation.IntDef;
 import android.annotation.MainThread;
@@ -34,6 +35,8 @@ import android.graphics.Rect;
 import android.hardware.hdmi.HdmiDeviceInfo;
 import android.media.AudioPresentation;
 import android.media.PlaybackParams;
+import android.media.tv.ad.TvAdManager;
+import android.media.tv.flags.Flags;
 import android.media.tv.interactive.TvInteractiveAppService;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -1259,6 +1262,37 @@ public abstract class TvInputService extends Service {
         }
 
         /**
+         * Notifies data related to this session to corresponding linked
+         * {@link android.media.tv.ad.TvAdService} object via TvAdView.
+         *
+         * <p>Methods like {@link #notifyBroadcastInfoResponse(BroadcastInfoResponse)} sends the
+         * related data to linked {@link android.media.tv.interactive.TvInteractiveAppService}, but
+         * don't work for {@link android.media.tv.ad.TvAdService}. The method is used specifically
+         * for {@link android.media.tv.ad.TvAdService} use cases.
+         *
+         * @param type data type
+         * @param data the related data values
+         * @hide
+         */
+        public void notifyTvInputSessionData(
+                @NonNull @TvInputManager.SessionDataType String type, @NonNull Bundle data) {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) Log.d(TAG, "notifyTvInputSessionData");
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onTvInputSessionData(type, data);
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in notifyTvInputSessionData", e);
+                    }
+                }
+            });
+        }
+
+        /**
          * Assigns a size and position to the surface passed in {@link #onSetSurface}. The position
          * is relative to the overlay view that sits on top of this surface.
          *
@@ -1399,6 +1433,20 @@ public abstract class TvInputService extends Service {
          * @param buffer The {@link AdBuffer} that became ready for playback.
          */
         public void onAdBufferReady(@NonNull AdBuffer buffer) {
+        }
+
+
+        /**
+         * Called when data from the linked {@link android.media.tv.ad.TvAdService} is received.
+         *
+         * @param type the type of the data
+         * @param data a bundle contains the data received
+         * @see android.media.tv.ad.TvAdService.Session#notifyTvAdSessionData(String, Bundle)
+         * @see android.media.tv.ad.TvAdView#setTvView(TvView)
+         * @hide
+         */
+        public void onTvAdSessionData(
+                @NonNull @TvAdManager.SessionDataType String type, @NonNull Bundle data) {
         }
 
         /**
@@ -1569,20 +1617,20 @@ public abstract class TvInputService extends Service {
          * <p> Note that this is different form {@link #timeShiftPause()} as should release the
          * stream, making it impossible to resume from this position again.
          * @param mode
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_TIAF_V_APIS)
         public void onStopPlayback(@TvInteractiveAppService.PlaybackCommandStopMode int mode) {
         }
 
         /**
-         * Starts playback of the Audio, Video, and CC streams.
+         * Resumes playback of the Audio, Video, and CC streams.
          *
          * <p> Note that this is different form {@link #timeShiftResume()} as this is intended to be
-         * used after stopping playback. This is used to restart playback from the current position
+         * used after stopping playback. This is used to resume playback from the current position
          * in the live broadcast.
-         * @hide
          */
-        public void onStartPlayback() {
+        @FlaggedApi(Flags.FLAG_TIAF_V_APIS)
+        public void onResumePlayback() {
         }
 
         /**
@@ -2066,10 +2114,10 @@ public abstract class TvInputService extends Service {
         }
 
         /**
-         * Calls {@link #onStartPlayback()}.
+         * Calls {@link #onResumePlayback()}.
          */
-        void startPlayback() {
-            onStartPlayback();
+        void resumePlayback() {
+            onResumePlayback();
         }
 
         /**
@@ -2164,6 +2212,10 @@ public abstract class TvInputService extends Service {
 
         void notifyAdBufferReady(AdBuffer buffer) {
             onAdBufferReady(buffer);
+        }
+
+        void notifyTvAdSessionData(String type, Bundle data) {
+            onTvAdSessionData(type, data);
         }
 
         void onTvMessageReceived(int type, Bundle data) {

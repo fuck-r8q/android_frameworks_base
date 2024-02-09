@@ -42,19 +42,20 @@ sealed class Key(val debugName: String, val identity: Any) {
 
 /** Key for a scene. */
 class SceneKey(
-    name: String,
+    debugName: String,
     identity: Any = Object(),
-) : Key(name, identity), UserActionResult {
+) : Key(debugName, identity), UserActionResult {
     @VisibleForTesting
     // TODO(b/240432457): Make internal once PlatformComposeSceneTransitionLayoutTestsUtils can
     // access internal members.
-    val testTag: String = "scene:$name"
+    val testTag: String = "scene:$debugName"
 
     /** The unique [ElementKey] identifying this scene's root element. */
-    val rootElementKey = ElementKey(name, identity)
+    val rootElementKey = ElementKey(debugName, identity)
 
     // Implementation of [UserActionResult].
     override val toScene: SceneKey = this
+    override val transitionKey: TransitionKey? = null
     override val distance: UserActionDistance? = null
 
     override fun toString(): String {
@@ -64,7 +65,7 @@ class SceneKey(
 
 /** Key for an element. */
 class ElementKey(
-    name: String,
+    debugName: String,
     identity: Any = Object(),
 
     /**
@@ -72,11 +73,11 @@ class ElementKey(
      * or compose MovableElements.
      */
     val scenePicker: ElementScenePicker = DefaultElementScenePicker,
-) : Key(name, identity), ElementMatcher {
+) : Key(debugName, identity), ElementMatcher {
     @VisibleForTesting
     // TODO(b/240432457): Make internal once PlatformComposeSceneTransitionLayoutTestsUtils can
     // access internal members.
-    val testTag: String = "element:$name"
+    val testTag: String = "element:$debugName"
 
     override fun matches(key: ElementKey, scene: SceneKey): Boolean {
         return key == this
@@ -99,8 +100,18 @@ class ElementKey(
 }
 
 /** Key for a shared value of an element. */
-class ValueKey(name: String, identity: Any = Object()) : Key(name, identity) {
+class ValueKey(debugName: String, identity: Any = Object()) : Key(debugName, identity) {
     override fun toString(): String {
         return "ValueKey(debugName=$debugName)"
+    }
+}
+
+/**
+ * Key for a transition. This can be used to specify which transition spec should be used when
+ * starting the transition between two scenes.
+ */
+class TransitionKey(debugName: String, identity: Any = Object()) : Key(debugName, identity) {
+    override fun toString(): String {
+        return "TransitionKey(debugName=$debugName)"
     }
 }

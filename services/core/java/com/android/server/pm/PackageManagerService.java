@@ -600,6 +600,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     static final int DEFAULT_FILE_ACCESS_MODE = 0644;
 
+    static final int DEFAULT_NATIVE_LIBRARY_FILE_ACCESS_MODE = 0755;
+
     final Handler mHandler;
     final Handler mBackgroundHandler;
 
@@ -1553,6 +1555,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
             pkgSetting
                     .setPkg(null)
+                    // This package was installed as archived. Need to mark it for later restore.
+                    .setPendingRestore(true)
                     .modifyUserState(userId)
                     .setInstalled(false)
                     .setArchiveState(archiveState);
@@ -2562,12 +2566,20 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         PackageSetting pkgSetting = mSettings.getPackageLPr(pkgName);
                         if (pkgSetting != null) {
                             pkgSetting.setAppMetadataFilePath(path);
+                            if (Flags.aslInApkAppMetadataSource()) {
+                                pkgSetting.setAppMetadataSource(
+                                        PackageManager.APP_METADATA_SOURCE_SYSTEM_IMAGE);
+                            }
                         } else {
                             Slog.w(TAG, "Cannot set app metadata file for nonexistent package "
                                     + pkgName);
                         }
                     } else {
                         disabledPkgSetting.setAppMetadataFilePath(path);
+                        if (Flags.aslInApkAppMetadataSource()) {
+                            disabledPkgSetting.setAppMetadataSource(
+                                    PackageManager.APP_METADATA_SOURCE_SYSTEM_IMAGE);
+                        }
                     }
                 }
             }
@@ -5255,6 +5267,21 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return null;
         }
 
+        @android.annotation.EnforcePermission(android.Manifest.permission.GET_APP_METADATA)
+        @Override
+        public int getAppMetadataSource(String packageName, int userId) {
+            getAppMetadataSource_enforcePermission();
+            final int callingUid = Binder.getCallingUid();
+            final Computer snapshot = snapshotComputer();
+            final PackageStateInternal ps = snapshot.getPackageStateForInstalledAndFiltered(
+                    packageName, callingUid, userId);
+            if (ps == null) {
+                throw new ParcelableException(
+                        new PackageManager.NameNotFoundException(packageName));
+            }
+            return ps.getAppMetadataSource();
+        }
+
         @Override
         public String getPermissionControllerPackageName() {
             final int callingUid = Binder.getCallingUid();
@@ -6442,8 +6469,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         @Override
-        public Bitmap getArchivedAppIcon(@NonNull String packageName, @NonNull UserHandle user) {
-            return mInstallerService.mPackageArchiver.getArchivedAppIcon(packageName, user);
+        public Bitmap getArchivedAppIcon(@NonNull String packageName, @NonNull UserHandle user,
+                @NonNull String callingPackageName) {
+            return mInstallerService.mPackageArchiver.getArchivedAppIcon(packageName, user,
+                    callingPackageName);
         }
 
         @Override
@@ -7835,7 +7864,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mResolveActivity.launchMode = ActivityInfo.LAUNCH_MULTIPLE;
             mResolveActivity.flags = ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS
                     | ActivityInfo.FLAG_FINISH_ON_CLOSE_SYSTEM_DIALOGS
-                    | ActivityInfo.FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES;
+                    | ActivityInfo.FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES
+                    | ActivityInfo.FLAG_HARDWARE_ACCELERATED;
             mResolveActivity.theme = 0;
             mResolveActivity.exported = true;
             mResolveActivity.enabled = true;
@@ -7869,7 +7899,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 mResolveActivity.documentLaunchMode = ActivityInfo.DOCUMENT_LAUNCH_NEVER;
                 mResolveActivity.flags = ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS
                         | ActivityInfo.FLAG_RELINQUISH_TASK_IDENTITY
-                        | ActivityInfo.FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES;
+                        | ActivityInfo.FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES
+                        | ActivityInfo.FLAG_HARDWARE_ACCELERATED;
                 mResolveActivity.theme = R.style.Theme_Material_Dialog_Alert;
                 mResolveActivity.exported = true;
                 mResolveActivity.enabled = true;

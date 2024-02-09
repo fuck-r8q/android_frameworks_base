@@ -42,7 +42,7 @@ import com.android.systemui.recents.RecentsImplementation;
 import com.android.systemui.rotationlock.RotationLockModule;
 import com.android.systemui.scene.SceneContainerFrameworkModule;
 import com.android.systemui.screenshot.ReferenceScreenshotModule;
-import com.android.systemui.settings.dagger.MultiUserUtilsModule;
+import com.android.systemui.settings.MultiUserUtilsModule;
 import com.android.systemui.shade.NotificationShadeWindowControllerImpl;
 import com.android.systemui.shade.ShadeModule;
 import com.android.systemui.statusbar.CommandQueue;
@@ -63,6 +63,7 @@ import com.android.systemui.statusbar.policy.IndividualSensorPrivacyControllerIm
 import com.android.systemui.statusbar.policy.SensorPrivacyController;
 import com.android.systemui.statusbar.policy.SensorPrivacyControllerImpl;
 import com.android.systemui.toast.ToastModule;
+import com.android.systemui.unfold.UnfoldTransitionModule;
 import com.android.systemui.volume.dagger.VolumeModule;
 import com.android.systemui.wallpapers.dagger.WallpaperModule;
 
@@ -107,6 +108,7 @@ import javax.inject.Named;
         ShadeModule.class,
         StartCentralSurfacesModule.class,
         SceneContainerFrameworkModule.class,
+        UnfoldTransitionModule.Startables.class,
         ToastModule.class,
         VolumeModule.class,
         WallpaperModule.class

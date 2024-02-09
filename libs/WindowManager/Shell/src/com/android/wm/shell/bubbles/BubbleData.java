@@ -15,7 +15,6 @@
  */
 package com.android.wm.shell.bubbles;
 
-import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PRIVATE;
 import static com.android.wm.shell.bubbles.Bubble.KEY_APP_BUBBLE;
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.DEBUG_BUBBLE_DATA;
@@ -41,6 +40,7 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.launcher3.icons.BubbleIconFactory;
 import com.android.wm.shell.R;
 import com.android.wm.shell.bubbles.Bubbles.DismissReason;
+import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.common.bubbles.BubbleBarUpdate;
 import com.android.wm.shell.common.bubbles.RemovedBubble;
 
@@ -427,7 +427,7 @@ public class BubbleData {
     /**
      * When this method is called it is expected that all info in the bubble has completed loading.
      * @see Bubble#inflate(BubbleViewInfoTask.Callback, Context, BubbleController, BubbleStackView,
-     * BubbleIconFactory, boolean)
+     * BubbleBarLayerView, BubbleIconFactory, boolean)
      */
     void notificationEntryUpdated(Bubble bubble, boolean suppressFlyout, boolean showInShade) {
         if (DEBUG_BUBBLE_DATA) {
@@ -488,6 +488,19 @@ public class BubbleData {
         }
         doRemove(key, reason);
         dispatchPendingChanges();
+    }
+
+    /**
+     * Explicitly removes a bubble from the overflow, if it exists.
+     *
+     * @param bubble the bubble to remove.
+     */
+    public void removeOverflowBubble(Bubble bubble) {
+        if (bubble == null) return;
+        if (mOverflowBubbles.remove(bubble)) {
+            mStateChange.removedOverflowBubble = bubble;
+            dispatchPendingChanges();
+        }
     }
 
     /**
@@ -1056,7 +1069,6 @@ public class BubbleData {
     /**
      * The set of bubbles in row.
      */
-    @VisibleForTesting(visibility = PACKAGE)
     public List<Bubble> getBubbles() {
         return Collections.unmodifiableList(mBubbles);
     }
@@ -1145,7 +1157,6 @@ public class BubbleData {
         return null;
     }
 
-    @VisibleForTesting(visibility = PRIVATE)
     public Bubble getOverflowBubbleWithKey(String key) {
         for (int i = 0; i < mOverflowBubbles.size(); i++) {
             Bubble bubble = mOverflowBubbles.get(i);

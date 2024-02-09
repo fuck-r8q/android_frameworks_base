@@ -179,6 +179,11 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
     }
 
     @Override
+    public void addQsTileToFrontOrEnd(ComponentName tile, boolean end) {
+        mQSHost.addTile(tile, end);
+    }
+
+    @Override
     public void remQsTile(ComponentName tile) {
         mQSHost.removeTileByUser(tile);
     }
@@ -347,7 +352,7 @@ public class CentralSurfacesCommandQueueCallbacks implements CommandQueue.Callba
         }
 
         if (!mKeyguardStateController.isShowing()) {
-            final Intent cameraIntent = CameraIntents.getInsecureCameraIntent(mContext);
+            final Intent cameraIntent = CameraIntents.getInsecureCameraIntent(mContext, mUserTracker.getUserId());
             cameraIntent.putExtra(CameraIntents.EXTRA_LAUNCH_SOURCE, source);
             mActivityStarter.startActivityDismissingKeyguard(cameraIntent,
                     false /* onlyProvisioned */, true /* dismissShade */,

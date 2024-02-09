@@ -26,9 +26,9 @@ import android.credentials.GetCandidateCredentialsResponse;
 import android.credentials.GetCredentialRequest;
 import android.credentials.GetCredentialResponse;
 import android.credentials.IGetCandidateCredentialsCallback;
-import android.credentials.ui.GetCredentialProviderData;
-import android.credentials.ui.ProviderData;
-import android.credentials.ui.RequestInfo;
+import android.credentials.selection.GetCredentialProviderData;
+import android.credentials.selection.ProviderData;
+import android.credentials.selection.RequestInfo;
 import android.os.CancellationSignal;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -116,7 +116,7 @@ public class GetCandidateRequestSession extends RequestSession<GetCredentialRequ
                         mRequestId, mClientRequest, mClientAppInfo.getPackageName(),
                         PermissionUtils.hasPermission(mContext, mClientAppInfo.getPackageName(),
                                 Manifest.permission.CREDENTIAL_MANAGER_SET_ALLOWED_PROVIDERS)),
-                providerDataList,
+                /*providerDataList=*/ null,
                 /*isRequestForAllOptions=*/ true);
 
         List<GetCredentialProviderData> candidateProviderDataList = new ArrayList<>();

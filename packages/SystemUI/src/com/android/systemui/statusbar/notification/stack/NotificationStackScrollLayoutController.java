@@ -21,8 +21,9 @@ import static android.service.notification.NotificationStats.DISMISS_SENTIMENT_N
 
 import static com.android.app.animation.Interpolators.STANDARD;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_NOTIFICATION_SHADE_SCROLL_FLING;
+import static com.android.server.notification.Flags.screenshareNotificationHiding;
 import static com.android.systemui.Dependency.ALLOW_NOTIFICATION_LONG_PRESS_NAME;
-import static com.android.systemui.Flags.screenshareNotificationHiding;
+import static com.android.systemui.Flags.nsslFalsingFix;
 import static com.android.systemui.statusbar.StatusBarState.KEYGUARD;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.OnEmptySpaceClickListener;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.OnOverscrollTopChangedListener;
@@ -845,11 +846,13 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         mView.setKeyguardBypassEnabled(mKeyguardBypassController.getBypassEnabled());
         mKeyguardBypassController
                 .registerOnBypassStateChangedListener(mView::setKeyguardBypassEnabled);
-        mView.setManageButtonClickListener(v -> {
-            if (mNotificationActivityStarter != null) {
-                mNotificationActivityStarter.startHistoryIntent(v, mView.isHistoryShown());
-            }
-        });
+        if (!FooterViewRefactor.isEnabled()) {
+            mView.setManageButtonClickListener(v -> {
+                if (mNotificationActivityStarter != null) {
+                    mNotificationActivityStarter.startHistoryIntent(v, mView.isHistoryShown());
+                }
+            });
+        }
 
         mHeadsUpManager.addListener(mOnHeadsUpChangedListener);
         mHeadsUpManager.setAnimationStateHandler(mView::setHeadsUpGoingAwayAnimationsAllowed);
@@ -1142,6 +1145,14 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     /** Get the y-coordinate of the top bound of the stack. */
     public float getPlaceholderTop() {
         return mStackAppearanceInteractor.getStackBounds().getValue().getTop();
+    }
+
+    /**
+     * Returns whether the notification stack is scrolled to the top; i.e., it cannot be scrolled
+     * down any further.
+     */
+    public boolean isPlaceholderScrolledToTop() {
+        return mStackAppearanceInteractor.getScrolledToTop().getValue();
     }
 
     /** Set the intrinsic height of the stack content without additional padding. */
@@ -2044,7 +2055,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             }
             boolean horizontalSwipeWantsIt = false;
             boolean scrollerWantsIt = false;
-            if (KeyguardShadeMigrationNssl.isEnabled()) {
+            if (nsslFalsingFix() || KeyguardShadeMigrationNssl.isEnabled()) {
                 // Reverse the order relative to the else statement. onScrollTouch will reset on an
                 // UP event, causing horizontalSwipeWantsIt to be set to true on vertical swipes.
                 if (mLongPressedView == null && !mView.isBeingDragged()

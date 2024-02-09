@@ -100,14 +100,17 @@ class DesktopTasksController(
 
     private val desktopMode: DesktopModeImpl
     private var visualIndicator: DesktopModeVisualIndicator? = null
+    private val desktopModeShellCommandHandler: DesktopModeShellCommandHandler =
+        DesktopModeShellCommandHandler(this)
+
     private val mOnAnimationFinishedCallback = Consumer<SurfaceControl.Transaction> {
         t: SurfaceControl.Transaction ->
         visualIndicator?.releaseVisualIndicator(t)
         visualIndicator = null
     }
     private val taskVisibilityListener = object : VisibleTasksListener {
-        override fun onVisibilityChanged(displayId: Int, hasVisibleFreeformTasks: Boolean) {
-            launchAdjacentController.launchAdjacentEnabled = !hasVisibleFreeformTasks
+        override fun onTasksVisibilityChanged(displayId: Int, visibleTasksCount: Int) {
+            launchAdjacentController.launchAdjacentEnabled = visibleTasksCount == 0
         }
     }
     private val dragToDesktopStateListener = object : DragToDesktopStateListener {
@@ -148,6 +151,8 @@ class DesktopTasksController(
     private fun onInit() {
         KtProtoLog.d(WM_SHELL_DESKTOP_MODE, "Initialize DesktopTasksController")
         shellCommandHandler.addDumpCallback(this::dump, this)
+        shellCommandHandler.addCommandCallback("desktopmode", desktopModeShellCommandHandler,
+            this)
         shellController.addExternalInterface(
             ShellSharedConstants.KEY_EXTRA_SHELL_DESKTOP_MODE,
             { createExternalInterface() },
@@ -237,6 +242,40 @@ class DesktopTasksController(
     ) {
         shellTaskOrganizer.getRunningTaskInfo(taskId)?.let {
             task -> moveToDesktop(decor, task, wct)
+        }
+    }
+
+    /** Move a task with given `taskId` to desktop without decor */
+    fun moveToDesktopWithoutDecor(
+        taskId: Int,
+        wct: WindowContainerTransaction
+    ): Boolean {
+        val task = shellTaskOrganizer.getRunningTaskInfo(taskId) ?: return false
+        moveToDesktopWithoutDecor(task, wct)
+        return true
+    }
+
+    /**
+     * Move a task to desktop without decor
+     */
+    private fun moveToDesktopWithoutDecor(
+        task: RunningTaskInfo,
+        wct: WindowContainerTransaction
+    ) {
+        KtProtoLog.v(
+            WM_SHELL_DESKTOP_MODE,
+            "DesktopTasksController: moveToDesktopWithoutDecor taskId=%d",
+            task.taskId
+        )
+        exitSplitIfApplicable(wct, task)
+        // Bring other apps to front first
+        bringDesktopAppsToFront(task.displayId, wct)
+        addMoveToDesktopChanges(wct, task)
+
+        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
+            transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
+        } else {
+            shellTaskOrganizer.applyTransaction(wct)
         }
     }
 
@@ -919,22 +958,27 @@ class DesktopTasksController(
         }
         if (taskBounds.top <= transitionAreaHeight) {
             moveToFullscreenWithAnimation(taskInfo, position)
+            return
         }
         if (inputCoordinate.x <= transitionAreaWidth) {
             releaseVisualIndicator()
-            var wct = WindowContainerTransaction()
+            val wct = WindowContainerTransaction()
             addMoveToSplitChanges(wct, taskInfo)
             splitScreenController.requestEnterSplitSelect(taskInfo, wct,
                 SPLIT_POSITION_TOP_OR_LEFT, taskBounds)
+            return
         }
         if (inputCoordinate.x >= (displayController.getDisplayLayout(taskInfo.displayId)?.width()
             ?.minus(transitionAreaWidth) ?: return)) {
             releaseVisualIndicator()
-            var wct = WindowContainerTransaction()
+            val wct = WindowContainerTransaction()
             addMoveToSplitChanges(wct, taskInfo)
             splitScreenController.requestEnterSplitSelect(taskInfo, wct,
                 SPLIT_POSITION_BOTTOM_OR_RIGHT, taskBounds)
+            return
         }
+        // A freeform drag-move ended, remove the indicator immediately.
+        releaseVisualIndicator()
     }
 
     /**
@@ -1028,14 +1072,16 @@ class DesktopTasksController(
                 SingleInstanceRemoteListener<DesktopTasksController, IDesktopTaskListener>
 
         private val listener: VisibleTasksListener = object : VisibleTasksListener {
-            override fun onVisibilityChanged(displayId: Int, visible: Boolean) {
+            override fun onTasksVisibilityChanged(displayId: Int, visibleTasksCount: Int) {
                 KtProtoLog.v(
                         WM_SHELL_DESKTOP_MODE,
-                        "IDesktopModeImpl: onVisibilityChanged display=%d visible=%b",
+                        "IDesktopModeImpl: onVisibilityChanged display=%d visible=%d",
                         displayId,
-                        visible
+                        visibleTasksCount
                 )
-                remoteListener.call { l -> l.onVisibilityChanged(displayId, visible) }
+                remoteListener.call {
+                    l -> l.onTasksVisibilityChanged(displayId, visibleTasksCount)
+                }
             }
 
             override fun onStashedChanged(displayId: Int, stashed: Boolean) {

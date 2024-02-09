@@ -959,6 +959,16 @@
   <java-symbol type="string" name="roamingText8" />
   <java-symbol type="string" name="roamingText9" />
   <java-symbol type="string" name="roamingTextSearching" />
+  <java-symbol type="string" name="scCellularNetworkSecuritySummary" />
+  <java-symbol type="string" name="scCellularNetworkSecurityTitle" />
+  <java-symbol type="string" name="scIdentifierDisclosureIssueSummary" />
+  <java-symbol type="string" name="scIdentifierDisclosureIssueTitle" />
+  <java-symbol type="string" name="scNullCipherIssueActionLearnMore" />
+  <java-symbol type="string" name="scNullCipherIssueActionSettings" />
+  <java-symbol type="string" name="scNullCipherIssueEncryptedSummary" />
+  <java-symbol type="string" name="scNullCipherIssueEncryptedTitle" />
+  <java-symbol type="string" name="scNullCipherIssueNonEncryptedSummary" />
+  <java-symbol type="string" name="scNullCipherIssueNonEncryptedTitle" />
   <java-symbol type="string" name="selected" />
   <java-symbol type="string" name="sendText" />
   <java-symbol type="string" name="sending" />
@@ -2105,6 +2115,8 @@
   <java-symbol type="bool" name="config_ignoreVibrationsOnWirelessCharger" />
   <java-symbol type="integer" name="config_vibrationWaveformRampDownDuration" />
   <java-symbol type="integer" name="config_radioScanningTimeout" />
+  <java-symbol type="integer" name="config_requestVibrationParamsTimeout" />
+  <java-symbol type="array" name="config_requestVibrationParamsForUsages" />
   <java-symbol type="integer" name="config_screenBrightnessSettingMinimum" />
   <java-symbol type="integer" name="config_screenBrightnessSettingMaximum" />
   <java-symbol type="integer" name="config_screenBrightnessSettingDefault" />
@@ -2307,6 +2319,8 @@
   <java-symbol type="string" name="config_platformVpnConfirmDialogComponent" />
   <java-symbol type="string" name="config_carrierAppInstallDialogComponent" />
   <java-symbol type="string" name="config_credentialManagerDialogComponent" />
+  <java-symbol type="bool" name="config_enableOemCredentialManagerDialogComponent" />
+  <java-symbol type="string" name="config_oemCredentialManagerDialogComponent" />
   <java-symbol type="string" name="config_credentialManagerReceiverComponent" />
   <java-symbol type="string" name="config_defaultNetworkScorerPackageName" />
   <java-symbol type="string" name="config_persistentDataPackageName" />
@@ -3853,6 +3867,9 @@
   <java-symbol type="string" name="expand_button_content_description_collapsed" />
   <java-symbol type="string" name="expand_button_content_description_expanded" />
 
+  <java-symbol type="string" name="content_description_collapsed" />
+  <java-symbol type="string" name="content_description_expanded" />
+
   <!-- Colon separated list of package names that should be granted Notification Listener access -->
   <java-symbol type="string" name="config_defaultListenerAccessPackages" />
 
@@ -5359,4 +5376,13 @@
   <java-symbol type="bool" name="config_showPercentageTextDuringRebootToUpdate" />
 
   <java-symbol type="integer" name="config_minMillisBetweenInputUserActivityEvents" />
+
+  <!-- System notification for satellite service -->
+  <java-symbol type="string" name="satellite_notification_title" />
+  <java-symbol type="string" name="satellite_notification_summary" />
+  <java-symbol type="string" name="satellite_notification_open_message" />
+  <java-symbol type="string" name="satellite_notification_how_it_works" />
+  <java-symbol type="drawable" name="ic_satellite_alt_24px" />
+
+  <java-symbol type="bool" name="config_watchlistUseFileHashesCache" />
 </resources>

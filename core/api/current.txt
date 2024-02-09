@@ -13,6 +13,7 @@ package android {
     field public static final String ACCESS_CHECKIN_PROPERTIES = "android.permission.ACCESS_CHECKIN_PROPERTIES";
     field public static final String ACCESS_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION";
     field public static final String ACCESS_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION";
+    field @FlaggedApi("android.multiuser.enable_permission_to_access_hidden_profiles") public static final String ACCESS_HIDDEN_PROFILES = "android.permission.ACCESS_HIDDEN_PROFILES";
     field public static final String ACCESS_LOCATION_EXTRA_COMMANDS = "android.permission.ACCESS_LOCATION_EXTRA_COMMANDS";
     field public static final String ACCESS_MEDIA_LOCATION = "android.permission.ACCESS_MEDIA_LOCATION";
     field public static final String ACCESS_NETWORK_STATE = "android.permission.ACCESS_NETWORK_STATE";
@@ -89,6 +90,7 @@ package android {
     field public static final String DELETE_PACKAGES = "android.permission.DELETE_PACKAGES";
     field public static final String DELIVER_COMPANION_MESSAGES = "android.permission.DELIVER_COMPANION_MESSAGES";
     field public static final String DETECT_SCREEN_CAPTURE = "android.permission.DETECT_SCREEN_CAPTURE";
+    field @FlaggedApi("com.android.window.flags.screen_recording_callbacks") public static final String DETECT_SCREEN_RECORDING = "android.permission.DETECT_SCREEN_RECORDING";
     field public static final String DIAGNOSTIC = "android.permission.DIAGNOSTIC";
     field public static final String DISABLE_KEYGUARD = "android.permission.DISABLE_KEYGUARD";
     field public static final String DUMP = "android.permission.DUMP";
@@ -148,6 +150,7 @@ package android {
     field public static final String MANAGE_DEVICE_POLICY_CAMERA = "android.permission.MANAGE_DEVICE_POLICY_CAMERA";
     field public static final String MANAGE_DEVICE_POLICY_CERTIFICATES = "android.permission.MANAGE_DEVICE_POLICY_CERTIFICATES";
     field public static final String MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE = "android.permission.MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE";
+    field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String MANAGE_DEVICE_POLICY_CONTENT_PROTECTION = "android.permission.MANAGE_DEVICE_POLICY_CONTENT_PROTECTION";
     field public static final String MANAGE_DEVICE_POLICY_DEBUGGING_FEATURES = "android.permission.MANAGE_DEVICE_POLICY_DEBUGGING_FEATURES";
     field public static final String MANAGE_DEVICE_POLICY_DEFAULT_SMS = "android.permission.MANAGE_DEVICE_POLICY_DEFAULT_SMS";
     field public static final String MANAGE_DEVICE_POLICY_DEVICE_IDENTIFIERS = "android.permission.MANAGE_DEVICE_POLICY_DEVICE_IDENTIFIERS";
@@ -1794,6 +1797,7 @@ package android {
     field public static final int updatePeriodMillis = 16843344; // 0x1010250
     field public static final int use32bitAbi = 16844053; // 0x1010515
     field public static final int useAppZygote = 16844183; // 0x1010597
+    field @FlaggedApi("com.android.text.flags.use_bounds_for_width") public static final int useBoundsForWidth;
     field public static final int useDefaultMargins = 16843641; // 0x1010379
     field public static final int useEmbeddedDex = 16844190; // 0x101059e
     field public static final int useIntrinsicSizeAsMinimum = 16843536; // 0x1010310
@@ -5095,10 +5099,12 @@ package android.app {
 
   public static interface AppOpsManager.OnOpActiveChangedListener {
     method public void onOpActiveChanged(@NonNull String, int, @NonNull String, boolean);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis_enabled") public default void onOpActiveChanged(@NonNull String, int, @NonNull String, @Nullable String, int, boolean, int, int);
   }
 
   public static interface AppOpsManager.OnOpChangedListener {
     method public void onOpChanged(String, String);
+    method @FlaggedApi("android.permission.flags.device_aware_permission_apis_enabled") public default void onOpChanged(@NonNull String, @NonNull String, int, @NonNull String);
   }
 
   public abstract static class AppOpsManager.OnOpNotedCallback {
@@ -6366,6 +6372,7 @@ package android.app {
     field public static final String CATEGORY_STOPWATCH = "stopwatch";
     field public static final String CATEGORY_SYSTEM = "sys";
     field public static final String CATEGORY_TRANSPORT = "transport";
+    field @FlaggedApi("android.app.category_voicemail") public static final String CATEGORY_VOICEMAIL = "voicemail";
     field public static final String CATEGORY_WORKOUT = "workout";
     field @ColorInt public static final int COLOR_DEFAULT = 0; // 0x0
     field @NonNull public static final android.os.Parcelable.Creator<android.app.Notification> CREATOR;
@@ -6888,6 +6895,7 @@ package android.app {
     method public CharSequence getName();
     method @Nullable public String getParentChannelId();
     method public android.net.Uri getSound();
+    method @FlaggedApi("android.app.notification_channel_vibration_effect_api") @Nullable public android.os.VibrationEffect getVibrationEffect();
     method public long[] getVibrationPattern();
     method public boolean hasUserSetImportance();
     method public boolean hasUserSetSound();
@@ -6907,6 +6915,7 @@ package android.app {
     method public void setName(CharSequence);
     method public void setShowBadge(boolean);
     method public void setSound(android.net.Uri, android.media.AudioAttributes);
+    method @FlaggedApi("android.app.notification_channel_vibration_effect_api") public void setVibrationEffect(@Nullable android.os.VibrationEffect);
     method public void setVibrationPattern(long[]);
     method public boolean shouldShowLights();
     method public boolean shouldVibrate();
@@ -8277,6 +8286,9 @@ package android.app.admin {
     field public static final String ACTION_SET_NEW_PASSWORD = "android.app.action.SET_NEW_PASSWORD";
     field public static final String ACTION_START_ENCRYPTION = "android.app.action.START_ENCRYPTION";
     field public static final String ACTION_SYSTEM_UPDATE_POLICY_CHANGED = "android.app.action.SYSTEM_UPDATE_POLICY_CHANGED";
+    field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final int CONTENT_PROTECTION_DISABLED = 1; // 0x1
+    field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final int CONTENT_PROTECTION_ENABLED = 2; // 0x2
+    field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final int CONTENT_PROTECTION_NOT_CONTROLLED_BY_POLICY = 0; // 0x0
     field public static final String DELEGATION_APP_RESTRICTIONS = "delegation-app-restrictions";
     field public static final String DELEGATION_BLOCK_UNINSTALL = "delegation-block-uninstall";
     field public static final String DELEGATION_CERT_INSTALL = "delegation-cert-install";
@@ -9586,8 +9598,8 @@ package android.appwidget {
     method public static android.appwidget.AppWidgetManager getInstance(android.content.Context);
     method @FlaggedApi("android.appwidget.flags.generated_previews") @Nullable public android.widget.RemoteViews getWidgetPreview(@NonNull android.content.ComponentName, @Nullable android.os.UserHandle, int);
     method public boolean isRequestPinAppWidgetSupported();
-    method @Deprecated public void notifyAppWidgetViewDataChanged(int[], int);
-    method @Deprecated public void notifyAppWidgetViewDataChanged(int, int);
+    method public void notifyAppWidgetViewDataChanged(int[], int);
+    method public void notifyAppWidgetViewDataChanged(int, int);
     method public void partiallyUpdateAppWidget(int[], android.widget.RemoteViews);
     method public void partiallyUpdateAppWidget(int, android.widget.RemoteViews);
     method @FlaggedApi("android.appwidget.flags.generated_previews") public void removeWidgetPreview(@NonNull android.content.ComponentName, int);
@@ -12470,6 +12482,7 @@ package android.content.pm {
     method public void registerCallback(android.content.pm.LauncherApps.Callback, android.os.Handler);
     method public void registerPackageInstallerSessionCallback(@NonNull java.util.concurrent.Executor, @NonNull android.content.pm.PackageInstaller.SessionCallback);
     method public android.content.pm.LauncherActivityInfo resolveActivity(android.content.Intent, android.os.UserHandle);
+    method @FlaggedApi("android.content.pm.archiving") public void setArchiveCompatibilityOptions(boolean, boolean);
     method public boolean shouldHideFromSuggestions(@NonNull String, @NonNull android.os.UserHandle);
     method public void startAppDetailsActivity(android.content.ComponentName, android.os.UserHandle, android.graphics.Rect, android.os.Bundle);
     method public void startMainActivity(android.content.ComponentName, android.os.UserHandle, android.graphics.Rect, android.os.Bundle);
@@ -13912,6 +13925,7 @@ package android.content.res {
     method public android.content.res.AssetFileDescriptor openRawResourceFd(@RawRes int) throws android.content.res.Resources.NotFoundException;
     method public void parseBundleExtra(String, android.util.AttributeSet, android.os.Bundle) throws org.xmlpull.v1.XmlPullParserException;
     method public void parseBundleExtras(android.content.res.XmlResourceParser, android.os.Bundle) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
+    method @FlaggedApi("android.content.res.register_resource_paths") public static void registerResourcePaths(@NonNull String, @NonNull android.content.pm.ApplicationInfo);
     method public void removeLoaders(@NonNull android.content.res.loader.ResourcesLoader...);
     method @Deprecated public void updateConfiguration(android.content.res.Configuration, android.util.DisplayMetrics);
     field @AnyRes public static final int ID_NULL = 0; // 0x0
@@ -15649,6 +15663,7 @@ package android.graphics {
     method public boolean clipRect(float, float, float, float);
     method public boolean clipRect(int, int, int, int);
     method public void concat(@Nullable android.graphics.Matrix);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void concat44(@Nullable android.graphics.Matrix44);
     method public void disableZ();
     method public void drawARGB(int, int, int, int);
     method public void drawArc(@NonNull android.graphics.RectF, float, float, boolean, @NonNull android.graphics.Paint);
@@ -16295,6 +16310,24 @@ package android.graphics {
     enum_constant public static final android.graphics.Matrix.ScaleToFit END;
     enum_constant public static final android.graphics.Matrix.ScaleToFit FILL;
     enum_constant public static final android.graphics.Matrix.ScaleToFit START;
+  }
+
+  @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public class Matrix44 {
+    ctor @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public Matrix44();
+    ctor @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public Matrix44(@NonNull android.graphics.Matrix);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 concat(@NonNull android.graphics.Matrix44);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public float get(int, int);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void getValues(@NonNull float[]);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public boolean invert();
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public boolean isIdentity();
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public float[] map(float, float, float, float);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void map(float, float, float, float, @NonNull float[]);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void reset();
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 rotate(float, float, float, float);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 scale(float, float, float);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void set(int, int, float);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") public void setValues(@NonNull float[]);
+    method @FlaggedApi("com.android.graphics.hwui.flags.matrix_44") @NonNull public android.graphics.Matrix44 translate(float, float, float);
   }
 
   public class Mesh {
@@ -19205,11 +19238,13 @@ package android.hardware.camera2 {
   }
 
   public final class CameraExtensionCharacteristics {
+    method @FlaggedApi("com.android.internal.camera.flags.camera_extensions_characteristics_get") public <T> T get(int, @NonNull android.hardware.camera2.CameraCharacteristics.Key<T>);
     method @NonNull public java.util.Set<android.hardware.camera2.CaptureRequest.Key> getAvailableCaptureRequestKeys(int);
     method @NonNull public java.util.Set<android.hardware.camera2.CaptureResult.Key> getAvailableCaptureResultKeys(int);
     method @Nullable public android.util.Range<java.lang.Long> getEstimatedCaptureLatencyRangeMillis(int, @NonNull android.util.Size, int);
     method @NonNull public <T> java.util.List<android.util.Size> getExtensionSupportedSizes(int, @NonNull Class<T>);
     method @NonNull public java.util.List<android.util.Size> getExtensionSupportedSizes(int, int);
+    method @FlaggedApi("com.android.internal.camera.flags.camera_extensions_characteristics_get") @NonNull public java.util.Set<android.hardware.camera2.CameraCharacteristics.Key> getKeys(int);
     method @NonNull public java.util.List<android.util.Size> getPostviewSupportedSizes(int, @NonNull android.util.Size, int);
     method @NonNull public java.util.List<java.lang.Integer> getSupportedExtensions();
     method public boolean isCaptureProcessProgressAvailable(int);
@@ -20320,6 +20355,7 @@ package android.hardware.input {
     method @Nullable public android.hardware.input.HostUsiVersion getHostUsiVersion(@NonNull android.view.Display);
     method @Nullable public android.view.InputDevice getInputDevice(int);
     method public int[] getInputDeviceIds();
+    method @FlaggedApi("com.android.input.flags.input_device_view_behavior_api") @Nullable public android.view.InputDevice.ViewBehavior getInputDeviceViewBehavior(int);
     method @FloatRange(from=0, to=1) public float getMaximumObscuringOpacityForTouch();
     method public boolean isStylusPointerIconEnabled();
     method public void registerInputDeviceListener(android.hardware.input.InputManager.InputDeviceListener, android.os.Handler);
@@ -21250,6 +21286,7 @@ package android.media {
     method public int getStreamMinVolume(int);
     method public int getStreamVolume(int);
     method public float getStreamVolumeDb(int, int, int);
+    method @FlaggedApi("android.media.audio.supported_device_types_api") @NonNull public java.util.Set<java.lang.Integer> getSupportedDeviceTypes(int);
     method @NonNull public java.util.List<android.media.AudioMixerAttributes> getSupportedMixerAttributes(@NonNull android.media.AudioDeviceInfo);
     method @Deprecated public int getVibrateSetting(int);
     method public int getVolumeGroupIdForAttributes(@NonNull android.media.AudioAttributes);
@@ -22454,6 +22491,7 @@ package android.media {
     method @NonNull public java.util.List<java.lang.String> getSupportedVendorParameters();
     method @Nullable public static android.media.Image mapHardwareBuffer(@NonNull android.hardware.HardwareBuffer);
     method public void queueInputBuffer(int, int, int, long, int) throws android.media.MediaCodec.CryptoException;
+    method @FlaggedApi("com.android.media.codec.flags.large_audio_frame") public void queueInputBuffers(int, @NonNull java.util.ArrayDeque<android.media.MediaCodec.BufferInfo>);
     method public void queueSecureInputBuffer(int, int, @NonNull android.media.MediaCodec.CryptoInfo, long, int) throws android.media.MediaCodec.CryptoException;
     method public void release();
     method public void releaseOutputBuffer(int, boolean);
@@ -22515,6 +22553,7 @@ package android.media {
     method public abstract void onError(@NonNull android.media.MediaCodec, @NonNull android.media.MediaCodec.CodecException);
     method public abstract void onInputBufferAvailable(@NonNull android.media.MediaCodec, int);
     method public abstract void onOutputBufferAvailable(@NonNull android.media.MediaCodec, int, @NonNull android.media.MediaCodec.BufferInfo);
+    method @FlaggedApi("com.android.media.codec.flags.large_audio_frame") public void onOutputBuffersAvailable(@NonNull android.media.MediaCodec, int, @NonNull java.util.ArrayDeque<android.media.MediaCodec.BufferInfo>);
     method public abstract void onOutputFormatChanged(@NonNull android.media.MediaCodec, @NonNull android.media.MediaFormat);
   }
 
@@ -22602,6 +22641,7 @@ package android.media {
   }
 
   public static final class MediaCodec.OutputFrame {
+    method @FlaggedApi("com.android.media.codec.flags.large_audio_frame") @NonNull public java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> getBufferInfos();
     method @NonNull public java.util.Set<java.lang.String> getChangedKeys();
     method public int getFlags();
     method @NonNull public android.media.MediaFormat getFormat();
@@ -22617,6 +22657,7 @@ package android.media {
 
   public final class MediaCodec.QueueRequest {
     method public void queue();
+    method @FlaggedApi("com.android.media.codec.flags.large_audio_frame") @NonNull public android.media.MediaCodec.QueueRequest setBufferInfos(@NonNull java.util.ArrayDeque<android.media.MediaCodec.BufferInfo>);
     method @NonNull public android.media.MediaCodec.QueueRequest setByteBufferParameter(@NonNull String, @NonNull java.nio.ByteBuffer);
     method @NonNull public android.media.MediaCodec.QueueRequest setEncryptedLinearBlock(@NonNull android.media.MediaCodec.LinearBlock, int, int, @NonNull android.media.MediaCodec.CryptoInfo);
     method @NonNull public android.media.MediaCodec.QueueRequest setFlags(int);
@@ -25865,6 +25906,7 @@ package android.media.metrics {
     field public static final int FINAL_STATE_CANCELED = 2; // 0x2
     field public static final int FINAL_STATE_ERROR = 3; // 0x3
     field public static final int FINAL_STATE_SUCCEEDED = 1; // 0x1
+    field public static final int TIME_SINCE_CREATED_UNKNOWN = -1; // 0xffffffff
   }
 
   @FlaggedApi("com.android.media.editing.flags.add_media_metrics_editing") public static final class EditingEndedEvent.Builder {
@@ -25872,7 +25914,7 @@ package android.media.metrics {
     method @NonNull public android.media.metrics.EditingEndedEvent build();
     method @NonNull public android.media.metrics.EditingEndedEvent.Builder setErrorCode(int);
     method @NonNull public android.media.metrics.EditingEndedEvent.Builder setMetricsBundle(@NonNull android.os.Bundle);
-    method @NonNull public android.media.metrics.EditingEndedEvent.Builder setTimeSinceCreatedMillis(@IntRange(from=0xffffffff) long);
+    method @NonNull public android.media.metrics.EditingEndedEvent.Builder setTimeSinceCreatedMillis(@IntRange(from=android.media.metrics.EditingEndedEvent.TIME_SINCE_CREATED_UNKNOWN) long);
   }
 
   public final class EditingSession implements java.lang.AutoCloseable {
@@ -27367,6 +27409,7 @@ package android.media.tv {
     field public static final int VIDEO_UNAVAILABLE_REASON_CAS_UNKNOWN = 18; // 0x12
     field public static final int VIDEO_UNAVAILABLE_REASON_INSUFFICIENT_RESOURCE = 6; // 0x6
     field public static final int VIDEO_UNAVAILABLE_REASON_NOT_CONNECTED = 5; // 0x5
+    field @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public static final int VIDEO_UNAVAILABLE_REASON_STOPPED = 19; // 0x13
     field public static final int VIDEO_UNAVAILABLE_REASON_TUNING = 1; // 0x1
     field public static final int VIDEO_UNAVAILABLE_REASON_UNKNOWN = 0; // 0x0
     field public static final int VIDEO_UNAVAILABLE_REASON_WEAK_SIGNAL = 2; // 0x2
@@ -27458,6 +27501,7 @@ package android.media.tv {
     method public void onRemoveBroadcastInfo(int);
     method public void onRequestAd(@NonNull android.media.tv.AdRequest);
     method public void onRequestBroadcastInfo(@NonNull android.media.tv.BroadcastInfoRequest);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void onResumePlayback();
     method public boolean onSelectAudioPresentation(int, int);
     method public boolean onSelectTrack(int, @Nullable String);
     method public abstract void onSetCaptionEnabled(boolean);
@@ -27465,6 +27509,7 @@ package android.media.tv {
     method public abstract void onSetStreamVolume(@FloatRange(from=0.0, to=1.0) float);
     method public abstract boolean onSetSurface(@Nullable android.view.Surface);
     method public void onSetTvMessageEnabled(int, boolean);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void onStopPlayback(int);
     method public void onSurfaceChanged(int, int, int);
     method public long onTimeShiftGetCurrentPosition();
     method public long onTimeShiftGetStartPosition();
@@ -27599,6 +27644,7 @@ package android.media.tv {
     method public boolean onUnhandledInputEvent(android.view.InputEvent);
     method public void overrideTvAppAttributionSource(@NonNull android.content.AttributionSource);
     method public void reset();
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void resumePlayback();
     method public void selectAudioPresentation(int, int);
     method public void selectTrack(int, String);
     method public void sendAppPrivateCommand(@NonNull String, android.os.Bundle);
@@ -27611,6 +27657,7 @@ package android.media.tv {
     method public void setTvMessageEnabled(int, boolean);
     method public void setZOrderMediaOverlay(boolean);
     method public void setZOrderOnTop(boolean);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void stopPlayback(int);
     method public void timeShiftPause();
     method public void timeShiftPlay(String, android.net.Uri);
     method public void timeShiftResume();
@@ -27660,6 +27707,59 @@ package android.media.tv {
 package android.media.tv.ad {
 
   @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public class TvAdManager {
+    method @NonNull public java.util.List<android.media.tv.ad.TvAdServiceInfo> getTvAdServiceList();
+  }
+
+  public abstract static class TvAdManager.TvAdServiceCallback {
+    ctor public TvAdManager.TvAdServiceCallback();
+    method public void onAdServiceAdded(@NonNull String);
+    method public void onAdServiceRemoved(@NonNull String);
+    method public void onAdServiceUpdated(@NonNull String);
+  }
+
+  @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public abstract class TvAdService extends android.app.Service {
+    ctor public TvAdService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method @Nullable public abstract android.media.tv.ad.TvAdService.Session onCreateSession(@NonNull String, @NonNull String);
+    field public static final String SERVICE_INTERFACE = "android.media.tv.ad.TvAdService";
+    field public static final String SERVICE_META_DATA = "android.media.tv.ad.service";
+  }
+
+  public abstract static class TvAdService.Session implements android.view.KeyEvent.Callback {
+    ctor public TvAdService.Session(@NonNull android.content.Context);
+    method @CallSuper public void layoutSurface(int, int, int, int);
+    method public boolean onGenericMotionEvent(@NonNull android.view.MotionEvent);
+    method public boolean onKeyDown(int, @Nullable android.view.KeyEvent);
+    method public boolean onKeyLongPress(int, @Nullable android.view.KeyEvent);
+    method public boolean onKeyMultiple(int, int, @Nullable android.view.KeyEvent);
+    method public boolean onKeyUp(int, @Nullable android.view.KeyEvent);
+    method public abstract void onRelease();
+    method public abstract boolean onSetSurface(@Nullable android.view.Surface);
+    method public void onSurfaceChanged(int, int, int);
+    method public boolean onTouchEvent(@NonNull android.view.MotionEvent);
+    method public boolean onTrackballEvent(@NonNull android.view.MotionEvent);
+  }
+
+  @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public final class TvAdServiceInfo implements android.os.Parcelable {
+    ctor public TvAdServiceInfo(@NonNull android.content.Context, @NonNull android.content.ComponentName);
+    method public int describeContents();
+    method @NonNull public String getId();
+    method @Nullable public android.content.pm.ServiceInfo getServiceInfo();
+    method @NonNull public java.util.List<java.lang.String> getSupportedTypes();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.tv.ad.TvAdServiceInfo> CREATOR;
+  }
+
+  @FlaggedApi("android.media.tv.flags.enable_ad_service_fw") public class TvAdView extends android.view.ViewGroup {
+    ctor public TvAdView(@NonNull android.content.Context);
+    ctor public TvAdView(@NonNull android.content.Context, @Nullable android.util.AttributeSet);
+    ctor public TvAdView(@NonNull android.content.Context, @Nullable android.util.AttributeSet, int);
+    method public void onAttachedToWindow();
+    method public void onDetachedFromWindow();
+    method public void onLayout(boolean, int, int, int, int);
+    method public void onMeasure(int, int);
+    method public void onVisibilityChanged(@NonNull android.view.View, int);
+    method public void prepareAdService(@NonNull String, @NonNull String);
   }
 
 }
@@ -27797,6 +27897,7 @@ package android.media.tv.interactive {
     method public void onRecordingTuned(@NonNull String, @NonNull android.net.Uri);
     method public abstract void onRelease();
     method public void onResetInteractiveApp();
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void onSelectedTrackInfo(@NonNull java.util.List<android.media.tv.TvTrackInfo>);
     method public abstract boolean onSetSurface(@Nullable android.view.Surface);
     method public void onSetTeletextAppEnabled(boolean);
     method public void onSignalStrength(int);
@@ -27831,6 +27932,7 @@ package android.media.tv.interactive {
     method @CallSuper public void requestCurrentVideoBounds();
     method @CallSuper public void requestScheduleRecording(@NonNull String, @NonNull String, @NonNull android.net.Uri, @NonNull android.net.Uri, @NonNull android.os.Bundle);
     method @CallSuper public void requestScheduleRecording(@NonNull String, @NonNull String, @NonNull android.net.Uri, long, long, int, @NonNull android.os.Bundle);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") @CallSuper public void requestSelectedTrackInfo();
     method @CallSuper public void requestSigning(@NonNull String, @NonNull String, @NonNull String, @NonNull byte[]);
     method @CallSuper public void requestStartRecording(@NonNull String, @Nullable android.net.Uri);
     method @CallSuper public void requestStopRecording(@NonNull String);
@@ -27895,6 +27997,7 @@ package android.media.tv.interactive {
     method public void sendCurrentChannelUri(@Nullable android.net.Uri);
     method public void sendCurrentTvInputId(@Nullable String);
     method public void sendCurrentVideoBounds(@NonNull android.graphics.Rect);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void sendSelectedTrackInfo(@Nullable java.util.List<android.media.tv.TvTrackInfo>);
     method public void sendSigningResult(@NonNull String, @NonNull byte[]);
     method public void sendStreamVolume(float);
     method public void sendTimeShiftMode(int);
@@ -27930,6 +28033,7 @@ package android.media.tv.interactive {
     method public void onRequestCurrentVideoBounds(@NonNull String);
     method public void onRequestScheduleRecording(@NonNull String, @NonNull String, @NonNull String, @NonNull android.net.Uri, @NonNull android.net.Uri, @NonNull android.os.Bundle);
     method public void onRequestScheduleRecording(@NonNull String, @NonNull String, @NonNull String, @NonNull android.net.Uri, long, long, int, @NonNull android.os.Bundle);
+    method @FlaggedApi("android.media.tv.flags.tiaf_v_apis") public void onRequestSelectedTrackInfo(@NonNull String);
     method public void onRequestSigning(@NonNull String, @NonNull String, @NonNull String, @NonNull String, @NonNull byte[]);
     method public void onRequestStartRecording(@NonNull String, @NonNull String, @Nullable android.net.Uri);
     method public void onRequestStopRecording(@NonNull String, @NonNull String);
@@ -33220,7 +33324,7 @@ package android.os {
     method public static long getStartRequestedElapsedRealtime();
     method public static long getStartRequestedUptimeMillis();
     method public static long getStartUptimeMillis();
-    method public static final int getThreadPriority(int) throws java.lang.IllegalArgumentException;
+    method @IntRange(from=0xffffffec, to=android.os.Process.THREAD_PRIORITY_LOWEST) public static final int getThreadPriority(int) throws java.lang.IllegalArgumentException;
     method public static final int getUidForName(String);
     method public static final boolean is64Bit();
     method public static boolean isApplicationUid(int);
@@ -33235,8 +33339,8 @@ package android.os {
     method public static final int myUid();
     method public static android.os.UserHandle myUserHandle();
     method public static final void sendSignal(int, int);
-    method public static final void setThreadPriority(int, int) throws java.lang.IllegalArgumentException, java.lang.SecurityException;
-    method public static final void setThreadPriority(int) throws java.lang.IllegalArgumentException, java.lang.SecurityException;
+    method public static final void setThreadPriority(int, @IntRange(from=0xffffffec, to=android.os.Process.THREAD_PRIORITY_LOWEST) int) throws java.lang.IllegalArgumentException, java.lang.SecurityException;
+    method public static final void setThreadPriority(@IntRange(from=0xffffffec, to=android.os.Process.THREAD_PRIORITY_LOWEST) int) throws java.lang.IllegalArgumentException, java.lang.SecurityException;
     method @Deprecated public static final boolean supportsProcesses();
     field public static final int BLUETOOTH_UID = 1002; // 0x3ea
     field public static final int FIRST_APPLICATION_UID = 10000; // 0x2710
@@ -43517,13 +43621,44 @@ package android.telephony {
   }
 
   public static final class CarrierConfigManager.ImsEmergency {
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int DOMAIN_CS = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int DOMAIN_PS_3GPP = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int DOMAIN_PS_NON_3GPP = 3; // 0x3
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_CROSS_STACK_REDIAL_TIMER_SEC_INT = "imsemergency.cross_stack_redial_timer_sec_int";
     field public static final String KEY_EMERGENCY_CALLBACK_MODE_SUPPORTED_BOOL = "imsemergency.emergency_callback_mode_supported_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_CALL_SETUP_TIMER_ON_CURRENT_NETWORK_SEC_INT = "imsemergency.emergency_call_setup_timer_on_current_network_sec_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_CDMA_PREFERRED_NUMBERS_STRING_ARRAY = "imsemergency.emergency_cdma_preferred_numbers_string_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_DOMAIN_PREFERENCE_INT_ARRAY = "imsemergency.emergency_domain_preference_int_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_DOMAIN_PREFERENCE_ROAMING_INT_ARRAY = "imsemergency.emergency_domain_preference_roaming_int_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_LTE_PREFERRED_AFTER_NR_FAILED_BOOL = "imsemergency.emergency_lte_preferred_after_nr_failed_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_NETWORK_SCAN_TYPE_INT = "imsemergency.emergency_network_scan_type_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_OVER_CS_ROAMING_SUPPORTED_ACCESS_NETWORK_TYPES_INT_ARRAY = "imsemergency.emergency_over_cs_roaming_supported_access_network_types_int_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_OVER_CS_SUPPORTED_ACCESS_NETWORK_TYPES_INT_ARRAY = "imsemergency.emergency_over_cs_supported_access_network_types_int_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_OVER_IMS_ROAMING_SUPPORTED_3GPP_NETWORK_TYPES_INT_ARRAY = "imsemergency.emergency_over_ims_roaming_supported_3gpp_network_types_int_array";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_OVER_IMS_SUPPORTED_3GPP_NETWORK_TYPES_INT_ARRAY = "imsemergency.emergency_over_ims_supported_3gpp_network_types_int_array";
     field public static final String KEY_EMERGENCY_OVER_IMS_SUPPORTED_RATS_INT_ARRAY = "imsemergency.emergency_over_ims_supported_rats_int_array";
     field public static final String KEY_EMERGENCY_QOS_PRECONDITION_SUPPORTED_BOOL = "imsemergency.emergency_qos_precondition_supported_bool";
     field public static final String KEY_EMERGENCY_REGISTRATION_TIMER_MILLIS_INT = "imsemergency.emergency_registration_timer_millis_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_REQUIRES_IMS_REGISTRATION_BOOL = "imsemergency.emergency_requires_ims_registration_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_REQUIRES_VOLTE_ENABLED_BOOL = "imsemergency.emergency_requires_volte_enabled_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_SCAN_TIMER_SEC_INT = "imsemergency.emergency_scan_timer_sec_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_EMERGENCY_VOWIFI_REQUIRES_CONDITION_INT = "imsemergency.emergency_vowifi_requires_condition_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_MAXIMUM_CELLULAR_SEARCH_TIMER_SEC_INT = "imsemergency.maximum_cellular_search_timer_sec_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_MAXIMUM_NUMBER_OF_EMERGENCY_TRIES_OVER_VOWIFI_INT = "imsemergency.maximum_number_of_emergency_tries_over_vowifi_int";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_PREFER_IMS_EMERGENCY_WHEN_VOICE_CALLS_ON_CS_BOOL = "imsemergency.prefer_ims_emergency_when_voice_calls_on_cs_bool";
     field public static final String KEY_PREFIX = "imsemergency.";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_QUICK_CROSS_STACK_REDIAL_TIMER_SEC_INT = "imsemergency.quick_cross_stack_redial_timer_sec_int";
     field public static final String KEY_REFRESH_GEOLOCATION_TIMEOUT_MILLIS_INT = "imsemergency.refresh_geolocation_timeout_millis_int";
     field public static final String KEY_RETRY_EMERGENCY_ON_IMS_PDN_BOOL = "imsemergency.retry_emergency_on_ims_pdn_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_SCAN_LIMITED_SERVICE_AFTER_VOLTE_FAILURE_BOOL = "imsemergency.scan_limited_service_after_volte_failure_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final String KEY_START_QUICK_CROSS_STACK_REDIAL_TIMER_WHEN_REGISTERED_BOOL = "imsemergency.start_quick_cross_stack_redial_timer_when_registered_bool";
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int REDIAL_TIMER_DISABLED = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int SCAN_TYPE_FULL_SERVICE = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int SCAN_TYPE_FULL_SERVICE_FOLLOWED_BY_LIMITED_SERVICE = 2; // 0x2
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int SCAN_TYPE_NO_PREFERENCE = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int VOWIFI_REQUIRES_NONE = 0; // 0x0
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int VOWIFI_REQUIRES_SETTING_ENABLED = 1; // 0x1
+    field @FlaggedApi("com.android.internal.telephony.flags.use_oem_domain_selection_service") public static final int VOWIFI_REQUIRES_VALID_EID = 2; // 0x2
   }
 
   public static final class CarrierConfigManager.ImsRtt {
@@ -44595,6 +44730,7 @@ package android.telephony {
     method @Nullable public android.telephony.CellIdentity getCellIdentity();
     method public int getDomain();
     method @Nullable public String getRegisteredPlmn();
+    method @FlaggedApi("com.android.internal.telephony.flags.network_registration_info_reject_cause") public int getRejectCause();
     method public int getTransportType();
     method public boolean isNetworkRegistered();
     method public boolean isNetworkRoaming();
@@ -45205,13 +45341,13 @@ package android.telephony {
     method @FlaggedApi("com.android.internal.telephony.flags.enforce_subscription_user_filter") @NonNull @RequiresPermission(android.Manifest.permission.INTERACT_ACROSS_PROFILES) public android.telephony.SubscriptionManager createForAllUserProfiles();
     method @NonNull @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public android.os.ParcelUuid createSubscriptionGroup(@NonNull java.util.List<java.lang.Integer>);
     method @Deprecated public static android.telephony.SubscriptionManager from(android.content.Context);
-    method public java.util.List<android.telephony.SubscriptionInfo> getAccessibleSubscriptionInfoList();
+    method @Nullable public java.util.List<android.telephony.SubscriptionInfo> getAccessibleSubscriptionInfoList();
     method public static int getActiveDataSubscriptionId();
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public android.telephony.SubscriptionInfo getActiveSubscriptionInfo(int);
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public int getActiveSubscriptionInfoCount();
     method public int getActiveSubscriptionInfoCountMax();
     method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public android.telephony.SubscriptionInfo getActiveSubscriptionInfoForSimSlotIndex(int);
-    method @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public java.util.List<android.telephony.SubscriptionInfo> getActiveSubscriptionInfoList();
+    method @Nullable @RequiresPermission(android.Manifest.permission.READ_PHONE_STATE) public java.util.List<android.telephony.SubscriptionInfo> getActiveSubscriptionInfoList();
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.READ_PHONE_STATE, "carrier privileges"}) public java.util.List<android.telephony.SubscriptionInfo> getAllSubscriptionInfoList();
     method @NonNull public java.util.List<android.telephony.SubscriptionInfo> getCompleteActiveSubscriptionInfoList();
     method public static int getDefaultDataSubscriptionId();
@@ -50485,6 +50621,10 @@ package android.view {
     method public boolean isFromSource(int);
   }
 
+  @FlaggedApi("com.android.input.flags.input_device_view_behavior_api") public static final class InputDevice.ViewBehavior {
+    method @FlaggedApi("com.android.input.flags.input_device_view_behavior_api") public boolean shouldSmoothScroll(int, int);
+  }
+
   public abstract class InputEvent implements android.os.Parcelable {
     method public int describeContents();
     method public final android.view.InputDevice getDevice();
@@ -50724,6 +50864,7 @@ package android.view {
     field public static final int KEYCODE_DVR = 173; // 0xad
     field public static final int KEYCODE_E = 33; // 0x21
     field public static final int KEYCODE_EISU = 212; // 0xd4
+    field @FlaggedApi("com.android.hardware.input.emoji_and_screenshot_keycodes_available") public static final int KEYCODE_EMOJI_PICKER = 317; // 0x13d
     field public static final int KEYCODE_ENDCALL = 6; // 0x6
     field public static final int KEYCODE_ENTER = 66; // 0x42
     field public static final int KEYCODE_ENVELOPE = 65; // 0x41
@@ -50856,6 +50997,7 @@ package android.view {
     field public static final int KEYCODE_RIGHT_BRACKET = 72; // 0x48
     field public static final int KEYCODE_RO = 217; // 0xd9
     field public static final int KEYCODE_S = 47; // 0x2f
+    field @FlaggedApi("com.android.hardware.input.emoji_and_screenshot_keycodes_available") public static final int KEYCODE_SCREENSHOT = 318; // 0x13e
     field public static final int KEYCODE_SCROLL_LOCK = 116; // 0x74
     field public static final int KEYCODE_SEARCH = 84; // 0x54
     field public static final int KEYCODE_SEMICOLON = 74; // 0x4a
@@ -53831,6 +53973,7 @@ package android.view {
     method public default void addCrossWindowBlurEnabledListener(@NonNull java.util.function.Consumer<java.lang.Boolean>);
     method public default void addCrossWindowBlurEnabledListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
     method public default void addProposedRotationListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.IntConsumer);
+    method @FlaggedApi("com.android.window.flags.screen_recording_callbacks") @RequiresPermission(android.Manifest.permission.DETECT_SCREEN_RECORDING) public default int addScreenRecordingCallback(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Integer>);
     method @NonNull public default android.view.WindowMetrics getCurrentWindowMetrics();
     method @Deprecated public android.view.Display getDefaultDisplay();
     method @NonNull public default android.view.WindowMetrics getMaximumWindowMetrics();
@@ -53840,6 +53983,7 @@ package android.view {
     method @FlaggedApi("com.android.window.flags.surface_control_input_receiver") public default void registerUnbatchedSurfaceControlInputReceiver(int, @NonNull android.os.IBinder, @NonNull android.view.SurfaceControl, @NonNull android.os.Looper, @NonNull android.view.SurfaceControlInputReceiver);
     method public default void removeCrossWindowBlurEnabledListener(@NonNull java.util.function.Consumer<java.lang.Boolean>);
     method public default void removeProposedRotationListener(@NonNull java.util.function.IntConsumer);
+    method @FlaggedApi("com.android.window.flags.screen_recording_callbacks") @RequiresPermission(android.Manifest.permission.DETECT_SCREEN_RECORDING) public default void removeScreenRecordingCallback(@NonNull java.util.function.Consumer<java.lang.Integer>);
     method public void removeViewImmediate(android.view.View);
     method @FlaggedApi("com.android.window.flags.surface_control_input_receiver") public default void unregisterSurfaceControlInputReceiver(@NonNull android.view.SurfaceControl);
     method @FlaggedApi("com.android.window.flags.trusted_presentation_listener_for_window") public default void unregisterTrustedPresentationListener(@NonNull java.util.function.Consumer<java.lang.Boolean>);
@@ -53859,6 +54003,8 @@ package android.view {
     field public static final String PROPERTY_COMPAT_ENABLE_FAKE_FOCUS = "android.window.PROPERTY_COMPAT_ENABLE_FAKE_FOCUS";
     field public static final String PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION = "android.window.PROPERTY_COMPAT_IGNORE_REQUESTED_ORIENTATION";
     field @FlaggedApi("com.android.window.flags.supports_multi_instance_system_ui") public static final String PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI = "android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI";
+    field @FlaggedApi("com.android.window.flags.screen_recording_callbacks") public static final int SCREEN_RECORDING_STATE_NOT_VISIBLE = 0; // 0x0
+    field @FlaggedApi("com.android.window.flags.screen_recording_callbacks") public static final int SCREEN_RECORDING_STATE_VISIBLE = 1; // 0x1
   }
 
   public static class WindowManager.BadTokenException extends java.lang.RuntimeException {
@@ -59572,7 +59718,7 @@ package android.widget {
     method public void setRadioGroupChecked(@IdRes int, @IdRes int);
     method public void setRelativeScrollPosition(@IdRes int, int);
     method @Deprecated public void setRemoteAdapter(int, @IdRes int, android.content.Intent);
-    method @Deprecated public void setRemoteAdapter(@IdRes int, android.content.Intent);
+    method public void setRemoteAdapter(@IdRes int, android.content.Intent);
     method public void setRemoteAdapter(@IdRes int, @NonNull android.widget.RemoteViews.RemoteCollectionItems);
     method public void setScrollPosition(@IdRes int, int);
     method public void setShort(@IdRes int, String, short);
@@ -59617,7 +59763,6 @@ package android.widget {
   }
 
   @FlaggedApi("android.appwidget.flags.draw_data_parcel") public static final class RemoteViews.DrawInstructions {
-    method @FlaggedApi("android.appwidget.flags.draw_data_parcel") public void appendInstructions(@NonNull byte[]);
   }
 
   @FlaggedApi("android.appwidget.flags.draw_data_parcel") public static final class RemoteViews.DrawInstructions.Builder {

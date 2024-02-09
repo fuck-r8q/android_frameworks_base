@@ -111,7 +111,7 @@ interface ITvInputManager {
     void resumeRecording(in IBinder sessionToken, in Bundle params, int userId);
 
     // For playback control
-    void startPlayback(in IBinder sessionToken, int userId);
+    void resumePlayback(in IBinder sessionToken, int userId);
     void stopPlayback(in IBinder sessionToken, int mode, int userId);
 
     // For broadcast info
@@ -152,4 +152,6 @@ interface ITvInputManager {
 
     // For freezing video playback
     void setVideoFrozen(in IBinder sessionToken, boolean isFrozen, int userId);
+
+    void notifyTvAdSessionData(in IBinder sessionToken, in String type, in Bundle data, int userId);
 }

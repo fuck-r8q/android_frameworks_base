@@ -2064,12 +2064,9 @@ public class DisplayPolicy {
              */
             final Rect mConfigFrame = new Rect();
 
-            /** The count of insets sources when calculating this info. */
-            int mLastInsetsSourceCount;
-
             private boolean mNeedUpdate = true;
 
-            void update(DisplayContent dc, int rotation, int w, int h) {
+            InsetsState update(DisplayContent dc, int rotation, int w, int h) {
                 final DisplayFrames df = new DisplayFrames();
                 dc.updateDisplayFrames(df, rotation, w, h);
                 dc.getDisplayPolicy().simulateLayoutDisplay(df);
@@ -2086,8 +2083,8 @@ public class DisplayPolicy {
                 mNonDecorFrame.inset(mNonDecorInsets);
                 mConfigFrame.set(displayFrame);
                 mConfigFrame.inset(mConfigInsets);
-                mLastInsetsSourceCount = dc.getDisplayPolicy().mInsetsSourceWindowsExceptIme.size();
                 mNeedUpdate = false;
+                return insetsState;
             }
 
             void set(Info other) {
@@ -2095,7 +2092,6 @@ public class DisplayPolicy {
                 mConfigInsets.set(other.mConfigInsets);
                 mNonDecorFrame.set(other.mNonDecorFrame);
                 mConfigFrame.set(other.mConfigFrame);
-                mLastInsetsSourceCount = other.mLastInsetsSourceCount;
                 mNeedUpdate = false;
             }
 
@@ -2148,6 +2144,29 @@ public class DisplayPolicy {
             }
         }
 
+        static boolean hasInsetsFrameDiff(InsetsState s1, InsetsState s2, int insetsTypes) {
+            int insetsCount1 = 0;
+            for (int i = s1.sourceSize() - 1; i >= 0; i--) {
+                final InsetsSource source1 = s1.sourceAt(i);
+                if ((source1.getType() & insetsTypes) == 0) {
+                    continue;
+                }
+                insetsCount1++;
+                final InsetsSource source2 = s2.peekSource(source1.getId());
+                if (source2 == null || !source2.getFrame().equals(source1.getFrame())) {
+                    return true;
+                }
+            }
+            int insetsCount2 = 0;
+            for (int i = s2.sourceSize() - 1; i >= 0; i--) {
+                final InsetsSource source2 = s2.sourceAt(i);
+                if ((source2.getType() & insetsTypes) != 0) {
+                    insetsCount2++;
+                }
+            }
+            return insetsCount1 != insetsCount2;
+        }
+
         private static class Cache {
             /**
              * If {@link #mPreserveId} is this value, it is in the middle of updating display
@@ -2182,12 +2201,14 @@ public class DisplayPolicy {
         final int dw = displayFrames.mWidth;
         final int dh = displayFrames.mHeight;
         final DecorInsets.Info newInfo = mDecorInsets.mTmpInfo;
-        newInfo.update(mDisplayContent, rotation, dw, dh);
+        final InsetsState newInsetsState = newInfo.update(mDisplayContent, rotation, dw, dh);
         final DecorInsets.Info currentInfo = getDecorInsetsInfo(rotation, dw, dh);
         if (newInfo.mConfigFrame.equals(currentInfo.mConfigFrame)) {
             // Even if the config frame is not changed in current rotation, it may change the
-            // insets in other rotations if the source count is changed.
-            if (newInfo.mLastInsetsSourceCount != currentInfo.mLastInsetsSourceCount) {
+            // insets in other rotations if the frame of insets source is changed.
+            final InsetsState currentInsetsState = mDisplayContent.mDisplayFrames.mInsetsState;
+            if (DecorInsets.hasInsetsFrameDiff(
+                    newInsetsState, currentInsetsState, mService.mConfigTypes)) {
                 for (int i = mDecorInsets.mInfoForRotation.length - 1; i >= 0; i--) {
                     if (i != rotation) {
                         final boolean flipSize = (i + rotation) % 2 == 1;

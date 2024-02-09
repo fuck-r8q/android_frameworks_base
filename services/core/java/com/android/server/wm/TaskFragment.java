@@ -16,6 +16,7 @@
 
 package com.android.server.wm;
 
+import static android.Manifest.permission.EMBED_ANY_APP_IN_UNTRUSTED_MODE;
 import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
@@ -731,6 +732,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             // TaskFragment to have bounds outside of the parent bounds.
             return false;
         }
+        if (hasEmbedAnyAppInUntrustedModePermission(mTaskFragmentOrganizerUid)) {
+            return true;
+        }
         return (a.info.flags & FLAG_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING)
                 == FLAG_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING;
     }
@@ -799,6 +803,15 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     private static boolean hasManageTaskPermission(int uid) {
         return checkPermission(MANAGE_ACTIVITY_TASKS, PermissionChecker.PID_UNKNOWN, uid)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Checks if a particular app uid has the {@link EMBED_ANY_APP_IN_UNTRUSTED_MODE} permission.
+     */
+    private static boolean hasEmbedAnyAppInUntrustedModePermission(int uid) {
+        return Flags.untrustedEmbeddingAnyAppPermission()
+                && checkPermission(EMBED_ANY_APP_IN_UNTRUSTED_MODE,
+                PermissionChecker.PID_UNKNOWN, uid) == PackageManager.PERMISSION_GRANTED;
     }
 
     /**
@@ -1947,11 +1960,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
                 ProtoLog.v(WM_DEBUG_STATES, "Enqueue pending stop if needed: %s "
                                 + "wasStopping=%b visibleRequested=%b",  prev,  wasStopping,
                         prev.isVisibleRequested());
-                if (prev.deferRelaunchUntilPaused) {
-                    // Complete the deferred relaunch that was waiting for pause to complete.
-                    ProtoLog.v(WM_DEBUG_STATES, "Re-launching after pause: %s", prev);
-                    prev.relaunchActivityLocked(prev.preserveWindowOnDeferredRelaunch);
-                } else if (wasStopping) {
+                if (wasStopping) {
                     // We are also stopping, the stop request must have gone soon after the pause.
                     // We can't clobber it, because the stop confirmation will not be handled.
                     // We don't need to schedule another stop, we only need to let it happen.

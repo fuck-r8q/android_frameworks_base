@@ -17,7 +17,10 @@
 package com.android.compose.animation.scene
 
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.util.fastForEach
@@ -36,34 +39,45 @@ import com.android.compose.animation.scene.transformation.Translate
 /** The transitions configuration of a [SceneTransitionLayout]. */
 class SceneTransitions
 internal constructor(
+    internal val defaultSwipeSpec: SpringSpec<Float>,
     internal val transitionSpecs: List<TransitionSpecImpl>,
 ) {
-    private val cache = mutableMapOf<SceneKey, MutableMap<SceneKey, TransitionSpecImpl>>()
+    private val cache =
+        mutableMapOf<
+            SceneKey, MutableMap<SceneKey, MutableMap<TransitionKey?, TransitionSpecImpl>>
+        >()
 
-    internal fun transitionSpec(from: SceneKey, to: SceneKey): TransitionSpecImpl {
-        return cache.getOrPut(from) { mutableMapOf() }.getOrPut(to) { findSpec(from, to) }
+    internal fun transitionSpec(
+        from: SceneKey,
+        to: SceneKey,
+        key: TransitionKey?,
+    ): TransitionSpecImpl {
+        return cache
+            .getOrPut(from) { mutableMapOf() }
+            .getOrPut(to) { mutableMapOf() }
+            .getOrPut(key) { findSpec(from, to, key) }
     }
 
-    private fun findSpec(from: SceneKey, to: SceneKey): TransitionSpecImpl {
-        val spec = transition(from, to) { it.from == from && it.to == to }
+    private fun findSpec(from: SceneKey, to: SceneKey, key: TransitionKey?): TransitionSpecImpl {
+        val spec = transition(from, to, key) { it.from == from && it.to == to }
         if (spec != null) {
             return spec
         }
 
-        val reversed = transition(from, to) { it.from == to && it.to == from }
+        val reversed = transition(from, to, key) { it.from == to && it.to == from }
         if (reversed != null) {
             return reversed.reversed()
         }
 
         val relaxedSpec =
-            transition(from, to) {
+            transition(from, to, key) {
                 (it.from == from && it.to == null) || (it.to == to && it.from == null)
             }
         if (relaxedSpec != null) {
             return relaxedSpec
         }
 
-        return transition(from, to) {
+        return transition(from, to, key) {
                 (it.from == to && it.to == null) || (it.to == from && it.from == null)
             }
             ?.reversed()
@@ -73,11 +87,12 @@ internal constructor(
     private fun transition(
         from: SceneKey,
         to: SceneKey,
+        key: TransitionKey?,
         filter: (TransitionSpecImpl) -> Boolean,
     ): TransitionSpecImpl? {
         var match: TransitionSpecImpl? = null
         transitionSpecs.fastForEach { spec ->
-            if (filter(spec)) {
+            if (spec.key == key && filter(spec)) {
                 if (match != null) {
                     error("Found multiple transition specs for transition $from => $to")
                 }
@@ -88,15 +103,24 @@ internal constructor(
     }
 
     private fun defaultTransition(from: SceneKey, to: SceneKey) =
-        TransitionSpecImpl(from, to, TransformationSpec.EmptyProvider)
+        TransitionSpecImpl(key = null, from, to, TransformationSpec.EmptyProvider)
 
     companion object {
-        val Empty = SceneTransitions(transitionSpecs = emptyList())
+        internal val DefaultSwipeSpec =
+            spring(
+                stiffness = Spring.StiffnessMediumLow,
+                visibilityThreshold = OffsetVisibilityThreshold,
+            )
+
+        val Empty = SceneTransitions(DefaultSwipeSpec, transitionSpecs = emptyList())
     }
 }
 
 /** The definition of a transition between [from] and [to]. */
 interface TransitionSpec {
+    /** The key of this [TransitionSpec]. */
+    val key: TransitionKey?
+
     /**
      * The scene we are transitioning from. If `null`, this spec can be used to animate from any
      * scene.
@@ -125,32 +149,50 @@ interface TransitionSpec {
 }
 
 interface TransformationSpec {
-    /** The [AnimationSpec] used to animate the associated transition progress. */
+    /**
+     * The [AnimationSpec] used to animate the associated transition progress from `0` to `1` when
+     * the transition is triggered (i.e. it is not gesture-based).
+     */
     val progressSpec: AnimationSpec<Float>
+
+    /**
+     * The [SpringSpec] used to animate the associated transition progress when the transition was
+     * started by a swipe and is now animating back to a scene because the user lifted their finger.
+     *
+     * If `null`, then the [SceneTransitions.defaultSwipeSpec] will be used.
+     */
+    val swipeSpec: SpringSpec<Float>?
 
     /** The list of [Transformation] applied to elements during this transition. */
     val transformations: List<Transformation>
 
     companion object {
         internal val Empty =
-            TransformationSpecImpl(progressSpec = snap(), transformations = emptyList())
+            TransformationSpecImpl(
+                progressSpec = snap(),
+                swipeSpec = null,
+                transformations = emptyList(),
+            )
         internal val EmptyProvider = { Empty }
     }
 }
 
 internal class TransitionSpecImpl(
+    override val key: TransitionKey?,
     override val from: SceneKey?,
     override val to: SceneKey?,
     private val transformationSpec: () -> TransformationSpecImpl,
 ) : TransitionSpec {
     override fun reversed(): TransitionSpecImpl {
         return TransitionSpecImpl(
+            key = key,
             from = to,
             to = from,
             transformationSpec = {
                 val reverse = transformationSpec.invoke()
                 TransformationSpecImpl(
                     progressSpec = reverse.progressSpec,
+                    swipeSpec = reverse.swipeSpec,
                     transformations = reverse.transformations.map { it.reversed() }
                 )
             }
@@ -166,6 +208,7 @@ internal class TransitionSpecImpl(
  */
 internal class TransformationSpecImpl(
     override val progressSpec: AnimationSpec<Float>,
+    override val swipeSpec: SpringSpec<Float>?,
     override val transformations: List<Transformation>,
 ) : TransformationSpec {
     private val cache = mutableMapOf<ElementKey, MutableMap<SceneKey, ElementTransformations>>()

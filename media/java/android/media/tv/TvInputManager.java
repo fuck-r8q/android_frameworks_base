@@ -17,11 +17,13 @@
 package android.media.tv;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
+import android.annotation.StringDef;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
@@ -34,6 +36,7 @@ import android.media.AudioFormat.Encoding;
 import android.media.AudioPresentation;
 import android.media.PlaybackParams;
 import android.media.tv.ad.TvAdManager;
+import android.media.tv.flags.Flags;
 import android.media.tv.interactive.TvInteractiveAppManager;
 import android.net.Uri;
 import android.os.Binder;
@@ -130,7 +133,8 @@ public final class TvInputManager {
             VIDEO_UNAVAILABLE_REASON_CAS_NEED_ACTIVATION, VIDEO_UNAVAILABLE_REASON_CAS_NEED_PAIRING,
             VIDEO_UNAVAILABLE_REASON_CAS_NO_CARD, VIDEO_UNAVAILABLE_REASON_CAS_CARD_MUTE,
             VIDEO_UNAVAILABLE_REASON_CAS_CARD_INVALID, VIDEO_UNAVAILABLE_REASON_CAS_BLACKOUT,
-            VIDEO_UNAVAILABLE_REASON_CAS_REBOOTING, VIDEO_UNAVAILABLE_REASON_CAS_UNKNOWN})
+            VIDEO_UNAVAILABLE_REASON_CAS_REBOOTING, VIDEO_UNAVAILABLE_REASON_CAS_UNKNOWN,
+            VIDEO_UNAVAILABLE_REASON_STOPPED})
     public @interface VideoUnavailableReason {}
 
     /** Indicates that this TV message contains watermarking data */
@@ -343,9 +347,9 @@ public final class TvInputManager {
     /**
      * Reason for {@link TvInputService.Session#notifyVideoUnavailable(int)} and
      * {@link TvView.TvInputCallback#onVideoUnavailable(String, int)}: Video is unavailable because
-     * it has been stopped by stopPlayback.
-     * @hide
+     * it has been stopped by {@link TvView#stopPlayback(int)}.
      */
+    @FlaggedApi(Flags.FLAG_TIAF_V_APIS)
     public static final int VIDEO_UNAVAILABLE_REASON_STOPPED = 19;
 
     /** @hide */
@@ -489,10 +493,19 @@ public final class TvInputManager {
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef(prefix = "BROADCAST_INFO_TYPE_", value =
-            {BROADCAST_INFO_TYPE_TS, BROADCAST_INFO_TYPE_TABLE, BROADCAST_INFO_TYPE_SECTION,
-            BROADCAST_INFO_TYPE_PES, BROADCAST_INFO_STREAM_EVENT, BROADCAST_INFO_TYPE_DSMCC,
-            BROADCAST_INFO_TYPE_COMMAND, BROADCAST_INFO_TYPE_TIMELINE})
+    @IntDef(
+            prefix = "BROADCAST_INFO_TYPE_",
+            value = {
+                BROADCAST_INFO_TYPE_TS,
+                BROADCAST_INFO_TYPE_TABLE,
+                BROADCAST_INFO_TYPE_SECTION,
+                BROADCAST_INFO_TYPE_PES,
+                BROADCAST_INFO_STREAM_EVENT,
+                BROADCAST_INFO_TYPE_DSMCC,
+                BROADCAST_INFO_TYPE_COMMAND,
+                BROADCAST_INFO_TYPE_TIMELINE,
+                BROADCAST_INFO_TYPE_SIGNALING_DATA
+            })
     public @interface BroadcastInfoType {}
 
     public static final int BROADCAST_INFO_TYPE_TS = 1;
@@ -503,6 +516,9 @@ public final class TvInputManager {
     public static final int BROADCAST_INFO_TYPE_DSMCC = 6;
     public static final int BROADCAST_INFO_TYPE_COMMAND = 7;
     public static final int BROADCAST_INFO_TYPE_TIMELINE = 8;
+
+    /** @hide */
+    public static final int BROADCAST_INFO_TYPE_SIGNALING_DATA = 9;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -522,6 +538,220 @@ public final class TvInputManager {
      * Strong signal.
      */
     public static final int SIGNAL_STRENGTH_STRONG = 3;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @StringDef(prefix = "SESSION_DATA_TYPE_", value = {
+            SESSION_DATA_TYPE_TUNED,
+            SESSION_DATA_TYPE_TRACK_SELECTED,
+            SESSION_DATA_TYPE_TRACKS_CHANGED,
+            SESSION_DATA_TYPE_VIDEO_AVAILABLE,
+            SESSION_DATA_TYPE_VIDEO_UNAVAILABLE,
+            SESSION_DATA_TYPE_BROADCAST_INFO_RESPONSE,
+            SESSION_DATA_TYPE_AD_RESPONSE,
+            SESSION_DATA_TYPE_AD_BUFFER_CONSUMED,
+            SESSION_DATA_TYPE_TV_MESSAGE})
+    public @interface SessionDataType {}
+
+    /**
+     * Informs the application that the session has been tuned to the given channel.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_CHANNEL_URI
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_TUNED = "tuned";
+
+    /**
+     * Sends the type and ID of a selected track. This is used to inform the application that a
+     * specific track is selected.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_TRACK_TYPE
+     * @see SESSION_DATA_KEY_TRACK_ID
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_TRACK_SELECTED = "track_selected";
+
+    /**
+     * Sends the list of all audio/video/subtitle tracks.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_TRACKS
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_TRACKS_CHANGED = "tracks_changed";
+
+    /**
+     * Informs the application that the video is now available for watching.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_VIDEO_AVAILABLE = "video_available";
+
+    /**
+     * Informs the application that the video became unavailable for some reason.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_VIDEO_UNAVAILABLE_REASON
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_VIDEO_UNAVAILABLE = "video_unavailable";
+
+    /**
+     * Notifies response for broadcast info.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_BROADCAST_INFO_RESPONSE
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_BROADCAST_INFO_RESPONSE =
+            "broadcast_info_response";
+
+    /**
+     * Notifies response for advertisement.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_AD_RESPONSE
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_AD_RESPONSE = "ad_response";
+
+    /**
+     * Notifies the advertisement buffer is consumed.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see SESSION_DATA_KEY_AD_BUFFER
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_AD_BUFFER_CONSUMED = "ad_buffer_consumed";
+
+    /**
+     * Sends the TV message.
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @see TvInputService.Session#notifyTvMessage(int, Bundle)
+     * @see SESSION_DATA_KEY_TV_MESSAGE_TYPE
+     * @hide
+     */
+    public static final String SESSION_DATA_TYPE_TV_MESSAGE = "tv_message";
+
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @StringDef(prefix = "SESSION_DATA_KEY_", value = {
+            SESSION_DATA_KEY_CHANNEL_URI,
+            SESSION_DATA_KEY_TRACK_TYPE,
+            SESSION_DATA_KEY_TRACK_ID,
+            SESSION_DATA_KEY_TRACKS,
+            SESSION_DATA_KEY_VIDEO_UNAVAILABLE_REASON,
+            SESSION_DATA_KEY_BROADCAST_INFO_RESPONSE,
+            SESSION_DATA_KEY_AD_RESPONSE,
+            SESSION_DATA_KEY_AD_BUFFER,
+            SESSION_DATA_KEY_TV_MESSAGE_TYPE})
+    public @interface SessionDataKey {}
+
+    /**
+     * The URI of a channel.
+     *
+     * <p> Type: android.net.Uri
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_CHANNEL_URI = "channel_uri";
+
+    /**
+     * The type of the track.
+     *
+     * <p>One of {@link TvTrackInfo#TYPE_AUDIO}, {@link TvTrackInfo#TYPE_VIDEO},
+     * {@link TvTrackInfo#TYPE_SUBTITLE}.
+     *
+     * <p> Type: Integer
+     *
+     * @see TvTrackInfo#getType()
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_TRACK_TYPE = "track_type";
+
+    /**
+     * The ID of the track.
+     *
+     * <p> Type: String
+     *
+     * @see TvTrackInfo#getId()
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_TRACK_ID = "track_id";
+
+    /**
+     * A list which includes track information.
+     *
+     * <p> Type: {@code java.util.List<android.media.tv.TvTrackInfo> }
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_TRACKS = "tracks";
+
+    /**
+     * The reason why the video became unavailable.
+     * <p>The value can be {@link VIDEO_UNAVAILABLE_REASON_BUFFERING},
+     * {@link VIDEO_UNAVAILABLE_REASON_AUDIO_ONLY}, etc.
+     *
+     * <p> Type: Integer
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_VIDEO_UNAVAILABLE_REASON =
+            "video_unavailable_reason";
+
+    /**
+     * An object of {@link BroadcastInfoResponse}.
+     *
+     * <p> Type: android.media.tv.BroadcastInfoResponse
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_BROADCAST_INFO_RESPONSE = "broadcast_info_response";
+
+    /**
+     * An object of {@link AdResponse}.
+     *
+     * <p> Type: android.media.tv.AdResponse
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_AD_RESPONSE = "ad_response";
+
+    /**
+     * An object of {@link AdBuffer}.
+     *
+     * <p> Type: android.media.tv.AdBuffer
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_AD_BUFFER = "ad_buffer";
+
+    /**
+     * The type of TV message.
+     * <p>It can be one of {@link TV_MESSAGE_TYPE_WATERMARK},
+     * {@link TV_MESSAGE_TYPE_CLOSED_CAPTION}, {@link TV_MESSAGE_TYPE_OTHER}
+     *
+     * <p> Type: Integer
+     *
+     * @see TvInputService.Session#notifyTvInputSessionData(String, Bundle)
+     * @hide
+     */
+    public static final String SESSION_DATA_KEY_TV_MESSAGE_TYPE = "tv_message_type";
+
 
     /**
      * An unknown state of the client pid gets from the TvInputManager. Client gets this value when
@@ -1259,6 +1489,17 @@ public final class TvInputManager {
                 });
             }
         }
+
+        void postTvInputSessionData(String type, Bundle data) {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (mSession.getAdSession() != null) {
+                        mSession.getAdSession().notifyTvInputSessionData(type, data);
+                    }
+                }
+            });
+        }
     }
 
     /**
@@ -1806,6 +2047,18 @@ public final class TvInputManager {
                         return;
                     }
                     record.postAdBufferConsumed(buffer);
+                }
+            }
+
+            @Override
+            public void onTvInputSessionData(String type, Bundle data, int seq) {
+                synchronized (mSessionCallbackRecordMap) {
+                    SessionCallbackRecord record = mSessionCallbackRecordMap.get(seq);
+                    if (record == null) {
+                        Log.e(TAG, "Callback not found for seq " + seq);
+                        return;
+                    }
+                    record.postTvInputSessionData(type, data);
                 }
             }
         };
@@ -3366,13 +3619,13 @@ public final class TvInputManager {
             }
         }
 
-        void startPlayback() {
+        void resumePlayback() {
             if (mToken == null) {
                 Log.w(TAG, "The session has been already released");
                 return;
             }
             try {
-                mService.startPlayback(mToken, mUserId);
+                mService.resumePlayback(mToken, mUserId);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -3829,6 +4082,21 @@ public final class TvInputManager {
                 if (buffer != null) {
                     buffer.getSharedMemory().close();
                 }
+            }
+        }
+
+        /**
+         * Notifies data from session of linked TvAdService.
+         */
+        public void notifyTvAdSessionData(String type, Bundle data) {
+            if (mToken == null) {
+                Log.w(TAG, "The session has been already released");
+                return;
+            }
+            try {
+                mService.notifyTvAdSessionData(mToken, type, data, mUserId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
             }
         }
 

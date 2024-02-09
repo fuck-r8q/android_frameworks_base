@@ -37,6 +37,7 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
 @RunWith(AndroidJUnit4::class)
+@android.platform.test.annotations.EnabledOnRavenwood
 class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
 
     private val testUser1 = UserHandle.of(1)!!
@@ -58,15 +59,21 @@ class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
     }
 
     @Test
+    fun isEnabled_settingNotInitialized_returnsFalseByDefault() =
+        scope.runTest {
+            val actualValue by collectLastValue(underTest.isEnabled(testUser1))
+
+            runCurrent()
+
+            Truth.assertThat(actualValue).isFalse()
+        }
+
+    @Test
     fun isEnabled_initiallyGetsSettingsValue() =
         scope.runTest {
             val actualValue by collectLastValue(underTest.isEnabled(testUser1))
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                ENABLED,
-                testUser1.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, ENABLED, testUser1.identifier)
             runCurrent()
 
             Truth.assertThat(actualValue).isTrue()
@@ -77,25 +84,13 @@ class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
         scope.runTest {
             val flowValues: List<Boolean> by collectValues(underTest.isEnabled(testUser1))
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                DISABLED,
-                testUser1.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, DISABLED, testUser1.identifier)
             runCurrent()
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                ENABLED,
-                testUser1.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, ENABLED, testUser1.identifier)
             runCurrent()
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                DISABLED,
-                testUser1.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, DISABLED, testUser1.identifier)
             runCurrent()
 
             Truth.assertThat(flowValues.size).isEqualTo(3)
@@ -108,26 +103,14 @@ class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
             val lastValueUser1 by collectLastValue(underTest.isEnabled(testUser1))
             val lastValueUser2 by collectLastValue(underTest.isEnabled(testUser2))
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                DISABLED,
-                testUser1.identifier
-            )
-            settings.putIntForUser(
-                SETTING_NAME,
-                DISABLED,
-                testUser2.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, DISABLED, testUser1.identifier)
+            settings.putIntForUser(SETTING_NAME, DISABLED, testUser2.identifier)
             runCurrent()
 
             Truth.assertThat(lastValueUser1).isFalse()
             Truth.assertThat(lastValueUser2).isFalse()
 
-            settings.putIntForUser(
-                SETTING_NAME,
-                ENABLED,
-                testUser1.identifier
-            )
+            settings.putIntForUser(SETTING_NAME, ENABLED, testUser1.identifier)
             runCurrent()
 
             Truth.assertThat(lastValueUser1).isTrue()
@@ -141,11 +124,7 @@ class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
             runCurrent()
             Truth.assertThat(success).isTrue()
 
-            val actualValue =
-                settings.getIntForUser(
-                    SETTING_NAME,
-                    testUser1.identifier
-                )
+            val actualValue = settings.getIntForUser(SETTING_NAME, testUser1.identifier)
             Truth.assertThat(actualValue).isEqualTo(ENABLED)
         }
 
@@ -156,11 +135,7 @@ class ColorCorrectionRepositoryImplTest : SysuiTestCase() {
             runCurrent()
             Truth.assertThat(success).isTrue()
 
-            val actualValue =
-                settings.getIntForUser(
-                    SETTING_NAME,
-                    testUser1.identifier
-                )
+            val actualValue = settings.getIntForUser(SETTING_NAME, testUser1.identifier)
             Truth.assertThat(actualValue).isEqualTo(DISABLED)
         }
 

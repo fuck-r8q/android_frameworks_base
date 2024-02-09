@@ -26,6 +26,7 @@ import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.protolog.ShellProtoLogGroup
+import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP
@@ -33,7 +34,6 @@ import com.android.wm.shell.transition.Transitions.TRANSIT_DESKTOP_MODE_END_DRAG
 import com.android.wm.shell.transition.Transitions.TRANSIT_DESKTOP_MODE_START_DRAG_TO_DESKTOP
 import com.android.wm.shell.transition.Transitions.TransitionHandler
 import com.android.wm.shell.util.KtProtoLog
-import com.android.wm.shell.util.TransitionUtil
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator.Companion.DRAG_FREEFORM_SCALE
@@ -239,7 +239,7 @@ class DragToDesktopTransitionHandler(
                     show(change.leash)
                 }
             } else if (TransitionInfo.isIndependent(change, info)) {
-                // Root.
+                // Root(s).
                 when (state) {
                     is TransitionState.FromSplit -> {
                         state.splitRootChange = change
@@ -256,6 +256,9 @@ class DragToDesktopTransitionHandler(
                         }
                     }
                     is TransitionState.FromFullscreen -> {
+                        // Most of the time we expect one change/task here, which should be the
+                        // same that initiated the drag and that should be layered on top of
+                        // everything.
                         if (change.taskInfo?.taskId == state.draggedTaskId) {
                             state.draggedTaskChange = change
                             val bounds = change.endAbsBounds
@@ -265,7 +268,18 @@ class DragToDesktopTransitionHandler(
                                 show(change.leash)
                             }
                         } else {
-                            throw IllegalStateException("Expected root to be dragged task")
+                            // It's possible to see an additional change that isn't the dragged
+                            // task when the dragged task is translucent and so the task behind it
+                            // is included in the transition since it was visible and is now being
+                            // occluded by the Home task. Just layer it at the bottom and save it
+                            // in case we need to restore order if the drag is cancelled.
+                            state.otherRootChanges.add(change)
+                            val bounds = change.endAbsBounds
+                            startTransaction.apply {
+                                setLayer(change.leash, appLayers - i)
+                                setWindowCrop(change.leash, bounds.width(), bounds.height())
+                                show(change.leash)
+                            }
                         }
                     }
                 }
@@ -515,8 +529,18 @@ class DragToDesktopTransitionHandler(
         val wct = WindowContainerTransaction()
         when (state) {
             is TransitionState.FromFullscreen -> {
+                // There may have been tasks sent behind home that are not the dragged task (like
+                // when the dragged task is translucent and that makes the task behind it visible).
+                // Restore the order of those first.
+                state.otherRootChanges.mapNotNull { it.container }.forEach { wc ->
+                    // TODO(b/322852244): investigate why even though these "other" tasks are
+                    //  reordered in front of home and behind the translucent dragged task, its
+                    //  surface is not visible on screen.
+                    wct.reorder(wc, true /* toTop */)
+                }
                 val wc = state.draggedTaskChange?.container
                         ?: error("Dragged task should be non-null before cancelling")
+                // Then the dragged task a the very top.
                 wct.reorder(wc, true /* toTop */)
             }
             is TransitionState.FromSplit -> {
@@ -574,6 +598,7 @@ class DragToDesktopTransitionHandler(
                 override var draggedTaskChange: Change? = null,
                 override var cancelled: Boolean = false,
                 override var startAborted: Boolean = false,
+                var otherRootChanges: MutableList<Change> = mutableListOf()
         ) : TransitionState()
         data class FromSplit(
                 override val draggedTaskId: Int,

@@ -18,8 +18,8 @@ package com.android.credentialmanager
 
 import android.app.Activity
 import android.content.Intent
-import android.credentials.ui.BaseDialogResult
-import android.credentials.ui.RequestInfo
+import android.credentials.selection.BaseDialogResult
+import android.credentials.selection.RequestInfo
 import android.net.Uri
 import android.os.Bundle
 import android.os.ResultReceiver
@@ -131,7 +131,7 @@ class CredentialSelectorActivity : ComponentActivity() {
             // Cancellation was for a different request, don't cancel the current UI.
             return Triple(true, false, null)
         }
-        val shouldShowCancellationUi = cancelUiRequest.shouldShowCancellationUi()
+        val shouldShowCancellationUi = cancelUiRequest.shouldShowCancellationExplanation()
         Log.d(
             Constants.LOG_TAG, "Received UI cancellation intent. Should show cancellation" +
             " ui = $shouldShowCancellationUi")
@@ -213,7 +213,7 @@ class CredentialSelectorActivity : ComponentActivity() {
     private fun onInitializationError(e: Exception, intent: Intent) {
         Log.e(Constants.LOG_TAG, "Failed to show the credential selector; closing the activity", e)
         val resultReceiver = intent.getParcelableExtra(
-            android.credentials.ui.Constants.EXTRA_RESULT_RECEIVER,
+            android.credentials.selection.Constants.EXTRA_RESULT_RECEIVER,
             ResultReceiver::class.java
         )
         val requestInfo = intent.extras?.getParcelable(

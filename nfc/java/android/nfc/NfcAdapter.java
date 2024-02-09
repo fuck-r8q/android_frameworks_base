@@ -19,6 +19,7 @@ package android.nfc;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -77,6 +78,7 @@ public final class NfcAdapter {
 
     private final NfcControllerAlwaysOnListener mControllerAlwaysOnListener;
     private final NfcWlcStateListener mNfcWlcStateListener;
+    private final NfcVendorNciCallbackListener mNfcVendorNciCallbackListener;
 
     /**
      * Intent to start an activity when a tag with NDEF payload is discovered.
@@ -416,18 +418,18 @@ public final class NfcAdapter {
     /**
      * Flags for use with {@link #setDiscoveryTechnology(Activity, int, int)}.
      * <p>
-     * Setting this flag makes listening to use current flags.
+     * Setting this flag makes listening to keep the current technology configuration.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_SET_DISCOVERY_TECH)
-    public static final int FLAG_LISTEN_KEEP = -1;
+    public static final int FLAG_LISTEN_KEEP = 0x80000000;
 
     /**
      * Flags for use with {@link #setDiscoveryTechnology(Activity, int, int)}.
      * <p>
-     * Setting this flag makes polling to use current flags.
+     * Setting this flag makes polling to keep the current technology configuration.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_SET_DISCOVERY_TECH)
-    public static final int FLAG_READER_KEEP = -1;
+    public static final int FLAG_READER_KEEP = 0x80000000;
 
     /** @hide */
     public static final int FLAG_USE_ALL_TECH = 0xff;
@@ -866,6 +868,7 @@ public final class NfcAdapter {
         mLock = new Object();
         mControllerAlwaysOnListener = new NfcControllerAlwaysOnListener(getService());
         mNfcWlcStateListener = new NfcWlcStateListener(getService());
+        mNfcVendorNciCallbackListener = new NfcVendorNciCallbackListener(getService());
     }
 
     /**
@@ -1204,37 +1207,21 @@ public final class NfcAdapter {
         }
     }
 
-   /**
-    * Disables observe mode to allow the transaction to proceed. See
-    * {@link #isObserveModeSupported()} for a description of observe mode and
-    * use {@link #disallowTransaction()} to enable observe mode and block
-    * transactions again.
-    *
-    * @return boolean indicating success or failure.
-    */
-    @FlaggedApi(Flags.FLAG_NFC_OBSERVE_MODE)
-    public boolean allowTransaction() {
-        try {
-            return sService.setObserveMode(false);
-        } catch (RemoteException e) {
-            attemptDeadServiceRecovery(e);
-            return false;
-        }
-    }
-
     /**
-    * Signals that the transaction has completed and observe mode may be
-    * reenabled. See {@link #isObserveModeSupported()} for a description of
-    * observe mode and use {@link #allowTransaction()} to disable observe
-    * mode and allow transactions to proceed.
-    *
-    * @return boolean indicating success or failure.
-    */
+     * Controls whether the NFC adapter will allow transactions to proceed or be in observe mode
+     * and simply observe and notify the APDU service of polling loop frames. See
+     * {@link #isObserveModeSupported()} for a description of observe mode.
+     *
+     * @param allowed true disables observe mode to allow the transaction to proceed while false
+     *                enables observe mode and does not allow transactions to proceed.
+     *
+     * @return boolean indicating success or failure.
+     */
 
     @FlaggedApi(Flags.FLAG_NFC_OBSERVE_MODE)
-    public boolean disallowTransaction() {
+    public boolean setTransactionAllowed(boolean allowed) {
         try {
-            return sService.setObserveMode(true);
+            return sService.setObserveMode(!allowed);
         } catch (RemoteException e) {
             attemptDeadServiceRecovery(e);
             return false;
@@ -1764,7 +1751,9 @@ public final class NfcAdapter {
     private static final int ENABLE_POLLING_FLAGS = 0x0000;
 
     /**
-     * Privileged API to enable disable reader polling.
+     * Privileged API to enable or disable reader polling.
+     * Unlike {@link #enableReaderMode(Activity, ReaderCallback, int, Bundle)}, this API does not
+     * need a foreground activity to control reader mode parameters
      * Note: Use with caution! The app is responsible for ensuring that the polling state is
      * returned to normal.
      *
@@ -1778,14 +1767,14 @@ public final class NfcAdapter {
     @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
     @SuppressLint("VisiblySynchronized")
-    public void setReaderMode(boolean enablePolling) {
+    public void setReaderModePollingEnabled(boolean enable) {
         synchronized (sLock) {
             if (!sHasNfcFeature) {
                 throw new UnsupportedOperationException();
             }
         }
         Binder token = new Binder();
-        int flags = enablePolling ? ENABLE_POLLING_FLAGS : DISABLE_POLLING_FLAGS;
+        int flags = enable ? ENABLE_POLLING_FLAGS : DISABLE_POLLING_FLAGS;
         try {
             NfcAdapter.sService.setReaderMode(token, null, flags, null);
         } catch (RemoteException e) {
@@ -1799,6 +1788,8 @@ public final class NfcAdapter {
      *
      * Use {@link #FLAG_READER_KEEP} to keep current polling technology.
      * Use {@link #FLAG_LISTEN_KEEP} to keep current listenig technology.
+     * (if the _KEEP flag is specified the other technology flags shouldn't be set
+     * and are quietly ignored otherwise).
      * Use {@link #FLAG_READER_DISABLE} to disable polling.
      * Use {@link #FLAG_LISTEN_DISABLE} to disable listening.
      * Also refer to {@link #resetDiscoveryTechnology(Activity)} to restore these changes.
@@ -1830,6 +1821,15 @@ public final class NfcAdapter {
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_SET_DISCOVERY_TECH)
     public void setDiscoveryTechnology(@NonNull Activity activity,
             @PollTechnology int pollTechnology, @ListenTechnology int listenTechnology) {
+
+        // A special treatment of the _KEEP flags
+        if ((listenTechnology & FLAG_LISTEN_KEEP) != 0) {
+            listenTechnology = -1;
+        }
+        if ((pollTechnology & FLAG_READER_KEEP) != 0) {
+            pollTechnology = -1;
+        }
+
         if (listenTechnology == FLAG_LISTEN_DISABLE) {
             synchronized (sLock) {
                 if (!sHasNfcFeature) {
@@ -1856,10 +1856,10 @@ public final class NfcAdapter {
     }
 
     /**
-     * Restore the poll/listen technologies of NFC controller,
+     * Restore the poll/listen technologies of NFC controller to its default state,
      * which were changed by {@link #setDiscoveryTechnology(Activity , int , int)}
      *
-     * @param activity The Activity that requests to changed technologies.
+     * @param activity The Activity that requested to change technologies.
      */
 
     @FlaggedApi(Flags.FLAG_ENABLE_NFC_SET_DISCOVERY_TECH)
@@ -2964,5 +2964,164 @@ public final class NfcAdapter {
             }
             return null;
         }
+    }
+
+    /**
+     * Vendor NCI command success.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public static final int SEND_VENDOR_NCI_STATUS_SUCCESS = 0;
+    /**
+     * Vendor NCI command rejected.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public static final int SEND_VENDOR_NCI_STATUS_REJECTED = 1;
+    /**
+     * Vendor NCI command corrupted.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public static final int SEND_VENDOR_NCI_STATUS_MESSAGE_CORRUPTED  = 2;
+    /**
+     * Vendor NCI command failed with unknown reason.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public static final int SEND_VENDOR_NCI_STATUS_FAILED = 3;
+
+    /**
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(value = {
+            SEND_VENDOR_NCI_STATUS_SUCCESS,
+            SEND_VENDOR_NCI_STATUS_REJECTED,
+            SEND_VENDOR_NCI_STATUS_MESSAGE_CORRUPTED,
+            SEND_VENDOR_NCI_STATUS_FAILED,
+    })
+    @interface SendVendorNciStatus {}
+
+    /**
+     * Message Type for NCI Command.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public static final int MESSAGE_TYPE_COMMAND = 1;
+
+    /**
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(value = {
+            MESSAGE_TYPE_COMMAND,
+    })
+    @interface MessageType {}
+
+    /**
+     * Send Vendor specific Nci Messages with custom message type.
+     *
+     * The format of the NCI messages are defined in the NCI specification. The platform is
+     * responsible for fragmenting the payload if necessary.
+     *
+     * Note that mt (message type) is added at the beginning of method parameters as it is more
+     * distinctive than other parameters and was requested from vendor.
+     *
+     * @param mt message Type of the command
+     * @param gid group ID of the command. This needs to be one of the vendor reserved GIDs from
+     *            the NCI specification
+     * @param oid opcode ID of the command. This is left to the OEM / vendor to decide
+     * @param payload containing vendor Nci message payload
+     * @return message send status
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+    public @SendVendorNciStatus int sendVendorNciMessage(@MessageType int mt,
+            @IntRange(from = 0, to = 15) int gid, @IntRange(from = 0) int oid,
+            @NonNull byte[] payload) {
+        Objects.requireNonNull(payload, "Payload must not be null");
+        try {
+            return sService.sendVendorNciMessage(mt, gid, oid, payload);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Register an {@link NfcVendorNciCallback} to listen for Nfc vendor responses and notifications
+     * <p>The provided callback will be invoked by the given {@link Executor}.
+     *
+     * <p>When first registering a callback, the callbacks's
+     * {@link NfcVendorNciCallback#onVendorNciCallBack(byte[])} is immediately invoked to
+     * notify the vendor notification.
+     *
+     * @param executor an {@link Executor} to execute given callback
+     * @param callback user implementation of the {@link NfcVendorNciCallback}
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+    public void registerNfcVendorNciCallback(@NonNull @CallbackExecutor Executor executor,
+            @NonNull NfcVendorNciCallback callback) {
+        mNfcVendorNciCallbackListener.register(executor, callback);
+    }
+
+    /**
+     * Unregister the specified {@link NfcVendorNciCallback}
+     *
+     * <p>The same {@link NfcVendorNciCallback} object used when calling
+     * {@link #registerNfcVendorNciCallback(Executor, NfcVendorNciCallback)} must be used.
+     *
+     * <p>Callbacks are automatically unregistered when application process goes away
+     *
+     * @param callback user implementation of the {@link NfcVendorNciCallback}
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
+    @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+    public void unregisterNfcVendorNciCallback(@NonNull NfcVendorNciCallback callback) {
+        mNfcVendorNciCallbackListener.unregister(callback);
+    }
+
+    /**
+     * Interface for receiving vendor NCI responses and notifications.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+    public interface NfcVendorNciCallback {
+        /**
+         * Invoked when a vendor specific NCI response is received.
+         *
+         * @param gid group ID of the command. This needs to be one of the vendor reserved GIDs from
+         *            the NCI specification.
+         * @param oid opcode ID of the command. This is left to the OEM / vendor to decide.
+         * @param payload containing vendor Nci message payload.
+         */
+        @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+        void onVendorNciResponse(
+                @IntRange(from = 0, to = 15) int gid, int oid, @NonNull byte[] payload);
+
+        /**
+         * Invoked when a vendor specific NCI notification is received.
+         *
+         * @param gid group ID of the command. This needs to be one of the vendor reserved GIDs from
+         *            the NCI specification.
+         * @param oid opcode ID of the command. This is left to the OEM / vendor to decide.
+         * @param payload containing vendor Nci message payload.
+         */
+        @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
+        void onVendorNciNotification(
+                @IntRange(from = 9, to = 15) int gid, int oid, @NonNull byte[] payload);
     }
 }

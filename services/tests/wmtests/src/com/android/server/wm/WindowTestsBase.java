@@ -1791,7 +1791,6 @@ class WindowTestsBase extends SystemServiceTestsBase {
         TestStartingWindowOrganizer(ActivityTaskManagerService service) {
             mAtm = service;
             mWMService = mAtm.mWindowManager;
-            mAtm.mTaskOrganizerController.setDeferTaskOrgCallbacksConsumer(Runnable::run);
             mAtm.mTaskOrganizerController.registerTaskOrganizer(this);
         }
 
@@ -1802,8 +1801,7 @@ class WindowTestsBase extends SystemServiceTestsBase {
         @Override
         public void addStartingWindow(StartingWindowInfo info) {
             synchronized (mWMService.mGlobalLock) {
-                final ActivityRecord activity = mWMService.mRoot.getActivityRecord(
-                        info.appToken);
+                final ActivityRecord activity = ActivityRecord.forTokenLocked(info.appToken);
                 IWindow iWindow = mock(IWindow.class);
                 doReturn(mock(IBinder.class)).when(iWindow).asBinder();
                 final WindowState window = WindowTestsBase.createWindow(null,
@@ -1825,8 +1823,7 @@ class WindowTestsBase extends SystemServiceTestsBase {
                 final IBinder appToken = mTaskAppMap.get(removalInfo.taskId);
                 if (appToken != null) {
                     mTaskAppMap.remove(removalInfo.taskId);
-                    final ActivityRecord activity = mWMService.mRoot.getActivityRecord(
-                            appToken);
+                    final ActivityRecord activity = ActivityRecord.forTokenLocked(appToken);
                     WindowState win = mAppWindowMap.remove(appToken);
                     activity.removeChild(win);
                     activity.mStartingWindow = null;

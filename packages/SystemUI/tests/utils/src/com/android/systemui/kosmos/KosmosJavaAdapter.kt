@@ -32,6 +32,11 @@ import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteract
 import com.android.systemui.flags.fakeFeatureFlagsClassic
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
+import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
+import com.android.systemui.keyguard.domain.interactor.fromLockscreenTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.fromPrimaryBouncerTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
+import com.android.systemui.model.sceneContainerPlugin
 import com.android.systemui.plugins.statusbar.statusBarStateController
 import com.android.systemui.power.data.repository.fakePowerRepository
 import com.android.systemui.power.domain.interactor.powerInteractor
@@ -40,6 +45,8 @@ import com.android.systemui.scene.sceneContainerConfig
 import com.android.systemui.scene.shared.flag.fakeSceneContainerFlags
 import com.android.systemui.statusbar.phone.screenOffAnimationController
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.fakeMobileConnectionsRepository
+import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
+import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.util.time.systemClock
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
@@ -60,6 +67,8 @@ class KosmosJavaAdapter(
     val bouncerRepository by lazy { kosmos.bouncerRepository }
     val communalRepository by lazy { kosmos.fakeCommunalRepository }
     val keyguardRepository by lazy { kosmos.fakeKeyguardRepository }
+    val keyguardTransitionRepository by lazy { kosmos.fakeKeyguardTransitionRepository }
+    val keyguardTransitionInteractor by lazy { kosmos.keyguardTransitionInteractor }
     val powerRepository by lazy { kosmos.fakePowerRepository }
     val clock by lazy { kosmos.systemClock }
     val mobileConnectionsRepository by lazy { kosmos.fakeMobileConnectionsRepository }
@@ -74,6 +83,13 @@ class KosmosJavaAdapter(
     val deviceEntryInteractor by lazy { kosmos.deviceEntryInteractor }
     val deviceUnlockedInteractor by lazy { kosmos.deviceUnlockedInteractor }
     val communalInteractor by lazy { kosmos.communalInteractor }
+    val sceneContainerPlugin by lazy { kosmos.sceneContainerPlugin }
+    val deviceProvisioningInteractor by lazy { kosmos.deviceProvisioningInteractor }
+    val fakeDeviceProvisioningRepository by lazy { kosmos.fakeDeviceProvisioningRepository }
+    val fromLockscreenTransitionInteractor by lazy { kosmos.fromLockscreenTransitionInteractor }
+    val fromPrimaryBouncerTransitionInteractor by lazy {
+        kosmos.fromPrimaryBouncerTransitionInteractor
+    }
 
     init {
         kosmos.applicationContext = testCase.context
