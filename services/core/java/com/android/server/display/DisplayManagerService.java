@@ -884,14 +884,15 @@ public final class DisplayManagerService extends SystemService {
     }
 
     @VisibleForTesting
-    void performTraversalInternal(SurfaceControl.Transaction t) {
+    void performTraversalInternal(SurfaceControl.Transaction t,
+            SparseArray<SurfaceControl.Transaction> displayTransactions) {
         synchronized (mSyncRoot) {
             if (!mPendingTraversal) {
                 return;
             }
             mPendingTraversal = false;
 
-            performTraversalLocked(t);
+            performTraversalLocked(t, displayTransactions);
         }
 
         // List is self-synchronized copy-on-write.
@@ -1673,14 +1674,16 @@ public final class DisplayManagerService extends SystemService {
             ContentRecordingSession session = null;
             try {
                 if (projection != null) {
-                    IBinder launchCookie = projection.getLaunchCookie();
-                    if (launchCookie == null) {
+                    IBinder taskWindowContainerToken = projection.getLaunchCookie() == null ? null
+                            : projection.getLaunchCookie().binder;
+                    if (taskWindowContainerToken == null) {
                         // Record a particular display.
                         session = ContentRecordingSession.createDisplaySession(
                                 virtualDisplayConfig.getDisplayIdToMirror());
                     } else {
                         // Record a single task indicated by the launch cookie.
-                        session = ContentRecordingSession.createTaskSession(launchCookie);
+                        session = ContentRecordingSession.createTaskSession(
+                                taskWindowContainerToken);
                     }
                 }
             } catch (RemoteException e) {
@@ -2608,7 +2611,8 @@ public final class DisplayManagerService extends SystemService {
         }
     }
 
-    private void performTraversalLocked(SurfaceControl.Transaction t) {
+    private void performTraversalLocked(SurfaceControl.Transaction t,
+            SparseArray<SurfaceControl.Transaction> displayTransactions) {
         // Clear all viewports before configuring displays so that we can keep
         // track of which ones we have configured.
         clearViewportsLocked();
@@ -2616,9 +2620,11 @@ public final class DisplayManagerService extends SystemService {
         // Configure each display device.
         mLogicalDisplayMapper.forEachLocked((LogicalDisplay display) -> {
             final DisplayDevice device = display.getPrimaryDisplayDeviceLocked();
+            final SurfaceControl.Transaction displayTransaction =
+                    displayTransactions.get(display.getDisplayIdLocked(), t);
             if (device != null) {
-                configureDisplayLocked(t, device);
-                device.performTraversalLocked(t);
+                configureDisplayLocked(displayTransaction, device);
+                device.performTraversalLocked(displayTransaction);
             }
         });
 
@@ -4706,8 +4712,9 @@ public final class DisplayManagerService extends SystemService {
         }
 
         @Override
-        public void performTraversal(SurfaceControl.Transaction t) {
-            performTraversalInternal(t);
+        public void performTraversal(SurfaceControl.Transaction t,
+                SparseArray<SurfaceControl.Transaction> displayTransactions) {
+            performTraversalInternal(t, displayTransactions);
         }
 
         @Override

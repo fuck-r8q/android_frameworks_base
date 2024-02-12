@@ -6736,11 +6736,7 @@ public class TelephonyManager {
         }
     }
 
-    /**
-     * @hide
-     */
-    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
-    private ITelephony getITelephony() {
+    private static ITelephony getITelephony() {
         // Keeps cache disabled until test fixes are checked into AOSP.
         if (!sServiceHandleCacheEnabled) {
             return ITelephony.Stub.asInterface(
@@ -18794,11 +18790,7 @@ public class TelephonyManager {
     @SimState
     public static int getSimStateForSlotIndex(int slotIndex) {
         try {
-            ITelephony telephony = ITelephony.Stub.asInterface(
-                    TelephonyFrameworkInitializer
-                            .getTelephonyServiceManager()
-                            .getTelephonyServiceRegisterer()
-                            .get());
+            ITelephony telephony = getITelephony();
             if (telephony != null) {
                 return telephony.getSimStateForSlotIndex(slotIndex);
             }
@@ -18815,9 +18807,9 @@ public class TelephonyManager {
      */
     @SystemApi
     @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_TELECOM_RESOLVE_HIDDEN_DEPENDENCIES)
-    public static final class EmergencyCallDiagnosticParams {
+    public static final class EmergencyCallDiagnosticData {
         public static final class Builder {
-            private boolean mCollectTelecomDumpSys;
+            private boolean mCollectTelecomDumpsys;
             private boolean mCollectTelephonyDumpsys;
 
             // If this is set to a value other than -1L, then the logcat collection is enabled.
@@ -18830,9 +18822,9 @@ public class TelephonyManager {
              * @param collectTelecomDumpsys Determines whether telecom dumpsys should be collected.
              * @return Builder instance corresponding to the configured call diagnostic params.
              */
-            public @NonNull Builder setTelecomDumpSysCollectionEnabled(
+            public @NonNull Builder setTelecomDumpsysCollectionEnabled(
                     boolean collectTelecomDumpsys) {
-                mCollectTelecomDumpSys = collectTelecomDumpsys;
+                mCollectTelecomDumpsys = collectTelecomDumpsys;
                 return this;
             }
 
@@ -18841,7 +18833,7 @@ public class TelephonyManager {
              * @param collectTelephonyDumpsys Determines if telephony dumpsys should be collected.
              * @return Builder instance corresponding to the configured call diagnostic params.
              */
-            public @NonNull Builder setTelephonyDumpSysCollectionEnabled(
+            public @NonNull Builder setTelephonyDumpsysCollectionEnabled(
                     boolean collectTelephonyDumpsys) {
                 mCollectTelephonyDumpsys = collectTelephonyDumpsys;
                 return this;
@@ -18859,35 +18851,35 @@ public class TelephonyManager {
             }
 
             /**
-             * Build the EmergencyCallDiagnosticParams from the provided Builder config.
-             * @return {@link EmergencyCallDiagnosticParams} instance from provided builder.
+             * Build the EmergencyCallDiagnosticData from the provided Builder config.
+             * @return {@link EmergencyCallDiagnosticData} instance from provided builder.
              */
-            public @NonNull EmergencyCallDiagnosticParams build() {
-                return new EmergencyCallDiagnosticParams(mCollectTelecomDumpSys,
+            public @NonNull EmergencyCallDiagnosticData build() {
+                return new EmergencyCallDiagnosticData(mCollectTelecomDumpsys,
                         mCollectTelephonyDumpsys, mLogcatStartTimeMillis);
             }
         }
 
-        private boolean mCollectTelecomDumpSys;
+        private boolean mCollectTelecomDumpsys;
         private boolean mCollectTelephonyDumpsys;
         private boolean mCollectLogcat;
         private long mLogcatStartTimeMillis;
 
         private static long sUnsetLogcatStartTime = -1L;
 
-        private EmergencyCallDiagnosticParams(boolean collectTelecomDumpSys,
+        private EmergencyCallDiagnosticData(boolean collectTelecomDumpsys,
                 boolean collectTelephonyDumpsys, long logcatStartTimeMillis) {
-            mCollectTelecomDumpSys = collectTelecomDumpSys;
+            mCollectTelecomDumpsys = collectTelecomDumpsys;
             mCollectTelephonyDumpsys = collectTelephonyDumpsys;
             mLogcatStartTimeMillis = logcatStartTimeMillis;
             mCollectLogcat = logcatStartTimeMillis != sUnsetLogcatStartTime;
         }
 
-        public boolean isTelecomDumpSysCollectionEnabled() {
-            return mCollectTelecomDumpSys;
+        public boolean isTelecomDumpsysCollectionEnabled() {
+            return mCollectTelecomDumpsys;
         }
 
-        public boolean isTelephonyDumpSysCollectionEnabled() {
+        public boolean isTelephonyDumpsysCollectionEnabled() {
             return mCollectTelephonyDumpsys;
         }
 
@@ -18902,12 +18894,12 @@ public class TelephonyManager {
 
         @Override
         public String toString() {
-            return "EmergencyCallDiagnosticParams{" +
-                    "mCollectTelecomDumpSys=" + mCollectTelecomDumpSys +
-                    ", mCollectTelephonyDumpsys=" + mCollectTelephonyDumpsys +
-                    ", mCollectLogcat=" + mCollectLogcat +
-                    ", mLogcatStartTimeMillis=" + mLogcatStartTimeMillis +
-                    '}';
+            return "EmergencyCallDiagnosticData{"
+                    + "mCollectTelecomDumpsys=" + mCollectTelecomDumpsys
+                    + ", mCollectTelephonyDumpsys=" + mCollectTelephonyDumpsys
+                    + ", mCollectLogcat=" + mCollectLogcat
+                    + ", mLogcatStartTimeMillis=" + mLogcatStartTimeMillis
+                    + '}';
         }
     }
 
@@ -18915,7 +18907,7 @@ public class TelephonyManager {
      * Request telephony to persist state for debugging emergency call failures.
      *
      * @param dropboxTag Tag to use when persisting data to dropbox service.
-     * @param params Parameters controlling what is collected.
+     * @param data Parameters controlling what is collected in the diagnostics.
      *
      * @hide
      */
@@ -18923,7 +18915,7 @@ public class TelephonyManager {
     @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_TELECOM_RESOLVE_HIDDEN_DEPENDENCIES)
     @RequiresPermission(android.Manifest.permission.DUMP)
     public void persistEmergencyCallDiagnosticData(@NonNull String dropboxTag,
-            @NonNull EmergencyCallDiagnosticParams params) {
+            @NonNull EmergencyCallDiagnosticData data) {
         try {
             ITelephony telephony = ITelephony.Stub.asInterface(
                     TelephonyFrameworkInitializer
@@ -18932,10 +18924,10 @@ public class TelephonyManager {
                             .get());
             if (telephony != null) {
                 telephony.persistEmergencyCallDiagnosticData(dropboxTag,
-                        params.isLogcatCollectionEnabled(),
-                        params.getLogcatCollectionStartTimeMillis(),
-                        params.isTelecomDumpSysCollectionEnabled(),
-                        params.isTelephonyDumpSysCollectionEnabled());
+                        data.isLogcatCollectionEnabled(),
+                        data.getLogcatCollectionStartTimeMillis(),
+                        data.isTelecomDumpsysCollectionEnabled(),
+                        data.isTelephonyDumpsysCollectionEnabled());
             }
         } catch (RemoteException e) {
             Log.e(TAG, "Error while persistEmergencyCallDiagnosticData: " + e);
@@ -19068,11 +19060,11 @@ public class TelephonyManager {
     @FlaggedApi(Flags.FLAG_ENABLE_MODEM_CIPHER_TRANSPARENCY)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     @SystemApi
-    public void setEnableNullCipherNotifications(boolean enable) {
+    public void setNullCipherNotificationsEnabled(boolean enable) {
         try {
             ITelephony telephony = getITelephony();
             if (telephony != null) {
-                telephony.setEnableNullCipherNotifications(enable);
+                telephony.setNullCipherNotificationsEnabled(enable);
             } else {
                 throw new IllegalStateException("telephony service is null.");
             }
@@ -19313,13 +19305,11 @@ public class TelephonyManager {
     /**
      * Returns whether the domain selection service is supported.
      *
-     * <p>Requires Permission:
-     * {@link android.Manifest.permission#READ_PRIVILEGED_PHONE_STATE READ_PRIVILEGED_PHONE_STATE}.
-     *
      * @return {@code true} if the domain selection service is supported.
      * @hide
      */
-    @TestApi
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CALLING)
     public boolean isDomainSelectionSupported() {

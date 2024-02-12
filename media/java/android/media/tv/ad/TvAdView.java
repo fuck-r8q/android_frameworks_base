@@ -17,6 +17,7 @@
 package android.media.tv.ad;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
@@ -28,25 +29,30 @@ import android.graphics.RectF;
 import android.media.tv.TvInputManager;
 import android.media.tv.TvTrackInfo;
 import android.media.tv.TvView;
+import android.media.tv.ad.TvAdManager.Session.FinishedInputEventCallback;
+import android.media.tv.flags.Flags;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Xml;
+import android.view.InputEvent;
+import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewRootImpl;
 
 import java.util.List;
 import java.util.concurrent.Executor;
 
 /**
- * Displays contents of TV AD services.
- * @hide
+ * Displays contents of TV advertisement services.
  */
+@FlaggedApi(Flags.FLAG_ENABLE_AD_SERVICE_FW)
 public class TvAdView extends ViewGroup {
     private static final String TAG = "TvAdView";
     private static final boolean DEBUG = false;
@@ -88,6 +94,7 @@ public class TvAdView extends ViewGroup {
 
     private boolean mMediaViewCreated;
     private Rect mMediaViewFrame;
+    private OnUnhandledInputEventListener mOnUnhandledInputEventListener;
 
 
 
@@ -177,14 +184,12 @@ public class TvAdView extends ViewGroup {
         return true;
     }
 
-    /** @hide */
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
         createSessionMediaView();
     }
 
-    /** @hide */
     @Override
     public void onDetachedFromWindow() {
         removeSessionMediaView();
@@ -327,6 +332,110 @@ public class TvAdView extends ViewGroup {
         mSession.dispatchSurfaceChanged(format, width, height);
     }
 
+    private final FinishedInputEventCallback mFinishedInputEventCallback =
+            new FinishedInputEventCallback() {
+                @Override
+                public void onFinishedInputEvent(Object token, boolean handled) {
+                    if (DEBUG) {
+                        Log.d(TAG, "onFinishedInputEvent(token=" + token + ", handled="
+                                + handled + ")");
+                    }
+                    if (handled) {
+                        return;
+                    }
+                    // TODO: Re-order unhandled events.
+                    InputEvent event = (InputEvent) token;
+                    if (dispatchUnhandledInputEvent(event)) {
+                        return;
+                    }
+                    ViewRootImpl viewRootImpl = getViewRootImpl();
+                    if (viewRootImpl != null) {
+                        viewRootImpl.dispatchUnhandledInputEvent(event);
+                    }
+                }
+            };
+
+    /**
+     * Dispatches an unhandled input event to the next receiver.
+     *
+     * It gives the host application a chance to dispatch the unhandled input events.
+     *
+     * @param event The input event.
+     * @return {@code true} if the event was handled by the view, {@code false} otherwise.
+     * @hide
+     */
+    public boolean dispatchUnhandledInputEvent(@NonNull InputEvent event) {
+        if (mOnUnhandledInputEventListener != null) {
+            if (mOnUnhandledInputEventListener.onUnhandledInputEvent(event)) {
+                return true;
+            }
+        }
+        return onUnhandledInputEvent(event);
+    }
+
+    /**
+     * Called when an unhandled input event also has not been handled by the user provided
+     * callback. This is the last chance to handle the unhandled input event in the
+     * TvAdView.
+     *
+     * @param event The input event.
+     * @return If you handled the event, return {@code true}. If you want to allow the event to be
+     *         handled by the next receiver, return {@code false}.
+     * @hide
+     */
+    public boolean onUnhandledInputEvent(@NonNull InputEvent event) {
+        return false;
+    }
+
+    /**
+     * Sets a listener to be invoked when an input event is not handled
+     * by the TV AD service.
+     *
+     * @param listener The callback to be invoked when the unhandled input event is received.
+     * @hide
+     */
+    public void setOnUnhandledInputEventListener(
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OnUnhandledInputEventListener listener) {
+        mOnUnhandledInputEventListener = listener;
+        // TODO: handle CallbackExecutor
+    }
+
+    /**
+     * Gets the {@link OnUnhandledInputEventListener}.
+     * <p>Returns {@code null} if the listener is not set or is cleared.
+     *
+     * @see #setOnUnhandledInputEventListener(Executor, OnUnhandledInputEventListener)
+     * @see #clearOnUnhandledInputEventListener()
+     * @hide
+     */
+    @Nullable
+    public OnUnhandledInputEventListener getOnUnhandledInputEventListener() {
+        return mOnUnhandledInputEventListener;
+    }
+
+    /**
+     * Clears the {@link OnUnhandledInputEventListener}.
+     * @hide
+     */
+    public void clearOnUnhandledInputEventListener() {
+        mOnUnhandledInputEventListener = null;
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(@Nullable KeyEvent event) {
+        if (super.dispatchKeyEvent(event)) {
+            return true;
+        }
+        if (mSession == null) {
+            return false;
+        }
+        InputEvent copiedEvent = event.copy();
+        int ret = mSession.dispatchInputEvent(copiedEvent, copiedEvent, mFinishedInputEventCallback,
+                mHandler);
+        return ret != TvAdManager.Session.DISPATCH_NOT_HANDLED;
+    }
+
     /**
      * Prepares the AD service of corresponding {@link TvAdService}.
      *
@@ -357,6 +466,7 @@ public class TvAdView extends ViewGroup {
 
     /**
      * Stops the AD service.
+     * @hide
      */
     public void stopAdService() {
         if (DEBUG) {
@@ -371,6 +481,7 @@ public class TvAdView extends ViewGroup {
      * Resets the AD service.
      *
      * <p>This releases the resources of the corresponding {@link TvAdService.Session}.
+     * @hide
      */
     public void resetAdService() {
         if (DEBUG) {
@@ -385,6 +496,7 @@ public class TvAdView extends ViewGroup {
      * Sends current video bounds to related TV AD service.
      *
      * @param bounds the rectangle area for rendering the current video.
+     * @hide
      */
     public void sendCurrentVideoBounds(@NonNull Rect bounds) {
         if (DEBUG) {
@@ -400,6 +512,7 @@ public class TvAdView extends ViewGroup {
      *
      * @param channelUri The current channel URI; {@code null} if there is no currently tuned
      *                   channel.
+     * @hide
      */
     public void sendCurrentChannelUri(@Nullable Uri channelUri) {
         if (DEBUG) {
@@ -412,6 +525,7 @@ public class TvAdView extends ViewGroup {
 
     /**
      * Sends track info list to related TV AD service.
+     * @hide
      */
     public void sendTrackInfoList(@Nullable List<TvTrackInfo> tracks) {
         if (DEBUG) {
@@ -428,6 +542,7 @@ public class TvAdView extends ViewGroup {
      * @param inputId The current TV input ID whose channel is tuned. {@code null} if no channel is
      *                tuned.
      * @see android.media.tv.TvInputInfo
+     * @hide
      */
     public void sendCurrentTvInputId(@Nullable String inputId) {
         if (DEBUG) {
@@ -469,6 +584,7 @@ public class TvAdView extends ViewGroup {
      *     can also be added to the params.
      *
      * @see #ERROR_KEY_METHOD_NAME
+     * @hide
      */
     public void notifyError(@NonNull String errMsg, @NonNull Bundle params) {
         if (DEBUG) {
@@ -491,6 +607,7 @@ public class TvAdView extends ViewGroup {
      *             {@link TvInputManager#TV_MESSAGE_KEY_RAW_DATA}.
      *             See {@link TvInputManager#TV_MESSAGE_KEY_SUBTYPE} for more information on
      *             how to parse this data.
+     * @hide
      */
     public void notifyTvMessage(@NonNull @TvInputManager.TvMessageType int type,
             @NonNull Bundle data) {
@@ -501,6 +618,24 @@ public class TvAdView extends ViewGroup {
         if (mSession != null) {
             mSession.notifyTvMessage(type, data);
         }
+    }
+
+    /**
+     * Interface definition for a callback to be invoked when the unhandled input event is received.
+     * @hide
+     */
+    public interface OnUnhandledInputEventListener {
+        /**
+         * Called when an input event was not handled by the TV AD service.
+         *
+         * <p>This is called asynchronously from where the event is dispatched. It gives the host
+         * application a chance to handle the unhandled input events.
+         *
+         * @param event The input event.
+         * @return If you handled the event, return {@code true}. If you want to allow the event to
+         *         be handled by the next receiver, return {@code false}.
+         */
+        boolean onUnhandledInputEvent(@NonNull InputEvent event);
     }
 
     /**
@@ -606,6 +741,117 @@ public class TvAdView extends ViewGroup {
             mUseRequestedSurfaceLayout = true;
             requestLayout();
         }
+
+        @Override
+        public void onRequestCurrentVideoBounds(TvAdManager.Session session) {
+            if (DEBUG) {
+                Log.d(TAG, "onRequestCurrentVideoBounds");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onRequestCurrentVideoBounds - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onRequestCurrentVideoBounds(mServiceId);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        @Override
+        public void onRequestCurrentChannelUri(TvAdManager.Session session) {
+            if (DEBUG) {
+                Log.d(TAG, "onRequestCurrentChannelUri");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onRequestCurrentChannelUri - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onRequestCurrentChannelUri(mServiceId);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        @Override
+        public void onRequestTrackInfoList(TvAdManager.Session session) {
+            if (DEBUG) {
+                Log.d(TAG, "onRequestTrackInfoList");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onRequestTrackInfoList - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onRequestTrackInfoList(mServiceId);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        @Override
+        public void onRequestCurrentTvInputId(TvAdManager.Session session) {
+            if (DEBUG) {
+                Log.d(TAG, "onRequestCurrentTvInputId");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onRequestCurrentTvInputId - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onRequestCurrentTvInputId(mServiceId);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        @Override
+        public void onRequestSigning(TvAdManager.Session session, String id, String algorithm,
+                String alias, byte[] data) {
+            if (DEBUG) {
+                Log.d(TAG, "onRequestSigning");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onRequestSigning - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onRequestSigning(mServiceId, id, algorithm, alias, data);
+                            }
+                        }
+                    });
+                }
+            }
+        }
     }
 
     /**
@@ -613,5 +859,55 @@ public class TvAdView extends ViewGroup {
      * @hide
      */
     public abstract static class TvAdCallback {
+
+        /**
+         * This is called when {@link TvAdService.Session#requestCurrentVideoBounds()}
+         * is called.
+         *
+         * @param serviceId The ID of the TV AD service bound to this view.
+         */
+        public void onRequestCurrentVideoBounds(@NonNull String serviceId) {
+        }
+
+        /**
+         * This is called when {@link TvAdService.Session#requestCurrentChannelUri()} is
+         * called.
+         *
+         * @param serviceId The ID of the AD service bound to this view.
+         */
+        public void onRequestCurrentChannelUri(@NonNull String serviceId) {
+        }
+
+        /**
+         * This is called when {@link TvAdService.Session#requestTrackInfoList()} is called.
+         *
+         * @param serviceId The ID of the AD service bound to this view.
+         */
+        public void onRequestTrackInfoList(@NonNull String serviceId) {
+        }
+
+        /**
+         * This is called when {@link TvAdService.Session#requestCurrentTvInputId()} is called.
+         *
+         * @param serviceId The ID of the AD service bound to this view.
+         */
+        public void onRequestCurrentTvInputId(@NonNull String serviceId) {
+        }
+
+        /**
+         * This is called when
+         * {@link TvAdService.Session#requestSigning(String, String, String, byte[])} is called.
+         *
+         * @param serviceId The ID of the AD service bound to this view.
+         * @param signingId the ID to identify the request.
+         * @param algorithm the standard name of the signature algorithm requested, such as
+         *                  MD5withRSA, SHA256withDSA, etc.
+         * @param alias the alias of the corresponding {@link java.security.KeyStore}.
+         * @param data the original bytes to be signed.
+         *
+         */
+        public void onRequestSigning(@NonNull String serviceId, @NonNull String signingId,
+                @NonNull String algorithm, @NonNull String alias, @NonNull byte[] data) {
+        }
     }
 }

@@ -4934,6 +4934,7 @@ public final class Settings {
          *
          * @hide
          */
+        @Readable
         public static final String DEFAULT_DEVICE_FONT_SCALE = "device_font_scale";
 
         /**
@@ -6023,8 +6024,10 @@ public final class Settings {
          *   +7 = fastest
          * @hide
          */
+        @SuppressLint({"NoSettingsProvider", "UnflaggedApi"}) // TestApi without associated feature.
         @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
         @Readable
+        @TestApi
         public static final String POINTER_SPEED = "pointer_speed";
 
         /**
@@ -6055,6 +6058,13 @@ public final class Settings {
          * @hide
          */
         public static final String TOUCHPAD_TAP_TO_CLICK = "touchpad_tap_to_click";
+
+        /**
+         * Whether to enable tap dragging on touchpads.
+         *
+         * @hide
+         */
+        public static final String TOUCHPAD_TAP_DRAGGING = "touchpad_tap_dragging";
 
         /**
          * Whether to enable a right-click zone on touchpads.
@@ -6278,6 +6288,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(TOUCHPAD_POINTER_SPEED);
             PRIVATE_SETTINGS.add(TOUCHPAD_NATURAL_SCROLLING);
             PRIVATE_SETTINGS.add(TOUCHPAD_TAP_TO_CLICK);
+            PRIVATE_SETTINGS.add(TOUCHPAD_TAP_DRAGGING);
             PRIVATE_SETTINGS.add(TOUCHPAD_RIGHT_CLICK_ZONE);
             PRIVATE_SETTINGS.add(CAMERA_FLASH_NOTIFICATION);
             PRIVATE_SETTINGS.add(SCREEN_FLASH_NOTIFICATION);

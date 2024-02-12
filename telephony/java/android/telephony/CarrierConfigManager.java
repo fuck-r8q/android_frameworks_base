@@ -7600,8 +7600,8 @@ public class CarrierConfigManager {
          *
          * The default value for this key is
          * {{@link AccessNetworkConstants.AccessNetworkType#EUTRAN},
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String
                 KEY_EMERGENCY_OVER_IMS_SUPPORTED_3GPP_NETWORK_TYPES_INT_ARRAY = KEY_PREFIX
                         + "emergency_over_ims_supported_3gpp_network_types_int_array";
@@ -7618,8 +7618,8 @@ public class CarrierConfigManager {
          *
          * The default value for this key is
          * {{@link AccessNetworkConstants.AccessNetworkType#EUTRAN},
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String
                 KEY_EMERGENCY_OVER_IMS_ROAMING_SUPPORTED_3GPP_NETWORK_TYPES_INT_ARRAY = KEY_PREFIX
                         + "emergency_over_ims_roaming_supported_3gpp_network_types_int_array";
@@ -7638,8 +7638,8 @@ public class CarrierConfigManager {
          * The default value for this key is
          * {{@link AccessNetworkConstants.AccessNetworkType#UTRAN},
          * {@link AccessNetworkConstants.AccessNetworkType#GERAN}}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_OVER_CS_SUPPORTED_ACCESS_NETWORK_TYPES_INT_ARRAY =
                 KEY_PREFIX + "emergency_over_cs_supported_access_network_types_int_array";
 
@@ -7657,8 +7657,8 @@ public class CarrierConfigManager {
          * The default value for this key is
          * {{@link AccessNetworkConstants.AccessNetworkType#UTRAN},
          * {@link AccessNetworkConstants.AccessNetworkType#GERAN}}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String
                 KEY_EMERGENCY_OVER_CS_ROAMING_SUPPORTED_ACCESS_NETWORK_TYPES_INT_ARRAY = KEY_PREFIX
                         + "emergency_over_cs_roaming_supported_access_network_types_int_array";
@@ -7673,20 +7673,20 @@ public class CarrierConfigManager {
 
         /**
          * Circuit switched domain.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int DOMAIN_CS = 1;
 
         /**
          * Packet switched domain over 3GPP networks.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int DOMAIN_PS_3GPP = 2;
 
         /**
          * Packet switched domain over non-3GPP networks such as Wi-Fi.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int DOMAIN_PS_NON_3GPP = 3;
 
         /**
@@ -7703,8 +7703,8 @@ public class CarrierConfigManager {
          * {{@link #DOMAIN_PS_3GPP},
          * {@link #DOMAIN_CS},
          * {@link #DOMAIN_PS_NON_3GPP}}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_DOMAIN_PREFERENCE_INT_ARRAY =
                 KEY_PREFIX + "emergency_domain_preference_int_array";
 
@@ -7722,18 +7722,22 @@ public class CarrierConfigManager {
          * {{@link #DOMAIN_PS_3GPP},
          * {@link #DOMAIN_CS},
          * {@link #DOMAIN_PS_NON_3GPP}}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_DOMAIN_PREFERENCE_ROAMING_INT_ARRAY =
                 KEY_PREFIX + "emergency_domain_preference_roaming_int_array";
 
         /**
-         * Specifies if emergency call shall be attempted on IMS, if PS is attached even though IMS
-         * is not registered and normal calls fallback to the CS networks.
+         * Specifies whether the emergency call shall be preferred over IMS or not
+         * irrespective of IMS registration status.
+         * If the value of the config is {@code true} then emergency calls shall prefer IMS
+         * when device is combined-attached in LTE network and IMS is not registered.
+         * If the value of the config is {@code false} then emergency calls use CS domain
+         * in the same scenario.
          *
          * The default value for this key is {@code false}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_PREFER_IMS_EMERGENCY_WHEN_VOICE_CALLS_ON_CS_BOOL =
                 KEY_PREFIX + "prefer_ims_emergency_when_voice_calls_on_cs_bool";
 
@@ -7750,32 +7754,39 @@ public class CarrierConfigManager {
          * If {@link ImsWfc#KEY_EMERGENCY_CALL_OVER_EMERGENCY_PDN_BOOL} is {@code true},
          * VoWi-Fi emergency call shall be attempted if Wi-Fi network is connected.
          * Otherwise, it shall be attempted if IMS is registered over Wi-Fi.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int VOWIFI_REQUIRES_NONE = 0;
 
         /**
          * VoWi-Fi emergency call shall be attempted on IMS over Wi-Fi if Wi-Fi network is connected
          * and Wi-Fi calling setting is enabled. This value is applicable if the value of
          * {@link ImsWfc#KEY_EMERGENCY_CALL_OVER_EMERGENCY_PDN_BOOL} is {@code true}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int VOWIFI_REQUIRES_SETTING_ENABLED = 1;
 
         /**
          * VoWi-Fi emergency call shall be attempted on IMS over Wi-Fi if Wi-Fi network is connected
-         * and Wi-Fi calling is activated successfully. This value is applicable if the value of
+         * and Wi-Fi calling is activated successfully. The device shall have the valid
+         * Entitlement ID if the user activates VoWi-Fi emergency calling successfully.
+         * This value is applicable if the value of
          * {@link ImsWfc#KEY_EMERGENCY_CALL_OVER_EMERGENCY_PDN_BOOL} is {@code true}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int VOWIFI_REQUIRES_VALID_EID = 2;
 
         /**
          * Specifies the condition when emergency call shall be attempted on IMS over Wi-Fi.
          *
-         * The default value for this key is {@code #VOWIFI_REQUIRES_NONE}.
-         * @hide
+         * <p>Possible values are,
+         * {@link #VOWIFI_REQUIRES_NONE}
+         * {@link #VOWIFI_REQUIRES_SETTING_ENABLED}
+         * {@link #VOWIFI_REQUIRES_VALID_EID}
+         *
+         * The default value for this key is {@link #VOWIFI_REQUIRES_NONE}.
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_VOWIFI_REQUIRES_CONDITION_INT =
                 KEY_PREFIX + "emergency_vowifi_requires_condition_int";
 
@@ -7786,8 +7797,8 @@ public class CarrierConfigManager {
          * {@link #KEY_EMERGENCY_DOMAIN_PREFERENCE_ROAMING_INT_ARRAY}.
          *
          * The default value for this key is 1.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_MAXIMUM_NUMBER_OF_EMERGENCY_TRIES_OVER_VOWIFI_INT =
                 KEY_PREFIX + "maximum_number_of_emergency_tries_over_vowifi_int";
 
@@ -7795,14 +7806,14 @@ public class CarrierConfigManager {
          * Emergency scan timer to wait for scan results from radio before attempting the call
          * over Wi-Fi. On timer expiry, if emergency call on Wi-Fi is allowed and possible,
          * telephony shall cancel the scan and place the call on Wi-Fi. If emergency call on Wi-Fi
-         * is not possible, then domain seleciton continues to wait for the scan result from the
+         * is not possible, then domain selection continues to wait for the scan result from the
          * radio. If an emergency scan result is received before the timer expires, the timer shall
          * be stopped and no dialing over Wi-Fi will be tried. If this value is set to 0, then
          * the timer is never started and domain selection waits for the scan result from the radio.
          *
          * The default value for the timer is 10 seconds.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_SCAN_TIMER_SEC_INT =
                 KEY_PREFIX + "emergency_scan_timer_sec_int";
 
@@ -7820,8 +7831,8 @@ public class CarrierConfigManager {
          * started.
          *
          * The default value for the timer is {@link #REDIAL_TIMER_DISABLED}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_MAXIMUM_CELLULAR_SEARCH_TIMER_SEC_INT =
                 KEY_PREFIX + "maximum_cellular_search_timer_sec_int";
 
@@ -7836,21 +7847,21 @@ public class CarrierConfigManager {
         /**
          * No specific preference given to the modem. Modem can return an emergency
          * capable network either with limited service or full service.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int SCAN_TYPE_NO_PREFERENCE = 0;
 
         /**
          * Modem will attempt to camp on a network with full service only.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int SCAN_TYPE_FULL_SERVICE = 1;
 
         /**
          * Telephony shall attempt full service scan first.
          * If a full service network is not found, telephony shall attempt a limited service scan.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int SCAN_TYPE_FULL_SERVICE_FOLLOWED_BY_LIMITED_SERVICE = 2;
 
         /**
@@ -7862,8 +7873,8 @@ public class CarrierConfigManager {
          * {@link #SCAN_TYPE_FULL_SERVICE_FOLLOWED_BY_LIMITED_SERVICE}
          *
          * The default value for this key is {@link #SCAN_TYPE_NO_PREFERENCE}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_NETWORK_SCAN_TYPE_INT =
                 KEY_PREFIX + "emergency_network_scan_type_int";
 
@@ -7874,8 +7885,8 @@ public class CarrierConfigManager {
          * If this value is set to 0, the timer shall be disabled.
          *
          * The default value for this key is 0.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_CALL_SETUP_TIMER_ON_CURRENT_NETWORK_SEC_INT =
                 KEY_PREFIX + "emergency_call_setup_timer_on_current_network_sec_int";
 
@@ -7884,8 +7895,8 @@ public class CarrierConfigManager {
          * This is applicable only for the case PS is in service.
          *
          * The default value for this key is {@code false}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_REQUIRES_IMS_REGISTRATION_BOOL =
                 KEY_PREFIX + "emergency_requires_ims_registration_bool";
 
@@ -7894,8 +7905,8 @@ public class CarrierConfigManager {
          * over NR. If not, CS will be preferred.
          *
          * The default value for this key is {@code false}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_LTE_PREFERRED_AFTER_NR_FAILED_BOOL =
                 KEY_PREFIX + "emergency_lte_preferred_after_nr_failed_bool";
 
@@ -7903,8 +7914,8 @@ public class CarrierConfigManager {
          * Specifies the numbers to be dialed over CDMA network in case of dialing over CS network.
          *
          * The default value for this key is an empty string array.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_CDMA_PREFERRED_NUMBERS_STRING_ARRAY =
                 KEY_PREFIX + "emergency_cdma_preferred_numbers_string_array";
 
@@ -7913,8 +7924,8 @@ public class CarrierConfigManager {
          * only when VoLTE is enabled.
          *
          * The default value for this key is {@code false}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_EMERGENCY_REQUIRES_VOLTE_ENABLED_BOOL =
                 KEY_PREFIX + "emergency_requires_volte_enabled_bool";
 
@@ -7925,8 +7936,8 @@ public class CarrierConfigManager {
          * @see #KEY_CROSS_STACK_REDIAL_TIMER_SEC_INT
          * @see #KEY_QUICK_CROSS_STACK_REDIAL_TIMER_SEC_INT
          * @see #KEY_MAXIMUM_CELLULAR_SEARCH_TIMER_SEC_INT
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final int REDIAL_TIMER_DISABLED = 0;
 
         /**
@@ -7938,8 +7949,8 @@ public class CarrierConfigManager {
          * This value should be greater than the value of {@link #KEY_EMERGENCY_SCAN_TIMER_SEC_INT}.
          *
          * The default value for the timer is 120 seconds.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_CROSS_STACK_REDIAL_TIMER_SEC_INT =
                 KEY_PREFIX + "cross_stack_redial_timer_sec_int";
 
@@ -7954,8 +7965,8 @@ public class CarrierConfigManager {
          * in the roaming networks and non-domestic networks.
          *
          * The default value for the timer is {@link #REDIAL_TIMER_DISABLED}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_QUICK_CROSS_STACK_REDIAL_TIMER_SEC_INT =
                 KEY_PREFIX + "quick_cross_stack_redial_timer_sec_int";
 
@@ -7964,10 +7975,23 @@ public class CarrierConfigManager {
          * the device is registered to the network.
          *
          * The default value is {@code true}.
-         * @hide
          */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
         public static final String KEY_START_QUICK_CROSS_STACK_REDIAL_TIMER_WHEN_REGISTERED_BOOL =
                 KEY_PREFIX + "start_quick_cross_stack_redial_timer_when_registered_bool";
+
+        /**
+         * Indicates whether limited service only scanning will be requested after VoLTE fails.
+         * This value is applicable if the value of
+         * {@link #KEY_EMERGENCY_NETWORK_SCAN_TYPE_INT} is any of {@link #SCAN_TYPE_NO_PREFERENCE}
+         * or {@link #SCAN_TYPE_FULL_SERVICE_FOLLOWED_BY_LIMITED_SERVICE}.
+         *
+         * The default value is {@code false}.
+         */
+        @FlaggedApi(Flags.FLAG_USE_OEM_DOMAIN_SELECTION_SERVICE)
+        public static final String
+                KEY_SCAN_LIMITED_SERVICE_AFTER_VOLTE_FAILURE_BOOL =
+                    KEY_PREFIX + "scan_limited_service_after_volte_failure_bool";
 
         private static PersistableBundle getDefaults() {
             PersistableBundle defaults = new PersistableBundle();
@@ -8040,6 +8064,7 @@ public class CarrierConfigManager {
             defaults.putInt(KEY_QUICK_CROSS_STACK_REDIAL_TIMER_SEC_INT, REDIAL_TIMER_DISABLED);
             defaults.putBoolean(KEY_START_QUICK_CROSS_STACK_REDIAL_TIMER_WHEN_REGISTERED_BOOL,
                     true);
+            defaults.putBoolean(KEY_SCAN_LIMITED_SERVICE_AFTER_VOLTE_FAILURE_BOOL, false);
 
             return defaults;
         }
@@ -9775,6 +9800,19 @@ public class CarrierConfigManager {
             "remove_satellite_plmn_in_manual_network_scan_bool";
 
     /**
+     * Determine whether to override roaming Wi-Fi Calling preference when device is connected to
+     * non-terrestrial network.
+     * {@code true}  - roaming preference cannot be changed by user independently.
+     *                 Roaming preference is overridden to
+     *                 {@link com.android.ims.ImsConfig.WfcModeFeatureValueConstants#WIFI_PREFERRED}
+     * {@code false} - roaming preference can be changed by user independently and is not
+     *                 overridden when device is connected to non-terrestrial network.
+     * @hide
+     */
+    public static final String KEY_OVERRIDE_WFC_ROAMING_MODE_WHILE_USING_NTN_BOOL =
+            "override_wfc_roaming_mode_while_using_ntn_bool";
+
+    /**
      * An integer key holds the time interval for refreshing or re-querying the satellite
      * entitlement status from the entitlement server to ensure it is the latest.
      *
@@ -11039,6 +11077,7 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_PARAMETERS_USED_FOR_NTN_LTE_SIGNAL_BAR_INT,
                 CellSignalStrengthLte.USE_RSRP);
         sDefaults.putBoolean(KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL, true);
+        sDefaults.putBoolean(KEY_OVERRIDE_WFC_ROAMING_MODE_WHILE_USING_NTN_BOOL, true);
         sDefaults.putInt(KEY_SATELLITE_ENTITLEMENT_STATUS_REFRESH_DAYS_INT, 30);
         sDefaults.putBoolean(KEY_SATELLITE_ENTITLEMENT_SUPPORTED_BOOL, false);
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);

@@ -3525,8 +3525,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     @Override
-    public boolean isAssistDataAllowedOnCurrentActivity() {
+    public boolean isAssistDataAllowed() {
         int userId;
+        boolean hasRestrictedWindow;
         synchronized (mGlobalLock) {
             final Task focusedRootTask = getTopDisplayFocusedRootTask();
             if (focusedRootTask == null || focusedRootTask.isActivityTypeAssistant()) {
@@ -3538,8 +3539,17 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 return false;
             }
             userId = activity.mUserId;
+            DisplayContent displayContent = activity.getDisplayContent();
+            if (displayContent == null) {
+                return false;
+            }
+            hasRestrictedWindow = displayContent.forAllWindows(windowState -> {
+                return windowState.isOnScreen() && UserManager.isUserTypePrivateProfile(
+                        getUserManager().getProfileType(windowState.mShowUserId));
+            }, true /* traverseTopToBottom */);
         }
-        return DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId);
+        return DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId)
+                && !hasRestrictedWindow;
     }
 
     private void onLocalVoiceInteractionStartedLocked(IBinder activity,

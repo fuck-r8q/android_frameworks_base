@@ -25,8 +25,8 @@ import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationStackAppearanceViewModel
-import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.launch
 
 /** Binds the shared notification container to its view-model. */
@@ -39,8 +39,8 @@ object NotificationStackAppearanceViewBinder {
         viewModel: NotificationStackAppearanceViewModel,
         ambientState: AmbientState,
         controller: NotificationStackScrollLayoutController,
-    ) {
-        view.repeatWhenAttached {
+    ): DisposableHandle {
+        return view.repeatWhenAttached {
             repeatOnLifecycle(Lifecycle.State.CREATED) {
                 launch {
                     viewModel.stackBounds.collect { bounds ->
@@ -65,7 +65,9 @@ object NotificationStackAppearanceViewBinder {
                     viewModel.expandFraction.collect { expandFraction ->
                         ambientState.expansionFraction = expandFraction
                         controller.expandedHeight = expandFraction * controller.view.height
-                        controller.setMaxAlphaForExpansion(expandFraction.pow(0.75f))
+                        controller.setMaxAlphaForExpansion(
+                            ((expandFraction - 0.5f) / 0.5f).coerceAtLeast(0f)
+                        )
                     }
                 }
             }

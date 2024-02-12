@@ -119,6 +119,8 @@ interface NativeInputManagerService {
      */
     boolean transferTouch(IBinder destChannelToken, int displayId);
 
+    int getMousePointerSpeed();
+
     void setPointerSpeed(int speed);
 
     void setMousePointerAccelerationEnabled(int displayId, boolean enabled);
@@ -128,6 +130,8 @@ interface NativeInputManagerService {
     void setTouchpadNaturalScrollingEnabled(boolean enabled);
 
     void setTouchpadTapToClickEnabled(boolean enabled);
+
+    void setTouchpadTapDraggingEnabled(boolean enabled);
 
     void setTouchpadRightClickZoneEnabled(boolean enabled);
 
@@ -362,6 +366,9 @@ interface NativeInputManagerService {
         public native boolean transferTouch(IBinder destChannelToken, int displayId);
 
         @Override
+        public native int getMousePointerSpeed();
+
+        @Override
         public native void setPointerSpeed(int speed);
 
         @Override
@@ -375,6 +382,9 @@ interface NativeInputManagerService {
 
         @Override
         public native void setTouchpadTapToClickEnabled(boolean enabled);
+
+        @Override
+        public native void setTouchpadTapDraggingEnabled(boolean enabled);
 
         @Override
         public native void setTouchpadRightClickZoneEnabled(boolean enabled);

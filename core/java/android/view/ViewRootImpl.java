@@ -26,6 +26,7 @@ import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InputDevice.SOURCE_CLASS_NONE;
 import static android.view.InsetsSource.ID_IME;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
+import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH_HINT;
 import static android.view.Surface.FRAME_RATE_CATEGORY_NO_PREFERENCE;
 import static android.view.View.PFLAG_DRAW_ANIMATION;
 import static android.view.View.SYSTEM_UI_FLAG_FULLSCREEN;
@@ -401,6 +402,8 @@ public final class ViewRootImpl implements ViewParent,
     @Nullable
     private ContentObserver mForceInvertObserver;
 
+    private static final int INVALID_VALUE = Integer.MIN_VALUE;
+    private int mForceInvertEnabled = INVALID_VALUE;
     /**
      * Callback for notifying about global configuration changes.
      */
@@ -1013,8 +1016,10 @@ public final class ViewRootImpl implements ViewParent,
     // Used to check if there were any view invalidations in
     // the previous time frame (FRAME_RATE_IDLENESS_REEVALUATE_TIME).
     private boolean mHasInvalidation = false;
-    // Used to check if it is in the touch boosting period.
+    // Used to check if it is in the frame rate boosting period.
     private boolean mIsFrameRateBoosting = false;
+    // Used to check if it is in touch boosting period.
+    private boolean mIsTouchBoosting = false;
     // Used to check if there is a message in the message queue
     // for idleness handling.
     private boolean mHasIdledMessage = false;
@@ -1024,6 +1029,16 @@ public final class ViewRootImpl implements ViewParent,
     private static final int FRAME_RATE_IDLENESS_CHECK_TIME_MILLIS = 500;
     // time for revaluating the idle status before lowering the frame rate.
     private static final int FRAME_RATE_IDLENESS_REEVALUATE_TIME = 500;
+    // time for evaluating the interval between current time and
+    // the time when frame rate was set previously.
+    private static final int FRAME_RATE_SETTING_REEVALUATE_TIME = 100;
+
+    /*
+     * the variables below are used to determine whther a dVRR feature should be enabled
+     */
+
+    // Used to determine whether to suppress boost on typing
+    private boolean mShouldSuppressBoostOnTyping = false;
 
     /**
      * A temporary object used so relayoutWindow can return the latest SyncSeqId
@@ -1617,6 +1632,23 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+    private boolean isForceInvertEnabled() {
+        if (mForceInvertEnabled == INVALID_VALUE) {
+            reloadForceInvertEnabled();
+        }
+        return mForceInvertEnabled == 1;
+    }
+
+    private void reloadForceInvertEnabled() {
+        if (forceInvertColor()) {
+            mForceInvertEnabled = Settings.Secure.getIntForUser(
+                    mContext.getContentResolver(),
+                    Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED,
+                    /* def= */ 0,
+                    UserHandle.myUserId());
+        }
+    }
+
     /**
      * Register any kind of listeners if setView was success.
      */
@@ -1643,6 +1675,7 @@ public final class ViewRootImpl implements ViewParent,
                 mForceInvertObserver = new ContentObserver(mHandler) {
                     @Override
                     public void onChange(boolean selfChange) {
+                        reloadForceInvertEnabled();
                         updateForceDarkMode();
                     }
                 };
@@ -1863,16 +1896,11 @@ public final class ViewRootImpl implements ViewParent,
     @VisibleForTesting
     public @ForceDarkType.ForceDarkTypeDef int determineForceDarkType() {
         if (forceInvertColor()) {
-            boolean isForceInvertEnabled = Settings.Secure.getIntForUser(
-                    mContext.getContentResolver(),
-                    Settings.Secure.ACCESSIBILITY_FORCE_INVERT_COLOR_ENABLED,
-                    /* def= */ 0,
-                    UserHandle.myUserId()) == 1;
             // Force invert ignores all developer opt-outs.
             // We also ignore dark theme, since the app developer can override the user's preference
             // for dark mode in configuration.uiMode. Instead, we assume that the force invert
             // setting will be enabled at the same time dark theme is in the Settings app.
-            if (isForceInvertEnabled) {
+            if (isForceInvertEnabled()) {
                 return ForceDarkType.FORCE_INVERT_COLOR_DARK;
             }
         }
@@ -4077,7 +4105,6 @@ public final class ViewRootImpl implements ViewParent,
         setPreferredFrameRate(mPreferredFrameRate);
         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
-        mPreferredFrameRate = 0;
     }
 
     private void createSyncIfNeeded() {
@@ -5828,9 +5855,11 @@ public final class ViewRootImpl implements ViewParent,
         if (mAttachInfo.mThreadedRenderer == null) {
             return;
         }
-        if ((colorMode == ActivityInfo.COLOR_MODE_HDR || colorMode == ActivityInfo.COLOR_MODE_HDR10)
-                && !mDisplay.isHdrSdrRatioAvailable()) {
+        boolean isHdr = colorMode == ActivityInfo.COLOR_MODE_HDR
+                || colorMode == ActivityInfo.COLOR_MODE_HDR10;
+        if (isHdr && !mDisplay.isHdrSdrRatioAvailable()) {
             colorMode = ActivityInfo.COLOR_MODE_WIDE_COLOR_GAMUT;
+            isHdr = false;
         }
         // TODO: Centralize this sanitization? Why do we let setting bad modes?
         // Alternatively, can we just let HWUI figure it out? Do we need to care here?
@@ -5843,7 +5872,7 @@ public final class ViewRootImpl implements ViewParent,
             desiredRatio = automaticRatio;
         }
 
-        mHdrRenderState.setDesiredHdrSdrRatio(desiredRatio);
+        mHdrRenderState.setDesiredHdrSdrRatio(isHdr, desiredRatio);
     }
 
     @Override
@@ -6129,6 +6158,7 @@ public final class ViewRootImpl implements ViewParent,
     private static final int MSG_TOUCH_BOOST_TIMEOUT = 39;
     private static final int MSG_CHECK_INVALIDATION_IDLE = 40;
     private static final int MSG_REFRESH_POINTER_ICON = 41;
+    private static final int MSG_FRAME_RATE_SETTING = 42;
 
     final class ViewRootHandler extends Handler {
         @Override
@@ -6440,11 +6470,12 @@ public final class ViewRootImpl implements ViewParent,
                      * Lower the frame rate after the boosting period (FRAME_RATE_TOUCH_BOOST_TIME).
                      */
                     mIsFrameRateBoosting = false;
+                    mIsTouchBoosting = false;
                     setPreferredFrameRateCategory(Math.max(mPreferredFrameRateCategory,
                             mLastPreferredFrameRateCategory));
                     break;
                 case MSG_CHECK_INVALIDATION_IDLE:
-                    if (!mHasInvalidation && !mIsFrameRateBoosting) {
+                    if (!mHasInvalidation && !mIsFrameRateBoosting && !mIsTouchBoosting) {
                         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
                         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
                         mHasIdledMessage = false;
@@ -6466,6 +6497,10 @@ public final class ViewRootImpl implements ViewParent,
                         break;
                     }
                     updatePointerIcon(mPointerIconEvent);
+                    break;
+                case MSG_FRAME_RATE_SETTING:
+                    mPreferredFrameRate = 0;
+                    setPreferredFrameRate(mPreferredFrameRate);
                     break;
             }
         }
@@ -7285,8 +7320,18 @@ public final class ViewRootImpl implements ViewParent,
             if (direction != 0) {
                 View focused = mView.findFocus();
                 if (focused != null) {
+                    mAttachInfo.mNextFocusLooped = false;
                     View v = focused.focusSearch(direction);
                     if (v != null && v != focused) {
+                        if (mAttachInfo.mNextFocusLooped) {
+                            // The next focus is looped. Let's try to move the focus to the adjacent
+                            // window. Note: we still need to move the focus in this window
+                            // regardless of what moveFocusToAdjacentWindow returns, so the focus
+                            // can be looped back from the focus in the adjacent window to next
+                            // focus of this window.
+                            moveFocusToAdjacentWindow(direction);
+                        }
+
                         // do the math the get the interesting rect
                         // of previous focused into the coord system of
                         // newly focused view
@@ -7470,7 +7515,7 @@ public final class ViewRootImpl implements ViewParent,
             // For the variable refresh rate project
             if (handled && shouldTouchBoost(action, mWindowAttributes.type)) {
                 // set the frame rate to the maximum value.
-                mIsFrameRateBoosting = true;
+                mIsTouchBoosting = true;
                 setPreferredFrameRateCategory(mPreferredFrameRateCategory);
             }
             /**
@@ -7478,7 +7523,7 @@ public final class ViewRootImpl implements ViewParent,
              * MotionEvent.ACTION_CANCEL is detected.
              * Not using ACTION_MOVE to avoid checking and sending messages too frequently.
              */
-            if (mIsFrameRateBoosting && (action == MotionEvent.ACTION_UP
+            if (mIsTouchBoosting && (action == MotionEvent.ACTION_UP
                     || action == MotionEvent.ACTION_CANCEL)) {
                 mHandler.removeMessages(MSG_TOUCH_BOOST_TIMEOUT);
                 mHandler.sendEmptyMessageDelayed(MSG_TOUCH_BOOST_TIMEOUT,
@@ -12238,17 +12283,32 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
-        int frameRateCategory = mIsFrameRateBoosting || mInsetsAnimationRunning
-                ? FRAME_RATE_CATEGORY_HIGH : preferredFrameRateCategory;
+        int frameRateCategory = mIsTouchBoosting
+                ? FRAME_RATE_CATEGORY_HIGH_HINT : preferredFrameRateCategory;
+
+        // FRAME_RATE_CATEGORY_HIGH has a higher precedence than FRAME_RATE_CATEGORY_HIGH_HINT
+        // For now, FRAME_RATE_CATEGORY_HIGH_HINT is used for boosting with user interaction.
+        // FRAME_RATE_CATEGORY_HIGH is for boosting without user interaction
+        // (e.g., Window Initialization).
+        if (mIsFrameRateBoosting || mInsetsAnimationRunning) {
+            frameRateCategory = FRAME_RATE_CATEGORY_HIGH;
+        }
 
         try {
             if (mLastPreferredFrameRateCategory != frameRateCategory) {
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                    Trace.traceBegin(
+                            Trace.TRACE_TAG_VIEW, "ViewRootImpl#setFrameRateCategory "
+                                + frameRateCategory);
+                }
                 mFrameRateTransaction.setFrameRateCategory(mSurfaceControl,
                         frameRateCategory, false).applyAsyncUnsafe();
                 mLastPreferredFrameRateCategory = frameRateCategory;
             }
         } catch (Exception e) {
             Log.e(mTag, "Unable to set frame rate category", e);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
         }
 
         if (mPreferredFrameRateCategory != FRAME_RATE_CATEGORY_NO_PREFERENCE && !mHasIdledMessage) {
@@ -12267,12 +12327,19 @@ public final class ViewRootImpl implements ViewParent,
 
         try {
             if (mLastPreferredFrameRate != preferredFrameRate) {
+                if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
+                    Trace.traceBegin(
+                            Trace.TRACE_TAG_VIEW, "ViewRootImpl#setFrameRate "
+                                + preferredFrameRate);
+                }
                 mFrameRateTransaction.setFrameRate(mSurfaceControl, preferredFrameRate,
                     Surface.FRAME_RATE_COMPATIBILITY_DEFAULT).applyAsyncUnsafe();
                 mLastPreferredFrameRate = preferredFrameRate;
             }
         } catch (Exception e) {
             Log.e(mTag, "Unable to set frame rate", e);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
         }
     }
 
@@ -12289,14 +12356,14 @@ public final class ViewRootImpl implements ViewParent,
 
     private boolean shouldSetFrameRate() {
         // use toolkitSetFrameRate flag to gate the change
-        return mPreferredFrameRate > 0 && sToolkitSetFrameRateReadOnlyFlagValue;
+        return sToolkitSetFrameRateReadOnlyFlagValue;
     }
 
     private boolean shouldTouchBoost(int motionEventAction, int windowType) {
         boolean desiredAction = motionEventAction == MotionEvent.ACTION_DOWN
                 || motionEventAction == MotionEvent.ACTION_MOVE
                 || motionEventAction == MotionEvent.ACTION_UP;
-        boolean undesiredType = windowType == TYPE_INPUT_METHOD;
+        boolean undesiredType = windowType == TYPE_INPUT_METHOD && mShouldSuppressBoostOnTyping;
         // use toolkitSetFrameRate flag to gate the change
         return desiredAction && !undesiredType && sToolkitSetFrameRateReadOnlyFlagValue
                 && getFrameRateBoostOnTouchEnabled();
@@ -12340,6 +12407,9 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         mHasInvalidation = true;
+        mHandler.removeMessages(MSG_FRAME_RATE_SETTING);
+        mHandler.sendEmptyMessageDelayed(MSG_FRAME_RATE_SETTING,
+                FRAME_RATE_SETTING_REEVALUATE_TIME);
     }
 
     /**

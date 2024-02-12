@@ -5,6 +5,7 @@ com.android.internal.util.ArrayUtils
 com.android.internal.logging.MetricsLogger
 com.android.internal.logging.testing.FakeMetricsLogger
 com.android.internal.logging.testing.UiEventLoggerFake
+com.android.internal.os.AndroidPrintStream
 com.android.internal.os.BatteryStatsHistory
 com.android.internal.os.BatteryStatsHistory$TraceDelegate
 com.android.internal.os.BatteryStatsHistory$VarintParceler
@@ -16,6 +17,7 @@ com.android.internal.os.MonotonicClock
 com.android.internal.os.PowerProfile
 com.android.internal.os.PowerStats
 com.android.internal.os.PowerStats$Descriptor
+com.android.internal.os.RuntimeInit
 com.android.internal.power.ModemPowerProfile
 
 android.util.AtomicFile
@@ -72,6 +74,7 @@ android.os.Process
 android.os.ServiceSpecificException
 android.os.SystemClock
 android.os.SystemProperties
+android.os.TestLooperManager
 android.os.ThreadLocalWorkSource
 android.os.TimestampedValue
 android.os.Trace
@@ -79,6 +82,8 @@ android.os.UidBatteryConsumer
 android.os.UidBatteryConsumer$Builder
 android.os.UserHandle
 android.os.UserManager
+android.os.VibrationAttributes
+android.os.VibrationAttributes$Builder
 android.os.WorkSource
 
 android.content.ClipData
@@ -140,6 +145,9 @@ android.graphics.Rect
 android.graphics.RectF
 
 android.content.ContentProvider
+
+android.app.ActivityManager
+android.app.Instrumentation
 
 android.metrics.LogMaker
 

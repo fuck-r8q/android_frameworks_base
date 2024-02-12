@@ -1753,6 +1753,9 @@
     <!-- Notification: Snooze panel: Snooze undo button label. [CHAR LIMIT=50]-->
     <string name="snooze_undo">Undo</string>
 
+    <!-- Notification: Snooze panel: Snooze undo content description for a11y. [CHAR LIMIT=NONE]-->
+    <string name="snooze_undo_content_description">Undo notification snooze</string>
+
     <!-- Notification: Snooze panel: message indicating how long the notification was snoozed for. [CHAR LIMIT=100]-->
     <string name="snoozed_for_time">Snoozed for <xliff:g id="time_amount" example="15 minutes">%1$s</xliff:g></string>
 
@@ -3327,4 +3330,8 @@
     <string name="keyboard_backlight_dialog_title">Keyboard backlight</string>
     <!-- Content description for keyboard backlight brightness value [CHAR LIMIT=NONE] -->
     <string name="keyboard_backlight_value">Level %1$d of %2$d</string>
+    <!-- Label for home control panel [CHAR LIMIT=30] -->
+    <string name="home_controls_dream_label">Home Controls</string>
+    <!-- Description for home control panel [CHAR LIMIT=50] -->
+    <string name="home_controls_dream_description">Quickly access your home controls as a screensaver</string>
 </resources>

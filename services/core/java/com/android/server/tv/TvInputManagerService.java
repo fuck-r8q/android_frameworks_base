@@ -2095,17 +2095,17 @@ public final class TvInputManagerService extends SystemService {
         }
 
         @Override
-        public void startPlayback(IBinder sessionToken, int userId) {
+        public void resumePlayback(IBinder sessionToken, int userId) {
             final int callingUid = Binder.getCallingUid();
             final int resolvedUserId = resolveCallingUserId(Binder.getCallingPid(), callingUid,
-                    userId, "stopPlayback");
+                    userId, "resumePlayback");
             final long identity = Binder.clearCallingIdentity();
             try {
                 synchronized (mLock) {
                     try {
-                        getSessionLocked(sessionToken, callingUid, resolvedUserId).startPlayback();
+                        getSessionLocked(sessionToken, callingUid, resolvedUserId).resumePlayback();
                     } catch (RemoteException | SessionNotFoundException e) {
-                        Slog.e(TAG, "error in startPlayback()", e);
+                        Slog.e(TAG, "error in resumePlayback()", e);
                     }
                 }
             } finally {
@@ -2783,6 +2783,29 @@ public final class TvInputManagerService extends SystemService {
                         if (buffer != null) {
                             buffer.getSharedMemory().close();
                         }
+                    }
+                }
+            } finally {
+                Binder.restoreCallingIdentity(identity);
+            }
+        }
+
+        @Override
+        public void notifyTvAdSessionData(
+                IBinder sessionToken, String type, Bundle data, int userId) {
+            final int callingUid = Binder.getCallingUid();
+            final int callingPid = Binder.getCallingPid();
+            final int resolvedUserId = resolveCallingUserId(callingPid, callingUid,
+                    userId, "notifyTvAdSessionData");
+            final long identity = Binder.clearCallingIdentity();
+            try {
+                synchronized (mLock) {
+                    try {
+                        SessionState sessionState = getSessionStateLocked(sessionToken, callingUid,
+                                resolvedUserId);
+                        getSessionLocked(sessionState).notifyTvAdSessionData(type, data);
+                    } catch (RemoteException | SessionNotFoundException e) {
+                        Slog.e(TAG, "error in notifyTvAdSessionData", e);
                     }
                 }
             } finally {
@@ -4319,6 +4342,23 @@ public final class TvInputManagerService extends SystemService {
                     if (buffer != null) {
                         buffer.getSharedMemory().close();
                     }
+                }
+            }
+        }
+
+        @Override
+        public void onTvInputSessionData(String type, Bundle data) {
+            synchronized (mLock) {
+                if (DEBUG) {
+                    Slog.d(TAG, "onTvInputSessionData()");
+                }
+                if (mSessionState.session == null || mSessionState.client == null) {
+                    return;
+                }
+                try {
+                    mSessionState.client.onTvInputSessionData(type, data, mSessionState.seq);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "error in onTvInputSessionData", e);
                 }
             }
         }

@@ -150,6 +150,7 @@ public class ScreenDecorations implements
     private final ThreadFactory mThreadFactory;
     private final DecorProviderFactory mDotFactory;
     private final FaceScanningProviderFactory mFaceScanningFactory;
+    private final CameraProtectionLoader mCameraProtectionLoader;
     public final int mFaceScanningViewId;
 
     @VisibleForTesting
@@ -337,7 +338,8 @@ public class ScreenDecorations implements
             FaceScanningProviderFactory faceScanningFactory,
             ScreenDecorationsLogger logger,
             FacePropertyRepository facePropertyRepository,
-            JavaAdapter javaAdapter) {
+            JavaAdapter javaAdapter,
+            CameraProtectionLoader cameraProtectionLoader) {
         mContext = context;
         mSecureSettings = secureSettings;
         mCommandRegistry = commandRegistry;
@@ -347,6 +349,7 @@ public class ScreenDecorations implements
         mThreadFactory = threadFactory;
         mDotFactory = dotFactory;
         mFaceScanningFactory = faceScanningFactory;
+        mCameraProtectionLoader = cameraProtectionLoader;
         mFaceScanningViewId = com.android.systemui.res.R.id.face_scanning_anim;
         mLogger = logger;
         mFacePropertyRepository = facePropertyRepository;
@@ -985,7 +988,9 @@ public class ScreenDecorations implements
         Resources res = mContext.getResources();
         boolean enabled = res.getBoolean(R.bool.config_enableDisplayCutoutProtection);
         if (enabled) {
-            mCameraListener = CameraAvailabilityListener.Factory.build(mContext, mExecutor);
+            mCameraListener =
+                    CameraAvailabilityListener.Factory.build(
+                            mContext, mExecutor, mCameraProtectionLoader);
             mCameraListener.addTransitionCallback(mCameraTransitionCallback);
             mCameraListener.startListening();
         }

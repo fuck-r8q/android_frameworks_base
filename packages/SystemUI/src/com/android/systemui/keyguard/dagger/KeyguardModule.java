@@ -51,7 +51,7 @@ import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.WindowManagerLockscreenVisibilityManager;
 import com.android.systemui.keyguard.data.quickaffordance.KeyguardDataQuickAffordanceModule;
-import com.android.systemui.keyguard.data.repository.KeyguardFaceAuthModule;
+import com.android.systemui.keyguard.data.repository.DeviceEntryFaceAuthModule;
 import com.android.systemui.keyguard.data.repository.KeyguardRepositoryModule;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.domain.interactor.StartKeyguardTransitionModule;
@@ -90,10 +90,12 @@ import dagger.multibindings.IntoMap;
 import java.util.concurrent.Executor;
 
 import kotlinx.coroutines.CoroutineDispatcher;
+import kotlinx.coroutines.ExperimentalCoroutinesApi;
 
 /**
  * Dagger Module providing keyguard.
  */
+@ExperimentalCoroutinesApi
 @Module(subcomponents = {
         KeyguardQsUserSwitchComponent.class,
         KeyguardStatusBarViewComponent.class,
@@ -104,7 +106,7 @@ import kotlinx.coroutines.CoroutineDispatcher;
             FalsingModule.class,
             KeyguardDataQuickAffordanceModule.class,
             KeyguardRepositoryModule.class,
-            KeyguardFaceAuthModule.class,
+            DeviceEntryFaceAuthModule.class,
             KeyguardDisplayModule.class,
             StartKeyguardTransitionModule.class,
             ResourceTrimmerModule.class,
@@ -115,7 +117,7 @@ public interface KeyguardModule {
      */
     @Provides
     @SysUISingleton
-    public static KeyguardViewMediator newKeyguardViewMediator(
+    static KeyguardViewMediator newKeyguardViewMediator(
             Context context,
             UiEventLogger uiEventLogger,
             SessionTracker sessionTracker,

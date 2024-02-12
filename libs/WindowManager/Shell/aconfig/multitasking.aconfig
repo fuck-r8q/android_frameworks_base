@@ -30,13 +30,6 @@ flag {
 }
 
 flag {
-    name: "enable_pip_ui_state_on_entering"
-    namespace: "multitasking"
-    description: "Enables PiP UI state callback on entering"
-    bug: "303718131"
-}
-
-flag {
     name: "enable_pip2_implementation"
     namespace: "multitasking"
     description: "Enables the new implementation of PiP (PiP2)"
@@ -56,4 +49,18 @@ flag {
     namespace: "multitasking"
     description: "Enables new animations for expand and collapse for bubbles"
     bug: "311450609"
+}
+
+flag {
+    name: "enable_pip_umo_experience"
+    namespace: "multitasking"
+    description: "Enables new UMO experience for PiP menu"
+    bug: "307998712"
+}
+
+flag {
+    name: "enable_bubble_bar"
+    namespace: "multitasking"
+    description: "Enables the new bubble bar UI for tablets"
+    bug: "286246694"
 }

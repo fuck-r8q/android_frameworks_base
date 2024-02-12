@@ -27,20 +27,17 @@ import com.android.systemui.bouncer.data.repository.FakeKeyguardBouncerRepositor
 import com.android.systemui.classifier.FalsingCollectorFake
 import com.android.systemui.common.ui.data.repository.FakeConfigurationRepository
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
-import com.android.systemui.communal.domain.interactor.communalInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryUdfpsInteractor
 import com.android.systemui.flags.FakeFeatureFlagsClassic
 import com.android.systemui.keyguard.data.repository.FakeCommandQueue
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository
-import com.android.systemui.keyguard.data.repository.FakeKeyguardSurfaceBehindRepository
 import com.android.systemui.keyguard.data.repository.FakeKeyguardTransitionRepository
-import com.android.systemui.keyguard.data.repository.InWindowLauncherUnlockAnimationRepository
 import com.android.systemui.keyguard.domain.interactor.FromLockscreenTransitionInteractor
 import com.android.systemui.keyguard.domain.interactor.FromPrimaryBouncerTransitionInteractor
-import com.android.systemui.keyguard.domain.interactor.GlanceableHubTransitions
-import com.android.systemui.keyguard.domain.interactor.InWindowLauncherUnlockAnimationInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.fromLockscreenTransitionInteractor
+import com.android.systemui.keyguard.domain.interactor.fromPrimaryBouncerTransitionInteractor
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.plugins.statusbar.StatusBarStateController
@@ -56,8 +53,8 @@ import com.android.systemui.shade.domain.interactor.ShadeInteractorLegacyImpl
 import com.android.systemui.statusbar.disableflags.data.repository.FakeDisableFlagsRepository
 import com.android.systemui.statusbar.notification.stack.domain.interactor.SharedNotificationContainerInteractor
 import com.android.systemui.statusbar.policy.ResourcesSplitShadeStateController
-import com.android.systemui.statusbar.policy.data.repository.FakeDeviceProvisioningRepository
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
+import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.mock
 import kotlinx.coroutines.flow.emptyFlow
@@ -74,8 +71,8 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
+import org.mockito.Mockito.`when` as whenever
 
 @SmallTest
 @RunWith(AndroidTestingRunner::class)
@@ -144,55 +141,14 @@ class StatusBarStateControllerImplTest : SysuiTestCase() {
                 { fromLockscreenTransitionInteractor },
                 { fromPrimaryBouncerTransitionInteractor }
             )
-        val communalInteractor = kosmos.communalInteractor
-        fromLockscreenTransitionInteractor =
-            FromLockscreenTransitionInteractor(
-                keyguardTransitionRepository,
-                keyguardTransitionInteractor,
-                testScope.backgroundScope,
-                testDispatcher,
-                testDispatcher,
-                keyguardInteractor,
-                featureFlags,
-                shadeRepository,
-                powerInteractor,
-                GlanceableHubTransitions(
-                    testScope,
-                    testDispatcher,
-                    keyguardTransitionInteractor,
-                    keyguardTransitionRepository,
-                    communalInteractor
-                ),
-                {
-                    InWindowLauncherUnlockAnimationInteractor(
-                        InWindowLauncherUnlockAnimationRepository(),
-                        testScope,
-                        keyguardTransitionInteractor,
-                        { FakeKeyguardSurfaceBehindRepository() },
-                        mock(),
-                    )
-                }
-            )
-        fromPrimaryBouncerTransitionInteractor =
-            FromPrimaryBouncerTransitionInteractor(
-                keyguardTransitionRepository,
-                keyguardTransitionInteractor,
-                testScope.backgroundScope,
-                testDispatcher,
-                testDispatcher,
-                keyguardInteractor,
-                communalInteractor,
-                featureFlags,
-                mock(),
-                mock(),
-                powerInteractor
-            )
+        fromLockscreenTransitionInteractor = kosmos.fromLockscreenTransitionInteractor
+        fromPrimaryBouncerTransitionInteractor = kosmos.fromPrimaryBouncerTransitionInteractor
 
         whenever(deviceEntryUdfpsInteractor.isUdfpsSupported).thenReturn(emptyFlow())
         shadeInteractor =
             ShadeInteractorImpl(
                 testScope.backgroundScope,
-                FakeDeviceProvisioningRepository(),
+                kosmos.deviceProvisioningInteractor,
                 FakeDisableFlagsRepository(),
                 mock(),
                 keyguardRepository,

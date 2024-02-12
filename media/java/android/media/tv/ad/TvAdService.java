@@ -17,6 +17,7 @@
 package android.media.tv.ad;
 
 import android.annotation.CallSuper;
+import android.annotation.FlaggedApi;
 import android.annotation.MainThread;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -31,6 +32,8 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.media.tv.TvInputManager;
 import android.media.tv.TvTrackInfo;
+import android.media.tv.TvView;
+import android.media.tv.flags.Flags;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -60,8 +63,8 @@ import java.util.List;
 
 /**
  * The TvAdService class represents a TV client-side advertisement service.
- * @hide
  */
+@FlaggedApi(Flags.FLAG_ENABLE_AD_SERVICE_FW)
 public abstract class TvAdService extends Service {
     private static final boolean DEBUG = false;
     private static final String TAG = "TvAdService";
@@ -72,7 +75,6 @@ public abstract class TvAdService extends Service {
      * Name under which a TvAdService component publishes information about itself. This meta-data
      * must reference an XML resource containing an
      * <code>&lt;{@link android.R.styleable#TvAdService tv-ad-service}&gt;</code> tag.
-     * @hide
      */
     public static final String SERVICE_META_DATA = "android.media.tv.ad.service";
 
@@ -91,7 +93,7 @@ public abstract class TvAdService extends Service {
 
     @Override
     @Nullable
-    public final IBinder onBind(@NonNull Intent intent) {
+    public final IBinder onBind(@Nullable Intent intent) {
         ITvAdService.Stub tvAdServiceBinder = new ITvAdService.Stub() {
             @Override
             public void registerCallback(ITvAdServiceCallback cb) {
@@ -132,6 +134,9 @@ public abstract class TvAdService extends Service {
 
     /**
      * Called when app link command is received.
+     *
+     * @see TvAdManager#sendAppLinkCommand(String, Bundle)
+     * @hide
      */
     public void onAppLinkCommand(@NonNull Bundle command) {
     }
@@ -279,23 +284,161 @@ public abstract class TvAdService extends Service {
             onResetAdService();
         }
 
+        /**
+         * Requests the bounds of the current video.
+         * @hide
+         */
+        @CallSuper
+        public void requestCurrentVideoBounds() {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) {
+                            Log.d(TAG, "requestCurrentVideoBounds");
+                        }
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onRequestCurrentVideoBounds();
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in requestCurrentVideoBounds", e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Requests the URI of the current channel.
+         * @hide
+         */
+        @CallSuper
+        public void requestCurrentChannelUri() {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) {
+                            Log.d(TAG, "requestCurrentChannelUri");
+                        }
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onRequestCurrentChannelUri();
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in requestCurrentChannelUri", e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Requests the list of {@link TvTrackInfo}.
+         * @hide
+         */
+        @CallSuper
+        public void requestTrackInfoList() {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) {
+                            Log.d(TAG, "requestTrackInfoList");
+                        }
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onRequestTrackInfoList();
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in requestTrackInfoList", e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Requests current TV input ID.
+         *
+         * @see android.media.tv.TvInputInfo
+         * @hide
+         */
+        @CallSuper
+        public void requestCurrentTvInputId() {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) {
+                            Log.d(TAG, "requestCurrentTvInputId");
+                        }
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onRequestCurrentTvInputId();
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in requestCurrentTvInputId", e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Requests signing of the given data.
+         *
+         * <p>This is used when the corresponding server of the AD service app requires signing
+         * during handshaking, and the service doesn't have the built-in private key. The private
+         * key is provided by the content providers and pre-built in the related app, such as TV
+         * app.
+         *
+         * @param signingId the ID to identify the request. When a result is received, this ID can
+         *                  be used to correlate the result with the request.
+         * @param algorithm the standard name of the signature algorithm requested, such as
+         *                  MD5withRSA, SHA256withDSA, etc. The name is from standards like
+         *                  FIPS PUB 186-4 and PKCS #1.
+         * @param alias the alias of the corresponding {@link java.security.KeyStore}.
+         * @param data the original bytes to be signed.
+         *
+         * @see #onSigningResult(String, byte[])
+         * @hide
+         */
+        @CallSuper
+        public void requestSigning(@NonNull String signingId, @NonNull String algorithm,
+                @NonNull String alias, @NonNull byte[] data) {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) {
+                            Log.d(TAG, "requestSigning");
+                        }
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onRequestSigning(signingId, algorithm, alias, data);
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in requestSigning", e);
+                    }
+                }
+            });
+        }
+
         @Override
-        public boolean onKeyDown(int keyCode, @NonNull KeyEvent event) {
+        public boolean onKeyDown(int keyCode, @Nullable KeyEvent event) {
             return false;
         }
 
         @Override
-        public boolean onKeyLongPress(int keyCode, @NonNull KeyEvent event) {
+        public boolean onKeyLongPress(int keyCode, @Nullable KeyEvent event) {
             return false;
         }
 
         @Override
-        public boolean onKeyMultiple(int keyCode, int count, @NonNull KeyEvent event) {
+        public boolean onKeyMultiple(int keyCode, int count, @Nullable KeyEvent event) {
             return false;
         }
 
         @Override
-        public boolean onKeyUp(int keyCode, @NonNull KeyEvent event) {
+        public boolean onKeyUp(int keyCode, @Nullable KeyEvent event) {
             return false;
         }
 
@@ -343,6 +486,7 @@ public abstract class TvAdService extends Service {
          * @param top Top position in pixels, relative to the overlay view.
          * @param right Right position in pixels, relative to the overlay view.
          * @param bottom Bottom position in pixels, relative to the overlay view.
+         *
          */
         @CallSuper
         public void layoutSurface(final int left, final int top, final int right,
@@ -470,6 +614,19 @@ public abstract class TvAdService extends Service {
         }
 
         /**
+         * Called when data from the linked {@link android.media.tv.TvInputService} is received.
+         *
+         * @param type the type of the data
+         * @param data a bundle contains the data received
+         * @see android.media.tv.TvInputService.Session#notifyTvAdSessionData(String, Bundle)
+         * @see android.media.tv.ad.TvAdView#setTvView(TvView)
+         * @hide
+         */
+        public void onTvInputSessionData(
+                @NonNull @TvInputManager.SessionDataType String type, @NonNull Bundle data) {
+        }
+
+        /**
          * Called when the size of the media view is changed by the application.
          *
          * <p>This is always called at least once when the session is created regardless of whether
@@ -494,6 +651,33 @@ public abstract class TvAdService extends Service {
         @Nullable
         public View onCreateMediaView() {
             return null;
+        }
+
+        /**
+         * Notifies data related to this session to corresponding linked
+         * {@link android.media.tv.TvInputService} object via TvView.
+         *
+         * @param type data type
+         * @param data the related data values
+         * @see TvAdView#setTvView(TvView)
+         * @hide
+         */
+        public void notifyTvAdSessionData(
+                @NonNull @TvAdManager.SessionDataType String type, @NonNull Bundle data) {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) Log.d(TAG, "notifyTvAdSessionData");
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onTvAdSessionData(type, data);
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in notifyTvAdSessionData", e);
+                    }
+                }
+            });
         }
 
         /**
@@ -592,6 +776,10 @@ public abstract class TvAdService extends Service {
                 Log.d(TAG, "notifyTvMessage (type=" + type + ", data= " + data + ")");
             }
             onTvMessage(type, data);
+        }
+
+        void notifyTvInputSessionData(String type, Bundle data) {
+            onTvInputSessionData(type, data);
         }
 
         private void executeOrPostRunnableOnMainThread(Runnable action) {

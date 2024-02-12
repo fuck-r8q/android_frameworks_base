@@ -210,6 +210,9 @@ public class ZenModeHelper {
 
         mDefaultConfig = readDefaultConfig(mContext.getResources());
         updateDefaultAutomaticRuleNames();
+        if (Flags.modesApi()) {
+            updateDefaultAutomaticRulePolicies();
+        }
         mConfig = mDefaultConfig.copy();
         synchronized (mConfigsArrayLock) {
             mConfigs.put(UserHandle.USER_SYSTEM, mConfig);
@@ -325,6 +328,7 @@ public class ZenModeHelper {
         }
     }
 
+    // TODO: b/310620812 - Remove when MODES_API is inlined (no more callers).
     public void onUserUnlocked(int user) {
         loadConfigForUser(user, "onUserUnlocked");
     }
@@ -840,9 +844,13 @@ public class ZenModeHelper {
                 && !PACKAGE_ANDROID.equals(ruleToRemove.pkg)) {
             String deletedKey = ZenModeConfig.deletedRuleKey(ruleToRemove);
             if (deletedKey != null) {
-                ruleToRemove.deletionInstant = Instant.now(mClock);
+                ZenRule deletedRule = ruleToRemove.copy();
+                deletedRule.deletionInstant = Instant.now(mClock);
+                // If the rule is restored it shouldn't be active (or snoozed).
+                deletedRule.snoozing = false;
+                deletedRule.condition = null;
                 // Overwrites a previously-deleted rule with the same conditionId, but that's okay.
-                config.deletedRules.put(deletedKey, ruleToRemove);
+                config.deletedRules.put(deletedKey, deletedRule);
             }
         }
     }
@@ -1958,6 +1966,21 @@ public class ZenModeHelper {
             } else if (ZenModeConfig.EVERY_NIGHT_DEFAULT_RULE_ID.equals(rule.id)) {
                 rule.name = mContext.getResources()
                         .getString(R.string.zen_mode_default_every_night_name);
+            }
+        }
+    }
+
+    // Updates the policies in the default automatic rules (provided via default XML config) to
+    // be fully filled in default values.
+    private void updateDefaultAutomaticRulePolicies() {
+        if (!Flags.modesApi()) {
+            // Should be checked before calling, but just in case.
+            return;
+        }
+        ZenPolicy defaultPolicy = mDefaultConfig.toZenPolicy();
+        for (ZenRule rule : mDefaultConfig.automaticRules.values()) {
+            if (ZenModeConfig.DEFAULT_RULE_IDS.contains(rule.id) && rule.zenPolicy == null) {
+                rule.zenPolicy = defaultPolicy.copy();
             }
         }
     }

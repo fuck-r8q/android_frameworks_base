@@ -22,11 +22,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.credentials.CredentialManager;
 import android.credentials.CredentialProviderInfo;
-import android.credentials.ui.DisabledProviderData;
-import android.credentials.ui.IntentFactory;
-import android.credentials.ui.ProviderData;
-import android.credentials.ui.RequestInfo;
-import android.credentials.ui.UserSelectionDialogResult;
+import android.credentials.selection.DisabledProviderData;
+import android.credentials.selection.IntentFactory;
+import android.credentials.selection.ProviderData;
+import android.credentials.selection.RequestInfo;
+import android.credentials.selection.UserSelectionDialogResult;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -148,8 +148,8 @@ public class CredentialManagerUi {
      * Creates a {@link PendingIntent} to be used to invoke the credential manager selector UI,
      * by the calling app process.
      *
-     * @param requestInfo      the information about the request
-     * @param providerDataList the list of provider data from remote providers
+     * @param requestInfo            the information about the request
+     * @param providerDataList       the list of provider data from remote providers
      * @param isRequestForAllOptions whether the bottom sheet should directly navigate to the
      *                               all options page
      */
@@ -170,7 +170,8 @@ public class CredentialManagerUi {
                 .map(disabledProvider -> new DisabledProviderData(
                         disabledProvider.getComponentName().flattenToString())).toList();
 
-        Intent intent = IntentFactory.createCredentialSelectorIntent(requestInfo, providerDataList,
+        Intent intent = IntentFactory.createCredentialSelectorIntent(mContext, requestInfo,
+                        providerDataList,
                         new ArrayList<>(disabledProviderDataList), mResultReceiver,
                         isRequestForAllOptions)
                 .setAction(UUID.randomUUID().toString());
@@ -178,7 +179,7 @@ public class CredentialManagerUi {
         // intents
         return PendingIntent.getActivityAsUser(
                 mContext, /*requestCode=*/0, intent,
-                PendingIntent.FLAG_IMMUTABLE, /*options=*/null,
+                PendingIntent.FLAG_MUTABLE, /*options=*/null,
                 UserHandle.of(mUserId));
     }
 }

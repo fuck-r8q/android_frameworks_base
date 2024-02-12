@@ -5044,10 +5044,7 @@ public class RemoteViews implements Parcelable, Filter {
      * @param viewId The id of the {@link AdapterView}
      * @param intent The intent of the service which will be
      *            providing data to the RemoteViewsAdapter
-     * @deprecated use
-     * {@link #setRemoteAdapter(int, android.widget.RemoteViews.RemoteCollectionItems)} instead
      */
-    @Deprecated
     public void setRemoteAdapter(@IdRes int viewId, Intent intent) {
         if (remoteAdapterConversion()) {
             addAction(new SetRemoteCollectionItemListAdapterAction(viewId, intent));
@@ -7594,14 +7591,6 @@ public class RemoteViews implements Parcelable, Filter {
                 dest.writeInt(instruction.length);
                 dest.writeByteArray(instruction);
             }
-        }
-
-        /**
-         * Append additional instructions to this {@link DrawInstructions} object.
-         */
-        @FlaggedApi(FLAG_DRAW_DATA_PARCEL)
-        public void appendInstructions(@NonNull final byte[] instructions) {
-            mInstructions.add(instructions);
         }
 
         /**

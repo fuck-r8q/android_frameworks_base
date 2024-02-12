@@ -243,6 +243,7 @@ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.FastMath;
 import com.android.internal.util.Preconditions;
+import com.android.text.flags.Flags;
 
 import libcore.util.EmptyArray;
 
@@ -539,7 +540,6 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
 
     // System wide time for last cut, copy or text changed action.
     static long sLastCutCopyOrTextChangedTime;
-
     private ColorStateList mTextColor;
     private ColorStateList mHintTextColor;
     private ColorStateList mLinkTextColor;
@@ -1259,6 +1259,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         int lastBaselineToBottomHeight = -1;
         float lineHeight = -1f;
         int lineHeightUnit = -1;
+        boolean hasUseBoundForWidthValue = false;
 
         readTextAppearance(context, a, attributes, true /* styleArray */);
 
@@ -1613,6 +1614,9 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                         lineHeight = a.getDimensionPixelSize(attr, -1);
                     }
                     break;
+                case com.android.internal.R.styleable.TextView_useBoundsForWidth:
+                    mUseBoundsForWidth = a.getBoolean(attr, false);
+                    hasUseBoundForWidthValue = true;
             }
         }
 
@@ -1639,10 +1643,12 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             mUseFallbackLineSpacing = FALLBACK_LINE_SPACING_NONE;
         }
 
-        if (CompatChanges.isChangeEnabled(USE_BOUNDS_FOR_WIDTH)) {
-            mUseBoundsForWidth = ClientFlags.useBoundsForWidth();
-        } else {
-            mUseBoundsForWidth = false;
+        if (!hasUseBoundForWidthValue) {
+            if (CompatChanges.isChangeEnabled(USE_BOUNDS_FOR_WIDTH)) {
+                mUseBoundsForWidth = ClientFlags.useBoundsForWidth();
+            } else {
+                mUseBoundsForWidth = false;
+            }
         }
 
         // TODO(b/179693024): Use a ChangeId instead.
@@ -2857,7 +2863,38 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         }
 
         if (updateText) {
-            setText(mText);
+            if (Flags.insertModeNotUpdateSelection()) {
+                // Update the transformation text.
+                if (mTransformation == null) {
+                    mTransformed = mText;
+                } else {
+                    mTransformed = mTransformation.getTransformation(mText, this);
+                }
+                if (mTransformed == null) {
+                    // Should not happen if the transformation method follows the non-null
+                    // postcondition.
+                    mTransformed = "";
+                }
+                final boolean isOffsetMapping = mTransformed instanceof OffsetMapping;
+
+                // If the mText is a Spannable and the new TransformationMethod needs to listen to
+                // its updates, apply the watcher on it.
+                if (mTransformation != null && mText instanceof Spannable
+                        && (!mAllowTransformationLengthChange || isOffsetMapping)) {
+                    Spannable sp = (Spannable) mText;
+                    final int priority = isOffsetMapping ? OFFSET_MAPPING_SPAN_PRIORITY : 0;
+                    sp.setSpan(mTransformation, 0, mText.length(),
+                            Spanned.SPAN_INCLUSIVE_INCLUSIVE
+                                    | (priority << Spanned.SPAN_PRIORITY_SHIFT));
+                }
+                if (mLayout != null) {
+                    nullLayouts();
+                    requestLayout();
+                    invalidate();
+                }
+            } else {
+                setText(mText);
+            }
         }
 
         if (hasPasswordTransformationMethod()) {

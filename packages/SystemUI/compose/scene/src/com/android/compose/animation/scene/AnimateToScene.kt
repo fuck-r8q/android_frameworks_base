@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 internal fun CoroutineScope.animateToScene(
     layoutState: BaseSceneTransitionLayoutState,
     target: SceneKey,
+    transitionKey: TransitionKey?,
 ): TransitionState.Transition? {
     val transitionState = layoutState.transitionState
     if (transitionState.currentScene == target) {
@@ -45,7 +46,7 @@ internal fun CoroutineScope.animateToScene(
     }
 
     return when (transitionState) {
-        is TransitionState.Idle -> animate(layoutState, target)
+        is TransitionState.Idle -> animate(layoutState, target, transitionKey)
         is TransitionState.Transition -> {
             // A transition is currently running: first check whether `transition.toScene` or
             // `transition.fromScene` is the same as our target scene, in which case the transition
@@ -61,13 +62,13 @@ internal fun CoroutineScope.animateToScene(
                     // The transition is already finished (progress ~= 1): no need to animate. We
                     // finish the current transition early to make sure that the current state
                     // change is committed.
-                    layoutState.finishTransition(transitionState, transitionState.currentScene)
+                    layoutState.finishTransition(transitionState, target)
                     null
                 } else {
                     // The transition is in progress: start the canned animation at the same
                     // progress as it was in.
                     // TODO(b/290184746): Also take the current velocity into account.
-                    animate(layoutState, target, startProgress = progress)
+                    animate(layoutState, target, transitionKey, startProgress = progress)
                 }
             } else if (transitionState.fromScene == target) {
                 // There is a transition from [target] to another scene: simply animate the same
@@ -78,16 +79,22 @@ internal fun CoroutineScope.animateToScene(
                 if (progress.absoluteValue < ProgressVisibilityThreshold) {
                     // The transition is at progress ~= 0: no need to animate.We finish the current
                     // transition early to make sure that the current state change is committed.
-                    layoutState.finishTransition(transitionState, transitionState.currentScene)
+                    layoutState.finishTransition(transitionState, target)
                     null
                 } else {
                     // TODO(b/290184746): Also take the current velocity into account.
-                    animate(layoutState, target, startProgress = progress, reversed = true)
+                    animate(
+                        layoutState,
+                        target,
+                        transitionKey,
+                        startProgress = progress,
+                        reversed = true,
+                    )
                 }
             } else {
                 // Generic interruption; the current transition is neither from or to [target].
                 // TODO(b/290930950): Better handle interruptions here.
-                animate(layoutState, target)
+                animate(layoutState, target, transitionKey)
             }
         }
     }
@@ -96,6 +103,7 @@ internal fun CoroutineScope.animateToScene(
 private fun CoroutineScope.animate(
     layoutState: BaseSceneTransitionLayoutState,
     target: SceneKey,
+    transitionKey: TransitionKey?,
     startProgress: Float = 0f,
     reversed: Boolean = false,
 ): TransitionState.Transition {
@@ -127,7 +135,7 @@ private fun CoroutineScope.animate(
     // Change the current layout state to start this new transition. This will compute the
     // TransformationSpec associated to this transition, which we need to initialize the Animatable
     // that will actually animate it.
-    layoutState.startTransition(transition)
+    layoutState.startTransition(transition, transitionKey)
 
     // The transformation now contains the spec that we should use to instantiate the Animatable.
     val animationSpec = layoutState.transformationSpec.progressSpec

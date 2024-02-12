@@ -19,50 +19,108 @@ package com.android.systemui.keyguard.ui.composable.section
 import android.content.Context
 import android.view.ViewGroup
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.android.compose.animation.scene.SceneScope
+import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.keyguard.shared.KeyguardShadeMigrationNssl
 import com.android.systemui.notifications.ui.composable.NotificationStack
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
 import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
+import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator
 import com.android.systemui.statusbar.notification.stack.shared.flexiNotifsEnabled
 import com.android.systemui.statusbar.notification.stack.ui.view.SharedNotificationContainer
 import com.android.systemui.statusbar.notification.stack.ui.viewbinder.NotificationStackAppearanceViewBinder
+import com.android.systemui.statusbar.notification.stack.ui.viewbinder.SharedNotificationContainerBinder
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationStackAppearanceViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.SharedNotificationContainerViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.DisposableHandle
 
+@SysUISingleton
 class NotificationSection
 @Inject
 constructor(
-    @Application context: Context,
+    @Application private val context: Context,
     private val viewModel: NotificationsPlaceholderViewModel,
-    controller: NotificationStackScrollLayoutController,
-    sceneContainerFlags: SceneContainerFlags,
-    sharedNotificationContainer: SharedNotificationContainer,
-    stackScrollLayout: NotificationStackScrollLayout,
-    notificationStackAppearanceViewModel: NotificationStackAppearanceViewModel,
-    ambientState: AmbientState,
+    private val controller: NotificationStackScrollLayoutController,
+    private val sceneContainerFlags: SceneContainerFlags,
+    private val sharedNotificationContainer: SharedNotificationContainer,
+    private val sharedNotificationContainerViewModel: SharedNotificationContainerViewModel,
+    private val stackScrollLayout: NotificationStackScrollLayout,
+    private val notificationStackAppearanceViewModel: NotificationStackAppearanceViewModel,
+    private val ambientState: AmbientState,
+    private val notificationStackSizeCalculator: NotificationStackSizeCalculator,
+    @Main private val mainDispatcher: CoroutineDispatcher,
 ) {
-    init {
-        if (sceneContainerFlags.flexiNotifsEnabled()) {
-            (stackScrollLayout.parent as? ViewGroup)?.removeView(stackScrollLayout)
-            sharedNotificationContainer.addNotificationStackScrollLayout(stackScrollLayout)
-
-            NotificationStackAppearanceViewBinder.bind(
-                context,
-                sharedNotificationContainer,
-                notificationStackAppearanceViewModel,
-                ambientState,
-                controller,
-            )
-        }
-    }
-
     @Composable
     fun SceneScope.Notifications(modifier: Modifier = Modifier) {
+        if (KeyguardShadeMigrationNssl.isUnexpectedlyInLegacyMode()) {
+            // This scene container section moves the NSSL to the SharedNotificationContainer.
+            // This also requires that SharedNotificationContainer gets moved to the
+            // SceneWindowRootView by the SceneWindowRootViewBinder. Prior to Scene Container,
+            // but when the KeyguardShadeMigrationNssl flag is enabled, NSSL is moved into this
+            // container by the NotificationStackScrollLayoutSection.
+            return
+        }
+
+        var isBound by remember { mutableStateOf(false) }
+
+        DisposableEffect(Unit) {
+            val disposableHandles: MutableList<DisposableHandle> = mutableListOf()
+
+            // Ensure stackScrollLayout is a child of sharedNotificationContainer.
+            if (stackScrollLayout.parent != sharedNotificationContainer) {
+                (stackScrollLayout.parent as? ViewGroup)?.removeView(stackScrollLayout)
+                sharedNotificationContainer.addNotificationStackScrollLayout(stackScrollLayout)
+            }
+
+            disposableHandles.add(
+                SharedNotificationContainerBinder.bind(
+                    sharedNotificationContainer,
+                    sharedNotificationContainerViewModel,
+                    sceneContainerFlags,
+                    controller,
+                    notificationStackSizeCalculator,
+                    mainDispatcher,
+                )
+            )
+
+            if (sceneContainerFlags.flexiNotifsEnabled()) {
+                disposableHandles.add(
+                    NotificationStackAppearanceViewBinder.bind(
+                        context,
+                        sharedNotificationContainer,
+                        notificationStackAppearanceViewModel,
+                        ambientState,
+                        controller,
+                    )
+                )
+            }
+
+            isBound = true
+
+            onDispose {
+                disposableHandles.forEach { it.dispose() }
+                disposableHandles.clear()
+                isBound = false
+            }
+        }
+
+        if (!isBound) {
+            return
+        }
+
         NotificationStack(
             viewModel = viewModel,
             modifier = modifier,

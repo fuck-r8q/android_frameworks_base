@@ -28,6 +28,7 @@ import android.hardware.biometrics.BiometricAuthenticator;
 import android.hardware.biometrics.BiometricConstants;
 import android.hardware.biometrics.BiometricFingerprintConstants;
 import android.hardware.biometrics.BiometricManager.Authenticators;
+import android.hardware.biometrics.BiometricSourceType;
 import android.hardware.biometrics.fingerprint.PointerContext;
 import android.hardware.biometrics.fingerprint.V2_1.IBiometricsFingerprint;
 import android.hardware.fingerprint.FingerprintAuthenticateOptions;
@@ -201,6 +202,8 @@ class FingerprintAuthenticationClient
 
     @Override
     public void onAcquired(int acquiredInfo, int vendorCode) {
+        mAuthenticationStateListeners.onAuthenticationAcquired(
+                BiometricSourceType.FINGERPRINT, getRequestReason(), acquiredInfo);
         super.onAcquired(acquiredInfo, vendorCode);
 
         @LockoutTracker.LockoutMode final int lockoutMode =
@@ -279,12 +282,10 @@ class FingerprintAuthenticationClient
         mALSProbeCallback.getProbe().enable();
         UdfpsHelper.onFingerDown(getFreshDaemon(), (int) pc.x, (int) pc.y, pc.minor, pc.major);
 
-        if (getListener() != null) {
-            try {
-                getListener().onUdfpsPointerDown(getSensorId());
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Remote exception", e);
-            }
+        try {
+            getListener().onUdfpsPointerDown(getSensorId());
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Remote exception", e);
         }
     }
 
@@ -295,12 +296,10 @@ class FingerprintAuthenticationClient
         mALSProbeCallback.getProbe().disable();
         UdfpsHelper.onFingerUp(getFreshDaemon());
 
-        if (getListener() != null) {
-            try {
-                getListener().onUdfpsPointerUp(getSensorId());
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Remote exception", e);
-            }
+        try {
+            getListener().onUdfpsPointerUp(getSensorId());
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Remote exception", e);
         }
     }
 
