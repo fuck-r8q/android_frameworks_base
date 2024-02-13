@@ -28,9 +28,6 @@ class NotificationStackAppearanceRepository @Inject constructor() {
     /** The bounds of the notification stack in the current scene. */
     val stackBounds = MutableStateFlow(NotificationContainerBounds())
 
-    /** The corner radius of the notification stack, in dp. */
-    val cornerRadiusDp = MutableStateFlow(32f)
-
     /**
      * The height in px of the contents of notification stack. Depending on the number of
      * notifications, this can exceed the space available on screen to show notifications, at which
@@ -50,4 +47,11 @@ class NotificationStackAppearanceRepository @Inject constructor() {
      * further.
      */
     val scrolledToTop = MutableStateFlow(true)
+
+    /**
+     * The amount in px that the notification stack should scroll due to internal expansion. This
+     * should only happen when a notification expansion hits the bottom of the screen, so it is
+     * necessary to scroll up to keep expanding the notification.
+     */
+    val syntheticScroll = MutableStateFlow(0f)
 }

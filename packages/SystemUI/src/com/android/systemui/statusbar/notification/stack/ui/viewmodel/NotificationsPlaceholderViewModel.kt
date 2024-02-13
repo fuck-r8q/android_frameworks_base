@@ -28,7 +28,6 @@ import com.android.systemui.statusbar.notification.stack.domain.interactor.Notif
 import com.android.systemui.statusbar.notification.stack.shared.flexiNotifsEnabled
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewModel used by the Notification placeholders inside the scene container to update the
@@ -74,9 +73,6 @@ constructor(
         interactor.setStackBounds(notificationContainerBounds)
     }
 
-    /** The corner radius of the placeholder, in dp. */
-    val cornerRadiusDp: StateFlow<Float> = interactor.cornerRadiusDp
-
     /**
      * The height in px of the contents of notification stack. Depending on the number of
      * notifications, this can exceed the space available on screen to show notifications, at which
@@ -89,6 +85,13 @@ constructor(
      * is open.
      */
     val expandFraction: Flow<Float> = shadeInteractor.shadeExpansion
+
+    /**
+     * The amount in px that the notification stack should scroll due to internal expansion. This
+     * should only happen when a notification expansion hits the bottom of the screen, so it is
+     * necessary to scroll up to keep expanding the notification.
+     */
+    val syntheticScroll: Flow<Float> = interactor.syntheticScroll
 
     /** Sets the y-coord in px of the top of the contents of the notification stack. */
     fun onContentTopChanged(padding: Float) {

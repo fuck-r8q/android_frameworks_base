@@ -23,8 +23,6 @@ import android.os.Looper;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.systemui.CoreStartable;
-import com.android.systemui.dagger.qualifiers.Application;
-import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.media.dialog.MediaOutputDialogFactory;
 import com.android.systemui.plugins.VolumeDialog;
@@ -55,13 +53,11 @@ import dagger.multibindings.ClassKey;
 import dagger.multibindings.IntoMap;
 import dagger.multibindings.IntoSet;
 
-import kotlinx.coroutines.CoroutineDispatcher;
-import kotlinx.coroutines.CoroutineScope;
-
 /** Dagger Module for code in the volume package. */
 @Module(
         includes = {
                 AudioModule.class,
+                CaptioningModule.class,
                 MediaDevicesModule.class
         },
         subcomponents = {
@@ -111,8 +107,6 @@ public interface VolumeModule {
             DumpManager dumpManager,
             Lazy<SecureSettings> secureSettings,
             VibratorHelper vibratorHelper,
-            @Main CoroutineDispatcher mainDispatcher,
-            @Application CoroutineScope applicationScope,
             SystemClock systemClock) {
         VolumeDialogImpl impl = new VolumeDialogImpl(
                 context,
@@ -131,8 +125,6 @@ public interface VolumeModule {
                 dumpManager,
                 secureSettings,
                 vibratorHelper,
-                mainDispatcher,
-                applicationScope,
                 systemClock);
         impl.setStreamImportant(AudioManager.STREAM_SYSTEM, false);
         impl.setAutomute(true);

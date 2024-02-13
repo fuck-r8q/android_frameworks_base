@@ -77,7 +77,7 @@ flag {
 }
 
 flag {
-  name: "inter_character_justification"
+  name: "letter_spacing_justification"
   namespace: "text"
   description: "A feature flag that implement inter character justification."
   bug: "283193133"
@@ -102,4 +102,11 @@ flag {
   namespace: "text"
   description: "Fix that InputService#onUpdateSelection is not called when insert mode gesture is performed."
   bug: "300850862"
+}
+
+flag {
+  name: "icu_bidi_migration"
+  namespace: "text"
+  description: "A flag for replacing AndroidBidi with android.icu.text.Bidi."
+  bug: "317144801"
 }

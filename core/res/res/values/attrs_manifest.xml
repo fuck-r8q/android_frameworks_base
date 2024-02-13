@@ -1273,11 +1273,17 @@
          null to indicate no split types are offered. -->
     <attr name="splitTypes" format="string" />
 
-    <!-- Flag to specify if this app wants to run the dex within its APK but not extracted or
-         locally compiled variants. This keeps the dex code protected by the APK signature. Such
-         apps will always run in JIT mode (same when they are first installed), and the system will
-         never generate ahead-of-time compiled code for them. Depending on the app's workload,
-         there may be some run time performance change, noteably the cold start time. -->
+    <!-- Flag to specify if this app (or process) wants to run the dex within its APK but not
+         extracted or locally compiled variants. This keeps the dex code protected by the APK
+         signature. Such apps (or processes) will always run in JIT mode (same when they are first
+         installed). If enabled at the app level, the system will never generate ahead-of-time
+         compiled code for the app. Depending on the app's workload, there may be some run time
+         performance change, noteably the cold start time.
+
+         <p>This attribute can be applied to either
+         {@link android.R.styleable#AndroidManifestProcess process} or
+         {@link android.R.styleable#AndroidManifestApplication application} tags. If enabled at the
+         app level, any process level attribute is effectively ignored.  -->
     <attr name="useEmbeddedDex" format="boolean" />
 
     <!-- Extra options for an activity's UI. Applies to either the {@code <activity>} or
@@ -1601,6 +1607,10 @@
          of the version it's replacing, the install will be rejected.
          This is a private attribute, used without android: namespace. -->
     <attr name="updatableSystem" format="boolean" />
+
+    <!-- Allows each installer in the system image to designate another app in the system image to
+        update the installer. -->
+    <attr name="emergencyInstaller" format="string" />
 
     <!-- Specify the type of foreground service. Multiple types can be specified by ORing the flags
          together. -->
@@ -2793,6 +2803,7 @@
         <attr name="gwpAsanMode" />
         <attr name="memtagMode" />
         <attr name="nativeHeapZeroInitialized" />
+        <attr name="useEmbeddedDex" />
     </declare-styleable>
 
     <!-- The <code>deny-permission</code> tag specifies that a permission is to be denied
@@ -3267,6 +3278,31 @@
              <p> By default, the behavior is configured by the same attribute in application.
         -->
         <attr name="enableOnBackInvokedCallback" format="boolean"/>
+
+        <!-- Specifies permissions necessary to launch this activity via
+             {@link android.content.Context#startActivity} when passing content URIs. The default
+             value is {@code none}, meaning no specific permissions are required. Setting this
+             attribute restricts activity invocation based on the invoker's permissions. If the
+             invoker doesn't have the required permissions, the activity start will be denied via a
+             {@link java.lang.SecurityException}.
+
+             <p> Note that the enforcement works for content URIs inside
+             {@link android.content.Intent#getData} and {@link android.content.Intent#getClipData}.
+             @FlaggedApi("android.security.content_uri_permission_apis") -->
+        <attr name="requireContentUriPermissionFromCaller" format="string">
+            <!-- Default, no specific permissions are required. -->
+            <enum name="none" value="0" />
+            <!-- Enforces the invoker to have read access to the passed content URIs. -->
+            <enum name="read" value="1" />
+            <!-- Enforces the invoker to have write access to the passed content URIs. -->
+            <enum name="write" value="2" />
+            <!-- Enforces the invoker to have either read or write access to the passed content
+                 URIs. -->
+            <enum name="readOrWrite" value="3" />
+            <!-- Enforces the invoker to have both read and write access to the passed content
+                 URIs. -->
+            <enum name="readAndWrite" value="4" />
+        </attr>
     </declare-styleable>
 
     <!-- The <code>activity-alias</code> tag declares a new

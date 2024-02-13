@@ -1957,7 +1957,8 @@ public final class ProcessList {
                 mService.mNativeDebuggingApp = null;
             }
 
-            if (app.info.isEmbeddedDexUsed()) {
+            if (app.info.isEmbeddedDexUsed()
+                    || (app.processInfo != null && app.processInfo.useEmbeddedDex)) {
                 runtimeFlags |= Zygote.ONLY_USE_SYSTEM_OAT_FILES;
             }
 
@@ -2505,7 +2506,7 @@ public final class ProcessList {
                         app.info.dataDir, null, app.info.packageName,
                         /*zygotePolicyFlags=*/ ZYGOTE_POLICY_FLAG_EMPTY, isTopApp,
                         app.getDisabledCompatChanges(), pkgDataInfoMap, allowlistedAppDataInfoMap,
-                        false, false, bindOverrideSysprops,
+                        false, false, false,
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else {
                 regularZygote = true;
@@ -5002,19 +5003,7 @@ public final class ProcessList {
     }
 
     void dispatchProcessStarted(ProcessRecord app, int pid) {
-        int i = mProcessObservers.beginBroadcast();
-        while (i > 0) {
-            i--;
-            final IProcessObserver observer = mProcessObservers.getBroadcastItem(i);
-            if (observer != null) {
-                try {
-                    observer.onProcessStarted(pid, app.uid, app.info.uid,
-                            app.info.packageName, app.processName);
-                } catch (RemoteException e) {
-                }
-            }
-        }
-        mProcessObservers.finishBroadcast();
+        // TODO(b/323959187) Add the implementation.
     }
 
     void dispatchProcessDied(int pid, int uid) {

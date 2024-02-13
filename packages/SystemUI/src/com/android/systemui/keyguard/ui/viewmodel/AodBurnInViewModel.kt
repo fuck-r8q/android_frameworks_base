@@ -28,6 +28,13 @@ import com.android.systemui.keyguard.domain.interactor.BurnInInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.BurnInModel
+import com.android.systemui.keyguard.shared.model.KeyguardState.ALTERNATE_BOUNCER
+import com.android.systemui.keyguard.shared.model.KeyguardState.AOD
+import com.android.systemui.keyguard.shared.model.KeyguardState.GONE
+import com.android.systemui.keyguard.shared.model.TransitionState
+import com.android.systemui.keyguard.shared.model.TransitionState.RUNNING
+import com.android.systemui.keyguard.shared.model.TransitionState.STARTED
+import com.android.systemui.keyguard.ui.StateToValue
 import com.android.systemui.plugins.clocks.ClockController
 import com.android.systemui.res.R
 import javax.inject.Inject
@@ -55,6 +62,7 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val goneToAodTransitionViewModel: GoneToAodTransitionViewModel,
+    private val aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
     private val occludedToLockscreenTransitionViewModel: OccludedToLockscreenTransitionViewModel,
     private val keyguardClockViewModel: KeyguardClockViewModel,
 ) {
@@ -80,21 +88,22 @@ constructor(
                     burnIn(params).map { it.translationY.toFloat() }.onStart { emit(0f) },
                     goneToAodTransitionViewModel
                         .enterFromTopTranslationY(enterFromTopAmount)
-                        .onStart { emit(0f) },
+                        .onStart { emit(StateToValue()) },
                     occludedToLockscreenTransitionViewModel.lockscreenTranslationY.onStart {
                         emit(0f)
                     },
-                ) {
-                    keyguardTransitionY,
-                    burnInTranslationY,
-                    goneToAodTransitionTranslationY,
-                    occludedToLockscreenTransitionTranslationY ->
-
-                    // All values need to be combined for a smooth translation
-                    keyguardTransitionY +
-                        burnInTranslationY +
-                        goneToAodTransitionTranslationY +
-                        occludedToLockscreenTransitionTranslationY
+                    aodToLockscreenTransitionViewModel.translationY(params.translationY).onStart {
+                        emit(StateToValue())
+                    },
+                ) { keyguardTranslationY, burnInY, goneToAod, occludedToLockscreen, aodToLockscreen
+                    ->
+                    if (isInTransition(aodToLockscreen.transitionState)) {
+                        aodToLockscreen.value ?: 0f
+                    } else if (isInTransition(goneToAod.transitionState)) {
+                        (goneToAod.value ?: 0f) + burnInY
+                    } else {
+                        burnInY + occludedToLockscreen + keyguardTranslationY
+                    }
                 }
             }
             .distinctUntilChanged()
@@ -112,12 +121,19 @@ constructor(
         }
     }
 
+    private fun isInTransition(state: TransitionState): Boolean {
+        return state == STARTED || state == RUNNING
+    }
+
     private fun burnIn(
         params: BurnInParameters,
     ): Flow<BurnInModel> {
         return combine(
             merge(
-                    keyguardTransitionInteractor.goneToAodTransition.map { it.value },
+                    keyguardTransitionInteractor.transition(GONE, AOD).map { it.value },
+                    keyguardTransitionInteractor.transition(ALTERNATE_BOUNCER, AOD).map {
+                        it.value
+                    },
                     keyguardTransitionInteractor.dozeAmountTransition.map { it.value },
                 )
                 .map { dozeAmount -> Interpolators.FAST_OUT_SLOW_IN.getInterpolation(dozeAmount) },
@@ -179,6 +195,8 @@ data class BurnInParameters(
     val topInset: Int = 0,
     /** Status view top, without translation added in */
     val statusViewTop: Int = 0,
+    /** The current y translation of the view */
+    val translationY: () -> Float? = { null }
 )
 
 /**

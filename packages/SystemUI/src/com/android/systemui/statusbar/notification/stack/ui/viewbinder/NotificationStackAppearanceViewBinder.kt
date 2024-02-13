@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 
 /** Binds the shared notification container to its view-model. */
 object NotificationStackAppearanceViewBinder {
+    const val SCRIM_CORNER_RADIUS = 32f
 
     @JvmStatic
     fun bind(
@@ -49,8 +50,8 @@ object NotificationStackAppearanceViewBinder {
                             bounds.top.roundToInt(),
                             bounds.right.roundToInt(),
                             bounds.bottom.roundToInt(),
-                            viewModel.cornerRadiusDp.value.dpToPx(context),
-                            viewModel.cornerRadiusDp.value.dpToPx(context),
+                            SCRIM_CORNER_RADIUS.dpToPx(context),
+                            0,
                         )
                     }
                 }
@@ -68,6 +69,9 @@ object NotificationStackAppearanceViewBinder {
                         controller.setMaxAlphaForExpansion(
                             ((expandFraction - 0.5f) / 0.5f).coerceAtLeast(0f)
                         )
+                        if (expandFraction == 0f || expandFraction == 1f) {
+                            controller.onExpansionStopped()
+                        }
                     }
                 }
             }

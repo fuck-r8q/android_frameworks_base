@@ -30,6 +30,8 @@ import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.shared.model.KeyguardState.AOD
 import com.android.systemui.keyguard.shared.model.KeyguardState.GONE
 import com.android.systemui.keyguard.shared.model.KeyguardState.LOCKSCREEN
+import com.android.systemui.keyguard.shared.model.TransitionState.RUNNING
+import com.android.systemui.keyguard.shared.model.TransitionState.STARTED
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationsKeyguardInteractor
 import com.android.systemui.statusbar.phone.DozeParameters
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController
@@ -48,6 +50,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onStart
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SysUISingleton
@@ -61,6 +64,9 @@ constructor(
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val notificationsKeyguardInteractor: NotificationsKeyguardInteractor,
     aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
+    lockscreenToGoneTransitionViewModel: LockscreenToGoneTransitionViewModel,
+    alternateBouncerToGoneTransitionViewModel: AlternateBouncerToGoneTransitionViewModel,
+    primaryBouncerToGoneTransitionViewModel: PrimaryBouncerToGoneTransitionViewModel,
     lockscreenToGlanceableHubTransitionViewModel: LockscreenToGlanceableHubTransitionViewModel,
     glanceableHubToLockscreenTransitionViewModel: GlanceableHubToLockscreenTransitionViewModel,
     screenOffAnimationController: ScreenOffAnimationController,
@@ -74,6 +80,12 @@ constructor(
             .map { VISIBLE }
 
     val goneToAodTransition = keyguardTransitionInteractor.transition(from = GONE, to = AOD)
+
+    private val goneToAodTransitionRunning: Flow<Boolean> =
+        goneToAodTransition
+            .map { it.transitionState == STARTED || it.transitionState == RUNNING }
+            .onStart { emit(false) }
+            .distinctUntilChanged()
 
     /** Last point that the root view was tapped */
     val lastRootViewTapPosition: Flow<Point?> = keyguardInteractor.lastRootViewTapPosition
@@ -92,10 +104,15 @@ constructor(
     val alpha: Flow<Float> =
         combine(
                 communalInteractor.isIdleOnCommunal,
+                // The transitions are mutually exclusive, so they are safe to merge to get the last
+                // value emitted by any of them. Do not add flows that cannot make this guarantee.
                 merge(
                     aodAlphaViewModel.alpha,
                     lockscreenToGlanceableHubTransitionViewModel.keyguardAlpha,
                     glanceableHubToLockscreenTransitionViewModel.keyguardAlpha,
+                    lockscreenToGoneTransitionViewModel.lockscreenAlpha,
+                    primaryBouncerToGoneTransitionViewModel.lockscreenAlpha,
+                    alternateBouncerToGoneTransitionViewModel.lockscreenAlpha,
                 )
             ) { isIdleOnCommunal, alpha ->
                 if (isIdleOnCommunal) {
@@ -130,6 +147,7 @@ constructor(
     /** Is the notification icon container visible? */
     val isNotifIconContainerVisible: Flow<AnimatedValue<Boolean>> =
         combine(
+                goneToAodTransitionRunning,
                 keyguardTransitionInteractor.finishedKeyguardState.map {
                     KeyguardState.lockscreenVisibleInState(it)
                 },
@@ -137,6 +155,7 @@ constructor(
                 areNotifsFullyHiddenAnimated(),
                 isPulseExpandingAnimated(),
             ) {
+                goneToAodTransitionRunning: Boolean,
                 onKeyguard: Boolean,
                 isBypassEnabled: Boolean,
                 notifsFullyHidden: AnimatedValue<Boolean>,
@@ -146,7 +165,9 @@ constructor(
                     // Hide the AOD icons if we're not in the KEYGUARD state unless the screen off
                     // animation is playing, in which case we want them to be visible if we're
                     // animating in the AOD UI and will be switching to KEYGUARD shortly.
-                    !onKeyguard && !screenOffAnimationController.shouldShowAodIconsWhenShade() ->
+                    goneToAodTransitionRunning ||
+                        (!onKeyguard &&
+                            !screenOffAnimationController.shouldShowAodIconsWhenShade()) ->
                         AnimatedValue.NotAnimating(false)
                     else ->
                         zip(notifsFullyHidden, pulseExpanding) {

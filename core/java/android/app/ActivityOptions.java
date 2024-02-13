@@ -2042,8 +2042,8 @@ public class ActivityOptions extends ComponentOptions {
             binder = new Binder(descriptor);
         }
 
-        private LaunchCookie(Parcel in) {
-            this.binder = in.readStrongBinder();
+        private LaunchCookie(IBinder binder) {
+            this.binder = binder;
         }
 
         /** @hide */
@@ -2064,7 +2064,11 @@ public class ActivityOptions extends ComponentOptions {
 
         /** @hide */
         public static LaunchCookie readFromParcel(@NonNull Parcel in) {
-            return new LaunchCookie(in);
+            IBinder binder = in.readStrongBinder();
+            if (binder == null) {
+                return null;
+            }
+            return new LaunchCookie(binder);
         }
 
         /** @hide */
@@ -2085,7 +2089,7 @@ public class ActivityOptions extends ComponentOptions {
 
                     @Override
                     public LaunchCookie createFromParcel(Parcel source) {
-                        return new LaunchCookie(source);
+                        return LaunchCookie.readFromParcel(source);
                     }
 
                     @Override

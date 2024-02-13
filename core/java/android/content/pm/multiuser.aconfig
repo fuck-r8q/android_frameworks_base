@@ -44,6 +44,20 @@ flag {
 }
 
 flag {
+    name: "start_user_before_scheduled_alarms"
+    namespace: "multiuser"
+    description: "Persist list of users with alarms scheduled and wakeup stopped users before alarms are due"
+    bug: "314907186"
+}
+
+flag {
+    name: "add_ui_for_sounds_from_background_users"
+    namespace: "multiuser"
+    description: "Allow foreground user to dismiss sounds that are coming from background users"
+    bug: "314907186"
+}
+
+flag {
     name: "enable_biometrics_to_unlock_private_space"
     namespace: "profile_experiences"
     description: "Add support to unlock the private space using biometrics"
@@ -95,18 +109,10 @@ flag {
 }
 
 flag {
-    name: "allow_private_profile_apis"
+    name: "enable_private_space_features"
     namespace: "profile_experiences"
-    description: "Enable only the API changes to support private space"
-    bug: "299069460"
-}
-
-flag {
-    name: "support_hiding_profiles"
-    namespace: "profile_experiences"
-    description: "Allow the use of a hide_profile property to hide some profiles behind a permission"
-    bug: "316362775"
-    is_fixed_read_only: true
+    description: "Enable the support for private space and all its sub-features"
+    bug: "286418785"
 }
 
 flag {
@@ -121,4 +127,11 @@ flag {
     namespace: "profile_experiences"
     description: "Handle listing of private space apps in settings pages with interleaved content"
     bug: "323212460"
+}
+
+flag {
+    name: "enable_hiding_profiles"
+    namespace: "profile_experiences"
+    description: "Allow the use of a profileApiAvailability user property to exclude HIDDEN profiles in API results"
+    bug: "316362775"
 }

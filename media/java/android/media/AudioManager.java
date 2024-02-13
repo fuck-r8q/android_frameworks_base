@@ -5190,13 +5190,12 @@ public class AudioManager {
      *     dispatch was successfully sent, or {@link #AUDIOFOCUS_REQUEST_DELAYED} if
      *     the request was successful but the dispatch of focus change was delayed due to a fade
      *     operation.
-     * @throws NullPointerException if the {@link AudioFocusInfo} or {@link AudioPolicy} or list of
-     *     other active {@link AudioFocusInfo} are {@code null}.
      * @hide
      */
     @FlaggedApi(FLAG_ENABLE_FADE_MANAGER_CONFIGURATION)
     @SystemApi
     @RequiresPermission(Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)
+    @FocusRequestResult
     public int dispatchAudioFocusChangeWithFade(@NonNull AudioFocusInfo afi, int focusChange,
             @NonNull AudioPolicy ap, @NonNull List<AudioFocusInfo> otherActiveAfis,
             @Nullable FadeManagerConfiguration transientFadeMgrConfig) {
@@ -5531,6 +5530,26 @@ public class AudioManager {
             policy.invalidateCaptorsAndInjectors();
             service.unregisterAudioPolicy(policy.cb());
             policy.reset();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * @return All currently registered audio policy mixes.
+     */
+    @TestApi
+    @FlaggedApi(android.media.audiopolicy.Flags.FLAG_AUDIO_MIX_TEST_API)
+    @NonNull
+    public List<android.media.audiopolicy.AudioMix> getRegisteredPolicyMixes() {
+        if (!android.media.audiopolicy.Flags.audioMixTestApi()) {
+            return Collections.emptyList();
+        }
+
+        final IAudioService service = getService();
+        try {
+            return service.getRegisteredPolicyMixes();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

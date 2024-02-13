@@ -89,7 +89,7 @@ import com.android.keyguard.TestScopeProvider;
 import com.android.keyguard.mediator.ScreenOnCoordinator;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.SysuiTestCase;
-import com.android.systemui.animation.ActivityLaunchAnimator;
+import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollectorFake;
@@ -97,7 +97,6 @@ import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dreams.DreamOverlayStateController;
 import com.android.systemui.dump.DumpManager;
 import com.android.systemui.flags.FakeFeatureFlags;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.flags.SystemPropertiesHelper;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
 import com.android.systemui.keyguard.ui.viewmodel.DreamingToLockscreenTransitionViewModel;
@@ -192,7 +191,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
     private @Mock ShadeController mShadeController;
     private NotificationShadeWindowController mNotificationShadeWindowController;
     private @Mock DreamOverlayStateController mDreamOverlayStateController;
-    private @Mock ActivityLaunchAnimator mActivityLaunchAnimator;
+    private @Mock ActivityTransitionAnimator mActivityTransitionAnimator;
     private @Mock ScrimController mScrimController;
     private @Mock FoldAodAnimationController mFoldAodAnimationController;
     private @Mock UnfoldLightRevealOverlayAnimation mUnfoldAnimation;
@@ -725,7 +724,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
 
     @Test
     public void testUpdateIsKeyguardAfterOccludeAnimationEnds() {
-        mViewMediator.mOccludeAnimationController.onLaunchAnimationEnd(
+        mViewMediator.mOccludeAnimationController.onTransitionAnimationEnd(
                 false /* isExpandingFullyAbove */);
 
         // Since the updateIsKeyguard call is delayed during the animation, ensure it's called once
@@ -735,7 +734,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
 
     @Test
     public void testUpdateIsKeyguardAfterOccludeAnimationIsCancelled() {
-        mViewMediator.mOccludeAnimationController.onLaunchAnimationCancelled(
+        mViewMediator.mOccludeAnimationController.onTransitionAnimationCancelled(
                 null /* newKeyguardOccludedState */);
 
         // Since the updateIsKeyguard call is delayed during the animation, ensure it's called if
@@ -1203,7 +1202,7 @@ public class KeyguardViewMediatorTest extends SysuiTestCase {
                 mWallpaperRepository,
                 () -> mShadeController,
                 () -> mNotificationShadeWindowController,
-                () -> mActivityLaunchAnimator,
+                () -> mActivityTransitionAnimator,
                 () -> mScrimController,
                 mActivityTaskManagerService,
                 mFeatureFlags,

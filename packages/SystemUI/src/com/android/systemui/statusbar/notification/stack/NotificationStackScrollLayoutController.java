@@ -314,8 +314,10 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             // The bottom might change because we're using the final actual height of the view
             mView.setAnimateBottomOnLayout(true);
         }
-        // Let's update the footer once the notifications have been updated (in the next frame)
-        mView.post(this::updateFooter);
+        if (!FooterViewRefactor.isEnabled()) {
+            // Let's update the footer once the notifications have been updated (in the next frame)
+            mView.post(this::updateFooter);
+        }
     };
 
     @VisibleForTesting
@@ -342,8 +344,8 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             mView.reinflateViews();
             if (!FooterViewRefactor.isEnabled()) {
                 updateShowEmptyShadeView();
+                updateFooter();
             }
-            updateFooter();
         }
 
         @Override
@@ -389,7 +391,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
 
                 @Override
                 public void onUpcomingStateChanged(int newState) {
-                    mView.setUpcomingStatusBarState(newState);
+                    if (!FooterViewRefactor.isEnabled()) {
+                        mView.setUpcomingStatusBarState(newState);
+                    }
                 }
 
                 @Override
@@ -407,7 +411,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         public void onUserChanged(int userId) {
             updateSensitivenessWithAnimation(false);
             mHistoryEnabled = null;
-            updateFooter();
+            if (!FooterViewRefactor.isEnabled()) {
+                updateFooter();
+            }
         }
     };
 
@@ -590,7 +596,8 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                             ev.getX(),
                             ev.getY(),
                             true /* requireMinHeight */,
-                            false /* ignoreDecors */);
+                            false /* ignoreDecors */,
+                            true /* ignoreWidth */);
                     if (child instanceof ExpandableNotificationRow row) {
                         ExpandableNotificationRow parent = row.getNotificationParent();
                         if (parent != null && parent.areChildrenExpanded()
@@ -810,14 +817,14 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         if (!FooterViewRefactor.isEnabled()) {
             mView.setFooterClearAllListener(() ->
                     mMetricsLogger.action(MetricsEvent.ACTION_DISMISS_ALL_NOTES));
+            mView.setIsRemoteInputActive(mRemoteInputManager.isRemoteInputActive());
+            mRemoteInputManager.addControllerCallback(new RemoteInputController.Callback() {
+                @Override
+                public void onRemoteInputActive(boolean active) {
+                    mView.setIsRemoteInputActive(active);
+                }
+            });
         }
-        mView.setIsRemoteInputActive(mRemoteInputManager.isRemoteInputActive());
-        mRemoteInputManager.addControllerCallback(new RemoteInputController.Callback() {
-            @Override
-            public void onRemoteInputActive(boolean active) {
-                mView.setIsRemoteInputActive(active);
-            }
-        });
         mView.setClearAllFinishedWhilePanelExpandedRunnable(()-> {
             final Runnable doCollapseRunnable = () ->
                     mShadeController.animateCollapseShade(CommandQueue.FLAG_EXCLUDE_NONE);
@@ -871,7 +878,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                     switch (key) {
                         case Settings.Secure.NOTIFICATION_HISTORY_ENABLED:
                             mHistoryEnabled = null;  // invalidate
-                            updateFooter();
+                            if (!FooterViewRefactor.isEnabled()) {
+                                updateFooter();
+                            }
                             break;
                         case HIGH_PRIORITY:
                             mView.setHighPriorityBeforeSpeedBump("1".equals(newValue));
@@ -893,9 +902,11 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             return kotlin.Unit.INSTANCE;
         });
 
-        // attach callback, and then call it to update mView immediately
-        mDeviceProvisionedController.addCallback(mDeviceProvisionedListener);
-        mDeviceProvisionedListener.onDeviceProvisionedChanged();
+        if (!FooterViewRefactor.isEnabled()) {
+            // attach callback, and then call it to update mView immediately
+            mDeviceProvisionedController.addCallback(mDeviceProvisionedListener);
+            mDeviceProvisionedListener.onDeviceProvisionedChanged();
+        }
 
         if (screenshareNotificationHiding()) {
             mSensitiveNotificationProtectionController
@@ -906,7 +917,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             mOnAttachStateChangeListener.onViewAttachedToWindow(mView);
         }
         mView.addOnAttachStateChangeListener(mOnAttachStateChangeListener);
-        mSilentHeaderController.setOnClearSectionClickListener(v -> clearSilentNotifications());
+        if (!FooterViewRefactor.isEnabled()) {
+            mSilentHeaderController.setOnClearSectionClickListener(v -> clearSilentNotifications());
+        }
 
         mGroupExpansionManager.registerGroupExpansionChangeListener(
                 (changedRow, expanded) -> mView.onGroupExpandChanged(changedRow, expanded));
@@ -1106,8 +1119,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     }
 
     public int getVisibleNotificationCount() {
-        // TODO(b/293167744): FooterViewRefactor.assertInLegacyMode() once we handle footer
-        //  visibility in the refactored code
+        FooterViewRefactor.assertInLegacyMode();
         return mNotifStats.getNumActiveNotifs();
     }
 
@@ -1140,6 +1152,11 @@ public class NotificationStackScrollLayoutController implements Dumpable {
         if (sceneContainer != null) {
             sceneContainer.dispatchTouchEvent(ev);
         }
+    }
+
+    /** Send internal notification expansion to the scene container framework. */
+    public void sendSyntheticScrollToSceneFramework(Float delta) {
+        mStackAppearanceInteractor.setSyntheticScroll(delta);
     }
 
     /** Get the y-coordinate of the top bound of the stack. */
@@ -1509,14 +1526,12 @@ public class NotificationStackScrollLayoutController implements Dumpable {
      * Return whether there are any clearable notifications
      */
     public boolean hasActiveClearableNotifications(@SelectedRows int selection) {
-        // TODO(b/293167744): FooterViewRefactor.assertInLegacyMode() once we handle the footer
-        //  visibility in the refactored code
+        FooterViewRefactor.assertInLegacyMode();
         return hasNotifications(selection, true /* clearable */);
     }
 
     public boolean hasNotifications(@SelectedRows int selection, boolean isClearable) {
-        // TODO(b/293167744): FooterViewRefactor.assertInLegacyMode() once we handle the footer
-        //  visibility in the refactored code
+        FooterViewRefactor.assertInLegacyMode();
         boolean hasAlertingMatchingClearable = isClearable
                 ? mNotifStats.getHasClearableAlertingNotifs()
                 : mNotifStats.getHasNonClearableAlertingNotifs();
@@ -1558,7 +1573,9 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                     boolean remoteInputActive) {
                 mHeadsUpManager.setRemoteInputActive(entry, remoteInputActive);
                 entry.notifyHeightChanged(true /* needsAnimation */);
-                updateFooter();
+                if (!FooterViewRefactor.isEnabled()) {
+                    updateFooter();
+                }
             }
 
             public void lockScrollTo(NotificationEntry entry) {
@@ -1573,6 +1590,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     }
 
     public void updateFooter() {
+        FooterViewRefactor.assertInLegacyMode();
         Trace.beginSection("NSSLC.updateFooter");
         mView.updateFooter();
         Trace.endSection();
@@ -1664,6 +1682,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     }
 
     public void clearSilentNotifications() {
+        FooterViewRefactor.assertInLegacyMode();
         // Leave the shade open if there will be other notifs left over to clear
         final boolean closeShade = !hasActiveClearableNotifications(ROWS_HIGH_PRIORITY);
         mView.clearNotifications(ROWS_GENTLE, closeShade);
@@ -2134,19 +2153,15 @@ public class NotificationStackScrollLayoutController implements Dumpable {
     private class NotifStackControllerImpl implements NotifStackController {
         @Override
         public void setNotifStats(@NonNull NotifStats notifStats) {
-            // TODO(b/293167744): FooterViewRefactor.assertInLegacyMode() once footer visibility
-            // is handled in the refactored stack.
+            FooterViewRefactor.assertInLegacyMode();
             mNotifStats = notifStats;
 
             if (!FooterViewRefactor.isEnabled()) {
                 mView.setHasFilteredOutSeenNotifications(
                         mSeenNotificationsInteractor
                                 .getHasFilteredOutSeenNotifications().getValue());
-            }
 
-            updateFooter();
-
-            if (!FooterViewRefactor.isEnabled()) {
+                updateFooter();
                 updateShowEmptyShadeView();
                 updateImportantForAccessibility();
             }

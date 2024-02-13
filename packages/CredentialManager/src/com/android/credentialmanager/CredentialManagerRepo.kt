@@ -58,6 +58,7 @@ class CredentialManagerRepo(
     private val providerEnabledList: List<ProviderData>
     private val providerDisabledList: List<DisabledProviderData>?
     val resultReceiver: ResultReceiver?
+    val finalResponseReceiver: ResultReceiver?
 
     var initialUiState: UiState
 
@@ -105,14 +106,20 @@ class CredentialManagerRepo(
             ResultReceiver::class.java
         )
 
+        finalResponseReceiver = intent.getParcelableExtra(
+                Constants.EXTRA_FINAL_RESPONSE_RECEIVER,
+                ResultReceiver::class.java
+        )
+
         isReqForAllOptions = intent.getBooleanExtra(
                 Constants.EXTRA_REQ_FOR_ALL_OPTIONS,
                 /*defaultValue=*/ false
-        )
+        ) || (requestInfo?.isShowAllOptionsRequested ?: false) // TODO(b/323552850) - Remove
+        // usage on Constants.EXTRA_REQ_FOR_ALL_OPTIONS once it is deprecated.
 
         val cancellationRequest = getCancelUiRequest(intent)
         val cancelUiRequestState = cancellationRequest?.let {
-            CancelUiRequestState(getAppLabel(context.getPackageManager(), it.appPackageName))
+            CancelUiRequestState(getAppLabel(context.getPackageManager(), it.packageName))
         }
 
         initialUiState = when (requestInfo?.type) {
@@ -199,7 +206,7 @@ class CredentialManagerRepo(
     }
 
     fun onCancel(cancelCode: Int) {
-        sendCancellationCode(cancelCode, requestInfo?.token, resultReceiver)
+        sendCancellationCode(cancelCode, requestInfo?.token, resultReceiver, finalResponseReceiver)
     }
 
     fun onOptionSelected(
@@ -218,6 +225,10 @@ class CredentialManagerRepo(
         )
         val resultDataBundle = Bundle()
         UserSelectionDialogResult.addToBundle(userSelectionDialogResult, resultDataBundle)
+
+        resultDataBundle.putParcelable(Constants.EXTRA_FINAL_RESPONSE_RECEIVER,
+                finalResponseReceiver)
+
         resultReceiver?.send(
             BaseDialogResult.RESULT_CODE_DIALOG_COMPLETE_WITH_SELECTION,
             resultDataBundle
@@ -285,10 +296,14 @@ class CredentialManagerRepo(
         fun sendCancellationCode(
             cancelCode: Int,
             requestToken: IBinder?,
-            resultReceiver: ResultReceiver?
+            resultReceiver: ResultReceiver?,
+            finalResponseReceiver: ResultReceiver?
         ) {
             if (requestToken != null && resultReceiver != null) {
                 val resultData = Bundle()
+                resultData.putParcelable(Constants.EXTRA_FINAL_RESPONSE_RECEIVER,
+                        finalResponseReceiver)
+
                 BaseDialogResult.addToBundle(BaseDialogResult(requestToken), resultData)
                 resultReceiver.send(cancelCode, resultData)
             }
