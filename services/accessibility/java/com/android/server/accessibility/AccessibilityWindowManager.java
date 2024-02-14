@@ -818,7 +818,7 @@ public class AccessibilityWindowManager {
             }
 
             // Don't need to add the embedded hierarchy windows into the accessibility windows list.
-            if (mHostEmbeddedMap.size() > 0 && isEmbeddedHierarchyWindowsLocked(windowId)) {
+            if (isEmbeddedHierarchyWindowsLocked(windowId)) {
                 return null;
             }
             final AccessibilityWindowInfo reportedWindow = AccessibilityWindowInfo.obtain();
@@ -864,21 +864,6 @@ public class AccessibilityWindowManager {
                 }
             }
             return reportedWindow;
-        }
-
-        private boolean isEmbeddedHierarchyWindowsLocked(int windowId) {
-            final IBinder leashToken = mWindowIdMap.get(windowId);
-            if (leashToken == null) {
-                return false;
-            }
-
-            for (int i = 0; i < mHostEmbeddedMap.size(); i++) {
-                if (mHostEmbeddedMap.keyAt(i).equals(leashToken)) {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private int getTypeForWindowManagerWindowType(int windowType) {
@@ -945,17 +930,11 @@ public class AccessibilityWindowManager {
          * Dumps all {@link AccessibilityWindowInfo}s here.
          */
         void dumpLocked(FileDescriptor fd, final PrintWriter pw, String[] args) {
-            pw.append("Global Info [ ");
-            pw.println("Top focused display Id = " + mTopFocusedDisplayId);
-            pw.println("     Active Window Id = " + mActiveWindowId);
-            pw.println("     Top Focused Window Id = " + mTopFocusedWindowId);
-            pw.println("     Accessibility Focused Window Id = " + mAccessibilityFocusedWindowId
-                    + " ]");
             if (mIsProxy) {
                 pw.println("Proxy accessibility focused window = "
                         + mProxyDisplayAccessibilityFocusedWindow);
+                pw.println();
             }
-            pw.println();
             if (mWindows != null) {
                 final int windowCount = mWindows.size();
                 for (int j = 0; j < windowCount; j++) {
@@ -1492,7 +1471,7 @@ public class AccessibilityWindowManager {
      * @return The windowId of the parent window, or self if no parent exists
      */
     public int resolveParentWindowIdLocked(int windowId) {
-        final IBinder token = getTokenLocked(windowId);
+        final IBinder token = getLeashTokenLocked(windowId);
         if (token == null) {
             return windowId;
         }
@@ -2097,7 +2076,7 @@ public class AccessibilityWindowManager {
      * @param windowId The windowID.
      * @return The token, or {@code NULL} if this windowID doesn't exist
      */
-    IBinder getTokenLocked(int windowId) {
+    IBinder getLeashTokenLocked(int windowId) {
         return mWindowIdMap.get(windowId);
     }
 
@@ -2123,6 +2102,23 @@ public class AccessibilityWindowManager {
      */
     IBinder getHostTokenLocked(IBinder token) {
         return mHostEmbeddedMap.get(token);
+    }
+
+    /**
+     * Checks if the window is embedded into another window so that the window should be excluded
+     * from the exposed accessibility windows, and the node tree should be embedded in the host.
+     */
+    boolean isEmbeddedHierarchyWindowsLocked(int windowId) {
+        if (mHostEmbeddedMap.size() == 0) {
+            return false;
+        }
+
+        final IBinder leashToken = getLeashTokenLocked(windowId);
+        if (leashToken == null) {
+            return false;
+        }
+
+        return mHostEmbeddedMap.containsKey(leashToken);
     }
 
     /**
@@ -2201,6 +2197,13 @@ public class AccessibilityWindowManager {
      * Dumps all {@link AccessibilityWindowInfo}s here.
      */
     public void dump(FileDescriptor fd, final PrintWriter pw, String[] args) {
+        pw.append("Global Info [ ");
+        pw.println("Top focused display Id = " + mTopFocusedDisplayId);
+        pw.println("     Active Window Id = " + mActiveWindowId);
+        pw.println("     Top Focused Window Id = " + mTopFocusedWindowId);
+        pw.println("     Accessibility Focused Window Id = " + mAccessibilityFocusedWindowId
+                + " ]");
+        pw.println();
         final int count = mDisplayWindowsObservers.size();
         for (int i = 0; i < count; i++) {
             final DisplayWindowsObserver observer = mDisplayWindowsObservers.valueAt(i);

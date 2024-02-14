@@ -16,12 +16,14 @@
 package android.telephony.euicc;
 
 import android.Manifest;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
+import android.annotation.SuppressAutoDoc;
 import android.annotation.SystemApi;
 import android.app.Activity;
 import android.app.PendingIntent;
@@ -50,6 +52,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -861,6 +864,10 @@ public class EuiccManager {
      */
     public static final int ERROR_INVALID_PORT = 10017;
 
+    /** Temporary failure to retrieve available memory because eUICC is not ready. */
+    @FlaggedApi(Flags.FLAG_ESIM_AVAILABLE_MEMORY)
+    public static final long EUICC_MEMORY_FIELD_UNAVAILABLE = -1L;
+
     /**
      * Apps targeting on Android T and beyond will get exception whenever switchToSubscription
      * without portIndex is called for disable subscription.
@@ -955,6 +962,35 @@ public class EuiccManager {
         }
         try {
             return getIEuiccController().getEid(mCardId, mContext.getOpPackageName());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the available memory in bytes of the eUICC.
+     *
+     * @return the available memory in bytes. May be {@link #EUICC_MEMORY_FIELD_UNAVAILABLE} if the
+     *     eUICC is not ready. Check {@link #isEnabled} for more information.
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC} or
+     *          device doesn't support querying this information from the eUICC.
+     */
+    @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
+    @FlaggedApi(Flags.FLAG_ESIM_AVAILABLE_MEMORY)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_PRIVILEGED_PHONE_STATE,
+                "carrier privileges"
+            })
+    public long getAvailableMemoryInBytes() {
+        if (!isEnabled()) {
+            return EUICC_MEMORY_FIELD_UNAVAILABLE;
+        }
+        try {
+            return getIEuiccController()
+                    .getAvailableMemoryInBytes(mCardId, mContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1705,6 +1741,59 @@ public class EuiccManager {
                     mContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Sets the supported carrier ids for pSIM conversion.
+     *
+     * <p>Any existing pSIM conversion supported carrier list will be replaced
+     * by the {@code carrierIds} set here.
+     *
+     * @param carrierIds is a list of carrierIds that supports pSIM conversion
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
+     * @throws IllegalStateException if this method is called when {@link #isEnabled} is false.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_PSIM_TO_ESIM_CONVERSION)
+    @SystemApi
+    @RequiresPermission(Manifest.permission.WRITE_EMBEDDED_SUBSCRIPTIONS)
+    public void setPsimConversionSupportedCarriers(@NonNull Set<Integer> carrierIds) {
+        if (!isEnabled()) {
+            throw new IllegalStateException("Euicc is not enabled");
+        }
+        try {
+            int[] arr = carrierIds.stream().mapToInt(Integer::intValue).toArray();
+            getIEuiccController().setPsimConversionSupportedCarriers(arr);
+        } catch (RemoteException e) {
+            throw e.rethrowAsRuntimeException();
+        }
+    }
+
+    /**
+     * Returns whether the given carrier id supports pSIM conversion or not.
+     *
+     * @param carrierId to check whether pSIM conversion is supported or not
+     * @return whether the given carrier id supports pSIM conversion or not,
+     *         or false if {@link #isEnabled} is false
+     *
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_EUICC}.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_PSIM_TO_ESIM_CONVERSION)
+    @SystemApi
+    @RequiresPermission(Manifest.permission.WRITE_EMBEDDED_SUBSCRIPTIONS)
+    public boolean isPsimConversionSupported(int carrierId) {
+        if (!isEnabled()) {
+            return false;
+        }
+        try {
+            return getIEuiccController().isPsimConversionSupported(carrierId);
+        } catch (RemoteException e) {
+            throw e.rethrowAsRuntimeException();
         }
     }
 }

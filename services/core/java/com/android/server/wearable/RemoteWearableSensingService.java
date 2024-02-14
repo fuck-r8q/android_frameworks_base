@@ -32,6 +32,8 @@ import android.util.Slog;
 
 import com.android.internal.infra.ServiceConnector;
 
+import java.io.IOException;
+
 /** Manages the connection to the remote wearable sensing service. */
 final class RemoteWearableSensingService extends ServiceConnector.Impl<IWearableSensingService> {
     private static final String TAG =
@@ -56,6 +58,29 @@ final class RemoteWearableSensingService extends ServiceConnector.Impl<IWearable
     }
 
     /**
+     * Provides a secure connection to the wearable.
+     *
+     * @param secureWearableConnection The secure connection to the wearable
+     * @param callback The callback for service status
+     */
+    public void provideSecureWearableConnection(
+            ParcelFileDescriptor secureWearableConnection, RemoteCallback callback) {
+        if (DEBUG) {
+            Slog.i(TAG, "Providing secure wearable connection.");
+        }
+        var unused = post(
+                service -> {
+                    service.provideSecureWearableConnection(secureWearableConnection, callback);
+                    try {
+                        // close the local fd after it has been sent to the WSS process
+                        secureWearableConnection.close();
+                    } catch (IOException ex) {
+                        Slog.w(TAG, "Unable to close the local parcelFileDescriptor.", ex);
+                    }
+                });
+    }
+
+    /**
      * Provides the implementation a data stream to the wearable.
      *
      * @param parcelFileDescriptor The data stream to the wearable
@@ -66,7 +91,16 @@ final class RemoteWearableSensingService extends ServiceConnector.Impl<IWearable
         if (DEBUG) {
             Slog.i(TAG, "Providing data stream.");
         }
-        post(service -> service.provideDataStream(parcelFileDescriptor, callback));
+        var unused = post(
+                service -> {
+                    service.provideDataStream(parcelFileDescriptor, callback);
+                    try {
+                        // close the local fd after it has been sent to the WSS process
+                        parcelFileDescriptor.close();
+                    } catch (IOException ex) {
+                        Slog.w(TAG, "Unable to close the local parcelFileDescriptor.", ex);
+                    }
+                });
     }
 
     /**
@@ -83,5 +117,63 @@ final class RemoteWearableSensingService extends ServiceConnector.Impl<IWearable
             Slog.i(TAG, "Providing data.");
         }
         post(service -> service.provideData(data, sharedMemory, callback));
+    }
+
+    /**
+     * Registers a data request observer with WearableSensingService.
+     *
+     * @param dataType The data type to listen to. Values are defined by the application that
+     *     implements WearableSensingService.
+     * @param dataRequestCallback The observer to send data requests to.
+     * @param dataRequestObserverId The unique ID for the data request observer. It will be used for
+     *     unregistering the observer.
+     * @param packageName The package name of the app that will receive the data requests.
+     * @param statusCallback The callback for status of the method call.
+     */
+    public void registerDataRequestObserver(
+            int dataType,
+            RemoteCallback dataRequestCallback,
+            int dataRequestObserverId,
+            String packageName,
+            RemoteCallback statusCallback) {
+        if (DEBUG) {
+            Slog.i(TAG, "Registering data request observer.");
+        }
+        var unused =
+                post(
+                        service ->
+                                service.registerDataRequestObserver(
+                                        dataType,
+                                        dataRequestCallback,
+                                        dataRequestObserverId,
+                                        packageName,
+                                        statusCallback));
+    }
+
+    /**
+     * Unregisters a previously registered data request observer.
+     *
+     * @param dataType The data type the observer was registered against.
+     * @param dataRequestObserverId The unique ID of the observer to unregister.
+     * @param packageName The package name of the app that will receive requests sent to the
+     *     observer.
+     * @param statusCallback The callback for status of the method call.
+     */
+    public void unregisterDataRequestObserver(
+            int dataType,
+            int dataRequestObserverId,
+            String packageName,
+            RemoteCallback statusCallback) {
+        if (DEBUG) {
+            Slog.i(TAG, "Unregistering data request observer.");
+        }
+        var unused =
+                post(
+                        service ->
+                                service.unregisterDataRequestObserver(
+                                        dataType,
+                                        dataRequestObserverId,
+                                        packageName,
+                                        statusCallback));
     }
 }

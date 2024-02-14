@@ -131,8 +131,8 @@ import com.android.systemui.DejankUtils;
 import com.android.systemui.Dependency;
 import com.android.systemui.Dumpable;
 import com.android.systemui.EventLogTags;
-import com.android.systemui.animation.ActivityLaunchAnimator;
-import com.android.systemui.animation.LaunchAnimator;
+import com.android.systemui.animation.ActivityTransitionAnimator;
+import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -693,17 +693,18 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                             } else {
                                 resetStateLocked();
                             }
-                        }
-                        if (simState == TelephonyManager.SIM_STATE_ABSENT) {
-                            // MVNO SIMs can become transiently NOT_READY when switching networks,
-                            // so we should only lock when they are ABSENT.
-                            if (lastSimStateWasLocked) {
-                                if (DEBUG_SIM_STATES) Log.d(TAG, "SIM moved to ABSENT when the "
-                                        + "previous state was locked. Reset the state.");
+                        } else {
+                            if (lastSimStateWasLocked && mShowing) {
+                                if (DEBUG_SIM_STATES) {
+                                    Log.d(TAG, "SIM moved to "
+                                            + "NOT_READY/ABSENT/UNKNOWN when the previous state "
+                                            + "was locked. Reset the state.");
+                                }
                                 resetStateLocked();
                             }
-                            mSimWasLocked.append(slotId, false);
                         }
+
+                        mSimWasLocked.append(slotId, false);
                     }
                     break;
                 case TelephonyManager.SIM_STATE_PIN_REQUIRED:
@@ -959,16 +960,17 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
      * Animation launch controller for activities that occlude the keyguard.
      */
     @VisibleForTesting
-    final ActivityLaunchAnimator.Controller mOccludeAnimationController =
-            new ActivityLaunchAnimator.Controller() {
+    final ActivityTransitionAnimator.Controller mOccludeAnimationController =
+            new ActivityTransitionAnimator.Controller() {
                 @Override
-                public void onLaunchAnimationStart(boolean isExpandingFullyAbove) {
+                public void onTransitionAnimationStart(boolean isExpandingFullyAbove) {
                     mOccludeAnimationPlaying = true;
                     mScrimControllerLazy.get().setOccludeAnimationPlaying(true);
                 }
 
                 @Override
-                public void onLaunchAnimationCancelled(@Nullable Boolean newKeyguardOccludedState) {
+                public void onTransitionAnimationCancelled(
+                        @Nullable Boolean newKeyguardOccludedState) {
                     Log.d(TAG, "Occlude launch animation cancelled. Occluded state is now: "
                             + mOccluded);
                     mOccludeAnimationPlaying = false;
@@ -979,7 +981,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 }
 
                 @Override
-                public void onLaunchAnimationEnd(boolean launchIsFullScreen) {
+                public void onTransitionAnimationEnd(boolean launchIsFullScreen) {
                     if (launchIsFullScreen) {
                         mShadeController.get().instantCollapseShade();
                     }
@@ -996,23 +998,23 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
                 @NonNull
                 @Override
-                public ViewGroup getLaunchContainer() {
+                public ViewGroup getTransitionContainer() {
                     return ((ViewGroup) mKeyguardViewControllerLazy.get()
                             .getViewRootImpl().getView());
                 }
 
                 @Override
-                public void setLaunchContainer(@NonNull ViewGroup launchContainer) {
+                public void setTransitionContainer(@NonNull ViewGroup transitionContainer) {
                     // No-op, launch container is always the shade.
                     Log.wtf(TAG, "Someone tried to change the launch container for the "
-                            + "ActivityLaunchAnimator, which should never happen.");
+                            + "ActivityTransitionAnimator, which should never happen.");
                 }
 
                 @NonNull
                 @Override
-                public LaunchAnimator.State createAnimatorState() {
-                    final int fullWidth = getLaunchContainer().getWidth();
-                    final int fullHeight = getLaunchContainer().getHeight();
+                public TransitionAnimator.State createAnimatorState() {
+                    final int fullWidth = getTransitionContainer().getWidth();
+                    final int fullHeight = getTransitionContainer().getHeight();
 
                     if (mUpdateMonitor.isSecureCameraLaunchedOverKeyguard()) {
                         final float initialHeight = fullHeight / 3f;
@@ -1020,7 +1022,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
                         // Start the animation near the power button, at one-third size, since the
                         // camera was launched from the power button.
-                        return new LaunchAnimator.State(
+                        return new TransitionAnimator.State(
                                 (int) (mPowerButtonY - initialHeight / 2f) /* top */,
                                 (int) (mPowerButtonY + initialHeight / 2f) /* bottom */,
                                 (int) (fullWidth - initialWidth) /* left */,
@@ -1032,7 +1034,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
                         // Start the animation in the center of the screen, scaled down to half
                         // size.
-                        return new LaunchAnimator.State(
+                        return new TransitionAnimator.State(
                                 (int) (fullHeight - initialHeight) / 2,
                                 (int) (initialHeight + (fullHeight - initialHeight) / 2),
                                 (int) (fullWidth - initialWidth) / 2,
@@ -1169,8 +1171,8 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     /**
      * Animation controller for activities that unocclude the keyguard. This does not use the
-     * ActivityLaunchAnimator since we're just translating down, rather than emerging from a view
-     * or the power button.
+     * ActivityTransitionAnimator since we're just translating down, rather than emerging from a
+     * view or the power button.
      */
     private final IRemoteAnimationRunner mUnoccludeAnimationRunner =
             new IRemoteAnimationRunner.Stub() {
@@ -1345,7 +1347,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
     private boolean mWallpaperSupportsAmbientMode;
     private final KeyguardTransitions mKeyguardTransitions;
 
-    private final Lazy<ActivityLaunchAnimator> mActivityLaunchAnimator;
+    private final Lazy<ActivityTransitionAnimator> mActivityTransitionAnimator;
     private final Lazy<ScrimController> mScrimControllerLazy;
     private final IActivityTaskManager mActivityTaskManagerService;
 
@@ -1392,7 +1394,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             WallpaperRepository wallpaperRepository,
             Lazy<ShadeController> shadeControllerLazy,
             Lazy<NotificationShadeWindowController> notificationShadeWindowControllerLazy,
-            Lazy<ActivityLaunchAnimator> activityLaunchAnimator,
+            Lazy<ActivityTransitionAnimator> activityTransitionAnimator,
             Lazy<ScrimController> scrimControllerLazy,
             IActivityTaskManager activityTaskManagerService,
             FeatureFlags featureFlags,
@@ -1457,7 +1459,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
         mJavaAdapter = javaAdapter;
         mWallpaperRepository = wallpaperRepository;
 
-        mActivityLaunchAnimator = activityLaunchAnimator;
+        mActivityTransitionAnimator = activityTransitionAnimator;
         mScrimControllerLazy = scrimControllerLazy;
         mActivityTaskManagerService = activityTaskManagerService;
 
@@ -3814,15 +3816,15 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
 
     /**
      * Implementation of RemoteAnimationRunner that creates a new
-     * {@link ActivityLaunchAnimator.Runner} whenever onAnimationStart is called, delegating the
+     * {@link ActivityTransitionAnimator.Runner} whenever onAnimationStart is called, delegating the
      * remote animation methods to that runner.
      */
     private class ActivityLaunchRemoteAnimationRunner extends IRemoteAnimationRunner.Stub {
 
-        private final ActivityLaunchAnimator.Controller mActivityLaunchController;
-        @Nullable private ActivityLaunchAnimator.Runner mRunner;
+        private final ActivityTransitionAnimator.Controller mActivityLaunchController;
+        @Nullable private ActivityTransitionAnimator.Runner mRunner;
 
-        ActivityLaunchRemoteAnimationRunner(ActivityLaunchAnimator.Controller controller) {
+        ActivityLaunchRemoteAnimationRunner(ActivityTransitionAnimator.Controller controller) {
             mActivityLaunchController = controller;
         }
 
@@ -3839,7 +3841,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
                 RemoteAnimationTarget[] nonApps,
                 IRemoteAnimationFinishedCallback finishedCallback)
                 throws RemoteException {
-            mRunner = mActivityLaunchAnimator.get().createRunner(mActivityLaunchController);
+            mRunner = mActivityTransitionAnimator.get().createRunner(mActivityLaunchController);
             mRunner.onAnimationStart(transit, apps, wallpapers, nonApps, finishedCallback);
         }
     }
@@ -3852,7 +3854,7 @@ public class KeyguardViewMediator implements CoreStartable, Dumpable,
             extends ActivityLaunchRemoteAnimationRunner {
 
         OccludeActivityLaunchRemoteAnimationRunner(
-                ActivityLaunchAnimator.Controller controller) {
+                ActivityTransitionAnimator.Controller controller) {
             super(controller);
         }
 

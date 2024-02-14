@@ -624,6 +624,7 @@ package android.app.admin {
     field public static final int OPERATION_SET_APPLICATION_HIDDEN = 15; // 0xf
     field public static final int OPERATION_SET_APPLICATION_RESTRICTIONS = 16; // 0x10
     field public static final int OPERATION_SET_CAMERA_DISABLED = 31; // 0x1f
+    field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final int OPERATION_SET_CONTENT_PROTECTION_POLICY = 41; // 0x29
     field public static final int OPERATION_SET_FACTORY_RESET_PROTECTION_POLICY = 32; // 0x20
     field public static final int OPERATION_SET_GLOBAL_PRIVATE_DNS = 33; // 0x21
     field public static final int OPERATION_SET_KEEP_UNINSTALLED_PACKAGES = 17; // 0x11
@@ -1282,10 +1283,6 @@ package android.credentials.selection {
     field public static final int RESULT_CODE_DIALOG_USER_CANCELED = 0; // 0x0
   }
 
-  @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") public final class CancelSelectionRequest implements android.os.Parcelable {
-    ctor @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") public CancelSelectionRequest(@NonNull android.os.IBinder, boolean, @NonNull String);
-  }
-
   @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") public final class CreateCredentialProviderData extends android.credentials.selection.ProviderData implements android.os.Parcelable {
     ctor public CreateCredentialProviderData(@NonNull String, @NonNull java.util.List<android.credentials.selection.Entry>, @Nullable android.credentials.selection.Entry);
     method @Nullable public android.credentials.selection.Entry getRemoteEntry();
@@ -1347,8 +1344,8 @@ package android.credentials.selection {
   }
 
   @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") public final class RequestInfo implements android.os.Parcelable {
-    method @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") @NonNull public static android.credentials.selection.RequestInfo newCreateRequestInfo(@NonNull android.os.IBinder, @NonNull android.credentials.CreateCredentialRequest, @NonNull String, boolean, @NonNull java.util.List<java.lang.String>);
-    method @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") @NonNull public static android.credentials.selection.RequestInfo newGetRequestInfo(@NonNull android.os.IBinder, @NonNull android.credentials.GetCredentialRequest, @NonNull String, boolean);
+    method @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") @NonNull public static android.credentials.selection.RequestInfo newCreateRequestInfo(@NonNull android.os.IBinder, @NonNull android.credentials.CreateCredentialRequest, @NonNull String, boolean, @NonNull java.util.List<java.lang.String>, boolean);
+    method @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") @NonNull public static android.credentials.selection.RequestInfo newGetRequestInfo(@NonNull android.os.IBinder, @NonNull android.credentials.GetCredentialRequest, @NonNull String, boolean, boolean);
   }
 
   @FlaggedApi("android.credentials.flags.configurable_selector_ui_enabled") public final class RequestToken {
@@ -1882,6 +1879,7 @@ package android.media {
     method @FlaggedApi("android.media.audio.focus_freeze_test_api") @RequiresPermission("android.permission.QUERY_AUDIO_STATE") public long getFocusUnmuteDelayAfterFadeOutForTest();
     method @Nullable public static android.media.AudioHalVersionInfo getHalVersion();
     method public static final int[] getPublicStreamTypes();
+    method @FlaggedApi("android.media.audiopolicy.audio_mix_test_api") @NonNull public java.util.List<android.media.audiopolicy.AudioMix> getRegisteredPolicyMixes();
     method @NonNull public java.util.List<java.lang.Integer> getReportedSurroundFormats();
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) public float getRs2Value();
     method public int getStreamMinVolumeInt(int);
@@ -2054,6 +2052,10 @@ package android.media.audiofx {
 }
 
 package android.media.audiopolicy {
+
+  public class AudioPolicy {
+    method @FlaggedApi("android.media.audiopolicy.audio_mix_test_api") @NonNull public java.util.List<android.media.audiopolicy.AudioMix> getMixes();
+  }
 
   public static class AudioPolicy.Builder {
     method @NonNull public android.media.audiopolicy.AudioPolicy.Builder setIsTestFocusPolicy(boolean);

@@ -262,6 +262,9 @@
 
     <uses-permission android:name="android.permission.MODIFY_THEME_OVERLAY" />
 
+    <!-- Activity Manager -->
+    <uses-permission android:name="android.permission.SET_THEME_OVERLAY_CONTROLLER_READY" />
+
     <!-- accessibility -->
     <uses-permission android:name="android.permission.MODIFY_ACCESSIBILITY_DATA" />
     <uses-permission android:name="android.permission.MANAGE_ACCESSIBILITY" />
@@ -476,6 +479,9 @@
             android:permission="android.permission.LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE" />
 
         <service android:name=".screenrecord.RecordingService"
+                 android:foregroundServiceType="systemExempted"/>
+
+        <service android:name=".recordissue.IssueRecordingService"
                  android:foregroundServiceType="systemExempted"/>
 
         <receiver android:name=".SysuiRestartReceiver"
@@ -995,7 +1001,6 @@
             android:theme="@style/Theme.EditWidgetsActivity"
             android:excludeFromRecents="true"
             android:autoRemoveFromRecents="true"
-            android:showOnLockScreen="true"
             android:launchMode="singleTop"
             android:exported="false">
         </activity>

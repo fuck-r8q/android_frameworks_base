@@ -1208,6 +1208,22 @@ public final class NfcAdapter {
     }
 
     /**
+     * Returns whether Observe Mode is currently enabled or not.
+     *
+     * @return true if observe mode is enabled, false otherwise.
+     */
+
+    @FlaggedApi(Flags.FLAG_NFC_OBSERVE_MODE)
+    public boolean isObserveModeEnabled() {
+        try {
+            return sService.isObserveModeEnabled();
+        } catch (RemoteException e) {
+            attemptDeadServiceRecovery(e);
+            return false;
+        }
+    }
+
+    /**
      * Controls whether the NFC adapter will allow transactions to proceed or be in observe mode
      * and simply observe and notify the APDU service of polling loop frames. See
      * {@link #isObserveModeSupported()} for a description of observe mode.
@@ -3087,7 +3103,7 @@ public final class NfcAdapter {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_ENABLE_NFC_MAINLINE)
+    @FlaggedApi(Flags.FLAG_NFC_VENDOR_CMD)
     @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS)
     public void unregisterNfcVendorNciCallback(@NonNull NfcVendorNciCallback callback) {
         mNfcVendorNciCallbackListener.unregister(callback);

@@ -28,6 +28,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /** ViewModel which represents the state of the NSSL/Controller in the world of flexiglass */
 @SysUISingleton
@@ -45,37 +46,35 @@ constructor(
      */
     val expandFraction: Flow<Float> =
         combine(
-            shadeInteractor.shadeExpansion,
-            sceneInteractor.transitionState,
-        ) { shadeExpansion, transitionState ->
-            when (transitionState) {
-                is ObservableTransitionState.Idle -> {
-                    if (transitionState.scene == SceneKey.Lockscreen) {
-                        1f
-                    } else {
-                        shadeExpansion
+                shadeInteractor.shadeExpansion,
+                sceneInteractor.transitionState,
+            ) { shadeExpansion, transitionState ->
+                when (transitionState) {
+                    is ObservableTransitionState.Idle -> {
+                        if (transitionState.scene == SceneKey.Lockscreen) {
+                            1f
+                        } else {
+                            shadeExpansion
+                        }
                     }
-                }
-                is ObservableTransitionState.Transition -> {
-                    if (
-                        (transitionState.fromScene == SceneKey.Shade &&
-                            transitionState.toScene == SceneKey.QuickSettings) ||
-                            (transitionState.fromScene == SceneKey.QuickSettings &&
-                                transitionState.toScene == SceneKey.Shade)
-                    ) {
-                        1f
-                    } else {
-                        shadeExpansion
+                    is ObservableTransitionState.Transition -> {
+                        if (
+                            (transitionState.fromScene == SceneKey.Shade &&
+                                transitionState.toScene == SceneKey.QuickSettings) ||
+                                (transitionState.fromScene == SceneKey.QuickSettings &&
+                                    transitionState.toScene == SceneKey.Shade)
+                        ) {
+                            1f
+                        } else {
+                            shadeExpansion
+                        }
                     }
                 }
             }
-        }
+            .distinctUntilChanged()
 
     /** The bounds of the notification stack in the current scene. */
     val stackBounds: Flow<NotificationContainerBounds> = stackAppearanceInteractor.stackBounds
-
-    /** The corner radius of the notification stack, in dp. */
-    val cornerRadiusDp: StateFlow<Float> = stackAppearanceInteractor.cornerRadiusDp
 
     /** The y-coordinate in px of top of the contents of the notification stack. */
     val contentTop: StateFlow<Float> = stackAppearanceInteractor.contentTop

@@ -1706,6 +1706,7 @@
   <java-symbol type="style" name="Theme.DeviceDefault.VoiceInteractionSession" />
   <java-symbol type="style" name="Pointer" />
   <java-symbol type="style" name="LargePointer" />
+  <java-symbol type="style" name="VectorPointer" />
   <java-symbol type="style" name="TextAppearance.DeviceDefault.Notification.Title" />
   <java-symbol type="style" name="TextAppearance.DeviceDefault.Notification.Info" />
 
@@ -3173,6 +3174,7 @@
   <java-symbol type="drawable" name="ic_collapse_notification" />
   <java-symbol type="drawable" name="ic_expand_bundle" />
   <java-symbol type="drawable" name="ic_collapse_bundle" />
+  <java-symbol type="drawable" name="ic_notification_summary_auto" />
   <java-symbol type="dimen" name="notification_header_shrink_min_width" />
   <java-symbol type="dimen" name="notification_header_shrink_hide_width" />
   <java-symbol type="dimen" name="notification_content_margin_start" />
@@ -3754,6 +3756,7 @@
   <java-symbol type="id" name="autofill_save_no" />
   <java-symbol type="id" name="autofill_save_title" />
   <java-symbol type="id" name="autofill_save_yes" />
+  <java-symbol type="id" name="autofill_button_bar_spacer" />
   <java-symbol type="id" name="autofill_service_icon" />
   <java-symbol type="id" name="autofill_dialog_picker"/>
   <java-symbol type="id" name="autofill_dialog_header"/>
@@ -3800,6 +3803,8 @@
   <java-symbol type="dimen" name="autofill_dialog_max_width" />
   <java-symbol type="dimen" name="autofill_dialog_offset"/>
   <java-symbol type="dimen" name="autofill_save_outer_margin"/>
+  <java-symbol type="dimen" name="autofill_button_bar_spacer_width"/>
+  <java-symbol type="dimen" name="autofill_button_bar_spacer_height"/>
 
   <java-symbol type="bool" name="autofill_dialog_horizontal_space_included"/>
 

@@ -65,6 +65,7 @@ import android.app.admin.IDevicePolicyManager;
 import android.app.admin.SecurityLog;
 import android.app.backup.IBackupManager;
 import android.app.role.RoleManager;
+import android.companion.virtual.VirtualDeviceManager;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.content.BroadcastReceiver;
@@ -571,7 +572,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * target sdk apps as malware can target older sdk versions to avoid
      * the enforcement of new API behavior.
      */
-    public static final int MIN_INSTALLABLE_TARGET_SDK = Build.VERSION_CODES.M;
+    public static final int MIN_INSTALLABLE_TARGET_SDK =
+            Flags.minTargetSdk24() ? Build.VERSION_CODES.N : Build.VERSION_CODES.M;
 
     // Compilation reasons.
     // TODO(b/260124949): Clean this up with the legacy dexopt code.
@@ -3020,8 +3022,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     // NOTE: Can't remove due to unsupported app usage
     public int checkPermission(String permName, String pkgName, int userId) {
-        return mPermissionManager.checkPermission(pkgName, permName, Context.DEVICE_ID_DEFAULT,
-                userId);
+        return mPermissionManager.checkPermission(pkgName, permName,
+                VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT, userId);
     }
 
     public String getSdkSandboxPackageName() {
@@ -6508,6 +6510,17 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 }
             }
             return true;
+        }
+
+        @Override
+        @Nullable
+        public ComponentName getDomainVerificationAgent() {
+            final int callerUid = Binder.getCallingUid();
+            if (!PackageManagerServiceUtils.isRootOrShell(callerUid)) {
+                throw new SecurityException("Not allowed to query domain verification agent");
+            }
+            final Computer snapshot = snapshotComputer();
+            return getDomainVerificationAgentComponentNameLPr(snapshot);
         }
 
         @Override

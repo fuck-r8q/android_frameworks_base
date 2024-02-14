@@ -69,6 +69,7 @@ import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.admin.DevicePolicyManagerInternal;
+import android.companion.virtual.VirtualDeviceManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -3438,26 +3439,33 @@ public class ComputerEngine implements Computer {
                                 }
                             }
                         } else {
-                            if (allowSetMutation) {
-                                Slog.i(TAG,
-                                        "Result set changed, dropping preferred activity "
-                                                + "for " + intent + " type "
-                                                + resolvedType);
-                                if (DEBUG_PREFERRED) {
-                                    Slog.v(TAG,
-                                            "Removing preferred activity since set changed "
-                                                    + pa.mPref.mComponent);
+                            final boolean isHomeActivity = ACTION_MAIN.equals(intent.getAction())
+                                    && intent.hasCategory(CATEGORY_HOME);
+                            if (!Flags.improveHomeAppBehavior() || !isHomeActivity) {
+                                // Don't reset the preferred activity just for the home intent, we
+                                // should respect the default home app even though there any new
+                                // home activity is enabled.
+                                if (allowSetMutation) {
+                                    Slog.i(TAG,
+                                            "Result set changed, dropping preferred activity "
+                                                    + "for " + intent + " type "
+                                                    + resolvedType);
+                                    if (DEBUG_PREFERRED) {
+                                        Slog.v(TAG,
+                                                "Removing preferred activity since set changed "
+                                                        + pa.mPref.mComponent);
+                                    }
+                                    pir.removeFilter(pa);
+                                    // Re-add the filter as a "last chosen" entry (!always)
+                                    PreferredActivity lastChosen = new PreferredActivity(
+                                            pa, pa.mPref.mMatch, null, pa.mPref.mComponent,
+                                            false);
+                                    pir.addFilter(this, lastChosen);
+                                    result.mChanged = true;
                                 }
-                                pir.removeFilter(pa);
-                                // Re-add the filter as a "last chosen" entry (!always)
-                                PreferredActivity lastChosen = new PreferredActivity(
-                                        pa, pa.mPref.mMatch, null, pa.mPref.mComponent,
-                                        false);
-                                pir.addFilter(this, lastChosen);
-                                result.mChanged = true;
+                                result.mPreferredResolveInfo = null;
+                                return result;
                             }
-                            result.mPreferredResolveInfo = null;
-                            return result;
                         }
                     }
 
@@ -4608,7 +4616,8 @@ public class ComputerEngine implements Computer {
         for (int i=0; i<permissions.length; i++) {
             final String permission = permissions[i];
             if (mPermissionManager.checkPermission(ps.getPackageName(), permission,
-                    Context.DEVICE_ID_DEFAULT, userId) == PERMISSION_GRANTED) {
+                    VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT, userId)
+                    == PERMISSION_GRANTED) {
                 tmp[i] = true;
                 numMatch++;
             } else {

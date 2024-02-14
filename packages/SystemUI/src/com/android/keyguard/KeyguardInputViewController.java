@@ -30,6 +30,7 @@ import com.android.internal.logging.UiEventLogger;
 import com.android.internal.util.LatencyTracker;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardSecurityModel.SecurityMode;
+import com.android.keyguard.domain.interactor.KeyguardKeyboardInteractor;
 import com.android.systemui.Flags;
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
 import com.android.systemui.bouncer.ui.BouncerMessageView;
@@ -37,7 +38,6 @@ import com.android.systemui.bouncer.ui.binder.BouncerMessageViewBinder;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.flags.FeatureFlags;
-import com.android.systemui.keyboard.data.repository.KeyboardRepository;
 import com.android.systemui.log.BouncerLogger;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController;
@@ -211,7 +211,7 @@ public abstract class KeyguardInputViewController<T extends KeyguardInputView>
         private final FeatureFlags mFeatureFlags;
         private final SelectedUserInteractor mSelectedUserInteractor;
         private final UiEventLogger mUiEventLogger;
-        private final KeyboardRepository mKeyboardRepository;
+        private final KeyguardKeyboardInteractor mKeyguardKeyboardInteractor;
 
         @Inject
         public Factory(KeyguardUpdateMonitor keyguardUpdateMonitor,
@@ -226,7 +226,7 @@ public abstract class KeyguardInputViewController<T extends KeyguardInputView>
                 KeyguardViewController keyguardViewController,
                 FeatureFlags featureFlags, SelectedUserInteractor selectedUserInteractor,
                 UiEventLogger uiEventLogger,
-                KeyboardRepository keyboardRepository) {
+                KeyguardKeyboardInteractor keyguardKeyboardInteractor) {
             mKeyguardUpdateMonitor = keyguardUpdateMonitor;
             mLockPatternUtils = lockPatternUtils;
             mLatencyTracker = latencyTracker;
@@ -243,7 +243,7 @@ public abstract class KeyguardInputViewController<T extends KeyguardInputView>
             mFeatureFlags = featureFlags;
             mSelectedUserInteractor = selectedUserInteractor;
             mUiEventLogger = uiEventLogger;
-            mKeyboardRepository = keyboardRepository;
+            mKeyguardKeyboardInteractor = keyguardKeyboardInteractor;
         }
 
         /** Create a new {@link KeyguardInputViewController}. */
@@ -265,14 +265,15 @@ public abstract class KeyguardInputViewController<T extends KeyguardInputView>
                         keyguardSecurityCallback, mMessageAreaControllerFactory, mLatencyTracker,
                         mInputMethodManager, emergencyButtonController, mMainExecutor, mResources,
                         mFalsingCollector, mKeyguardViewController,
-                        mDevicePostureController, mFeatureFlags, mSelectedUserInteractor);
+                        mDevicePostureController, mFeatureFlags, mSelectedUserInteractor,
+                        mKeyguardKeyboardInteractor);
             } else if (keyguardInputView instanceof KeyguardPINView) {
                 return new KeyguardPinViewController((KeyguardPINView) keyguardInputView,
                         mKeyguardUpdateMonitor, securityMode, mLockPatternUtils,
                         keyguardSecurityCallback, mMessageAreaControllerFactory, mLatencyTracker,
                         mLiftToActivateListener, emergencyButtonController, mFalsingCollector,
                         mDevicePostureController, mFeatureFlags, mSelectedUserInteractor,
-                        mUiEventLogger, mKeyboardRepository
+                        mUiEventLogger, mKeyguardKeyboardInteractor
                 );
             } else if (keyguardInputView instanceof KeyguardSimPinView) {
                 return new KeyguardSimPinViewController((KeyguardSimPinView) keyguardInputView,
@@ -280,14 +281,15 @@ public abstract class KeyguardInputViewController<T extends KeyguardInputView>
                         keyguardSecurityCallback, mMessageAreaControllerFactory, mLatencyTracker,
                         mLiftToActivateListener, mTelephonyManager, mFalsingCollector,
                         emergencyButtonController, mFeatureFlags, mSelectedUserInteractor,
-                        mKeyboardRepository);
+                        mKeyguardKeyboardInteractor);
             } else if (keyguardInputView instanceof KeyguardSimPukView) {
                 return new KeyguardSimPukViewController((KeyguardSimPukView) keyguardInputView,
                         mKeyguardUpdateMonitor, securityMode, mLockPatternUtils,
                         keyguardSecurityCallback, mMessageAreaControllerFactory, mLatencyTracker,
                         mLiftToActivateListener, mTelephonyManager, mFalsingCollector,
                         emergencyButtonController, mFeatureFlags, mSelectedUserInteractor,
-                        mKeyboardRepository);
+                        mKeyguardKeyboardInteractor
+                );
             }
 
             throw new RuntimeException("Unable to find controller for " + keyguardInputView);

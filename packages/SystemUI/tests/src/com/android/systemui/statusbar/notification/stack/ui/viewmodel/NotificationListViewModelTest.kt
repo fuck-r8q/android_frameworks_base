@@ -27,19 +27,23 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.Flags
 import com.android.systemui.flags.fakeFeatureFlagsClassic
-import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
-import com.android.systemui.keyguard.shared.model.KeyguardState
-import com.android.systemui.keyguard.shared.model.TransitionState
-import com.android.systemui.keyguard.shared.model.TransitionStep
+import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
+import com.android.systemui.keyguard.shared.model.StatusBarState
 import com.android.systemui.kosmos.testScope
+import com.android.systemui.power.data.repository.fakePowerRepository
+import com.android.systemui.power.shared.model.WakefulnessState
 import com.android.systemui.res.R
 import com.android.systemui.shade.data.repository.fakeShadeRepository
+import com.android.systemui.statusbar.data.repository.fakeRemoteInputRepository
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.setActiveNotifs
 import com.android.systemui.statusbar.notification.footer.shared.FooterViewRefactor
+import com.android.systemui.statusbar.policy.data.repository.fakeUserSetupRepository
 import com.android.systemui.statusbar.policy.data.repository.zenModeRepository
 import com.android.systemui.statusbar.policy.fakeConfigurationController
 import com.android.systemui.testKosmos
+import com.android.systemui.util.ui.isAnimating
+import com.android.systemui.util.ui.value
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
@@ -58,11 +62,15 @@ class NotificationListViewModelTest : SysuiTestCase() {
             fakeFeatureFlagsClassic.apply { set(Flags.FULL_SCREEN_USER_SWITCHER, false) }
         }
     private val testScope = kosmos.testScope
+
     private val activeNotificationListRepository = kosmos.activeNotificationListRepository
-    private val fakeKeyguardTransitionRepository = kosmos.fakeKeyguardTransitionRepository
-    private val fakeShadeRepository = kosmos.fakeShadeRepository
-    private val zenModeRepository = kosmos.zenModeRepository
     private val fakeConfigurationController = kosmos.fakeConfigurationController
+    private val fakeKeyguardRepository = kosmos.fakeKeyguardRepository
+    private val fakePowerRepository = kosmos.fakePowerRepository
+    private val fakeRemoteInputRepository = kosmos.fakeRemoteInputRepository
+    private val fakeShadeRepository = kosmos.fakeShadeRepository
+    private val fakeUserSetupRepository = kosmos.fakeUserSetupRepository
+    private val zenModeRepository = kosmos.zenModeRepository
 
     val underTest = kosmos.notificationListViewModel
 
@@ -77,11 +85,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             val important by collectLastValue(underTest.isImportantForAccessibility)
 
             // WHEN on lockscreen
-            fakeKeyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.GONE,
-                to = KeyguardState.LOCKSCREEN,
-                testScope,
-            )
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
             // AND has no notifs
             activeNotificationListRepository.setActiveNotifs(count = 0)
             testScope.runCurrent()
@@ -96,11 +100,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             val important by collectLastValue(underTest.isImportantForAccessibility)
 
             // WHEN on lockscreen
-            fakeKeyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.GONE,
-                to = KeyguardState.LOCKSCREEN,
-                testScope,
-            )
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
             // AND has notifs
             activeNotificationListRepository.setActiveNotifs(count = 2)
             runCurrent()
@@ -115,11 +115,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             val important by collectLastValue(underTest.isImportantForAccessibility)
 
             // WHEN not on lockscreen
-            fakeKeyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.LOCKSCREEN,
-                to = KeyguardState.GONE,
-                testScope,
-            )
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
             // AND has no notifs
             activeNotificationListRepository.setActiveNotifs(count = 0)
             runCurrent()
@@ -137,7 +133,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             activeNotificationListRepository.setActiveNotifs(count = 0)
             runCurrent()
 
-            // THEN should show
+            // THEN empty shade is visible
             assertThat(shouldShow).isTrue()
         }
 
@@ -150,7 +146,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             activeNotificationListRepository.setActiveNotifs(count = 2)
             runCurrent()
 
-            // THEN should not show
+            // THEN empty shade is not visible
             assertThat(shouldShow).isFalse()
         }
 
@@ -165,7 +161,7 @@ class NotificationListViewModelTest : SysuiTestCase() {
             fakeShadeRepository.legacyQsFullscreen.value = true
             runCurrent()
 
-            // THEN should not show
+            // THEN empty shade is not visible
             assertThat(shouldShow).isFalse()
         }
 
@@ -183,48 +179,54 @@ class NotificationListViewModelTest : SysuiTestCase() {
             fakeConfigurationController.notifyConfigurationChanged()
             runCurrent()
 
-            // THEN should show
+            // THEN empty shade is visible
             assertThat(shouldShow).isTrue()
         }
 
     @Test
-    fun testShouldShowEmptyShadeView_falseWhenTransitioningToAOD() =
+    fun testShouldShowEmptyShadeView_trueWhenLockedShade() =
         testScope.runTest {
             val shouldShow by collectLastValue(underTest.shouldShowEmptyShadeView)
 
             // WHEN has no notifs
             activeNotificationListRepository.setActiveNotifs(count = 0)
-            // AND transitioning to AOD
-            fakeKeyguardTransitionRepository.sendTransitionStep(
-                TransitionStep(
-                    transitionState = TransitionState.STARTED,
-                    from = KeyguardState.LOCKSCREEN,
-                    to = KeyguardState.AOD,
-                    value = 0f,
-                )
-            )
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE_LOCKED)
             runCurrent()
 
-            // THEN should not show
+            // THEN empty shade is visible
+            assertThat(shouldShow).isTrue()
+        }
+
+    @Test
+    fun testShouldShowEmptyShadeView_falseWhenKeyguard() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowEmptyShadeView)
+
+            // WHEN has no notifs
+            activeNotificationListRepository.setActiveNotifs(count = 0)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
+            runCurrent()
+
+            // THEN empty shade is not visible
             assertThat(shouldShow).isFalse()
         }
 
     @Test
-    fun testShouldShowEmptyShadeView_falseWhenBouncerShowing() =
+    fun testShouldShowEmptyShadeView_falseWhenStartingToSleep() =
         testScope.runTest {
             val shouldShow by collectLastValue(underTest.shouldShowEmptyShadeView)
 
             // WHEN has no notifs
             activeNotificationListRepository.setActiveNotifs(count = 0)
-            // AND is on bouncer
-            fakeKeyguardTransitionRepository.sendTransitionSteps(
-                from = KeyguardState.LOCKSCREEN,
-                to = KeyguardState.PRIMARY_BOUNCER,
-                testScope,
-            )
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            // AND device is starting to go to sleep
+            fakePowerRepository.updateWakefulness(WakefulnessState.STARTING_TO_SLEEP)
             runCurrent()
 
-            // THEN should not show
+            // THEN empty shade is not visible
             assertThat(shouldShow).isFalse()
         }
 
@@ -272,5 +274,194 @@ class NotificationListViewModelTest : SysuiTestCase() {
             runCurrent()
 
             assertThat(hasFilteredNotifs).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_trueWhenShade() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN footer is visible
+            assertThat(shouldShow?.value).isTrue()
+        }
+
+    @Test
+    fun testShouldShowFooterView_trueWhenLockedShade() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open on lockscreen
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE_LOCKED)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN footer is visible
+            assertThat(shouldShow?.value).isTrue()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenKeyguard() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND is on keyguard
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenUserNotSetUp() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            // AND user is not set up
+            fakeUserSetupRepository.setUserSetUp(false)
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenStartingToSleep() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            // AND device is starting to go to sleep
+            fakePowerRepository.updateWakefulness(WakefulnessState.STARTING_TO_SLEEP)
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenQsExpandedDefault() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            // AND quick settings are expanded
+            fakeShadeRepository.setQsExpansion(1f)
+            fakeShadeRepository.legacyQsFullscreen.value = true
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_trueWhenQsExpandedSplitShade() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            // AND quick settings are expanded
+            fakeShadeRepository.setQsExpansion(1f)
+            // AND split shade is enabled
+            overrideResource(R.bool.config_use_split_notification_shade, true)
+            fakeConfigurationController.notifyConfigurationChanged()
+            runCurrent()
+
+            // THEN footer is visible
+            assertThat(shouldShow?.value).isTrue()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenRemoteInputActive() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            // AND remote input is active
+            fakeRemoteInputRepository.isRemoteInputActive.value = true
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_falseWhenShadeIsClosed() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is closed
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(0f)
+            runCurrent()
+
+            // THEN footer is not visible
+            assertThat(shouldShow?.value).isFalse()
+        }
+
+    @Test
+    fun testShouldShowFooterView_animatesWhenShade() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND shade is open and fully expanded
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.SHADE)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN footer visibility animates
+            assertThat(shouldShow?.isAnimating).isTrue()
+        }
+
+    @Test
+    fun testShouldShowFooterView_notAnimatingOnKeyguard() =
+        testScope.runTest {
+            val shouldShow by collectLastValue(underTest.shouldShowFooterView)
+
+            // WHEN has notifs
+            activeNotificationListRepository.setActiveNotifs(count = 2)
+            // AND we are on the keyguard
+            fakeKeyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
+            fakeShadeRepository.setLegacyShadeExpansion(1f)
+            runCurrent()
+
+            // THEN footer visibility does not animate
+            assertThat(shouldShow?.isAnimating).isFalse()
         }
 }

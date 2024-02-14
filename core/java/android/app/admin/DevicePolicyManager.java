@@ -18,12 +18,14 @@ package android.app.admin;
 
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
+import static android.Manifest.permission.LOCK_DEVICE;
 import static android.Manifest.permission.MANAGE_DEVICE_ADMINS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ACCOUNT_MANAGEMENT;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_APPS_CONTROL;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CAMERA;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CERTIFICATES;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_COMMON_CRITERIA_MODE;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_CONTENT_PROTECTION;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_DEFAULT_SMS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_INPUT_METHODS;
@@ -53,7 +55,6 @@ import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_1;
 import static android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE;
-import static android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
 
@@ -3825,6 +3826,10 @@ public class DevicePolicyManager {
     /** @hide */
     @TestApi
     public static final int OPERATION_UNINSTALL_CA_CERT = 40;
+    /** @hide */
+    @TestApi
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    public static final int OPERATION_SET_CONTENT_PROTECTION_POLICY = 41;
 
     private static final String PREFIX_OPERATION = "OPERATION_";
 
@@ -3869,7 +3874,8 @@ public class DevicePolicyManager {
             OPERATION_SET_PERMISSION_GRANT_STATE,
             OPERATION_SET_PERMISSION_POLICY,
             OPERATION_SET_RESTRICTIONS_PROVIDER,
-            OPERATION_UNINSTALL_CA_CERT
+            OPERATION_UNINSTALL_CA_CERT,
+            OPERATION_SET_CONTENT_PROTECTION_POLICY
     })
     @Retention(RetentionPolicy.SOURCE)
     public static @interface DevicePolicyOperation {
@@ -4095,15 +4101,15 @@ public class DevicePolicyManager {
     }
 
     /** Indicates that content protection is not controlled by policy, allowing user to choose. */
-    @FlaggedApi(FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
     public static final int CONTENT_PROTECTION_NOT_CONTROLLED_BY_POLICY = 0;
 
-    /** Indicates that content protection is controlled and disabled by a policy. */
-    @FlaggedApi(FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    /** Indicates that content protection is controlled and disabled by a policy (default). */
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
     public static final int CONTENT_PROTECTION_DISABLED = 1;
 
     /** Indicates that content protection is controlled and enabled by a policy. */
-    @FlaggedApi(FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
     public static final int CONTENT_PROTECTION_ENABLED = 2;
 
     /** @hide */
@@ -4116,6 +4122,86 @@ public class DevicePolicyManager {
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ContentProtectionPolicy {}
+
+    /**
+     * Sets the content protection policy which controls scanning for deceptive apps.
+     * <p>
+     * This function can only be called by the device owner, a profile owner of an affiliated user
+     * or profile, or the profile owner when no device owner is set or holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_CONTENT_PROTECTION}. See
+     * {@link #isAffiliatedUser}.
+     * Any policy set via this method will be cleared if the user becomes unaffiliated.
+     * <p>
+     * After the content protection policy has been set,
+     * {@link PolicyUpdateReceiver#onPolicySetResult(Context, String, Bundle, TargetUser,
+     * PolicyUpdateResult)} will notify the admin on whether the policy was successfully set or not.
+     * This callback will contain:
+     * <ul>
+     * <li> The policy identifier {@link DevicePolicyIdentifiers#CONTENT_PROTECTION_POLICY}
+     * <li> The {@link TargetUser} that this policy relates to
+     * <li> The {@link PolicyUpdateResult}, which will be
+     * {@link PolicyUpdateResult#RESULT_POLICY_SET} if the policy was successfully set or the
+     * reason the policy failed to be set
+     * (e.g. {@link PolicyUpdateResult#RESULT_FAILURE_CONFLICTING_ADMIN_POLICY})
+     * </ul>
+     * If there has been a change to the policy,
+     * {@link PolicyUpdateReceiver#onPolicyChanged(Context, String, Bundle, TargetUser,
+     * PolicyUpdateResult)} will notify the admin of this change. This callback will contain the
+     * same parameters as PolicyUpdateReceiver#onPolicySetResult and the {@link PolicyUpdateResult}
+     * will contain the reason why the policy changed.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with. Null if the
+     *               caller is not a device admin.
+     * @param policy The content protection policy to set. One of {@link
+     *               #CONTENT_PROTECTION_NOT_CONTROLLED_BY_POLICY},
+     *               {@link #CONTENT_PROTECTION_DISABLED} or {@link #CONTENT_PROTECTION_ENABLED}.
+     * @throws SecurityException if {@code admin} is not the device owner, the profile owner of an
+     * affiliated user or profile, or the profile owner when no device owner is set or holder of the
+     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_CONTENT_PROTECTION}.
+     * @see #isAffiliatedUser
+     */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_CONTENT_PROTECTION, conditional = true)
+    @SupportsCoexistence
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    public void setContentProtectionPolicy(
+            @Nullable ComponentName admin, @ContentProtectionPolicy int policy) {
+        throwIfParentInstance("setContentProtectionPolicy");
+        if (mService != null) {
+            try {
+                mService.setContentProtectionPolicy(admin, mContext.getPackageName(), policy);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Returns the current content protection policy.
+     * <p>
+     * The returned policy will be the current resolved policy rather than the policy set by the
+     * calling admin.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with. Null if the
+     *              caller is not a device admin.
+     * @throws SecurityException if {@code admin} is not the device owner, the profile owner of an
+     * affiliated user or profile, or the profile owner when no device owner is set or holder of the
+     * permission {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_CONTENT_PROTECTION}.
+     * @see #isAffiliatedUser
+     * @see #setContentProtectionPolicy
+     */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_CONTENT_PROTECTION, conditional = true)
+    @FlaggedApi(android.view.contentprotection.flags.Flags.FLAG_MANAGE_DEVICE_POLICY_ENABLED)
+    public @ContentProtectionPolicy int getContentProtectionPolicy(@Nullable ComponentName admin) {
+        throwIfParentInstance("getContentProtectionPolicy");
+        if (mService != null) {
+            try {
+                return mService.getContentProtectionPolicy(admin, mContext.getPackageName());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return CONTENT_PROTECTION_DISABLED;
+    }
 
     /**
      * This object is a single place to tack on invalidation and disable calls.  All
@@ -6330,10 +6416,10 @@ public class DevicePolicyManager {
      * (PIN, pattern, or password). This API is intended for use only by device admins.
      * <p>
      * From version {@link android.os.Build.VERSION_CODES#R} onwards, the caller must either have
-     * the LOCK_DEVICE permission or the device must have the device admin feature; if neither is
-     * true, then the method will return without completing any action. Before version
-     * {@link android.os.Build.VERSION_CODES#R}, the device needed the device admin feature,
-     * regardless of the caller's permissions.
+     * the LOCK_DEVICE permission or the device must have the
+     * device admin feature; if neither is true, then the method will return without completing
+     * any action. Before version {@link android.os.Build.VERSION_CODES#R},
+     * the device needed the device admin feature, regardless of the caller's permissions.
      * <p>
      * The calling device admin must have requested {@link DeviceAdminInfo#USES_POLICY_FORCE_LOCK}
      * to be able to call this method; if it has not, a security exception will be thrown.
@@ -6353,7 +6439,8 @@ public class DevicePolicyManager {
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_FORCE_LOCK}
      */
-    @RequiresPermission(value = MANAGE_DEVICE_POLICY_LOCK, conditional = true)
+    @SuppressLint("RequiresPermission")
+    @RequiresPermission(value = LOCK_DEVICE, conditional = true)
     public void lockNow() {
         lockNow(0);
     }
@@ -6364,14 +6451,13 @@ public class DevicePolicyManager {
      * <p>
      * This method secures the device in response to an urgent situation, such as a lost or stolen
      * device. After this method is called, the device must be unlocked using strong authentication
-     * (PIN, pattern, or password). This API is for use only by device admins and holders of the
-     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_LOCK} permission.
+     * (PIN, pattern, or password). This API is intended for use only by device admins.
      * <p>
      * From version {@link android.os.Build.VERSION_CODES#R} onwards, the caller must either have
-     * the LOCK_DEVICE permission or the device must have the device admin feature; if neither is
-     * true, then the method will return without completing any action. Before version
-     * {@link android.os.Build.VERSION_CODES#R}, the device needed the device admin feature,
-     * regardless of the caller's permissions.
+     * the LOCK_DEVICE permission or the device must have the
+     * device admin feature; if neither is true, then the method will return without completing any
+     * action. Before version {@link android.os.Build.VERSION_CODES#R}, the device needed the device
+     * admin feature, regardless of the caller's permissions.
      * <p>
      * A calling device admin must have requested {@link DeviceAdminInfo#USES_POLICY_FORCE_LOCK}
      * to be able to call this method; if it has not, a security exception will be thrown.
@@ -6400,7 +6486,7 @@ public class DevicePolicyManager {
      * @param flags May be 0 or {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY}.
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_FORCE_LOCK} and the does not hold
-     *             the {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_LOCK} permission, or
+     *             the {@link android.Manifest.permission#LOCK_DEVICE} permission, or
      *             the {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY} flag is passed by an
      *             application that is not a profile owner of a managed profile.
      * @throws IllegalArgumentException if the {@link #FLAG_EVICT_CREDENTIAL_ENCRYPTION_KEY} flag is
@@ -6409,7 +6495,7 @@ public class DevicePolicyManager {
      *             flag is passed when {@link #getStorageEncryptionStatus} does not return
      *             {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER}.
      */
-    @RequiresPermission(value = MANAGE_DEVICE_POLICY_LOCK, conditional = true)
+    @RequiresPermission(value = LOCK_DEVICE, conditional = true)
     public void lockNow(@LockNowFlag int flags) {
         if (mService != null) {
             try {

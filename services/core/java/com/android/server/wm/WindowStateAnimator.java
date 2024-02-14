@@ -514,8 +514,10 @@ class WindowStateAnimator {
 
         // We don't apply animation for application main window here since this window type
         // should be controlled by ActivityRecord in general. Wallpaper is also excluded because
-        // WallpaperController should handle it.
-        if (mAttrType != TYPE_BASE_APPLICATION && !mIsWallpaper) {
+        // WallpaperController should handle it. Also skip play enter animation for the window
+        // below starting window.
+        if (mAttrType != TYPE_BASE_APPLICATION && !mIsWallpaper
+                && !(mWin.mActivityRecord != null && mWin.mActivityRecord.hasStartingWindow())) {
             applyAnimationLocked(transit, true);
         }
 

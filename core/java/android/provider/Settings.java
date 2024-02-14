@@ -12323,6 +12323,16 @@ public final class Settings {
         public static final String PRIVATE_SPACE_AUTO_LOCK = "private_space_auto_lock";
 
         /**
+         * Toggle for enabling stylus pointer icon. Pointer icons for styluses will only be be shown
+         * when this is enabled. Enabling this alone won't enable the stylus pointer;
+         * config_enableStylusPointerIcon needs to be true as well.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String STYLUS_POINTER_ICON_ENABLED = "stylus_pointer_icon_enabled";
+
+        /**
          * These entries are considered common between the personal and the managed profile,
          * since the managed profile doesn't get to change them.
          */
@@ -18182,6 +18192,16 @@ public final class Settings {
         @Readable
         public static final String SHOW_NOTIFICATION_CHANNEL_WARNINGS =
                 "show_notification_channel_warnings";
+
+        /**
+         * Whether to disable app and notification screen share protections.
+         *
+         * The value 1 - enable, 0 - disable
+         * @hide
+         */
+        @Readable
+        public static final String DISABLE_SCREEN_SHARE_PROTECTIONS_FOR_APPS_AND_NOTIFICATIONS =
+                "disable_screen_share_protections_for_apps_and_notifications";
 
         /**
          * Whether cell is enabled/disabled
