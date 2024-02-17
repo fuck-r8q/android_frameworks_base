@@ -4815,7 +4815,7 @@ public abstract class Context {
      * @see android.net.thread.ThreadNetworkManager
      * @hide
      */
-    @FlaggedApi("com.android.net.thread.flags.thread_enabled")
+    @FlaggedApi(com.android.net.thread.flags.Flags.FLAG_THREAD_ENABLED_PLATFORM)
     @SystemApi
     public static final String THREAD_NETWORK_SERVICE = "thread_network";
 
@@ -5066,6 +5066,7 @@ public abstract class Context {
      * {@link android.hardware.fingerprint.FingerprintManager} for handling management
      * of fingerprints.
      *
+     * @removed See {@link android.hardware.biometrics.BiometricPrompt}
      * @see #getSystemService(String)
      * @see android.hardware.fingerprint.FingerprintManager
      */
