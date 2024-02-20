@@ -559,6 +559,10 @@ public class IntentFilter implements Parcelable {
             sb.append(" sch=");
             sb.append(mDataSchemes.toString());
         }
+        if (Flags.relativeReferenceIntentFilters() && countUriRelativeFilterGroups() > 0) {
+            sb.append(" grp=");
+            sb.append(mUriRelativeFilterGroups.toString());
+        }
         sb.append(" }");
         return sb.toString();
     }
@@ -673,7 +677,7 @@ public class IntentFilter implements Parcelable {
      * has at least one HTTP or HTTPS data URI pattern defined, and optionally
      * does not define any non-http/https data URI patterns.
      *
-     * This will check if if the Intent action is {@link android.content.Intent#ACTION_VIEW} and
+     * This will check if the Intent action is {@link android.content.Intent#ACTION_VIEW} and
      * the Intent category is {@link android.content.Intent#CATEGORY_BROWSABLE} and the Intent
      * data scheme is "http" or "https".
      *
@@ -714,7 +718,7 @@ public class IntentFilter implements Parcelable {
         }
 
         // We get here if:
-        //   1) onlyWebSchemes and no non-web schemes were found, i.e success; or
+        //   1) onlyWebSchemes and no non-web schemes were found, i.e. success; or
         //   2) !onlyWebSchemes and no http/https schemes were found, i.e. failure.
         return onlyWebSchemes;
     }
@@ -724,7 +728,7 @@ public class IntentFilter implements Parcelable {
      *
      * @return True if the filter needs to be automatically verified. False otherwise.
      *
-     * This will check if if the Intent action is {@link android.content.Intent#ACTION_VIEW} and
+     * This will check if the Intent action is {@link android.content.Intent#ACTION_VIEW} and
      * the Intent category is {@link android.content.Intent#CATEGORY_BROWSABLE} and the Intent
      * data scheme is "http" or "https".
      *
@@ -1807,13 +1811,7 @@ public class IntentFilter implements Parcelable {
         if (mUriRelativeFilterGroups == null) {
             return false;
         }
-        for (int i = 0; i < mUriRelativeFilterGroups.size(); i++) {
-            UriRelativeFilterGroup group = mUriRelativeFilterGroups.get(i);
-            if (group.matchData(data)) {
-                return group.getAction() == UriRelativeFilterGroup.ACTION_ALLOW;
-            }
-        }
-        return false;
+        return UriRelativeFilterGroup.matchGroupsToUri(mUriRelativeFilterGroups, data);
     }
 
     /**

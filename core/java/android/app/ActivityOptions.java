@@ -76,6 +76,7 @@ import java.util.ArrayList;
  * {@link android.content.Context#startActivity(android.content.Intent, android.os.Bundle)
  * Context.startActivity(Intent, Bundle)} and related methods.
  */
+@android.ravenwood.annotation.RavenwoodKeepWholeClass
 public class ActivityOptions extends ComponentOptions {
     private static final String TAG = "ActivityOptions";
 
@@ -533,6 +534,7 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static ActivityOptions makeCustomAnimation(Context context,
             int enterResId, int exitResId) {
         return makeCustomAnimation(context, enterResId, exitResId, 0, null, null);
@@ -553,6 +555,7 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static @NonNull ActivityOptions makeCustomAnimation(@NonNull Context context,
             int enterResId, int exitResId, int backgroundColor) {
         return makeCustomAnimation(context, enterResId, exitResId, backgroundColor, null, null);
@@ -578,6 +581,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @UnsupportedAppUsage
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static ActivityOptions makeCustomAnimation(Context context,
             int enterResId, int exitResId, int backgroundColor, Handler handler,
             OnAnimationStartedListener listener) {
@@ -613,6 +617,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @TestApi
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static @NonNull ActivityOptions makeCustomAnimation(@NonNull Context context,
             int enterResId, int exitResId, int backgroundColor, @Nullable Handler handler,
             @Nullable OnAnimationStartedListener startedListener,
@@ -647,6 +652,7 @@ public class ActivityOptions extends ComponentOptions {
      */
     @RequiresPermission(START_TASKS_FROM_RECENTS)
     @TestApi
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static @NonNull ActivityOptions makeCustomTaskAnimation(@NonNull Context context,
             int enterResId, int exitResId, @Nullable Handler handler,
             @Nullable OnAnimationStartedListener startedListener,
@@ -669,6 +675,7 @@ public class ActivityOptions extends ComponentOptions {
      * supply these options as the options Bundle when running an in-place animation.
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static ActivityOptions makeCustomInPlaceAnimation(Context context, int animId) {
         if (animId == 0) {
             throw new RuntimeException("You must specify a valid animation.");
@@ -775,6 +782,7 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     public static ActivityOptions makeScaleUpAnimation(View source,
             int startX, int startY, int width, int height) {
         ActivityOptions opts = new ActivityOptions();
@@ -803,6 +811,7 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     public static ActivityOptions makeClipRevealAnimation(View source,
             int startX, int startY, int width, int height) {
         ActivityOptions opts = new ActivityOptions();
@@ -848,6 +857,7 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     public static ActivityOptions makeThumbnailScaleUpAnimation(View source,
             Bitmap thumbnail, int startX, int startY) {
         return makeThumbnailScaleUpAnimation(source, thumbnail, startX, startY, null);
@@ -870,11 +880,13 @@ public class ActivityOptions extends ComponentOptions {
      * @return Returns a new ActivityOptions object that you can use to
      * supply these options as the options Bundle when starting an activity.
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     private static ActivityOptions makeThumbnailScaleUpAnimation(View source,
             Bitmap thumbnail, int startX, int startY, OnAnimationStartedListener listener) {
         return makeThumbnailAnimation(source, thumbnail, startX, startY, listener, true);
     }
 
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     private static ActivityOptions makeThumbnailAnimation(View source,
             Bitmap thumbnail, int startX, int startY, OnAnimationStartedListener listener,
             boolean scaleUp) {
@@ -896,6 +908,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @UnsupportedAppUsage
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Context.class)
     public static ActivityOptions makeMultiThumbFutureAspectScaleAnimation(Context context,
             Handler handler, IAppTransitionAnimationSpecsFuture specsFuture,
             OnAnimationStartedListener listener, boolean scaleUp) {
@@ -928,6 +941,7 @@ public class ActivityOptions extends ComponentOptions {
      * supply these options as the options Bundle when starting an activity.
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     public static ActivityOptions makeThumbnailAspectScaleDownAnimation(View source,
             Bitmap thumbnail, int startX, int startY, int targetWidth, int targetHeight,
             Handler handler, OnAnimationStartedListener listener) {
@@ -935,6 +949,7 @@ public class ActivityOptions extends ComponentOptions {
                 targetWidth, targetHeight, handler, listener, false);
     }
 
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     private static ActivityOptions makeAspectScaledThumbnailAnimation(View source, Bitmap thumbnail,
             int startX, int startY, int targetWidth, int targetHeight,
             Handler handler, OnAnimationStartedListener listener, boolean scaleUp) {
@@ -954,6 +969,7 @@ public class ActivityOptions extends ComponentOptions {
     }
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = View.class)
     public static ActivityOptions makeThumbnailAspectScaleDownAnimation(View source,
             AppTransitionAnimationSpec[] specs, Handler handler,
             OnAnimationStartedListener onAnimationStartedListener,
@@ -986,6 +1002,7 @@ public class ActivityOptions extends ComponentOptions {
      * @see android.transition.Transition#setEpicenterCallback(
      *          android.transition.Transition.EpicenterCallback)
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Activity.class)
     public static ActivityOptions makeSceneTransitionAnimation(Activity activity,
             View sharedElement, String sharedElementName) {
         return makeSceneTransitionAnimation(activity, Pair.create(sharedElement, sharedElementName));
@@ -1011,6 +1028,7 @@ public class ActivityOptions extends ComponentOptions {
      *          android.transition.Transition.EpicenterCallback)
      */
     @SafeVarargs
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Activity.class)
     public static ActivityOptions makeSceneTransitionAnimation(Activity activity,
             Pair<View, String>... sharedElements) {
         ActivityOptions opts = new ActivityOptions();
@@ -1037,6 +1055,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @SafeVarargs
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Window.class)
     public static Pair<ActivityOptions, ExitTransitionCoordinator> startSharedElementAnimation(
             Window window, ExitTransitionCallbacks exitCallbacks, SharedElementCallback callback,
             Pair<View, String>... sharedElements) {
@@ -1058,6 +1077,7 @@ public class ActivityOptions extends ComponentOptions {
      *
      * @hide
      */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Window.class)
     public static void stopSharedElementAnimation(Window window) {
         final View decorView = window.getDecorView();
         if (decorView == null) {
@@ -1075,6 +1095,7 @@ public class ActivityOptions extends ComponentOptions {
         }
     }
 
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Window.class)
     static ExitTransitionCoordinator makeSceneTransitionAnimation(
             ExitTransitionCallbacks exitCallbacks, SharedElementCallback callback, Window window,
             ActivityOptions opts, Pair<View, String>[] sharedElements) {
@@ -1125,6 +1146,7 @@ public class ActivityOptions extends ComponentOptions {
     }
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = Activity.class)
     static ActivityOptions makeSceneTransitionAnimation(Activity activity,
             ExitTransitionCoordinator exitCoordinator, ArrayList<String> sharedElementNames,
             int resultCode, Intent resultData) {
@@ -1179,6 +1201,7 @@ public class ActivityOptions extends ComponentOptions {
      */
     @RequiresPermission(CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS)
     @UnsupportedAppUsage
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = RemoteAnimationAdapter.class)
     public static ActivityOptions makeRemoteAnimation(
             RemoteAnimationAdapter remoteAnimationAdapter) {
         final ActivityOptions opts = new ActivityOptions();
@@ -1193,6 +1216,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @RequiresPermission(CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS)
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = RemoteAnimationAdapter.class)
     public static ActivityOptions makeRemoteAnimation(RemoteAnimationAdapter remoteAnimationAdapter,
             RemoteTransition remoteTransition) {
         final ActivityOptions opts = new ActivityOptions();
@@ -1208,6 +1232,7 @@ public class ActivityOptions extends ComponentOptions {
      * @hide
      */
     @RequiresPermission(CONTROL_REMOTE_APP_TRANSITION_ANIMATIONS)
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = RemoteAnimationAdapter.class)
     public static ActivityOptions makeRemoteTransition(RemoteTransition remoteTransition) {
         final ActivityOptions opts = new ActivityOptions();
         opts.mRemoteTransition = remoteTransition;
@@ -1222,6 +1247,7 @@ public class ActivityOptions extends ComponentOptions {
      *                               picture-in-picture mode.
      */
     @NonNull
+    @android.ravenwood.annotation.RavenwoodThrow(blockedBy = PictureInPictureParams.class)
     public static ActivityOptions makeLaunchIntoPip(
             @NonNull PictureInPictureParams pictureInPictureParams) {
         final ActivityOptions opts = new ActivityOptions();

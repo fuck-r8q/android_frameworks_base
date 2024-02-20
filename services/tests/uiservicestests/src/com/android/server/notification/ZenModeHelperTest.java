@@ -17,12 +17,14 @@
 package com.android.server.notification;
 
 import static android.app.AutomaticZenRule.TYPE_BEDTIME;
+import static android.app.AutomaticZenRule.TYPE_IMMERSIVE;
 import static android.app.NotificationManager.AUTOMATIC_RULE_STATUS_ACTIVATED;
 import static android.app.NotificationManager.AUTOMATIC_RULE_STATUS_DEACTIVATED;
 import static android.app.NotificationManager.AUTOMATIC_RULE_STATUS_DISABLED;
 import static android.app.NotificationManager.AUTOMATIC_RULE_STATUS_ENABLED;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_ALARMS;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_ALL;
+import static android.app.NotificationManager.INTERRUPTION_FILTER_NONE;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY;
 import static android.app.NotificationManager.Policy.CONVERSATION_SENDERS_ANYONE;
 import static android.app.NotificationManager.Policy.CONVERSATION_SENDERS_IMPORTANT;
@@ -67,6 +69,7 @@ import static com.android.os.dnd.DNDProtoEnums.PEOPLE_STARRED;
 import static com.android.os.dnd.DNDProtoEnums.ROOT_CONFIG;
 import static com.android.os.dnd.DNDProtoEnums.STATE_ALLOW;
 import static com.android.os.dnd.DNDProtoEnums.STATE_DISALLOW;
+import static com.android.server.notification.ZenModeEventLogger.ACTIVE_RULE_TYPE_MANUAL;
 import static com.android.server.notification.ZenModeHelper.RULE_LIMIT_PER_PACKAGE;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -160,7 +163,9 @@ import com.android.server.UiServiceTestCase;
 import com.android.server.notification.ManagedServices.UserProfiles;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.truth.Correspondence;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.testing.junit.testparameterinjector.TestParameter;
 import com.google.testing.junit.testparameterinjector.TestParameterInjector;
@@ -2579,6 +2584,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         mSetFlagsRule.enableFlags(Flags.FLAG_MODES_API);
         ZenDeviceEffects original = new ZenDeviceEffects.Builder()
                 .setShouldDisableTapToWake(true)
+                .addExtraEffect("extra")
                 .build();
         String ruleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
                 new AutomaticZenRule.Builder("Rule", CONDITION_ID)
@@ -2590,6 +2596,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         ZenDeviceEffects updateFromApp = new ZenDeviceEffects.Builder()
                 .setShouldUseNightMode(true) // Good
                 .setShouldMaximizeDoze(true) // Bad
+                .addExtraEffect("should be rejected") // Bad
                 .build();
         mZenModeHelper.updateAutomaticZenRule(ruleId,
                 new AutomaticZenRule.Builder("Rule", CONDITION_ID)
@@ -2603,6 +2610,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 new ZenDeviceEffects.Builder()
                         .setShouldUseNightMode(true) // From update.
                         .setShouldDisableTapToWake(true) // From original.
+                        .addExtraEffect("extra")
                         .build());
     }
 
@@ -3545,6 +3553,89 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 ZenModeEventLogger.ZenStateChangedEvent.DND_ACTIVE_RULES_CHANGED.getId());
         assertThat(mZenModeEventLogger.getNumRulesActive(1)).isEqualTo(0);
         assertThat(mZenModeEventLogger.getPolicyProto(1)).isNull();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MODES_API)
+    public void testZenModeEventLog_activeRuleTypes() {
+        mTestFlagResolver.setFlagOverride(LOG_DND_STATE_EVENTS, true);
+        setupZenConfig();
+
+        // Event 1: turn on manual zen mode. Manual rule will have ACTIVE_RULE_TYPE_MANUAL
+        mZenModeHelper.setManualZenMode(ZEN_MODE_IMPORTANT_INTERRUPTIONS, null,
+                UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI, "", null, Process.SYSTEM_UID);
+
+        // Create bedtime rule
+        AutomaticZenRule bedtime = new AutomaticZenRule.Builder("Bedtime Mode (TM)", CONDITION_ID)
+                .setType(TYPE_BEDTIME)
+                .build();
+        String bedtimeRuleId = mZenModeHelper.addAutomaticZenRule("pkg", bedtime, UPDATE_ORIGIN_APP,
+                "reason", CUSTOM_PKG_UID);
+
+        // Create immersive rule
+        AutomaticZenRule immersive = new AutomaticZenRule.Builder("Immersed", CONDITION_ID)
+                .setType(TYPE_IMMERSIVE)
+                .build();
+        String immersiveId = mZenModeHelper.addAutomaticZenRule("pkg", immersive, UPDATE_ORIGIN_APP,
+                "reason", CUSTOM_PKG_UID);
+
+        // Event 2: Activate bedtime rule
+        mZenModeHelper.setAutomaticZenRuleState(bedtimeRuleId,
+                new Condition(bedtime.getConditionId(), "", STATE_TRUE, SOURCE_SCHEDULE),
+                UPDATE_ORIGIN_APP, CUSTOM_PKG_UID);
+
+        // Event 3: Turn immersive on
+        mZenModeHelper.setAutomaticZenRuleState(immersiveId,
+                new Condition(immersive.getConditionId(), "", STATE_TRUE, SOURCE_SCHEDULE),
+                UPDATE_ORIGIN_APP, CUSTOM_PKG_UID);
+
+        // Event 4: Turn off bedtime mode, leaving just unknown + immersive
+        mZenModeHelper.setAutomaticZenRuleState(bedtimeRuleId,
+                new Condition(bedtime.getConditionId(), "", STATE_FALSE, SOURCE_SCHEDULE),
+                UPDATE_ORIGIN_APP, CUSTOM_PKG_UID);
+
+        // Total of 4 events
+        assertEquals(4, mZenModeEventLogger.numLoggedChanges());
+
+        // First event: DND_TURNED_ON; active rules: 1; type is ACTIVE_RULE_TYPE_MANUAL
+        assertThat(mZenModeEventLogger.getEventId(0)).isEqualTo(
+                ZenModeEventLogger.ZenStateChangedEvent.DND_TURNED_ON.getId());
+        assertThat(mZenModeEventLogger.getChangedRuleType(0)).isEqualTo(
+                DNDProtoEnums.MANUAL_RULE);
+        assertThat(mZenModeEventLogger.getNumRulesActive(0)).isEqualTo(1);
+        int[] ruleTypes0 = mZenModeEventLogger.getActiveRuleTypes(0);
+        assertThat(ruleTypes0.length).isEqualTo(1);
+        assertThat(ruleTypes0[0]).isEqualTo(ACTIVE_RULE_TYPE_MANUAL);
+
+        // Second event: active rules: 2; types are TYPE_MANUAL and TYPE_BEDTIME
+        assertThat(mZenModeEventLogger.getChangedRuleType(1)).isEqualTo(
+                DNDProtoEnums.AUTOMATIC_RULE);
+        assertThat(mZenModeEventLogger.getNumRulesActive(1)).isEqualTo(2);
+        int[] ruleTypes1 = mZenModeEventLogger.getActiveRuleTypes(1);
+        assertThat(ruleTypes1.length).isEqualTo(2);
+        assertThat(ruleTypes1[0]).isEqualTo(TYPE_BEDTIME);
+        assertThat(ruleTypes1[1]).isEqualTo(ACTIVE_RULE_TYPE_MANUAL);
+
+        // Third event: active rules: 3
+        assertThat(mZenModeEventLogger.getEventId(2)).isEqualTo(
+                ZenModeEventLogger.ZenStateChangedEvent.DND_ACTIVE_RULES_CHANGED.getId());
+        assertThat(mZenModeEventLogger.getChangedRuleType(2)).isEqualTo(
+                DNDProtoEnums.AUTOMATIC_RULE);
+        int[] ruleTypes2 = mZenModeEventLogger.getActiveRuleTypes(2);
+        assertThat(ruleTypes2.length).isEqualTo(3);
+        assertThat(ruleTypes2[0]).isEqualTo(TYPE_BEDTIME);
+        assertThat(ruleTypes2[1]).isEqualTo(TYPE_IMMERSIVE);
+        assertThat(ruleTypes2[2]).isEqualTo(ACTIVE_RULE_TYPE_MANUAL);
+
+        // Fourth event: active rules 2, types are TYPE_MANUAL and TYPE_IMMERSIVE
+        assertThat(mZenModeEventLogger.getEventId(3)).isEqualTo(
+                ZenModeEventLogger.ZenStateChangedEvent.DND_ACTIVE_RULES_CHANGED.getId());
+        assertThat(mZenModeEventLogger.getChangedRuleType(3)).isEqualTo(
+                DNDProtoEnums.AUTOMATIC_RULE);
+        int[] ruleTypes3 = mZenModeEventLogger.getActiveRuleTypes(3);
+        assertThat(ruleTypes3.length).isEqualTo(2);
+        assertThat(ruleTypes3[0]).isEqualTo(TYPE_IMMERSIVE);
+        assertThat(ruleTypes3[1]).isEqualTo(ACTIVE_RULE_TYPE_MANUAL);
     }
 
     @Test
@@ -4699,19 +4790,26 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         verify(mDeviceEffectsApplier).apply(eq(NO_EFFECTS), eq(UPDATE_ORIGIN_INIT));
 
         String ruleId = addRuleWithEffects(
-                new ZenDeviceEffects.Builder().setShouldDisplayGrayscale(true).build());
+                new ZenDeviceEffects.Builder()
+                        .setShouldDisplayGrayscale(true)
+                        .addExtraEffect("ONE")
+                        .build());
         mZenModeHelper.setAutomaticZenRuleState(ruleId, CONDITION_TRUE, UPDATE_ORIGIN_APP,
                 CUSTOM_PKG_UID);
         mTestableLooper.processAllMessages();
         verify(mDeviceEffectsApplier).apply(
                 eq(new ZenDeviceEffects.Builder()
                         .setShouldDisplayGrayscale(true)
+                        .addExtraEffect("ONE")
                         .build()),
                 eq(UPDATE_ORIGIN_APP));
 
         // Now create and activate a second rule that adds more effects.
         String secondRuleId = addRuleWithEffects(
-                new ZenDeviceEffects.Builder().setShouldDimWallpaper(true).build());
+                new ZenDeviceEffects.Builder()
+                        .setShouldDimWallpaper(true)
+                        .addExtraEffect("TWO")
+                        .build());
         mZenModeHelper.setAutomaticZenRuleState(secondRuleId, CONDITION_TRUE, UPDATE_ORIGIN_APP,
                 CUSTOM_PKG_UID);
         mTestableLooper.processAllMessages();
@@ -4720,6 +4818,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 eq(new ZenDeviceEffects.Builder()
                         .setShouldDisplayGrayscale(true)
                         .setShouldDimWallpaper(true)
+                        .setExtraEffects(ImmutableSet.of("ONE", "TWO"))
                         .build()),
                 eq(UPDATE_ORIGIN_APP));
     }
@@ -4730,7 +4829,10 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         mZenModeHelper.setDeviceEffectsApplier(mDeviceEffectsApplier);
         verify(mDeviceEffectsApplier).apply(eq(NO_EFFECTS), eq(UPDATE_ORIGIN_INIT));
 
-        ZenDeviceEffects zde = new ZenDeviceEffects.Builder().setShouldUseNightMode(true).build();
+        ZenDeviceEffects zde = new ZenDeviceEffects.Builder()
+                .setShouldUseNightMode(true)
+                .addExtraEffect("extra_effect")
+                .build();
         String ruleId = addRuleWithEffects(zde);
         mZenModeHelper.setAutomaticZenRuleState(ruleId, CONDITION_TRUE, UPDATE_ORIGIN_APP,
                 CUSTOM_PKG_UID);
@@ -4796,7 +4898,7 @@ public class ZenModeHelperTest extends UiServiceTestCase {
                 .setDeviceEffects(effects)
                 .build();
         return mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(), rule,
-                UPDATE_ORIGIN_APP, "reasons", CUSTOM_PKG_UID);
+                UPDATE_ORIGIN_SYSTEM_OR_SYSTEMUI, "reasons", Process.SYSTEM_UID);
     }
 
     @Test
@@ -5219,6 +5321,52 @@ public class ZenModeHelperTest extends UiServiceTestCase {
         rule.name = "A rule from " + pkg + " created on " + createdAt;
         rule.conditionId = Uri.parse(rule.name);
         return rule;
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void testCallbacks_policy() throws Exception {
+        setupZenConfig();
+        assertThat(mZenModeHelper.getNotificationPolicy().allowReminders()).isTrue();
+        SettableFuture<Policy> futurePolicy = SettableFuture.create();
+        mZenModeHelper.addCallback(new ZenModeHelper.Callback() {
+            @Override
+            void onPolicyChanged(Policy newPolicy) {
+                futurePolicy.set(newPolicy);
+            }
+        });
+
+        Policy totalSilencePolicy = new Policy(0, 0, 0);
+        mZenModeHelper.setNotificationPolicy(totalSilencePolicy, UPDATE_ORIGIN_APP, CUSTOM_PKG_UID);
+
+        Policy callbackPolicy = futurePolicy.get(1, TimeUnit.SECONDS);
+        assertThat(callbackPolicy.allowReminders()).isFalse();
+    }
+
+    @Test
+    @EnableFlags(android.app.Flags.FLAG_MODES_API)
+    public void testCallbacks_consolidatedPolicy() throws Exception {
+        setupZenConfig();
+        assertThat(mZenModeHelper.getConsolidatedNotificationPolicy().allowAlarms()).isTrue();
+        SettableFuture<Policy> futureConsolidatedPolicy = SettableFuture.create();
+        mZenModeHelper.addCallback(new ZenModeHelper.Callback() {
+            @Override
+            void onConsolidatedPolicyChanged(Policy newConsolidatedPolicy) {
+                futureConsolidatedPolicy.set(newConsolidatedPolicy);
+            }
+        });
+
+        String totalSilenceRuleId = mZenModeHelper.addAutomaticZenRule(mContext.getPackageName(),
+                new AutomaticZenRule.Builder("Rule", CONDITION_ID)
+                        .setOwner(OWNER)
+                        .setInterruptionFilter(INTERRUPTION_FILTER_NONE)
+                        .build(),
+                UPDATE_ORIGIN_APP, "reasons", 0);
+        mZenModeHelper.setAutomaticZenRuleState(totalSilenceRuleId,
+                new Condition(CONDITION_ID, "", STATE_TRUE), UPDATE_ORIGIN_APP, CUSTOM_PKG_UID);
+
+        Policy callbackPolicy = futureConsolidatedPolicy.get(1, TimeUnit.SECONDS);
+        assertThat(callbackPolicy.allowAlarms()).isFalse();
     }
 
     @Test

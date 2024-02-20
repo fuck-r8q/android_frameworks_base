@@ -123,6 +123,7 @@ import android.view.WindowInsets.Side.InsetsSide;
 import android.view.WindowInsets.Type;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.window.InputTransferToken;
 import android.window.TaskFpsCallback;
 import android.window.TrustedPresentationThresholds;
 
@@ -6028,16 +6029,63 @@ public interface WindowManager extends ViewManager {
     }
 
     /**
-     * Add a trusted presentation listener associated with a window.
+     * Sets a callback to receive feedback about the presentation of a {@link Window}.
+     * When the {@link Window} is presented according to the passed in
+     * {@link TrustedPresentationThresholds}, it is said to "enter the state", and receives the
+     * callback with {@code true}. When the conditions fall out of thresholds, it is then
+     * said to leave the state and the caller will receive a callback with {@code false}. The
+     * callbacks be sent for every state transition thereafter.
+     * <p>
+     * There are a few simple thresholds:
+     * <ul>
+     *    <li>minAlpha: Lower bound on computed alpha</li>
+     *    <li>minFractionRendered: Lower bounds on fraction of pixels that were rendered</li>
+     *    <li>stabilityThresholdMs: A time that alpha and fraction rendered must remain within
+     *    bounds before we can "enter the state" </li>
+     * </ul>
+     * <p>
+     * The fraction of pixels rendered is a computation based on scale, crop
+     * and occlusion. The calculation may be somewhat counterintuitive, so we
+     * can work through an example. Imagine we have a Window with a 100x100 buffer
+     * which is occluded by (10x100) pixels on the left, and cropped by (100x10) pixels
+     * on the top. Furthermore imagine this Window is scaled by 0.9 in both dimensions.
+     * (c=crop,o=occluded,b=both,x=none)
      *
-     * <p> If this listener is already registered then the window and thresholds will be updated.
+     * <blockquote>
+     * <table>
+     *   <caption></caption>
+     *   <tr><td>b</td><td>c</td><td>c</td><td>c</td></tr>
+     *   <tr><td>o</td><td>x</td><td>x</td><td>x</td></tr>
+     *   <tr><td>o</td><td>x</td><td>x</td><td>x</td></tr>
+     *   <tr><td>o</td><td>x</td><td>x</td><td>x</td></tr>
+     * </table>
+     * </blockquote>
      *
-     * @param window     The Window to add the trusted presentation listener for
-     * @param thresholds The {@link TrustedPresentationThresholds} that will specify
-     *                   when the to invoke the callback.
+     *<p>
+     * We first start by computing fr=xscale*yscale=0.9*0.9=0.81, indicating
+     * that "81%" of the pixels were rendered. This corresponds to what was 100
+     * pixels being displayed in 81 pixels. This is somewhat of an abuse of
+     * language, as the information of merged pixels isn't totally lost, but
+     * we err on the conservative side.
+     * <p>
+     * We then repeat a similar process for the crop and covered regions and
+     * accumulate the results: fr = fr * (fractionNotCropped) * (fractionNotCovered)
+     * So for this example we would get 0.9*0.9*0.9*0.9=0.65...
+     * <p>
+     * Notice that this is not completely accurate, as we have double counted
+     * the region marked as b. However we only wanted a "lower bound" and so it
+     * is ok to err in this direction. Selection of the threshold will ultimately
+     * be somewhat arbitrary, and so there are some somewhat arbitrary decisions in
+     * this API as well.
+     * <p>
+     * @param window     The Window to add the trusted presentation listener for. This can be
+     *                   retrieved from {@link View#getWindowToken()}.
+     * @param thresholds The {@link TrustedPresentationThresholds} that will specify when the to
+     *                   invoke the callback.
      * @param executor   The {@link Executor} where the callback will be invoked on.
      * @param listener   The {@link Consumer} that will receive the callbacks
-     *                  when entered or exited trusted presentation per the thresholds.
+     *                   when entered or exited trusted presentation per the thresholds.
+     * @see TrustedPresentationThresholds
      */
     @FlaggedApi(Flags.FLAG_TRUSTED_PRESENTATION_LISTENER_FOR_WINDOW)
     default void registerTrustedPresentationListener(@NonNull IBinder window,
@@ -6062,25 +6110,28 @@ public interface WindowManager extends ViewManager {
      * receive batched input event. For those events that are batched, the invocation will happen
      * once per {@link Choreographer} frame, and other input events will be delivered immediately.
      * This is different from
-     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
-     * SurfaceControlInputReceiver)} in that the input events are received batched. The caller must
-     * invoke {@link #unregisterSurfaceControlInputReceiver(SurfaceControl)} to clean up the
-     * resources when no longer needing to use the {@link SurfaceControlInputReceiver}
+     * { #registerUnbatchedSurfaceControlInputReceiver(int, InputTransferToken, SurfaceControl,
+     * Looper, SurfaceControlInputReceiver)} in that the input events are received batched. The
+     * caller must invoke {@link #unregisterSurfaceControlInputReceiver(SurfaceControl)} to clean up
+     * the resources when no longer needing to use the {@link SurfaceControlInputReceiver}
      *
-     * @param displayId      The display that the SurfaceControl will be placed on. Input will
-     *                       only work
-     *                       if SurfaceControl is on that display and that display was touched.
-     * @param surfaceControl The SurfaceControl to register the InputChannel for
-     * @param hostToken      The host token to link the InputChannel for. This is primarily for ANRs
-     *                       to ensure the host receives the ANR if any issues with touch on the
-     *                       InputChannel
-     * @param choreographer  The Choreographer used for batching. This should match the rendering
-     *                       Choreographer.
-     * @param receiver       The SurfaceControlInputReceiver that will receive the input events
+     * @param displayId              The display that the SurfaceControl will be placed on. Input
+     *                               will only work if SurfaceControl is on that display and that
+     *                               display  was touched.
+     * @param surfaceControl         The SurfaceControl to register the InputChannel for
+     * @param hostInputTransferToken The host token to link the embedded. This is used to handle
+     *                               transferring touch gesture from host to embedded and for ANRs
+     *                               to ensure the host receives the ANR if any issues with
+     *                               touch on the embedded.
+     * @param choreographer          The Choreographer used for batching. This should match the
+     *                               rendering Choreographer.
+     * @param receiver               The SurfaceControlInputReceiver that will receive the input
+     *                               events
      */
     @FlaggedApi(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
     default void registerBatchedSurfaceControlInputReceiver(int displayId,
-            @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
+            @NonNull InputTransferToken hostInputTransferToken,
+            @NonNull SurfaceControl surfaceControl,
             @NonNull Choreographer choreographer, @NonNull SurfaceControlInputReceiver receiver) {
         throw new UnsupportedOperationException(
                 "registerBatchedSurfaceControlInputReceiver is not implemented");
@@ -6088,26 +6139,30 @@ public interface WindowManager extends ViewManager {
 
     /**
      * Registers a {@link SurfaceControlInputReceiver} for a {@link SurfaceControl} that will
-     * receive every input event. This is different than calling @link
-     * #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Choreographer,
-     * SurfaceControlInputReceiver)} in that the input events are received unbatched. The caller
-     * must invoke {@link #unregisterSurfaceControlInputReceiver(SurfaceControl)} to clean up the
-     * resources when no longer needing to use the {@link SurfaceControlInputReceiver}
+     * receive every input event. This is different than calling
+     * {@link #registerBatchedSurfaceControlInputReceiver(int, InputTransferToken, SurfaceControl,
+     * Choreographer, SurfaceControlInputReceiver)} in that the input events are received
+     * unbatched.
+     * The caller must invoke {@link #unregisterSurfaceControlInputReceiver(SurfaceControl)} to
+     * clean up the resources when no longer needing to use the {@link SurfaceControlInputReceiver}
      *
-     * @param displayId      The display that the SurfaceControl will be placed on. Input will only
-     *                       work if SurfaceControl is on that display and that display was
-     *                       touched.
-     * @param hostToken      The host token to link the InputChannel for. This is primarily for ANRs
-     *                       to ensure the host receives the ANR if any issues with touch on the
-     *                       InputChannel
-     * @param surfaceControl The SurfaceControl to register the InputChannel for
-     * @param looper         The looper to use when invoking callbacks.
-     * @param receiver       The SurfaceControlInputReceiver that will receive the input events
-     **/
+     * @param displayId              The display that the SurfaceControl will be placed on. Input
+     *                               will only work if SurfaceControl is on that display and that
+     *                               display  was touched.
+     * @param surfaceControl         The SurfaceControl to register the InputChannel for
+     * @param hostInputTransferToken The host token to link the embedded. This is used to handle
+     *                               transferring touch gesture from host to embedded and for ANRs
+     *                               to ensure the host receives the ANR if any issues with
+     *                               touch on the embedded.
+     * @param looper                 The looper to use when invoking callbacks.
+     * @param receiver               The SurfaceControlInputReceiver that will receive the input
+     *                               events.
+     */
     @FlaggedApi(Flags.FLAG_SURFACE_CONTROL_INPUT_RECEIVER)
     default void registerUnbatchedSurfaceControlInputReceiver(int displayId,
-            @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
-            @NonNull Looper looper, @NonNull SurfaceControlInputReceiver receiver) {
+            @NonNull InputTransferToken hostInputTransferToken,
+            @NonNull SurfaceControl surfaceControl, @NonNull Looper looper,
+            @NonNull SurfaceControlInputReceiver receiver) {
         throw new UnsupportedOperationException(
                 "registerUnbatchedSurfaceControlInputReceiver is not implemented");
     }
@@ -6117,10 +6172,10 @@ public interface WindowManager extends ViewManager {
      * specified token.
      * <p>
      * Must be called on the same {@link Looper} thread to which was passed to the
-     * {@link #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl,
+     * {@link #registerBatchedSurfaceControlInputReceiver(int, InputTransferToken, SurfaceControl,
      * Choreographer,
      * SurfaceControlInputReceiver)} or
-     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
+     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, InputTransferToken, SurfaceControl, Looper,
      * SurfaceControlInputReceiver)}
      *
      * @param surfaceControl The SurfaceControl to remove and unregister the input channel for.
@@ -6136,7 +6191,7 @@ public interface WindowManager extends ViewManager {
      * if the SurfaceControl was registered for input via
      * { #registerBatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Choreographer,
      * SurfaceControlInputReceiver)} or
-     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, IBinder, SurfaceControl, Looper,
+     * {@link #registerUnbatchedSurfaceControlInputReceiver(int, InputTransferToken, SurfaceControl, Looper,
      * SurfaceControlInputReceiver)}.
      * <p>
      * This is helpful for testing to ensure the test waits for the layer to be registered with

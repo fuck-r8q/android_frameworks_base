@@ -2197,6 +2197,12 @@
       "group": "WM_DEBUG_ORIENTATION",
       "at": "com\/android\/server\/wm\/WindowManagerService.java"
     },
+    "-195654020": {
+      "message": "Attempt to transfer touch gesture with host window not associated with embedded window",
+      "level": "WARN",
+      "group": "WM_DEBUG_EMBEDDED_WINDOWS",
+      "at": "com\/android\/server\/wm\/EmbeddedWindowController.java"
+    },
     "-193782861": {
       "message": "Final remove of window: %s",
       "level": "VERBOSE",
@@ -2256,12 +2262,6 @@
       "level": "DEBUG",
       "group": "WM_DEBUG_STATES",
       "at": "com\/android\/server\/wm\/Task.java"
-    },
-    "-134091882": {
-      "message": "Screenshotting Activity %s",
-      "level": "VERBOSE",
-      "group": "WM_DEBUG_BACK_PREVIEW",
-      "at": "com\/android\/server\/wm\/TaskFragment.java"
     },
     "-125383273": {
       "message": "Content Recording: waiting to record, so do nothing",
@@ -3247,6 +3247,12 @@
       "group": "WM_DEBUG_FOCUS_LIGHT",
       "at": "com\/android\/server\/wm\/WindowState.java"
     },
+    "701366755": {
+      "message": "Attempt to transfer touch gesture with non-existent embedded window",
+      "level": "WARN",
+      "group": "WM_DEBUG_EMBEDDED_WINDOWS",
+      "at": "com\/android\/server\/wm\/EmbeddedWindowController.java"
+    },
     "704998117": {
       "message": "Failed to create surface control for %s",
       "level": "WARN",
@@ -3600,6 +3606,12 @@
       "level": "WARN",
       "group": "WM_DEBUG_CONFIGURATION",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
+    },
+    "1042363394": {
+      "message": "Attempt to transfer touch gesture using a host window with no input channel",
+      "level": "WARN",
+      "group": "WM_DEBUG_EMBEDDED_WINDOWS",
+      "at": "com\/android\/server\/wm\/EmbeddedWindowController.java"
     },
     "1046228706": {
       "message": "Defer transition id=%d for TaskFragmentTransaction=%s",
@@ -4093,6 +4105,12 @@
       "group": "WM_DEBUG_RECENTS_ANIMATIONS",
       "at": "com\/android\/server\/wm\/RecentsAnimationController.java"
     },
+    "1520642640": {
+      "message": "Attempt to transfer touch gesture using embedded window with no associated host",
+      "level": "WARN",
+      "group": "WM_DEBUG_EMBEDDED_WINDOWS",
+      "at": "com\/android\/server\/wm\/EmbeddedWindowController.java"
+    },
     "1521476038": {
       "message": "Attempted to set flag to a display that does not exist: %d",
       "level": "WARN",
@@ -4266,6 +4284,12 @@
       "level": "INFO",
       "group": "WM_DEBUG_APP_TRANSITIONS_ANIM",
       "at": "com\/android\/server\/wm\/ActivityRecord.java"
+    },
+    "1721036256": {
+      "message": "Attempt to transfer touch gesture using embedded window that has no input channel",
+      "level": "WARN",
+      "group": "WM_DEBUG_EMBEDDED_WINDOWS",
+      "at": "com\/android\/server\/wm\/EmbeddedWindowController.java"
     },
     "1730300180": {
       "message": "PendingStartTransaction found",
@@ -4759,6 +4783,9 @@
       "tag": "WindowManager"
     },
     "WM_DEBUG_DREAM": {
+      "tag": "WindowManager"
+    },
+    "WM_DEBUG_EMBEDDED_WINDOWS": {
       "tag": "WindowManager"
     },
     "WM_DEBUG_FOCUS": {

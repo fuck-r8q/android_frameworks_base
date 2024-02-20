@@ -178,13 +178,16 @@ public class NotificationShadeWindowControllerImplTest extends SysuiTestCase {
                 mTestScope.getBackgroundScope(),
                 new SceneContainerRepository(
                         mTestScope.getBackgroundScope(),
-                        mKosmos.getFakeSceneContainerConfig()),
+                        mKosmos.getFakeSceneContainerConfig(),
+                        mKosmos.getSceneDataSource()),
                 powerInteractor,
                 mock(SceneLogger.class),
                 mKosmos.getDeviceUnlockedInteractor());
 
         FakeConfigurationRepository configurationRepository = new FakeConfigurationRepository();
         FakeSceneContainerFlags sceneContainerFlags = new FakeSceneContainerFlags();
+        KeyguardTransitionInteractor keyguardTransitionInteractor =
+                mKosmos.getKeyguardTransitionInteractor();
         KeyguardInteractor keyguardInteractor = new KeyguardInteractor(
                 keyguardRepository,
                 new FakeCommandQueue(),
@@ -193,11 +196,9 @@ public class NotificationShadeWindowControllerImplTest extends SysuiTestCase {
                 new FakeKeyguardBouncerRepository(),
                 new ConfigurationInteractor(configurationRepository),
                 shadeRepository,
+                keyguardTransitionInteractor,
                 () -> sceneInteractor);
         CommunalInteractor communalInteractor = mKosmos.getCommunalInteractor();
-
-        KeyguardTransitionInteractor keyguardTransitionInteractor =
-                mKosmos.getKeyguardTransitionInteractor();
 
         mFromLockscreenTransitionInteractor = mKosmos.getFromLockscreenTransitionInteractor();
         mFromPrimaryBouncerTransitionInteractor =

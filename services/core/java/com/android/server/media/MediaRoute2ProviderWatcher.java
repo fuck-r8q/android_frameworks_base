@@ -145,13 +145,14 @@ final class MediaRoute2ProviderWatcher {
                                     new ComponentName(serviceInfo.packageName, serviceInfo.name),
                                     isSelfScanOnlyProvider,
                                     mUserId);
-                    proxy.start();
+                    proxy.start(/* rebindIfDisconnected= */ false);
                     mProxies.add(targetIndex++, proxy);
                     mCallback.onAddProviderService(proxy);
                 } else if (sourceIndex >= targetIndex) {
                     MediaRoute2ProviderServiceProxy proxy = mProxies.get(sourceIndex);
-                    proxy.start(); // restart the proxy if needed
-                    proxy.rebindIfDisconnected();
+                    proxy.start(
+                            /* rebindIfDisconnected= */
+                                    !Flags.enablePreventionOfKeepAliveRouteProviders());
                     Collections.swap(mProxies, sourceIndex, targetIndex++);
                 }
             }

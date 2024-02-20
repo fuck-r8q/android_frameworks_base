@@ -71,7 +71,6 @@ import android.util.IndentingPrintWriter;
 import android.util.Log;
 import android.util.MathUtils;
 import android.view.HapticFeedbackConstants;
-import android.view.InputDevice;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -1166,9 +1165,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Occluded->Lockscreen
         collectFlow(mView, mKeyguardTransitionInteractor.getOccludedToLockscreenTransition(),
                 mOccludedToLockscreenTransition, mMainDispatcher);
-        collectFlow(mView, mOccludedToLockscreenTransitionViewModel.getLockscreenAlpha(),
-                setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
         if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mOccludedToLockscreenTransitionViewModel.getLockscreenAlpha(),
+                    setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
             collectFlow(mView,
                     mOccludedToLockscreenTransitionViewModel.getLockscreenTranslationY(),
                     setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
@@ -1177,9 +1176,11 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Lockscreen->Dreaming
         collectFlow(mView, mKeyguardTransitionInteractor.getLockscreenToDreamingTransition(),
                 mLockscreenToDreamingTransition, mMainDispatcher);
-        collectFlow(mView, mLockscreenToDreamingTransitionViewModel.getLockscreenAlpha(),
-                setDreamLockscreenTransitionAlpha(mNotificationStackScrollLayoutController),
-                mMainDispatcher);
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mLockscreenToDreamingTransitionViewModel.getLockscreenAlpha(),
+                    setDreamLockscreenTransitionAlpha(mNotificationStackScrollLayoutController),
+                    mMainDispatcher);
+        }
         collectFlow(mView, mLockscreenToDreamingTransitionViewModel.lockscreenTranslationY(
                 mLockscreenToDreamingTransitionTranslationY),
                 setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
@@ -1187,8 +1188,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Gone->Dreaming
         collectFlow(mView, mKeyguardTransitionInteractor.getGoneToDreamingTransition(),
                 mGoneToDreamingTransition, mMainDispatcher);
-        collectFlow(mView, mGoneToDreamingTransitionViewModel.getLockscreenAlpha(),
-                setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mGoneToDreamingTransitionViewModel.getLockscreenAlpha(),
+                    setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+        }
         collectFlow(mView, mGoneToDreamingTransitionViewModel.lockscreenTranslationY(
                 mGoneToDreamingTransitionTranslationY),
                 setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
@@ -1196,16 +1199,18 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
         // Lockscreen->Occluded
         collectFlow(mView, mKeyguardTransitionInteractor.getLockscreenToOccludedTransition(),
                 mLockscreenToOccludedTransition, mMainDispatcher);
-        collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenAlpha(),
-                setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
         if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenAlpha(),
+                    setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
             collectFlow(mView, mLockscreenToOccludedTransitionViewModel.getLockscreenTranslationY(),
                     setTransitionY(mNotificationStackScrollLayoutController), mMainDispatcher);
         }
 
         // Primary bouncer->Gone (ensures lockscreen content is not visible on successful auth)
-        collectFlow(mView, mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha(),
-                setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+        if (!KeyguardShadeMigrationNssl.isEnabled()) {
+            collectFlow(mView, mPrimaryBouncerToGoneTransitionViewModel.getLockscreenAlpha(),
+                    setTransitionAlpha(mNotificationStackScrollLayoutController), mMainDispatcher);
+        }
     }
 
     @VisibleForTesting
@@ -2746,6 +2751,9 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
     }
 
     private void updateKeyguardBottomAreaAlpha() {
+        if (KeyguardShadeMigrationNssl.isEnabled()) {
+            return;
+        }
         if (mIsOcclusionTransitionRunning) {
             return;
         }
@@ -5069,19 +5077,6 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 return false;
             }
 
-            final boolean isTrackpadTwoOrThreeFingerSwipe = isTrackpadScroll(
-                    mTrackpadGestureFeaturesEnabled, event) || isTrackpadThreeFingerSwipe(
-                    mTrackpadGestureFeaturesEnabled, event);
-
-            // On expanding, single mouse click expands the panel instead of dragging.
-            if (isFullyCollapsed() && (event.isFromSource(InputDevice.SOURCE_MOUSE)
-                    && !isTrackpadTwoOrThreeFingerSwipe)) {
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    expand(true /* animate */);
-                }
-                return true;
-            }
-
             /*
              * We capture touch events here and update the expand height here in case according to
              * the users fingers. This also handles multi-touch.
@@ -5101,6 +5096,10 @@ public final class NotificationPanelViewController implements ShadeSurface, Dump
                 mGestureWaitForTouchSlop = shouldGestureWaitForTouchSlop();
                 mIgnoreXTouchSlop = true;
             }
+
+            final boolean isTrackpadTwoOrThreeFingerSwipe = isTrackpadScroll(
+                    mTrackpadGestureFeaturesEnabled, event) || isTrackpadThreeFingerSwipe(
+                    mTrackpadGestureFeaturesEnabled, event);
 
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:

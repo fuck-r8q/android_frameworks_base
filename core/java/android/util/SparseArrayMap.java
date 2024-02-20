@@ -32,6 +32,7 @@ import java.util.function.Consumer;
  * @hide
  */
 @TestApi
+@android.ravenwood.annotation.RavenwoodKeepWholeClass
 public class SparseArrayMap<K, V> {
     private final SparseArray<ArrayMap<K, V>> mData = new SparseArray<>();
 

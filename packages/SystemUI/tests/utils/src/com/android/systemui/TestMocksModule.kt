@@ -26,7 +26,7 @@ import com.android.internal.statusbar.IStatusBarService
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.keyguard.KeyguardUpdateMonitor
 import com.android.keyguard.KeyguardViewController
-import com.android.systemui.animation.DialogLaunchAnimator
+import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.communal.domain.interactor.CommunalInteractor
 import com.android.systemui.demomode.DemoModeController
 import com.android.systemui.dump.DumpManager
@@ -42,6 +42,7 @@ import com.android.systemui.model.SysUiState
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.plugins.statusbar.StatusBarStateController
+import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.shared.system.ActivityManagerWrapper
 import com.android.systemui.statusbar.LockscreenShadeTransitionController
 import com.android.systemui.statusbar.NotificationListener
@@ -112,7 +113,7 @@ data class TestMocksModule(
     @get:Provides val statusBarWindowController: StatusBarWindowController = mock(),
     @get:Provides val wakefulnessLifecycle: WakefulnessLifecycle = mock(),
     @get:Provides val keyguardViewController: KeyguardViewController = mock(),
-    @get:Provides val dialogLaunchAnimator: DialogLaunchAnimator = mock(),
+    @get:Provides val dialogTransitionAnimator: DialogTransitionAnimator = mock(),
     @get:Provides val sysuiState: SysUiState = mock(),
     @get:Provides
     val unfoldTransitionProgressProvider: Optional<UnfoldTransitionProgressProvider> =
@@ -121,12 +122,13 @@ data class TestMocksModule(
     @get:Provides val systemUIDialogManager: SystemUIDialogManager = mock(),
     @get:Provides val deviceEntryIconTransitions: Set<DeviceEntryIconTransition> = emptySet(),
     @get:Provides val communalInteractor: CommunalInteractor = mock(),
+    @get:Provides val sceneLogger: SceneLogger = mock(),
 
     // log buffers
     @get:[Provides BroadcastDispatcherLog]
     val broadcastDispatcherLogger: LogBuffer = mock(),
     @get:[Provides SceneFrameworkLog]
-    val sceneLogger: LogBuffer = mock(),
+    val sceneLogBuffer: LogBuffer = mock(),
     @get:[Provides BiometricLog]
     val biometricLogger: LogBuffer = mock(),
     @get:Provides val lsShadeTransitionLogger: LSShadeTransitionLogger = mock(),

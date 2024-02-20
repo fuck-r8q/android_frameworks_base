@@ -585,9 +585,7 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
         }
 
         if (ClientFlags.fixLineHeightForLocale()) {
-            if (minimumFontMetrics == null) {
-                paint.getFontMetricsIntForLocale(fm);
-            } else {
+            if (minimumFontMetrics != null) {
                 fm.set(minimumFontMetrics);
                 // Because the font metrics is provided by public APIs, adjust the top/bottom with
                 // ascent/descent: top must be smaller than ascent, bottom must be larger than
@@ -713,18 +711,21 @@ public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback 
     public void draw(Canvas c, Path highlight, Paint highlightpaint,
                      int cursorOffset) {
         if (mDirect != null && highlight == null) {
+            float leftShift = 0;
             if (getUseBoundsForWidth()) {
-                c.save();
                 RectF drawingRect = computeDrawingBoundingBox();
                 if (drawingRect.left < 0) {
-                    c.translate(-drawingRect.left, 0);
+                    leftShift = -drawingRect.left;
+                    c.translate(leftShift, 0);
                 }
             }
 
             c.drawText(mDirect, 0, mBottom - mDesc, mPaint);
 
-            if (getUseBoundsForWidth()) {
-                c.restore();
+            if (leftShift != 0) {
+                // Manually translate back to the original position because of b/324498002, using
+                // save/restore disappears the toggle switch drawables.
+                c.translate(-leftShift, 0);
             }
         } else {
             super.draw(c, highlight, highlightpaint, cursorOffset);

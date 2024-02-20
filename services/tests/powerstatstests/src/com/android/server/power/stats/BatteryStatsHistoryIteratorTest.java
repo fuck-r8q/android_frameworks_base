@@ -21,6 +21,7 @@ import static com.google.common.truth.Truth.assertThat;
 import android.os.BatteryManager;
 import android.os.BatteryStats;
 import android.os.Process;
+import android.platform.test.ravenwood.RavenwoodRule;
 
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
@@ -29,6 +30,7 @@ import com.android.internal.os.BatteryStatsHistoryIterator;
 import com.android.internal.os.MonotonicClock;
 
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -42,6 +44,11 @@ import java.util.concurrent.Future;
 @SmallTest
 @SuppressWarnings("GuardedBy")
 public class BatteryStatsHistoryIteratorTest {
+    @Rule
+    public final RavenwoodRule mRavenwood = new RavenwoodRule.Builder()
+            .setProvideMainThread(true)
+            .build();
+
     private static final int APP_UID = Process.FIRST_APPLICATION_UID + 42;
 
     private final MockClock mMockClock = new MockClock();
@@ -88,24 +95,24 @@ public class BatteryStatsHistoryIteratorTest {
         assertThat(item = iterator.next()).isNotNull();
         assertHistoryItem(item,
                 BatteryStats.HistoryItem.CMD_UPDATE, BatteryStats.HistoryItem.EVENT_NONE,
-                null, 0, 3_600_000, 90, 1_000_000);
+                null, 0, -1, 3_600_000, 90, 1_000_000);
 
         assertThat(item = iterator.next()).isNotNull();
         assertHistoryItem(item,
                 BatteryStats.HistoryItem.CMD_UPDATE, BatteryStats.HistoryItem.EVENT_NONE,
-                null, 0, 2_400_000, 80, 2_000_000);
+                null, 0, 3700, 2_400_000, 80, 2_000_000);
 
         assertThat(item = iterator.next()).isNotNull();
         assertHistoryItem(item,
                 BatteryStats.HistoryItem.CMD_UPDATE,
                 BatteryStats.HistoryItem.EVENT_ALARM | BatteryStats.HistoryItem.EVENT_FLAG_START,
-                "foo", APP_UID, 2_400_000, 80, 3_000_000);
+                "foo", APP_UID, 3700, 2_400_000, 80, 3_000_000);
 
         assertThat(item = iterator.next()).isNotNull();
         assertHistoryItem(item,
                 BatteryStats.HistoryItem.CMD_UPDATE,
                 BatteryStats.HistoryItem.EVENT_ALARM | BatteryStats.HistoryItem.EVENT_FLAG_FINISH,
-                "foo", APP_UID, 2_400_000, 80, 3_001_000);
+                "foo", APP_UID, 3700, 2_400_000, 80, 3_001_000);
 
         assertThat(iterator.hasNext()).isFalse();
         assertThat(iterator.next()).isNull();
@@ -133,7 +140,7 @@ public class BatteryStatsHistoryIteratorTest {
         mMockClock.currentTime = 3000;
 
         mBatteryStats.setBatteryStateLocked(BatteryManager.BATTERY_STATUS_DISCHARGING,
-                100, /* plugType */ 0, 90, 72, 3700, 3_600_000, 4_000_000, 0, 1_000_000,
+                100, /* plugType */ 0, 90, 72, -1, 3_600_000, 4_000_000, 0, 1_000_000,
                 1_000_000, 1_000_000);
         mBatteryStats.setBatteryStateLocked(BatteryManager.BATTERY_STATUS_DISCHARGING,
                 100, /* plugType */ 0, 80, 72, 3700, 2_400_000, 4_000_000, 0, 2_000_000,
@@ -296,7 +303,7 @@ public class BatteryStatsHistoryIteratorTest {
     }
 
     private void assertHistoryItem(BatteryStats.HistoryItem item, int command, int eventCode,
-            String tag, int uid, int batteryChargeUah, int batteryLevel,
+            String tag, int uid, int voltageMv, int batteryChargeUah, int batteryLevel,
             long elapsedTimeMs) {
         assertThat(item.cmd).isEqualTo(command);
         assertThat(item.eventCode).isEqualTo(eventCode);
@@ -306,6 +313,7 @@ public class BatteryStatsHistoryIteratorTest {
             assertThat(item.eventTag.string).isEqualTo(tag);
             assertThat(item.eventTag.uid).isEqualTo(uid);
         }
+        assertThat((int) item.batteryVoltage).isEqualTo(voltageMv);
         assertThat(item.batteryChargeUah).isEqualTo(batteryChargeUah);
         assertThat(item.batteryLevel).isEqualTo(batteryLevel);
 

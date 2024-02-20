@@ -226,6 +226,7 @@ public class SecureSettings {
         Settings.Secure.ACCESSIBILITY_MAGNIFICATION_ALWAYS_ON_ENABLED,
         Settings.Secure.ACCESSIBILITY_MAGNIFICATION_JOYSTICK_ENABLED,
         Settings.Secure.ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED,
+        Settings.Secure.ACCESSIBILITY_PINCH_TO_ZOOM_ANYWHERE_ENABLED,
         Settings.Secure.ODI_CAPTIONS_VOLUME_UI_ENABLED,
         Settings.Secure.NOTIFICATION_BUBBLES,
         Settings.Secure.LOCATION_TIME_ZONE_DETECTION_ENABLED,
@@ -246,6 +247,7 @@ public class SecureSettings {
         Settings.Secure.BLUETOOTH_LE_BROADCAST_FALLBACK_ACTIVE_DEVICE_ADDRESS,
         Settings.Secure.CUSTOM_BUGREPORT_HANDLER_APP,
         Settings.Secure.CUSTOM_BUGREPORT_HANDLER_USER,
+        Settings.Secure.CONTEXTUAL_SCREEN_TIMEOUT_ENABLED,
         Settings.Secure.LOCK_SCREEN_WEATHER_ENABLED,
         Settings.Secure.HEARING_AID_RINGTONE_ROUTING,
         Settings.Secure.HEARING_AID_CALL_ROUTING,
@@ -263,5 +265,7 @@ public class SecureSettings {
         Settings.Secure.EVEN_DIMMER_ACTIVATED,
         Settings.Secure.EVEN_DIMMER_MIN_NITS,
         Settings.Secure.STYLUS_POINTER_ICON_ENABLED,
+        Settings.Secure.CAMERA_EXTENSIONS_FALLBACK,
+        Settings.Secure.VISUAL_QUERY_ACCESSIBILITY_DETECTION_ENABLED
     };
 }

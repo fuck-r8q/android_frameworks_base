@@ -37,6 +37,7 @@ import static android.media.AudioManager.RINGER_MODE_VIBRATE;
 import static android.media.AudioManager.STREAM_SYSTEM;
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
 import static android.media.audio.Flags.automaticBtDeviceType;
+import static android.media.audio.Flags.featureSpatialAudioHeadtrackingLowLatency;
 import static android.media.audio.Flags.focusFreezeTestApi;
 import static android.media.audiopolicy.Flags.enableFadeManagerConfiguration;
 import static android.os.Process.FIRST_APPLICATION_UID;
@@ -47,7 +48,6 @@ import static android.provider.Settings.Secure.VOLUME_HUSH_VIBRATE;
 
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
 import static com.android.media.audio.Flags.alarmMinVolumeZero;
-import static com.android.media.audio.Flags.bluetoothMacAddressAnonymization;
 import static com.android.media.audio.Flags.disablePrescaleAbsoluteVolume;
 import static com.android.media.audio.Flags.ringerModeAffectsAlarm;
 import static com.android.server.audio.SoundDoseHelper.ACTION_CHECK_MUSIC_ACTIVE;
@@ -4420,16 +4420,23 @@ public class AudioService extends IAudioService.Stub
     }
 
     private int getBluetoothContextualVolumeStream(int mode) {
+        boolean voiceActivityCanOverride = true;
         switch (mode) {
             case AudioSystem.MODE_IN_COMMUNICATION:
             case AudioSystem.MODE_IN_CALL:
                 return AudioSystem.STREAM_VOICE_CALL;
+            case AudioSystem.MODE_CALL_SCREENING:
+            case AudioSystem.MODE_COMMUNICATION_REDIRECT:
+            case AudioSystem.MODE_CALL_REDIRECT:
+                voiceActivityCanOverride = false;
+                // intended fallthrough
             case AudioSystem.MODE_NORMAL:
             default:
                 // other conditions will influence the stream type choice, read on...
                 break;
         }
-        if (mVoicePlaybackActive.get() && mode != AudioSystem.MODE_NORMAL) {
+        if (voiceActivityCanOverride
+                && mVoicePlaybackActive.get() && mode != AudioSystem.MODE_NORMAL) {
             return AudioSystem.STREAM_VOICE_CALL;
         }
         return AudioSystem.STREAM_MUSIC;
@@ -4560,10 +4567,12 @@ public class AudioService extends IAudioService.Stub
         pw.println("\nFun with Flags: ");
         pw.println("\tandroid.media.audio.autoPublicVolumeApiHardening:"
                 + autoPublicVolumeApiHardening());
+        pw.println("\tandroid.media.audio.Flags.automaticBtDeviceType:"
+                + automaticBtDeviceType());
+        pw.println("\tandroid.media.audio.featureSpatialAudioHeadtrackingLowLatency:"
+                + featureSpatialAudioHeadtrackingLowLatency());
         pw.println("\tandroid.media.audio.focusFreezeTestApi:"
                 + focusFreezeTestApi());
-        pw.println("\tcom.android.media.audio.bluetoothMacAddressAnonymization:"
-                + bluetoothMacAddressAnonymization());
         pw.println("\tcom.android.media.audio.disablePrescaleAbsoluteVolume:"
                 + disablePrescaleAbsoluteVolume());
         pw.println("\tandroid.media.audiopolicy.enableFadeManagerConfiguration:"
@@ -10721,9 +10730,6 @@ public class AudioService extends IAudioService.Stub
     }
 
     private boolean isBluetoothPrividged() {
-        if (!bluetoothMacAddressAnonymization()) {
-            return true;
-        }
         return PackageManager.PERMISSION_GRANTED == mContext.checkCallingOrSelfPermission(
                 android.Manifest.permission.BLUETOOTH_CONNECT)
                 || Binder.getCallingUid() == Process.SYSTEM_UID;

@@ -29,10 +29,13 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -60,7 +63,7 @@ import com.android.systemui.qs.footer.ui.compose.FooterActions
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsSceneViewModel
 import com.android.systemui.scene.shared.model.SceneKey
 import com.android.systemui.scene.ui.composable.ComposableScene
-import com.android.systemui.scene.ui.composable.toTransitionSceneKey
+import com.android.systemui.scene.ui.composable.asComposeAware
 import com.android.systemui.shade.ui.composable.CollapsedShadeHeader
 import com.android.systemui.shade.ui.composable.ExpandedShadeHeader
 import com.android.systemui.shade.ui.composable.Shade
@@ -125,6 +128,9 @@ private fun SceneScope.QuickSettingsScene(
             remember(lifecycleOwner, viewModel) {
                 viewModel.getFooterActionsViewModel(lifecycleOwner)
             }
+
+        // ############## SCROLLING ################
+
         val scrollState = rememberScrollState()
         // When animating into the scene, we don't want it to be able to scroll, as it could mess
         // up with the expansion animation.
@@ -132,13 +138,25 @@ private fun SceneScope.QuickSettingsScene(
             when (val state = layoutState.transitionState) {
                 is TransitionState.Idle -> true
                 is TransitionState.Transition -> {
-                    state.fromScene == SceneKey.QuickSettings.toTransitionSceneKey()
+                    state.fromScene == SceneKey.QuickSettings.asComposeAware()
                 }
             }
 
         LaunchedEffect(isCustomizing, scrollState) {
             if (isCustomizing) {
                 scrollState.scrollTo(0)
+            }
+        }
+
+        // ############# NAV BAR paddings ###############
+
+        val navBarBottomHeight =
+            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val density = LocalDensity.current
+
+        LaunchedEffect(navBarBottomHeight, density) {
+            with(density) {
+                viewModel.qsSceneAdapter.applyBottomNavBarPadding(navBarBottomHeight.roundToPx())
             }
         }
 
@@ -154,8 +172,13 @@ private fun SceneScope.QuickSettingsScene(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier =
                 Modifier.fillMaxSize()
-                    // bottom should be tied to insets
-                    .padding(bottom = 16.dp)
+                    .then(
+                        if (isCustomizing) {
+                            Modifier.padding(top = 48.dp)
+                        } else {
+                            Modifier.padding(bottom = navBarBottomHeight)
+                        }
+                    )
         ) {
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
                 val shadeHeaderAndQuickSettingsModifier =

@@ -70,8 +70,8 @@ import com.android.wm.shell.sysui.ShellSharedConstants
 import com.android.wm.shell.transition.OneShotRemoteHandler
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.util.KtProtoLog
-import com.android.wm.shell.windowdecor.DesktopModeWindowDecoration
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
+import com.android.wm.shell.windowdecor.OnTaskResizeAnimationListener
 import java.io.PrintWriter
 import java.util.concurrent.Executor
 import java.util.function.Consumer
@@ -175,6 +175,12 @@ class DesktopTasksController(
         )
     }
 
+    fun setOnTaskResizeAnimationListener(listener: OnTaskResizeAnimationListener) {
+        toggleResizeDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
+        enterDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
+        dragToDesktopTransitionHandler.setOnTaskResizeAnimatorListener(listener)
+    }
+
     /** Setter needed to avoid cyclic dependency. */
     fun setSplitScreenController(controller: SplitScreenController) {
         splitScreenController = controller
@@ -236,54 +242,19 @@ class DesktopTasksController(
 
     /** Move a task with given `taskId` to desktop */
     fun moveToDesktop(
-            decor: DesktopModeWindowDecoration,
             taskId: Int,
             wct: WindowContainerTransaction = WindowContainerTransaction()
-    ) {
-        shellTaskOrganizer.getRunningTaskInfo(taskId)?.let {
-            task -> moveToDesktop(decor, task, wct)
-        }
-    }
-
-    /** Move a task with given `taskId` to desktop without decor */
-    fun moveToDesktopWithoutDecor(
-        taskId: Int,
-        wct: WindowContainerTransaction
     ): Boolean {
-        val task = shellTaskOrganizer.getRunningTaskInfo(taskId) ?: return false
-        moveToDesktopWithoutDecor(task, wct)
+        shellTaskOrganizer.getRunningTaskInfo(taskId)?.let {
+            task -> moveToDesktop(task, wct)
+        } ?: return false
         return true
-    }
-
-    /**
-     * Move a task to desktop without decor
-     */
-    private fun moveToDesktopWithoutDecor(
-        task: RunningTaskInfo,
-        wct: WindowContainerTransaction
-    ) {
-        KtProtoLog.v(
-            WM_SHELL_DESKTOP_MODE,
-            "DesktopTasksController: moveToDesktopWithoutDecor taskId=%d",
-            task.taskId
-        )
-        exitSplitIfApplicable(wct, task)
-        // Bring other apps to front first
-        bringDesktopAppsToFront(task.displayId, wct)
-        addMoveToDesktopChanges(wct, task)
-
-        if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            transitions.startTransition(TRANSIT_CHANGE, wct, null /* handler */)
-        } else {
-            shellTaskOrganizer.applyTransaction(wct)
-        }
     }
 
     /**
      * Move a task to desktop
      */
     fun moveToDesktop(
-            decor: DesktopModeWindowDecoration,
             task: RunningTaskInfo,
             wct: WindowContainerTransaction = WindowContainerTransaction()
     ) {
@@ -298,7 +269,7 @@ class DesktopTasksController(
         addMoveToDesktopChanges(wct, task)
 
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            enterDesktopTaskTransitionHandler.moveToDesktop(wct, decor)
+            enterDesktopTaskTransitionHandler.moveToDesktop(wct)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
@@ -311,7 +282,6 @@ class DesktopTasksController(
     fun startDragToDesktop(
             taskInfo: RunningTaskInfo,
             dragToDesktopValueAnimator: MoveToDesktopAnimator,
-            windowDecor: DesktopModeWindowDecoration
     ) {
         KtProtoLog.v(
                 WM_SHELL_DESKTOP_MODE,
@@ -320,8 +290,7 @@ class DesktopTasksController(
         )
         dragToDesktopTransitionHandler.startDragToDesktopTransition(
                 taskInfo.taskId,
-                dragToDesktopValueAnimator,
-                windowDecor
+                dragToDesktopValueAnimator
         )
     }
 
@@ -522,7 +491,7 @@ class DesktopTasksController(
     }
 
     /** Quick-resizes a desktop task, toggling between the stable bounds and the default bounds. */
-    fun toggleDesktopTaskSize(taskInfo: RunningTaskInfo, windowDecor: DesktopModeWindowDecoration) {
+    fun toggleDesktopTaskSize(taskInfo: RunningTaskInfo) {
         val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
 
         val stableBounds = Rect()
@@ -543,11 +512,7 @@ class DesktopTasksController(
 
         val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            toggleResizeDesktopTaskTransitionHandler.startTransition(
-                wct,
-                taskInfo.taskId,
-                windowDecor
-            )
+            toggleResizeDesktopTaskTransitionHandler.startTransition(wct)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }
@@ -558,11 +523,7 @@ class DesktopTasksController(
      *
      * @param position the portion of the screen (RIGHT or LEFT) we want to snap the task to.
      */
-    fun snapToHalfScreen(
-            taskInfo: RunningTaskInfo,
-            windowDecor: DesktopModeWindowDecoration,
-            position: SnapPosition
-    ) {
+    fun snapToHalfScreen(taskInfo: RunningTaskInfo, position: SnapPosition) {
         val displayLayout = displayController.getDisplayLayout(taskInfo.displayId) ?: return
 
         val stableBounds = Rect()
@@ -592,11 +553,7 @@ class DesktopTasksController(
 
         val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
         if (Transitions.ENABLE_SHELL_TRANSITIONS) {
-            toggleResizeDesktopTaskTransitionHandler.startTransition(
-                    wct,
-                    taskInfo.taskId,
-                    windowDecor
-            )
+            toggleResizeDesktopTaskTransitionHandler.startTransition(wct)
         } else {
             shellTaskOrganizer.applyTransaction(wct)
         }

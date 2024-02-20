@@ -18,6 +18,7 @@ package android.view;
 
 import static android.content.res.Resources.ID_NULL;
 import static android.os.Trace.TRACE_TAG_APP;
+import static android.service.autofill.Flags.FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION;
 import static android.view.ContentInfo.SOURCE_DRAG_AND_DROP;
 import static android.view.Surface.FRAME_RATE_CATEGORY_HIGH;
 import static android.view.Surface.FRAME_RATE_CATEGORY_LOW;
@@ -30,6 +31,7 @@ import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ER
 import static android.view.displayhash.DisplayHashResultCallback.DISPLAY_HASH_ERROR_UNKNOWN;
 import static android.view.displayhash.DisplayHashResultCallback.EXTRA_DISPLAY_HASH;
 import static android.view.displayhash.DisplayHashResultCallback.EXTRA_DISPLAY_HASH_ERROR_CODE;
+import static android.view.flags.Flags.FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API;
 import static android.view.flags.Flags.FLAG_TOOLKIT_SET_FRAME_RATE_READ_ONLY;
 import static android.view.flags.Flags.FLAG_VIEW_VELOCITY_API;
 import static android.view.flags.Flags.enableUseMeasureCacheDuringForceLayout;
@@ -42,6 +44,7 @@ import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFI
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS;
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__SINGLE_TAP;
 import static com.android.internal.util.FrameworkStatsLog.TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__UNKNOWN_CLASSIFICATION;
+import static com.android.window.flags.Flags.FLAG_DELEGATE_UNHANDLED_DRAGS;
 
 import static java.lang.Math.max;
 
@@ -67,6 +70,7 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.annotation.UiContext;
 import android.annotation.UiThread;
+import android.app.PendingIntent;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.AutofillOptions;
 import android.content.ClipData;
@@ -79,6 +83,10 @@ import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.credentials.CredentialManager;
+import android.credentials.GetCredentialException;
+import android.credentials.GetCredentialRequest;
+import android.credentials.GetCredentialResponse;
 import android.graphics.Bitmap;
 import android.graphics.BlendMode;
 import android.graphics.Canvas;
@@ -112,6 +120,7 @@ import android.os.DeviceIntegrationUtils;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.OutcomeReceiver;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteCallback;
@@ -1035,6 +1044,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private static String sTraceRequestLayoutClass;
 
+    @Nullable
+    private ViewCredentialHandler mViewCredentialHandler;
+
+
     /** Used to avoid computing the full strings each time when layout tracing is enabled. */
     @Nullable
     private ViewTraversalTracingStrings mTracingStrings;
@@ -1945,6 +1958,41 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * {@hide}
      */
     static final int TOOLTIP = 0x40000000;
+
+    /** @hide */
+    @IntDef(prefix = { "CONTENT_SENSITIVITY_" }, value = {
+            CONTENT_SENSITIVITY_AUTO,
+            CONTENT_SENSITIVITY_SENSITIVE,
+            CONTENT_SENSITIVITY_NOT_SENSITIVE
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface ContentSensitivity {}
+
+    /**
+     * Automatically determine whether a view displays sensitive content. For example, available
+     * autofill hints (or some other signal) can be used to determine if this view
+     * displays sensitive content.
+     *
+     * @see #getContentSensitivity()
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public static final int CONTENT_SENSITIVITY_AUTO = 0x0;
+
+    /**
+     * The view displays sensitive content.
+     *
+     * @see #getContentSensitivity()
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public static final int CONTENT_SENSITIVITY_SENSITIVE = 0x1;
+
+    /**
+     * The view doesn't display sensitive content.
+     *
+     * @see #getContentSensitivity()
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public static final int CONTENT_SENSITIVITY_NOT_SENSITIVE = 0x2;
 
     /** @hide */
     @IntDef(flag = true, prefix = { "FOCUSABLES_" }, value = {
@@ -3647,6 +3695,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *           1                      PFLAG4_ROTARY_HAPTICS_ENABLED
      *          1                       PFLAG4_ROTARY_HAPTICS_SCROLL_SINCE_LAST_ROTARY_INPUT
      *         1                        PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT
+     *       11                         PFLAG4_CONTENT_SENSITIVITY_MASK
      * |-------|-------|-------|-------|
      */
 
@@ -3763,6 +3812,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      */
     private static final int PFLAG4_ROTARY_HAPTICS_WAITING_FOR_SCROLL_EVENT = 0x800000;
 
+    private static final int PFLAG4_CONTENT_SENSITIVITY_SHIFT = 24;
+
+    /**
+     * Mask for obtaining the bits which specify how to determine whether a view
+     * displays sensitive content or not.
+     */
+    private static final int PFLAG4_CONTENT_SENSITIVITY_MASK =
+            (CONTENT_SENSITIVITY_AUTO | CONTENT_SENSITIVITY_SENSITIVE
+                    | CONTENT_SENSITIVITY_NOT_SENSITIVE) << PFLAG4_CONTENT_SENSITIVITY_SHIFT;
     /* End of masks for mPrivateFlags4 */
 
     /** @hide */
@@ -5284,6 +5342,34 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public static final int DRAG_FLAG_REQUEST_SURFACE_FOR_RETURN_ANIMATION = 1 << 11;
 
     /**
+     * Flag indicating that a drag can cross window boundaries (within the same application).  When
+     * {@link #startDragAndDrop(ClipData, DragShadowBuilder, Object, int)} is called
+     * with this flag set, only visible windows belonging to the same application (ie. share the
+     * same UID) with targetSdkVersion >= {@link android.os.Build.VERSION_CODES#N API 24} will be
+     * able to participate in the drag operation and receive the dragged content.
+     *
+     * If both DRAG_FLAG_GLOBAL_SAME_APPLICATION and DRAG_FLAG_GLOBAL are set, then
+     * DRAG_FLAG_GLOBAL_SAME_APPLICATION takes precedence and the drag will only go to visible
+     * windows from the same application.
+     */
+    @FlaggedApi(FLAG_DELEGATE_UNHANDLED_DRAGS)
+    public static final int DRAG_FLAG_GLOBAL_SAME_APPLICATION = 1 << 12;
+
+    /**
+     * Flag indicating that an unhandled drag should be delegated to the system to be started if no
+     * visible window wishes to handle the drop. When using this flag, the caller must provide
+     * ClipData with an Item that contains an immutable PendingIntent to an activity to be launched
+     * (not a broadcast, service, etc).  See
+     * {@link ClipData.Item.Builder#setPendingIntent(PendingIntent)}.
+     *
+     * The system can decide to launch the intent or not based on factors like the current screen
+     * size or windowing mode. If the system does not launch the intent, it will be canceled via the
+     * normal drag and drop flow.
+     */
+    @FlaggedApi(FLAG_DELEGATE_UNHANDLED_DRAGS)
+    public static final int DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG = 1 << 13;
+
+    /**
      * Vertical scroll factor cached by {@link #getVerticalScrollFactor}.
      */
     private float mVerticalScrollFactor;
@@ -6319,6 +6405,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 case R.styleable.View_handwritingBoundsOffsetBottom:
                     mHandwritingBoundsOffsetBottom = a.getDimension(attr, 0);
                     break;
+                case R.styleable.View_contentSensitivity:
+                    setContentSensitivity(a.getInt(attr, CONTENT_SENSITIVITY_AUTO));
+                    break;
             }
         }
 
@@ -6898,6 +6987,64 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     public void setFadingEdgeLength(int length) {
         initScrollCache();
         mScrollCache.fadingEdgeLength = length;
+    }
+
+    /**
+     * Clears the request and callback previously set
+     * through {@link View#setCredentialManagerRequest}.
+     * Once this API is invoked, there will be no request fired to {@link CredentialManager}
+     * on future view focus events.
+     *
+     * @see #setCredentialManagerRequest
+     */
+    @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
+    public void clearCredentialManagerRequest() {
+        if (Log.isLoggable(AUTOFILL_LOG_TAG, Log.VERBOSE)) {
+            Log.v(AUTOFILL_LOG_TAG, "clearCredentialManagerRequest called");
+        }
+        mViewCredentialHandler = null;
+    }
+
+    /**
+     * Sets a {@link CredentialManager} request to retrieve credentials, when the user focuses
+     * on this given view.
+     *
+     * When this view is focused, the given {@code request} will be fired to
+     * {@link CredentialManager}, which will fetch content from all
+     * {@link android.service.credentials.CredentialProviderService} services on the
+     * device, and then display credential options to the user on a relevant UI
+     * (dropdown, keyboard suggestions etc.).
+     *
+     * When the user selects a credential, the final {@link GetCredentialResponse} will be
+     * propagated to the given {@code callback}. Developers are expected to handle the response
+     * programmatically and perform a relevant action, e.g. signing in the user.
+     *
+     * <p> For details on how to  build a Credential Manager request, please see
+     * {@link GetCredentialRequest}.
+     *
+     * <p> This API should be called at any point before the user focuses on the view, e.g. during
+     * {@code onCreate} of an Activity.
+     *
+     * @param request the request to be fired when this view is entered
+     * @param callback to be invoked when either a response or an exception needs to be
+     *                 propagated for the given view
+     */
+    @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
+    public void setCredentialManagerRequest(@NonNull GetCredentialRequest request,
+            @NonNull OutcomeReceiver<GetCredentialResponse, GetCredentialException> callback) {
+        Preconditions.checkNotNull(request, "request must not be null");
+        Preconditions.checkNotNull(callback, "request must not be null");
+
+        mViewCredentialHandler = new ViewCredentialHandler(request, callback);
+    }
+
+    /**
+     *
+     * @hide
+     */
+    @Nullable
+    public ViewCredentialHandler getViewCredentialHandler() {
+        return mViewCredentialHandler;
     }
 
     /**
@@ -9365,6 +9512,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 structure.setAutofillValue(getAutofillValue());
                 structure.setIsCredential(isCredential());
             }
+            if (getViewCredentialHandler() != null) {
+                structure.setCredentialManagerRequest(
+                        getViewCredentialHandler().getRequest(),
+                        getViewCredentialHandler().getCallback());
+            }
             structure.setImportantForAutofill(getImportantForAutofill());
             structure.setReceiveContentMimeTypes(getReceiveContentMimeTypes());
         }
@@ -9782,6 +9934,53 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
     }
 
     /**
+     * Returns the {@link GetCredentialRequest} associated with the view.
+     * If the return value is null, that means no request has been set
+     * on the view and no {@link CredentialManager} flow will be invoked
+     * when this view is focused. Traditioanl autofill flows will still
+     * work, autofilling content if applicable, from
+     * the active {@link android.service.autofill.AutofillService} on
+     * the device.
+     *
+     * <p>See {@link #setCredentialManagerRequest} for more info.
+     *
+     * @return The credential request associated with this View.
+     */
+    @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
+    @Nullable
+    public final GetCredentialRequest getCredentialManagerRequest() {
+        if (mViewCredentialHandler == null) {
+            return null;
+        }
+        return mViewCredentialHandler.getRequest();
+    }
+
+
+    /**
+     * Returns the callback that has previously been set up on this view through
+     * the {@link #setCredentialManagerRequest} API.
+     * If the return value is null, that means no callback, or request, has been set
+     * on the view and no {@link CredentialManager} flow will be invoked
+     * when this view is focused. Traditioanl autofill flows will still
+     * work, and autofillable content will still be returned through the
+     * {@link #autofill(AutofillValue)} )} API.
+     *
+     * <p>See {@link #setCredentialManagerRequest} for more info.
+     *
+     * @return The callback associated with this view that will be invoked on a response from
+     * {@link CredentialManager} .
+     */
+    @FlaggedApi(FLAG_AUTOFILL_CREDMAN_DEV_INTEGRATION)
+    @Nullable
+    public final OutcomeReceiver<GetCredentialResponse,
+            GetCredentialException> getCredentialManagerCallback() {
+        if (mViewCredentialHandler == null) {
+            return null;
+        }
+        return mViewCredentialHandler.getCallback();
+    }
+
+    /**
      * Sets the unique, logical identifier of this view in the activity, for autofill purposes.
      *
      * <p>The autofill id is created on demand, and this method should only be called when a view is
@@ -10147,6 +10346,54 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         }
 
         // Otherwise, assume it's not important...
+        return false;
+    }
+
+    /**
+     * Sets content sensitivity mode to determine whether this view displays sensitive content.
+     *
+     * @param mode {@link #CONTENT_SENSITIVITY_AUTO}, {@link #CONTENT_SENSITIVITY_NOT_SENSITIVE}
+     *                                            or {@link #CONTENT_SENSITIVITY_SENSITIVE}
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public final void setContentSensitivity(@ContentSensitivity int mode)  {
+        mPrivateFlags4 &= ~PFLAG4_CONTENT_SENSITIVITY_MASK;
+        mPrivateFlags4 |= ((mode << PFLAG4_CONTENT_SENSITIVITY_SHIFT)
+                & PFLAG4_CONTENT_SENSITIVITY_MASK);
+    }
+
+    /**
+     * Gets content sensitivity mode to determine whether this view displays sensitive content.
+     *
+     * <p>See {@link #setContentSensitivity(int)} and
+     * {@link #isContentSensitive()} for more info about this mode.
+     *
+     * @return {@link #CONTENT_SENSITIVITY_AUTO} by default, or value passed to
+     * {@link #setContentSensitivity(int)}.
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public @ContentSensitivity
+    final int getContentSensitivity() {
+        return (mPrivateFlags4 & PFLAG4_CONTENT_SENSITIVITY_MASK)
+                >> PFLAG4_CONTENT_SENSITIVITY_SHIFT;
+    }
+
+    /**
+     * Returns whether this view displays sensitive content, based
+     * on the value explicitly set by {@link #setContentSensitivity(int)}.
+     *
+     * @return whether the view displays sensitive content.
+     *
+     * @see #setContentSensitivity(int)
+     * @see #CONTENT_SENSITIVITY_AUTO
+     * @see #CONTENT_SENSITIVITY_SENSITIVE
+     * @see #CONTENT_SENSITIVITY_NOT_SENSITIVE
+     */
+    @FlaggedApi(FLAG_SENSITIVE_CONTENT_APP_PROTECTION_API)
+    public final boolean isContentSensitive() {
+        if (getContentSensitivity() == CONTENT_SENSITIVITY_SENSITIVE) {
+            return true;
+        }
         return false;
     }
 
@@ -10624,6 +10871,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             structure.setAutofillId(new AutofillId(getAutofillId(),
                     AccessibilityNodeInfo.getVirtualDescendantId(info.getSourceNodeId())));
         }
+        structure.setCredentialManagerRequest(getCredentialManagerRequest(),
+                getCredentialManagerCallback());
         CharSequence cname = info.getClassName();
         structure.setClassName(cname != null ? cname.toString() : null);
         structure.setContentDescription(info.getContentDescription());
@@ -22189,6 +22438,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * Retrieve a unique token identifying the window this view is attached to.
      * @return Return the window's token for use in
      * {@link WindowManager.LayoutParams#token WindowManager.LayoutParams.token}.
+     * This token maybe null if this view is not attached to a window.
+     * @see #isAttachedToWindow() for current window attach state
+     * @see OnAttachStateChangeListener to listen to window attach/detach state changes
      */
     public IBinder getWindowToken() {
         return mAttachInfo != null ? mAttachInfo.mWindowToken : null;
@@ -28416,9 +28668,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
             Log.w(VIEW_LOG_TAG, "startDragAndDrop called with an invalid surface.");
             return false;
         }
+        if ((flags & DRAG_FLAG_GLOBAL) != 0 && ((flags & DRAG_FLAG_GLOBAL_SAME_APPLICATION) != 0)) {
+            Log.w(VIEW_LOG_TAG, "startDragAndDrop called with both DRAG_FLAG_GLOBAL "
+                    + "and DRAG_FLAG_GLOBAL_SAME_APPLICATION, the drag will default to "
+                    + "DRAG_FLAG_GLOBAL_SAME_APPLICATION");
+            flags &= ~DRAG_FLAG_GLOBAL;
+        }
 
         if (data != null) {
-            data.prepareToLeaveProcess((flags & View.DRAG_FLAG_GLOBAL) != 0);
+            if (com.android.window.flags.Flags.delegateUnhandledDrags()) {
+                data.prepareToLeaveProcess(
+                        (flags & (DRAG_FLAG_GLOBAL_SAME_APPLICATION | DRAG_FLAG_GLOBAL)) != 0);
+                if ((flags & DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG) != 0) {
+                    if (!data.hasActivityPendingIntents()) {
+                        // Reset the flag if there is no launchable activity intent
+                        flags &= ~DRAG_FLAG_START_PENDING_INTENT_ON_UNHANDLED_DRAG;
+                        Log.w(VIEW_LOG_TAG, "startDragAndDrop called with "
+                                + "DRAG_FLAG_START_INTENT_ON_UNHANDLED_DRAG but the clip data "
+                                + "contains non-activity PendingIntents");
+                    }
+                }
+            } else {
+                data.prepareToLeaveProcess((flags & DRAG_FLAG_GLOBAL) != 0);
+            }
         }
 
         Rect bounds = new Rect();
@@ -28444,6 +28716,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 if (token != null) {
                     root.setLocalDragState(myLocalState);
                     mAttachInfo.mDragToken = token;
+                    mAttachInfo.mDragData = data;
                     mAttachInfo.mViewRootImpl.setDragStartedViewForAccessibility(this);
                     setAccessibilityDragStarted(true);
                 }
@@ -28521,8 +28794,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
                 if (mAttachInfo.mDragSurface != null) {
                     mAttachInfo.mDragSurface.release();
                 }
+                if (mAttachInfo.mDragData != null) {
+                    mAttachInfo.mDragData.cleanUpPendingIntents();
+                }
                 mAttachInfo.mDragSurface = surface;
                 mAttachInfo.mDragToken = token;
+                mAttachInfo.mDragData = data;
                 // Cache the local state object for delivery with DragEvents
                 root.setLocalDragState(myLocalState);
                 if (a11yEnabled) {
@@ -31436,10 +31713,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         IBinder mDragToken;
 
         /**
+         * Used to track the data of the current drag operation for cleanup later.
+         */
+        ClipData mDragData;
+
+        /**
          * The drag shadow surface for the current drag operation.
          */
         public Surface mDragSurface;
-
 
         /**
          * The view that currently has a tooltip displayed.

@@ -86,7 +86,7 @@ import com.android.settingslib.net.SignalStrengthUtil;
 import com.android.settingslib.wifi.WifiUtils;
 import com.android.settingslib.wifi.dpp.WifiDppIntentHelper;
 import com.android.systemui.animation.ActivityTransitionAnimator;
-import com.android.systemui.animation.DialogLaunchAnimator;
+import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -207,7 +207,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
     private SignalDrawable mSignalDrawable;
     private SignalDrawable mSecondarySignalDrawable; // For the secondary mobile data sub in DSDS
     private LocationController mLocationController;
-    private DialogLaunchAnimator mDialogLaunchAnimator;
+    private DialogTransitionAnimator mDialogTransitionAnimator;
     private boolean mHasWifiEntries;
     private WifiStateWorker mWifiStateWorker;
     private boolean mHasActiveSubId;
@@ -304,7 +304,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             @Background Handler workerHandler,
             CarrierConfigTracker carrierConfigTracker,
             LocationController locationController,
-            DialogLaunchAnimator dialogLaunchAnimator,
+            DialogTransitionAnimator dialogTransitionAnimator,
             WifiStateWorker wifiStateWorker,
             FeatureFlags featureFlags,
             CarrierNameCustomization carrierNameCustomization
@@ -338,7 +338,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         mSignalDrawable = new SignalDrawable(mContext);
         mSecondarySignalDrawable = new SignalDrawable(mContext);
         mLocationController = locationController;
-        mDialogLaunchAnimator = dialogLaunchAnimator;
+        mDialogTransitionAnimator = dialogTransitionAnimator;
         mConnectedWifiInternetMonitor = new ConnectedWifiInternetMonitor();
         mWifiStateWorker = wifiStateWorker;
         mFeatureFlags = featureFlags;
@@ -823,7 +823,7 @@ public class InternetDialogController implements AccessPointController.AccessPoi
 
     private void startActivity(Intent intent, View view) {
         ActivityTransitionAnimator.Controller controller =
-                mDialogLaunchAnimator.createActivityLaunchController(view);
+                mDialogTransitionAnimator.createActivityTransitionController(view);
 
         if (controller == null && mCallback != null) {
             mCallback.dismissDialog();

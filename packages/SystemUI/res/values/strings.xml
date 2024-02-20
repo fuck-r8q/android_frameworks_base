@@ -674,6 +674,10 @@
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_disconnect">disconnect</string>
     <!-- QuickSettings: Accessibility label to activate a device [CHAR LIMIT=NONE]-->
     <string name="accessibility_quick_settings_bluetooth_device_tap_to_activate">activate</string>
+    <!-- QuickSettings: Bluetooth auto on tomorrow [CHAR LIMIT=NONE]-->
+    <string name="turn_on_bluetooth_auto_tomorrow">Automatically turn on again tomorrow</string>
+    <!-- QuickSettings: Bluetooth auto on info text [CHAR LIMIT=NONE]-->
+    <string name="turn_on_bluetooth_auto_info">Features like Quick Share, Find My Device, and device location use Bluetooth</string>
 
     <!-- QuickSettings: Bluetooth secondary label for the battery level of a connected device [CHAR LIMIT=20]-->
     <string name="quick_settings_bluetooth_secondary_label_battery_level"><xliff:g id="battery_level_as_percentage">%s</xliff:g> battery</string>
@@ -1441,6 +1445,8 @@
     <string name="sound_settings">Sound &amp; vibration</string>
     <!-- Label for button to go to sound settings screen [CHAR_LIMIT=30] -->
     <string name="volume_panel_dialog_settings_button">Settings</string>
+
+    <string name="volume_panel_captioning_title">Live Caption</string>
 
     <!-- Title for notification after audio lowers -->
     <string name="csd_lowered_title" product="default">Volume lowered to safer level</string>

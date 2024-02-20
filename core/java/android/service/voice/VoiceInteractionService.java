@@ -18,7 +18,6 @@ package android.service.voice;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
-import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -49,7 +48,6 @@ import android.os.ServiceManager;
 import android.os.SharedMemory;
 import android.os.SystemProperties;
 import android.provider.Settings;
-import android.service.voice.flags.Flags;
 import android.util.ArraySet;
 import android.util.Log;
 
@@ -439,20 +437,6 @@ public class VoiceInteractionService extends Service {
         identity.packageName = ActivityThread.currentOpPackageName();
         try {
             return mSystemService.listModuleProperties(identity);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /** Reset hotword training data egressed count.
-     *  @hide */
-    @TestApi
-    @FlaggedApi(Flags.FLAG_ALLOW_TRAINING_DATA_EGRESS_FROM_HDS)
-    @RequiresPermission(Manifest.permission.RESET_HOTWORD_TRAINING_DATA_EGRESS_COUNT)
-    public final void resetHotwordTrainingDataEgressCountForTest() {
-        Log.i(TAG, "Resetting hotword training data egress count for test.");
-        try {
-            mSystemService.resetHotwordTrainingDataEgressCountForTest();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1021,36 +1005,6 @@ public class VoiceInteractionService extends Service {
             }
             mActiveVisualQueryDetector = visualQueryDetector;
             return visualQueryDetector;
-        }
-    }
-
-    /**
-     * Allow/disallow receiving training data from trusted process.
-     *
-     * <p> This method can be called by a preinstalled assistant to receive/stop receiving
-     * training data via {@link HotwordDetector.Callback#onTrainingData(HotwordTrainingData)}.
-     * These training data events are produced during sandboxed detection (in trusted process).
-     *
-     * @param allowed whether to allow/disallow receiving training data produced during
-     *                sandboxed detection (from trusted process).
-     * @throws SecurityException if caller is not a preinstalled assistant or if caller is not the
-     * active assistant.
-     *
-     * @hide
-     */
-    //TODO(b/315053245): Add mitigations to make API no-op once user has modified setting.
-    @SystemApi
-    @FlaggedApi(Flags.FLAG_ALLOW_TRAINING_DATA_EGRESS_FROM_HDS)
-    @RequiresPermission(Manifest.permission.MANAGE_HOTWORD_DETECTION)
-    public void setShouldReceiveSandboxedTrainingData(boolean allowed) {
-        Log.i(TAG, "setShouldReceiveSandboxedTrainingData to " + allowed);
-        if (mSystemService == null) {
-            throw new IllegalStateException("Not available until onReady() is called");
-        }
-        try {
-            mSystemService.setShouldReceiveSandboxedTrainingData(allowed);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
         }
     }
 
