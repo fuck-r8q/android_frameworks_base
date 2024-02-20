@@ -6784,6 +6784,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return mSandboxDisplayApis;
     }
 
+    /**
+     * For testing only; inject a ContentRecorder instance.
+     */
+    @VisibleForTesting
+    void setContentRecorder(ContentRecorder contentRecorder) {
+        mContentRecorder = contentRecorder;
+    }
+
     private ContentRecorder getContentRecorder() {
         if (mContentRecorder == null) {
             mContentRecorder = new ContentRecorder(this);

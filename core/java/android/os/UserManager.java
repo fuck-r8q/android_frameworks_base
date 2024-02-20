@@ -163,28 +163,26 @@ public class UserManager {
      * User type representing a managed profile, which is a profile that is to be managed by a
      * device policy controller (DPC).
      * The intended purpose is for work profiles, which are managed by a corporate entity.
-     * @hide
      */
-    @SystemApi
+    @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     public static final String USER_TYPE_PROFILE_MANAGED = "android.os.usertype.profile.MANAGED";
 
     /**
      * User type representing a clone profile. Clone profile is a user profile type used to run
      * second instance of an otherwise single user App (eg, messengers). Currently only the
      * {@link android.content.pm.UserInfo#isMain()} user can have a clone profile.
-     *
-     * @hide
      */
-    @SystemApi
+    @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
     public static final String USER_TYPE_PROFILE_CLONE = "android.os.usertype.profile.CLONE";
 
 
     /**
-     * User type representing a private profile.
-     * @hide
+     * User type representing a private profile. Private profile is a user profile that can be used
+     * as an alternative user-space to install and use sensitive apps.
+     * UI surfaces can adopt an alternative strategy to show apps belonging to this profile, in line
+     * with their sensitive nature.
      */
     @FlaggedApi(android.os.Flags.FLAG_ALLOW_PRIVATE_PROFILE)
-    @TestApi
     public static final String USER_TYPE_PROFILE_PRIVATE = "android.os.usertype.profile.PRIVATE";
 
     /**
@@ -1424,8 +1422,8 @@ public class UserManager {
     public static final String DISALLOW_RECORD_AUDIO = "no_record_audio";
 
     /**
-     * Specifies if a user is not allowed to run in the background and should be stopped during
-     * user switch. The default value is <code>false</code>.
+     * Specifies if a user is not allowed to run in the background and should be stopped and locked
+     * during user switch. The default value is <code>false</code>.
      *
      * <p>This restriction can be set by device owners and profile owners.
      *
@@ -1782,7 +1780,11 @@ public class UserManager {
     /**
      * Specifies whether the user is allowed to modify default apps in settings.
      *
-     * <p>This restriction can be set by device or profile owner.
+     * <p>A device owner and a profile owner can set this restriction. When it is set by a
+     * device owner, it applies globally - i.e., modifying of default apps in Settings for all
+     * users is disallowed. When it is set by a profile owner on the primary user or by a profile
+     * owner of an organization-owned managed profile on the parent profile, modifying of
+     * default apps in Settings for the primary user is disallowed.
      *
      * <p>The default value is <code>false</code>.
      *
@@ -1922,6 +1924,56 @@ public class UserManager {
     public static final String DISALLOW_THREAD_NETWORK = "no_thread_network";
 
     /**
+     * This user restriction specifies if the user is able to add SIMs to the device.
+     *
+     * <p>
+     * This restriction blocks the download of embedded SIMs, and disables any physical SIMs.
+     * If any embedded SIMs are already on the device, then they are removed. This restriction
+     * does not affect SIMs provisioned to the device by device owners or profile owners.
+     *
+     * <p>
+     * This restriction can only be set by a device owner or a profile owner of an
+     * organization-owned managed profile.
+     * In both cases, the restriction applies globally on the device.
+     *
+     * <p>
+     * Holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_MOBILE_NETWORK}
+     * can set this restriction using the DevicePolicyManager APIs mentioned below.
+     *
+     * <p>Default is <code>false</code>.
+     *
+     * <p>Key for user restrictions.
+     * <p>Type: Boolean
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     * @see #getUserRestrictions()
+     */
+    @FlaggedApi(android.app.admin.flags.Flags.FLAG_ESIM_MANAGEMENT_ENABLED)
+    public static final String DISALLOW_SIM_GLOBALLY =
+            "no_sim_globally";
+
+    /**
+     * This user restriction specifies if assist content is disallowed from being sent to
+     * a privileged app such as the Assistant app. Assist content includes screenshots and
+     * information about an app, such as package name.
+     *
+     * <p>This restriction can only be set by a device owner or a profile owner. When it is set
+     * by a device owner, it disables the assist contextual data on the entire device. When it is
+     * set by a profile owner, it disables assist content on the profile.
+     *
+     * <p>Default is <code>false</code>.
+     *
+     * <p>Key for user restrictions.
+     * <p>Type: Boolean
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     * @see #getUserRestrictions()
+     */
+    @FlaggedApi(android.app.admin.flags.Flags.FLAG_ASSIST_CONTENT_USER_RESTRICTION_ENABLED)
+    public static final String DISALLOW_ASSIST_CONTENT = "no_assist_content";
+
+    /**
      * List of key values that can be passed into the various user restriction related methods
      * in {@link UserManager} & {@link DevicePolicyManager}.
      * Note: This is slightly different from the real set of user restrictions listed in {@link
@@ -2008,6 +2060,8 @@ public class UserManager {
             DISALLOW_GRANT_ADMIN,
             DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO,
             DISALLOW_THREAD_NETWORK,
+            DISALLOW_SIM_GLOBALLY,
+            DISALLOW_ASSIST_CONTENT,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface UserRestrictionKey {}

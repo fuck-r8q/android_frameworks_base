@@ -59,6 +59,24 @@ class AodToLockscreenTransitionViewModelTest : SysuiTestCase() {
         }
 
     @Test
+    fun lockscreenAlphaStartsFromViewStateAccessorAlpha() =
+        testScope.runTest {
+            val viewState = ViewStateAccessor(alpha = { 0.5f })
+            val alpha by collectLastValue(underTest.lockscreenAlpha(viewState))
+
+            repository.sendTransitionStep(step(0f, TransitionState.STARTED))
+
+            repository.sendTransitionStep(step(0f))
+            assertThat(alpha).isEqualTo(0.5f)
+
+            repository.sendTransitionStep(step(0.5f))
+            assertThat(alpha).isEqualTo(0.75f)
+
+            repository.sendTransitionStep(step(1f))
+            assertThat(alpha).isEqualTo(1f)
+        }
+
+    @Test
     fun deviceEntryBackgroundView_udfps_alphaFadeIn() =
         testScope.runTest {
             fingerprintPropertyRepository.supportsUdfps()
@@ -81,25 +99,6 @@ class AodToLockscreenTransitionViewModelTest : SysuiTestCase() {
 
             repository.sendTransitionStep(step(1f))
             assertThat(deviceEntryBackgroundViewAlpha).isEqualTo(1f)
-        }
-
-    @Test
-    fun deviceEntryBackgroundView_rearFp_noUpdates() =
-        testScope.runTest {
-            fingerprintPropertyRepository.supportsRearFps()
-            val deviceEntryBackgroundViewAlpha by
-                collectLastValue(underTest.deviceEntryBackgroundViewAlpha)
-            // no updates
-            repository.sendTransitionStep(step(0f, TransitionState.STARTED))
-            assertThat(deviceEntryBackgroundViewAlpha).isNull()
-            repository.sendTransitionStep(step(0.1f))
-            assertThat(deviceEntryBackgroundViewAlpha).isNull()
-            repository.sendTransitionStep(step(0.3f))
-            assertThat(deviceEntryBackgroundViewAlpha).isNull()
-            repository.sendTransitionStep(step(0.6f))
-            assertThat(deviceEntryBackgroundViewAlpha).isNull()
-            repository.sendTransitionStep(step(1f))
-            assertThat(deviceEntryBackgroundViewAlpha).isNull()
         }
 
     private fun step(

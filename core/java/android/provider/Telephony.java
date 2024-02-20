@@ -5007,6 +5007,26 @@ public final class Telephony {
          */
         public static final String COLUMN_SERVICE_CAPABILITIES = "service_capabilities";
 
+        /**
+         * TelephonyProvider column name for satellite entitlement status. The value of this column
+         * is set based on entitlement query result for satellite configuration.
+         * By default, it's disabled.
+         *
+         * @hide
+         */
+        public static final String COLUMN_SATELLITE_ENTITLEMENT_STATUS =
+                "satellite_entitlement_status";
+
+        /**
+         * TelephonyProvider column name for satellite entitlement plmns. The value of this
+         * column is set based on entitlement query result for satellite configuration.
+         * By default, it's empty.
+         *
+         * @hide
+         */
+        public static final String COLUMN_SATELLITE_ENTITLEMENT_PLMNS =
+                "satellite_entitlement_plmns";
+
         /** All columns in {@link SimInfo} table. */
         private static final List<String> ALL_COLUMNS = List.of(
                 COLUMN_UNIQUE_KEY_SUBSCRIPTION_ID,
@@ -5080,7 +5100,9 @@ public final class Telephony {
                 COLUMN_SATELLITE_ATTACH_ENABLED_FOR_CARRIER,
                 COLUMN_IS_NTN,
                 COLUMN_SERVICE_CAPABILITIES,
-                COLUMN_TRANSFER_STATUS
+                COLUMN_TRANSFER_STATUS,
+                COLUMN_SATELLITE_ENTITLEMENT_STATUS,
+                COLUMN_SATELLITE_ENTITLEMENT_PLMNS
         );
 
         /**

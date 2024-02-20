@@ -37,6 +37,7 @@ import static android.Manifest.permission.MANAGE_DEVICE_POLICY_MTE;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_ORGANIZATION_IDENTITY;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_PACKAGE_STATE;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_PROFILE_INTERACTION;
+import static android.Manifest.permission.MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_RESET_PASSWORD;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_RUNTIME_PERMISSIONS;
 import static android.Manifest.permission.MANAGE_DEVICE_POLICY_SCREEN_CAPTURE;
@@ -51,6 +52,8 @@ import static android.Manifest.permission.QUERY_ADMIN_POLICY;
 import static android.Manifest.permission.REQUEST_PASSWORD_COMPLEXITY;
 import static android.Manifest.permission.SET_TIME;
 import static android.Manifest.permission.SET_TIME_ZONE;
+import static android.app.admin.flags.Flags.FLAG_ESIM_MANAGEMENT_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_DEVICE_POLICY_SIZE_TRACKING_ENABLED;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
 import static android.net.NetworkCapabilities.NET_ENTERPRISE_ID_1;
@@ -84,6 +87,7 @@ import android.app.Activity;
 import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.admin.SecurityLog.SecurityEvent;
+import android.app.admin.flags.Flags;
 import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledSince;
@@ -2863,6 +2867,19 @@ public class DevicePolicyManager {
     public static final int STATUS_HEADLESS_SYSTEM_USER_MODE_NOT_SUPPORTED = 16;
 
     /**
+     * Result code for {@link #checkProvisioningPrecondition}.
+     *
+     * <p>Returned for {@link #ACTION_PROVISION_MANAGED_DEVICE} when provisioning a DPC into the
+     * {@link DeviceAdminInfo#HEADLESS_DEVICE_OWNER_MODE_SINGLE_USER} mode but only the system
+     * user exists on the device.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_HEADLESS_DEVICE_OWNER_SINGLE_USER_ENABLED)
+    public static final int STATUS_HEADLESS_ONLY_SYSTEM_USER = 17;
+
+    /**
      * Result codes for {@link #checkProvisioningPrecondition} indicating all the provisioning pre
      * conditions.
      *
@@ -2876,7 +2893,7 @@ public class DevicePolicyManager {
             STATUS_CANNOT_ADD_MANAGED_PROFILE, STATUS_DEVICE_ADMIN_NOT_SUPPORTED,
             STATUS_SPLIT_SYSTEM_USER_DEVICE_SYSTEM_USER,
             STATUS_PROVISIONING_NOT_ALLOWED_FOR_NON_DEVELOPER_USERS,
-            STATUS_HEADLESS_SYSTEM_USER_MODE_NOT_SUPPORTED
+            STATUS_HEADLESS_SYSTEM_USER_MODE_NOT_SUPPORTED, STATUS_HEADLESS_ONLY_SYSTEM_USER
     })
     public @interface ProvisioningPrecondition {}
 
@@ -9178,9 +9195,11 @@ public class DevicePolicyManager {
      * <p>Calling this after the setup phase of the device owner user has completed is allowed only
      * if the caller is the {@link Process#SHELL_UID Shell UID}, and there are no additional users
      * (except when the device runs on headless system user mode, in which case it could have exact
-     * one extra user, which is the current user - the device owner will be set in the
-     * {@link UserHandle#SYSTEM system} user and a profile owner will be set in the current user)
-     * and no accounts.
+     * one extra user, which is the current user.
+     *
+     * <p>On a headless devices, if it is in affiliated mode the device owner will be set in the
+     * {@link UserHandle#SYSTEM system} user. If the device is in single user mode, the device owner
+     * will be set in the first secondary user.
      *
      * @param who the component name to be registered as device owner.
      * @param userId ID of the user on which the device owner runs.
@@ -11371,7 +11390,9 @@ public class DevicePolicyManager {
      * @see UserHandle
      * @return the {@link android.os.UserHandle} object for the created user, or {@code null} if the
      *         user could not be created.
-     * @throws SecurityException if {@code admin} is not a device owner.
+     * @throws SecurityException if headless device is in
+     *        {@link DeviceAdminInfo#HEADLESS_DEVICE_OWNER_MODE_SINGLE_USER} mode.
+     * @throws SecurityException if {@code admin} is not a device owner
      * @throws UserOperationException if the user could not be created and the calling app is
      * targeting {@link android.os.Build.VERSION_CODES#P} and running on
      * {@link android.os.Build.VERSION_CODES#P}.
@@ -13396,17 +13417,25 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Called by device or profile owners to get information about a pending system update.
+     * Get information about a pending system update.
+     *
+     * Can be called by device or profile owners, and starting from Android
+     * {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM}, holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES}.
      *
      * @param admin Which profile or device owner this request is associated with.
      * @return Information about a pending system update or {@code null} if no update pending.
-     * @throws SecurityException if {@code admin} is not a device or profile owner.
+     * @throws SecurityException if {@code admin} is not a device, profile owner or holders of
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES}.
      * @see DeviceAdminReceiver#onSystemUpdatePending(Context, Intent, long)
      */
-    public @Nullable SystemUpdateInfo getPendingSystemUpdate(@NonNull ComponentName admin) {
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_QUERY_SYSTEM_UPDATES, conditional = true)
+    @SuppressLint("RequiresPermission")
+    @FlaggedApi(Flags.FLAG_PERMISSION_MIGRATION_FOR_ZERO_TRUST_API_ENABLED)
+    public @Nullable SystemUpdateInfo getPendingSystemUpdate(@Nullable ComponentName admin) {
         throwIfParentInstance("getPendingSystemUpdate");
         try {
-            return mService.getPendingSystemUpdate(admin);
+            return mService.getPendingSystemUpdate(admin, mContext.getPackageName());
         } catch (RemoteException re) {
             throw re.rethrowFromSystemServer();
         }
@@ -13956,6 +13985,24 @@ public class DevicePolicyManager {
      * owners are not subject to this restriction since all
      * privacy-sensitive events happening outside the managed profile would have been redacted
      * already.
+     *
+     * Starting from {@link Build.VERSION_CODES#VANILLA_ICE_CREAM}, after the security logging
+     * policy has been set, {@link PolicyUpdateReceiver#onPolicySetResult(Context, String,
+     * Bundle, TargetUser, PolicyUpdateResult)} will notify the admin on whether the policy was
+     * successfully set or not. This callback will contain:
+     * <ul>
+     * <li> The policy identifier {@link DevicePolicyIdentifiers#SECURITY_LOGGING_POLICY}
+     * <li> The {@link TargetUser} that this policy relates to
+     * <li> The {@link PolicyUpdateResult}, which will be
+     * {@link PolicyUpdateResult#RESULT_POLICY_SET} if the policy was successfully set or the
+     * reason the policy failed to be set
+     * e.g. {@link PolicyUpdateResult#RESULT_FAILURE_CONFLICTING_ADMIN_POLICY})
+     * </ul>
+     * If there has been a change to the policy,
+     * {@link PolicyUpdateReceiver#onPolicyChanged(Context, String, Bundle, TargetUser,
+     * PolicyUpdateResult)} will notify the admin of this change. This callback will contain the
+     * same parameters as PolicyUpdateReceiver#onPolicySetResult and the {@link PolicyUpdateResult}
+     * will contain the reason why the policy changed.
      *
      * @param admin Which device admin this request is associated with, or {@code null}
      *              if called by a delegated app.
@@ -16457,8 +16504,9 @@ public class DevicePolicyManager {
      * The identifier would be consistent even if the work profile is removed and enrolled again
      * (to the same organization), or the device is factory reset and re-enrolled.
      *
-     * Can only be called by the Profile Owner or Device Owner, if the
-     * {@link #setOrganizationId(String)} was previously called.
+     * Can only be called by the Profile Owner and Device Owner, and starting from Android
+     * {@link android.os.Build.VERSION_CODES#VANILLA_ICE_CREAM}, holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_CERTIFICATES}.
      * If {@link #setOrganizationId(String)} was not called, then the returned value will be an
      * empty string.
      *
@@ -16471,8 +16519,12 @@ public class DevicePolicyManager {
      * and must switch to using this method.
      *
      * @return A stable, enrollment-specific identifier.
-     * @throws SecurityException if the caller is not a profile owner or device owner.
+     * @throws SecurityException if the caller is not a profile owner, device owner or holding the
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_CERTIFICATES} permission
      */
+    @RequiresPermission(value = MANAGE_DEVICE_POLICY_CERTIFICATES, conditional = true)
+    @SuppressLint("RequiresPermission")
+    @FlaggedApi(Flags.FLAG_PERMISSION_MIGRATION_FOR_ZERO_TRUST_API_ENABLED)
     @NonNull public String getEnrollmentSpecificId() {
         throwIfParentInstance("getEnrollmentSpecificId");
         if (mService == null) {
@@ -16612,7 +16664,10 @@ public class DevicePolicyManager {
      * before calling this method.
      *
      * <p>Holders of {@link android.Manifest.permission#PROVISION_DEMO_DEVICE} can call this API
-     * only if {@link FullyManagedDeviceProvisioningParams#isDemoDevice()} is {@code true}.</p>
+     * only if {@link FullyManagedDeviceProvisioningParams#isDemoDevice()} is {@code true}.
+     *
+     * <p>If headless device is in {@link DeviceAdminInfo#HEADLESS_DEVICE_OWNER_MODE_SINGLE_USER}
+     * mode then it sets the device owner on the first secondary user.</p>
      *
      * @param provisioningParams Params required to provision a fully managed device,
      * see {@link FullyManagedDeviceProvisioningParams}.
@@ -17278,5 +17333,76 @@ public class DevicePolicyManager {
     @UnsupportedAppUsage
     public boolean isOnboardingBugreportV2FlagEnabled() {
         return onboardingBugreportV2Enabled();
+    }
+
+    /**
+     * Returns the subscription ids of all subscriptions which was downloaded by the calling
+     * admin.
+     *
+     * <p> This returns only the subscriptions which were downloaded by the calling admin via
+     *      {@link android.telephony.euicc.EuiccManager#downloadSubscription}.
+     *      If a susbcription is returned by this method then in it subject to management controls
+     *      and cannot be removed by users.
+     *
+     * <p> Callable by device owners and profile owners.
+     *
+     * @throws SecurityException if the caller is not authorized to call this method
+     * @return ids of all managed subscriptions currently downloaded by an admin on the device
+     */
+    @FlaggedApi(FLAG_ESIM_MANAGEMENT_ENABLED)
+    @RequiresPermission(android.Manifest.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS)
+    @NonNull
+    public Set<Integer> getSubscriptionsIds() {
+        throwIfParentInstance("getSubscriptionsIds");
+        if (mService != null) {
+            try {
+                return intArrayToSet(mService.getSubscriptionIds(mContext.getPackageName()));
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return new HashSet<>();
+    }
+
+    /**
+     * Controls the maximum storage size allowed for policies associated with an admin.
+     * Setting a limit of -1 effectively removes any storage restrictions.
+     *
+     * @param storageLimit Maximum storage allowed in bytes. Use -1 to disable limits.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(permission.MANAGE_PROFILE_AND_DEVICE_OWNERS)
+    @FlaggedApi(FLAG_DEVICE_POLICY_SIZE_TRACKING_ENABLED)
+    public void setMaxPolicyStorageLimit(int storageLimit) {
+        if (mService != null) {
+            try {
+                mService.setMaxPolicyStorageLimit(mContext.getPackageName(), storageLimit);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Retrieves the current maximum storage limit for policies associated with an admin.
+     *
+     * @return The maximum storage limit in bytes, or -1 if no limit is enforced.
+     *
+     * @hide
+     */
+    @SystemApi
+    @RequiresPermission(permission.MANAGE_PROFILE_AND_DEVICE_OWNERS)
+    @FlaggedApi(FLAG_DEVICE_POLICY_SIZE_TRACKING_ENABLED)
+    public int getMaxPolicyStorageLimit() {
+        if (mService != null) {
+            try {
+                return mService.getMaxPolicyStorageLimit(mContext.getPackageName());
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return -1;
     }
 }

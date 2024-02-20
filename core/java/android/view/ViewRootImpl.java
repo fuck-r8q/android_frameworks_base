@@ -91,10 +91,10 @@ import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
 import static android.view.accessibility.Flags.fixMergedContentChangeEvent;
 import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
+import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
+import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
 import static android.view.inputmethod.InputMethodEditorTraceProto.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
-import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
-import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 
 import static com.android.input.flags.Flags.enablePointerChoreographer;
 
@@ -103,7 +103,6 @@ import android.accessibilityservice.AccessibilityService;
 import android.animation.AnimationHandler;
 import android.animation.LayoutTransition;
 import android.annotation.AnyThread;
-import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.Size;
@@ -220,6 +219,7 @@ import android.widget.Scroller;
 import android.window.BackEvent;
 import android.window.ClientWindowFrames;
 import android.window.CompatOnBackInvokedCallback;
+import android.window.InputTransferToken;
 import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
@@ -241,7 +241,6 @@ import com.android.internal.view.BaseSurfaceHolder;
 import com.android.internal.view.RootViewSurfaceTaker;
 import com.android.internal.view.SurfaceCallbackHelper;
 import com.android.modules.expresslog.Counter;
-import com.android.window.flags.Flags;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -7609,6 +7608,15 @@ public final class ViewRootImpl implements ViewParent,
         }
     }
 
+    /**
+     * Returns whether this view is currently handling a pointer event.
+     *
+     * @hide
+     */
+    public boolean isHandlingPointerEvent() {
+        return mAttachInfo.mHandlingPointerEvent;
+    }
+
     private void resetPointerIcon(MotionEvent event) {
         mPointerIconType = null;
         mResolvedPointerIcon = null;
@@ -8610,6 +8618,10 @@ public final class ViewRootImpl implements ViewParent,
                     if (mAttachInfo.mDragSurface != null) {
                         mAttachInfo.mDragSurface.release();
                         mAttachInfo.mDragSurface = null;
+                    }
+                    if (mAttachInfo.mDragData != null) {
+                        mAttachInfo.mDragData.cleanUpPendingIntents();
+                        mAttachInfo.mDragData = null;
                     }
                 }
             }
@@ -11244,16 +11256,18 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     /**
-     * @return Returns a token used for associating the root surface
-     * to {@link SurfaceControlViewHost}.
+     * {@inheritDoc}
      */
-    @Nullable
+    @NonNull
     @Override
-    @FlaggedApi(Flags.FLAG_GET_HOST_TOKEN_API)
-    public IBinder getHostToken() {
-        return getInputToken();
+    public InputTransferToken getInputTransferToken() {
+        IBinder inputToken = getInputToken();
+        if (inputToken == null) {
+            throw new IllegalStateException(
+                    "Called getInputTransferToken for Window with no input channel");
+        }
+        return new InputTransferToken(inputToken);
     }
-
     @NonNull
     public IBinder getWindowToken() {
         return mAttachInfo.mWindowToken;
@@ -12461,7 +12475,7 @@ public final class ViewRootImpl implements ViewParent,
         final IWindowSession realWm = WindowManagerGlobal.getWindowSession();
         try {
             return realWm.transferHostTouchGestureToEmbedded(mWindow,
-                    surfacePackage.getInputToken());
+                    surfacePackage.getInputTransferToken());
         } catch (RemoteException e) {
             e.rethrowAsRuntimeException();
         }

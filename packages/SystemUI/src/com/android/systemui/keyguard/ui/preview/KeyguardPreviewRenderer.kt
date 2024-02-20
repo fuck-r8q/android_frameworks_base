@@ -40,8 +40,13 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.window.InputTransferToken
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
+import androidx.constraintlayout.widget.ConstraintSet.PARENT_ID
+import androidx.constraintlayout.widget.ConstraintSet.START
+import androidx.constraintlayout.widget.ConstraintSet.TOP
+import androidx.constraintlayout.widget.ConstraintSet.WRAP_CONTENT
 import androidx.core.view.isInvisible
 import com.android.keyguard.ClockEventController
 import com.android.keyguard.KeyguardClockSwitch
@@ -206,7 +211,7 @@ constructor(
                 SurfaceControlViewHost(
                     context,
                     displayManager.getDisplay(DEFAULT_DISPLAY),
-                    hostToken,
+                    if (hostToken == null) null else InputTransferToken(hostToken),
                     "KeyguardPreviewRenderer"
                 )
             disposables.add(DisposableHandle { host.release() })
@@ -392,7 +397,7 @@ constructor(
             ),
         )
 
-        setUpUdfps(previewContext, rootView)
+        setUpUdfps(previewContext, if (migrateClocksToBlueprint()) keyguardRootView else rootView)
 
         if (keyguardBottomAreaRefactor()) {
             setupShortcuts(keyguardRootView)
@@ -467,15 +472,6 @@ constructor(
             return
         }
 
-        // Place the UDFPS view in the proper sensor location
-        val fingerprintLayoutParams =
-            FrameLayout.LayoutParams(sensorBounds.width(), sensorBounds.height())
-        fingerprintLayoutParams.setMarginsRelative(
-            sensorBounds.left,
-            sensorBounds.top,
-            sensorBounds.right,
-            sensorBounds.bottom
-        )
         val finger =
             LayoutInflater.from(previewContext)
                 .inflate(
@@ -483,7 +479,31 @@ constructor(
                     parentView,
                     false,
                 ) as View
-        parentView.addView(finger, fingerprintLayoutParams)
+
+        // Place the UDFPS view in the proper sensor location
+        if (migrateClocksToBlueprint()) {
+            finger.id = R.id.lock_icon_view
+            parentView.addView(finger)
+            val cs = ConstraintSet()
+            cs.clone(parentView as ConstraintLayout)
+            cs.apply {
+                constrainWidth(R.id.lock_icon_view, sensorBounds.width())
+                constrainHeight(R.id.lock_icon_view, sensorBounds.height())
+                connect(R.id.lock_icon_view, TOP, PARENT_ID, TOP, sensorBounds.top)
+                connect(R.id.lock_icon_view, START, PARENT_ID, START, sensorBounds.left)
+            }
+            cs.applyTo(parentView)
+        } else {
+            val fingerprintLayoutParams =
+                FrameLayout.LayoutParams(sensorBounds.width(), sensorBounds.height())
+            fingerprintLayoutParams.setMarginsRelative(
+                sensorBounds.left,
+                sensorBounds.top,
+                sensorBounds.right,
+                sensorBounds.bottom
+            )
+            parentView.addView(finger, fingerprintLayoutParams)
+        }
     }
 
     private fun setUpClock(previewContext: Context, parentView: ViewGroup) {

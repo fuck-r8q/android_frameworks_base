@@ -60,6 +60,7 @@ import com.android.systemui.flags.FakeFeatureFlagsClassic;
 import com.android.systemui.flags.Flags;
 import com.android.systemui.keyguard.data.repository.FakeKeyguardRepository;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.power.domain.interactor.PowerInteractorFactory;
@@ -147,6 +148,7 @@ public class KeyguardStatusBarViewControllerTest extends SysuiTestCase {
     private KeyguardStatusBarView mKeyguardStatusBarView;
     private KeyguardStatusBarViewController mController;
     private FakeExecutor mFakeExecutor = new FakeExecutor(new FakeSystemClock());
+    private final FakeExecutor mBackgroundExecutor = new FakeExecutor(new FakeSystemClock());
     private final TestScope mTestScope = TestScopeProvider.getTestScope();
     private final FakeKeyguardRepository mKeyguardRepository = new FakeKeyguardRepository();
     private final KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
@@ -161,7 +163,8 @@ public class KeyguardStatusBarViewControllerTest extends SysuiTestCase {
         MockitoAnnotations.initMocks(this);
 
         when(mIconManagerFactory.create(any(), any())).thenReturn(mIconManager);
-
+        KeyguardTransitionInteractor keyguardTransitionInteractor =
+                mKosmos.getKeyguardTransitionInteractor();
         mKeyguardInteractor = new KeyguardInteractor(
                 mKeyguardRepository,
                 mCommandQueue,
@@ -170,6 +173,7 @@ public class KeyguardStatusBarViewControllerTest extends SysuiTestCase {
                 new FakeKeyguardBouncerRepository(),
                 new ConfigurationInteractor(new FakeConfigurationRepository()),
                 new FakeShadeRepository(),
+                keyguardTransitionInteractor,
                 () -> mKosmos.getSceneInteractor());
         mViewModel =
                 new KeyguardStatusBarViewModel(
@@ -214,6 +218,7 @@ public class KeyguardStatusBarViewControllerTest extends SysuiTestCase {
                 mSecureSettings,
                 mCommandQueue,
                 mFakeExecutor,
+                mBackgroundExecutor,
                 mLogger,
                 mNotificationMediaManager,
                 mStatusOverlayHoverListenerFactory

@@ -1523,7 +1523,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         a.configChanges = 0xffffffff;
 
         if (homePanelDream()) {
-            a.launchMode = ActivityInfo.LAUNCH_SINGLE_TASK;
+            a.launchMode = ActivityInfo.LAUNCH_MULTIPLE;
+            a.documentLaunchMode = ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
         } else {
             a.resizeMode = RESIZE_MODE_UNRESIZEABLE;
             a.launchMode = ActivityInfo.LAUNCH_SINGLE_INSTANCE;
@@ -3541,10 +3542,15 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             if (displayContent == null) {
                 return false;
             }
-            hasRestrictedWindow = displayContent.forAllWindows(windowState -> {
-                return windowState.isOnScreen() && UserManager.isUserTypePrivateProfile(
-                        getUserManager().getProfileType(windowState.mShowUserId));
-            }, true /* traverseTopToBottom */);
+            final long callingIdentity = Binder.clearCallingIdentity();
+            try {
+                hasRestrictedWindow = displayContent.forAllWindows(windowState -> {
+                    return windowState.isOnScreen() && UserManager.isUserTypePrivateProfile(
+                            getUserManager().getProfileType(windowState.mShowUserId));
+                }, true /* traverseTopToBottom */);
+            } finally {
+                Binder.restoreCallingIdentity(callingIdentity);
+            }
         }
         return DevicePolicyCache.getInstance().isScreenCaptureAllowed(userId)
                 && !hasRestrictedWindow;
@@ -4176,13 +4182,20 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     @Override
-    public void onPictureInPictureStateChanged(PictureInPictureUiState pipState) {
-        enforceTaskPermission("onPictureInPictureStateChanged");
-        final Task rootPinnedTask = mRootWindowContainer.getDefaultTaskDisplayArea()
-                .getRootPinnedTask();
-        if (rootPinnedTask != null && rootPinnedTask.getTopMostActivity() != null) {
-            mWindowManager.mAtmService.mActivityClientController.onPictureInPictureStateChanged(
-                    rootPinnedTask.getTopMostActivity(), pipState);
+    public void onPictureInPictureUiStateChanged(PictureInPictureUiState pipState) {
+        enforceTaskPermission("onPictureInPictureUiStateChanged");
+        // The PictureInPictureUiState is sent to current pip task if there is any
+        // -or- the top standard task (state like entering PiP does not require a pinned task).
+        final Task task;
+        if (mRootWindowContainer.getDefaultTaskDisplayArea().hasPinnedTask()) {
+            task = mRootWindowContainer.getDefaultTaskDisplayArea().getRootPinnedTask();
+        } else {
+            task = mRootWindowContainer.getDefaultTaskDisplayArea().getRootTask(
+                    t -> t.isActivityTypeStandard());
+        }
+        if (task != null && task.getTopMostActivity() != null) {
+            mWindowManager.mAtmService.mActivityClientController.onPictureInPictureUiStateChanged(
+                    task.getTopMostActivity(), pipState);
         }
     }
 

@@ -34,6 +34,7 @@ import android.view.WindowManager;
 import android.window.ImeOnBackInvokedDispatcher;
 
 import com.android.internal.inputmethod.DirectBootAwareness;
+import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
 import com.android.internal.inputmethod.IImeTracker;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
@@ -492,6 +493,27 @@ final class IInputMethodManagerGlobalInvoker {
     }
 
     @AnyThread
+    static boolean startConnectionlessStylusHandwriting(
+            @NonNull IInputMethodClient client,
+            @UserIdInt int userId,
+            @Nullable CursorAnchorInfo cursorAnchorInfo,
+            @Nullable String delegatePackageName,
+            @Nullable String delegatorPackageName,
+            @NonNull IConnectionlessHandwritingCallback callback) {
+        final IInputMethodManager service = getService();
+        if (service == null) {
+            return false;
+        }
+        try {
+            service.startConnectionlessStylusHandwriting(client, userId, cursorAnchorInfo,
+                    delegatePackageName, delegatorPackageName, callback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+        return true;
+    }
+
+    @AnyThread
     static void prepareStylusHandwritingDelegation(
             @NonNull IInputMethodClient client,
             @UserIdInt int userId,
@@ -530,13 +552,14 @@ final class IInputMethodManagerGlobalInvoker {
 
     @AnyThread
     @RequiresPermission(value = Manifest.permission.INTERACT_ACROSS_USERS_FULL, conditional = true)
-    static boolean isStylusHandwritingAvailableAsUser(@UserIdInt int userId) {
+    static boolean isStylusHandwritingAvailableAsUser(
+            @UserIdInt int userId, boolean connectionless) {
         final IInputMethodManager service = getService();
         if (service == null) {
             return false;
         }
         try {
-            return service.isStylusHandwritingAvailableAsUser(userId);
+            return service.isStylusHandwritingAvailableAsUser(userId, connectionless);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -575,14 +598,14 @@ final class IInputMethodManagerGlobalInvoker {
     @AnyThread
     @NonNull
     static ImeTracker.Token onRequestShow(@NonNull String tag, int uid,
-            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason) {
+            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason, boolean fromUser) {
         final IImeTracker service = getImeTrackerService();
         if (service == null) {
             // Create token with "fake" binder if the service was not found.
             return new ImeTracker.Token(new Binder(), tag);
         }
         try {
-            return service.onRequestShow(tag, uid, origin, reason);
+            return service.onRequestShow(tag, uid, origin, reason, fromUser);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -592,14 +615,14 @@ final class IInputMethodManagerGlobalInvoker {
     @AnyThread
     @NonNull
     static ImeTracker.Token onRequestHide(@NonNull String tag, int uid,
-            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason) {
+            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason, boolean fromUser) {
         final IImeTracker service = getImeTrackerService();
         if (service == null) {
             // Create token with "fake" binder if the service was not found.
             return new ImeTracker.Token(new Binder(), tag);
         }
         try {
-            return service.onRequestHide(tag, uid, origin, reason);
+            return service.onRequestHide(tag, uid, origin, reason, fromUser);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

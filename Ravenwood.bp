@@ -33,6 +33,7 @@ java_genrule {
         "@$(location ravenwood/ravenwood-standard-options.txt) " +
 
         "--debug-log $(location hoststubgen_framework-minus-apex.log) " +
+        "--stats-file $(location hoststubgen_framework-minus-apex_stats.csv) " +
 
         "--out-impl-jar $(location ravenwood.jar) " +
 
@@ -56,6 +57,7 @@ java_genrule {
         "hoststubgen_dump.txt",
 
         "hoststubgen_framework-minus-apex.log",
+        "hoststubgen_framework-minus-apex_stats.csv",
     ],
     visibility: ["//visibility:private"],
 }
@@ -91,18 +93,39 @@ java_library {
     ],
 }
 
+// Jars in "ravenwood-runtime" are set to the classpath, sorted alphabetically.
+// Rename some of the dependencies to make sure they're included in the intended order.
+java_genrule {
+    name: "100-framework-minus-apex.ravenwood",
+    cmd: "cp $(in) $(out)",
+    srcs: [":framework-minus-apex.ravenwood"],
+    out: ["100-framework-minus-apex.ravenwood.jar"],
+    visibility: ["//visibility:private"],
+}
+
+java_genrule {
+    // Use 200 to make sure it comes before the mainline stub ("all-updatable...").
+    name: "200-kxml2-android",
+    cmd: "cp $(in) $(out)",
+    srcs: [":kxml2-android"],
+    out: ["200-kxml2-android.jar"],
+    visibility: ["//visibility:private"],
+}
+
 android_ravenwood_libgroup {
     name: "ravenwood-runtime",
     libs: [
-        "framework-minus-apex.ravenwood",
-        "hoststubgen-helper-runtime.ravenwood",
-        "hoststubgen-helper-framework-runtime.ravenwood",
-        "core-libart-for-host",
+        "100-framework-minus-apex.ravenwood",
+        "200-kxml2-android",
         "all-updatable-modules-system-stubs",
+        "android.test.mock.ravenwood",
+        "ravenwood-helper-runtime",
+        "hoststubgen-helper-runtime.ravenwood",
+
+        // Provide runtime versions of utils linked in below
         "junit",
         "truth",
         "ravenwood-junit-impl",
-        "android.test.mock.ravenwood",
         "mockito-ravenwood-prebuilt",
         "inline-mockito-ravenwood-prebuilt",
     ],

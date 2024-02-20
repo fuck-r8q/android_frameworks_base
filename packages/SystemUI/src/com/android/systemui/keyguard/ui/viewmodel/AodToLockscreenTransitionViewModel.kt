@@ -29,8 +29,6 @@ import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flatMapLatest
 
 /**
  * Breaks down AOD->LOCKSCREEN transition into discrete steps for corresponding views to consume.
@@ -59,21 +57,32 @@ constructor(
         var startValue = 0f
         return transitionAnimation.sharedFlowWithState(
             duration = 500.milliseconds,
-            onStart = {
-                startValue = currentTranslationY() ?: 0f
-                startValue
-            },
+            onStart = { startValue = currentTranslationY() ?: 0f },
             onStep = { MathUtils.lerp(startValue, 0f, FAST_OUT_SLOW_IN.getInterpolation(it)) },
         )
     }
 
     /** Ensure alpha is set to be visible */
-    val lockscreenAlpha: Flow<Float> =
-        transitionAnimation.sharedFlow(
+    fun lockscreenAlpha(viewState: ViewStateAccessor): Flow<Float> {
+        var startAlpha: Float? = null
+        return transitionAnimation.sharedFlow(
             duration = 500.milliseconds,
-            onStart = { 1f },
-            onStep = { 1f },
+            onStep = {
+                if (startAlpha == null) {
+                    startAlpha = viewState.alpha()
+                }
+                MathUtils.lerp(startAlpha!!, 1f, it)
+            },
+            onFinish = {
+                startAlpha = null
+                1f
+            },
+            onCancel = {
+                startAlpha = null
+                1f
+            },
         )
+    }
 
     val shortcutsAlpha: Flow<Float> =
         transitionAnimation.sharedFlow(
@@ -84,19 +93,16 @@ constructor(
         )
 
     val deviceEntryBackgroundViewAlpha: Flow<Float> =
-        deviceEntryUdfpsInteractor.isUdfpsSupported.flatMapLatest { isUdfps ->
-            if (isUdfps) {
-                // fade in
-                transitionAnimation.sharedFlow(
-                    duration = 250.milliseconds,
-                    onStep = { it },
-                    onFinish = { 1f },
-                )
-            } else {
-                // background view isn't visible, so return an empty flow
-                emptyFlow()
-            }
-        }
+        transitionAnimation.sharedFlow(
+            duration = 250.milliseconds,
+            onStep = { it },
+            onFinish = { 1f },
+        )
 
-    override val deviceEntryParentViewAlpha: Flow<Float> = lockscreenAlpha
+    override val deviceEntryParentViewAlpha: Flow<Float> =
+        transitionAnimation.sharedFlow(
+            duration = 500.milliseconds,
+            onStart = { 1f },
+            onStep = { 1f },
+        )
 }

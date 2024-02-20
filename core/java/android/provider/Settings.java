@@ -668,6 +668,23 @@ public final class Settings {
             "android.settings.MANAGE_APP_LONG_RUNNING_JOBS";
 
     /**
+     * Activity Action: Show settings to allow configuration of
+     * {@link Manifest.permission#RUN_BACKUP_JOBS} permission.
+     *
+     * Input: Optionally, the Intent's data URI can specify the application package name to
+     * directly invoke the management GUI specific to the package name. For example
+     * "package:com.my.app".
+     * <p>
+     * Output: When a package data uri is passed as input, the activity result is set to
+     * {@link android.app.Activity#RESULT_OK} if the permission was granted to the app. Otherwise,
+     * the result is set to {@link android.app.Activity#RESULT_CANCELED}.
+     */
+    @FlaggedApi(Flags.FLAG_BACKUP_TASKS_SETTINGS_SCREEN)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_RUN_BACKUP_JOBS =
+            "android.settings.REQUEST_RUN_BACKUP_JOBS";
+
+    /**
      * Activity Action: Show settings to allow configuration of cross-profile access for apps
      *
      * Input: Optionally, the Intent's data URI can specify the application package name to
@@ -1532,6 +1549,23 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS =
             "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS";
+
+    /**
+     * Activity Action: Show screen for controlling any background restrictions imposed on
+     * an app. If the system returns true for
+     * {@link android.app.ActivityManager#isBackgroundRestricted()}, and the app is not able to
+     * satisfy user requests due to being restricted in the background, then this intent can be
+     * used to request the user to unrestrict the app.
+     * <p>
+     * Input: The Intent's data URI must specify the application package name
+     *        to be shown, with the "package" scheme, such as "package:com.my.app".
+     * <p>
+     * Output: Nothing.
+     */
+    @FlaggedApi(android.app.Flags.FLAG_APP_RESTRICTIONS_API)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_BACKGROUND_RESTRICTIONS_SETTINGS =
+            "android.settings.BACKGROUND_RESTRICTIONS_SETTINGS";
 
     /**
      * Activity Action: Open the advanced power usage details page of an associated app.
@@ -11055,6 +11089,15 @@ public final class Settings {
         public static final String SEARCH_LONG_PRESS_HOME_ENABLED =
                 "search_long_press_home_enabled";
 
+
+        /**
+         * Whether or not the accessibility data streaming is enbled for the
+         * {@link VisualQueryDetectedResult#setAccessibilityDetectionData}.
+         * @hide
+         */
+        public static final String VISUAL_QUERY_ACCESSIBILITY_DETECTION_ENABLED =
+                "visual_query_accessibility_detection_enabled";
+
         /**
          * Control whether Night display is currently activated.
          * @hide
@@ -11841,6 +11884,13 @@ public final class Settings {
         public static final String MEDIA_CONTROLS_LOCK_SCREEN = "media_controls_lock_screen";
 
         /**
+         * Whether to enable camera extensions software fallback.
+         * @hide
+         */
+        @Readable
+        public static final String CAMERA_EXTENSIONS_FALLBACK = "camera_extensions_fallback";
+
+        /**
          * Controls whether contextual suggestions can be shown in the media controls.
          * @hide
          */
@@ -11918,6 +11968,16 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED =
                 "accessibility_magnification_two_finger_triple_tap_enabled";
+
+        /**
+         * For pinch to zoom anywhere feature.
+         *
+         * If true, you should be able to pinch to magnify the window anywhere.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_PINCH_TO_ZOOM_ANYWHERE_ENABLED =
+                "accessibility_pinch_to_zoom_anywhere_enabled";
 
         /**
          * Controls magnification capability. Accessibility magnification is capable of at least one
@@ -12261,6 +12321,14 @@ public final class Settings {
          */
         public static final String EXTRA_AUTOMATIC_POWER_SAVE_MODE =
                 "extra_automatic_power_save_mode";
+
+        /**
+         * Whether contextual screen timeout is enabled.
+         *
+         * @hide
+         */
+        public static final String CONTEXTUAL_SCREEN_TIMEOUT_ENABLED =
+                "contextual_screen_timeout_enabled";
 
         /**
          * Whether lockscreen weather is enabled.

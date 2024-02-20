@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -60,18 +61,31 @@ constructor(
     private val deviceEntryInteractor: DeviceEntryInteractor,
     private val dozeParameters: DozeParameters,
     private val keyguardInteractor: KeyguardInteractor,
-    communalInteractor: CommunalInteractor,
+    private val communalInteractor: CommunalInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val notificationsKeyguardInteractor: NotificationsKeyguardInteractor,
-    aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
-    lockscreenToGoneTransitionViewModel: LockscreenToGoneTransitionViewModel,
-    alternateBouncerToGoneTransitionViewModel: AlternateBouncerToGoneTransitionViewModel,
-    primaryBouncerToGoneTransitionViewModel: PrimaryBouncerToGoneTransitionViewModel,
-    lockscreenToGlanceableHubTransitionViewModel: LockscreenToGlanceableHubTransitionViewModel,
-    glanceableHubToLockscreenTransitionViewModel: GlanceableHubToLockscreenTransitionViewModel,
-    screenOffAnimationController: ScreenOffAnimationController,
+    private val alternateBouncerToGoneTransitionViewModel:
+        AlternateBouncerToGoneTransitionViewModel,
+    private val aodToLockscreenTransitionViewModel: AodToLockscreenTransitionViewModel,
+    private val dozingToLockscreenTransitionViewModel: DozingToLockscreenTransitionViewModel,
+    private val glanceableHubToLockscreenTransitionViewModel:
+        GlanceableHubToLockscreenTransitionViewModel,
+    private val lockscreenToDreamingTransitionViewModel: LockscreenToDreamingTransitionViewModel,
+    private val lockscreenToGlanceableHubTransitionViewModel:
+        LockscreenToGlanceableHubTransitionViewModel,
+    private val lockscreenToGoneTransitionViewModel: LockscreenToGoneTransitionViewModel,
+    private val lockscreenToOccludedTransitionViewModel: LockscreenToOccludedTransitionViewModel,
+    private val lockscreenToPrimaryBouncerTransitionViewModel:
+        LockscreenToPrimaryBouncerTransitionViewModel,
+    private val occludedToAodTransitionViewModel: OccludedToAodTransitionViewModel,
+    private val occludedToLockscreenTransitionViewModel: OccludedToLockscreenTransitionViewModel,
+    private val primaryBouncerToAodTransitionViewModel: PrimaryBouncerToAodTransitionViewModel,
+    private val primaryBouncerToGoneTransitionViewModel: PrimaryBouncerToGoneTransitionViewModel,
+    private val primaryBouncerToLockscreenTransitionViewModel:
+        PrimaryBouncerToLockscreenTransitionViewModel,
+    private val screenOffAnimationController: ScreenOffAnimationController,
     private val aodBurnInViewModel: AodBurnInViewModel,
-    aodAlphaViewModel: AodAlphaViewModel,
+    private val aodAlphaViewModel: AodAlphaViewModel,
 ) {
 
     val burnInLayerVisibility: Flow<Int> =
@@ -101,19 +115,30 @@ constructor(
     val topClippingBounds: Flow<Int?> = keyguardInteractor.topClippingBounds
 
     /** An observable for the alpha level for the entire keyguard root view. */
-    val alpha: Flow<Float> =
-        combine(
+    fun alpha(viewState: ViewStateAccessor): Flow<Float> {
+        return combine(
                 communalInteractor.isIdleOnCommunal,
                 // The transitions are mutually exclusive, so they are safe to merge to get the last
                 // value emitted by any of them. Do not add flows that cannot make this guarantee.
                 merge(
-                    aodAlphaViewModel.alpha,
-                    lockscreenToGlanceableHubTransitionViewModel.keyguardAlpha,
-                    glanceableHubToLockscreenTransitionViewModel.keyguardAlpha,
-                    lockscreenToGoneTransitionViewModel.lockscreenAlpha,
-                    primaryBouncerToGoneTransitionViewModel.lockscreenAlpha,
-                    alternateBouncerToGoneTransitionViewModel.lockscreenAlpha,
-                )
+                        aodAlphaViewModel.alpha,
+                        keyguardInteractor.dismissAlpha.filterNotNull(),
+                        alternateBouncerToGoneTransitionViewModel.lockscreenAlpha,
+                        aodToLockscreenTransitionViewModel.lockscreenAlpha(viewState),
+                        dozingToLockscreenTransitionViewModel.lockscreenAlpha,
+                        glanceableHubToLockscreenTransitionViewModel.keyguardAlpha,
+                        lockscreenToDreamingTransitionViewModel.lockscreenAlpha,
+                        lockscreenToGlanceableHubTransitionViewModel.keyguardAlpha,
+                        lockscreenToGoneTransitionViewModel.lockscreenAlpha(viewState),
+                        lockscreenToOccludedTransitionViewModel.lockscreenAlpha,
+                        lockscreenToPrimaryBouncerTransitionViewModel.lockscreenAlpha,
+                        occludedToAodTransitionViewModel.lockscreenAlpha,
+                        occludedToLockscreenTransitionViewModel.lockscreenAlpha,
+                        primaryBouncerToAodTransitionViewModel.lockscreenAlpha,
+                        primaryBouncerToGoneTransitionViewModel.lockscreenAlpha,
+                        primaryBouncerToLockscreenTransitionViewModel.lockscreenAlpha,
+                    )
+                    .onStart { emit(1f) }
             ) { isIdleOnCommunal, alpha ->
                 if (isIdleOnCommunal) {
                     // Keyguard should not show while the communal hub is fully visible. This check
@@ -125,12 +150,16 @@ constructor(
                 }
             }
             .distinctUntilChanged()
+    }
 
     /** Specific alpha value for elements visible during [KeyguardState.LOCKSCREEN] */
-    val lockscreenStateAlpha: Flow<Float> = aodToLockscreenTransitionViewModel.lockscreenAlpha
+    @Deprecated("only used for legacy status view")
+    fun lockscreenStateAlpha(viewState: ViewStateAccessor): Flow<Float> {
+        return aodToLockscreenTransitionViewModel.lockscreenAlpha(viewState)
+    }
 
     /** For elements that appear and move during the animation -> AOD */
-    val burnInLayerAlpha: Flow<Float> = aodBurnInViewModel.alpha
+    val burnInLayerAlpha: Flow<Float> = aodAlphaViewModel.alpha
 
     fun translationY(params: BurnInParameters): Flow<Float> {
         return aodBurnInViewModel.translationY(params)

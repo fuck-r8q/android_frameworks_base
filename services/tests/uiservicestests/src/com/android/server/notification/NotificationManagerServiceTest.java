@@ -37,6 +37,7 @@ import static android.app.Notification.FLAG_NO_CLEAR;
 import static android.app.Notification.FLAG_ONGOING_EVENT;
 import static android.app.Notification.FLAG_ONLY_ALERT_ONCE;
 import static android.app.Notification.FLAG_USER_INITIATED_JOB;
+import static android.app.Notification.VISIBILITY_PRIVATE;
 import static android.app.NotificationChannel.USER_LOCKED_ALLOW_BUBBLE;
 import static android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED;
 import static android.app.NotificationManager.BUBBLE_PREFERENCE_ALL;
@@ -163,6 +164,7 @@ import android.app.AlarmManager;
 import android.app.AppOpsManager;
 import android.app.AutomaticZenRule;
 import android.app.IActivityManager;
+import android.app.ICallNotificationEventCallback;
 import android.app.INotificationManager;
 import android.app.ITransientNotification;
 import android.app.IUriGrantsManager;
@@ -2337,7 +2339,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         mService.updateAutobundledSummaryLocked(0, "pkg",
                 new NotificationAttributes(GroupHelper.BASE_FLAGS | FLAG_ONGOING_EVENT,
-                    mock(Icon.class), 0), false);
+                    mock(Icon.class), 0, VISIBILITY_PRIVATE), false);
         waitForIdle();
 
         assertTrue(summary.getSbn().isOngoing());
@@ -2356,7 +2358,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         mService.updateAutobundledSummaryLocked(0, "pkg",
                 new NotificationAttributes(GroupHelper.BASE_FLAGS,
-                    mock(Icon.class), 0), false);
+                    mock(Icon.class), 0, VISIBILITY_PRIVATE), false);
         waitForIdle();
 
         assertFalse(summary.getSbn().isOngoing());
@@ -2544,6 +2546,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertThat(mBinderService.getActiveNotifications(sbn.getPackageName()).length).isEqualTo(1);
         assertThat(mService.getNotificationRecordCount()).isEqualTo(1);
 
+        // Checks that a post update is sent.
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
+        ArgumentCaptor<NotificationRecord> captor =
+                ArgumentCaptor.forClass(NotificationRecord.class);
+        verify(mListeners, times(1)).prepareNotifyPostedLocked(captor.capture(), any(),
+                anyBoolean());
+        assertThat(captor.getValue().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
+                FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
+
         mSetFlagsRule.disableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
         mBinderService.cancelNotificationWithTag(PKG, PKG, sbn.getTag(), sbn.getId(),
                 sbn.getUserId());
@@ -2576,6 +2589,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         StatusBarNotification[] notifs = mBinderService.getActiveNotifications(PKG);
         assertThat(notifs.length).isEqualTo(1);
         assertThat(notifs[0].getId()).isEqualTo(1);
+
+        // Checks that a post update is sent.
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
+        ArgumentCaptor<NotificationRecord> captor =
+                ArgumentCaptor.forClass(NotificationRecord.class);
+        verify(mListeners, times(1)).prepareNotifyPostedLocked(captor.capture(), any(),
+                anyBoolean());
+        assertThat(captor.getValue().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
+                FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
     }
 
     @Test
@@ -2984,18 +3008,29 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     public void testCancelNotificationsFromListener_clearAll_NoClearLifetimeExt()
             throws Exception {
         mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
-
         final NotificationRecord notif = generateNotificationRecord(
                 mTestNotificationChannel, 1, null, false);
-        notif.getNotification().flags = FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
+        notif.getNotification().flags |= FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
         mService.addNotification(notif);
-
+        verify(mWorkerHandler, times(0))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
         mService.getBinderService().cancelNotificationsFromListener(null, null);
         waitForIdle();
-
+        // Notification not cancelled.
         StatusBarNotification[] notifs =
                 mBinderService.getActiveNotifications(notif.getSbn().getPackageName());
         assertThat(notifs.length).isEqualTo(1);
+
+        // Checks that a post update is sent.
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
+        ArgumentCaptor<NotificationRecord> captor =
+                ArgumentCaptor.forClass(NotificationRecord.class);
+        verify(mListeners, times(1)).prepareNotifyPostedLocked(captor.capture(), any(),
+                anyBoolean());
+        assertThat(captor.getValue().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
+                FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
     }
 
     @Test
@@ -3216,6 +3251,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         StatusBarNotification[] notifs =
                 mBinderService.getActiveNotifications(notif.getSbn().getPackageName());
         assertEquals(1, notifs.length);
+
+        // Checks that a post update is sent.
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
+        ArgumentCaptor<NotificationRecord> captor =
+                ArgumentCaptor.forClass(NotificationRecord.class);
+        verify(mListeners, times(1)).prepareNotifyPostedLocked(captor.capture(), any(),
+                anyBoolean());
+        assertThat(captor.getValue().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
+                FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
     }
 
     @Test
@@ -3434,7 +3480,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         when(mPermissionHelper.isPermissionFixed(PKG, temp.getUserId())).thenReturn(true);
 
         NotificationRecord r = mService.createAutoGroupSummary(temp.getUserId(),
-                temp.getSbn().getPackageName(), temp.getKey(), 0, mock(Icon.class), 0);
+                temp.getSbn().getPackageName(), temp.getKey(), 0, mock(Icon.class), 0,
+                VISIBILITY_PRIVATE);
 
         assertThat(r.isImportanceFixed()).isTrue();
     }
@@ -3950,6 +3997,69 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         }
 
         verify(mPreferencesHelper, never()).updateNotificationChannel(
+                anyString(), anyInt(), any(), anyBoolean(),  anyInt(), anyBoolean());
+
+        verify(mListeners, never()).notifyNotificationChannelChanged(eq(PKG),
+                eq(Process.myUserHandle()), eq(mTestNotificationChannel),
+                eq(NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED));
+    }
+
+    @Test
+    public void testUpdateNotificationChannelFromPrivilegedListener_noSoundUriPermission()
+            throws Exception {
+        mService.setPreferencesHelper(mPreferencesHelper);
+        when(mCompanionMgr.getAssociations(PKG, mUserId))
+                .thenReturn(singletonList(mock(AssociationInfo.class)));
+        when(mPreferencesHelper.getNotificationChannel(eq(PKG), anyInt(),
+                eq(mTestNotificationChannel.getId()), anyBoolean()))
+                .thenReturn(mTestNotificationChannel);
+
+        final Uri soundUri = Uri.parse("content://media/test/sound/uri");
+        final NotificationChannel updatedNotificationChannel = new NotificationChannel(
+                TEST_CHANNEL_ID, TEST_CHANNEL_ID, IMPORTANCE_DEFAULT);
+        updatedNotificationChannel.setSound(soundUri,
+                updatedNotificationChannel.getAudioAttributes());
+
+        doThrow(new SecurityException("no access")).when(mUgmInternal)
+                .checkGrantUriPermission(eq(Process.myUid()), any(), eq(soundUri),
+                anyInt(), eq(Process.myUserHandle().getIdentifier()));
+
+        assertThrows(SecurityException.class,
+                () -> mBinderService.updateNotificationChannelFromPrivilegedListener(null, PKG,
+                Process.myUserHandle(), updatedNotificationChannel));
+
+        verify(mPreferencesHelper, never()).updateNotificationChannel(
+                anyString(), anyInt(), any(), anyBoolean(),  anyInt(), anyBoolean());
+
+        verify(mListeners, never()).notifyNotificationChannelChanged(eq(PKG),
+                eq(Process.myUserHandle()), eq(mTestNotificationChannel),
+                eq(NotificationListenerService.NOTIFICATION_CHANNEL_OR_GROUP_UPDATED));
+    }
+
+    @Test
+    public void testUpdateNotificationChannelFromPrivilegedListener_noSoundUriPermission_sameSound()
+            throws Exception {
+        mService.setPreferencesHelper(mPreferencesHelper);
+        when(mCompanionMgr.getAssociations(PKG, mUserId))
+                .thenReturn(singletonList(mock(AssociationInfo.class)));
+        when(mPreferencesHelper.getNotificationChannel(eq(PKG), anyInt(),
+                eq(mTestNotificationChannel.getId()), anyBoolean()))
+                .thenReturn(mTestNotificationChannel);
+
+        final Uri soundUri = Settings.System.DEFAULT_NOTIFICATION_URI;
+        final NotificationChannel updatedNotificationChannel = new NotificationChannel(
+                TEST_CHANNEL_ID, TEST_CHANNEL_ID, IMPORTANCE_DEFAULT);
+        updatedNotificationChannel.setSound(soundUri,
+                updatedNotificationChannel.getAudioAttributes());
+
+        doThrow(new SecurityException("no access")).when(mUgmInternal)
+                .checkGrantUriPermission(eq(Process.myUid()), any(), eq(soundUri),
+                    anyInt(), eq(Process.myUserHandle().getIdentifier()));
+
+        mBinderService.updateNotificationChannelFromPrivilegedListener(
+                null, PKG, Process.myUserHandle(), updatedNotificationChannel);
+
+        verify(mPreferencesHelper, times(1)).updateNotificationChannel(
                 anyString(), anyInt(), any(), anyBoolean(),  anyInt(), anyBoolean());
 
         verify(mListeners, never()).notifyNotificationChannelChanged(eq(PKG),
@@ -5658,6 +5768,17 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         StatusBarNotification[] notifsAfter = mBinderService.getActiveNotifications(PKG);
         assertThat(notifsAfter.length).isEqualTo(1);
         assertThat(mService.getNotificationRecord(notif.getKey())).isEqualTo(notif);
+
+        // Checks that a post update is sent.
+        verify(mWorkerHandler, times(1))
+                .post(any(NotificationManagerService.PostNotificationRunnable.class));
+        ArgumentCaptor<NotificationRecord> captor =
+                ArgumentCaptor.forClass(NotificationRecord.class);
+        verify(mListeners, times(1)).prepareNotifyPostedLocked(captor.capture(), any(),
+                anyBoolean());
+        assertThat(captor.getValue().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(
+                FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY);
     }
 
     @Test
@@ -8407,6 +8528,27 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertEquals(
                 NotificationRecordLogger.NotificationEvent.NOTIFICATION_ACTION_CLICKED_2,
                 mNotificationRecordLogger.event(0));
+    }
+
+    @Test
+    public void testOnNotificationActionClickLifetimeExtendedEnds() {
+        mSetFlagsRule.enableFlags(android.app.Flags.FLAG_LIFETIME_EXTENSION_REFACTOR);
+        final Notification.Action action =
+                new Notification.Action.Builder(null, "text", PendingIntent.getActivity(
+                        mContext, 0, new Intent(), PendingIntent.FLAG_IMMUTABLE)).build();
+        // Creates a notification marked as being lifetime extended.
+        NotificationRecord r = generateNotificationRecord(mTestNotificationChannel);
+        r.getSbn().getNotification().flags |= FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY;
+        mService.addNotification(r);
+        // Call on action click.
+        NotificationVisibility notificationVisibility =
+                NotificationVisibility.obtain(r.getKey(), 1, 2, true);
+        mService.mNotificationDelegate.onNotificationActionClick(
+                10, 10, r.getKey(), /*actionIndex=*/2, action, notificationVisibility,
+                /*generatedByAssistant=*/false);
+        // The flag is removed, so the notification is no longer lifetime extended.
+        assertThat(r.getSbn().getNotification().flags
+                & FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY).isEqualTo(0);
     }
 
     @Test
@@ -12075,9 +12217,10 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         // grouphelper is a mock here, so make the calls it would make
 
         // add summary
-        mService.addNotification(mService.createAutoGroupSummary(nr1.getUserId(),
-                nr1.getSbn().getPackageName(), nr1.getKey(),
-                GroupHelper.BASE_FLAGS | FLAG_ONGOING_EVENT, mock(Icon.class), 0));
+        mService.addNotification(
+                mService.createAutoGroupSummary(nr1.getUserId(), nr1.getSbn().getPackageName(),
+                    nr1.getKey(), GroupHelper.BASE_FLAGS | FLAG_ONGOING_EVENT, mock(Icon.class), 0,
+                    VISIBILITY_PRIVATE));
 
         // cancel both children
         mBinderService.cancelNotificationWithTag(PKG, PKG, nr0.getSbn().getTag(),
@@ -12106,7 +12249,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mService.addNotification(nr1);
         mService.addNotification(
                 mService.createAutoGroupSummary(nr1.getUserId(), nr1.getSbn().getPackageName(),
-                nr1.getKey(), GroupHelper.BASE_FLAGS, mock(Icon.class), 0));
+                nr1.getKey(), GroupHelper.BASE_FLAGS, mock(Icon.class), 0, VISIBILITY_PRIVATE));
 
         // add notifications + summary for USER_ALL
         NotificationRecord nr0_all =
@@ -12119,7 +12262,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mService.addNotification(
                 mService.createAutoGroupSummary(nr0_all.getUserId(),
                 nr0_all.getSbn().getPackageName(),
-                nr0_all.getKey(), GroupHelper.BASE_FLAGS, mock(Icon.class), 0));
+                nr0_all.getKey(), GroupHelper.BASE_FLAGS, mock(Icon.class), 0, VISIBILITY_PRIVATE));
 
         // cancel both children for USER_ALL
         mBinderService.cancelNotificationWithTag(PKG, PKG, nr0_all.getSbn().getTag(),
@@ -14451,6 +14594,120 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         assertEquals(ACTION_KEYGUARD_PRIVATE_NOTIFICATIONS_CHANGED, actual.getValue().getAction());
         assertFalse(actual.getValue().getBooleanExtra(EXTRA_KM_PRIVATE_NOTIFS_ALLOWED, true));
         assertFalse(mBinderService.getPrivateNotificationsAllowed());
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_CALLSTYLE_CALLBACK_API)
+    public void testCallNotificationListener_NotifiedOnPostCallStyle() throws Exception {
+        ICallNotificationEventCallback listener = mock(
+                ICallNotificationEventCallback.class);
+        when(listener.asBinder()).thenReturn(mock(IBinder.class));
+        mBinderService.registerCallNotificationEventListener(PKG, UserHandle.CURRENT, listener);
+        waitForIdle();
+
+        final UserHandle userHandle = UserHandle.getUserHandleForUid(mUid);
+        final NotificationRecord r = createAndPostCallStyleNotification(PKG, userHandle,
+                "testCallNotificationListener_NotifiedOnPostCallStyle");
+
+        verify(listener, times(1)).onCallNotificationPosted(PKG, userHandle);
+
+        mBinderService.cancelNotificationWithTag(PKG, PKG, r.getSbn().getTag(), r.getSbn().getId(),
+                r.getSbn().getUserId());
+        waitForIdle();
+
+        verify(listener, times(1)).onCallNotificationRemoved(PKG, userHandle);
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_CALLSTYLE_CALLBACK_API)
+    public void testCallNotificationListener_NotNotifiedOnPostNonCallStyle() throws Exception {
+        ICallNotificationEventCallback listener = mock(
+                ICallNotificationEventCallback.class);
+        when(listener.asBinder()).thenReturn(mock(IBinder.class));
+        mBinderService.registerCallNotificationEventListener(PKG,
+                UserHandle.getUserHandleForUid(mUid), listener);
+        waitForIdle();
+
+        Notification.Builder nb = new Notification.Builder(mContext,
+                mTestNotificationChannel.getId()).setSmallIcon(android.R.drawable.sym_def_app_icon);
+        final NotificationRecord r = createAndPostNotification(nb,
+                "testCallNotificationListener_NotNotifiedOnPostNonCallStyle");
+
+        verify(listener, never()).onCallNotificationPosted(anyString(), any());
+
+        mBinderService.cancelNotificationWithTag(PKG, PKG, r.getSbn().getTag(), r.getSbn().getId(),
+                r.getSbn().getUserId());
+        waitForIdle();
+
+        verify(listener, never()).onCallNotificationRemoved(anyString(), any());
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_CALLSTYLE_CALLBACK_API)
+    public void testCallNotificationListener_registerForUserAll_notifiedOnAnyUserId()
+            throws Exception {
+        ICallNotificationEventCallback listener = mock(
+                ICallNotificationEventCallback.class);
+        when(listener.asBinder()).thenReturn(mock(IBinder.class));
+        mBinderService.registerCallNotificationEventListener(PKG, UserHandle.ALL, listener);
+        waitForIdle();
+
+        final UserHandle otherUser = UserHandle.of(2);
+        final NotificationRecord r = createAndPostCallStyleNotification(PKG,
+                otherUser, "testCallNotificationListener_registerForUserAll_notifiedOnAnyUserId");
+
+        verify(listener, times(1)).onCallNotificationPosted(PKG, otherUser);
+
+        mBinderService.cancelNotificationWithTag(PKG, PKG, r.getSbn().getTag(), r.getSbn().getId(),
+                r.getSbn().getUserId());
+        waitForIdle();
+
+        verify(listener, times(1)).onCallNotificationRemoved(PKG, otherUser);
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_CALLSTYLE_CALLBACK_API)
+    public void testCallNotificationListener_differentPackage_notNotified() throws Exception {
+        final String packageName = "package";
+        ICallNotificationEventCallback listener = mock(
+                ICallNotificationEventCallback.class);
+        when(listener.asBinder()).thenReturn(mock(IBinder.class));
+        mBinderService.registerCallNotificationEventListener(packageName, UserHandle.ALL, listener);
+        waitForIdle();
+
+        final NotificationRecord r = createAndPostCallStyleNotification(PKG,
+                UserHandle.of(mUserId),
+                "testCallNotificationListener_differentPackage_notNotified");
+
+        verify(listener, never()).onCallNotificationPosted(anyString(), any());
+
+        mBinderService.cancelNotificationWithTag(PKG, PKG, r.getSbn().getTag(), r.getSbn().getId(),
+                r.getSbn().getUserId());
+        waitForIdle();
+
+        verify(listener, never()).onCallNotificationRemoved(anyString(), any());
+    }
+
+    private NotificationRecord createAndPostCallStyleNotification(String packageName,
+            UserHandle userHandle, String testName) throws Exception {
+        Person person = new Person.Builder().setName("caller").build();
+        Notification.Builder nb = new Notification.Builder(mContext,
+                mTestNotificationChannel.getId())
+                .setFlag(FLAG_USER_INITIATED_JOB, true)
+                .setStyle(Notification.CallStyle.forOngoingCall(
+                    person, mock(PendingIntent.class)))
+                .setSmallIcon(android.R.drawable.sym_def_app_icon);
+        StatusBarNotification sbn = new StatusBarNotification(packageName, packageName, 1,
+                testName, mUid, 0, nb.build(), userHandle, null, 0);
+        NotificationRecord r = new NotificationRecord(mContext, sbn, mTestNotificationChannel);
+
+        mService.addEnqueuedNotification(r);
+        mService.new PostNotificationRunnable(r.getKey(), r.getSbn().getPackageName(),
+                r.getUid(), mPostNotificationTrackerFactory.newTracker(null)).run();
+        waitForIdle();
+
+        return mService.findNotificationLocked(
+                packageName, r.getSbn().getTag(), r.getSbn().getId(), r.getSbn().getUserId());
     }
 
     private NotificationRecord createAndPostNotification(Notification.Builder nb, String testName)

@@ -24,8 +24,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.ui.viewmodel.BurnInParameters
+import com.android.systemui.keyguard.ui.viewmodel.ViewStateAccessor
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.scene.shared.flag.SceneContainerFlags
+import com.android.systemui.statusbar.notification.footer.shared.FooterViewRefactor
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
 import com.android.systemui.statusbar.notification.stack.NotificationStackSizeCalculator
 import com.android.systemui.statusbar.notification.stack.shared.flexiNotifsEnabled
@@ -65,13 +67,19 @@ object SharedNotificationContainerBinder {
 
                             controller.setOverExpansion(0f)
                             controller.setOverScrollAmount(0)
-                            controller.updateFooter()
+                            if (!FooterViewRefactor.isEnabled) {
+                                controller.updateFooter()
+                            }
                         }
                     }
                 }
             }
 
         val burnInParams = MutableStateFlow(BurnInParameters())
+        val viewState =
+            ViewStateAccessor(
+                alpha = { controller.getAlpha() },
+            )
 
         /*
          * For animation sensitive coroutines, immediately run just like applicationScope does
@@ -138,7 +146,7 @@ object SharedNotificationContainerBinder {
 
                     if (!sceneContainerFlags.isEnabled()) {
                         launch {
-                            viewModel.expansionAlpha.collect {
+                            viewModel.expansionAlpha(viewState).collect {
                                 controller.setMaxAlphaForExpansion(it)
                             }
                         }

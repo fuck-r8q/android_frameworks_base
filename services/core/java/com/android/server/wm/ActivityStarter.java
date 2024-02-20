@@ -1594,6 +1594,10 @@ class ActivityStarter {
             return null;
         }
 
+        if (android.security.Flags.contentUriPermissionApis() && started.isAttached()) {
+            started.computeInitialCallerInfo();
+        }
+
         // Apply setAlwaysOnTop when starting an activity is successful regardless of creating
         // a new Activity or reusing the existing activity.
         if (options != null && options.getTaskAlwaysOnTop()) {

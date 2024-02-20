@@ -323,6 +323,8 @@ applications that come with the platform
         <permission name="android.permission.SET_LOW_POWER_STANDBY_PORTS" />
         <permission name="android.permission.MANAGE_ROLLBACKS"/>
         <permission name="android.permission.MANAGE_USB"/>
+        <!-- Permission required to test Launcher Apps APIs for hidden profiles -->
+        <permission name="android.permission.ACCESS_HIDDEN_PROFILES_FULL" />
         <!-- Needed for tests only -->
         <permission name="android.permission.MANAGE_CLOUDSEARCH" />
         <permission name="android.permission.MANAGE_WALLPAPER_EFFECTS_GENERATION" />
@@ -582,6 +584,13 @@ applications that come with the platform
         <permission name="android.permission.READ_SYSTEM_GRAMMATICAL_GENDER"/>
         <!-- Permissions required for CTS test - CtsContactKeysProviderPrivilegedApp -->
         <permission name="android.permission.WRITE_VERIFICATION_STATE_E2EE_CONTACT_KEYS"/>
+        <!-- Permission required for CTS test BlockedNumberContractTest -->
+        <permission name="android.permission.WRITE_BLOCKED_NUMBERS" />
+        <permission name="android.permission.READ_BLOCKED_NUMBERS" />
+        <!-- Permission required for CTS test - PackageManagerTest -->
+        <permission name="android.permission.DOMAIN_VERIFICATION_AGENT"/>
+        <!-- Permission required for CTS test CtsInputTestCases -->
+        <permission name="android.permission.OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.statementservice">

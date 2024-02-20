@@ -4213,7 +4213,7 @@ final class InstallPackageHelper {
                                 + "; old: " + pkgSetting.getPathString() + " @ "
                                 + pkgSetting.getVersionCode()
                                 + "; new: " + parsedPackage.getPath() + " @ "
-                                + parsedPackage.getPath());
+                                + parsedPackage.getLongVersionCode());
             }
         }
 

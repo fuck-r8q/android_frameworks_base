@@ -47,6 +47,8 @@ import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.DISPLAY_IME_POLICY_HIDE;
 import static android.view.WindowManager.DISPLAY_IME_POLICY_LOCAL;
+import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_OTHER;
+import static android.view.inputmethod.ConnectionlessHandwritingCallback.CONNECTIONLESS_HANDWRITING_ERROR_UNSUPPORTED;
 
 import static com.android.server.inputmethod.ImeVisibilityStateComputer.ImeTargetWindowState;
 import static com.android.server.inputmethod.ImeVisibilityStateComputer.ImeVisibilityResult;
@@ -123,6 +125,7 @@ import android.view.WindowManager;
 import android.view.WindowManager.DisplayImePolicy;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManager.LayoutParams.SoftInputModeFlags;
+import android.view.inputmethod.CursorAnchorInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.Flags;
 import android.view.inputmethod.ImeTracker;
@@ -145,6 +148,7 @@ import com.android.internal.content.PackageMonitor;
 import com.android.internal.infra.AndroidFuture;
 import com.android.internal.inputmethod.DirectBootAwareness;
 import com.android.internal.inputmethod.IAccessibilityInputMethodSession;
+import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
 import com.android.internal.inputmethod.IImeTracker;
 import com.android.internal.inputmethod.IInlineSuggestionsRequestCallback;
 import com.android.internal.inputmethod.IInputContentUriToken;
@@ -204,6 +208,7 @@ import java.util.OptionalInt;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -286,8 +291,10 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
     final InputManagerInternal mInputManagerInternal;
     final ImePlatformCompatUtils mImePlatformCompatUtils;
     final InputMethodDeviceConfigs mInputMethodDeviceConfigs;
-    private final ArrayMap<String, List<InputMethodSubtype>> mAdditionalSubtypeMap =
-            new ArrayMap<>();
+
+    @GuardedBy("ImfLock.class")
+    @NonNull
+    private AdditionalSubtypeMap mAdditionalSubtypeMap = AdditionalSubtypeMap.EMPTY_MAP;
     private final UserManagerInternal mUserManagerInternal;
     private final InputMethodMenuController mMenuController;
     @NonNull private final InputMethodBindingController mBindingController;
@@ -1331,17 +1338,24 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
         @Override
         public void onPackageDataCleared(String packageName, int uid) {
-            boolean changed = false;
-            for (InputMethodInfo imi : mSettings.getMethodList()) {
-                if (imi.getPackageName().equals(packageName)) {
-                    mAdditionalSubtypeMap.remove(imi.getId());
-                    changed = true;
+            synchronized (ImfLock.class) {
+                // Note that one package may implement multiple IMEs.
+                final ArrayList<String> changedImes = new ArrayList<>();
+                for (InputMethodInfo imi : mSettings.getMethodList()) {
+                    if (imi.getPackageName().equals(packageName)) {
+                        changedImes.add(imi.getId());
+                    }
                 }
-            }
-            if (changed) {
-                AdditionalSubtypeUtils.save(
-                        mAdditionalSubtypeMap, mSettings.getMethodMap(), mSettings.getUserId());
-                mChangedPackages.add(packageName);
+                final AdditionalSubtypeMap newMap =
+                        mAdditionalSubtypeMap.cloneWithRemoveOrSelf(changedImes);
+                if (newMap != mAdditionalSubtypeMap) {
+                    mAdditionalSubtypeMap = newMap;
+                    AdditionalSubtypeUtils.save(
+                            mAdditionalSubtypeMap, mSettings.getMethodMap(), mSettings.getUserId());
+                }
+                if (!changedImes.isEmpty()) {
+                    mChangedPackages.add(packageName);
+                }
             }
         }
 
@@ -1411,7 +1425,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                             Slog.i(TAG,
                                     "Input method reinstalling, clearing additional subtypes: "
                                             + imi.getComponent());
-                            mAdditionalSubtypeMap.remove(imi.getId());
+                            mAdditionalSubtypeMap =
+                                    mAdditionalSubtypeMap.cloneWithRemoveOrSelf(imi.getId());
                             AdditionalSubtypeUtils.save(mAdditionalSubtypeMap,
                                     mSettings.getMethodMap(), mSettings.getUserId());
                         }
@@ -1646,7 +1661,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         // mSettings should be created before buildInputMethodListLocked
         mSettings = InputMethodSettings.createEmptyMap(userId);
 
-        AdditionalSubtypeUtils.load(mAdditionalSubtypeMap, userId);
+        mAdditionalSubtypeMap = AdditionalSubtypeUtils.load(userId);
         mSwitchingController =
                 InputMethodSubtypeSwitchingController.createInstanceLocked(context,
                         mSettings.getMethodMap(), userId);
@@ -1675,8 +1690,9 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         IntConsumer toolTypeConsumer =
                 Flags.useHandwritingListenerForTooltype()
                         ? toolType -> onUpdateEditorToolType(toolType) : null;
+        Runnable discardDelegationTextRunnable = () -> discardHandwritingDelegationText();
         mHwController = new HandwritingModeController(mContext, thread.getLooper(),
-                new InkWindowInitializer(), toolTypeConsumer);
+                new InkWindowInitializer(), toolTypeConsumer, discardDelegationTextRunnable);
         registerDeviceListenerAndCheckStylusSupport();
     }
 
@@ -1702,6 +1718,15 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
             IInputMethodInvoker curMethod = getCurMethodLocked();
             if (curMethod != null) {
                 curMethod.updateEditorToolType(toolType);
+            }
+        }
+    }
+
+    private void discardHandwritingDelegationText() {
+        synchronized (ImfLock.class) {
+            IInputMethodInvoker curMethod = getCurMethodLocked();
+            if (curMethod != null) {
+                curMethod.discardHandwritingDelegationText();
             }
         }
     }
@@ -1781,7 +1806,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
         mSettings = InputMethodSettings.createEmptyMap(newUserId);
         // Additional subtypes should be reset when the user is changed
-        AdditionalSubtypeUtils.load(mAdditionalSubtypeMap, newUserId);
+        mAdditionalSubtypeMap = AdditionalSubtypeUtils.load(newUserId);
         final String defaultImiId = mSettings.getSelectedInputMethod();
 
         if (DEBUG) {
@@ -1970,7 +1995,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
     }
 
     @Override
-    public boolean isStylusHandwritingAvailableAsUser(@UserIdInt int userId) {
+    public boolean isStylusHandwritingAvailableAsUser(
+            @UserIdInt int userId, boolean connectionless) {
         if (UserHandle.getCallingUserId() != userId) {
             mContext.enforceCallingOrSelfPermission(
                     Manifest.permission.INTERACT_ACROSS_USERS_FULL, null);
@@ -1983,14 +2009,17 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
             // Check if selected IME of current user supports handwriting.
             if (userId == mSettings.getUserId()) {
-                return mBindingController.supportsStylusHandwriting();
+                return mBindingController.supportsStylusHandwriting()
+                        && (!connectionless
+                                || mBindingController.supportsConnectionlessStylusHandwriting());
             }
             //TODO(b/197848765): This can be optimized by caching multi-user methodMaps/methodList.
             //TODO(b/210039666): use cache.
             final InputMethodSettings settings = queryMethodMapForUser(userId);
             final InputMethodInfo imi = settings.getMethodMap().get(
                     settings.getSelectedInputMethod());
-            return imi != null && imi.supportsStylusHandwriting();
+            return imi != null && imi.supportsStylusHandwriting()
+                    && (!connectionless || imi.supportsConnectionlessStylusHandwriting());
         }
     }
 
@@ -2014,9 +2043,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                 && directBootAwareness == DirectBootAwareness.AUTO) {
             settings = mSettings;
         } else {
-            final ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap =
-                    new ArrayMap<>();
-            AdditionalSubtypeUtils.load(additionalSubtypeMap, userId);
+            final AdditionalSubtypeMap additionalSubtypeMap = AdditionalSubtypeUtils.load(userId);
             settings = queryInputMethodServicesInternal(mContext, userId, additionalSubtypeMap,
                     directBootAwareness);
         }
@@ -3368,54 +3395,111 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         startStylusHandwriting(client, false /* usesDelegation */);
     }
 
-    private void startStylusHandwriting(IInputMethodClient client, boolean usesDelegation) {
+    @BinderThread
+    @Override
+    public void startConnectionlessStylusHandwriting(IInputMethodClient client, int userId,
+            @Nullable CursorAnchorInfo cursorAnchorInfo, @Nullable String delegatePackageName,
+            @Nullable String delegatorPackageName,
+            @NonNull IConnectionlessHandwritingCallback callback) throws RemoteException {
+        synchronized (ImfLock.class) {
+            if (!mBindingController.supportsConnectionlessStylusHandwriting()) {
+                Slog.w(TAG, "Connectionless stylus handwriting mode unsupported by IME.");
+                callback.onError(CONNECTIONLESS_HANDWRITING_ERROR_UNSUPPORTED);
+                return;
+            }
+        }
+
+        IConnectionlessHandwritingCallback immsCallback = callback;
+        boolean isForDelegation = delegatePackageName != null && delegatorPackageName != null;
+        if (isForDelegation) {
+            synchronized (ImfLock.class) {
+                if (!mClientController.verifyClientAndPackageMatch(client, delegatorPackageName)) {
+                    Slog.w(TAG, "startConnectionlessStylusHandwriting() fail");
+                    callback.onError(CONNECTIONLESS_HANDWRITING_ERROR_OTHER);
+                    throw new IllegalArgumentException("Delegator doesn't match UID");
+                }
+            }
+            immsCallback = new IConnectionlessHandwritingCallback.Stub() {
+                @Override
+                public void onResult(CharSequence text) throws RemoteException {
+                    synchronized (ImfLock.class) {
+                        mHwController.prepareStylusHandwritingDelegation(
+                                userId, delegatePackageName, delegatorPackageName,
+                                /* connectionless= */ true);
+                    }
+                    callback.onResult(text);
+                }
+
+                @Override
+                public void onError(int errorCode) throws RemoteException {
+                    callback.onError(errorCode);
+                }
+            };
+        }
+
+        if (!startStylusHandwriting(
+                client, false, immsCallback, cursorAnchorInfo, isForDelegation)) {
+            callback.onError(CONNECTIONLESS_HANDWRITING_ERROR_OTHER);
+        }
+    }
+
+    private void startStylusHandwriting(IInputMethodClient client, boolean acceptingDelegation) {
+        startStylusHandwriting(client, acceptingDelegation, null, null, false);
+    }
+
+    private boolean startStylusHandwriting(IInputMethodClient client, boolean acceptingDelegation,
+            IConnectionlessHandwritingCallback connectionlessCallback,
+            CursorAnchorInfo cursorAnchorInfo, boolean isConnectionlessForDelegation) {
         Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "IMMS.startStylusHandwriting");
         try {
             ImeTracing.getInstance().triggerManagerServiceDump(
                     "InputMethodManagerService#startStylusHandwriting");
             int uid = Binder.getCallingUid();
             synchronized (ImfLock.class) {
-                if (!usesDelegation) {
+                if (!acceptingDelegation) {
                     mHwController.clearPendingHandwritingDelegation();
                 }
                 if (!canInteractWithImeLocked(uid, client, "startStylusHandwriting",
                         null /* statsToken */)) {
-                    return;
+                    return false;
                 }
                 if (!hasSupportedStylusLocked()) {
                     Slog.w(TAG, "No supported Stylus hardware found on device. Ignoring"
                             + " startStylusHandwriting()");
-                    return;
+                    return false;
                 }
                 final long ident = Binder.clearCallingIdentity();
                 try {
                     if (!mBindingController.supportsStylusHandwriting()) {
                         Slog.w(TAG,
                                 "Stylus HW unsupported by IME. Ignoring startStylusHandwriting()");
-                        return;
+                        return false;
                     }
 
                     final OptionalInt requestId = mHwController.getCurrentRequestId();
                     if (!requestId.isPresent()) {
                         Slog.e(TAG, "Stylus handwriting was not initialized.");
-                        return;
+                        return false;
                     }
                     if (!mHwController.isStylusGestureOngoing()) {
                         Slog.e(TAG,
                                 "There is no ongoing stylus gesture to start stylus handwriting.");
-                        return;
+                        return false;
                     }
                     if (mHwController.hasOngoingStylusHandwritingSession()) {
                         // prevent duplicate calls to startStylusHandwriting().
                         Slog.e(TAG,
                                 "Stylus handwriting session is already ongoing."
                                         + " Ignoring startStylusHandwriting().");
-                        return;
+                        return false;
                     }
                     if (DEBUG) Slog.v(TAG, "Client requesting Stylus Handwriting to be started");
                     final IInputMethodInvoker curMethod = getCurMethodLocked();
                     if (curMethod != null) {
-                        curMethod.canStartStylusHandwriting(requestId.getAsInt());
+                        curMethod.canStartStylusHandwriting(requestId.getAsInt(),
+                                connectionlessCallback, cursorAnchorInfo,
+                                isConnectionlessForDelegation);
+                        return true;
                     }
                 } finally {
                     Binder.restoreCallingIdentity(ident);
@@ -3424,6 +3508,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         } finally {
             Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
         }
+        return false;
     }
 
     @Override
@@ -3463,8 +3548,18 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         if (!verifyDelegator(client, delegatePackageName, delegatorPackageName, flags)) {
             return false;
         }
-
-        startStylusHandwriting(client, true /* usesDelegation */);
+        synchronized (ImfLock.class) {
+            if (mHwController.isDelegationUsingConnectionlessFlow()) {
+                final IInputMethodInvoker curMethod = getCurMethodLocked();
+                if (curMethod == null) {
+                    return false;
+                }
+                curMethod.commitHandwritingDelegationTextIfAvailable();
+                mHwController.clearPendingHandwritingDelegation();
+            } else {
+                startStylusHandwriting(client, true /* acceptingDelegation */);
+            }
+        }
         return true;
     }
 
@@ -3529,7 +3624,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         // Create statsToken is none exists.
         if (statsToken == null) {
             statsToken = createStatsTokenForFocusedClient(true /* show */,
-                    ImeTracker.ORIGIN_SERVER_START_INPUT, reason);
+                    ImeTracker.ORIGIN_SERVER_START_INPUT, reason, false /* fromUser */);
         }
 
         if (!mVisibilityStateComputer.onImeShowFlags(statsToken, flags)) {
@@ -3552,8 +3647,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
             ImeTracker.forLogging().onProgress(statsToken, ImeTracker.PHASE_SERVER_HAS_IME);
             mCurStatsToken = null;
 
-            if (!Flags.useHandwritingListenerForTooltype()
-                    && lastClickToolType != MotionEvent.TOOL_TYPE_UNKNOWN) {
+            if (lastClickToolType != MotionEvent.TOOL_TYPE_UNKNOWN) {
                 curMethod.updateEditorToolType(lastClickToolType);
             }
             mVisibilityApplier.performShowIme(windowToken, statsToken,
@@ -3605,8 +3699,9 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
             @SoftInputShowHideReason int reason) {
         // Create statsToken is none exists.
         if (statsToken == null) {
+            final boolean fromUser = reason == SoftInputShowHideReason.HIDE_SOFT_INPUT_BY_BACK_KEY;
             statsToken = createStatsTokenForFocusedClient(false /* show */,
-                    ImeTracker.ORIGIN_SERVER_HIDE_INPUT, reason);
+                    ImeTracker.ORIGIN_SERVER_HIDE_INPUT, reason, fromUser);
         }
 
         if (!mVisibilityStateComputer.canHideIme(statsToken, flags)) {
@@ -4215,10 +4310,15 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
             }
 
             if (mSettings.getUserId() == userId) {
-                if (!mSettings.setAdditionalInputMethodSubtypes(imiId, toBeAdded,
-                        mAdditionalSubtypeMap, mPackageManagerInternal, callingUid)) {
+                final var newAdditionalSubtypeMap = mSettings.getNewAdditionalSubtypeMap(
+                        imiId, toBeAdded, mAdditionalSubtypeMap, mPackageManagerInternal,
+                        callingUid);
+                if (mAdditionalSubtypeMap == newAdditionalSubtypeMap) {
                     return;
                 }
+                AdditionalSubtypeUtils.save(newAdditionalSubtypeMap, mSettings.getMethodMap(),
+                        mSettings.getUserId());
+                mAdditionalSubtypeMap = newAdditionalSubtypeMap;
                 final long ident = Binder.clearCallingIdentity();
                 try {
                     buildInputMethodListLocked(false /* resetDefaultEnabledIme */);
@@ -4228,13 +4328,15 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                 return;
             }
 
-            final ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap =
-                    new ArrayMap<>();
-            AdditionalSubtypeUtils.load(additionalSubtypeMap, userId);
+            final AdditionalSubtypeMap additionalSubtypeMap = AdditionalSubtypeUtils.load(userId);
             final InputMethodSettings settings = queryInputMethodServicesInternal(mContext, userId,
                     additionalSubtypeMap, DirectBootAwareness.AUTO);
-            settings.setAdditionalInputMethodSubtypes(imiId, toBeAdded, additionalSubtypeMap,
-                    mPackageManagerInternal, callingUid);
+            final var newAdditionalSubtypeMap = settings.getNewAdditionalSubtypeMap(
+                    imiId, toBeAdded, additionalSubtypeMap, mPackageManagerInternal, callingUid);
+            if (additionalSubtypeMap != newAdditionalSubtypeMap) {
+                AdditionalSubtypeUtils.save(newAdditionalSubtypeMap, settings.getMethodMap(),
+                        settings.getUserId());
+            }
         }
     }
 
@@ -4971,7 +5073,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                     int userId = msg.arg1;
                     String delegate = (String) ((Pair) msg.obj).first;
                     String delegator = (String) ((Pair) msg.obj).second;
-                    mHwController.prepareStylusHandwritingDelegation(userId, delegate, delegator);
+                    mHwController.prepareStylusHandwritingDelegation(
+                            userId, delegate, delegator, /* connectionless= */ false);
                 }
                 return true;
             case MSG_START_HANDWRITING:
@@ -5069,7 +5172,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
     @NonNull
     static InputMethodSettings queryInputMethodServicesInternal(Context context,
-            @UserIdInt int userId, ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap,
+            @UserIdInt int userId, @NonNull AdditionalSubtypeMap additionalSubtypeMap,
             @DirectBootAwareness int directBootAwareness) {
         final Context userAwareContext = context.getUserId() == userId
                 ? context
@@ -5109,7 +5212,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
 
     @NonNull
     static InputMethodMap filterInputMethodServices(
-            ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap,
+            @NonNull AdditionalSubtypeMap additionalSubtypeMap,
             List<String> enabledInputMethodList, Context userAwareContext,
             List<ResolveInfo> services) {
         final ArrayMap<String, Integer> imiPackageCount = new ArrayMap<>();
@@ -5509,9 +5612,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         if (userId == mSettings.getUserId()) {
             settings = mSettings;
         } else {
-            final ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap =
-                    new ArrayMap<>();
-            AdditionalSubtypeUtils.load(additionalSubtypeMap, userId);
+            final AdditionalSubtypeMap additionalSubtypeMap = AdditionalSubtypeUtils.load(userId);
             settings = queryInputMethodServicesInternal(mContext, userId,
                     additionalSubtypeMap, DirectBootAwareness.AUTO);
         }
@@ -5519,9 +5620,7 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
     }
 
     private InputMethodSettings queryMethodMapForUser(@UserIdInt int userId) {
-        final ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap =
-                new ArrayMap<>();
-        AdditionalSubtypeUtils.load(additionalSubtypeMap, userId);
+        final AdditionalSubtypeMap additionalSubtypeMap = AdditionalSubtypeUtils.load(userId);
         return queryInputMethodServicesInternal(mContext, userId, additionalSubtypeMap,
                 DirectBootAwareness.AUTO);
     }
@@ -5977,7 +6076,23 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
         @BinderThread
         private void dumpAsProtoNoCheck(FileDescriptor fd) {
             final ProtoOutputStream proto = new ProtoOutputStream(fd);
+            // Dump in the format of an ImeTracing trace with a single entry.
+            final long magicNumber =
+                    ((long) InputMethodManagerServiceTraceFileProto.MAGIC_NUMBER_H << 32)
+                            | InputMethodManagerServiceTraceFileProto.MAGIC_NUMBER_L;
+            final long timeOffsetNs = TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis())
+                    - SystemClock.elapsedRealtimeNanos();
+            proto.write(InputMethodManagerServiceTraceFileProto.MAGIC_NUMBER,
+                    magicNumber);
+            proto.write(InputMethodManagerServiceTraceFileProto.REAL_TO_ELAPSED_TIME_OFFSET_NANOS,
+                    timeOffsetNs);
+            final long token = proto.start(InputMethodManagerServiceTraceFileProto.ENTRY);
+            proto.write(InputMethodManagerServiceTraceProto.ELAPSED_REALTIME_NANOS,
+                    SystemClock.elapsedRealtimeNanos());
+            proto.write(InputMethodManagerServiceTraceProto.WHERE,
+                    "InputMethodManagerService.mPriorityDumper#dumpAsProtoNoCheck");
             dumpDebug(proto, InputMethodManagerServiceTraceProto.INPUT_METHOD_MANAGER_SERVICE);
+            proto.end(token);
             proto.flush();
         }
     };
@@ -6569,9 +6684,8 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                         nextIme = mSettings.getSelectedInputMethod();
                         nextEnabledImes = mSettings.getEnabledInputMethodList();
                     } else {
-                        final ArrayMap<String, List<InputMethodSubtype>> additionalSubtypeMap =
-                                new ArrayMap<>();
-                        AdditionalSubtypeUtils.load(additionalSubtypeMap, userId);
+                        final AdditionalSubtypeMap additionalSubtypeMap =
+                                AdditionalSubtypeUtils.load(userId);
                         final InputMethodSettings settings = queryInputMethodServicesInternal(
                                 mContext, userId, additionalSubtypeMap, DirectBootAwareness.AUTO);
 
@@ -6675,10 +6789,11 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
      * @param show whether this is a show or a hide request.
      * @param origin the origin of the IME request.
      * @param reason the reason why the IME request was created.
+     * @param fromUser whether this request was created directly from user interaction.
      */
     @NonNull
     private ImeTracker.Token createStatsTokenForFocusedClient(boolean show,
-            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason) {
+            @ImeTracker.Origin int origin, @SoftInputShowHideReason int reason, boolean fromUser) {
         final int uid = mCurFocusedWindowClient != null
                 ? mCurFocusedWindowClient.mUid
                 : -1;
@@ -6687,9 +6802,11 @@ public final class InputMethodManagerService extends IInputMethodManager.Stub
                 : "uid(" + uid + ")";
 
         if (show) {
-            return ImeTracker.forLogging().onRequestShow(packageName, uid, origin, reason);
+            return ImeTracker.forLogging()
+                    .onRequestShow(packageName, uid, origin, reason, fromUser);
         } else {
-            return ImeTracker.forLogging().onRequestHide(packageName, uid, origin, reason);
+            return ImeTracker.forLogging()
+                    .onRequestHide(packageName, uid, origin, reason, fromUser);
         }
     }
 

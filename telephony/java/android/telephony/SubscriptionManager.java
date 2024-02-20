@@ -1156,6 +1156,28 @@ public class SubscriptionManager {
      */
     public static final String TRANSFER_STATUS = SimInfo.COLUMN_TRANSFER_STATUS;
 
+    /**
+     * TelephonyProvider column name for satellite entitlement status. The value of this column is
+     * set based on entitlement query result for satellite configuration.
+     * By default, it's disabled.
+     * <P>Type: INTEGER (int)</P>
+     *
+     * @hide
+     */
+    public static final String SATELLITE_ENTITLEMENT_STATUS =
+            SimInfo.COLUMN_SATELLITE_ENTITLEMENT_STATUS;
+
+    /**
+     * TelephonyProvider column name for satellite entitlement plmns. The value of this column is
+     * set based on entitlement query result for satellite configuration.
+     * By default, it's empty.
+     * <P>Type: TEXT </P>
+     *
+     * @hide
+     */
+    public static final String SATELLITE_ENTITLEMENT_PLMNS =
+            SimInfo.COLUMN_SATELLITE_ENTITLEMENT_PLMNS;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"USAGE_SETTING_"},
@@ -4333,7 +4355,7 @@ public class SubscriptionManager {
      *
      * <p>Note the assumption is that one subscription (which usually means one SIM) has
      * only one phone number. The multiple sources backup each other so hopefully at least one
-     * is availavle. For example, for a carrier that doesn't typically set phone numbers
+     * is available. For example, for a carrier that doesn't typically set phone numbers
      * on {@link #PHONE_NUMBER_SOURCE_UICC UICC}, the source {@link #PHONE_NUMBER_SOURCE_IMS IMS}
      * may provide one. Or, a carrier may decide to provide the phone number via source
      * {@link #PHONE_NUMBER_SOURCE_CARRIER carrier} if neither source UICC nor IMS is available.

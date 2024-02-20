@@ -538,6 +538,7 @@ public final class DisplayManagerService extends SystemService {
     private final DisplayManagerFlags mFlags;
 
     private final DisplayNotificationManager mDisplayNotificationManager;
+    private final ExternalDisplayStatsService mExternalDisplayStatsService;
 
     /**
      * Applications use {@link android.view.Display#getRefreshRate} and
@@ -579,7 +580,6 @@ public final class DisplayManagerService extends SystemService {
         mInjector = injector;
         mContext = context;
         mFlags = injector.getFlags();
-        mDisplayNotificationManager = new DisplayNotificationManager(mFlags, mContext);
         mHandler = new DisplayManagerHandler(DisplayThread.get().getLooper());
         mUiHandler = UiThread.getHandler();
         mDisplayDeviceRepo = new DisplayDeviceRepository(mSyncRoot, mPersistentDataStore);
@@ -609,6 +609,10 @@ public final class DisplayManagerService extends SystemService {
         mConfigParameterProvider = new DeviceConfigParameterProvider(DeviceConfigInterface.REAL);
         mExtraDisplayLoggingPackageName = DisplayProperties.debug_vri_package().orElse(null);
         mExtraDisplayEventLogging = !TextUtils.isEmpty(mExtraDisplayLoggingPackageName);
+
+        mExternalDisplayStatsService = new ExternalDisplayStatsService(mContext, mHandler);
+        mDisplayNotificationManager = new DisplayNotificationManager(mFlags, mContext,
+                mExternalDisplayStatsService);
         mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
     }
 
@@ -1928,6 +1932,7 @@ public final class DisplayManagerService extends SystemService {
             return;
         }
         releaseDisplayAndEmitEvent(display, DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED);
+        mExternalDisplayPolicy.handleLogicalDisplayDisconnectedLocked(display);
     }
 
     @RequiresPermission(Manifest.permission.READ_DEVICE_CONFIG)
@@ -1994,7 +1999,7 @@ public final class DisplayManagerService extends SystemService {
 
         setupLogicalDisplay(display);
 
-        if (ExternalDisplayPolicy.isExternalDisplay(display)) {
+        if (ExternalDisplayPolicy.isExternalDisplayLocked(display)) {
             mExternalDisplayPolicy.handleExternalDisplayConnectedLocked(display);
         } else {
             sendDisplayEventLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
@@ -2019,6 +2024,8 @@ public final class DisplayManagerService extends SystemService {
         sendDisplayEventIfEnabledLocked(display, DisplayManagerGlobal.EVENT_DISPLAY_ADDED);
 
         updateLogicalDisplayState(display);
+
+        mExternalDisplayPolicy.handleLogicalDisplayAddedLocked(display);
     }
 
     private void handleLogicalDisplayChangedLocked(@NonNull LogicalDisplay display) {
@@ -3308,7 +3315,7 @@ public final class DisplayManagerService extends SystemService {
             final var logicalDisplay = mLogicalDisplayMapper.getDisplayLocked(displayId);
             if (logicalDisplay == null) {
                 Slog.w(TAG, "enableConnectedDisplay: Can not find displayId=" + displayId);
-            } else if (ExternalDisplayPolicy.isExternalDisplay(logicalDisplay)) {
+            } else if (ExternalDisplayPolicy.isExternalDisplayLocked(logicalDisplay)) {
                 mExternalDisplayPolicy.setExternalDisplayEnabledLocked(logicalDisplay, enabled);
             } else {
                 mLogicalDisplayMapper.setDisplayEnabledLocked(logicalDisplay, enabled);
@@ -4994,6 +5001,11 @@ public final class DisplayManagerService extends SystemService {
                 return session;
             }
         }
+
+        @Override
+        public void onPresentation(int displayId, boolean isShown) {
+            mExternalDisplayPolicy.onPresentation(displayId, isShown);
+        }
     }
 
     class DesiredDisplayModeSpecsObserver
@@ -5150,6 +5162,15 @@ public final class DisplayManagerService extends SystemService {
         @NonNull
         public Handler getHandler() {
             return mHandler;
+        }
+
+        /**
+         * Gets service used for metrics collection.
+         */
+        @Override
+        @NonNull
+        public ExternalDisplayStatsService getExternalDisplayStatsService() {
+            return mExternalDisplayStatsService;
         }
     }
 }

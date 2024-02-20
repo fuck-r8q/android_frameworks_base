@@ -4097,15 +4097,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_SYSRQ:
                 if (down && repeatCount == 0) {
                     interceptScreenshotChord(SCREENSHOT_KEY_OTHER, 0 /*pressDelay*/);
+                    return true;
                 }
-                return true;
+                break;
             case KeyEvent.KEYCODE_ESCAPE:
                 if (down
                         && KeyEvent.metaStateHasNoModifiers(metaState)
                         && repeatCount == 0) {
                     mContext.closeSystemDialogs();
+                    return true;
                 }
-                return true;
+                break;
             case KeyEvent.KEYCODE_STEM_PRIMARY:
                 handleUnhandledSystemKey(event);
                 sendSystemKeyToStatusBarAsync(event);
@@ -5034,6 +5036,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         }
                         result &= ~ACTION_PASS_TO_USER;
                     }
+                }
+                break;
+            }
+            case KeyEvent.KEYCODE_STEM_PRIMARY: {
+                if (down && event.getRepeatCount() == 0 && (result & ACTION_PASS_TO_USER) == 0) {
+                    // We've decided not to pass key to user at queueing stage. Make the gesture
+                    // executable.
+                    setDeferredKeyActionsExecutableAsync(keyCode, event.getDownTime());
                 }
                 break;
             }

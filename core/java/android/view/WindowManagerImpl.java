@@ -39,6 +39,7 @@ import android.os.RemoteException;
 import android.os.StrictMode;
 import android.util.Log;
 import android.window.ITaskFpsCallback;
+import android.window.InputTransferToken;
 import android.window.TaskFpsCallback;
 import android.window.TrustedPresentationThresholds;
 import android.window.WindowContext;
@@ -521,27 +522,34 @@ public final class WindowManagerImpl implements WindowManager {
     public void registerTrustedPresentationListener(@NonNull IBinder window,
             @NonNull TrustedPresentationThresholds thresholds, @NonNull Executor executor,
             @NonNull Consumer<Boolean> listener) {
+        Objects.requireNonNull(window, "window must not be null");
+        Objects.requireNonNull(thresholds, "thresholds must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
         mGlobal.registerTrustedPresentationListener(window, thresholds, executor, listener);
     }
 
     @Override
     public void unregisterTrustedPresentationListener(@NonNull Consumer<Boolean> listener) {
+        Objects.requireNonNull(listener, "listener must not be null");
         mGlobal.unregisterTrustedPresentationListener(listener);
     }
 
     @Override
     public void registerBatchedSurfaceControlInputReceiver(int displayId,
-            @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
-            @NonNull Choreographer choreographer, @NonNull SurfaceControlInputReceiver receiver) {
-        mGlobal.registerBatchedSurfaceControlInputReceiver(displayId, hostToken,
+            @NonNull InputTransferToken hostInputTransferToken,
+            @NonNull SurfaceControl surfaceControl, @NonNull Choreographer choreographer,
+            @NonNull SurfaceControlInputReceiver receiver) {
+        mGlobal.registerBatchedSurfaceControlInputReceiver(displayId, hostInputTransferToken,
                 surfaceControl, choreographer, receiver);
     }
 
     @Override
-    public void registerUnbatchedSurfaceControlInputReceiver(
-            int displayId, @NonNull IBinder hostToken, @NonNull SurfaceControl surfaceControl,
-            @NonNull Looper looper, @NonNull SurfaceControlInputReceiver receiver) {
-        mGlobal.registerUnbatchedSurfaceControlInputReceiver(displayId, hostToken,
+    public void registerUnbatchedSurfaceControlInputReceiver(int displayId,
+            @NonNull InputTransferToken hostInputTransferToken,
+            @NonNull SurfaceControl surfaceControl, @NonNull Looper looper,
+            @NonNull SurfaceControlInputReceiver receiver) {
+        mGlobal.registerUnbatchedSurfaceControlInputReceiver(displayId, hostInputTransferToken,
                 surfaceControl, looper, receiver);
     }
 

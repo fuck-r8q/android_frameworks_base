@@ -74,6 +74,8 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
     private val dozeParameters = kosmos.dozeParameters
     private val underTest by lazy { kosmos.keyguardRootViewModel }
 
+    private val viewState = ViewStateAccessor()
+
     @Before
     fun setUp() {
         mSetFlagsRule.enableFlags(AConfigFlags.FLAG_KEYGUARD_BOTTOM_AREA_REFACTOR)
@@ -251,7 +253,10 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
     @Test
     fun alpha_idleOnHub_isZero() =
         testScope.runTest {
-            val alpha by collectLastValue(underTest.alpha)
+            val alpha by collectLastValue(underTest.alpha(viewState))
+
+            // Default value check
+            assertThat(alpha).isEqualTo(1f)
 
             // Hub transition state is idle with hub open.
             communalRepository.setTransitionState(
@@ -259,8 +264,12 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
             )
             runCurrent()
 
-            // Set keyguard alpha to 1.0f.
-            keyguardInteractor.setAlpha(1.0f)
+            // Run at least 1 transition to make sure value remains at 0
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.AOD,
+                to = KeyguardState.LOCKSCREEN,
+                testScope,
+            )
 
             // Alpha property remains 0 regardless.
             assertThat(alpha).isEqualTo(0f)
@@ -269,7 +278,7 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
     @Test
     fun alpha_transitionToHub_isZero() =
         testScope.runTest {
-            val alpha by collectLastValue(underTest.alpha)
+            val alpha by collectLastValue(underTest.alpha(viewState))
 
             keyguardTransitionRepository.sendTransitionSteps(
                 from = KeyguardState.LOCKSCREEN,
@@ -283,7 +292,7 @@ class KeyguardRootViewModelTest : SysuiTestCase() {
     @Test
     fun alpha_transitionFromHubToLockscreen_isOne() =
         testScope.runTest {
-            val alpha by collectLastValue(underTest.alpha)
+            val alpha by collectLastValue(underTest.alpha(viewState))
 
             // Transition to the glanceable hub and back.
             keyguardTransitionRepository.sendTransitionSteps(
