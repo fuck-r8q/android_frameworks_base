@@ -1278,7 +1278,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         public void onCallStateChanged(int callState) {
             Log.d(TAG, "onCallStateChanged: " + callState);
             mNonDdsCallState = callState;
-            mCallback.onNonDdsCallStateChanged(callState);
+            if (mCallback != null) {
+                mCallback.onNonDdsCallStateChanged(callState);
+            }
         }
     }
 
@@ -1292,17 +1294,21 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         public void onCallStateChanged(int callState) {
             Log.d(TAG, "onCallStateChanged: " + callState);
             mNonDdsCallState = callState;
-            mCallback.onNonDdsCallStateChanged(callState);
+            if (mCallback != null) {
+                mCallback.onNonDdsCallStateChanged(callState);
+            }
         }
     }
 
     @Override
     public void onWifiScan(boolean isScan) {
-        if (!isWifiEnabled() || isDeviceLocked()) {
-            mCallback.onWifiScan(false);
-            return;
+        if (mCallback != null) {
+            if (!isWifiEnabled() || isDeviceLocked()) {
+                mCallback.onWifiScan(false);
+                return;
+            }
+            mCallback.onWifiScan(isScan);
         }
-        mCallback.onWifiScan(isScan);
     }
 
     private class InternetTelephonyCallback extends TelephonyCallback implements
@@ -1366,7 +1372,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         @Override
         public void onActiveDataSubscriptionIdChanged(int subId) {
             mActiveDataSubId = subId;
-            mCallback.onTempDdsSwitchHappened();
+            if (mCallback != null) {
+                mCallback.onTempDdsSwitchHappened();
+            }
         }
     }
 
@@ -1525,7 +1533,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
             InternetTelephonyCallback newCallback = new InternetTelephonyCallback(defaultDataSubId);
             mSubIdTelephonyCallbackMap.put(defaultDataSubId, newCallback);
             mTelephonyManager.registerTelephonyCallback(mHandler::post, newCallback);
-            mCallback.onSubscriptionsChanged(defaultDataSubId);
+            if (mCallback != null) {
+                mCallback.onSubscriptionsChanged(defaultDataSubId);
+            }
         }
         mDefaultDataSubId = defaultDataSubId;
     }
@@ -1561,7 +1571,9 @@ public class InternetDialogController implements AccessPointController.AccessPoi
         updateNddsSubId(mDefaultDataSubId);
         final boolean isDualDataEnabled = isDualDataEnabled();
         Log.d(TAG, "Ndds sub ID: " + mNddsSubId + " isDualDataEnabled: " + isDualDataEnabled);
-        mCallback.onDualDataEnabledStateChanged();
+        if (mCallback != null) {
+            mCallback.onDualDataEnabledStateChanged();
+        }
     }
 
     private void updateNddsSubId(int defaultDataSubId) {
